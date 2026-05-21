@@ -14,13 +14,11 @@ const actionStateRetentionService = require('../services/actionStateRetentionSer
 const jsonToMongoMigrationService = require('../services/migration/jsonToMongoMigrationService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
-const pathResolver = require('../utils/pathResolver');
-const uploadPathUtils = require('../utils/uploadPathUtils');
-const { isRailwayProxyMode } = require('../utils/uploadModeUtils');
-const { gatewayListDirectory, gatewayUploadFile } = require('../services/fileGatewayClientService');
+const coreFilesService = require('../services/coreFilesService');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
 
 const PUBLIC_PAGE_MEDIA_FOLDER = 'misc/public-pages';
+const MONGO_RESTORE_MAX_UPLOAD_MB = Number.parseInt(process.env.MONGO_BACKUP_RESTORE_MAX_MB || '100', 10) || 100;
 
 function normalizeScopeToken(value = '') {
   const token = cleanFormText(value, 120).toUpperCase();
@@ -279,11 +277,11 @@ function encodePublicPageUploadUrl(uploadPath = '') {
 }
 
 function toPublicPageUploadReference(filePath = '', fileUrl = '') {
-  const fromUrl = uploadPathUtils.extractRelativeUploadPath(fileUrl);
+  const fromUrl = coreFilesService.extractRelativeUploadPath(fileUrl);
   if (fromUrl) return `/uploads/${fromUrl}`;
-  const fromPathUrl = uploadPathUtils.extractRelativeUploadPath(filePath);
+  const fromPathUrl = coreFilesService.extractRelativeUploadPath(filePath);
   if (fromPathUrl) return `/uploads/${fromPathUrl}`;
-  return uploadPathUtils.fromDiskPathToUploadsUrl(filePath) || String(fileUrl || filePath || '').replace(/\\/g, '/').trim();
+  return coreFilesService.fromDiskPathToUploadsUrl(filePath) || String(fileUrl || filePath || '').replace(/\\/g, '/').trim();
 }
 
 function buildPublicPageUploadPath(scopeFolder = 'GLOBAL', folder = '', fileName = '') {
@@ -311,105 +309,53 @@ function buildPublicPageGatewayMediaRow(entry = {}, currentFolder = '', scopeFol
   };
 }
 
-function buildPublicPageMediaLibraryRow(filePath = '', stat = null) {
-  const normalizedPath = String(filePath || '').replace(/\\/g, '/').trim();
-  const fileName = path.basename(normalizedPath);
-  const canonicalUrl = toPublicPageUploadReference(normalizedPath, normalizedPath);
-  const digest = crypto.createHash('md5').update(canonicalUrl || normalizedPath).digest('hex');
-  return {
-    id: `LIB_${digest}`,
-    name: fileName,
-    originalName: fileName,
-    filename: fileName,
-    path: canonicalUrl || normalizedPath,
-    url: encodePublicPageUploadUrl(canonicalUrl) || canonicalUrl,
-    mimeType: '',
-    size: Number(stat?.size || 0) || 0,
-    uploadDate: stat?.mtime ? new Date(stat.mtime).toISOString() : '',
-    source: 'public_page_library'
-  };
-}
-
-async function resolveAvailablePublicPageMediaPath(directory = '', desiredName = '') {
-  const cleanName = path.basename(cleanFormText(desiredName, 260) || `file_${Date.now()}`);
-  const ext = path.extname(cleanName);
-  const base = path.basename(cleanName, ext) || 'file';
-  let candidate = pathResolver.resolveSafePath(directory, cleanName);
-  let index = 1;
-
-  // eslint-disable-next-line no-await-in-loop
-  while (await fs.stat(candidate).then(() => true).catch(() => false)) {
-    candidate = pathResolver.resolveSafePath(directory, `${base}_${index}${ext}`);
-    index += 1;
-  }
-  return candidate;
-}
-
 async function buildPublicPageUploadedMediaRows(reqFiles = [], targetFolder = '', options = {}) {
   const rows = Array.isArray(reqFiles) ? reqFiles : [];
   const folder = normalizePublicPageRelativeFolder(targetFolder) || getPublicPageMediaDefaultFolder();
   const scope = resolvePublicPageMediaScope(options?.user);
-  const output = [];
+  const baseDir = coreFilesService.getRootPath(scope.scopeKey);
+  const targetPath = folder
+    ? coreFilesService.resolveSafePath(baseDir, folder)
+    : baseDir;
+  coreFilesService.ensureDir(targetPath);
+  const context = {
+    scopeKey: scope.scopeKey,
+    relativeSub: folder,
+    currentPath: [scope.scopeFolder, folder].filter(Boolean).join('/'),
+    baseDir,
+    targetPath
+  };
+  const relativePaths = rows.map((file, index) =>
+    cleanFormText(file?.originalname, 260)
+      || cleanFormText(file?.filename, 260)
+      || `public-page-file-${Date.now()}-${index + 1}`
+  );
+  const uploadResult = await coreFilesService.uploadFilesToContext({
+    context,
+    files: rows,
+    relativePaths
+  });
+  const uploadedRows = Array.isArray(uploadResult?.files) ? uploadResult.files : [];
 
-  for (const file of rows) {
-    const originalName = cleanFormText(file.originalname, 260) || cleanFormText(file.filename, 260);
-    const stagedPath = String(file?.localPath || file?.path || '').trim();
-    let finalName = originalName || cleanFormText(file.filename, 260);
-    let reference = '';
-
-    if (isRailwayProxyMode()) {
-      const gatewayResult = await gatewayUploadFile({
-        scopeKey: scope.scopeKey,
-        relativeDir: folder,
-        desiredName: originalName || finalName,
-        localFilePath: stagedPath,
-        mimeType: file.mimetype || 'application/octet-stream'
-      });
-      finalName = cleanFormText(gatewayResult?.fileName, 260) || finalName;
-      reference = toPublicPageUploadReference(gatewayResult?.url, gatewayResult?.url)
-        || buildPublicPageUploadPath(scope.scopeFolder, folder, finalName);
-      if (stagedPath) await fs.unlink(stagedPath).catch(() => {});
-    } else {
-      const root = pathResolver.getRootPath(scope.scopeKey);
-      const finalDir = pathResolver.resolveSafePath(root, folder);
-      pathResolver.ensureDir(finalDir);
-      const finalPath = await resolveAvailablePublicPageMediaPath(finalDir, finalName || originalName);
-      finalName = path.basename(finalPath);
-      if (stagedPath && path.resolve(stagedPath) !== path.resolve(finalPath)) {
-        await fs.rename(stagedPath, finalPath);
-      }
-      reference = toPublicPageUploadReference(finalPath, finalPath);
-    }
-
-    output.push({
+  return uploadedRows.map((uploaded, index) => {
+    const uploadedName = cleanFormText(uploaded?.name, 260)
+      || cleanFormText(rows[index]?.originalname, 260)
+      || cleanFormText(rows[index]?.filename, 260);
+    const reference = toPublicPageUploadReference(uploaded?.url, uploaded?.url)
+      || buildPublicPageUploadPath(scope.scopeFolder, folder, uploadedName);
+    return {
       id: crypto.randomBytes(8).toString('hex'),
-      name: originalName || finalName,
-      originalName,
-      filename: finalName,
+      name: uploadedName,
+      originalName: uploadedName,
+      filename: uploadedName,
       path: reference,
       url: encodePublicPageUploadUrl(reference) || reference,
-      mimeType: cleanFormText(file.mimetype, 120),
-      size: Number(file.size || 0) || 0,
+      mimeType: cleanFormText(rows[index]?.mimetype, 120),
+      size: Number(uploaded?.size || rows[index]?.size || 0) || 0,
       uploadDate: new Date().toISOString(),
       source: 'public_page_upload'
-    });
-  }
-
-  return output;
-}
-
-function toPublicPageRelativeFolder(baseRoot = '', absolutePath = '') {
-  const root = String(baseRoot || '').trim();
-  const target = String(absolutePath || '').trim();
-  if (!root || !target) return '';
-  const relative = path.relative(root, target);
-  if (!relative || relative === '.') return '';
-  return normalizePublicPageRelativeFolder(relative.split(path.sep).join('/'));
-}
-
-async function publicPageDirectoryExists(dirPath = '') {
-  const stat = await fs.stat(String(dirPath || '')).catch(() => null);
-  return Boolean(stat && stat.isDirectory && stat.isDirectory());
+    };
+  });
 }
 
 function buildContactRows(body, titleKey, valueKey, outputKey, fallbackTitle) {
@@ -660,83 +606,35 @@ exports.listPublicPageMediaLibrary = async (req, res) => {
       ? [requestedFolder, defaultFolder, '']
       : [defaultFolder, ''];
 
-    if (isRailwayProxyMode()) {
-      const currentFolder = hasRequestedFolder ? requestedFolder : defaultFolder;
-      const gatewayResult = await gatewayListDirectory({
-        scopeKey: scope.scopeKey,
-        relativeDir: currentFolder
-      });
-      const entries = Array.isArray(gatewayResult?.files) ? gatewayResult.files : [];
-      const folders = [];
-      const fileRows = [];
-
-      entries.forEach((entry) => {
-        if (!entry) return;
-        const name = cleanFormText(entry.name, 260);
-        if (!name) return;
-        if (entry.isDir) {
-          folders.push({
-            name,
-            path: normalizePublicPageRelativeFolder([currentFolder, name].filter(Boolean).join('/'))
-          });
-          return;
-        }
-        fileRows.push(buildPublicPageGatewayMediaRow(entry, currentFolder, scope.scopeFolder));
-      });
-
-      folders.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-      fileRows.sort((a, b) => String(b.uploadDate || '').localeCompare(String(a.uploadDate || '')));
-
-      return res.json({
-        status: 'success',
-        message: fileRows.length ? `Loaded ${fileRows.length} file(s).` : 'No saved public page files found in this folder.',
-        results: fileRows,
-        scopeFolder: scope.scopeFolder,
-        folders,
-        currentFolder,
-        parentFolder: getPublicPageParentFolder(currentFolder),
-        defaultFolder,
-        defaults: { pageSize: defaultPageSize }
-      });
-    }
-
-    const root = pathResolver.getRootPath(scope.scopeKey);
     let currentFolder = '';
+    let entries = [];
     for (const folderToken of candidateFolders) {
-      const maybePath = folderToken
-        ? pathResolver.resolveSafePath(root, folderToken)
-        : root;
       // eslint-disable-next-line no-await-in-loop
-      const exists = await publicPageDirectoryExists(maybePath);
-      if (exists) {
+      const listed = await coreFilesService.listDirectoryByScope({
+        scopeKey: scope.scopeKey,
+        relativeDir: normalizePublicPageRelativeFolder(folderToken)
+      }).catch(() => null);
+      if (Array.isArray(listed)) {
         currentFolder = normalizePublicPageRelativeFolder(folderToken);
+        entries = listed;
         break;
       }
     }
-
-    const currentPath = currentFolder
-      ? pathResolver.resolveSafePath(root, currentFolder)
-      : root;
-    const entries = await fs.readdir(currentPath, { withFileTypes: true }).catch(() => []);
     const folders = [];
     const fileRows = [];
 
     for (const entry of entries) {
       if (!entry) continue;
-      const absolutePath = pathResolver.resolveSafePath(currentPath, entry.name);
-      if (entry.isDirectory && entry.isDirectory()) {
-        const relativePath = toPublicPageRelativeFolder(root, absolutePath);
+      const name = cleanFormText(entry.name, 260);
+      if (!name) continue;
+      if (entry.isDir) {
         folders.push({
-          name: cleanFormText(entry.name, 260) || relativePath || '/',
-          path: normalizePublicPageRelativeFolder(relativePath)
+          name,
+          path: normalizePublicPageRelativeFolder([currentFolder, name].filter(Boolean).join('/'))
         });
         continue;
       }
-      if (!entry.isFile || !entry.isFile()) continue;
-      // eslint-disable-next-line no-await-in-loop
-      const stat = await fs.stat(absolutePath).catch(() => null);
-      if (!stat || !stat.isFile || !stat.isFile()) continue;
-      fileRows.push(buildPublicPageMediaLibraryRow(absolutePath, stat));
+      fileRows.push(buildPublicPageGatewayMediaRow(entry, currentFolder, scope.scopeFolder));
     }
 
     folders.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -806,14 +704,30 @@ exports.updatePublicPageContentSettings = async (req, res) => {
   }
 };
 
-exports.showUploadFolderSettings = async (req, res) => {
+function resolveDefaultFilePathsSelectedPackage(req = {}) {
+  const fromQuery = uploadFolderSettingsService.normalizePackageName(req?.query?.package, '');
+  if (fromQuery) return fromQuery;
+  return uploadFolderSettingsService.normalizePackageName(req?.body?.packageFilter, '');
+}
+
+function buildDefaultFilePathsRedirectUrl(packageFilter = '') {
+  const selectedPackage = uploadFolderSettingsService.normalizePackageName(packageFilter, '');
+  return selectedPackage
+    ? `/systemSettings/default-file-paths?package=${encodeURIComponent(selectedPackage)}`
+    : '/systemSettings/default-file-paths';
+}
+
+exports.showDefaultFilePathSettings = async (req, res) => {
   try {
     const settings = await systemSettingsRepository.getSettings();
-    res.render('systemSettings/uploadFolderSettings', {
-      title: 'Upload Folder Settings',
+    const selectedPackage = resolveDefaultFilePathsSelectedPackage(req);
+    res.render('systemSettings/defaultFilePathSettings', {
+      title: 'Default File Paths',
       settings,
-      definitions: uploadFolderSettingsService.getUploadFolderDefinitions(),
+      definitions: uploadFolderSettingsService.getUploadFolderDefinitions({ packageName: selectedPackage }),
       groups: uploadFolderSettingsService.GROUPS,
+      packageOptions: uploadFolderSettingsService.getUploadFolderPackageOptions(),
+      selectedPackage,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -823,27 +737,43 @@ exports.showUploadFolderSettings = async (req, res) => {
   }
 };
 
-exports.updateUploadFolderSettings = async (req, res) => {
+exports.updateDefaultFilePathSettings = async (req, res) => {
   try {
-    const sanitized = uploadFolderSettingsService.sanitizeUploadFolderSettings(req.body?.uploadFolders || {}, {
+    const selectedPackage = resolveDefaultFilePathsSelectedPackage(req);
+    const sanitizedPatch = uploadFolderSettingsService.sanitizeUploadFolderSettingsPatch(req.body?.uploadFolders || {}, {
       required: false
     });
+    const settings = await systemSettingsRepository.getSettings();
+    const nextUploadFolders = uploadFolderSettingsService.mergeUploadFolderSettings(
+      settings?.app?.uploadFolders || {},
+      sanitizedPatch
+    );
 
     await systemSettingsRepository.updateSettings({
       app: {
-        uploadFolders: sanitized
+        uploadFolders: nextUploadFolders
       }
     }, req.user);
     await settingService.refresh();
 
     if (req.headers['x-ajax-request']) {
-      return res.json({ status: 'success', message: 'Upload folder settings saved.' });
+      return res.json({ status: 'success', message: 'Default file paths saved.' });
     }
-    return res.redirect('/systemSettings/upload-folders');
+    return res.redirect(buildDefaultFilePathsRedirectUrl(selectedPackage));
   } catch (error) {
     if (req.headers['x-ajax-request']) return res.status(400).json({ status: 'error', message: error.message });
-    return res.status(400).render('error', { title: 'Upload Folder Settings Error', message: error.message, user: req.user });
+    return res.status(400).render('error', { title: 'Default File Paths Error', message: error.message, user: req.user });
   }
+};
+
+exports.redirectUploadFolderSettingsGet = async (req, res) => {
+  const query = new URLSearchParams(req.query || {}).toString();
+  const target = `/systemSettings/default-file-paths${query ? `?${query}` : ''}`;
+  return res.redirect(target);
+};
+
+exports.redirectUploadFolderSettingsPost = async (req, res) => {
+  return res.redirect(307, '/systemSettings/default-file-paths');
 };
 
 /* =========================================================
@@ -860,6 +790,7 @@ exports.showDataBackendSettings = async (req, res) => {
       settings,
       runtimeBackend,
       productionLocked,
+      mongoRestoreMaxUploadMb: MONGO_RESTORE_MAX_UPLOAD_MB,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -922,6 +853,7 @@ exports.retryDataBackendConnection = async (req, res) => {
       settings: await systemSettingsRepository.getSettings(),
       runtimeBackend,
       productionLocked: Boolean(runtimeBackend?.production?.active),
+      mongoRestoreMaxUploadMb: MONGO_RESTORE_MAX_UPLOAD_MB,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId,

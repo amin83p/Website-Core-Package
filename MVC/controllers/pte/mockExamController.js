@@ -1,5 +1,5 @@
 const path = require('path');
-const pathResolver = require('../../utils/pathResolver');
+const coreFilesService = require('../../services/coreFilesService');
 const uploadMiddleware = require('../../middleware/upload');
 const pteAttemptLedgerService = require('../../services/pte/pteAttemptLedgerService');
 const pteMockExamDataService = require('../../services/pte/pteMockExamDataService');
@@ -47,7 +47,7 @@ function buildAttachmentUrlFromPath(filePath) {
   if (/^https?:\/\/[^/]+\/uploads\//i.test(normalized)) return normalized;
   if (/^\/uploads\//i.test(normalized)) return normalized;
   const dirPath = path.dirname(normalized);
-  const dirUrl = pathResolver.getWebUrlForUpload(dirPath);
+  const dirUrl = coreFilesService.getWebUrlForUpload(dirPath);
   const filename = path.basename(normalized);
   if (!dirUrl || !filename) return '';
   return `${dirUrl}/${filename}`;

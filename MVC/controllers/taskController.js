@@ -5,7 +5,7 @@ const { buildDataServiceQuery } = require('../utils/generalTools');
 
 const {isAdmin} = require('../services/adminChekersService');
 const path = require('path');
-const uploadPathUtils = require('../utils/uploadPathUtils');
+const coreFilesService = require('../services/coreFilesService');
 const TASK_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'status', 'priority', 'projectName', 'phaseName'],
   allowedSearchFields: ['id', 'title', 'description', 'status', 'priority', 'projectName', 'phaseName', 'assignments.name', 'assignments.userId'],
@@ -33,7 +33,7 @@ function getTaskPermissions(user, task) {
 }
 
 function getWebUrl(physicalPath) {
-    return uploadPathUtils.fromDiskPathToUploadsUrl(physicalPath);
+    return coreFilesService.fromDiskPathToUploadsUrl(physicalPath);
 }
 
 function parseJsonSafe(jsonString) {

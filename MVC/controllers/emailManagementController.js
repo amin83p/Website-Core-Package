@@ -2,10 +2,10 @@ const emailManagementService = require('../services/emailManagementService');
 const emailLedgerService = require('../services/emailLedgerService');
 const paginate = require('../utils/paginationHelper');
 const { assertCreateOrgContextOrThrow, canCreateOrgScopedItem } = require('../utils/orgContextUtils');
-const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
-const pathResolver = require('../utils/pathResolver');
+const coreFilesService = require('../services/coreFilesService');
+const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const settingService = require('../services/settingService');
 
 function isAjax(req) {
@@ -102,50 +102,56 @@ function normalizeRelativeFolderToken(value, max = 800) {
   return compact.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
-function toRelativeFolder(baseRoot = '', absolutePath = '') {
-  const root = String(baseRoot || '').trim();
-  const target = String(absolutePath || '').trim();
-  if (!root || !target) return '';
-  const relative = path.relative(root, target);
-  if (!relative || relative === '.') return '';
-  return relative.split(path.sep).join('/').replace(/^\/+/, '').replace(/\/+$/, '');
-}
-
-async function directoryExists(dirPath = '') {
-  const stat = await fs.stat(String(dirPath || '')).catch(() => null);
-  return Boolean(stat && stat.isDirectory && stat.isDirectory());
-}
-
 function isImageFilename(fileName = '') {
   const ext = String(path.extname(String(fileName || '')).toLowerCase() || '').trim();
   return ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico'].includes(ext);
 }
 
-function buildMediaLibraryRow(filePath = '', stat = null) {
-  const normalizedPath = String(filePath || '').replace(/\\/g, '/').trim();
-  const fileName = path.basename(normalizedPath);
-  const dirPath = path.dirname(normalizedPath);
-  const baseUrl = pathResolver.getWebUrlForUpload(dirPath);
-  const fileUrl = baseUrl ? `${baseUrl}/${encodeURIComponent(fileName)}` : '';
-  const digest = crypto.createHash('md5').update(normalizedPath).digest('hex');
+function normalizeScopeKeyToken(value = '') {
+  const token = String(value || '').trim().toUpperCase();
+  if (!token || token === 'SYSTEM' || token === 'GLOBAL') return '';
+  return token.replace(/^ORG_/, '');
+}
+
+function buildScopeUploadPrefix(scopeKey = '') {
+  const token = String(scopeKey || '').trim().toUpperCase();
+  return token ? `/uploads/ORG_${token}` : '/uploads/GLOBAL';
+}
+
+function encodeUploadUrl(uploadPath = '') {
+  const normalized = String(uploadPath || '').replace(/\\/g, '/').replace(/\/+/g, '/').trim();
+  if (!normalized) return '';
+  return normalized
+    .split('/')
+    .map((part, index) => (index === 0 ? part : encodeURIComponent(part)))
+    .join('/');
+}
+
+function buildMediaLibraryRow(entry = {}, scopeKey = '', currentFolder = '') {
+  const fileName = cleanString(entry.name, { max: 260, allowEmpty: true });
+  const folder = normalizeRelativeFolderToken(currentFolder);
+  const uploadPath = `${buildScopeUploadPrefix(scopeKey)}/${[folder, fileName].filter(Boolean).join('/')}`.replace(/\/+/g, '/');
+  const digest = crypto.createHash('md5').update(uploadPath).digest('hex');
   return {
     id: `LIB_${digest}`,
     name: fileName,
     originalName: fileName,
     filename: fileName,
-    path: normalizedPath,
-    url: fileUrl,
+    path: uploadPath,
+    url: encodeUploadUrl(uploadPath),
     mimeType: '',
-    size: Number(stat?.size || 0) || 0,
-    uploadDate: stat?.mtime ? new Date(stat.mtime).toISOString() : '',
+    size: Number(entry.size || 0) || 0,
+    uploadDate: entry.modified ? new Date(entry.modified).toISOString() : '',
     source: 'saved_library'
   };
 }
 
 function activeOrgScopeId(user = null) {
-  const token = String(user?.activeOrgId || '').trim();
-  if (!token || token.toUpperCase() === 'SYSTEM') return '';
-  return token;
+  return normalizeScopeKeyToken(user?.activeOrgId);
+}
+
+function getEmailTemplateMediaDefaultFolder() {
+  return uploadFolderSettingsService.resolveUploadFolder('core.emailTemplates');
 }
 
 async function showTemplateList(req, res) {
@@ -227,6 +233,7 @@ async function showAddTemplateForm(req, res) {
     return res.render('emailManagement/templateForm', {
       title: 'Create Email Template',
       template: null,
+      mediaDefaultFolder: getEmailTemplateMediaDefaultFolder(),
       eventCatalog,
       placeholderRegistry: registryRows,
       placeholderRegistryMap: buildPlaceholderMap(registryRows),
@@ -355,9 +362,9 @@ async function pickerEmailEvents(req, res) {
 async function listTemplateMediaLibrary(req, res) {
   try {
     const defaultPageSize = resolveDefaultPageSize();
-    const orgId = activeOrgScopeId(req.user);
-    const defaultFolder = 'email-templates';
-    if (!orgId) {
+    const scopeKey = activeOrgScopeId(req.user);
+    const defaultFolder = normalizeRelativeFolderToken(getEmailTemplateMediaDefaultFolder()) || 'email-templates';
+    if (!scopeKey) {
       return res.json({
         status: 'success',
         message: 'Saved media library is available for organization scope only.',
@@ -370,49 +377,41 @@ async function listTemplateMediaLibrary(req, res) {
       });
     }
 
-    const root = pathResolver.getRootPath(orgId);
     const requestedFolder = normalizeRelativeFolderToken(req.query?.folder);
     const candidateFolders = requestedFolder
       ? [requestedFolder, defaultFolder, '']
       : [defaultFolder, ''];
 
     let currentFolder = '';
+    let entries = [];
     for (const folderToken of candidateFolders) {
-      const maybePath = folderToken
-        ? pathResolver.resolveSafePath(root, folderToken)
-        : root;
       // eslint-disable-next-line no-await-in-loop
-      const exists = await directoryExists(maybePath);
-      if (exists) {
+      const listed = await coreFilesService.listDirectoryByScope({
+        scopeKey,
+        relativeDir: normalizeRelativeFolderToken(folderToken)
+      }).catch(() => null);
+      if (Array.isArray(listed)) {
         currentFolder = normalizeRelativeFolderToken(folderToken);
+        entries = listed;
         break;
       }
     }
-
-    const currentPath = currentFolder
-      ? pathResolver.resolveSafePath(root, currentFolder)
-      : root;
-    const entries = await fs.readdir(currentPath, { withFileTypes: true }).catch(() => []);
     const folders = [];
     const rows = [];
 
     for (const entry of entries) {
       if (!entry) continue;
-      const absolutePath = pathResolver.resolveSafePath(currentPath, entry.name);
-      if (entry.isDirectory && entry.isDirectory()) {
-        const relativePath = normalizeRelativeFolderToken(toRelativeFolder(root, absolutePath));
+      const name = cleanString(entry.name, { max: 260, allowEmpty: true });
+      if (!name) continue;
+      if (entry.isDir) {
         folders.push({
-          name: cleanString(entry.name, { max: 260, allowEmpty: true }) || relativePath || '/',
-          path: relativePath
+          name,
+          path: normalizeRelativeFolderToken([currentFolder, name].filter(Boolean).join('/'))
         });
         continue;
       }
-      if (!entry.isFile || !entry.isFile()) continue;
-      if (!isImageFilename(entry.name)) continue;
-      // eslint-disable-next-line no-await-in-loop
-      const stat = await fs.stat(absolutePath).catch(() => null);
-      if (!stat || !stat.isFile || !stat.isFile()) continue;
-      rows.push(buildMediaLibraryRow(absolutePath, stat));
+      if (!isImageFilename(name)) continue;
+      rows.push(buildMediaLibraryRow(entry, scopeKey, currentFolder));
     }
 
     folders.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -454,6 +453,7 @@ async function showEditTemplateForm(req, res) {
     return res.render('emailManagement/templateForm', {
       title: 'Edit Email Template',
       template: templateRow,
+      mediaDefaultFolder: getEmailTemplateMediaDefaultFolder(),
       eventCatalog,
       placeholderRegistry: registryRows,
       placeholderRegistryMap: buildPlaceholderMap(registryRows),

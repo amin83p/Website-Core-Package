@@ -1,0 +1,95 @@
+<%
+  const bootstrap = (typeof firstRunBootstrap !== 'undefined' && firstRunBootstrap && typeof firstRunBootstrap === 'object')
+    ? firstRunBootstrap
+    : {};
+  const groups = Array.isArray(bootstrapGroups) ? bootstrapGroups : [];
+  const checks = Array.isArray(bootstrap.checks) ? bootstrap.checks : [];
+  const missing = Array.isArray(bootstrap.missingLabels) ? bootstrap.missingLabels : [];
+  const requestedMode = String(bootstrap.requestedMode || 'json').toUpperCase();
+  const bypassEnabled = bootstrap.bypassEnabled === true;
+%>
+
+<div class="container py-4">
+  <div class="dash-hero mb-4 d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+    <div>
+      <div class="text-uppercase fw-bold small text-warning mb-2">
+        <i class="bi bi-sliders me-1"></i> First-Run Bootstrap
+      </div>
+      <h1 class="page-heading size-lg mb-1 text-start">Bootstrap Setup Access</h1>
+      <p class="text-muted mb-0" style="max-width: 860px;">
+        Use this launcher to reach critical setup pages while core registries are still being prepared.
+      </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/dashboard" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+      </a>
+      <a href="/systemSettings" class="btn btn-warning btn-sm text-dark fw-bold">
+        <i class="bi bi-gear me-1"></i>System Settings
+      </a>
+    </div>
+  </div>
+
+  <div class="alert <%= bypassEnabled ? 'alert-warning' : 'alert-success' %> border mb-4">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2">
+      <div>
+        <div class="fw-bold">
+          <i class="bi <%= bypassEnabled ? 'bi-lightning-charge-fill' : 'bi-check-circle-fill' %> me-1"></i>
+          Bootstrap Bypass: <%= bypassEnabled ? 'Enabled' : 'Inactive' %>
+        </div>
+        <% if (bypassEnabled && missing.length) { %>
+          <div class="small mt-1">Missing prerequisites: <%= missing.join(', ') %></div>
+        <% } else { %>
+          <div class="small mt-1">Core setup prerequisites are present.</div>
+        <% } %>
+      </div>
+      <div class="small text-muted">
+        Requested backend mode: <span class="fw-bold text-dark"><%= requestedMode %></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <% checks.forEach((item) => { %>
+      <div class="col-md-4">
+        <div class="module-card h-100">
+          <div class="module-accent"></div>
+          <div class="small text-uppercase text-muted fw-bold mb-2"><%= item.label %></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="fs-4 fw-bold"><%= Number(item.count || 0) %></div>
+            <% if (item.ready) { %>
+              <span class="badge bg-success-subtle text-success border border-success-subtle">Ready</span>
+            <% } else { %>
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Missing</span>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="row g-4">
+    <% groups.forEach((group) => { %>
+      <div class="col-xl-4 col-lg-6">
+        <div class="module-card h-100">
+          <div class="module-accent"></div>
+          <h5 class="fw-bold mb-1"><%= group.title %></h5>
+          <p class="text-muted small mb-3"><%= group.description %></p>
+          <div class="list-group list-group-flush border rounded">
+            <% (group.items || []).forEach((item) => { %>
+              <a href="<%= item.href %>" class="list-group-item list-group-item-action d-flex align-items-start justify-content-between gap-2">
+                <div>
+                  <div class="fw-semibold text-dark">
+                    <i class="bi <%= item.icon %> me-1"></i><%= item.label %>
+                  </div>
+                  <div class="small text-muted"><%= item.note %></div>
+                </div>
+                <i class="bi bi-chevron-right text-muted"></i>
+              </a>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</div>

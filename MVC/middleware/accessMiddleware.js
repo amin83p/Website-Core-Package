@@ -1,5 +1,6 @@
 // MVC/middleware/accessMiddleware.js
 const accessService = require('../services/security/index');
+const firstRunBootstrapService = require('../services/firstRunBootstrapService');
 
 function setLogContext(req, sectionId, operationId) {
   if (!req || typeof req !== 'object') return;
@@ -104,6 +105,23 @@ const requireAccess = (sectionId, operationId) => {
         });
       }
 
+      const bootstrapBypassAllowed = await firstRunBootstrapService.isBypassAllowed({
+        user: req.user,
+        sectionId
+      });
+      if (bootstrapBypassAllowed) {
+        req.accessLimits = {};
+        req.adminContext = req.adminContext || null;
+        req.accessScope = req.accessScope || '';
+        req.bootstrapBypass = {
+          enabled: true,
+          sectionId: String(sectionId || '').trim(),
+          operationId: String(operationId || '').trim(),
+          reason: 'first_run_bootstrap'
+        };
+        return next();
+      }
+
       // 2. Evaluate Access
       const evaluation = await accessService.evaluateAccess({
         user: req.user,
@@ -158,6 +176,23 @@ const requireAccessAny = (sectionIds, operationId) => {
       const ids = Array.isArray(sectionIds) ? sectionIds : [];
       if (!ids.length) {
         return denyAccess(req, res, 'No sections configured for this route.', { operationId });
+      }
+
+      const bootstrapContext = await firstRunBootstrapService.resolveUserBootstrapContext(req.user);
+      if (bootstrapContext.bypassEnabled === true) {
+        const bypassSectionId = ids.find((sectionId) => firstRunBootstrapService.isBypassSection(sectionId));
+        if (bypassSectionId) {
+          req.accessLimits = {};
+          req.adminContext = req.adminContext || null;
+          req.accessScope = req.accessScope || '';
+          req.bootstrapBypass = {
+            enabled: true,
+            sectionId: String(bypassSectionId || '').trim(),
+            operationId: String(operationId || '').trim(),
+            reason: 'first_run_bootstrap'
+          };
+          return next();
+        }
       }
       let lastReason = 'Insufficient permissions.';
       let lastEvaluation = null;

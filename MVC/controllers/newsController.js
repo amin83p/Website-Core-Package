@@ -1,6 +1,6 @@
 // MVC/controllers/newsController.js
 const dataService = require('../services/dataService');
-const pathResolver = require('../utils/pathResolver'); 
+const coreFilesService = require('../services/coreFilesService');
 const fs = require('fs').promises; 
 const path = require('path');
 const { buildDataServiceQuery } = require('../utils/generalTools');
@@ -70,7 +70,7 @@ function getWebUrlFromFile(file) {
     }
     const token = String(file || '').trim();
     if (/^\/uploads\//i.test(token)) return token;
-    return pathResolver.getWebUrlForUpload(token);
+    return coreFilesService.getWebUrlForUpload(token);
 }
 
 // Helper: Calculate Read Time

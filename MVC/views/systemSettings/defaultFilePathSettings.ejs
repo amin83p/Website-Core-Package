@@ -1,0 +1,174 @@
+<%
+  const byGroup = {};
+  (definitions || []).forEach((definition) => {
+    const group = definition.group || 'Other';
+    if (!byGroup[group]) byGroup[group] = [];
+    byGroup[group].push(definition);
+  });
+  const orderedGroups = Object.values(groups || {}).filter((group) => byGroup[group]);
+  Object.keys(byGroup).forEach((group) => {
+    if (!orderedGroups.includes(group)) orderedGroups.push(group);
+  });
+  const defaultsJson = JSON.stringify((definitions || []).reduce((out, definition) => {
+    out[definition.key] = definition.defaultTemplate;
+    return out;
+  }, {})).replace(/</g, '\\u003c');
+  const selectedPackageToken = String(selectedPackage || '').trim().toUpperCase();
+  const packageList = Array.isArray(packageOptions) ? packageOptions : [];
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0">Default File Paths</h1>
+      <div class="text-muted small mt-1">Manage package-aware default path templates for upload and media workflows.</div>
+    </div>
+    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Configuration</span>
+  </div>
+
+  <div class="form-container wide mb-3" style="max-width: 1400px;">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div class="small text-muted">Filter by installed package/domain.</div>
+      <form id="defaultFilePathsFilterForm" action="/systemSettings/default-file-paths" method="GET" class="d-flex align-items-center gap-2">
+        <label class="small text-muted mb-0" for="defaultFilePathsPackageFilter">Package</label>
+        <select id="defaultFilePathsPackageFilter" name="package" class="form-select form-select-sm" style="min-width: 220px;">
+          <option value="">All Packages</option>
+          <% packageList.forEach((pkg) => { %>
+            <option value="<%= pkg.id %>" <%= selectedPackageToken === String(pkg.id || '').trim().toUpperCase() ? 'selected' : '' %>>
+              <%= pkg.label || pkg.id %> (<%= Number(pkg.count || 0) %>)
+            </option>
+          <% }) %>
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="defaultFilePathsForm" action="/systemSettings/default-file-paths<%= selectedPackageToken ? ('?package=' + encodeURIComponent(selectedPackageToken)) : '' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      <input type="hidden" name="packageFilter" value="<%= selectedPackageToken %>">
+
+      <% orderedGroups.forEach((groupName) => { %>
+        <section class="card mb-4 shadow-sm border-0">
+          <div class="card-header bg-white border-0 pb-0">
+            <h2 class="h5 fw-bold mb-1"><i class="bi bi-folder2-open text-primary me-2"></i><%= groupName %></h2>
+          </div>
+          <div class="card-body p-4">
+            <div class="table-responsive">
+              <table class="table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Variable</th>
+                    <th style="width: 10%;">Package</th>
+                    <th style="width: 34%;">Template</th>
+                    <th style="width: 24%;">Preview</th>
+                    <th style="width: 12%;" class="text-end">Default</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% byGroup[groupName].forEach((definition) => { %>
+                    <tr>
+                      <td>
+                        <div class="fw-semibold"><%= definition.label %></div>
+                        <div class="small text-muted font-monospace"><%= definition.key %></div>
+                        <% if ((definition.placeholders || []).length) { %>
+                          <div class="small text-muted">
+                            <% definition.placeholders.forEach((placeholder) => { %>
+                              <code>{<%= placeholder %>}</code>
+                            <% }) %>
+                          </div>
+                        <% } %>
+                      </td>
+                      <td>
+                        <span class="badge bg-light text-dark border font-monospace"><%= definition.packageName || 'CORE' %></span>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          class="form-control font-monospace upload-folder-input"
+                          name="uploadFolders[<%= definition.key %>]"
+                          value="<%= definition.currentTemplate || definition.defaultTemplate %>"
+                          data-key="<%= definition.key %>"
+                          data-default="<%= definition.defaultTemplate %>">
+                      </td>
+                      <td>
+                        <code class="upload-folder-preview" data-preview-for="<%= definition.key %>"></code>
+                      </td>
+                      <td class="text-end">
+                        <button type="button" class="btn btn-outline-secondary btn-sm upload-folder-reset" data-reset-key="<%= definition.key %>">
+                          <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+                        </button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      <% }) %>
+
+      <div class="d-flex justify-content-end gap-2">
+        <a href="/systemSettings" class="btn btn-secondary btn-filled btn-md">Back to Dashboard</a>
+        <button type="submit" class="btn btn-primary btn-filled btn-md">
+          <i class="bi bi-save me-1"></i> Save Default File Paths
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(() => {
+  const defaults = <%- defaultsJson %>;
+  const filterSelect = document.getElementById('defaultFilePathsPackageFilter');
+  const filterForm = document.getElementById('defaultFilePathsFilterForm');
+  const placeholderSamples = {
+    taskId: 'TASK_123',
+    conversationId: 'CONV_123',
+    personId: 'PERSON_123',
+    templateId: 'TPL_123',
+    questionId: 'Q_123',
+    classId: 'CLS_123',
+    subjectId: 'SUBJ_123',
+    jobDate: '2026-05-19',
+    jobId: 'JOB_123',
+    userId: 'USER_123',
+    practiceName: 'Read_Aloud',
+    testName: 'Mock_Test_A',
+    sessionId: 'SESSION_123',
+    itemId: 'ITEM_123'
+  };
+
+  function previewTemplate(value, fallback) {
+    const template = String(value || '').trim() || fallback || '';
+    return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, name) => placeholderSamples[name] || name);
+  }
+
+  function updatePreview(input) {
+    const key = input.dataset.key;
+    const target = document.querySelector(`[data-preview-for="${CSS.escape(key)}"]`);
+    if (!target) return;
+    target.textContent = previewTemplate(input.value, defaults[key]);
+  }
+
+  document.querySelectorAll('.upload-folder-input').forEach((input) => {
+    updatePreview(input);
+    input.addEventListener('input', () => updatePreview(input));
+  });
+
+  document.querySelectorAll('.upload-folder-reset').forEach((button) => {
+    button.addEventListener('click', () => {
+      const key = button.dataset.resetKey;
+      const input = document.querySelector(`.upload-folder-input[data-key="${CSS.escape(key)}"]`);
+      if (!input) return;
+      input.value = defaults[key] || '';
+      updatePreview(input);
+    });
+  });
+
+  filterSelect?.addEventListener('change', () => {
+    filterForm?.submit();
+  });
+})();
+</script>

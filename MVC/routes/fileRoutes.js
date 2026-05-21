@@ -9,17 +9,17 @@ const { requireAccess } = require('../middleware/accessMiddleware');
 const { trackActionState } = require('../middleware/actionStateMiddleware');
 const adminApproval = require('../middleware/adminApproval');
 
-const orgBackupRestoreLimitMb = Number.parseInt(process.env.ORG_FILE_BACKUP_RESTORE_MAX_MB || '500', 10) || 500;
+const ORG_FILE_BACKUP_RESTORE_MAX_MB = Number.parseInt(process.env.ORG_FILE_BACKUP_RESTORE_MAX_MB || '500', 10) || 500;
 const orgBackupRestoreUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: orgBackupRestoreLimitMb * 1024 * 1024 }
+  limits: { fileSize: ORG_FILE_BACKUP_RESTORE_MAX_MB * 1024 * 1024 }
 });
 
 function handleOrgBackupRestoreUpload(req, res, next) {
   orgBackupRestoreUpload.single('backupFile')(req, res, (error) => {
     if (!error) return next();
     const message = error.code === 'LIMIT_FILE_SIZE'
-      ? `Backup file is too large. Maximum upload size is ${orgBackupRestoreLimitMb} MB.`
+      ? `Backup file is too large. Maximum upload size is ${ORG_FILE_BACKUP_RESTORE_MAX_MB} MB. Set ORG_FILE_BACKUP_RESTORE_MAX_MB and restart the service if a larger restore is required.`
       : (error.message || 'Backup upload failed.');
     return res.status(400).json({ status: 'error', message });
   });
@@ -104,6 +104,7 @@ router.post('/org-backup/download', requireAuth,
 
 router.post('/org-backup/restore', requireAuth,
   requireAccess(SECTIONS.UPLOADED_FILES, OPERATIONS.UPDATE),
+  adminApproval,
   handleOrgBackupRestoreUpload,
   trackActionState(SECTIONS.UPLOADED_FILES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   fileController.restoreOrgBackup

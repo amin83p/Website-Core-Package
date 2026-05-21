@@ -18,7 +18,7 @@
   const initCoursesJson = JSON.stringify(Array.isArray(a.courses) ? a.courses : []).replace(/</g, '\\u003c');
   const initPackagesJson = JSON.stringify(Array.isArray(a.selectedPackages) ? a.selectedPackages : []).replace(/</g, '\\u003c');
   const initAttachmentsJson = JSON.stringify(Array.isArray(a.attachments) ? a.attachments : []).replace(/</g, '\\u003c');
-  const mediaDefaultFolder = isPublicAudience ? 'PTE/Public_Applicants' : 'PTE/Students';
+  const mediaDefaultFolder = String((typeof locals.mediaDefaultFolder !== 'undefined' && locals.mediaDefaultFolder) ? locals.mediaDefaultFolder : (isPublicAudience ? 'PTE/Public_Applicants' : 'PTE/Students')).trim();
 %>
 
 <style>

@@ -1,12 +1,8 @@
 const path = require('path');
 const crypto = require('crypto');
-const fs = require('fs').promises;
 const paginate = require('../../utils/paginationHelper');
-const pathResolver = require('../../utils/pathResolver');
 const pteUploadPathUtils = require('../../utils/pteUploadPathUtils');
-const uploadPathUtils = require('../../utils/uploadPathUtils');
-const { isRailwayProxyMode } = require('../../utils/uploadModeUtils');
-const { gatewayListDirectory } = require('../../services/fileGatewayClientService');
+const coreFilesService = require('../../services/coreFilesService');
 const uploadMiddleware = require('../../middleware/upload');
 const {
   isAjax,
@@ -121,7 +117,7 @@ function buildAttachmentUrlFromPath(filePath) {
   if (!normalized) return '';
   if (/^\/uploads\//i.test(normalized)) return normalized;
   const dirPath = path.dirname(normalized);
-  const dirUrl = pathResolver.getWebUrlForUpload(dirPath);
+  const dirUrl = coreFilesService.getWebUrlForUpload(dirPath);
   const filename = path.basename(normalized);
   if (!dirUrl || !filename) return '';
   return `${dirUrl}/${filename}`;
@@ -156,21 +152,16 @@ function resolveScopeIdToken(orgId = '') {
   return token;
 }
 
-function getUploadsRootPath() {
-  const globalRoot = pathResolver.getRootPath('GLOBAL');
-  return normalizeAbsolutePath(path.dirname(globalRoot));
-}
-
 function getQuestionBankMediaRoot(orgId = '') {
   const scopeId = resolveScopeIdToken(orgId);
-  const scopedRoot = pathResolver.getRootPath(scopeId);
-  return normalizeAbsolutePath(pathResolver.resolveSafePath(scopedRoot, pteUploadPathUtils.getQuestionBankRoot()));
+  const scopedRoot = coreFilesService.getRootPath(scopeId);
+  return normalizeAbsolutePath(coreFilesService.resolveSafePath(scopedRoot, pteUploadPathUtils.getQuestionBankRoot()));
 }
 
 function getLegacyQuestionBankMediaRoot(orgId = '') {
   const scopeId = resolveScopeIdToken(orgId);
-  const scopedRoot = pathResolver.getRootPath(scopeId);
-  return normalizeAbsolutePath(pathResolver.resolveSafePath(scopedRoot, 'pte-question-bank'));
+  const scopedRoot = coreFilesService.getRootPath(scopeId);
+  return normalizeAbsolutePath(coreFilesService.resolveSafePath(scopedRoot, 'pte-question-bank'));
 }
 
 function getAllowedQuestionBankRoots(orgId = '') {
@@ -183,7 +174,7 @@ function getAllowedQuestionBankRoots(orgId = '') {
 function resolveDiskPathFromUploadsUrl(fileUrl = '') {
   const token = cleanText(fileUrl, 1600);
   if (!token) return '';
-  return normalizeAbsolutePath(uploadPathUtils.fromUploadsUrlToDiskPath(token));
+  return normalizeAbsolutePath(coreFilesService.fromUploadsUrlToDiskPath(token));
 }
 
 function normalizeSafeQuestionBankPath(filePath = '', fileUrl = '', orgId = '') {
@@ -200,11 +191,11 @@ function normalizeSafeQuestionBankPath(filePath = '', fileUrl = '', orgId = '') 
 }
 
 function toCanonicalUploadReference(filePath = '', fileUrl = '') {
-  const fromUrl = uploadPathUtils.extractRelativeUploadPath(fileUrl);
+  const fromUrl = coreFilesService.extractRelativeUploadPath(fileUrl);
   if (fromUrl) return `/uploads/${fromUrl}`;
-  const fromPathUrl = uploadPathUtils.extractRelativeUploadPath(filePath);
+  const fromPathUrl = coreFilesService.extractRelativeUploadPath(filePath);
   if (fromPathUrl) return `/uploads/${fromPathUrl}`;
-  return uploadPathUtils.fromDiskPathToUploadsUrl(filePath) || String(filePath || '').replace(/\\/g, '/').trim();
+  return coreFilesService.fromDiskPathToUploadsUrl(filePath) || String(filePath || '').replace(/\\/g, '/').trim();
 }
 
 function sanitizeIncomingMediaRows(mediaRows = [], orgId = '') {
@@ -279,28 +270,6 @@ function findMediaById(mediaAssets = [], mediaId = '') {
   return list.find((row) => String(row?.id || '').trim() === token) || null;
 }
 
-function buildMediaLibraryRow(filePath = '', stat = null) {
-  const normalizedPath = String(filePath || '').replace(/\\/g, '/').trim();
-  const fileName = path.basename(normalizedPath);
-  const dirPath = path.dirname(normalizedPath);
-  const baseUrl = pathResolver.getWebUrlForUpload(dirPath);
-  const fileUrl = baseUrl ? `${baseUrl}/${encodeURIComponent(fileName)}` : '';
-  const digest = crypto.createHash('md5').update(normalizedPath).digest('hex');
-  return {
-    id: `LIB_${digest}`,
-    name: fileName,
-    originalName: fileName,
-    filename: fileName,
-    path: normalizedPath,
-    url: fileUrl,
-    mimeType: '',
-    size: Number(stat?.size || 0) || 0,
-    uploadDate: stat?.mtime ? new Date(stat.mtime).toISOString() : '',
-    comment: '',
-    source: 'saved_library'
-  };
-}
-
 function buildScopeUploadPrefix(orgId = '') {
   const token = cleanText(orgId, 120);
   if (!token || token.toUpperCase() === 'SYSTEM') return '/uploads/GLOBAL';
@@ -354,20 +323,6 @@ function normalizeRelativeFolderToken(value, max = 800) {
   return compact.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
-function toRelativeFolder(baseRoot = '', absolutePath = '') {
-  const root = String(baseRoot || '').trim();
-  const target = String(absolutePath || '').trim();
-  if (!root || !target) return '';
-  const relative = path.relative(root, target);
-  if (!relative || relative === '.') return '';
-  return relative.split(path.sep).join('/').replace(/^\/+/, '').replace(/\/+$/, '');
-}
-
-async function directoryExists(dirPath = '') {
-  const stat = await fs.stat(String(dirPath || '')).catch(() => null);
-  return Boolean(stat && stat.isDirectory && stat.isDirectory());
-}
-
 async function listOrgMediaLibrary(req, res) {
   try {
     const defaultPageSize = resolveDefaultPageSize();
@@ -386,90 +341,40 @@ async function listOrgMediaLibrary(req, res) {
       });
     }
 
-    const root = pathResolver.getRootPath(resolveScopeIdToken(activeOrgId));
     const requestedFolder = normalizeRelativeFolderToken(req.query?.folder);
     const candidateFolders = requestedFolder
       ? [requestedFolder, defaultFolder, '']
       : [defaultFolder, ''];
-
-    if (isRailwayProxyMode()) {
-      const currentFolder = normalizeRelativeFolderToken(requestedFolder || defaultFolder);
-      const gatewayResult = await gatewayListDirectory({
-        scopeKey: activeOrgId,
-        relativeDir: currentFolder
-      });
-      const entries = Array.isArray(gatewayResult?.files) ? gatewayResult.files : [];
-      const folders = [];
-      const fileRows = [];
-
-      entries.forEach((entry) => {
-        if (!entry) return;
-        const name = cleanText(entry.name, 260);
-        if (!name) return;
-        if (entry.isDir) {
-          folders.push({
-            name,
-            path: normalizeRelativeFolderToken([currentFolder, name].filter(Boolean).join('/'))
-          });
-          return;
-        }
-        fileRows.push(buildGatewayMediaLibraryRow(entry, activeOrgId, currentFolder));
-      });
-
-      folders.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-      fileRows.sort((a, b) => String(b.uploadDate || '').localeCompare(String(a.uploadDate || '')));
-      const parentFolder = currentFolder.includes('/')
-        ? currentFolder.split('/').slice(0, -1).join('/')
-        : '';
-
-      return res.json({
-        status: 'success',
-        message: fileRows.length ? `Loaded ${fileRows.length} file(s).` : 'No saved files found in this folder.',
-        results: fileRows,
-        folders,
-        currentFolder,
-        parentFolder,
-        defaultFolder,
-        defaults: { pageSize: defaultPageSize }
-      });
-    }
-
+    const scopeKey = resolveScopeIdToken(activeOrgId);
     let currentFolder = '';
+    let entries = [];
     for (const folderToken of candidateFolders) {
-      const maybePath = folderToken
-        ? pathResolver.resolveSafePath(root, folderToken)
-        : root;
       // eslint-disable-next-line no-await-in-loop
-      const exists = await directoryExists(maybePath);
-      if (exists) {
+      const listed = await coreFilesService.listDirectoryByScope({
+        scopeKey,
+        relativeDir: normalizeRelativeFolderToken(folderToken)
+      }).catch(() => null);
+      if (Array.isArray(listed)) {
         currentFolder = normalizeRelativeFolderToken(folderToken);
+        entries = listed;
         break;
       }
     }
-
-    const currentPath = currentFolder
-      ? pathResolver.resolveSafePath(root, currentFolder)
-      : root;
-    const entries = await fs.readdir(currentPath, { withFileTypes: true }).catch(() => []);
     const folders = [];
     const fileRows = [];
 
     for (const entry of entries) {
       if (!entry) continue;
-      const absolutePath = pathResolver.resolveSafePath(currentPath, entry.name);
-      if (entry.isDirectory && entry.isDirectory()) {
-        const relativePath = normalizeRelativeFolderToken(toRelativeFolder(root, absolutePath));
+      const name = cleanText(entry.name, 260);
+      if (!name) continue;
+      if (entry.isDir) {
         folders.push({
-          name: cleanText(entry.name, 260) || relativePath || '/',
-          path: relativePath
+          name,
+          path: normalizeRelativeFolderToken([currentFolder, name].filter(Boolean).join('/'))
         });
         continue;
       }
-      if (!entry.isFile || !entry.isFile()) continue;
-      // eslint-disable-next-line no-await-in-loop
-      const stat = await fs.stat(absolutePath).catch(() => null);
-      if (!stat || !stat.isFile || !stat.isFile()) continue;
-      fileRows.push(buildMediaLibraryRow(absolutePath, stat));
+      fileRows.push(buildGatewayMediaLibraryRow(entry, activeOrgId, currentFolder));
     }
 
     folders.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -615,6 +520,7 @@ async function showForm(req, res) {
     return res.render('pte/questionsBank/questionBankForm', {
       title: isEdit ? `Edit Question: ${question.id}` : 'Create PTE Question',
       question,
+      mediaDefaultFolder: pteUploadPathUtils.getQuestionBankRoot(),
       formOptions: pteQuestionBankDataService.getFormOptions(),
       typeMatrix: pteQuestionBankDataService.buildQuestionTypeMatrix(),
       includeModal: true,

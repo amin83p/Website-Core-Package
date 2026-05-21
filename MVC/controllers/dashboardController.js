@@ -1,8 +1,9 @@
 // MVC/controllers/dashboardController.js
 const dataService = require('../services/dataService'); 
 const accessService = require('../services/security/accessControl'); 
+const firstRunBootstrapService = require('../services/firstRunBootstrapService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
-const { isAdmin } = require('../services/adminChekersService');
+const adminCheckersService = require('../services/adminChekersService');
 
 const DASHBOARD_ALL_SECTIONS_CACHE_TTL_MS = 60 * 1000;
 const dashboardAllSectionsCache = new Map();
@@ -278,11 +279,12 @@ async function getAllAccessibleSections(req, res) {
 async function showDashboard(req, res) {
   try {
     // 1. Fetch Data
-    const [allSections, contextSymbols, sectionCategories] = await Promise.all([
+    const [allSections, contextSymbols, sectionCategories, firstRunBootstrap] = await Promise.all([
         dataService.fetchData('sections', {}, req.user),
         // ✅ USE NEW DEDICATED FUNCTION
         dataService.getContextSymbols(req.user),
-        dataService.getSectionCategories()
+        dataService.getSectionCategories(),
+        firstRunBootstrapService.resolveUserBootstrapContext(req.user)
     ]);
     // 2. Filter Sections
     let accessibleSections = await filterMainDashboardSections(req.user, allSections);
@@ -298,7 +300,7 @@ async function showDashboard(req, res) {
     });
 
     const canViewSystemStat = async (sectionId, operationId) => {
-      if (isAdmin(req.user)) return true;
+      if (adminCheckersService.isAdmin(req.user)) return true;
       try {
         const evaluation = await accessService.evaluateAccess({
           user: req.user,
@@ -317,8 +319,13 @@ async function showDashboard(req, res) {
       canViewSystemStat(SECTIONS.ACTION_STATES, OPERATIONS.DELETE_ALL)
     ]);
 
+    const canViewBootstrapShortcut = Boolean(
+      adminCheckersService.isAdmin(req.user)
+      || adminCheckersService.isSuperAdmin(req.user)
+    );
+
     const showDashboardSummary = Boolean(
-      isAdmin(req.user)
+      adminCheckersService.isAdmin(req.user)
       || String(req.user?.systemAccessProfileId || '').trim()
     );
 
@@ -338,6 +345,8 @@ async function showDashboard(req, res) {
       sectionCategories,
       websitePolicy: req.websitePolicy || {},
       showDashboardSummary,
+      canViewBootstrapShortcut,
+      firstRunBootstrap,
       //
       stats: {
         sections: allSections.length, 
@@ -825,6 +834,75 @@ async function showSectionSubDashboard(req, res) {
   }
 }
 
+function getBootstrapSetupGroups() {
+  return [
+    {
+      title: 'Core Setup',
+      description: 'First-run pages for backend mode, file storage, and global setup.',
+      items: [
+        { label: 'System Settings', href: '/systemSettings', icon: 'bi-sliders2-vertical', note: 'Configure app/backend settings.' },
+        { label: 'File Manager', href: '/files', icon: 'bi-folder2-open', note: 'Upload and manage setup assets.' },
+        { label: 'Website Policy', href: '/websitePolicy', icon: 'bi-shield-check', note: 'Review maintenance and access policy.' }
+      ]
+    },
+    {
+      title: 'Access & Identity',
+      description: 'Create users, persons, roles, and profile mappings.',
+      items: [
+        { label: 'Users', href: '/users', icon: 'bi-people', note: 'Manage application users.' },
+        { label: 'Persons', href: '/persons', icon: 'bi-person-vcard', note: 'Manage person profiles and links.' },
+        { label: 'Access Profiles', href: '/accesses', icon: 'bi-shield-lock', note: 'Create system/local access profiles.' },
+        { label: 'Access Policies', href: '/accessPolicies', icon: 'bi-person-lock', note: 'Apply policy-level restrictions.' },
+        { label: 'Roles', href: '/roles', icon: 'bi-award', note: 'Manage package and system roles.' }
+      ]
+    },
+    {
+      title: 'Authorization Registry',
+      description: 'Seed and verify sections/operations/scope metadata.',
+      items: [
+        { label: 'Sections', href: '/sections', icon: 'bi-grid', note: 'Seed section registry.' },
+        { label: 'Operations', href: '/operations', icon: 'bi-list-check', note: 'Seed operation registry.' },
+        { label: 'Scopes', href: '/scopes', icon: 'bi-diagram-3', note: 'Review access scopes.' },
+        { label: 'Symbols', href: '/symbols', icon: 'bi-stars', note: 'Manage dashboard/navigation symbols.' }
+      ]
+    }
+  ];
+}
+
+async function showBootstrapSetup(req, res) {
+  try {
+    const firstRunBootstrap = await firstRunBootstrapService.resolveUserBootstrapContext(req.user, { forceRefresh: true });
+    const dashboardAdminLike = Boolean(
+      adminCheckersService.isAdmin(req.user)
+      || adminCheckersService.isSuperAdmin(req.user)
+    );
+
+    if (!dashboardAdminLike) {
+      return res.status(403).render('error', {
+        title: 'Access Needed',
+        statusCode: 403,
+        message: 'This page is available only to global admins and superusers.',
+        user: req.user || null
+      });
+    }
+
+    return res.render('dashboard/bootstrapSetup', {
+      title: 'First-Run Bootstrap Setup',
+      user: req.user || null,
+      websitePolicy: req.websitePolicy || {},
+      firstRunBootstrap,
+      bootstrapGroups: getBootstrapSetupGroups()
+    });
+  } catch (error) {
+    console.error('Dashboard Bootstrap Setup Error:', error);
+    return res.status(500).render('error', {
+      title: 'Error',
+      message: 'Error loading bootstrap setup.',
+      user: req.user || null
+    });
+  }
+}
+
 /* ============================================================
    HELPER: Get Section for Sub-Dashboard (with Symbol Icon)
    Use when rendering school/credit/ielts/etc. dashboards to get
@@ -855,6 +933,7 @@ module.exports = {
   showDashboard,
   showSectionNav,
   showSectionSubDashboard,
+  showBootstrapSetup,
   getQuickMenu,
   getAllAccessibleSections,
   getStartMenu,

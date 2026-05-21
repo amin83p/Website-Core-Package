@@ -1,6 +1,6 @@
 const fs = require('fs/promises');
 const path = require('path');
-const uploadPathUtils = require('../../utils/uploadPathUtils');
+const coreFilesService = require('../coreFilesService');
 const { getGatewayBaseUrl } = require('../../utils/uploadModeUtils');
 const pteAiProviderDataService = require('./pteAiProviderDataService');
 const pteAiProviderService = require('./ai/aiProviderService');
@@ -947,7 +947,7 @@ function normalizeUploadUrlToken(value = '') {
   const uploadSegmentIndex = withoutQuery.toLowerCase().indexOf('/uploads/');
   if (uploadSegmentIndex >= 0) return withoutQuery.slice(uploadSegmentIndex);
 
-  const fromDisk = uploadPathUtils.fromDiskPathToUploadsUrl(token);
+  const fromDisk = coreFilesService.fromDiskPathToUploadsUrl(token);
   if (fromDisk) return fromDisk;
   return '';
 }
@@ -1073,7 +1073,7 @@ async function readRemoteUploadArtifactForAi({
 function resolveUploadPathFromUrl(url = '') {
   const token = s(url, 2000).replace(/^https?:\/\/[^/]+/i, '');
   if (!/^\/?uploads\//i.test(token)) return '';
-  return uploadPathUtils.fromUploadsUrlToDiskPath(token);
+  return coreFilesService.fromUploadsUrlToDiskPath(token);
 }
 
 function resolveArtifactPath(artifact = {}) {

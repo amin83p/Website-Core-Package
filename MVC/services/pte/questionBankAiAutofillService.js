@@ -5,7 +5,7 @@ const pteAiProviderDataService = require('./pteAiProviderDataService');
 const pteAiProviderService = require('./ai/aiProviderService');
 const promptRegistry = require('./questionBankAiPromptRegistry');
 const settingService = require('../settingService');
-const uploadPathUtils = require('../../utils/uploadPathUtils');
+const coreFilesService = require('../coreFilesService');
 const {
   isRailwayProxyMode,
   getGatewayBaseUrl,
@@ -3640,9 +3640,9 @@ function getUploadRootCandidates() {
   }
   const candidates = [];
   if (configuredRoot) {
-    pushUniquePathCandidate(candidates, uploadPathUtils.getUploadRootAbsolute());
+    pushUniquePathCandidate(candidates, coreFilesService.getUploadRootAbsolute());
   }
-  pushUniquePathCandidate(candidates, uploadPathUtils.DEFAULT_UPLOAD_ROOT);
+  pushUniquePathCandidate(candidates, coreFilesService.getDefaultUploadRoot());
   pushUniquePathCandidate(candidates, path.resolve(process.cwd(), '../uploads'));
   return candidates;
 }

@@ -11,9 +11,10 @@
   const questionTypes = Array.isArray(options.questionTypes) ? options.questionTypes : [];
   const matrix = Array.isArray(typeMatrix) ? typeMatrix : [];
   const activeOrgId = String((user && user.activeOrgId) || '').trim();
+  const mediaDefaultFolder = String((typeof locals.mediaDefaultFolder !== 'undefined' && locals.mediaDefaultFolder) ? locals.mediaDefaultFolder : 'PTE/Question_Bank').trim() || 'PTE/Question_Bank';
   const mediaLibraryPathText = activeOrgId
-    ? (`uploads/ORG_${activeOrgId}/PTE/Question_Bank`)
-    : 'uploads/ORG_<activeOrgId>/PTE/Question_Bank';
+    ? (`uploads/ORG_${activeOrgId}/${mediaDefaultFolder}`)
+    : `uploads/ORG_<activeOrgId>/${mediaDefaultFolder}`;
   const actionUrl = isEdit
     ? ('/pte/questions-bank/edit/' + encodeURIComponent(routeId))
     : '/pte/questions-bank/new';
@@ -3830,7 +3831,7 @@
       folders: Array.isArray(result.folders) ? result.folders : [],
       currentFolder: normalizeFolderToken(result.currentFolder || folder),
       parentFolder: normalizeFolderToken(result.parentFolder),
-      defaultFolder: normalizeFolderToken(result.defaultFolder || 'PTE/Question_Bank'),
+      defaultFolder: normalizeFolderToken(result.defaultFolder || '<%= mediaDefaultFolder %>'),
       defaults: Number.isFinite(defaultPageSize) && !Number.isNaN(defaultPageSize) && defaultPageSize > 0
         ? { pageSize: defaultPageSize }
         : null
@@ -3939,7 +3940,7 @@
       maxSelection,
       defaultView,
       forceRefresh: true,
-      defaultFolder: 'PTE/Question_Bank',
+      defaultFolder: '<%= mediaDefaultFolder %>',
       onRefresh: async (query = {}) => {
         return loadSavedMediaLibrary({ folder: query && query.folder });
       },

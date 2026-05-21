@@ -86,6 +86,43 @@ function summarizeGatewayTextError(text = '', status = 0, fallbackMessage = '') 
   return raw.length > 500 ? `${raw.slice(0, 500)}...` : raw;
 }
 
+function extractGatewayNetworkCause(error) {
+  const cause = error?.cause;
+  if (!cause) return '';
+  const code = clean(cause?.code || cause?.name || '');
+  const message = clean(cause?.message || '');
+  if (code && message) return `${code}: ${message}`;
+  return code || message;
+}
+
+function summarizeGatewayFetchFailure(error, routePath = '') {
+  const route = getRoutePath(routePath);
+  const baseUrl = clean(getGatewayBaseUrl());
+  const gatewayTarget = baseUrl ? `${baseUrl}${route}` : route;
+  const timeoutMs = getGatewayTimeoutMs();
+  const name = clean(error?.name || '');
+  const message = clean(error?.message || '');
+  const causeText = extractGatewayNetworkCause(error);
+  const detail = causeText || message;
+
+  if (name === 'AbortError') {
+    return `Railway file gateway request timed out after ${timeoutMs} ms (${gatewayTarget}). Check gateway availability or increase FILE_GATEWAY_TIMEOUT_MS.`;
+  }
+
+  if (!baseUrl) {
+    return 'RAILWAY_GATEWAY_BASE_URL is not configured for Railway proxy mode.';
+  }
+
+  if (/fetch failed|failed to fetch|networkerror|econnrefused|enotfound|eai_again|socket/i.test(detail)) {
+    return `Unable to reach Railway file gateway at ${gatewayTarget}. Verify RAILWAY_GATEWAY_BASE_URL, network access, and gateway deployment.`;
+  }
+
+  if (detail) {
+    return `Railway file gateway request failed (${gatewayTarget}): ${detail}`;
+  }
+  return `Railway file gateway request failed (${gatewayTarget}).`;
+}
+
 async function fetchJson(routePath = '', options = {}) {
   const route = getRoutePath(routePath);
   const url = getGatewayUrl(route);
@@ -114,6 +151,11 @@ async function fetchJson(routePath = '', options = {}) {
       throw error;
     }
     return result;
+  } catch (error) {
+    if (error && typeof error === 'object' && Number.isFinite(error.statusCode)) {
+      throw error;
+    }
+    throw new Error(summarizeGatewayFetchFailure(error, route));
   } finally {
     clearTimeout(timeout);
   }
@@ -154,6 +196,11 @@ async function fetchGatewayResponse(routePath = '', options = {}) {
       throw error;
     }
     return response;
+  } catch (error) {
+    if (error && typeof error === 'object' && Number.isFinite(error.statusCode)) {
+      throw error;
+    }
+    throw new Error(summarizeGatewayFetchFailure(error, route));
   } finally {
     clearTimeout(timeout);
   }

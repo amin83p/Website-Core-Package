@@ -407,6 +407,7 @@ async function getUserFromToken(token) {
     name: fullName, 
     email: user.email, 
     accessLevel: user.accessLevel, 
+    systemAccessProfileId: user.systemAccessProfileId || '',
     isVirtualSuperAdmin: user.isVirtualSuperAdmin, 
     isSystemAdmin: (currentProfileMode === 'SYSTEM' && (isVirtualSuperAdmin || hasSystemProfile)), 
     activeOrgId, 

@@ -1,6 +1,6 @@
 const fs = require('fs/promises');
 const path = require('path');
-const uploadPathUtils = require('../../utils/uploadPathUtils');
+const coreFilesService = require('../coreFilesService');
 const { getGatewayBaseUrl } = require('../../utils/uploadModeUtils');
 const pteAiProviderDataService = require('./pteAiProviderDataService');
 const pteAiProviderService = require('./ai/aiProviderService');
@@ -562,18 +562,18 @@ function selectAudioArtifact({ item = {}, artifacts = [], responsePayload = {} }
 function resolveArtifactPath(artifact = {}) {
   const rawPath = s(artifact.path || artifact.filePath || artifact.localPath || '', 2000);
   if (rawPath && isAppUploadUrl(rawPath)) {
-    return uploadPathUtils.fromUploadsUrlToDiskPath(rawPath);
+    return coreFilesService.fromUploadsUrlToDiskPath(rawPath);
   }
   if (rawPath && !isHttpUrl(rawPath)) {
     if (rawPath.startsWith('/uploads/')) {
-      return uploadPathUtils.fromUploadsUrlToDiskPath(rawPath);
+      return coreFilesService.fromUploadsUrlToDiskPath(rawPath);
     }
     return path.isAbsolute(rawPath) ? rawPath : path.resolve(process.cwd(), rawPath);
   }
 
   const url = s(artifact.url || '', 2000);
   if (url.startsWith('/uploads/') || isAppUploadUrl(url)) {
-    return uploadPathUtils.fromUploadsUrlToDiskPath(url);
+    return coreFilesService.fromUploadsUrlToDiskPath(url);
   }
   return '';
 }
@@ -601,7 +601,7 @@ function normalizeUploadUrlToken(value = '') {
   if (/^\/uploads\//i.test(withoutQuery)) return withoutQuery;
   if (/^uploads\//i.test(withoutQuery)) return `/${withoutQuery.replace(/^\/+/, '')}`;
 
-  const fromDisk = uploadPathUtils.fromDiskPathToUploadsUrl(token);
+  const fromDisk = coreFilesService.fromDiskPathToUploadsUrl(token);
   if (fromDisk) return fromDisk;
   return '';
 }

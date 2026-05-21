@@ -17,8 +17,7 @@ const { resolveCanonicalOrganizationName } = require('../../utils/organizationDi
 
 // File handling helpers (centralized)
 const fileService = require('../../services/fileService');
-const pathResolver = require('../../utils/pathResolver');
-const uploadPathUtils = require('../../utils/uploadPathUtils');
+const coreFilesService = require('../../services/coreFilesService');
 const upload = require('../../middleware/upload');
 const fileAssetStorage = require('../../services/fileAssetStorageService');
 const path = require('path');
@@ -1023,7 +1022,7 @@ exports.deleteAttachment = async (req, res) => {
         let fileUrl = String(attachment?.url || '').trim();
         if (!fileUrl) {
             const normalizedPath = String(attachment?.path || '').replace(/\\/g, '/');
-            fileUrl = uploadPathUtils.fromDiskPathToUploadsUrl(normalizedPath) || normalizedPath;
+            fileUrl = coreFilesService.fromDiskPathToUploadsUrl(normalizedPath) || normalizedPath;
         }
 
         // Remove from DB first

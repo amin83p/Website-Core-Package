@@ -3,7 +3,6 @@ const fs = require('fs/promises');
 const paginate = require('../../utils/paginationHelper');
 const { isAjax } = require('../../utils/generalTools');
 const { idsEqual } = require('../../utils/idAdapter');
-const pathResolver = require('../../utils/pathResolver');
 const uploadMiddleware = require('../../middleware/upload');
 const fileAssetStorage = require('../../services/fileAssetStorageService');
 const uploadFolderSettingsService = require('../../services/uploadFolderSettingsService');

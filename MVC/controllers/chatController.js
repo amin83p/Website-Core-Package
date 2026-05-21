@@ -4,7 +4,7 @@ const { idsEqual } = require('../utils/idAdapter');
 
 const dataService = require('../services/dataService'); 
 const chatAccessService = require('../services/chatAccessService');
-const pathResolver = require('../utils/pathResolver'); // ✅ Import Resolver
+const coreFilesService = require('../services/coreFilesService');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
@@ -17,25 +17,6 @@ const uploadFolderSettingsService = require('../services/uploadFolderSettingsSer
 /* ==========================================================================
    HELPERS
    ========================================================================== */
-
-// Helper: Convert Physical Disk Path to Web URL
-// Example: "C:\App\uploads\GLOBAL\chat\123.jpg" -> "/uploads/GLOBAL/chat/123.jpg"
-function zzzgetWebUrlFromFile(physicalPath) {
-    const amin = pathResolver.getWebUrlForUpload(physicalPath);
-    console.log('1: ',amin);
-    // 1. Get the Project Root Uploads directory
-    // We derive this by going up one level from the 'GLOBAL' root defined in resolver
-    const uploadsRoot = path.resolve(pathResolver.getRootPath('GLOBAL'), '..');
-    
-    // 2. Get relative path from uploads folder
-    const relative = path.relative(uploadsRoot, physicalPath);
-    
-    // 3. Normalize slashes for Web URL (Windows backslash -> Forward slash)
-    const urlPath = relative.split(path.sep).join('/');
-    
-    console.log('2: ','/uploads/' + urlPath);
-    return '/uploads/' + urlPath;
-}
 
 // Helper: Calculate Folder Size (Recursive)
 function getFolderSize(directoryPath) {
@@ -199,8 +180,8 @@ exports.listAllChats = async (req, res) => {
 
             // B. Attachment Folder Size (Dynamic Path via Resolver)
             try {
-                const root = pathResolver.getRootPath('GLOBAL');
-                const chatDir = pathResolver.resolveSafePath(root, `chat/${c.id}`);
+                const root = coreFilesService.getRootPath('GLOBAL');
+                const chatDir = coreFilesService.resolveSafePath(root, `chat/${c.id}`);
                 totalBytes += getFolderSize(chatDir);
             } catch (e) {
                 // Folder might not exist if no attachments were sent
@@ -276,7 +257,7 @@ exports.deleteChat = async (req, res) => {
         }
 
         // ✅ USE RESOLVER to find the folder to delete
-        const root = pathResolver.getRootPath('GLOBAL');
+        const root = coreFilesService.getRootPath('GLOBAL');
         let filesDeleted = false;
 
         try {
@@ -299,7 +280,7 @@ exports.deleteChat = async (req, res) => {
             }
             if (!filesDeleted) {
                 // resolveSafePath ensures we don't accidentally delete outside our scope
-                const chatDir = pathResolver.resolveSafePath(root, `chat/${convId}`);
+                const chatDir = coreFilesService.resolveSafePath(root, `chat/${convId}`);
                 if (fs.existsSync(chatDir)) {
                     await fsPromises.rm(chatDir, { recursive: true, force: true });
                     filesDeleted = true;

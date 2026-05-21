@@ -5,6 +5,7 @@
   const selectedEventKey = String(row.eventKey || '').toUpperCase();
   const selectedSection = String(row.sectionId || '').toUpperCase();
   const selectedOperation = String(row.operationId || '').toUpperCase();
+  const mediaDefaultFolder = String((typeof locals.mediaDefaultFolder !== 'undefined' && locals.mediaDefaultFolder) ? locals.mediaDefaultFolder : 'email-templates').trim() || 'email-templates';
 %>
 
 <div class="sections-page">
@@ -390,7 +391,7 @@
         maxSelection: 1,
         title: 'Select Image From Saved Media Library',
         defaultView: 'list',
-        defaultFolder: initial.defaultFolder || 'email-templates',
+        defaultFolder: initial.defaultFolder || '<%= mediaDefaultFolder %>',
         defaultPageSize: 30,
         forceRefresh: true,
         onRefresh: async (query = {}) => {

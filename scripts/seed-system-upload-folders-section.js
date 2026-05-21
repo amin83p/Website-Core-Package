@@ -28,7 +28,7 @@ const SECTION_DOC = {
   name: UPLOAD_FOLDERS_SECTION_NAME,
   category: 'SYSTEM',
   description: 'Configure File Manager-visible upload folder templates and generated asset destinations.',
-  homeURL: '/systemSettings/upload-folders',
+  homeURL: '/systemSettings/default-file-paths',
   message: '',
   inactiveMessage: '',
   active: true,

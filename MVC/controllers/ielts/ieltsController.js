@@ -19,7 +19,7 @@ const {
     canCreateOrgScopedItem
 } = require('../../utils/orgContextUtils');
 const adminChekersService = require('../../services/adminChekersService');
-const uploadPathUtils = require('../../utils/uploadPathUtils');
+const coreFilesService = require('../../services/coreFilesService');
 
 const path = require('path');
 const fs = require('fs/promises');
@@ -205,7 +205,7 @@ function buildScoringHistoryCategoryPayload(session, id, category = {}, actorId 
 // Helper to convert physical path to web URL
 function getWebUrl(physicalPath) {
     if (!physicalPath) return null;
-    return uploadPathUtils.fromDiskPathToUploadsUrl(physicalPath);
+    return coreFilesService.fromDiskPathToUploadsUrl(physicalPath);
 }
 
 function runIeltsCommitHelper(scriptArgs = []) {

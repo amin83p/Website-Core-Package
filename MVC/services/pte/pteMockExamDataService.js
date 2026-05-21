@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const uploadPathUtils = require('../../utils/uploadPathUtils');
+const coreFilesService = require('../coreFilesService');
 const pteTestVersionRepository = require('../../repositories/pteTestVersionRepository');
 const pteQuestionVersionRepository = require('../../repositories/pteQuestionVersionRepository');
 const pteAttemptSessionRepository = require('../../repositories/pteAttemptSessionRepository');
@@ -149,9 +149,9 @@ function uploadUrlExistsOnDisk(url = '') {
   if (/^https?:\/\//i.test(token) || /^data:/i.test(token)) return true;
   const match = token.replace(/\\/g, '/').match(/\/uploads\/(.+)$/i);
   if (!match || !match[1]) return true;
-  const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
-  const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(`/uploads/${match[1]}`, uploadRoot);
-  if (!diskPath || !uploadPathUtils.isInsideUploadRoot(diskPath, uploadRoot)) return false;
+  const uploadRoot = coreFilesService.getUploadRootAbsolute();
+  const diskPath = coreFilesService.fromUploadsUrlToDiskPath(`/uploads/${match[1]}`);
+  if (!diskPath || !coreFilesService.isInsideUploadRoot(diskPath, uploadRoot)) return false;
   return fs.existsSync(diskPath);
 }
 

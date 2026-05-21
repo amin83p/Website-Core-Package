@@ -52,6 +52,24 @@ function normalizeManagedAccessProfiles(values = []) {
   return out;
 }
 
+function isActionStateLookupMiss(error) {
+  const message = String(error?.message || '').trim();
+  return /action state not found/i.test(message);
+}
+
+async function runActionStateUpdateSafely(updateFn) {
+  try {
+    return await updateFn();
+  } catch (error) {
+    if (isActionStateLookupMiss(error)) {
+      // Action-state tracking is best-effort; if a state is cleaned up or expired mid-request,
+      // do not fail the primary operation flow.
+      return null;
+    }
+    throw error;
+  }
+}
+
 const domainOpsService = {
   async unlinkPersonFromUser(userId, personId) {
     return await userRepository.unlinkPerson(userId, personId);
@@ -107,27 +125,27 @@ const domainOpsService = {
   },
 
   async updateActionStateProgress(id, volumeKB, context = {}) {
-    return await actionStateRepository.updateProgress(id, volumeKB, context);
+    return await runActionStateUpdateSafely(() => actionStateRepository.updateProgress(id, volumeKB, context));
   },
 
   async completeActionState(id, payload, volumeKB, context = {}) {
-    return await actionStateRepository.completeState(id, payload, volumeKB, context);
+    return await runActionStateUpdateSafely(() => actionStateRepository.completeState(id, payload, volumeKB, context));
   },
 
   async appendActionStateChangeEvent(id, changeEvent, context = {}) {
-    return await actionStateRepository.appendChangeEvent(id, changeEvent, context);
+    return await runActionStateUpdateSafely(() => actionStateRepository.appendChangeEvent(id, changeEvent, context));
   },
 
   async failActionState(id, volumeKB, context = {}) {
-    return await actionStateRepository.failAttempt(id, volumeKB, context);
+    return await runActionStateUpdateSafely(() => actionStateRepository.failAttempt(id, volumeKB, context));
   },
 
   async recordActionStateRetryableError(id, msg, volumeKB, context = {}) {
-    return await actionStateRepository.recordRetryableError(id, msg, volumeKB, context);
+    return await runActionStateUpdateSafely(() => actionStateRepository.recordRetryableError(id, msg, volumeKB, context));
   },
 
   async cancelActionState(id) {
-    return await actionStateRepository.cancelState(id);
+    return await runActionStateUpdateSafely(() => actionStateRepository.cancelState(id));
   },
 
   async getActionStateEntityTimeline(entityType, entityId) {

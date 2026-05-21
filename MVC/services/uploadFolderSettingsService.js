@@ -7,6 +7,15 @@ const GROUPS = Object.freeze({
   GENERATED: 'Generated Assets'
 });
 
+const PACKAGE_NAMES = Object.freeze({
+  CORE: 'Core',
+  PTE: 'PTE',
+  SCHOOL: 'School',
+  IELTS: 'IELTS',
+  BENCHPATH: 'BenchPath',
+  CREDIT: 'Credit'
+});
+
 const PLACEHOLDER_DEFAULTS = Object.freeze({
   taskId: 'task_unsaved',
   conversationId: 'conversation_unsaved',
@@ -24,36 +33,37 @@ const PLACEHOLDER_DEFAULTS = Object.freeze({
   itemId: 'item_unsaved'
 });
 
-const DEFINITIONS = Object.freeze([
-  { key: 'core.fileManager', group: GROUPS.CORE, label: 'File Manager Staging', defaultTemplate: 'misc', placeholders: [] },
-  { key: 'core.tasks', group: GROUPS.CORE, label: 'Task Attachments', defaultTemplate: 'tasks/{taskId}', placeholders: ['taskId'] },
-  { key: 'core.symbols', group: GROUPS.CORE, label: 'Symbol Images', defaultTemplate: 'symbols', placeholders: [] },
-  { key: 'core.news', group: GROUPS.CORE, label: 'News Media', defaultTemplate: 'news', placeholders: [] },
-  { key: 'core.chat', group: GROUPS.CORE, label: 'Chat Attachments', defaultTemplate: 'chat/{conversationId}', placeholders: ['conversationId'] },
-  { key: 'core.contacts', group: GROUPS.CORE, label: 'Contact Attachments', defaultTemplate: 'contacts', placeholders: [] },
-  { key: 'core.ielts', group: GROUPS.CORE, label: 'IELTS Attachments', defaultTemplate: 'ielts', placeholders: [] },
+const BUILTIN_DEFINITIONS = Object.freeze([
+  { key: 'core.fileManager', packageName: 'CORE', group: GROUPS.CORE, label: 'File Manager Staging', defaultTemplate: 'misc', placeholders: [] },
+  { key: 'core.tasks', packageName: 'CORE', group: GROUPS.CORE, label: 'Task Attachments', defaultTemplate: 'tasks/{taskId}', placeholders: ['taskId'] },
+  { key: 'core.symbols', packageName: 'CORE', group: GROUPS.CORE, label: 'Symbol Images', defaultTemplate: 'symbols', placeholders: [] },
+  { key: 'core.news', packageName: 'CORE', group: GROUPS.CORE, label: 'News Media', defaultTemplate: 'news', placeholders: [] },
+  { key: 'core.chat', packageName: 'CORE', group: GROUPS.CORE, label: 'Chat Attachments', defaultTemplate: 'chat/{conversationId}', placeholders: ['conversationId'] },
+  { key: 'core.contacts', packageName: 'CORE', group: GROUPS.CORE, label: 'Contact Attachments', defaultTemplate: 'contacts', placeholders: [] },
+  { key: 'core.ielts', packageName: 'IELTS', group: GROUPS.CORE, label: 'IELTS Attachments', defaultTemplate: 'ielts', placeholders: [] },
+  { key: 'core.emailTemplates', packageName: 'CORE', group: GROUPS.CORE, label: 'Email Template Media', defaultTemplate: 'email-templates', placeholders: [] },
 
-  { key: 'school.students', group: GROUPS.SCHOOL, label: 'School Student Attachments', defaultTemplate: 'students/{personId}', placeholders: ['personId'] },
-  { key: 'school.reportTemplates', group: GROUPS.SCHOOL, label: 'School Report Templates', defaultTemplate: 'reports', placeholders: [] },
-  { key: 'school.examMedia', group: GROUPS.SCHOOL, label: 'School Exam Media', defaultTemplate: 'school-exams/{templateId}/{questionId}', placeholders: ['templateId', 'questionId'] },
-  { key: 'school.classWorkspace', group: GROUPS.SCHOOL, label: 'School Class Workspaces', defaultTemplate: 'school/classes/{classId}', placeholders: ['classId'] },
-  { key: 'school.subjectWorkspace', group: GROUPS.SCHOOL, label: 'School Subject Workspaces', defaultTemplate: 'school/subjects/{subjectId}', placeholders: ['subjectId'] },
+  { key: 'school.students', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Student Attachments', defaultTemplate: 'students/{personId}', placeholders: ['personId'] },
+  { key: 'school.reportTemplates', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Report Templates', defaultTemplate: 'reports', placeholders: [] },
+  { key: 'school.examMedia', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Exam Media', defaultTemplate: 'school-exams/{templateId}/{questionId}', placeholders: ['templateId', 'questionId'] },
+  { key: 'school.classWorkspace', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Class Workspaces', defaultTemplate: 'school/classes/{classId}', placeholders: ['classId'] },
+  { key: 'school.subjectWorkspace', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Subject Workspaces', defaultTemplate: 'school/subjects/{subjectId}', placeholders: ['subjectId'] },
 
-  { key: 'pte.questionBank', group: GROUPS.PTE, label: 'PTE Question Bank', defaultTemplate: 'PTE/Question_Bank', placeholders: [] },
-  { key: 'pte.students', group: GROUPS.PTE, label: 'PTE Student Root', defaultTemplate: 'PTE/Students', placeholders: [] },
-  { key: 'pte.studentItem', group: GROUPS.PTE, label: 'PTE Student Files', defaultTemplate: 'PTE/Students/{itemId}', placeholders: ['itemId'] },
-  { key: 'pte.publicApplicants', group: GROUPS.PTE, label: 'PTE Public Applicant Root', defaultTemplate: 'PTE/Public_Applicants', placeholders: [] },
-  { key: 'pte.publicApplicantItem', group: GROUPS.PTE, label: 'PTE Public Applicant Files', defaultTemplate: 'PTE/Public_Applicants/{itemId}', placeholders: ['itemId'] },
-  { key: 'pte.practiceAttempt', group: GROUPS.PTE, label: 'PTE Practice Audio', defaultTemplate: 'PTE/Practice_By_Skills/{userId}/{practiceName}/{sessionId}/{itemId}', placeholders: ['userId', 'practiceName', 'sessionId', 'itemId'] },
-  { key: 'pte.smartPracticeAttempt', group: GROUPS.PTE, label: 'PTE Smart Practice Audio', defaultTemplate: 'PTE/Smart_Practice/{userId}/{practiceName}/{sessionId}/{itemId}', placeholders: ['userId', 'practiceName', 'sessionId', 'itemId'] },
-  { key: 'pte.mockExamAttempt', group: GROUPS.PTE, label: 'PTE Mock Exam Audio', defaultTemplate: 'PTE/Mock_Exams/{userId}/{testName}/{sessionId}/{itemId}', placeholders: ['userId', 'testName', 'sessionId', 'itemId'] },
+  { key: 'pte.questionBank', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Question Bank', defaultTemplate: 'PTE/Question_Bank', placeholders: [] },
+  { key: 'pte.students', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Student Root', defaultTemplate: 'PTE/Students', placeholders: [] },
+  { key: 'pte.studentItem', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Student Files', defaultTemplate: 'PTE/Students/{itemId}', placeholders: ['itemId'] },
+  { key: 'pte.publicApplicants', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Public Applicant Root', defaultTemplate: 'PTE/Public_Applicants', placeholders: [] },
+  { key: 'pte.publicApplicantItem', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Public Applicant Files', defaultTemplate: 'PTE/Public_Applicants/{itemId}', placeholders: ['itemId'] },
+  { key: 'pte.practiceAttempt', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Practice Audio', defaultTemplate: 'PTE/Practice_By_Skills/{userId}/{practiceName}/{sessionId}/{itemId}', placeholders: ['userId', 'practiceName', 'sessionId', 'itemId'] },
+  { key: 'pte.smartPracticeAttempt', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Smart Practice Audio', defaultTemplate: 'PTE/Smart_Practice/{userId}/{practiceName}/{sessionId}/{itemId}', placeholders: ['userId', 'practiceName', 'sessionId', 'itemId'] },
+  { key: 'pte.mockExamAttempt', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Mock Exam Audio', defaultTemplate: 'PTE/Mock_Exams/{userId}/{testName}/{sessionId}/{itemId}', placeholders: ['userId', 'testName', 'sessionId', 'itemId'] },
 
-  { key: 'generated.heic', group: GROUPS.GENERATED, label: 'HEIC Converter Jobs', defaultTemplate: 'heic-converter/{jobDate}/{jobId}', placeholders: ['jobDate', 'jobId'] },
-  { key: 'generated.importReports', group: GROUPS.GENERATED, label: 'Import Reports', defaultTemplate: 'importReports', placeholders: [] },
-  { key: 'generated.benchpathReports', group: GROUPS.GENERATED, label: 'BenchPath Reports', defaultTemplate: 'benchpath/reports', placeholders: [] }
+  { key: 'generated.heic', packageName: 'CORE', group: GROUPS.GENERATED, label: 'HEIC Converter Jobs', defaultTemplate: 'heic-converter/{jobDate}/{jobId}', placeholders: ['jobDate', 'jobId'] },
+  { key: 'generated.importReports', packageName: 'CORE', group: GROUPS.GENERATED, label: 'Import Reports', defaultTemplate: 'importReports', placeholders: [] },
+  { key: 'generated.benchpathReports', packageName: 'BENCHPATH', group: GROUPS.GENERATED, label: 'BenchPath Reports', defaultTemplate: 'benchpath/reports', placeholders: [] }
 ]);
 
-const DEFINITION_MAP = new Map(DEFINITIONS.map((definition) => [definition.key, definition]));
+const RUNTIME_DEFINITIONS = [];
 const WINDOWS_RESERVED_NAMES = new Set([
   'CON', 'PRN', 'AUX', 'NUL',
   'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
@@ -68,6 +78,13 @@ function normalizeSeparators(value = '') {
   return clean(value).replace(/\\/g, '/').replace(/\/+/g, '/');
 }
 
+function normalizePackageName(value, fallback = '') {
+  const token = clean(value).toUpperCase();
+  if (!token) return fallback;
+  if (Object.prototype.hasOwnProperty.call(PACKAGE_NAMES, token)) return token;
+  return fallback;
+}
+
 function sanitizeFolderToken(value, fallback = 'unspecified', max = 120) {
   const token = clean(value).slice(0, max);
   if (!token) return fallback;
@@ -80,15 +97,42 @@ function sanitizeFolderToken(value, fallback = 'unspecified', max = 120) {
   return normalized || fallback;
 }
 
+function cloneDefinition(definition = {}) {
+  return {
+    key: clean(definition.key),
+    label: clean(definition.label),
+    group: clean(definition.group),
+    packageName: normalizePackageName(definition.packageName, 'CORE'),
+    defaultTemplate: normalizeSeparators(definition.defaultTemplate),
+    placeholders: Array.isArray(definition.placeholders)
+      ? definition.placeholders.map((row) => clean(row)).filter(Boolean)
+      : []
+  };
+}
+
+function getAllDefinitions() {
+  const rows = [...BUILTIN_DEFINITIONS, ...RUNTIME_DEFINITIONS].map(cloneDefinition);
+  const seen = new Set();
+  return rows.filter((row) => {
+    if (!row.key || seen.has(row.key)) return false;
+    seen.add(row.key);
+    return true;
+  });
+}
+
+function getDefinitionMap() {
+  return new Map(getAllDefinitions().map((definition) => [definition.key, definition]));
+}
+
 function getDefaultUploadFolders() {
-  return DEFINITIONS.reduce((out, definition) => {
+  return getAllDefinitions().reduce((out, definition) => {
     out[definition.key] = definition.defaultTemplate;
     return out;
   }, {});
 }
 
 function getDefinition(key) {
-  const definition = DEFINITION_MAP.get(String(key || '').trim());
+  const definition = getDefinitionMap().get(String(key || '').trim());
   if (!definition) throw new Error(`Unknown upload folder setting: ${key}`);
   return definition;
 }
@@ -147,17 +191,29 @@ function validateTemplateForDefinition(definition, rawValue, options = {}) {
 function sanitizeUploadFolderSettings(input = {}, options = {}) {
   const source = input && typeof input === 'object' ? input : {};
   const sanitized = {};
-  DEFINITIONS.forEach((definition) => {
+  getAllDefinitions().forEach((definition) => {
+    sanitized[definition.key] = validateTemplateForDefinition(definition, source[definition.key], options);
+  });
+  return sanitized;
+}
+
+function sanitizeUploadFolderSettingsPatch(input = {}, options = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  const sanitized = {};
+  Object.keys(source).forEach((key) => {
+    const definition = getDefinitionMap().get(String(key || '').trim());
+    if (!definition) return;
     sanitized[definition.key] = validateTemplateForDefinition(definition, source[definition.key], options);
   });
   return sanitized;
 }
 
 function mergeUploadFolderSettings(...settingsObjects) {
+  const definitions = getAllDefinitions();
   const merged = getDefaultUploadFolders();
   settingsObjects.forEach((settings) => {
     if (!settings || typeof settings !== 'object') return;
-    DEFINITIONS.forEach((definition) => {
+    definitions.forEach((definition) => {
       const rawValue = settings[definition.key];
       if (rawValue === undefined || rawValue === null || rawValue === '') return;
       try {
@@ -212,25 +268,75 @@ function resolveDefaultUploadFolder(key, context = {}) {
   return normalizeSeparators(template).split('/').filter(Boolean).join('/');
 }
 
-function getUploadFolderDefinitions() {
-  return DEFINITIONS.map((definition) => ({
-    ...definition,
-    placeholders: [...(definition.placeholders || [])],
-    defaultTemplate: definition.defaultTemplate,
-    currentTemplate: getUploadFolderTemplate(definition.key)
-  }));
+function getUploadFolderDefinitions(options = {}) {
+  const filterPackage = normalizePackageName(options.packageName, '');
+  return getAllDefinitions()
+    .filter((definition) => !filterPackage || definition.packageName === filterPackage)
+    .map((definition) => ({
+      ...definition,
+      placeholders: [...(definition.placeholders || [])],
+      defaultTemplate: definition.defaultTemplate,
+      currentTemplate: getUploadFolderTemplate(definition.key)
+    }));
+}
+
+function getUploadFolderPackageOptions() {
+  const counts = {};
+  getAllDefinitions().forEach((definition) => {
+    const token = normalizePackageName(definition.packageName, 'CORE');
+    counts[token] = Number(counts[token] || 0) + 1;
+  });
+  return Object.keys(PACKAGE_NAMES)
+    .filter((id) => Number(counts[id] || 0) > 0)
+    .map((id) => ({
+      id,
+      label: PACKAGE_NAMES[id],
+      count: counts[id]
+    }));
+}
+
+function registerUploadFolderDefinitions(definitions = []) {
+  const rows = Array.isArray(definitions) ? definitions : [definitions];
+  if (!rows.length) return 0;
+
+  const existingKeys = new Set(getAllDefinitions().map((definition) => definition.key));
+  let inserted = 0;
+  rows.forEach((rawDefinition) => {
+    const next = cloneDefinition({
+      key: rawDefinition?.key,
+      label: rawDefinition?.label || rawDefinition?.key,
+      group: rawDefinition?.group || GROUPS.CORE,
+      packageName: rawDefinition?.packageName || 'CORE',
+      defaultTemplate: rawDefinition?.defaultTemplate,
+      placeholders: rawDefinition?.placeholders || []
+    });
+    if (!next.key || existingKeys.has(next.key)) return;
+    if (!next.defaultTemplate) {
+      throw new Error(`Upload folder definition ${next.key || '(unknown)'} is missing defaultTemplate.`);
+    }
+    validateTemplateForDefinition(next, next.defaultTemplate, { required: true });
+    RUNTIME_DEFINITIONS.push(next);
+    existingKeys.add(next.key);
+    inserted += 1;
+  });
+  return inserted;
 }
 
 module.exports = {
   GROUPS,
+  PACKAGE_NAMES,
   PLACEHOLDER_DEFAULTS,
   getDefaultUploadFolders,
   getUploadFolderDefinitions,
+  getUploadFolderPackageOptions,
   getUploadFolderTemplate,
+  normalizePackageName,
   resolveUploadFolder,
   resolveDefaultUploadFolder,
   sanitizeFolderToken,
   sanitizeUploadFolderSettings,
+  sanitizeUploadFolderSettingsPatch,
   mergeUploadFolderSettings,
+  registerUploadFolderDefinitions,
   validateTemplateForDefinition
 };

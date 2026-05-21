@@ -15,6 +15,8 @@ function redirectNonAdminToPteHub(req, res, next) {
 
 router.get('/', requireAuth, redirectNonAdminToPteHub, dashboardController.showDashboard);
 
+router.get('/bootstrap-setup', requireAuth, dashboardController.showBootstrapSetup);
+
 router.get('/section-nav/:sectionKey', requireAuth, dashboardController.showSectionNav);
 
 router.get('/section/:sectionId', requireAuth, dashboardController.showSectionSubDashboard);

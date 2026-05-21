@@ -155,16 +155,27 @@ router.post('/public-pages',
           trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
           ctrl.updatePublicPageContentSettings);
 
+router.get('/default-file-paths',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_UPLOAD_FOLDERS, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_UPLOAD_FOLDERS, OPERATIONS.UPDATE),
+          ctrl.showDefaultFilePathSettings);
+router.post('/default-file-paths',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_UPLOAD_FOLDERS, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_UPLOAD_FOLDERS, OPERATIONS.UPDATE),
+          ctrl.updateDefaultFilePathSettings);
+
 router.get('/upload-folders',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_UPLOAD_FOLDERS, OPERATIONS.UPDATE),
           trackActionState(SECTIONS.SYSTEM_UPLOAD_FOLDERS, OPERATIONS.UPDATE),
-          ctrl.showUploadFolderSettings);
+          ctrl.redirectUploadFolderSettingsGet);
 router.post('/upload-folders',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_UPLOAD_FOLDERS, OPERATIONS.UPDATE),
           trackActionState(SECTIONS.SYSTEM_UPLOAD_FOLDERS, OPERATIONS.UPDATE),
-          ctrl.updateUploadFolderSettings);
+          ctrl.redirectUploadFolderSettingsPost);
 
 // 6. Data Backend Mode (restart-based)
 router.get('/data-backend',

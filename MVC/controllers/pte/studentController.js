@@ -1,12 +1,8 @@
 const path = require('path');
 const crypto = require('crypto');
-const fs = require('fs').promises;
 const paginate = require('../../utils/paginationHelper');
-const pathResolver = require('../../utils/pathResolver');
 const pteUploadPathUtils = require('../../utils/pteUploadPathUtils');
-const uploadPathUtils = require('../../utils/uploadPathUtils');
-const { isRailwayProxyMode } = require('../../utils/uploadModeUtils');
-const { gatewayListDirectory } = require('../../services/fileGatewayClientService');
+const coreFilesService = require('../../services/coreFilesService');
 const uploadMiddleware = require('../../middleware/upload');
 const pteStudentDataService = require('../../services/pte/pteStudentDataService');
 const {
@@ -251,32 +247,10 @@ function buildAttachmentUrlFromPath(filePath) {
   if (!normalized) return '';
   if (/^\/uploads\//i.test(normalized)) return normalized;
   const dirPath = path.dirname(normalized);
-  const dirUrl = pathResolver.getWebUrlForUpload(dirPath);
+  const dirUrl = coreFilesService.getWebUrlForUpload(dirPath);
   const filename = path.basename(normalized);
   if (!dirUrl || !filename) return '';
   return `${dirUrl}/${filename}`;
-}
-
-function buildMediaLibraryRow(filePath = '', stat = null) {
-  const normalizedPath = String(filePath || '').replace(/\\/g, '/').trim();
-  const fileName = path.basename(normalizedPath);
-  const dirPath = path.dirname(normalizedPath);
-  const dirUrl = pathResolver.getWebUrlForUpload(dirPath);
-  const fileUrl = dirUrl ? `${dirUrl}/${encodeURIComponent(fileName)}` : '';
-  const digest = crypto.createHash('md5').update(normalizedPath).digest('hex');
-  return {
-    id: `LIB_${digest}`,
-    name: fileName,
-    originalName: fileName,
-    filename: fileName,
-    path: normalizedPath,
-    url: fileUrl,
-    mimeType: '',
-    size: Number(stat?.size || 0) || 0,
-    uploadDate: stat?.mtime ? new Date(stat.mtime).toISOString() : '',
-    comment: '',
-    source: 'saved_library'
-  };
 }
 
 function buildScopeUploadPrefix(orgId = '') {
@@ -332,20 +306,6 @@ function normalizeRelativeFolderToken(value, max = 800) {
   return compact.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
-function toRelativeFolder(baseRoot = '', absolutePath = '') {
-  const root = String(baseRoot || '').trim();
-  const target = String(absolutePath || '').trim();
-  if (!root || !target) return '';
-  const relative = path.relative(root, target);
-  if (!relative || relative === '.') return '';
-  return relative.split(path.sep).join('/').replace(/^\/+/, '').replace(/\/+$/, '');
-}
-
-async function directoryExists(dirPath = '') {
-  const stat = await fs.stat(String(dirPath || '')).catch(() => null);
-  return Boolean(stat && stat.isDirectory && stat.isDirectory());
-}
-
 function normalizeAbsolutePath(inputPath = '') {
   const token = String(inputPath || '').trim();
   if (!token) return '';
@@ -375,15 +335,10 @@ function resolveScopeIdToken(orgId = '') {
   return token;
 }
 
-function getUploadsRootPath() {
-  const globalRoot = pathResolver.getRootPath('GLOBAL');
-  return normalizeAbsolutePath(path.dirname(globalRoot));
-}
-
 function getStudentsAttachmentRoot(orgId = '') {
   const scopeId = resolveScopeIdToken(orgId);
-  const scopedRoot = pathResolver.getRootPath(scopeId);
-  return normalizeAbsolutePath(pathResolver.resolveSafePath(
+  const scopedRoot = coreFilesService.getRootPath(scopeId);
+  return normalizeAbsolutePath(coreFilesService.resolveSafePath(
     scopedRoot,
     pteUploadPathUtils.getStudentsRoot(false)
   ));
@@ -391,8 +346,8 @@ function getStudentsAttachmentRoot(orgId = '') {
 
 function getPublicApplicantsAttachmentRoot(orgId = '') {
   const scopeId = resolveScopeIdToken(orgId);
-  const scopedRoot = pathResolver.getRootPath(scopeId);
-  return normalizeAbsolutePath(pathResolver.resolveSafePath(
+  const scopedRoot = coreFilesService.getRootPath(scopeId);
+  return normalizeAbsolutePath(coreFilesService.resolveSafePath(
     scopedRoot,
     pteUploadPathUtils.getStudentsRoot(true)
   ));
@@ -400,8 +355,8 @@ function getPublicApplicantsAttachmentRoot(orgId = '') {
 
 function getLegacyStudentsAttachmentRoot(orgId = '') {
   const scopeId = resolveScopeIdToken(orgId);
-  const scopedRoot = pathResolver.getRootPath(scopeId);
-  return normalizeAbsolutePath(pathResolver.resolveSafePath(scopedRoot, 'pte-students'));
+  const scopedRoot = coreFilesService.getRootPath(scopeId);
+  return normalizeAbsolutePath(coreFilesService.resolveSafePath(scopedRoot, 'pte-students'));
 }
 
 function getAllowedAttachmentRoots(orgId = '') {
@@ -415,7 +370,7 @@ function getAllowedAttachmentRoots(orgId = '') {
 function resolveDiskPathFromUploadsUrl(fileUrl = '') {
   const token = cleanText(fileUrl, 1600);
   if (!token) return '';
-  return normalizeAbsolutePath(uploadPathUtils.fromUploadsUrlToDiskPath(token));
+  return normalizeAbsolutePath(coreFilesService.fromUploadsUrlToDiskPath(token));
 }
 
 function normalizeSafeStudentAttachmentPath(filePath = '', fileUrl = '', orgId = '') {
@@ -436,11 +391,11 @@ function normalizeSafeStudentAttachmentPath(filePath = '', fileUrl = '', orgId =
 }
 
 function toCanonicalUploadReference(filePath = '', fileUrl = '') {
-  const fromUrl = uploadPathUtils.extractRelativeUploadPath(fileUrl);
+  const fromUrl = coreFilesService.extractRelativeUploadPath(fileUrl);
   if (fromUrl) return `/uploads/${fromUrl}`;
-  const fromPathUrl = uploadPathUtils.extractRelativeUploadPath(filePath);
+  const fromPathUrl = coreFilesService.extractRelativeUploadPath(filePath);
   if (fromPathUrl) return `/uploads/${fromPathUrl}`;
-  return uploadPathUtils.fromDiskPathToUploadsUrl(filePath) || String(filePath || '').replace(/\\/g, '/').trim();
+  return coreFilesService.fromDiskPathToUploadsUrl(filePath) || String(filePath || '').replace(/\\/g, '/').trim();
 }
 
 function isPublicMediaLibraryRequest(req) {
@@ -680,6 +635,9 @@ async function showForm(req, res, audience = 'regular') {
     const mediaItemId = isEdit
       ? cleanText(applicant?.id, 120)
       : `ITEM_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const mediaDefaultFolder = pageContext.isPublic
+      ? pteUploadPathUtils.getStudentsRoot(true)
+      : pteUploadPathUtils.getStudentsRoot(false);
 
     return res.render('pte/students/studentForm', {
       title: isEdit
@@ -687,6 +645,7 @@ async function showForm(req, res, audience = 'regular') {
         : 'Create PTE Applicant',
       applicant,
       mediaItemId,
+      mediaDefaultFolder,
       countries: COUNTRY_OPTIONS,
       academicStatuses: ACADEMIC_STATUS_OPTIONS,
       listBasePath: pageContext.listBasePath,
@@ -925,90 +884,41 @@ async function listOrgMediaLibrary(req, res) {
       });
     }
 
-    const root = pathResolver.getRootPath(resolveScopeIdToken(activeOrgId));
     const requestedFolder = normalizeRelativeFolderToken(req.query?.folder);
     const candidateFolders = requestedFolder
       ? [requestedFolder, defaultFolder, '']
       : [defaultFolder, ''];
-
-    if (isRailwayProxyMode()) {
-      const currentFolder = normalizeRelativeFolderToken(requestedFolder || defaultFolder);
-      const gatewayResult = await gatewayListDirectory({
-        scopeKey: activeOrgId,
-        relativeDir: currentFolder
-      });
-      const entries = Array.isArray(gatewayResult?.files) ? gatewayResult.files : [];
-      const folders = [];
-      const rows = [];
-
-      entries.forEach((entry) => {
-        if (!entry) return;
-        const name = cleanText(entry.name, 260);
-        if (!name) return;
-        if (entry.isDir) {
-          folders.push({
-            name,
-            path: normalizeRelativeFolderToken([currentFolder, name].filter(Boolean).join('/'))
-          });
-          return;
-        }
-        rows.push(buildGatewayMediaLibraryRow(entry, activeOrgId, currentFolder));
-      });
-
-      folders.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-      rows.sort((a, b) => String(b.uploadDate || '').localeCompare(String(a.uploadDate || '')));
-      const parentFolder = currentFolder.includes('/')
-        ? currentFolder.split('/').slice(0, -1).join('/')
-        : '';
-
-      return res.json({
-        status: 'success',
-        message: rows.length ? `Loaded ${rows.length} file(s).` : 'No saved files found in this folder.',
-        results: rows,
-        folders,
-        currentFolder,
-        parentFolder,
-        defaultFolder,
-        defaults: { pageSize: defaultPageSize }
-      });
-    }
-
+    const scopeKey = resolveScopeIdToken(activeOrgId);
     let currentFolder = '';
+    let entries = [];
     for (const folderToken of candidateFolders) {
-      const maybePath = folderToken
-        ? pathResolver.resolveSafePath(root, folderToken)
-        : root;
       // eslint-disable-next-line no-await-in-loop
-      const exists = await directoryExists(maybePath);
-      if (exists) {
+      const listed = await coreFilesService.listDirectoryByScope({
+        scopeKey,
+        relativeDir: normalizeRelativeFolderToken(folderToken)
+      }).catch(() => null);
+      if (Array.isArray(listed)) {
         currentFolder = normalizeRelativeFolderToken(folderToken);
+        entries = listed;
         break;
       }
     }
 
-    const currentPath = currentFolder
-      ? pathResolver.resolveSafePath(root, currentFolder)
-      : root;
-    const entries = await fs.readdir(currentPath, { withFileTypes: true }).catch(() => []);
     const folders = [];
     const rows = [];
 
     for (const entry of entries) {
       if (!entry) continue;
-      const absolutePath = pathResolver.resolveSafePath(currentPath, entry.name);
-      if (entry.isDirectory && entry.isDirectory()) {
-        const relativePath = normalizeRelativeFolderToken(toRelativeFolder(root, absolutePath));
+      const name = cleanText(entry.name, 260);
+      if (!name) continue;
+      if (entry.isDir) {
         folders.push({
-          name: cleanText(entry.name, 260) || relativePath || '/',
-          path: relativePath
+          name,
+          path: normalizeRelativeFolderToken([currentFolder, name].filter(Boolean).join('/'))
         });
         continue;
       }
-      if (!entry.isFile || !entry.isFile()) continue;
-      // eslint-disable-next-line no-await-in-loop
-      const stat = await fs.stat(absolutePath).catch(() => null);
-      if (!stat || !stat.isFile || !stat.isFile()) continue;
-      rows.push(buildMediaLibraryRow(absolutePath, stat));
+      rows.push(buildGatewayMediaLibraryRow(entry, activeOrgId, currentFolder));
     }
 
     folders.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));

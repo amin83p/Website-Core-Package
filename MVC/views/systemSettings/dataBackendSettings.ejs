@@ -16,6 +16,7 @@
   const lastMongoError = runtime.lastMongoError && runtime.lastMongoError.message ? String(runtime.lastMongoError.message) : '';
   const retryErrorMessage = typeof retryError !== 'undefined' ? String(retryError || '') : '';
   const actionStateValue = typeof actionStateId !== 'undefined' ? String(actionStateId || '') : '';
+  const restoreMaxUploadMb = Number.isFinite(Number(mongoRestoreMaxUploadMb)) ? Number(mongoRestoreMaxUploadMb) : 100;
 %>
 
 <div class="sections-page">
@@ -189,6 +190,7 @@
               <label for="mongoBackupFile" class="form-label fw-bold">Backup File</label>
               <input type="file" class="form-control" id="mongoBackupFile" name="backupFile" accept=".gz,.jsonl,.json" <%= mongoReady ? '' : 'disabled' %>>
               <div class="form-text">Expected format: <code>mongo-backup-YYYYMMDD-HHMMSS.jsonl.gz</code>.</div>
+              <div class="form-text">Maximum upload size: <b><%= restoreMaxUploadMb %> MB</b>.</div>
             </div>
             <div class="col-lg-5">
               <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
@@ -299,6 +301,38 @@
     `;
   }
 
+  function submitRestoreBackup(formData, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/systemSettings/data-backend/restore-backup', true);
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.setRequestHeader('X-AJAX-Request', 'true');
+
+      xhr.upload.onprogress = (event) => {
+        if (typeof onProgress === 'function') onProgress(event);
+      };
+
+      xhr.onerror = () => reject(new Error('Restore request failed. Check your connection and try again.'));
+      xhr.onabort = () => reject(new Error('Restore request was cancelled.'));
+      xhr.onload = () => {
+        let payload = {};
+        try {
+          payload = JSON.parse(xhr.responseText || '{}');
+        } catch (_) {
+          payload = {};
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300 && payload.status === 'success') {
+          resolve(payload);
+          return;
+        }
+        reject(new Error(payload.message || `Restore failed (${xhr.status}).`));
+      };
+
+      xhr.send(formData);
+    });
+  }
+
   if (downloadBtn && downloadForm) {
     downloadBtn.addEventListener('click', () => downloadForm.submit());
   }
@@ -333,7 +367,7 @@
         if (typeof window.hideLoading === 'function') window.hideLoading();
         const selected = await showModalMessage(
           'Mongo Connection Restored',
-          escapeHtml(payload.message || 'Mongo connection retry succeeded.'),
+          String(payload.message || 'Mongo connection retry succeeded.'),
           'success',
           'btn-success'
         );
@@ -344,7 +378,7 @@
         if (typeof window.hideLoading === 'function') window.hideLoading();
         await showModalMessage(
           'Mongo Retry Failed',
-          escapeHtml(error.message || 'Mongo connection retry failed.'),
+          String(error.message || 'Mongo connection retry failed.'),
           'error',
           'btn-danger'
         );
@@ -360,8 +394,18 @@
   restoreForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    const maxUploadBytes = <%= restoreMaxUploadMb %> * 1024 * 1024;
     if (!file) {
       await showModalMessage('Backup Required', 'Select a Mongo backup file before restoring.', 'warning', 'btn-warning');
+      return;
+    }
+    if (file.size > maxUploadBytes) {
+      await showModalMessage(
+        'Backup File Too Large',
+        `Selected file is too large. Maximum upload size is <b><%= restoreMaxUploadMb %> MB</b>.`,
+        'warning',
+        'btn-warning'
+      );
       return;
     }
 
@@ -386,48 +430,52 @@
     }
     if (selected !== 'Restore Database') return;
 
+    const original = restoreBtn.innerHTML;
+    let loadingShown = false;
     try {
       if (typeof window.requestProtectedAction !== 'function') {
         throw new Error('Admin verification system is not loaded. Please refresh the page and try again.');
       }
       await window.requestProtectedAction();
 
-      const original = restoreBtn.innerHTML;
       restoreBtn.disabled = true;
       restoreBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Restoring...';
 
       if (typeof window.showLoading === 'function') {
         window.showLoading({
           title: 'Restoring Mongo Backup',
-          note: 'Uploading backup and rebuilding included collections...',
-          operation: 'Database restore'
+          note: 'Uploading backup file...',
+          operation: 'Database restore',
+          progress: 0
         });
+        loadingShown = true;
       }
 
       const formData = new FormData(restoreForm);
-      const response = await fetch('/systemSettings/data-backend/restore-backup', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'X-AJAX-Request': 'true'
-        },
-        body: formData
+      const payload = await submitRestoreBackup(formData, (progressEvent) => {
+        if (!progressEvent || !progressEvent.lengthComputable || progressEvent.total <= 0) return;
+        const percent = Math.min(100, Math.round((progressEvent.loaded / progressEvent.total) * 100));
+        if (typeof window.setLoadingProgress === 'function') {
+          window.setLoadingProgress(percent, {
+            note: percent >= 100
+              ? 'Upload complete. Restoring Mongo collections...'
+              : `Uploading backup file... ${percent}%`
+          });
+        }
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || payload.status !== 'success') {
-        throw new Error(payload.message || `Restore failed (${response.status}).`);
+      if (typeof window.setLoadingProgress === 'function') {
+        window.setLoadingProgress(100, { note: 'Restore completed.' });
       }
-
-      if (typeof window.hideLoading === 'function') window.hideLoading();
-      await showModalMessage('Restore Completed', buildRestoreSummary(payload.report), 'success', 'btn-success');
       fileInput.value = '';
       restoreBtn.innerHTML = original;
       restoreBtn.disabled = false;
+      await showModalMessage('Restore Completed', buildRestoreSummary(payload.report), 'success', 'btn-success');
     } catch (error) {
       if (error && error.code === 'ADMIN_VERIFICATION_CANCELLED') return;
-      if (typeof window.hideLoading === 'function') window.hideLoading();
-      await showModalMessage('Restore Failed', escapeHtml(error.message || 'Database restore failed.'), 'error', 'btn-danger');
-      restoreBtn.innerHTML = '<i class="bi bi-cloud-arrow-up me-1"></i> Restore Backup';
+      await showModalMessage('Restore Failed', String(error.message || 'Database restore failed.'), 'error', 'btn-danger');
+    } finally {
+      if (loadingShown && typeof window.hideLoading === 'function') window.hideLoading();
+      restoreBtn.innerHTML = original;
       restoreBtn.disabled = false;
     }
   });

@@ -2,7 +2,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const dataService = require('../services/dataService');
 const symbolRepository = require('../repositories/symbolRepository');
-const uploadPathUtils = require('../utils/uploadPathUtils');
+const coreFilesService = require('../services/coreFilesService');
 const appBrandingService = require('../services/appBrandingService');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 
@@ -19,7 +19,7 @@ async function getHome(req, res) {
   let heroSlides = [];
   let homeShowcaseItems = [];
   let buyMeACoffeeQr = null;
-  const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
+  const uploadRoot = coreFilesService.getUploadRootAbsolute();
   let publicPageContent = null;
   let homeContent = null;
 

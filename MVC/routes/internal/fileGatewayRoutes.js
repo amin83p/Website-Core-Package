@@ -19,17 +19,17 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: uploadLimitMb * 1024 * 1024 }
 });
-const restoreLimitMb = Number.parseInt(process.env.ORG_FILE_BACKUP_RESTORE_MAX_MB || '500', 10) || 500;
+const ORG_FILE_BACKUP_RESTORE_MAX_MB = Number.parseInt(process.env.ORG_FILE_BACKUP_RESTORE_MAX_MB || '500', 10) || 500;
 const backupRestoreUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: restoreLimitMb * 1024 * 1024 }
+  limits: { fileSize: ORG_FILE_BACKUP_RESTORE_MAX_MB * 1024 * 1024 }
 });
 
 function handleBackupRestoreUpload(req, res, next) {
   backupRestoreUpload.single('backupFile')(req, res, (error) => {
     if (!error) return next();
     const message = error.code === 'LIMIT_FILE_SIZE'
-      ? `Backup file is too large. Maximum upload size is ${restoreLimitMb} MB.`
+      ? `Backup file is too large. Maximum upload size is ${ORG_FILE_BACKUP_RESTORE_MAX_MB} MB. Set ORG_FILE_BACKUP_RESTORE_MAX_MB and restart the gateway service if a larger restore is required.`
       : (error.message || 'Backup upload failed.');
     return res.status(400).json({ status: 'error', message });
   });
