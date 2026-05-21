@@ -1,0 +1,237 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="page-heading size-md m-0">Search Components</h2>
+        <p class="text-muted mb-0">Style the global search bars and filter inputs.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/styles" class="btn btn-outline-secondary btn-sm">Back</a>
+        <button type="submit" form="searchForm" class="btn btn-primary btn-sm btn-filled">
+            <i class="bi bi-save-fill me-1"></i> Save Changes
+        </button>
+    </div>
+  </div>
+
+  <div class="row g-4">
+      
+      <div class="col-lg-4">
+          <div class="card border-0 shadow-lg sticky-top" style="top: 20px;">
+              <div class="card-header bg-dark text-white fw-bold">
+                  Search Configuration
+              </div>
+              <div class="card-body bg-light">
+                  <form id="searchForm" action="/styles/search/save" method="POST">
+                      
+                      <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
+                          <li class="nav-item">
+                              <button class="nav-link active small py-1" data-bs-toggle="pill" data-bs-target="#tab-standard" type="button">Page Filters</button>
+                          </li>
+                          <li class="nav-item">
+                              <button class="nav-link small py-1" data-bs-toggle="pill" data-bs-target="#tab-header" type="button">Header Search</button>
+                          </li>
+                      </ul>
+
+                      <div class="tab-content">
+                          
+                          <div class="tab-pane fade show active" id="tab-standard">
+                              <h6 class="fw-bold text-primary mb-3">General Inputs</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Layout Direction</label>
+                                  <select class="form-select form-select-sm font-monospace" 
+                                          onchange="updatePreview('--search-layout-dir', this.value)">
+                                      <option value="row" <%= (!searchVars.layoutDir || searchVars.layoutDir === 'row') ? 'selected' : '' %>>Horizontal (Row)</option>
+                                      <option value="column" <%= searchVars.layoutDir === 'column' ? 'selected' : '' %>>Vertical (Column)</option>
+                                  </select>
+                                  <input type="hidden" name="--search-layout-dir" id="val_layoutDir" value="<%= searchVars.layoutDir || 'row' %>">
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Border Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= searchVars.borderColor %>" oninput="updatePreview('--search-border-color', this.value)">
+                                      <input type="text" name="--search-border-color" id="val_borderColor" class="form-control font-monospace" value="<%= searchVars.borderColor %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Focus Ring (Glow)</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="#007bff" title="Pick base color" onchange="const v = this.value + '40'; document.getElementById('val_focusRing').value = v; updatePreview('--search-focus-ring', v)">
+                                      <input type="text" name="--search-focus-ring" id="val_focusRing" class="form-control font-monospace" value="<%= searchVars.focusRing %>">
+                                  </div>
+                                  <div class="form-text x-small">Use RGBA or Hex with opacity.</div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Corner Radius</span>
+                                      <span id="radVal" class="text-primary"><%= searchVars.radius %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="25" step="1" 
+                                         value="<%= parseInt(searchVars.radius) %>"
+                                         oninput="updatePreview('--search-radius', this.value + 'px'); document.getElementById('radVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--search-radius" id="val_radius" value="<%= searchVars.radius %>">
+                              </div>
+                          </div>
+
+                          <div class="tab-pane fade" id="tab-header">
+                              <h6 class="fw-bold text-primary mb-3">Header "Pill" Search</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Input Background</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= searchVars.headerBg %>" oninput="updatePreview('--header-search-bg', this.value)">
+                                      <input type="text" name="--header-search-bg" id="val_headerBg" class="form-control font-monospace" value="<%= searchVars.headerBg %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Border / Button Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= searchVars.headerBorder %>" oninput="updatePreview('--header-search-border', this.value)">
+                                      <input type="text" name="--header-search-border" id="val_headerBorder" class="form-control font-monospace" value="<%= searchVars.headerBorder %>">
+                                  </div>
+                                  <div class="form-text x-small">Affects border and submit button.</div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Pill Radius</span>
+                                      <span id="hRadVal" class="text-primary"><%= searchVars.headerRadius %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="50" step="1" 
+                                         value="<%= parseInt(searchVars.headerRadius) %>"
+                                         oninput="updatePreview('--header-search-radius', this.value + 'px'); document.getElementById('hRadVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--header-search-radius" id="val_headerRadius" value="<%= searchVars.headerRadius %>">
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Expanded Width</span>
+                                      <span id="widVal" class="text-primary"><%= searchVars.headerWidth %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="150" max="400" step="10" 
+                                         value="<%= parseInt(searchVars.headerWidth) %>"
+                                         oninput="updatePreview('--header-search-width', this.value + 'px'); document.getElementById('widVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--header-search-width" id="val_headerWidth" value="<%= searchVars.headerWidth %>">
+                              </div>
+                          </div>
+
+                      </div>
+
+                  </form>
+              </div>
+          </div>
+      </div>
+
+      <div class="col-lg-8">
+          <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white border-bottom-0 pt-3 fw-bold text-secondary d-flex justify-content-between align-items-center">
+                  <span>Live Preview</span>
+                  <span class="badge bg-light text-muted border">Component Test</span>
+              </div>
+              <div class="card-body p-4 bg-light d-flex flex-column gap-5">
+                  
+                  <div class="p-4 bg-white rounded shadow-sm border">
+                      <h6 class="fw-bold text-dark mb-3"><i class="bi bi-filter me-2 text-secondary"></i>Standard Page Filter</h6>
+                      <p class="text-muted small">Used in data tables and forms.</p>
+                      
+                      <div class="search-wrapper">
+                          <label class="form-label me-2">Filter:</label>
+                          <select class="form-select search-select">
+                              <option>Name</option>
+                              <option>Email</option>
+                          </select>
+                          <input type="text" class="form-control search-input" placeholder="Type query..." autocomplete="off">
+                      </div>
+                  </div>
+
+                  <div class="p-4 bg-white rounded shadow-sm border">
+                      <div class="d-flex justify-content-between align-items-center mb-3">
+                          <h6 class="fw-bold text-dark m-0"><i class="bi bi-search me-2 text-primary"></i>Header Search (Pill)</h6>
+                          <div class="form-check form-switch">
+                              <input class="form-check-input" type="checkbox" id="toggleAnim" checked onchange="toggleAnimation(this.checked)">
+                              <label class="form-check-label small text-muted" for="toggleAnim">Show Active</label>
+                          </div>
+                      </div>
+                      <p class="text-muted small">Normally hidden in the header until clicked. Use toggle to preview animation.</p>
+                      
+                      <div class="p-3 bg-light border rounded d-flex align-items-center" style="height: 80px;">
+                          <div class="fw-bold text-muted me-auto">LOGO</div>
+                          
+                          <div class="search-form active" id="headerSearchPreview">
+                              <input type="text" class="form-control search-input" placeholder="Search site..." autocomplete="off">
+                              <button class="search-submit">
+                                  <i class="bi bi-search"></i>
+                              </button>
+                          </div>
+
+                          <div class="ms-3 rounded-circle bg-secondary" style="width: 32px; height: 32px;"></div>
+                      </div>
+                  </div>
+
+              </div>
+          </div>
+      </div>
+
+  </div>
+</div>
+
+<script>
+    function updatePreview(varName, val) {
+        // 1. Sync Hidden Inputs for form submission
+        // Convert CSS var name to input ID format (e.g., --search-layout-dir -> val_layoutDir)
+        const shortName = varName.replace('--search-', '').replace('--header-search-', 'header').replace(/-([a-z])/g, g => g[1].toUpperCase());
+        const inputId = 'val_' + shortName;
+        
+        const textInput = document.getElementById(inputId);
+        if(textInput) textInput.value = val;
+
+        // 2. Apply to Root to trigger live preview
+        document.documentElement.style.setProperty(varName, val);
+    }
+
+    function toggleAnimation(isActive) {
+        const form = document.getElementById('headerSearchPreview');
+        if(isActive) form.classList.add('active');
+        else form.classList.remove('active');
+    }
+
+    document.getElementById('searchForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.querySelector('button[type="submit"]');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        btn.disabled = true;
+
+        try {
+            const fd = new FormData(e.target);
+            const data = Object.fromEntries(fd.entries());
+            const res = await fetch(e.target.action, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' }, 
+                body: JSON.stringify(data) 
+            });
+            const result = await res.json();
+            
+            if (result.status === 'success') {
+                if(typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Saved', icon: 'success', message: 'Search styles updated.', buttons: [{text:'OK', class:'btn-success'}]});
+                }
+                btn.disabled = false; 
+                btn.innerHTML = originalHtml;
+            } else {
+                alert('Error: ' + result.message);
+                btn.disabled = false; 
+                btn.innerHTML = originalHtml;
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Network error.');
+            btn.disabled = false; 
+            btn.innerHTML = originalHtml;
+        }
+    });
+</script>

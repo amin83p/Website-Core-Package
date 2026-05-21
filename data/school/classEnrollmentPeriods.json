@@ -1,0 +1,254 @@
+[
+  {
+    "orgId": "900000",
+    "classId": "609077",
+    "studentId": "STU50124",
+    "status": "active",
+    "startDate": "2026-01-30",
+    "endDate": "2026-04-30",
+    "programId": "232974",
+    "termId": "",
+    "funderType": "",
+    "funderId": "",
+    "authorizationRef": "",
+    "reasonStart": "",
+    "reasonEnd": "Rolled back posted transactions; returned to draft.",
+    "notes": "Draft rolling enrollment for class 609077.",
+    "transactionSummary": {
+      "mode": "chargeable",
+      "currency": "CAD",
+      "totalAmount": 5000,
+      "transactionCount": 2,
+      "draftTransactionItems": [
+        {
+          "orgId": "900000",
+          "status": "posted",
+          "postedAt": "2026-04-01T08:01:38.418Z",
+          "effectiveDate": "2026-01-30",
+          "transactionType": "adjustment",
+          "party": {
+            "studentId": "STU50124",
+            "personId": "146788",
+            "programId": "232974",
+            "feeCategory": "Others"
+          },
+          "fee": {
+            "category": "Others",
+            "code": "TUTION-FEE-SAMPLE",
+            "label": "Tuition Fee Sample for LINC Classes",
+            "frequency": "",
+            "isOptional": false
+          },
+          "amount": {
+            "value": 4898,
+            "currency": "CAD",
+            "direction": "debit"
+          },
+          "memo": "STU50124 146788 232974",
+          "externalReference": "",
+          "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+          "metadata": {
+            "transactionDefinitionId": "Tuition_Fee_Sample",
+            "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+            "lineIndex": 1,
+            "ledgerSide": "debit",
+            "accountId": "ACC_1772254486560_570",
+            "accountCode": "STU_STU50124",
+            "accountName": "Javad Amini Foroushani (Student)"
+          },
+          "source": {
+            "module": "school_transaction_definition",
+            "eventType": "class_enrollment_fee",
+            "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_1-1|DR",
+            "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_1-1|DR"
+          }
+        },
+        {
+          "orgId": "900000",
+          "status": "posted",
+          "postedAt": "2026-04-01T08:01:38.418Z",
+          "effectiveDate": "2026-01-30",
+          "transactionType": "adjustment",
+          "party": {
+            "studentId": "STU50124",
+            "personId": "146788",
+            "programId": "232974",
+            "feeCategory": "Others"
+          },
+          "fee": {
+            "category": "Others",
+            "code": "TUTION-FEE-SAMPLE",
+            "label": "Tuition Fee Sample for LINC Classes",
+            "frequency": "",
+            "isOptional": false
+          },
+          "amount": {
+            "value": 4898,
+            "currency": "CAD",
+            "direction": "credit"
+          },
+          "memo": "STU50124 146788 232974",
+          "externalReference": "",
+          "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+          "metadata": {
+            "transactionDefinitionId": "Tuition_Fee_Sample",
+            "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+            "lineIndex": 1,
+            "ledgerSide": "credit",
+            "accountId": "ACC_4110",
+            "accountCode": "4110",
+            "accountName": "Tuition Revenue - Domestic"
+          },
+          "source": {
+            "module": "school_transaction_definition",
+            "eventType": "class_enrollment_fee",
+            "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_1-1|CR",
+            "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_1-1|CR"
+          }
+        },
+        {
+          "orgId": "900000",
+          "status": "posted",
+          "postedAt": "2026-04-01T08:01:38.419Z",
+          "effectiveDate": "2026-01-30",
+          "transactionType": "adjustment",
+          "party": {
+            "studentId": "STU50124",
+            "personId": "146788",
+            "programId": "232974",
+            "feeCategory": "Others"
+          },
+          "fee": {
+            "category": "Others",
+            "code": "TUTION-FEE-SAMPLE",
+            "label": "Tuition Fee Sample for LINC Classes",
+            "frequency": "",
+            "isOptional": false
+          },
+          "amount": {
+            "value": 102,
+            "currency": "CAD",
+            "direction": "debit"
+          },
+          "memo": "Tuition Fee Sample for LINC Classes - line 2",
+          "externalReference": "",
+          "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+          "metadata": {
+            "transactionDefinitionId": "Tuition_Fee_Sample",
+            "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+            "lineIndex": 2,
+            "ledgerSide": "debit",
+            "accountId": "ACC_1772254486560_570",
+            "accountCode": "STU_STU50124",
+            "accountName": "Javad Amini Foroushani (Student)"
+          },
+          "source": {
+            "module": "school_transaction_definition",
+            "eventType": "class_enrollment_fee",
+            "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_2-2|DR",
+            "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_2-2|DR"
+          }
+        },
+        {
+          "orgId": "900000",
+          "status": "posted",
+          "postedAt": "2026-04-01T08:01:38.419Z",
+          "effectiveDate": "2026-01-30",
+          "transactionType": "adjustment",
+          "party": {
+            "studentId": "STU50124",
+            "personId": "146788",
+            "programId": "232974",
+            "feeCategory": "Others"
+          },
+          "fee": {
+            "category": "Others",
+            "code": "TUTION-FEE-SAMPLE",
+            "label": "Tuition Fee Sample for LINC Classes",
+            "frequency": "",
+            "isOptional": false
+          },
+          "amount": {
+            "value": 102,
+            "currency": "CAD",
+            "direction": "credit"
+          },
+          "memo": "Tuition Fee Sample for LINC Classes - line 2",
+          "externalReference": "",
+          "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+          "metadata": {
+            "transactionDefinitionId": "Tuition_Fee_Sample",
+            "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+            "lineIndex": 2,
+            "ledgerSide": "credit",
+            "accountId": "ACC_4210",
+            "accountCode": "4210",
+            "accountName": "Registration Fees"
+          },
+          "source": {
+            "module": "school_transaction_definition",
+            "eventType": "class_enrollment_fee",
+            "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_2-2|CR",
+            "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_2-2|CR"
+          }
+        }
+      ],
+      "draftPreviewRows": [
+        {
+          "rowIndex": 0,
+          "include": true,
+          "memo": "STU50124 146788 232974",
+          "amount": 4898,
+          "currency": "CAD",
+          "debitAccount": {
+            "id": "ACC_1772254486560_570",
+            "code": "STU_STU50124",
+            "name": "Javad Amini Foroushani (Student)"
+          },
+          "creditAccount": {
+            "id": "ACC_4110",
+            "code": "4110",
+            "name": "Tuition Revenue - Domestic"
+          }
+        },
+        {
+          "rowIndex": 1,
+          "include": true,
+          "memo": "Tuition Fee Sample for LINC Classes - line 2",
+          "amount": 102,
+          "currency": "CAD",
+          "debitAccount": {
+            "id": "ACC_1772254486560_570",
+            "code": "STU_STU50124",
+            "name": "Javad Amini Foroushani (Student)"
+          },
+          "creditAccount": {
+            "id": "ACC_4210",
+            "code": "4210",
+            "name": "Registration Fees"
+          }
+        }
+      ],
+      "postedTransactionIds": [
+        "428075",
+        "672512",
+        "366515",
+        "804682"
+      ],
+      "draftSavedAt": "2026-04-01T08:01:44.167Z",
+      "note": "",
+      "postedAt": "2026-04-07T17:06:21.848Z",
+      "reversalIds": [
+        "416654",
+        "905261",
+        "261385",
+        "193911"
+      ],
+      "rollbackAt": "2026-04-01T16:30:22.857Z"
+    },
+    "sequenceNo": 1,
+    "createdBy": "ROOT_001",
+    "updatedBy": "ROOT_001",
+    "id": "118605"
+  }
+]

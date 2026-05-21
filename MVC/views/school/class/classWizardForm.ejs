@@ -1,0 +1,529 @@
+<%- include('./classForm') %>
+
+<style>
+  #classWizardGuide {
+    font-size: 1rem;
+  }
+  #classWizardGuide .small {
+    font-size: 1rem !important;
+  }
+  .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .wizard-step-rail::-webkit-scrollbar {
+    display: none;
+  }
+  #classWizardGuide .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    transition: all 0.2s ease;
+  }
+  #classWizardGuide .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #classWizardGuide .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #classWizardGuide .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #classWizardGuide .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  .class-wizard-controls {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .class-wizard-controls .wizard-step-label {
+    color: #17324d;
+    font-weight: 600;
+  }
+  .class-wizard-controls .btn.btn-sm {
+    font-size: 1rem;
+    padding: 0.45rem 0.85rem;
+  }
+  .wizard-cycle-chain {
+    border: 1px solid #ffe08a;
+    border-radius: 0.6rem;
+    background: #fff8e1;
+    padding: 0.5rem 0.65rem;
+  }
+  .wizard-cycle-chain .badge {
+    font-size: 0.78rem;
+  }
+  .wizard-lifecycle-hint {
+    background: #fff8e1;
+    border: 1px solid #ffe08a;
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    color: #5f4b00;
+    font-size: 0.92rem;
+  }
+  .wizard-lifecycle-hint .btn {
+    font-size: 0.82rem;
+  }
+</style>
+
+<script src="/scripts/wizardStepRail.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tabs = document.getElementById('classTabs');
+  const form = document.getElementById('classForm');
+  if (!tabs || !form || typeof bootstrap === 'undefined') return;
+
+  const navButtons = Array.from(tabs.querySelectorAll('button.nav-link[data-bs-target]'));
+  if (!navButtons.length) return;
+
+  const stepConfig = [
+    {
+      target: '#tab-general',
+      title: 'General & Lifecycle',
+      helper: [
+        'Set title, status, delivery department, and capacity first.',
+        'Choose Registration Mode: Term-Based (existing flow) or Rolling (period/cycle flow).',
+        'For rolling classes, configure cycle dates and run cycle actions from this step.',
+        'Delivery Department is required and drives payroll/timesheet context.',
+        'Status controls visibility and lifecycle behavior of the class.'
+      ],
+      impacts: [
+        'Used by list/search pages and term registration screens.',
+        'Rolling mode activates enrollment-period and cycle validations.',
+        'Department affects teacher pay-rate and operational lookups.',
+        'Capacity constrains enrollment operations.'
+      ],
+      required: [
+        { selector: 'input[name="title"]', label: 'Class Title' },
+        { selector: '#inp_deliveryDepartmentId', label: 'Delivery Department' },
+        { selector: '#inp_capacity', label: 'Max Student Capacity' }
+      ],
+      customCheck: function () {
+        const mode = String(document.getElementById('inp_registrationMode')?.value || 'term_based').trim().toLowerCase();
+        if (mode !== 'rolling') return '';
+        const cycleNo = Number.parseInt(String(document.getElementById('inp_cycleNo')?.value || '').trim(), 10);
+        if (!Number.isFinite(cycleNo) || cycleNo <= 0) return 'Cycle Number must be a positive value.';
+        const start = String(document.getElementById('inp_cycleStartDate')?.value || '').trim();
+        const end = String(document.getElementById('inp_cycleEndDate')?.value || '').trim();
+        if (!start) return 'Cycle Start Date is required for rolling classes.';
+        if (start && end && end < start) return 'Cycle End Date cannot be before Cycle Start Date.';
+        return '';
+      }
+    },
+    {
+      target: '#tab-eligibility',
+      title: 'Program / terms',
+      helper: [
+        'Term-based: add program–term pairs (terms must exist on the program).',
+        'Rolling: add at least one program; term is optional for each row.',
+        'Use notes for registrar context when needed.'
+      ],
+      impacts: [
+        'Term registration and rolling enrollment use this list for program context.',
+        'Rolling classes without a program here will not resolve academic ledger rows.',
+        'Directly affects eligibility pickers and enrollment defaults.'
+      ],
+      required: [],
+      customCheck: function () {
+        const mode = String(document.getElementById('inp_registrationMode')?.value || 'term_based').trim().toLowerCase();
+        if (mode !== 'rolling') return '';
+        if (typeof window.__classFormSyncAllowedProgramTermsForWizard === 'function') {
+          window.__classFormSyncAllowedProgramTermsForWizard();
+        }
+        const hid = document.getElementById('hid_allowedProgramTerms');
+        let rows = [];
+        try {
+          rows = JSON.parse(hid?.value || '[]');
+        } catch (e) {
+          rows = [];
+        }
+        const hasProgram = Array.isArray(rows) && rows.some((r) => String(r.programId || '').trim());
+        if (!hasProgram) return 'Add at least one program on this tab (term optional for rolling).';
+        return '';
+      }
+    },
+    {
+      target: '#tab-curriculum',
+      title: 'Curriculum & Team',
+      helper: [
+        'Add subjects and adjust allocated hours and fee weights.',
+        'Set the default instructor for delivery and session generation.',
+        'Weights should total 100% for fee calculations.'
+      ],
+      impacts: [
+        'Subjects drive academic postings and score coverage.',
+        'Weights and credits influence pricing proposal and policy checks.',
+        'Instructor is used by session and attendance workflows.'
+      ],
+      required: [
+        { selector: '#inp_instructorId', label: 'Default Instructor' }
+      ],
+      customCheck: function () {
+        const subjectRows = document.querySelectorAll('#subjectsTbody .btn-remove-subject');
+        if (!subjectRows.length) return 'Add at least one Curriculum Subject.';
+        return '';
+      }
+    },
+    {
+      target: '#tab-sessions',
+      title: 'Session Builder',
+      helper: [
+        'Generate sessions in batch or add them one by one.',
+        'Use conflict checks before saving to reduce schedule clashes.',
+        'Lock sessions when finalized to prevent accidental edits.'
+      ],
+      impacts: [
+        'Sessions feed attendance and teacher schedule timelines.',
+        'Conflicts affect operations and teaching assignment quality.',
+        'Session ledger controls class execution history.'
+      ],
+      required: []
+    },
+    {
+      target: '#tab-eval',
+      title: 'Evaluation Rules',
+      helper: [
+        'Define passing score and weight distribution.',
+        'Ensure total weight logic matches your assessment policy.',
+        'Use consistent weights across similar classes when possible.'
+      ],
+      impacts: [
+        'Score calculations and outcome decisions use these values.',
+        'Affects progress and report consistency for students.',
+        'Supports standardization across departments.'
+      ],
+      required: [
+        { selector: '#inp_passingScore', label: 'Passing Score' }
+      ]
+    },
+    {
+      target: '#tab-pricing',
+      title: 'Pricing',
+      helper: [
+        'Choose Auto or Manual pricing mode.',
+        'Auto mode derives suggested amounts from subject rules and weights.',
+        'Manual mode lets you define explicit category amounts.'
+      ],
+      impacts: [
+        'Enrollment price snapshots depend on these fee rules.',
+        'Used later by registration financial previews.',
+        'Category setup must align with posting policy rows.'
+      ],
+      required: []
+    },
+    {
+      target: '#tab-posting',
+      title: 'Posting Policies',
+      helper: [
+        'Attach transaction templates per fee category.',
+        'For Chargeable classes, keep All Categories row as fallback.',
+        'For No-Charge classes, posting policies are optional and skipped.',
+        'Verify templates are active and valid before save.'
+      ],
+      impacts: [
+        'Financial postings during enrollment depend on this mapping for Chargeable classes.',
+        'Missing mapping can block registration in downstream workflows.',
+        'Provides stable accounting behavior across categories.'
+      ],
+      required: []
+    }
+  ];
+
+  const byTarget = new Map(stepConfig.map((step, index) => [step.target, { ...step, index }]));
+
+  const guide = document.createElement('div');
+  guide.id = 'classWizardGuide';
+  guide.className = 'card border-0 shadow-sm mb-3';
+  guide.innerHTML = [
+    '<div class="card-body">',
+      '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">',
+        '<div>',
+          '<div class="fw-bold text-primary">Class Setup Wizard</div>',
+          '<div class="text-muted">Complete one step at a time. Guidance and cross-section impact update automatically.</div>',
+        '</div>',
+        '<div class="d-flex align-items-center gap-2">',
+          '<span class="badge bg-light text-dark border" id="wizardStepBadge">Step 1 of ' + stepConfig.length + '</span>',
+          '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="wizardProgressPct">0%</span>',
+        '</div>',
+      '</div>',
+      '<div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="wizardProgressBar"></div></div>',
+      '<div id="wizardCycleChainSummary" class="wizard-cycle-chain d-none mb-3"></div>',
+      '<div class="wizard-step-rail mb-3" id="wizardStepPills"></div>',
+      '<div class="row g-3">',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light-subtle">',
+            '<div class="fw-bold mb-2">Active Step Help</div>',
+            '<div id="wizardStepHelp"></div>',
+          '</div>',
+        '</div>',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light">',
+            '<div class="fw-bold mb-2">How Other Sections Use This Data</div>',
+            '<div id="wizardStepImpacts"></div>',
+          '</div>',
+        '</div>',
+      '</div>',
+    '</div>'
+  ].join('');
+
+  tabs.parentNode.insertBefore(guide, tabs);
+  tabs.classList.add('d-none');
+
+  const buttonRow = form.querySelector('.button-row');
+  const controls = document.createElement('div');
+  controls.className = 'class-wizard-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3';
+  controls.innerHTML = [
+    '<div class="wizard-step-label" id="wizardCurrentLabel"></div>',
+    '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="wizardPrevBtn"><i class="bi bi-arrow-left me-1"></i>Previous</button>',
+      '<button type="button" class="btn btn-primary btn-sm" id="wizardNextBtn">Next<i class="bi bi-arrow-right ms-1"></i></button>',
+    '</div>'
+  ].join('');
+  if (buttonRow && buttonRow.parentNode) {
+    buttonRow.parentNode.insertBefore(controls, buttonRow);
+  }
+
+  const lifecycleHint = document.createElement('div');
+  lifecycleHint.id = 'wizardLifecycleHint';
+  lifecycleHint.className = 'wizard-lifecycle-hint d-none mb-3';
+  lifecycleHint.innerHTML = [
+    '<div class="d-flex align-items-start justify-content-between flex-wrap gap-2">',
+      '<div>',
+        '<div class="fw-semibold"><i class="bi bi-arrow-repeat me-1"></i>Rolling Cycle Actions Available</div>',
+        '<div class="small">You can close current cycle, create next cycle, and carry-forward students directly in this step.</div>',
+      '</div>',
+      '<div class="d-flex gap-2">',
+        '<button type="button" class="btn btn-outline-warning btn-sm" id="wizardRunIntegrityBtn">Run Integrity</button>',
+        '<button type="button" class="btn btn-outline-primary btn-sm" id="wizardFocusLifecycleBtn">Focus Lifecycle</button>',
+      '</div>',
+    '</div>'
+  ].join('');
+  if (controls.parentNode) {
+    controls.parentNode.insertBefore(lifecycleHint, controls.nextSibling);
+  }
+
+  const stepPills = document.getElementById('wizardStepPills');
+  const stepHelp = document.getElementById('wizardStepHelp');
+  const stepImpacts = document.getElementById('wizardStepImpacts');
+  const stepBadge = document.getElementById('wizardStepBadge');
+  const progressPct = document.getElementById('wizardProgressPct');
+  const stepLabel = document.getElementById('wizardCurrentLabel');
+  const progressBar = document.getElementById('wizardProgressBar');
+  const btnPrev = document.getElementById('wizardPrevBtn');
+  const btnNext = document.getElementById('wizardNextBtn');
+  const registrationModeInput = document.getElementById('inp_registrationMode');
+  const rollingFieldsWrap = document.getElementById('rollingLifecycleFields');
+  const btnRunIntegrity = document.getElementById('wizardRunIntegrityBtn');
+  const btnFocusLifecycle = document.getElementById('wizardFocusLifecycleBtn');
+  const inFormIntegrityBtn = document.getElementById('btn_checkRollingIntegrity');
+  const cycleSummaryEl = document.getElementById('wizardCycleChainSummary');
+  const previousClassIdInput = document.getElementById('inp_previousClassId');
+  const nextClassIdInput = document.getElementById('inp_nextClassId');
+
+  let currentIndex = Math.max(0, navButtons.findIndex((btn) => btn.classList.contains('active')));
+  if (currentIndex < 0) currentIndex = 0;
+  const isRollingMode = () => String(registrationModeInput?.value || '').trim().toLowerCase() === 'rolling';
+  const hasCycleActions = () => !!document.getElementById('btn_cycleClose');
+  const escapeInline = (value) => String(value || '').replace(/[&<>\"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; });
+  const getCurrentClassId = () => {
+    const action = String(form.getAttribute('action') || '');
+    const match = action.match(/\/school\/classes\/edit\/([^/?#]+)/i);
+    if (!match || !match[1]) return '';
+    try { return decodeURIComponent(match[1]); } catch (_) { return match[1]; }
+  };
+
+  function renderCycleChainSummary() {
+    if (!cycleSummaryEl) return;
+    if (!isRollingMode()) {
+      cycleSummaryEl.classList.add('d-none');
+      cycleSummaryEl.innerHTML = '';
+      return;
+    }
+    const currentId = getCurrentClassId();
+    const prevId = String(previousClassIdInput?.value || '').trim();
+    const nextId = String(nextClassIdInput?.value || '').trim();
+    const hasAny = Boolean(currentId || prevId || nextId);
+    if (!hasAny) {
+      cycleSummaryEl.classList.add('d-none');
+      cycleSummaryEl.innerHTML = '';
+      return;
+    }
+    const html = [
+      '<div class="d-flex align-items-center flex-wrap gap-2">',
+        '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"><i class="bi bi-link-45deg me-1"></i>Cycle Chain</span>',
+        `<span class="badge bg-light text-dark border">Current: <b>${escapeInline(currentId || 'New Class')}</b></span>`,
+        `<span class="badge bg-light text-dark border">Prev: <b>${escapeInline(prevId || '-')}</b></span>`,
+        `<span class="badge bg-light text-dark border">Next: <b>${escapeInline(nextId || '-')}</b></span>`,
+      '</div>'
+    ].join('');
+    cycleSummaryEl.innerHTML = html;
+    cycleSummaryEl.classList.remove('d-none');
+  }
+
+  function renderList(items) {
+    const safe = Array.isArray(items) ? items : [];
+    if (!safe.length) return '<div class="text-muted">No additional notes for this step.</div>';
+    return '<ul class="mb-0 ps-3">' + safe.map(function (line) {
+      return '<li>' + String(line || '').replace(/[&<>\"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; }) + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function getStepIndexFromTarget(target) {
+    return byTarget.has(target) ? byTarget.get(target).index : 0;
+  }
+
+  function showStep(index) {
+    const bounded = Math.max(0, Math.min(stepConfig.length - 1, Number(index)));
+    const tab = navButtons[bounded];
+    if (!tab) return;
+    bootstrap.Tab.getOrCreateInstance(tab).show();
+  }
+
+  function findMissingRequired(step) {
+    const missing = [];
+    (step.required || []).forEach(function (rule) {
+      const el = document.querySelector(rule.selector);
+      const value = String(el?.value || '').trim();
+      if (!el || !value) missing.push({ label: rule.label, selector: rule.selector });
+    });
+    if (typeof step.customCheck === 'function') {
+      const customError = String(step.customCheck() || '').trim();
+      if (customError) missing.push({ label: customError, selector: '' });
+    }
+    return missing;
+  }
+
+  async function showWarning(message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title: 'Step Incomplete',
+        icon: 'warning',
+        message,
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  function renderWizardUi() {
+    const step = stepConfig[currentIndex];
+    const progress = ((currentIndex + 1) / stepConfig.length) * 100;
+
+    stepBadge.textContent = 'Step ' + (currentIndex + 1) + ' of ' + stepConfig.length;
+    if (progressPct) progressPct.textContent = Math.round(progress) + '%';
+    stepLabel.textContent = step.title;
+    progressBar.style.width = progress.toFixed(2) + '%';
+    stepHelp.innerHTML = renderList(step.helper);
+    stepImpacts.innerHTML = renderList(step.impacts);
+
+    stepPills.innerHTML = stepConfig.map(function (item, idx) {
+      const cls = idx === currentIndex ? 'active' : (idx < currentIndex ? 'completed' : '');
+      return '<button type="button" class="wizard-step-pill ' + cls + '" data-step-index="' + idx + '">' + (idx + 1) + '. ' + item.title + '</button>';
+    }).join('');
+
+    stepPills.querySelectorAll('[data-step-index]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        showStep(Number(btn.getAttribute('data-step-index')));
+      });
+    });
+
+    if (window.WizardStepRail) window.WizardStepRail.sync(stepPills);
+
+    btnPrev.disabled = currentIndex <= 0;
+    btnNext.innerHTML = currentIndex >= stepConfig.length - 1
+      ? 'Review Save<i class="bi bi-check2-circle ms-1"></i>'
+      : 'Next<i class="bi bi-arrow-right ms-1"></i>';
+
+    const showLifecycleHint = currentIndex === 0 && isRollingMode() && hasCycleActions();
+    if (lifecycleHint) {
+      lifecycleHint.classList.toggle('d-none', !showLifecycleHint);
+    }
+    renderCycleChainSummary();
+  }
+
+  btnPrev?.addEventListener('click', function () {
+    showStep(currentIndex - 1);
+  });
+
+  btnNext?.addEventListener('click', async function () {
+    const step = stepConfig[currentIndex];
+    if (currentIndex < stepConfig.length - 1) {
+      const missing = findMissingRequired(step);
+      if (missing.length) {
+        const message = 'Complete required fields before moving on:<br>' +
+          missing.map(function (item) { return '- ' + item.label; }).join('<br>');
+        await showWarning(message);
+        const first = missing.find(function (item) { return item.selector; });
+        if (first?.selector) {
+          const el = document.querySelector(first.selector);
+          if (el) {
+            try { el.focus(); } catch (_) {}
+          }
+        }
+        return;
+      }
+      showStep(currentIndex + 1);
+      return;
+    }
+    const saveRow = form.querySelector('.button-row');
+    if (saveRow) saveRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const saveBtn = form.querySelector('button[type="submit"]');
+    if (saveBtn) {
+      saveBtn.classList.add('shadow');
+      setTimeout(function () { saveBtn.classList.remove('shadow'); }, 1200);
+    }
+  });
+
+  navButtons.forEach(function (btn) {
+    btn.addEventListener('shown.bs.tab', function (event) {
+      currentIndex = getStepIndexFromTarget(event.target.getAttribute('data-bs-target'));
+      renderWizardUi();
+    });
+  });
+
+  registrationModeInput?.addEventListener('change', renderWizardUi);
+  previousClassIdInput?.addEventListener('input', renderCycleChainSummary);
+  nextClassIdInput?.addEventListener('input', renderCycleChainSummary);
+  window.addEventListener('class-cycle-chain-updated', renderCycleChainSummary);
+  btnRunIntegrity?.addEventListener('click', function () {
+    if (inFormIntegrityBtn) inFormIntegrityBtn.click();
+  });
+  btnFocusLifecycle?.addEventListener('click', function () {
+    if (rollingFieldsWrap) {
+      rollingFieldsWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  renderWizardUi();
+});
+</script>
+
+

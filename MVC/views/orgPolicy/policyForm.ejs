@@ -1,0 +1,1595 @@
+<%
+  const p = policy || {};
+  const validity = p.validityPeriod || {};
+  const network = p.network || { ipWhitelist: [], ipBlacklist: [] };
+  const security = p.security || { mfaRequired: false, allowedMfaTypes: [] };
+  
+  // Session Defaults
+  const session = p.sessionControl || { maxSessions: 5, maxDuration: 480, idleTimeout: 30 };
+  const reqCtrl = p.requestControl || {};
+  const websiteReqCtrl = (typeof websiteRequestControl !== 'undefined' && websiteRequestControl) ? websiteRequestControl : {
+    enabled: true,
+    mode: 'monitor',
+    phase2: { enabled: false, enforceGroups: ['auth', 'heavy'] },
+    phase3: { enabled: true },
+    groups: {
+      auth: { windowMs: 900000, max: 30, keyMode: 'username_ip' },
+      picker: { windowMs: 60000, max: 120, keyMode: 'user_or_ip' },
+      write: { windowMs: 60000, max: 80, keyMode: 'user_or_ip' },
+      heavy: { windowMs: 600000, max: 20, keyMode: 'user_or_ip' },
+      global: { windowMs: 60000, max: 300, keyMode: 'user_or_ip' }
+    },
+    routeOverrides: []
+  };
+  const websiteGroups = websiteReqCtrl.groups || {};
+  const websiteExcludePaths = Array.isArray(websiteReqCtrl.excludePaths) ? websiteReqCtrl.excludePaths : [];
+  const websitePhase2Groups = Array.isArray(websiteReqCtrl.phase2?.enforceGroups) ? websiteReqCtrl.phase2.enforceGroups : [];
+  const websiteOverridesCount = Array.isArray(websiteReqCtrl.routeOverrides) ? websiteReqCtrl.routeOverrides.length : 0;
+  const schedule = p.globalSchedule || { weekdays: {} };
+  const currentConfiguredSections = p.sections || [];
+  const bannedUsers = p.bannedUsers || [];
+  
+  const isEditMode = !!p.id;
+
+  // Resolve Org Display
+  let currentOrgId = p.orgId || '';
+  let currentOrgName = 'Select Organization';
+  if (currentOrgId && typeof targetOrgName !== 'undefined') { 
+      currentOrgName = targetOrgName;
+  }
+%>
+
+<div class="sections-page">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0">            
+        <%= isEditMode ? 'Edit Organization Policy' : 'Create New Organization Policy' %>
+      </h1>
+      <% if (isEditMode) { %>
+          <span class="badge bg-primary border">Editing: <%= p.id %></span>
+      <% } else { %>
+          <span class="badge bg-success border">New Policy</span>
+      <% } %>
+    </div>
+
+  <div class="form-container" style="width: 100%; max-width: 100%;">
+    <form id="policyForm"
+          novalidate 
+          data-mode="<%= isEditMode ? 'edit' : 'new' %>"
+          action="<%= isEditMode ? '/organizationpolicies/edit/' + p.id : '/organizationpolicies/new' %>"
+          method="POST">
+
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <input type="hidden" id="networkHidden" name="network">
+      <input type="hidden" id="securityHidden" name="security">
+      <input type="hidden" id="sessionControlHidden" name="sessionControl">
+      <input type="hidden" id="requestControlHidden" name="requestControl">
+      <input type="hidden" id="scheduleHidden" name="globalSchedule">
+      <input type="hidden" id="sectionsHidden" name="sections">
+      <input type="hidden" id="bannedUsersHidden" name="bannedUsers">
+
+      <script type="application/json" id="initNetwork"><%- JSON.stringify(network) %></script>
+      <script type="application/json" id="initSecurity"><%- JSON.stringify(security) %></script>
+      <script type="application/json" id="initSession"><%- JSON.stringify(session) %></script>
+      <script type="application/json" id="initRequestControl"><%- JSON.stringify(reqCtrl) %></script>
+      <script type="application/json" id="initSchedule"><%- JSON.stringify(schedule) %></script>
+      <script type="application/json" id="initConfiguredSections"><%- JSON.stringify(currentConfiguredSections) %></script>
+      <script type="application/json" id="initBannedUsers"><%- JSON.stringify(bannedUsers) %></script>
+
+      <ul class="nav nav-tabs mb-4" role="tablist" id="policyTabs">
+        <li class="nav-item"><button class="nav-link active" id="btn-tab-general" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-session" data-bs-toggle="tab" data-bs-target="#tab-session" type="button">Session Control</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-request-control" data-bs-toggle="tab" data-bs-target="#tab-request-control" type="button">Request Control</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-schedule" data-bs-toggle="tab" data-bs-target="#tab-schedule" type="button">Global Schedule</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-security" data-bs-toggle="tab" data-bs-target="#tab-security" type="button">Network & Security</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-sections" data-bs-toggle="tab" data-bs-target="#tab-sections" type="button">Section & Operations</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-banned" data-bs-toggle="tab" data-bs-target="#tab-banned" type="button">Banned Users</button></li>
+      </ul>
+
+       <div class="tab-content">
+        
+        <div class="tab-pane fade show active" id="tab-general">
+          <div class="row">
+            
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Target Organization *</label>
+              <div class="input-group">
+                 <input type="hidden" name="orgId" id="selectedOrgId" value="<%= currentOrgId %>">
+                 <input type="text" id="selectedOrgName" class="form-control size-md bg-white" placeholder="Select Organization" value="<%= currentOrgName %>" readonly required>
+                 <% if (!isEditMode) { %>
+                    <button type="button" class="btn btn-outline-primary" id="openOrgPickerBtn"><i class="bi bi-building"></i> Select</button>
+                 <% } else { %>
+                    <button type="button" class="btn btn-outline-secondary" disabled>Locked</button>
+                 <% } %>
+              </div>
+              <div class="form-text x-small text-muted">Global org limits apply to all members. Section-level targeting can be configured in the <strong>Section &amp; Operations</strong> tab.</div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Policy Name *</label>
+              <input type="text" name="policyName" class="form-control size-md" value="<%= p.policyName || '' %>" required>
+              <div class="invalid-feedback">Policy Name is required.</div>
+            </div>
+
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Valid From</label>
+              <input type="date" name="validStartDate" class="form-control size-md" value="<%= validity.startDate ? new Date(validity.startDate).toISOString().split('T')[0] : '' %>">
+            </div>
+
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Valid Until</label>
+              <input type="date" name="validEndDate" class="form-control size-md" value="<%= validity.endDate ? new Date(validity.endDate).toISOString().split('T')[0] : '' %>">
+            </div>
+
+            <div class="col-md-4 mb-3 d-flex align-items-end">
+               <div class="form-check form-switch pb-2">
+                <input class="form-check-input" type="checkbox" id="activeCheck" name="active" <%= p.active !== false ? 'checked' : '' %>> 
+                <label class="form-check-label" for="activeCheck">Policy Active</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-session">
+            <div class="alert alert-info py-2 mb-4 small">
+                <i class="bi bi-building me-1"></i> These settings default to all organization users. You can target selected users below. Website policy remains the hard guardrail.
+            </div>
+            <div class="p-3 border rounded bg-white mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                  <div>
+                    <label class="small fw-bold d-block mb-1">Session Control Targeting</label>
+                    <div class="form-check form-switch m-0">
+                      <input class="form-check-input" type="checkbox" id="sessionApplyAllToggle" checked>
+                      <label class="form-check-label small" for="sessionApplyAllToggle">Apply to all users in this organization</label>
+                    </div>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary btn-filled disabled" id="sessionPickUsersBtn" disabled><i class="bi bi-people me-1"></i> Select Users</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary btn-filled" id="sessionResetUsersBtn"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>
+                  </div>
+                </div>
+                <div class="small text-muted mb-1" id="sessionTargetUsersSummary">Applies to all users in this organization.</div>
+                <div id="sessionTargetUsersList"></div>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-0 bg-light">
+                        <div class="card-body text-center">
+                            <div class="mb-3 text-primary"><i class="bi bi-pc-display fs-1"></i></div>
+                            <h6 class="fw-bold">Max Active Devices</h6>
+                            <p class="text-muted small">Concurrent sessions allowed per user.</p>
+                            <input type="number" id="inp_maxSessions" class="form-control text-center fw-bold fs-5" value="<%= session.maxSessions %>" min="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-0 bg-light">
+                        <div class="card-body text-center">
+                            <div class="mb-3 text-success"><i class="bi bi-hourglass-split fs-1"></i></div>
+                            <h6 class="fw-bold">Absolute Timeout</h6>
+                            <p class="text-muted small">Max session duration in minutes.</p>
+                            <input type="number" id="inp_maxDuration" class="form-control text-center fw-bold fs-5" value="<%= session.maxDuration %>" min="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-0 bg-light">
+                        <div class="card-body text-center">
+                            <div class="mb-3 text-warning"><i class="bi bi-moon-stars fs-1"></i></div>
+                            <h6 class="fw-bold">Idle Timeout</h6>
+                            <p class="text-muted small">Auto-logout minutes after inactivity.</p>
+                            <input type="number" id="inp_idleTimeout" class="form-control text-center fw-bold fs-5" value="<%= session.idleTimeout %>" min="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-request-control">
+          <div class="alert alert-info py-2 mb-3 small">
+            <i class="bi bi-shield-lock me-1"></i>
+            Website policy is authoritative. Organization policy can only add custom route rules, and any overlap with website rules is ignored.
+          </div>
+
+          <div class="p-3 border rounded bg-white mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <div>
+                <label class="small fw-bold d-block mb-1">Request Control Targeting</label>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="requestControlApplyAllToggle" checked>
+                  <label class="form-check-label small" for="requestControlApplyAllToggle">Apply to all users in this organization</label>
+                </div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-primary btn-filled disabled" id="requestControlPickUsersBtn" disabled><i class="bi bi-people me-1"></i> Select Users</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-filled" id="requestControlResetUsersBtn"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>
+              </div>
+            </div>
+            <div class="small text-muted mb-1" id="requestControlTargetUsersSummary">Applies to all users in this organization.</div>
+            <div id="requestControlTargetUsersList"></div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
+              <span>Website Request Control Summary</span>
+              <span class="badge bg-secondary">Read-Only</span>
+            </div>
+            <div class="card-body">
+              <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                  <div class="border rounded p-2 h-100 bg-white">
+                    <div class="small text-muted">Phase 1 (Baseline)</div>
+                    <div class="fw-bold">
+                      <span class="badge <%= websiteReqCtrl.enabled !== false ? 'bg-success' : 'bg-secondary' %>">
+                        <%= websiteReqCtrl.enabled !== false ? 'Enabled' : 'Disabled' %>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="border rounded p-2 h-100 bg-white">
+                    <div class="small text-muted">Phase 2 (Selective)</div>
+                    <div class="fw-bold">
+                      <span class="badge <%= websiteReqCtrl.phase2?.enabled === true ? 'bg-success' : 'bg-secondary' %>">
+                        <%= websiteReqCtrl.phase2?.enabled === true ? 'Enabled' : 'Disabled' %>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="border rounded p-2 h-100 bg-white">
+                    <div class="small text-muted">Phase 3 (Route Rules)</div>
+                    <div class="fw-bold">
+                      <span class="badge <%= websiteReqCtrl.phase3?.enabled !== false ? 'bg-success' : 'bg-secondary' %>">
+                        <%= websiteReqCtrl.phase3?.enabled !== false ? 'Enabled' : 'Disabled' %>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="border rounded p-2 h-100 bg-white">
+                    <div class="small text-muted">Default Mode</div>
+                    <div class="fw-bold text-capitalize"><%= websiteReqCtrl.mode || 'monitor' %></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <div class="small text-muted">Log Cooldown</div>
+                  <div class="fw-bold"><%= websiteReqCtrl.logCooldownMs || 60000 %> ms</div>
+                </div>
+                <div class="col-md-4">
+                  <div class="small text-muted">Phase 2 Enforced Groups</div>
+                  <div class="fw-bold"><%= websitePhase2Groups.length ? websitePhase2Groups.join(', ') : 'None' %></div>
+                </div>
+                <div class="col-md-4">
+                  <div class="small text-muted">Website Route Rules</div>
+                  <div class="fw-bold"><%= websiteOverridesCount %> rule(s)</div>
+                </div>
+              </div>
+
+              <div class="small text-muted mb-2">Group Limits</div>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle mb-2">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Group</th>
+                      <th>Window (ms)</th>
+                      <th>Max Requests</th>
+                      <th>Key Mode</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% ['auth', 'picker', 'write', 'heavy', 'global'].forEach((groupName) => { 
+                      const g = websiteGroups[groupName] || {};
+                    %>
+                      <tr>
+                        <td class="fw-bold text-capitalize"><%= groupName %></td>
+                        <td><%= g.windowMs || '-' %></td>
+                        <td><%= g.max || '-' %></td>
+                        <td><%= g.keyMode || '-' %></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+              <div class="small text-muted">
+                Excluded paths:
+                <%= websiteExcludePaths.length ? websiteExcludePaths.join(', ') : 'None' %>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mt-3" id="orgReqRouteOverridesCard">
+            <div class="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
+              <span>Organization Custom Routes</span>
+              <button type="button" class="btn btn-sm btn-outline-primary btn-filled" id="addOrgReqRouteOverrideBtn">
+                <i class="bi bi-plus-circle me-1"></i> Add Route Rule
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="small text-muted mb-3">
+                Use this area to add temporary or targeted route limits for this organization. Matching website routes always take priority.
+              </div>
+              <div class="table-responsive" style="max-height: 360px;">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light position-sticky top-0">
+                    <tr>
+                      <th style="width:70px;">On</th>
+                      <th style="min-width:260px;">Route</th>
+                      <th style="min-width:220px;">Active Span</th>
+                      <th style="min-width:200px;">Limits</th>
+                      <th style="min-width:170px;">Scope</th>
+                      <th style="width:150px;" class="text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="orgReqRouteOverridesBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal fade" id="orgReqRouteOverrideModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title fw-bold" id="orgReqRouteOverrideModalTitle">Route Override</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <input type="hidden" id="orgRoModalIndex" value="">
+                  <input type="hidden" id="orgRoModalId" value="">
+                  <div class="row g-3">
+                    <div class="col-md-2">
+                      <label class="form-label small fw-bold">Enabled</label>
+                      <div class="form-check mt-2">
+                        <input type="checkbox" class="form-check-input" id="orgRoEnabled">
+                        <label class="form-check-label" for="orgRoEnabled">Active</label>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Method</label>
+                      <select class="form-select" id="orgRoMethod">
+                        <option value="*">*</option>
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="DELETE">DELETE</option>
+                      </select>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Match Type</label>
+                      <select class="form-select" id="orgRoMatchType">
+                        <option value="exact">exact</option>
+                        <option value="prefix">prefix</option>
+                        <option value="contains">contains</option>
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label small fw-bold">Route Path</label>
+                      <input type="text" class="form-control" id="orgRoPath" placeholder="/school/classes/new">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-bold">Start</label>
+                      <input type="datetime-local" class="form-control" id="orgRoStartAt">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-bold">End</label>
+                      <input type="datetime-local" class="form-control" id="orgRoEndAt">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Window (ms)</label>
+                      <input type="number" class="form-control" id="orgRoWindowMs" min="1000" step="1000" placeholder="inherit">
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small fw-bold">Max</label>
+                      <input type="number" class="form-control" id="orgRoMax" min="1" placeholder="inherit">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Key Mode</label>
+                      <select class="form-select" id="orgRoKeyMode">
+                        <option value="">inherit</option>
+                        <option value="user_or_ip">user/ip</option>
+                        <option value="ip">ip</option>
+                        <option value="username_ip">username/ip</option>
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small fw-bold">Mode</label>
+                      <select class="form-select" id="orgRoMode">
+                        <option value="inherit">inherit</option>
+                        <option value="monitor">monitor</option>
+                        <option value="enforce">enforce</option>
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small fw-bold">Group</label>
+                      <select class="form-select" id="orgRoGroup">
+                        <option value="">inherit</option>
+                        <option value="auth">auth</option>
+                        <option value="picker">picker</option>
+                        <option value="write">write</option>
+                        <option value="heavy">heavy</option>
+                        <option value="global">global</option>
+                      </select>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Priority</label>
+                      <input type="number" class="form-control" id="orgRoPriority" step="1" value="0">
+                    </div>
+                    <div class="col-md-9">
+                      <label class="form-label small fw-bold">Label</label>
+                      <input type="text" class="form-control" id="orgRoLabel" placeholder="Temporary class new throttle">
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label small fw-bold">Notes</label>
+                      <textarea class="form-control" id="orgRoNotes" rows="2" placeholder="Reason for this temporary override..."></textarea>
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-danger me-auto" id="orgRoDeleteBtn"><i class="bi bi-trash me-1"></i>Delete</button>
+                  <button type="button" class="btn btn-secondary btn-filled" data-bs-dismiss="modal">Cancel</button>
+                  <button type="button" class="btn btn-primary btn-filled" id="orgRoSaveBtn">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-schedule">
+          <div class="p-3 border rounded bg-white mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <div>
+                <label class="small fw-bold d-block mb-1">Global Schedule Targeting</label>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="scheduleApplyAllToggle" checked>
+                  <label class="form-check-label small" for="scheduleApplyAllToggle">Apply to all users in this organization</label>
+                </div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-primary btn-filled disabled" id="schedulePickUsersBtn" disabled><i class="bi bi-people me-1"></i> Select Users</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-filled" id="scheduleResetUsersBtn"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>
+              </div>
+            </div>
+            <div class="small text-muted mb-1" id="scheduleTargetUsersSummary">Applies to all users in this organization.</div>
+            <div id="scheduleTargetUsersList"></div>
+          </div>
+          <div class="row mb-3">
+             <div class="col-md-3">
+               <select id="scheduleDaySelect" class="form-select size-md">
+                  <option value="Monday">Monday</option><option value="Tuesday">Tuesday</option><option value="Wednesday">Wednesday</option>
+                  <option value="Thursday">Thursday</option><option value="Friday">Friday</option><option value="Saturday">Saturday</option><option value="Sunday">Sunday</option>
+               </select>
+             </div>
+             <div class="col-md-3"><input type="time" id="scheduleStart" class="form-control size-md"></div>
+             <div class="col-md-3"><input type="time" id="scheduleEnd" class="form-control size-md"></div>
+             <div class="col-md-3">
+               <button type="button" class="btn btn-primary btn-filled btn-md w-100" id="addScheduleBtn"><i class="bi bi-plus-lg me-1"></i> Add Time Slot</button>
+             </div>
+          </div>
+          <div id="scheduleContainer" class="border rounded p-3 bg-light" style="min-height: 200px;"></div>
+         </div>
+
+        <div class="tab-pane fade" id="tab-security">
+          <div class="p-3 border rounded bg-white mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <div>
+                <label class="small fw-bold d-block mb-1">Network Policy Targeting</label>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="networkApplyAllToggle" checked>
+                  <label class="form-check-label small" for="networkApplyAllToggle">Apply to all users in this organization</label>
+                </div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-primary btn-filled disabled" id="networkPickUsersBtn" disabled><i class="bi bi-people me-1"></i> Select Users</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-filled" id="networkResetUsersBtn"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>
+              </div>
+            </div>
+            <div class="small text-muted mb-1" id="networkTargetUsersSummary">Applies to all users in this organization.</div>
+            <div id="networkTargetUsersList"></div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 border-end">
+               <h6 class="fw-bold text-primary mb-2">IP Whitelist</h6>
+               <div class="input-group mb-2">
+                 <input type="text" id="inp_whitelist" class="form-control size-md" placeholder="e.g. 192.168.1.5">
+                 <button type="button" class="btn btn-primary btn-filled" id="btn_add_whitelist">Add IP</button>
+               </div>
+               <div class="table-responsive mb-4" style="max-height: 200px; overflow-y: auto;">
+                 <table class="table table-sm table-striped table-bordered"><thead><tr><th>Whitelisted IP</th><th style="width: 80px;">Action</th></tr></thead><tbody id="table_whitelist"></tbody></table>
+               </div>
+
+               <h6 class="fw-bold text-danger mb-2">IP Blacklist</h6>
+               <div class="input-group mb-2">
+                 <input type="text" id="inp_blacklist" class="form-control size-md" placeholder="e.g. 203.0.113.1">
+                 <button type="button" class="btn btn-danger btn-filled" id="btn_add_blacklist">Block IP</button>
+               </div>
+               <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                 <table class="table table-sm table-striped table-bordered"><thead><tr><th>Blacklisted IP</th><th style="width: 80px;">Action</th></tr></thead><tbody id="table_blacklist"></tbody></table>
+               </div>
+            </div>
+
+            <div class="col-md-6 ps-4">
+              <h6 class="fw-bold">Multi-Factor Authentication</h6>
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="mfaCheck" <%= security.mfaRequired ? 'checked' : '' %>>
+                <label class="form-check-label" for="mfaCheck">Require MFA</label>
+              </div>
+              <label class="form-label small">Allowed Types</label>
+              <div class="card p-2">
+                <div class="form-check">
+                  <input class="form-check-input mfa-type-chk" type="checkbox" value="authenticator_app" <%= (security.allowedMfaTypes||[]).includes('authenticator_app') ? 'checked' : '' %>>
+                  <label class="form-check-label">Authenticator App</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input mfa-type-chk" type="checkbox" value="sms" <%= (security.allowedMfaTypes||[]).includes('sms') ? 'checked' : '' %>>
+                  <label class="form-check-label">SMS / Text</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-sections">
+           <div class="row h-100">
+             <div class="col-md-3 border-end bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0 text-primary">Configured Sections</h6>
+                    <span class="badge bg-secondary" id="secCountBadge">0</span>
+                </div>
+                <input type="text" id="sectionSearch" class="form-control size-sm mb-2" placeholder="Filter list...">
+                <div class="list-group list-group-flush overflow-auto" id="sectionsSidebar" style="max-height: 600px; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <div class="text-center text-muted small p-3">No sections added.</div>
+                </div>
+             </div>
+
+             <div class="col-md-9 py-3">
+                <div class="card p-3 mb-4 bg-light border-0">
+                    <label class="form-label fw-bold">Add Section Policy</label>
+                    <div class="d-flex gap-2">
+                         <button type="button" class="btn btn-primary btn-filled w-100" id="addSectionConfigBtn">
+                             <i class="bi bi-search me-1"></i> Add Section from List
+                         </button>
+                    </div>
+                </div>
+                <div id="sectionsContainer" class="accordion"></div>
+             </div>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-banned">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-danger mb-0">Organization Banned Users</h6>
+            <button type="button" class="btn btn-danger btn-sm btn-filled" id="btnBanUser">
+              <i class="bi bi-person-x-fill me-1"></i> Ban User
+            </button>
+          </div>
+          <div class="alert alert-warning small py-2 mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Banned users are blocked only in the selected target organization.
+          </div>
+          <div class="table-responsive border rounded">
+            <table class="table table-striped align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>User</th>
+                  <th>Reason</th>
+                  <th>Date Banned</th>
+                  <th style="width:110px;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="bannedUsersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Policy</button>
+        <a href="/organizationpolicies" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/organizationpolicies"> Cancel </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  // --- 1. STATE INITIALIZATION ---
+  function readJson(id, fallback) {
+    try { return JSON.parse(document.getElementById(id).textContent || ''); } catch { return fallback; }
+  }
+
+  function normalizeIdList(values) {
+    const rows = Array.isArray(values) ? values : [values];
+    const out = [];
+    const seen = new Set();
+    rows.forEach((value) => {
+      const id = String(value || '').trim();
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      out.push(id);
+    });
+    return out;
+  }
+
+  function normalizeConfiguredSections(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .map((row) => {
+        if (!row || typeof row !== 'object') return null;
+        const targetUserIds = normalizeIdList(row.targetUserIds || []);
+        const applyToAllUsers = row.applyToAllUsers === false ? false : targetUserIds.length === 0;
+        return {
+          ...row,
+          targetUserIds,
+          applyToAllUsers
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function getSectionTargetUserIds(section) {
+    return normalizeIdList(section?.targetUserIds || []);
+  }
+
+  function getSectionApplyAllUsers(section) {
+    if (!section || typeof section !== 'object') return true;
+    if (section.applyToAllUsers === false) return false;
+    return getSectionTargetUserIds(section).length === 0;
+  }
+
+  function normalizeBannedUsers(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const out = [];
+    const seen = new Set();
+    list.forEach((row) => {
+      if (!row || typeof row !== 'object') return;
+      const userId = String(row.userId || row.id || '').trim();
+      if (!userId || seen.has(userId)) return;
+      seen.add(userId);
+      const userName = String(row.userName || row.username || row.email || userId).trim() || userId;
+      const reason = String(row.reason || '').trim();
+      const dateRaw = String(row.dateBanned || '').trim();
+      const dateObj = dateRaw ? new Date(dateRaw) : null;
+      const dateBanned = dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj.toISOString() : '';
+      out.push({ userId, userName, reason, dateBanned });
+    });
+    return out;
+  }
+
+  function normalizeTargetingStateFromBlock(block) {
+    const ids = normalizeIdList(block && typeof block === 'object' ? block.targetUserIds || [] : []);
+    return {
+      applyToAllUsers: ids.length === 0,
+      targetUserIds: ids
+    };
+  }
+
+  function applyTargetingStateToBlock(block, state) {
+    const target = (block && typeof block === 'object') ? block : {};
+    const safeState = state && typeof state === 'object' ? state : { applyToAllUsers: true, targetUserIds: [] };
+    const targetUserIds = normalizeIdList(safeState.targetUserIds || []);
+    if (safeState.applyToAllUsers || targetUserIds.length === 0) delete target.targetUserIds;
+    else target.targetUserIds = targetUserIds;
+    return target;
+  }
+
+  function buildTargetUserBadgesForBlock(targetUserIds) {
+    if (!Array.isArray(targetUserIds) || targetUserIds.length === 0) {
+      return '<span class=\"text-muted small\">No targeted users selected.</span>';
+    }
+    return targetUserIds.map((id) => (
+      `<span class=\"badge bg-white text-dark border me-1 mb-1\"><i class=\"bi bi-person me-1\"></i>${escapeHtml(id)}</span>`
+    )).join('');
+  }
+
+  function getBlockTargetingSummary(state) {
+    if (!state || state.applyToAllUsers) return 'Applies to all users in this organization.';
+    const count = Array.isArray(state.targetUserIds) ? state.targetUserIds.length : 0;
+    if (count === 0) return 'No users selected yet. Pick at least one user before saving.';
+    return `Applies to ${count} selected user${count === 1 ? '' : 's'} only.`;
+  }
+
+  function sanitizeConfiguredSectionsForSave() {
+    return configuredSections.map((section, index) => {
+      const sectionId = String(section?.sectionId || '').trim();
+      if (!sectionId) {
+        throw new Error(`Section #${index + 1} is missing sectionId.`);
+      }
+      const targetUserIds = getSectionTargetUserIds(section);
+      const applyToAllUsers = getSectionApplyAllUsers(section);
+      if (!applyToAllUsers && targetUserIds.length === 0) {
+        throw new Error(`Section "${section.sectionName || sectionId}" requires at least one selected user when "Apply to all users" is off.`);
+      }
+      const cleanRow = { ...section, sectionId };
+      if (applyToAllUsers) delete cleanRow.targetUserIds;
+      else cleanRow.targetUserIds = targetUserIds;
+      delete cleanRow.applyToAllUsers;
+      return cleanRow;
+    });
+  }
+
+  let configuredSections = normalizeConfiguredSections(readJson('initConfiguredSections', []));
+  let network = readJson('initNetwork', { ipWhitelist: [], ipBlacklist: [] });
+  let security = readJson('initSecurity', { mfaRequired: false, allowedMfaTypes: [] });
+  let session = readJson('initSession', { maxSessions: 5, maxDuration: 480, idleTimeout: 30 });
+  let requestControl = readJson('initRequestControl', { customRoutes: [] });
+  if (!requestControl || typeof requestControl !== 'object') requestControl = { customRoutes: [] };
+  let requestRouteOverrides = Array.isArray(requestControl.customRoutes)
+    ? requestControl.customRoutes
+    : (Array.isArray(requestControl.routeOverrides) ? requestControl.routeOverrides : []);
+  let schedule = readJson('initSchedule', { weekdays: {} });
+  let bannedUsers = normalizeBannedUsers(readJson('initBannedUsers', []));
+  const blockTargeting = {
+    session: normalizeTargetingStateFromBlock(session),
+    requestControl: normalizeTargetingStateFromBlock(requestControl),
+    schedule: normalizeTargetingStateFromBlock(schedule),
+    network: normalizeTargetingStateFromBlock(network)
+  };
+  
+  const form = document.getElementById('policyForm');
+
+  // --- 2. ORG PICKER LOGIC ---
+  const orgPickerBtn = document.getElementById('openOrgPickerBtn');
+  const orgIdInput = document.getElementById('selectedOrgId');
+  const orgNameInput = document.getElementById('selectedOrgName');
+
+  if (orgPickerBtn) {
+    orgPickerBtn.addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.organization({
+            title: 'Select Organization',
+            onSelect: async (item) => {
+                orgIdInput.value = item.id;
+                orgNameInput.value = item.identity?.displayName || item.name || `Org #${item.id}`;
+            }
+        }));
+    });
+  }
+
+  async function showMsg(title, message, icon='info', btn_class='btn-primary') {
+    if (typeof showMessageModal === 'function') {
+      return await showMessageModal({ title, message, icon, buttons: [{ text: 'OK', class: btn_class }] });
+    } else { alert(message); }
+  }
+
+  function getUserPickerContextMeta() {
+    const activeOrgId = String(orgIdInput?.value || '').trim();
+    const activeOrgName = String(orgNameInput?.value || '').trim();
+    const endpoint = activeOrgId
+      ? `/users?primaryOrgId__eq=${encodeURIComponent(activeOrgId)}`
+      : '/users';
+    return { activeOrgId, activeOrgName, endpoint };
+  }
+
+  function renderBlockTargetingUi(key) {
+    const state = blockTargeting[key];
+    if (!state) return;
+    const toggle = document.getElementById(`${key}ApplyAllToggle`);
+    const pickBtn = document.getElementById(`${key}PickUsersBtn`);
+    const summary = document.getElementById(`${key}TargetUsersSummary`);
+    const list = document.getElementById(`${key}TargetUsersList`);
+    if (toggle) toggle.checked = state.applyToAllUsers !== false;
+    if (pickBtn) {
+      const disabled = state.applyToAllUsers !== false;
+      pickBtn.disabled = disabled;
+      pickBtn.classList.toggle('disabled', disabled);
+    }
+    if (summary) summary.textContent = getBlockTargetingSummary(state);
+    if (list) list.innerHTML = buildTargetUserBadgesForBlock(state.targetUserIds || []);
+  }
+
+  function resetBlockTargeting(key) {
+    if (!blockTargeting[key]) return;
+    blockTargeting[key].applyToAllUsers = true;
+    blockTargeting[key].targetUserIds = [];
+    renderBlockTargetingUi(key);
+  }
+
+  function bindBlockTargetingControls(key) {
+    const toggle = document.getElementById(`${key}ApplyAllToggle`);
+    const pickBtn = document.getElementById(`${key}PickUsersBtn`);
+    const resetBtn = document.getElementById(`${key}ResetUsersBtn`);
+    if (!blockTargeting[key]) return;
+
+    toggle?.addEventListener('change', async (e) => {
+      blockTargeting[key].applyToAllUsers = !!e.target.checked;
+      if (blockTargeting[key].applyToAllUsers) {
+        blockTargeting[key].targetUserIds = [];
+      } else if (!Array.isArray(blockTargeting[key].targetUserIds) || blockTargeting[key].targetUserIds.length === 0) {
+        await showMsg('Target Users Required', 'Select at least one user or switch back to apply to all users.', 'warning', 'btn-warning');
+      }
+      renderBlockTargetingUi(key);
+    });
+
+    resetBtn?.addEventListener('click', () => resetBlockTargeting(key));
+
+    pickBtn?.addEventListener('click', () => {
+      const { activeOrgId, activeOrgName, endpoint } = getUserPickerContextMeta();
+      GenericPicker.open(GenericPickerPresets.user({
+        title: 'Select Target Users',
+        placeholder: 'Search users (type --- to list all)...',
+        apiEndpoint: endpoint,
+        multiselect: true,
+        context: GenericPickerContexts.orgScope(
+          { id: activeOrgId, name: activeOrgName },
+          { label: 'Target Organization' }
+        ),
+        onSelect: async (items) => {
+          const selected = Array.isArray(items) ? items : [items];
+          const ids = normalizeIdList(selected.map((item) => item?.id));
+          if (!ids.length) {
+            await showMsg('No Users Selected', 'Pick at least one user or use Apply to all users.', 'warning', 'btn-warning');
+            return;
+          }
+          blockTargeting[key].applyToAllUsers = false;
+          blockTargeting[key].targetUserIds = ids;
+          renderBlockTargetingUi(key);
+        }
+      }));
+    });
+
+    renderBlockTargetingUi(key);
+  }
+
+  ['session', 'requestControl', 'schedule', 'network'].forEach((key) => bindBlockTargetingControls(key));
+
+  const orgReqRouteOverridesBody = document.getElementById('orgReqRouteOverridesBody');
+  const orgReqRouteOverrideModalEl = document.getElementById('orgReqRouteOverrideModal');
+  const orgReqRouteOverrideModal = orgReqRouteOverrideModalEl ? new bootstrap.Modal(orgReqRouteOverrideModalEl) : null;
+
+  function escapeHtml(value) {
+      return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+  }
+
+  function toDateTimeLocalValue(value) {
+      if (!value) return '';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  }
+
+  function toIsoFromLocalValue(value) {
+      const v = String(value || '').trim();
+      if (!v) return '';
+      const dt = new Date(v);
+      if (Number.isNaN(dt.getTime())) return '';
+      return dt.toISOString();
+  }
+
+  function createNewRouteOverride() {
+      const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      return {
+          id: `ROV_${uid}`,
+          enabled: true,
+          method: '*',
+          matchType: 'prefix',
+          path: '',
+          startAt: '',
+          endAt: '',
+          windowMs: '',
+          max: '',
+          keyMode: '',
+          mode: 'inherit',
+          group: '',
+          priority: 0,
+          label: '',
+          notes: ''
+      };
+  }
+
+  function formatDateTimeShort(value) {
+      if (!value) return 'Any';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return 'Any';
+      return dt.toLocaleString();
+  }
+
+  function renderRouteOverrides() {
+      if (!orgReqRouteOverridesBody) return;
+      if (!Array.isArray(requestRouteOverrides)) requestRouteOverrides = [];
+      if (requestRouteOverrides.length === 0) {
+          orgReqRouteOverridesBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No route overrides configured.</td></tr>';
+          return;
+      }
+
+      orgReqRouteOverridesBody.innerHTML = requestRouteOverrides.map((row, idx) => {
+          const enabled = row.enabled === true || String(row.enabled || '').toLowerCase() === 'true';
+          const method = String(row.method || '*').toUpperCase();
+          const matchType = String(row.matchType || 'prefix').toLowerCase();
+          const path = String(row.path || '').trim() || '/';
+          const label = String(row.label || '').trim() || 'No label';
+          const windowMs = row.windowMs ? `${row.windowMs} ms` : 'inherit';
+          const max = row.max ? `${row.max}` : 'inherit';
+          const keyMode = row.keyMode || 'inherit';
+          const mode = row.mode || 'inherit';
+          const group = row.group || 'inherit';
+          return `
+            <tr data-idx="${idx}">
+              <td><input type="checkbox" class="form-check-input org-ro-toggle-enabled" ${enabled ? 'checked' : ''}></td>
+              <td>
+                <div class="fw-bold">${escapeHtml(label)}</div>
+                <div><code>${escapeHtml(method)}</code> <span class="text-muted">(${escapeHtml(matchType)})</span></div>
+                <div><code>${escapeHtml(path)}</code></div>
+              </td>
+              <td>
+                <div class="small"><strong>From:</strong> ${escapeHtml(formatDateTimeShort(row.startAt))}</div>
+                <div class="small"><strong>To:</strong> ${escapeHtml(formatDateTimeShort(row.endAt))}</div>
+              </td>
+              <td>
+                <div class="small"><strong>Window:</strong> ${escapeHtml(windowMs)}</div>
+                <div class="small"><strong>Max:</strong> ${escapeHtml(max)}</div>
+                <div class="small"><strong>Key:</strong> ${escapeHtml(keyMode)}</div>
+              </td>
+              <td>
+                <div class="small"><strong>Mode:</strong> ${escapeHtml(mode)}</div>
+                <div class="small"><strong>Group:</strong> ${escapeHtml(group)}</div>
+                <div class="small"><strong>Prio:</strong> ${escapeHtml(String(row.priority ?? 0))}</div>
+              </td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-primary org-ro-edit me-1"><i class="bi bi-pencil"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-danger org-ro-remove"><i class="bi bi-trash"></i></button>
+              </td>
+            </tr>
+          `;
+      }).join('');
+
+      orgReqRouteOverridesBody.querySelectorAll('tr[data-idx]').forEach((tr) => {
+          const idx = parseInt(tr.dataset.idx, 10);
+          if (!requestRouteOverrides[idx]) return;
+          tr.querySelector('.org-ro-toggle-enabled')?.addEventListener('change', (e) => {
+              requestRouteOverrides[idx].enabled = !!e.target.checked;
+          });
+          tr.querySelector('.org-ro-edit')?.addEventListener('click', () => openRouteOverrideModal(idx));
+          tr.querySelector('.org-ro-remove')?.addEventListener('click', () => {
+              requestRouteOverrides.splice(idx, 1);
+              renderRouteOverrides();
+          });
+      });
+  }
+
+  function openRouteOverrideModal(index = null) {
+      if (!orgReqRouteOverrideModalEl || !orgReqRouteOverrideModal) return;
+      const isEdit = Number.isInteger(index) && index >= 0 && index < requestRouteOverrides.length;
+      const row = isEdit ? requestRouteOverrides[index] : createNewRouteOverride();
+      document.getElementById('orgReqRouteOverrideModalTitle').textContent = isEdit ? 'Edit Route Override' : 'Add Route Override';
+      document.getElementById('orgRoDeleteBtn').style.display = isEdit ? 'inline-block' : 'none';
+      document.getElementById('orgRoModalIndex').value = isEdit ? String(index) : '';
+      document.getElementById('orgRoModalId').value = String(row.id || '');
+      document.getElementById('orgRoEnabled').checked = row.enabled === true || String(row.enabled || '').toLowerCase() === 'true';
+      document.getElementById('orgRoMethod').value = String(row.method || '*').toUpperCase();
+      document.getElementById('orgRoMatchType').value = String(row.matchType || 'prefix').toLowerCase();
+      document.getElementById('orgRoPath').value = String(row.path || '');
+      document.getElementById('orgRoStartAt').value = toDateTimeLocalValue(row.startAt);
+      document.getElementById('orgRoEndAt').value = toDateTimeLocalValue(row.endAt);
+      document.getElementById('orgRoWindowMs').value = row.windowMs || '';
+      document.getElementById('orgRoMax').value = row.max || '';
+      document.getElementById('orgRoKeyMode').value = String(row.keyMode || '').toLowerCase();
+      document.getElementById('orgRoMode').value = String(row.mode || 'inherit').toLowerCase();
+      document.getElementById('orgRoGroup').value = String(row.group || '').toLowerCase();
+      document.getElementById('orgRoPriority').value = row.priority ?? 0;
+      document.getElementById('orgRoLabel').value = String(row.label || '');
+      document.getElementById('orgRoNotes').value = String(row.notes || '');
+      orgReqRouteOverrideModal.show();
+  }
+
+  function collectRouteOverrideFromModal() {
+      const id = String(document.getElementById('orgRoModalId').value || '').trim() || createNewRouteOverride().id;
+      const pathRaw = String(document.getElementById('orgRoPath').value || '').trim();
+      return {
+          id,
+          enabled: !!document.getElementById('orgRoEnabled').checked,
+          method: String(document.getElementById('orgRoMethod').value || '*').toUpperCase(),
+          matchType: String(document.getElementById('orgRoMatchType').value || 'prefix').toLowerCase(),
+          path: pathRaw ? (pathRaw.startsWith('/') ? pathRaw : `/${pathRaw}`) : '',
+          startAt: toIsoFromLocalValue(document.getElementById('orgRoStartAt').value),
+          endAt: toIsoFromLocalValue(document.getElementById('orgRoEndAt').value),
+          windowMs: document.getElementById('orgRoWindowMs').value,
+          max: document.getElementById('orgRoMax').value,
+          keyMode: String(document.getElementById('orgRoKeyMode').value || '').toLowerCase(),
+          mode: String(document.getElementById('orgRoMode').value || 'inherit').toLowerCase(),
+          group: String(document.getElementById('orgRoGroup').value || '').toLowerCase(),
+          priority: document.getElementById('orgRoPriority').value,
+          label: String(document.getElementById('orgRoLabel').value || '').trim(),
+          notes: String(document.getElementById('orgRoNotes').value || '').trim()
+      };
+  }
+
+  document.getElementById('addOrgReqRouteOverrideBtn')?.addEventListener('click', () => openRouteOverrideModal(null));
+  document.getElementById('orgRoSaveBtn')?.addEventListener('click', async () => {
+      const idxRaw = String(document.getElementById('orgRoModalIndex').value || '').trim();
+      const nextRow = collectRouteOverrideFromModal();
+      if (!nextRow.path) {
+          await showMsg('Validation', 'Route path is required.', 'warning', 'btn-warning');
+          return;
+      }
+      if (idxRaw === '') requestRouteOverrides.push(nextRow);
+      else {
+          const idx = parseInt(idxRaw, 10);
+          if (Number.isFinite(idx) && idx >= 0 && idx < requestRouteOverrides.length) requestRouteOverrides[idx] = nextRow;
+          else requestRouteOverrides.push(nextRow);
+      }
+      renderRouteOverrides();
+      orgReqRouteOverrideModal?.hide();
+  });
+  document.getElementById('orgRoDeleteBtn')?.addEventListener('click', () => {
+      const idxRaw = String(document.getElementById('orgRoModalIndex').value || '').trim();
+      const idx = parseInt(idxRaw, 10);
+      if (Number.isFinite(idx) && idx >= 0 && idx < requestRouteOverrides.length) {
+          requestRouteOverrides.splice(idx, 1);
+          renderRouteOverrides();
+      }
+      orgReqRouteOverrideModal?.hide();
+  });
+  renderRouteOverrides();
+
+  // --- 3. NETWORK (IP TABLES) ---
+  function renderIPTable(tableId, array, type) { 
+     const tbody = document.getElementById(tableId);
+     if (!tbody) return;
+     tbody.innerHTML = '';
+     if (array.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted small">No IPs configured</td></tr>`;
+        return;
+     }
+     array.forEach((ip, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td><code>${ip}</code></td><td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger remove-ip" data-idx="${index}"><i class="bi bi-trash"></i></button></td>`;
+        tbody.appendChild(row);
+     });
+     tbody.querySelectorAll('.remove-ip').forEach(btn => {
+        btn.addEventListener('click', () => { array.splice(parseInt(btn.dataset.idx), 1); renderIPTable(tableId, array, type); });
+     });
+  }
+
+  document.getElementById('btn_add_whitelist').addEventListener('click', () => {
+     const val = document.getElementById('inp_whitelist').value.trim();
+     if (val && !network.ipWhitelist.includes(val)) { network.ipWhitelist.push(val); renderIPTable('table_whitelist', network.ipWhitelist, 'white'); document.getElementById('inp_whitelist').value = ''; }
+  });
+  document.getElementById('btn_add_blacklist').addEventListener('click', () => {
+     const val = document.getElementById('inp_blacklist').value.trim();
+     if (val && !network.ipBlacklist.includes(val)) { network.ipBlacklist.push(val); renderIPTable('table_blacklist', network.ipBlacklist, 'black'); document.getElementById('inp_blacklist').value = ''; }
+  });
+  renderIPTable('table_whitelist', network.ipWhitelist, 'white');
+  renderIPTable('table_blacklist', network.ipBlacklist, 'black');
+
+
+  // --- 4. SECTIONS & OPERATIONS LOGIC ---
+  const sectionsContainer = document.getElementById('sectionsContainer');
+  const sectionsSidebar = document.getElementById('sectionsSidebar'); 
+  const secCountBadge = document.getElementById('secCountBadge'); 
+  const addSectionConfigBtn = document.getElementById('addSectionConfigBtn');
+
+  function buildTargetUserBadges(targetUserIds) {
+     if (!Array.isArray(targetUserIds) || targetUserIds.length === 0) {
+        return '<span class="text-muted small">No targeted users selected.</span>';
+     }
+     return targetUserIds.map((id) => (
+       `<span class="badge bg-white text-dark border me-1 mb-1"><i class="bi bi-person me-1"></i>${escapeHtml(id)}</span>`
+     )).join('');
+  }
+
+  function getTargetingSummary(applyToAllUsers, targetUserIds) {
+     if (applyToAllUsers) return 'Applies to all users in the selected organization.';
+     const count = Array.isArray(targetUserIds) ? targetUserIds.length : 0;
+     if (count === 0) return 'No users selected yet. Pick at least one user before saving.';
+     return `Applies to ${count} selected user${count === 1 ? '' : 's'} only.`;
+  }
+
+  function renderSections() {
+     const openItem = sectionsContainer.querySelector('.accordion-collapse.show');
+     const openIndex = openItem ? openItem.id.replace('collapseSec', '') : null;
+     sectionsContainer.innerHTML = '';
+     sectionsSidebar.innerHTML = ''; 
+     secCountBadge.textContent = configuredSections.length;
+
+     if (configuredSections.length === 0) {
+        sectionsSidebar.innerHTML = '<div class="text-center text-muted small p-3">No sections added.</div>';
+     }
+
+     configuredSections.forEach((secPolicy, index) => {
+        const tl = secPolicy.timeLimits || {};
+        const st = secPolicy.accessState || {};
+        const ops = secPolicy.operations || [];
+        const targetUserIds = getSectionTargetUserIds(secPolicy);
+        const applyToAllUsers = getSectionApplyAllUsers(secPolicy);
+        const accType = secPolicy.accessType || 'custom';
+        const isFrozen = (accType === 'full_access' || accType === 'full_ban');
+        const headerId = `headingSec${index}`;
+        const collapseId = `collapseSec${index}`;
+
+        const sideItem = document.createElement('a');
+        sideItem.href = "#";
+        sideItem.className = "list-group-item list-group-item-action py-2 section-nav-item";
+        sideItem.innerHTML = `<div class="d-flex w-100 justify-content-between align-items-center"><span class="fw-bold text-truncate" style="max-width: 140px;">${secPolicy.sectionName || secPolicy.sectionId}</span><small class="badge bg-light text-dark border">${ops.length}</small></div><small class="text-muted d-block text-truncate" style="font-size: 0.75rem;">ID: ${secPolicy.sectionId}</small>`;
+        sideItem.addEventListener('click', (e) => { e.preventDefault(); const el = document.getElementById(collapseId); if (!el) return; new bootstrap.Collapse(el, { toggle: false }).show(); setTimeout(() => el.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150); });
+        sectionsSidebar.appendChild(sideItem);
+
+        const item = document.createElement('div');
+        item.className = 'accordion-item mb-2 border';
+        const isShow = (openIndex && openIndex == index) ? 'show' : '';
+        const isCollapsed = (openIndex && openIndex == index) ? '' : 'collapsed';
+        item.innerHTML = `<h2 class="accordion-header" id="${headerId}"><button class="accordion-button ${isCollapsed} py-2 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}"><strong>${secPolicy.sectionName || secPolicy.sectionId}</strong><span class="ms-auto badge ${accType==='full_ban'?'bg-danger':(accType==='full_access'?'bg-success':'bg-light text-dark border')} me-2">${accType === 'custom' ? 'Custom' : (accType === 'full_access' ? 'Full Access' : 'Banned')}</span></button></h2><div id="${collapseId}" class="accordion-collapse collapse ${isShow}" data-bs-parent="#sectionsContainer"><div class="accordion-body bg-light"><div class="d-flex justify-content-between mb-3 border-bottom pb-2"><div class="d-flex align-items-center gap-2"><h6 class="text-primary fw-bold m-0">Section Configuration</h6><select class="form-select form-select-sm sec-acc-type" style="width:auto;" data-index="${index}"><option value="custom" ${accType=='custom'?'selected':''}>Custom Settings</option><option value="full_access" ${accType=='full_access'?'selected':''}>Full Access (No Limits)</option><option value="full_ban" ${accType=='full_ban'?'selected':''}>Full Ban (Suspended)</option></select></div><button type="button" class="btn btn-sm btn-outline-danger remove-section btn-filled" data-index="${index}">Remove Section</button></div><div class="row g-2 mb-3"><div class="col-md-8"><label class="small fw-bold">Reason (if suspended)</label><input type="text" class="form-control size-sm sec-reason" value="${st.reason||''}" data-index="${index}" ${isFrozen ? 'disabled' : ''}></div><div class="col-md-4"><label class="small fw-bold">Status</label><select class="form-select size-sm sec-status" data-index="${index}" ${isFrozen ? 'disabled' : ''}><option value="active" ${st.status=='active'?'selected':''}>Active</option><option value="suspended" ${st.status=='suspended'?'selected':''}>Suspended</option></select></div><div class="col-md-3"><label class="small fw-bold">Max Session (min)</label><input type="number" class="form-control size-sm sec-max-sess" value="${tl.maxSessionDurationMinutes||''}" data-index="${index}" ${isFrozen ? 'disabled' : ''}></div><div class="col-md-3"><label class="small fw-bold">Max Attempts (Per Session)</label><input type="number" class="form-control size-sm sec-idle" value="${tl.maxAttemptsPerSession||''}" data-index="${index}" ${isFrozen ? 'disabled' : ''}></div><div class="col-md-6"></div><div class="col-12 mt-2"><div class="p-2 border rounded bg-white"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2"><div><label class="small fw-bold d-block mb-1">User Targeting</label><div class="form-check form-switch m-0"><input class="form-check-input sec-apply-all-users" type="checkbox" data-index="${index}" ${applyToAllUsers ? 'checked' : ''}><label class="form-check-label small">Apply to all users in this organization</label></div></div><div class="d-flex gap-2"><button type="button" class="btn btn-sm btn-outline-primary sec-pick-users btn-filled ${applyToAllUsers ? 'disabled' : ''}" data-index="${index}" ${applyToAllUsers ? 'disabled' : ''}><i class="bi bi-people me-1"></i> Select Users</button><button type="button" class="btn btn-sm btn-outline-secondary sec-clear-users btn-filled" data-index="${index}"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button></div></div><div class="small text-muted mb-1">${escapeHtml(getTargetingSummary(applyToAllUsers, targetUserIds))}</div><div class="sec-target-users-list">${buildTargetUserBadges(targetUserIds)}</div></div></div></div><div class="card p-2 border-0 shadow-sm mt-3"><h6 class="fw-bold text-dark border-bottom pb-1 mb-2">Operation Overrides</h6><div class="row mb-3 ${isFrozen ? 'd-none' : ''}"><div class="col-md-12 d-flex gap-2"><button type="button" class="btn btn-sm btn-outline-primary w-100 add-op-btn btn-filled" data-index="${index}"><i class="bi bi-search me-1"></i> Add Operation Override</button><button type="button" class="btn btn-sm btn-outline-secondary w-100 add-all-op-btn btn-filled" data-index="${index}"><i class="bi bi-collection me-1"></i> Add All Operations</button></div></div><div class="table-responsive"><table class="table table-sm table-bordered bg-white"><thead class="table-light"><tr><th>Operation</th><th style="width: 140px;">Access</th><th>Attempts</th><th>Session</th><th style="width:50px"></th></tr></thead><tbody>${ops.length === 0 ? '<tr><td colspan="5" class="text-center text-muted small">No overrides configured</td></tr>' : ''}${ops.map((op, opIdx) => { const opAcc = op.accessType || 'custom'; const isOpFrozen = (opAcc === 'full_access' || opAcc === 'full_ban' || isFrozen); return `<tr><td><strong>${op.operationName || op.operationId}</strong></td><td><select class="form-select form-select-sm p-0 border-0 op-acc-type" data-sec="${index}" data-op="${opIdx}" ${isFrozen ? 'disabled' : ''}><option value="custom" ${opAcc=='custom'?'selected':''}>Custom</option><option value="full_access" ${opAcc=='full_access'?'selected':''}>Full Access</option><option value="full_ban" ${opAcc=='full_ban'?'selected':''}>Ban</option></select></td><td><input type="number" class="form-control form-control-sm border-0 op-attempts" placeholder="Limit" value="${op.executionLimits?.maxAttemptsPerSession || ''}" data-sec="${index}" data-op="${opIdx}" ${isOpFrozen ? 'disabled' : ''}></td><td><input type="number" class="form-control form-control-sm border-0 op-sess" placeholder="Mins" value="${op.timeLimits?.maxSessionDurationMinutes || ''}" data-sec="${index}" data-op="${opIdx}" ${isOpFrozen ? 'disabled' : ''}></td><td>${!isFrozen ? `<i class="bi bi-trash text-danger cursor-pointer remove-op" data-sec="${index}" data-op="${opIdx}"></i>` : ''}</td></tr>`}).join('')}</tbody></table></div></div></div></div>`;
+        sectionsContainer.appendChild(item);
+     });
+
+     // BINDINGS
+     document.querySelectorAll('.remove-section').forEach(btn => {
+        btn.addEventListener('click', e => { configuredSections.splice(parseInt(e.target.dataset.index), 1); renderSections(); });
+     });
+
+     document.querySelectorAll('.add-op-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+           e.preventDefault();
+           const idx = parseInt(e.target.dataset.index);
+           GenericPicker.open(GenericPickerPresets.operation({
+                title: 'Select Operation',
+                placeholder: 'Search operations by ID or Name...',
+                context: GenericPickerContexts.allRegisteredOperations(),
+                onSelect: async (item) => {
+                    if (configuredSections[idx].operations.find(o => o.operationId === item.id)) {
+                        await showMsg('Duplicate', 'Operation already configured.', 'warning', 'btn-warning');
+                        return;
+                    }
+                    configuredSections[idx].operations.push({ operationId: item.id, operationName: item.name, accessType: 'custom', accessState: { status: 'active' }, executionLimits: {}, timeLimits: {}, throughputLimits: {} });
+                    renderSections();
+                }
+            }));
+        });
+     });
+
+     document.querySelectorAll('.add-all-op-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const idx = parseInt(e.target.dataset.index);
+            const secId = configuredSections[idx].sectionId;
+            const originalText = e.target.innerHTML;
+            e.target.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...`;
+            e.target.disabled = true;
+
+            try {
+                const resp = await fetch(`/sections?q=${secId}&type=exact_match&searchFields=id`, { headers: {'X-AJAX-Request': 'true'} });
+                const data = await resp.json();
+                const sectionDef = (data.results || []).find(s => String(s.id) === String(secId));
+                if (!sectionDef) { await showMsg('Error', 'Section definition not found in system.', 'error', 'btn-danger'); return; }
+                const reso = await fetch(`/operations`, { headers: {'X-AJAX-Request': 'true'} });
+                const data_opt = await reso.json();
+                const regOps = sectionDef.operations || [];
+                if (regOps.length === 0) { await showMsg('Info', 'No operations registered for this section.', 'info', 'btn-primary'); return; }
+
+                let addedCount = 0;
+                if(!configuredSections[idx].operations) configuredSections[idx].operations = [];
+                regOps.forEach(opRef => {
+                    if (!configuredSections[idx].operations.find(existing => existing.operationId === opRef.id)) {
+                        configuredSections[idx].operations.push({
+                            operationId: opRef.id,
+                            operationName: opRef.name || (data_opt.results || []).find(s => String(s.id) === String(opRef.id)).name, 
+                            accessType: 'custom', 
+                            accessState: { status: 'active' },
+                            executionLimits: { maxAttemptsPerSession: opRef.sessionAttempts }, 
+                            timeLimits: { maxSessionDurationMinutes: opRef.sessionTime }, 
+                            throughputLimits: {}
+                        });
+                        addedCount++;
+                    }
+                });
+                if(addedCount > 0) { renderSections(); await showMsg('Success', `Added ${addedCount} operations.`, 'success', 'btn-success'); } 
+                else { await showMsg('Info', 'All operations are already added.', 'info', 'btn-primary'); }
+            } catch (err) { console.error(err); await showMsg('Error', 'Failed to retrieve operations list.', 'error', 'btn-danger'); } 
+            finally { e.target.innerHTML = originalText; e.target.disabled = false; }
+        });
+     });
+
+     document.querySelectorAll('.remove-op').forEach(btn => {
+        btn.addEventListener('click', e => {
+           const secIdx = parseInt(e.target.dataset.sec);
+           const opIdx = parseInt(e.target.dataset.op);
+           configuredSections[secIdx].operations.splice(opIdx, 1);
+           renderSections();
+        });
+     });
+
+     document.querySelectorAll('.sec-acc-type').forEach(s => s.addEventListener('change', e => {
+        const idx = parseInt(e.target.dataset.index);
+        configuredSections[idx].accessType = e.target.value;
+        renderSections();
+     }));
+     document.querySelectorAll('.op-acc-type').forEach(s => s.addEventListener('change', e => {
+        const secIdx = parseInt(e.target.dataset.sec);
+        const opIdx = parseInt(e.target.dataset.op);
+        configuredSections[secIdx].operations[opIdx].accessType = e.target.value;
+        renderSections();
+     }));
+
+     document.querySelectorAll('.sec-apply-all-users').forEach((checkbox) => {
+        checkbox.addEventListener('change', async (e) => {
+          const idx = parseInt(e.target.dataset.index, 10);
+          if (!Number.isFinite(idx) || !configuredSections[idx]) return;
+          if (e.target.checked) {
+            configuredSections[idx].applyToAllUsers = true;
+            configuredSections[idx].targetUserIds = [];
+            renderSections();
+            return;
+          }
+          configuredSections[idx].applyToAllUsers = false;
+          if (getSectionTargetUserIds(configuredSections[idx]).length === 0) {
+            await showMsg('Target Users Required', 'Select at least one user for this section, or turn "Apply to all users" back on.', 'warning', 'btn-warning');
+          }
+          renderSections();
+        });
+     });
+
+     document.querySelectorAll('.sec-clear-users').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.currentTarget.dataset.index, 10);
+          if (!Number.isFinite(idx) || !configuredSections[idx]) return;
+          configuredSections[idx].applyToAllUsers = true;
+          configuredSections[idx].targetUserIds = [];
+          renderSections();
+        });
+     });
+
+     document.querySelectorAll('.sec-pick-users').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.currentTarget.dataset.index, 10);
+          if (!Number.isFinite(idx) || !configuredSections[idx]) return;
+
+          const activeOrgId = String(orgIdInput?.value || '').trim();
+          const activeOrgName = String(orgNameInput?.value || '').trim();
+          const endpoint = activeOrgId
+            ? `/users?primaryOrgId__eq=${encodeURIComponent(activeOrgId)}`
+            : '/users';
+
+          GenericPicker.open(GenericPickerPresets.user({
+            title: 'Select Target Users',
+            placeholder: 'Search users (type --- to list all)...',
+            apiEndpoint: endpoint,
+            multiselect: true,
+            context: GenericPickerContexts.orgScope(
+              { id: activeOrgId, name: activeOrgName },
+              { label: 'Target Organization' }
+            ),
+            onSelect: async (items) => {
+              const selected = Array.isArray(items) ? items : [items];
+              const targetUserIds = normalizeIdList(selected.map((item) => item?.id));
+              if (targetUserIds.length === 0) {
+                await showMsg('No Users Selected', 'Pick at least one user or use Apply to all users.', 'warning', 'btn-warning');
+                return;
+              }
+              configuredSections[idx].applyToAllUsers = false;
+              configuredSections[idx].targetUserIds = targetUserIds;
+              renderSections();
+            }
+          }));
+        });
+     });
+
+     const bindSectionInput = (cls, pathFn) => {
+        document.querySelectorAll('.' + cls).forEach(i => i.addEventListener('input', e => {
+           const idx = parseInt(e.target.dataset.index);
+           let val = e.target.type === 'number' ? parseInt(e.target.value) : e.target.value;
+           if (isNaN(val) && e.target.type === 'number') val = null;
+           pathFn(configuredSections[idx], val);
+        }));
+     };
+     bindSectionInput('sec-max-sess', (obj, v) => { if(!obj.timeLimits) obj.timeLimits={}; obj.timeLimits.maxSessionDurationMinutes = v; });
+     bindSectionInput('sec-idle', (obj, v) => { if(!obj.timeLimits) obj.timeLimits={}; obj.timeLimits.maxAttemptsPerSession = v; });
+     
+     document.querySelectorAll('.op-attempts').forEach(i => i.addEventListener('input', e => {
+        const op = configuredSections[e.target.dataset.sec].operations[e.target.dataset.op];
+        if(!op.executionLimits) op.executionLimits={}; op.executionLimits.maxAttemptsPerSession = parseInt(e.target.value) || null;
+     }));
+     document.querySelectorAll('.op-sess').forEach(i => i.addEventListener('input', e => {
+        const op = configuredSections[e.target.dataset.sec].operations[e.target.dataset.op];
+        if(!op.timeLimits) op.timeLimits={}; op.timeLimits.maxSessionDurationMinutes = parseInt(e.target.value) || null;
+     }));
+  }
+
+  // --- 5c. SIDEBAR FILTER ---
+  document.getElementById('sectionSearch').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      document.querySelectorAll('.section-nav-item').forEach(item => {
+          item.style.display = item.textContent.toLowerCase().includes(term) ? '' : 'none';
+      });
+  });
+  if(addSectionConfigBtn) {
+      addSectionConfigBtn.addEventListener('click', () => {
+         GenericPicker.open(GenericPickerPresets.section({
+            title: 'Select Section',
+            context: GenericPickerContexts.allRegisteredSections(),
+            onSelect: async (item) => {
+                 const id = item.id;
+                 const name = item.name;
+                 if (configuredSections.find(s => s.sectionId === id)) { 
+                     await showMsg('Duplicate', 'Section already configured.', 'warning','btn-warning'); 
+                     return; 
+                 }
+                 configuredSections.push({
+                    sectionId: id,
+                    sectionName: name,
+                    accessType: 'custom', 
+                    accessState: { status: 'active' },
+                    timeLimits: {},
+                    throughputLimits: {},
+                    operations: [],
+                    applyToAllUsers: true,
+                    targetUserIds: []
+                 });
+                 renderSections();
+            }
+         }));
+      });
+  }
+
+  // --- 6. SCHEDULE ---
+  const scheduleContainer = document.getElementById('scheduleContainer');
+  function getMinutes(timeStr) {
+      if(!timeStr) return 0;
+      const [h, m] = timeStr.split(':').map(Number);
+      return (h * 60) + m;
+  }
+
+  function renderSchedule() {
+      scheduleContainer.innerHTML = '';
+      const days = Object.keys(schedule.weekdays || {});
+      if(days.length === 0) {
+          scheduleContainer.innerHTML = '<div class="text-muted small text-center p-3">No schedule defined (Access allowed 24/7).</div>';
+          return;
+      }
+      days.forEach(day => {
+          const times = schedule.weekdays[day];
+          if(times.length === 0) return;
+          times.sort((a,b) => getMinutes(a.start) - getMinutes(b.start));
+          const row = document.createElement('div');
+          row.className = 'mb-2 p-2 border rounded bg-white shadow-sm';
+          let html = `<div class="fw-bold text-primary mb-1 border-bottom pb-1 small text-uppercase">${day}</div><div class="d-flex flex-wrap gap-2">`;
+          times.forEach((t, idx) => {
+              html += `<span class="badge bg-light text-dark border d-flex align-items-center"><i class="bi bi-clock me-1 text-muted"></i> ${t.start} - ${t.end} <i class="bi bi-x-circle-fill text-danger ms-2 cursor-pointer remove-schedule-item" data-day="${day}" data-idx="${idx}" title="Remove"></i></span>`;
+          });
+          html += `</div>`;
+          row.innerHTML = html;
+          scheduleContainer.appendChild(row);
+      });
+      scheduleContainer.querySelectorAll('.remove-schedule-item').forEach(btn => {
+          btn.addEventListener('click', e => {
+              const d = e.target.dataset.day;
+              const i = parseInt(e.target.dataset.idx);
+              schedule.weekdays[d].splice(i, 1);
+              if(schedule.weekdays[d].length === 0) delete schedule.weekdays[d];
+              renderSchedule();
+          });
+      });
+  }
+
+  document.getElementById('addScheduleBtn').addEventListener('click', async () => {
+     const d = document.getElementById('scheduleDaySelect').value;
+     const s = document.getElementById('scheduleStart').value;
+     const e = document.getElementById('scheduleEnd').value;
+     if(!s || !e) { await showMsg('Missing Input', 'Please select both Start and End times.', 'warning', 'btn-warning'); return; }
+     if (getMinutes(s) >= getMinutes(e)) { await showMsg('Invalid Time Range', 'End time must be greater than Start time.', 'warning', 'btn-warning'); return; }
+     if(!schedule.weekdays) schedule.weekdays = {};
+     if(!schedule.weekdays[d]) schedule.weekdays[d] = [];
+     
+     let hasConflict = false;
+     for (let slot of schedule.weekdays[d]) {
+         if (getMinutes(s) < getMinutes(slot.end) && getMinutes(e) > getMinutes(slot.start)) { hasConflict = true; break; }
+     }
+     if (hasConflict) { await showMsg('Schedule Conflict', `The time slot <b>${s} - ${e}</b> overlaps with an existing slot on <b>${d}</b>.`, 'error', 'btn-danger'); return; }
+     schedule.weekdays[d].push({start:s, end:e});
+     renderSchedule();
+  });
+
+  // --- 6b. BANNED USERS ---
+  const bannedBody = document.getElementById('bannedUsersBody');
+  const banUserBtn = document.getElementById('btnBanUser');
+
+  function renderBannedUsers() {
+      if (!bannedBody) return;
+      bannedBody.innerHTML = '';
+      if (!Array.isArray(bannedUsers) || bannedUsers.length === 0) {
+        bannedBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No users banned.</td></tr>';
+        return;
+      }
+      bannedBody.innerHTML = bannedUsers.map((row, idx) => {
+        const userName = escapeHtml(row.userName || row.userId || '');
+        const userId = escapeHtml(row.userId || '');
+        const reason = escapeHtml(row.reason || '');
+        const dateText = row.dateBanned ? escapeHtml(new Date(row.dateBanned).toLocaleDateString()) : 'N/A';
+        return `<tr>
+          <td>${userName}<div class="small text-muted">${userId}</div></td>
+          <td><input type="text" class="form-control form-control-sm ban-reason-input" data-idx="${idx}" value="${reason}"></td>
+          <td>${dateText}</td>
+          <td><button type="button" class="btn btn-sm btn-outline-danger btn-unban" data-idx="${idx}">Unban</button></td>
+        </tr>`;
+      }).join('');
+
+      bannedBody.querySelectorAll('.btn-unban').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.currentTarget.dataset.idx, 10);
+          if (!Number.isFinite(idx) || idx < 0 || idx >= bannedUsers.length) return;
+          bannedUsers.splice(idx, 1);
+          renderBannedUsers();
+        });
+      });
+
+      bannedBody.querySelectorAll('.ban-reason-input').forEach((input) => {
+        input.addEventListener('input', (e) => {
+          const idx = parseInt(e.currentTarget.dataset.idx, 10);
+          if (!Number.isFinite(idx) || idx < 0 || idx >= bannedUsers.length) return;
+          bannedUsers[idx].reason = e.currentTarget.value || '';
+        });
+      });
+  }
+
+  banUserBtn?.addEventListener('click', async () => {
+    const activeOrgId = String(orgIdInput?.value || '').trim();
+    const activeOrgName = String(orgNameInput?.value || '').trim();
+    if (!activeOrgId) {
+      await showMsg('Organization Required', 'Please select a target organization before banning users.', 'warning', 'btn-warning');
+      return;
+    }
+    GenericPicker.open(GenericPickerPresets.user({
+      title: 'Ban User',
+      icon: 'bi-person-x',
+      placeholder: 'Search users (type --- to list all)...',
+      apiEndpoint: `/users?primaryOrgId__eq=${encodeURIComponent(activeOrgId)}`,
+      context: GenericPickerContexts.orgScope(
+        { id: activeOrgId, name: activeOrgName },
+        { label: 'Target Organization' }
+      ),
+      onSelect: async (item) => {
+        const userId = String(item?.id || '').trim();
+        if (!userId) return;
+        if (bannedUsers.some((u) => String(u.userId) === userId)) {
+          await showMsg('Already Banned', 'This user is already in the banned users list.', 'info', 'btn-primary');
+          return;
+        }
+        const userName = String(item?.username || item?.email || item?.identity?.displayName || item?.name || userId).trim();
+        bannedUsers.push({
+          userId,
+          userName,
+          reason: 'Policy Violation',
+          dateBanned: new Date().toISOString()
+        });
+        renderBannedUsers();
+      }
+    }));
+  });
+
+  renderBannedUsers();
+
+  // --- 7. SUBMIT ---
+  form.addEventListener('submit', async (e) => {
+     e.preventDefault();
+
+     // ✅ FIX: Manual Validation Logic to Switch Tabs
+     if (!form.checkValidity()) {
+         e.stopPropagation();
+         
+         const invalidEl = form.querySelector(':invalid');
+         if (invalidEl) {
+             // Find closest tab-pane
+             const tabPane = invalidEl.closest('.tab-pane');
+             if (tabPane) {
+                 // Find the button that targets this pane
+                 const tabBtn = document.querySelector(`button[data-bs-target="#${tabPane.id}"]`);
+                 if (tabBtn) {
+                     // Switch to that tab
+                     new bootstrap.Tab(tabBtn).show();
+                 }
+             }
+             // Focus the input to show the bubble
+             setTimeout(() => invalidEl.focus(), 100);
+             
+             // Optional: Show message if needed
+             // await showMsg('Required Fields', 'Please fill in all required fields marked with *.', 'warning', 'btn-warning');
+         }
+         
+         form.classList.add('was-validated');
+         return;
+     }
+     
+     // Proceed if valid
+     const sMax = parseInt(document.getElementById('inp_maxSessions').value);
+     const sDur = parseInt(document.getElementById('inp_maxDuration').value);
+     const sIdle = parseInt(document.getElementById('inp_idleTimeout').value);
+
+     session.maxSessions = isNaN(sMax) ? 5 : sMax;
+     session.maxDuration = isNaN(sDur) ? 480 : sDur;
+     session.idleTimeout = isNaN(sIdle) ? 30 : sIdle;
+
+     requestControl = {
+        customRoutes: requestRouteOverrides || []
+     };
+
+     applyTargetingStateToBlock(session, blockTargeting.session);
+     applyTargetingStateToBlock(requestControl, blockTargeting.requestControl);
+     applyTargetingStateToBlock(schedule, blockTargeting.schedule);
+     applyTargetingStateToBlock(network, blockTargeting.network);
+
+     const nonSectionTargetingTabs = [
+       { key: 'session', tab: 'tab-session', label: 'Session Control' },
+       { key: 'requestControl', tab: 'tab-request-control', label: 'Request Control' },
+       { key: 'schedule', tab: 'tab-schedule', label: 'Global Schedule' },
+       { key: 'network', tab: 'tab-security', label: 'Network & Security' }
+     ];
+     for (const rule of nonSectionTargetingTabs) {
+       const state = blockTargeting[rule.key] || { applyToAllUsers: true, targetUserIds: [] };
+       if (state.applyToAllUsers === false && (!Array.isArray(state.targetUserIds) || state.targetUserIds.length === 0)) {
+         await showMsg(`${rule.label} Targeting`, `Please select at least one target user for ${rule.label}, or turn on "Apply to all users".`, 'warning', 'btn-warning');
+         const tabBtn = document.querySelector(`button[data-bs-target=\"#${rule.tab}\"]`);
+         if (tabBtn) new bootstrap.Tab(tabBtn).show();
+         return;
+       }
+     }
+
+     security.mfaRequired = document.getElementById('mfaCheck').checked;
+     security.allowedMfaTypes = Array.from(document.querySelectorAll('.mfa-type-chk:checked')).map(cb => cb.value);
+
+     document.getElementById('networkHidden').value = JSON.stringify(network);
+     document.getElementById('securityHidden').value = JSON.stringify(security);
+     document.getElementById('sessionControlHidden').value = JSON.stringify(session);
+     document.getElementById('requestControlHidden').value = JSON.stringify(requestControl);
+     document.getElementById('scheduleHidden').value = JSON.stringify(schedule);
+     document.getElementById('bannedUsersHidden').value = JSON.stringify(normalizeBannedUsers(bannedUsers));
+     let sectionPayload = [];
+     try {
+       sectionPayload = sanitizeConfiguredSectionsForSave();
+     } catch (validationErr) {
+       await showMsg('Section Targeting Validation', validationErr.message || 'Please review section targeting configuration.', 'warning', 'btn-warning');
+       const sectionTabBtn = document.querySelector('button[data-bs-target="#tab-sections"]');
+       if (sectionTabBtn) new bootstrap.Tab(sectionTabBtn).show();
+       return;
+     }
+     document.getElementById('sectionsHidden').value = JSON.stringify(sectionPayload);
+
+     const fd = new FormData(form);
+     if(document.getElementById('activeCheck')) {
+        fd.set('active', document.getElementById('activeCheck').checked ? 'true' : 'false');
+     }
+
+     try {
+        const resp = await fetch(form.action, { 
+          method: 'POST', 
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          }, 
+          body: new URLSearchParams(fd).toString()
+        });
+        const result = await resp.json();
+        
+        await showMsg(result.status === 'success' ? 'Success' : 'Error', result.message || 'Done.', result.status === 'success' ? 'success' : 'error', result.status === 'success' ? 'btn-success' : 'btn-danger');
+        if (result.status === 'success') window.location.href = '/organizationpolicies';
+     } catch (err) { 
+        console.error(err);
+        await showMsg('Error', 'An unexpected error occurred.', 'error', 'btn-danger');
+     }
+  });
+
+  renderSections(); renderSchedule();
+});
+</script>
+<style>
+  .accordion-button:not(.collapsed) { background-color: #f8f9fa; color: #000; }
+  .cursor-pointer { cursor: pointer; }
+  .modal { z-index: 1060; }
+  #sectionsSidebar::-webkit-scrollbar { width: 6px; }
+  #sectionsSidebar::-webkit-scrollbar-track { background: #f1f1f1; }
+  #sectionsSidebar::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+  #sectionsSidebar::-webkit-scrollbar-thumb:hover { background: #555; }
+  .nav-tabs .nav-link.active { font-weight: bold; color: #0d6efd; border-top: 3px solid #0d6efd; }
+</style>

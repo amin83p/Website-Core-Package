@@ -1,0 +1,26 @@
+[
+  {
+    "id": "AI_1770531738824_880",
+    "userId": "SYS_ROOT_001",
+    "sampleId": "T2S_1770518012424_911",
+    "assessmentId": "MA_1770528690129_900",
+    "questionId": "Q_1770528690129_0",
+    "sampleRef": "Cambridge IELTS 20 Academic",
+    "questionText": "Is there a clear position throughout the response?",
+    "aiResponse": "*   **Answer:** No\n\n*   **Reasoning:** While the essay describes changes at Beechwood Farm, it lacks a clear, overarching position or argument about these changes. It doesn't state whether the changes are positive, negative, necessary, or any other specific viewpoint. The essay is purely descriptive. There is no thesis statement or any sentence that indicates the author's position. For example, sentences like \"Lot of things have changed since 1950, and Beechwood Farm is not an exception,\" and \"Modern times had come, and everyone had to be adjusted to new ways of living,\" simply state facts or observations rather than a defined position.\n",
+    "timestamp": "2026-02-08T06:22:18.824Z",
+    "orgId": "900000"
+  },
+  {
+    "id": "AI_1770537922100_165",
+    "userId": "SYS_ROOT_001",
+    "sampleId": "T2S_1770518012424_911",
+    "assessmentId": "MA_1770528690129_900",
+    "questionId": "Q_1770528690129_0",
+    "sampleRef": "Cambridge IELTS 20 Academic",
+    "questionText": "Is there a clear position throughout the response?",
+    "aiResponse": "Yes.",
+    "timestamp": "2026-02-08T08:05:22.100Z",
+    "orgId": "900000"
+  }
+]

@@ -1,0 +1,125 @@
+<%
+  const ui = accessUi || {};
+  const canUpdate = ui.canUpdate === true;
+  const canDelete = ui.canDelete === true;
+  const hasRowActions = canUpdate || canDelete;
+%>
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  manageBtns: Array.isArray(manageBtns) ? manageBtns : []
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search rules by id, name, section, operation, event, or creator...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Rule</th>
+        <th>Organization</th>
+        <th>Matcher</th>
+        <th>Audience</th>
+        <th>Timing / Validity</th>
+        <th>Formula</th>
+        <th>Creator</th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr>
+          <td colspan="8" class="text-center py-4 text-muted">No rules found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const summary = item.summary || {}; %>
+        <% const creator = item.creator || {}; %>
+        <% const validity = item.validity || {}; %>
+        <% const formula = summary.formulaMetrics || {}; %>
+        <% const formulaLine = ['call', 'amount', 'token', 'volume'].map((metric) => { const row = formula[metric] || {}; return metric + ': ' + Number(row.base || 0) + ' + ' + Number(row.multiplier || 0) + 'x(' + (row.contextKey || '-') + ')'; }); %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.name || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
+            <div class="x-small mt-1 d-flex gap-1 flex-wrap">
+              <span class="badge <%= item.active !== false ? 'text-bg-success' : 'text-bg-secondary' %>"><%= item.active !== false ? 'Active' : 'Inactive' %></span>
+              <% if (item.isFallback === true) { %>
+                <span class="badge text-bg-warning">Fallback</span>
+              <% } %>
+            </div>
+          </td>
+          <td>
+            <div class="small font-monospace text-dark"><%= item.orgId || '-' %></div>
+          </td>
+          <td>
+            <div class="small text-dark"><span class="fw-bold"><%= item.sectionId || '-' %></span> / <span class="fw-bold"><%= item.operationId || '-' %></span></div>
+            <div class="x-small text-muted">Event: <%= item.sourceEventType || 'Any' %></div>
+          </td>
+          <td>
+            <div class="small text-dark"><%= Number(summary.targetUserCount || 0) %> targeted user(s)</div>
+            <div class="x-small text-muted"><%= item.isFallback === true ? 'Fallback rule (no user targeting)' : 'User-targeted + generic resolution enabled' %></div>
+          </td>
+          <td>
+            <div class="small text-dark fw-bold text-capitalize"><%= item.consumeTiming || 'on_attempt' %></div>
+            <div class="x-small text-muted"><%= validity.startDate || '-' %> to <%= validity.endDate || '-' %></div>
+            <div class="x-small text-muted">TZ: <%= validity.timezone || 'UTC' %></div>
+          </td>
+          <td>
+            <div class="x-small text-muted"><%= formulaLine[0] %></div>
+            <div class="x-small text-muted"><%= formulaLine[1] %></div>
+            <div class="x-small text-muted"><%= formulaLine[2] %></div>
+            <div class="x-small text-muted"><%= formulaLine[3] %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= creator.displayName || (creator.type === 'system' ? 'System' : '-') %></div>
+            <div class="x-small text-muted font-monospace"><%= creator.userId || 'System' %></div>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <% if (hasRowActions) { %>
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= item.id %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                  <% if (canUpdate) { %>
+                    <a href="/activity-quota/rules/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-pencil-square me-2"></i>Edit
+                    </a>
+                  <% } %>
+                  <% if (canDelete) { %>
+                    <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>" data-delete-url="/activity-quota/rules/delete/<%= item.id %>">
+                      <i class="bi bi-trash me-2"></i>Delete
+                    </button>
+                  <% } %>
+                </div>
+              </div>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('../../partials/tablePages-end') %>

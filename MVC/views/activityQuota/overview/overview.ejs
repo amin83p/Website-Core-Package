@@ -1,0 +1,331 @@
+<%
+  const data = (overview && typeof overview === 'object') ? overview : {};
+  const filters = (data.filters && typeof data.filters === 'object') ? data.filters : {};
+  const stats = (data.stats && typeof data.stats === 'object') ? data.stats : {};
+  const totals = (data.totals && typeof data.totals === 'object') ? data.totals : {};
+  const sectionRows = Array.isArray(data.sectionRows) ? data.sectionRows : [];
+  const recentRows = Array.isArray(data.recentRows) ? data.recentRows : [];
+  const actions = Array.isArray(pageActions) ? pageActions : [];
+  const dashboardAction = actions.find((action) => action.key === 'dashboard') || null;
+  const navActions = actions.filter((action) => action.key !== 'dashboard');
+  const DEFAULT_OVERVIEW_MAX_ROWS = 5000;
+
+  function formatMetric(value) {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return '0';
+    const abs = Math.abs(num);
+    if (abs >= 1000000) return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 });
+  }
+
+  function formatDateTime(value) {
+    const token = String(value || '').trim();
+    if (!token) return '-';
+    const date = new Date(token);
+    if (Number.isNaN(date.getTime())) return token;
+    return date.toLocaleString();
+  }
+
+  const totalsCredit = (totals.credit && typeof totals.credit === 'object') ? totals.credit : {};
+  const totalsConsumption = (totals.consumption && typeof totals.consumption === 'object') ? totals.consumption : {};
+  const totalsAvailable = (totals.available && typeof totals.available === 'object') ? totals.available : {};
+  const entryCounts = (stats.entryCounts && typeof stats.entryCounts === 'object') ? stats.entryCounts : {};
+
+  const hasCustomOverviewMaxRows = (() => {
+    const raw = String(filters.maxRows ?? '').trim();
+    if (!raw) return false;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 && parsed !== DEFAULT_OVERVIEW_MAX_ROWS;
+  })();
+
+  const hasOverviewFiltersApplied = Boolean(
+    String(filters.fromDate || '').trim()
+    || String(filters.toDate || '').trim()
+    || String(filters.entryType || '').trim()
+    || String(filters.userId || '').trim()
+    || String(filters.section || '').trim()
+    || String(filters.operation || '').trim()
+    || hasCustomOverviewMaxRows
+  );
+%>
+
+<div class="sections-page">
+  <div class="mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+      <h1 class="page-heading size-md m-0">Activity Quota Overview</h1>
+      <% if (dashboardAction) { %>
+        <a href="<%= dashboardAction.href %>" class="<%= String(dashboardAction.className || 'btn btn-filled btn-secondary btn-md').replace(/\bmb-2\b/g, '') %>">
+          <i class="bi <%= dashboardAction.icon || 'bi-speedometer2' %> me-1"></i> <%= dashboardAction.label %>
+        </a>
+      <% } %>
+    </div>
+    <div class="d-flex align-items-center justify-content-end gap-2 flex-wrap">
+      <% navActions.forEach((action) => { %>
+        <a href="<%= action.href %>" class="btn btn-outline-primary btn-md">
+          <i class="bi <%= action.icon || 'bi-arrow-right' %> me-1"></i> <%= action.label %>
+        </a>
+      <% }) %>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Overview</div>
+      <button
+        id="aqOverviewFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#aqOverviewFilterCollapse"
+        aria-expanded="<%= hasOverviewFiltersApplied ? 'true' : 'false' %>"
+        aria-controls="aqOverviewFilterCollapse"
+        aria-label="<%= hasOverviewFiltersApplied ? 'Close filters' : 'Open filters' %>">
+        <i id="aqOverviewFilterToggleIcon" class="bi <%= hasOverviewFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+      </button>
+    </div>
+    <div class="collapse<%= hasOverviewFiltersApplied ? ' show' : '' %>" id="aqOverviewFilterCollapse">
+      <form method="GET" action="/activity-quota/overview" class="card-body p-3">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-2">
+            <label class="form-label">From Date</label>
+            <input type="date" name="fromDate" class="form-control size-md" value="<%= filters.fromDate || '' %>">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">To Date</label>
+            <input type="date" name="toDate" class="form-control size-md" value="<%= filters.toDate || '' %>">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Entry Type</label>
+            <select name="entryType" class="form-select size-md">
+              <option value="" <%= !filters.entryType ? 'selected' : '' %>>All</option>
+              <option value="credit" <%= filters.entryType === 'credit' ? 'selected' : '' %>>Credit</option>
+              <option value="consumption" <%= filters.entryType === 'consumption' ? 'selected' : '' %>>Consumption</option>
+              <option value="adjustment" <%= filters.entryType === 'adjustment' ? 'selected' : '' %>>Adjustment</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">User ID</label>
+            <input type="text" name="userId" class="form-control size-md" value="<%= filters.userId || '' %>" placeholder="e.g. U1001">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Section</label>
+            <input type="text" name="section" class="form-control size-md" value="<%= filters.section || '' %>" placeholder="e.g. IELTS_SCORING_PIPELINES">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Operation</label>
+            <input type="text" name="operation" class="form-control size-md" value="<%= filters.operation || '' %>" placeholder="e.g. OP1001">
+          </div>
+        </div>
+
+        <div class="row g-3 align-items-end mt-1">
+          <div class="col-md-2">
+            <label class="form-label">Max Rows</label>
+            <input type="number" name="maxRows" class="form-control size-md" value="<%= Number(filters.maxRows || 5000) %>" min="100" max="50000" step="100">
+          </div>
+          <div class="col-md-10 d-flex justify-content-end gap-2">
+            <a href="/activity-quota/overview" class="btn btn-outline-secondary btn-md">Reset</a>
+            <button type="submit" class="btn btn-filled btn-primary btn-md">
+              <i class="bi bi-funnel me-1"></i> Apply
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <% if (stats.truncated) { %>
+    <div class="alert alert-warning border shadow-sm mb-3">
+      Results are capped at <b><%= Number(stats.maxRows || 0).toLocaleString() %></b> rows. Narrow filters for full precision.
+    </div>
+  <% } %>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-6 col-xl-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Total Entries</div>
+          <div class="h4 fw-bold mb-0"><%= Number(stats.totalEntries || 0).toLocaleString() %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Unique Users</div>
+          <div class="h4 fw-bold mb-0"><%= Number(stats.uniqueUserCount || 0).toLocaleString() %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Unique Sections</div>
+          <div class="h4 fw-bold mb-0"><%= Number(stats.uniqueSectionCount || 0).toLocaleString() %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Credits</div>
+          <div class="fw-bold">Entries: <%= Number(entryCounts.credit || 0).toLocaleString() %></div>
+          <div class="x-small text-muted">Call <%= formatMetric(totalsCredit.call) %> | Token <%= formatMetric(totalsCredit.token) %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Consumption</div>
+          <div class="fw-bold">Entries: <%= Number(entryCounts.consumption || 0).toLocaleString() %></div>
+          <div class="x-small text-muted">Call <%= formatMetric(totalsConsumption.call) %> | Token <%= formatMetric(totalsConsumption.token) %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Net Available</div>
+          <div class="fw-bold">Call <%= formatMetric(totalsAvailable.call) %></div>
+          <div class="x-small text-muted">Amount <%= formatMetric(totalsAvailable.amount) %> | Token <%= formatMetric(totalsAvailable.token) %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-xl-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h5 class="fw-bold mb-3"><i class="bi bi-grid-3x3-gap me-2"></i>Section Summary</h5>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Section</th>
+                  <th class="text-end">Entries</th>
+                  <th class="text-end">Net Call</th>
+                  <th class="text-end">Net Amount</th>
+                  <th class="text-end">Net Token</th>
+                  <th class="text-end">Net Volume</th>
+                  <th>Last Activity</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!sectionRows.length) { %>
+                  <tr>
+                    <td colspan="7" class="text-center text-muted py-3">No ledger data for current filters.</td>
+                  </tr>
+                <% } %>
+                <% sectionRows.forEach((row) => { %>
+                  <% const available = (row.totals && row.totals.available) ? row.totals.available : {}; %>
+                  <tr>
+                    <td>
+                      <div class="fw-bold"><%= row.sectionName || row.sectionId || '-' %></div>
+                      <div class="x-small text-muted font-monospace"><%= row.sectionId || '-' %></div>
+                    </td>
+                    <td class="text-end"><%= Number(row.entryCount || 0).toLocaleString() %></td>
+                    <td class="text-end"><%= formatMetric(available.call) %></td>
+                    <td class="text-end"><%= formatMetric(available.amount) %></td>
+                    <td class="text-end"><%= formatMetric(available.token) %></td>
+                    <td class="text-end"><%= formatMetric(available.volume) %></td>
+                    <td><%= formatDateTime(row.latestDateTime) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h5 class="fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>Recent Ledger Entries</h5>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Date</th>
+                  <th>User</th>
+                  <th>Section / Operation</th>
+                  <th>Type</th>
+                  <th class="text-end">Call</th>
+                  <th class="text-end">Token</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!recentRows.length) { %>
+                  <tr>
+                    <td colspan="6" class="text-center text-muted py-3">No recent rows.</td>
+                  </tr>
+                <% } %>
+                <% recentRows.forEach((row) => { %>
+                  <tr>
+                    <td>
+                      <div><%= formatDateTime(row.dateTime) %></div>
+                      <div class="x-small text-muted font-monospace"><%= row.id || '-' %></div>
+                    </td>
+                    <td>
+                      <div class="fw-bold"><%= row.user.name || row.user.id || '-' %></div>
+                      <div class="x-small text-muted font-monospace"><%= row.user.id || '-' %></div>
+                    </td>
+                    <td>
+                      <div class="fw-bold"><%= row.section.name || row.section.id || '-' %></div>
+                      <div class="x-small text-muted"><%= row.operation.name || row.operation.id || '-' %></div>
+                    </td>
+                    <td>
+                      <span class="badge <%= row.entryType === 'credit' ? 'bg-success-subtle text-success-emphasis border border-success-subtle' : (row.entryType === 'consumption' ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-info-subtle text-info-emphasis border border-info-subtle') %>">
+                        <%= row.entryType %>
+                      </span>
+                    </td>
+                    <td class="text-end"><%= formatMetric(row.call) %></td>
+                    <td class="text-end"><%= formatMetric(row.token) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  function initCollapseToggleIcon(options = {}) {
+    const collapseEl = document.getElementById(String(options.collapseId || ''));
+    const buttonEl = document.getElementById(String(options.buttonId || ''));
+    const iconEl = document.getElementById(String(options.iconId || ''));
+    if (!collapseEl || !buttonEl || !iconEl) return;
+
+    const openIcon = String(options.openIcon || 'bi-chevron-down');
+    const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+    const openLabel = String(options.openLabel || 'Open filters');
+    const closeLabel = String(options.closeLabel || 'Close filters');
+
+    const setState = (expanded) => {
+      iconEl.classList.remove(openIcon, closeIcon);
+      iconEl.classList.add(expanded ? closeIcon : openIcon);
+      buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+    };
+
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+    collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+  }
+
+  initCollapseToggleIcon({
+    collapseId: 'aqOverviewFilterCollapse',
+    buttonId: 'aqOverviewFilterToggleBtn',
+    iconId: 'aqOverviewFilterToggleIcon',
+    openIcon: 'bi-chevron-down',
+    closeIcon: 'bi-chevron-up',
+    openLabel: 'Open filters',
+    closeLabel: 'Close filters'
+  });
+});
+</script>

@@ -1,0 +1,40 @@
+[
+  {
+    "id": "PR_1771792310932",
+    "createdAt": "2026-02-22T20:31:50.932Z",
+    "departmentId": "DEP_1771788678638",
+    "orgId": "",
+    "personId": "760360",
+    "personRole": "teacher",
+    "ratePeriods": [
+      {
+        "id": "PRP_1772146012264",
+        "hourlyRate": 36,
+        "effectiveFrom": "2026-02-01",
+        "effectiveTo": "2026-02-28",
+        "contractId": "CNT22632",
+        "updatedAt": "2026-02-26T22:46:52.264Z"
+      }
+    ],
+    "updatedAt": "2026-02-22T20:46:56.977Z"
+  },
+  {
+    "id": "PR_1771793459474",
+    "createdAt": "2026-02-22T20:50:59.474Z",
+    "departmentId": "DEP_1771788762810",
+    "orgId": "",
+    "personId": "313786",
+    "personRole": "teacher",
+    "ratePeriods": [
+      {
+        "id": "PRP_1772146012265",
+        "hourlyRate": 32,
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2026-12-31",
+        "contractId": "CNT22655",
+        "updatedAt": "2026-02-26T22:46:52.265Z"
+      }
+    ],
+    "updatedAt": null
+  }
+]

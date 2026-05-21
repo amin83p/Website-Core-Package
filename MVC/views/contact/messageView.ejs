@@ -1,0 +1,314 @@
+<%
+  const m = message || {};
+  const audit = m.audit || {};
+  const files = Array.isArray(m.attachments) ? m.attachments : [];
+  const statusVal = m.status || 'Unread';
+%>
+
+<section class="sections-page">
+
+  <!-- Header (uniform) -->
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0">
+      View Contact Message
+    </h1>
+
+    <div class="d-flex gap-2 flex-wrap">
+      <span class="badge bg-primary border">ID: <%= m.id || '—' %></span>
+
+      <% if (statusVal === 'Unread') { %>
+        <span class="badge bg-danger border">Unread</span>
+      <% } else if (statusVal === 'Under view') { %>
+        <span class="badge bg-warning border text-dark">Under view</span>
+      <% } else { %>
+        <span class="badge bg-success border">Done</span>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="form-container" style="width: 100%; max-width: 100%;">
+    <form id="reviewForm" action="/contact/messages/review/update" method="POST">
+      <input type="hidden" id="msgId" name="id" value="<%= m.id || '' %>" />
+      <input type="hidden" id="actionStateId" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      <!-- Tabs (uniform) -->
+      <ul class="nav nav-tabs mb-4" id="msgTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="details-tab" data-bs-toggle="tab" data-bs-target="#details"
+            type="button" role="tab">
+            Message Details
+          </button>
+        </li>
+
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="attachments-tab" data-bs-toggle="tab" data-bs-target="#attachments"
+            type="button" role="tab">
+            Attachments
+            <% if (files.length) { %>
+              <span class="badge bg-primary ms-2"><%= files.length %></span>
+            <% } %>
+          </button>
+        </li>
+
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="review-tab" data-bs-toggle="tab" data-bs-target="#review"
+            type="button" role="tab">
+            Reviewer
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+
+        <!-- Details -->
+        <div class="tab-pane fade show active" id="details" role="tabpanel">
+          <div class="row">
+            <div class="col-md-8">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Name</label>
+                  <input class="form-control size-md" value="<%= m.name || '' %>" readonly />
+                </div>
+
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Email</label>
+                  <div class="d-flex gap-2">
+                    <input class="form-control size-md" value="<%= m.email || '' %>" readonly />
+                    <% if (m.email) { %>
+                      <a class="btn btn-filled btn-secondary btn-md" href="mailto:<%= m.email %>">Email</a>
+                    <% } %>
+                  </div>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Type</label>
+                  <input class="form-control size-md" value="<%= m.type || '—' %>" readonly />
+                </div>
+
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Timeline</label>
+                  <input class="form-control size-md" value="<%= m.timeline || '—' %>" readonly />
+                </div>
+
+                <div class="col-12 mb-3">
+                  <label class="form-label">Subject</label>
+                  <input class="form-control size-md" value="<%= m.subject || '' %>" readonly />
+                </div>
+
+                <div class="col-12 mb-3">
+                  <label class="form-label">Message</label>
+                  <textarea class="form-control size-md" rows="10" readonly><%= m.message || '' %></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="card bg-light border-0 mb-3">
+                <div class="card-body">
+                  <h6 class="fw-bold text-primary mb-3">Audit</h6>
+
+                  <div class="mb-2">
+                    <div class="form-text x-small">Received</div>
+                    <div class="fw-bold">
+                      <%= audit.createDateTime ? new Date(audit.createDateTime).toLocaleString() : '—' %>
+                    </div>
+                  </div>
+
+                  <div class="mb-2">
+                    <div class="form-text x-small">IP</div>
+                    <div class="text-muted"><%= audit.ip || '—' %></div>
+                  </div>
+
+                  <div class="mb-2">
+                    <div class="form-text x-small">User</div>
+                    <div class="text-muted"><%= audit.userId || '—' %></div>
+                  </div>
+
+                  <div class="mb-0">
+                    <div class="form-text x-small">User Agent</div>
+                    <div class="text-muted" style="word-break: break-word;"><%= audit.userAgent || '—' %></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card bg-light border-0">
+                <div class="card-body">
+                  <h6 class="fw-bold text-primary mb-3">Quick Actions</h6>
+                  <div class="d-grid gap-2">
+                    <a href="/contact/messages" class="btn btn-filled btn-secondary btn-md">Back to list</a>
+                    <a href="/contact/messages/delete/<%= m.id %>" class="btn btn-filled btn-danger btn-md"
+                       onclick="return confirm('Delete this message?')">
+                      Delete message
+                    </a>
+                  </div>
+                  <div class="form-text x-small mt-2">
+                    Tip: Use Delete in the list page for an AJAX delete.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attachments -->
+        <div class="tab-pane fade" id="attachments" role="tabpanel">
+          <% if (!files.length) { %>
+            <div class="text-muted">No attachments found.</div>
+          <% } else { %>
+            <div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 520px;">
+              <table class="table table-hover table-bordered align-middle mb-0">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>File</th>
+                    <th style="width: 200px;">Type</th>
+                    <th style="width: 140px;">Size</th>
+                    <th style="width: 140px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% files.forEach(f => { %>
+                    <tr>
+                      <td class="fw-bold">
+                        <%= f.originalName || f.fileName || '—' %>
+                        <% if (f.fileName) { %>
+                          <div class="x-small text-muted font-monospace"><%= f.fileName %></div>
+                        <% } %>
+                      </td>
+                      <td><span class="text-muted"><%= f.mimeType || '—' %></span></td>
+                      <td><span class="text-muted"><%= (f.size || 0) %></span></td>
+                      <td class="text-center">
+                        <a class="btn btn-sm btn-filled btn-primary"
+                           href="/contact/messages/<%= m.id %>/attachments/<%= encodeURIComponent(f.fileName || '') %>">
+                          Download
+                        </a>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+
+        <!-- Reviewer -->
+        <div class="tab-pane fade" id="review" role="tabpanel">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Status</label>
+              <select class="form-select size-md" id="status" name="status" required>
+                <option value="Unread" <%= statusVal === 'Unread' ? 'selected' : '' %>>Unread</option>
+                <option value="Under view" <%= statusVal === 'Under view' ? 'selected' : '' %>>Under view</option>
+                <option value="Done" <%= statusVal === 'Done' ? 'selected' : '' %>>Done</option>
+              </select>
+              <div class="form-text x-small">This is internal and used for reviewer workflow.</div>
+            </div>
+
+            <div class="col-12 mb-3">
+              <label class="form-label">Internal note</label>
+              <textarea class="form-control size-md" id="note" name="note" rows="8"
+                placeholder="Add reviewer notes..."><%= m.note || '' %></textarea>
+            </div>
+
+            <label class="form-label">Note for user (public)</label>
+            <textarea class="form-control size-md" id="userNote" name="userNote" rows="5"
+              placeholder="This note will be visible to the user in Follow up..."><%= m.userNote || '' %></textarea>
+            <div class="form-text x-small">Visible in Follow up (code + email).</div>
+
+            <div class="col-12">
+              <div id="reviewStatus" class="form-text" style="min-height: 20px;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Buttons (uniform) -->
+      <div class="button-row mt-4 pt-3 border-top d-flex gap-2 flex-wrap">
+        <button type="submit" class="btn btn-filled btn-primary btn-md" id="saveReviewBtn">
+          Save
+        </button>
+
+        <a href="/contact/messages" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction"
+           data-return-url="/contact/messages">
+          Cancel
+        </a>
+      </div>
+
+    </form>
+  </div>
+
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('reviewForm');
+  const btn = document.getElementById('saveReviewBtn');
+  const statusLine = document.getElementById('reviewStatus');
+
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const id = document.getElementById('msgId').value;
+    const status = document.getElementById('status').value;
+    const note = document.getElementById('note').value;
+    const actionStateId = document.getElementById('actionStateId').value;
+    const userNote = document.getElementById('userNote').value;
+
+    const original = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+    }
+    if (statusLine) statusLine.textContent = '';
+
+    try {
+      const res = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify({ id, status, note, userNote, actionStateId })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Update failed.');
+
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Success',
+          icon: 'success',
+          message: data.message || 'Saved.',
+          buttons: [{ text: 'OK', class: 'btn-success' }]
+        });
+      } else {
+        if (statusLine) statusLine.textContent = data.message || 'Saved.';
+      }
+      window.location.href = '/contact/messages';
+    } catch (err) {
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Error',
+          icon: 'error',
+          message: err.message || 'Update failed.',
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+      } else {
+        if (statusLine) statusLine.textContent = err.message || 'Update failed.';
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    }
+  });
+});
+</script>
+
+<style>
+  /* Keep same style conventions used in sectionForm.ejs */
+  .nav-tabs .nav-link { color: #495057; font-weight: 500; }
+  .nav-tabs .nav-link.active { font-weight: bold; color: #0d6efd; border-top: 3px solid #0d6efd; }
+</style>

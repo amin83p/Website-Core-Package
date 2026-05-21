@@ -1,0 +1,93 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0">Organization Configuration</h1>
+      <span class="badge bg-success-subtle text-success border border-success-subtle">Settings</span>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="orgSettingsForm" action="/systemSettings/organization" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-body p-4">
+            
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <label class="form-label fw-bold">Default Trial Period</label>
+                    <div class="input-group">
+                        <input type="number" name="defaultTrialDays" class="form-control" 
+                               value="<%= settings.organization.defaultTrialDays %>" min="0" max="365">
+                        <span class="input-group-text text-muted">Days</span>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4 d-flex align-items-center">
+                     <div class="form-check form-switch mt-4">
+                        <input class="form-check-input" type="checkbox" id="freeReg" name="allowFreeRegistration" value="true"
+                            <%= settings.organization.allowFreeRegistration ? 'checked' : '' %>>
+                        <label class="form-check-label fw-bold" for="freeReg">Allow Free Registration</label>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="text-muted opacity-25 my-4">
+            
+            <h6 class="fw-bold text-muted mb-3">Free Tier Settings</h6>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Free Org ID</label>
+                    <input type="number" name="freeOrgId" class="form-control font-monospace" value="<%= settings.organization.freeOrgId %>">
+                    <div class="form-text">System ID used for the default free organization.</div>
+                </div>
+                 <div class="col-md-4 mb-3">
+                    <label class="form-label">Free Org Name</label>
+                    <input type="text" name="freeOrgName" class="form-control" value="<%= settings.organization.freeOrgName %>">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">PTE Join Org ID</label>
+                    <input type="number" name="pteJoinOrgId" class="form-control font-monospace" value="<%= settings.organization.pteJoinOrgId || '' %>" placeholder="Optional">
+                    <div class="form-text">Used by <code>/pte/join</code>. If empty, Free Org ID is used.</div>
+                </div>
+            </div>
+
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+          <a href="/systemSettings" class="btn btn-secondary btn-filled btn-md">Back to Dashboard</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save Changes</button>
+      </div>
+   </form>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('orgSettingsForm');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; }
+
+      const formData = new FormData(form);
+      if(!document.getElementById('freeReg').checked) formData.set('allowFreeRegistration', 'false');
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+          body: new URLSearchParams(formData).toString()
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          if (typeof showMessageModal === 'function') await showMessageModal({ title: 'Success', icon: 'success', message: result.message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+          window.location.reload();
+        } else throw new Error(result.message || 'Failed.');
+      } catch (error) {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = 'Save Changes'; }
+        if (typeof showMessageModal === 'function') await showMessageModal({ title: 'Error', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        else alert(error.message);
+      }
+    });
+  }
+});
+</script>

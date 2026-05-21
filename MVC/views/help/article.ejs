@@ -1,0 +1,90 @@
+<div class="sections-page">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="page-heading size-md m-0"><%= article.title %></h1>
+      <div class="small text-muted mt-1"><%= article.summary || '' %></div>
+    </div>
+    <div class="d-flex gap-2">
+      <% if (typeof canManage !== 'undefined' && canManage) { %>
+        <a href="/help/manage/edit/<%= encodeURIComponent(article.id) %>" class="btn btn-outline-primary btn-filled">Edit Item</a>
+      <% } %>
+      <a href="/help/center" class="btn btn-outline-secondary btn-filled">Back To Help</a>
+      <a href="/help/resolve?sectionId=<%= encodeURIComponent(article.sectionId || '') %>&operationId=<%= encodeURIComponent(article.operationId || '') %>" class="btn btn-outline-primary btn-filled">Resolve Context</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <% if (article.contentMode === 'html_page' && article.contentPagePath) { %>
+          <div class="card-body">
+            <div class="alert alert-info py-2 small mb-3">
+              This help item is linked to an external/internal HTML page.
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="small text-muted"><code><%= article.contentPagePath %></code></div>
+              <a href="<%= article.contentPagePath %>" target="_blank" class="btn btn-sm btn-outline-primary btn-filled">Open Page</a>
+            </div>
+            <iframe src="<%= article.contentPagePath %>" class="w-100 border rounded" style="min-height: 70vh;" loading="lazy"></iframe>
+          </div>
+        <% } else { %>
+          <div class="card-body help-article-body">
+            <%- article.contentHtml || '<p class=\"text-muted\">No article content.</p>' %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-light fw-bold">Article Metadata</div>
+        <div class="card-body small">
+          <div class="mb-2"><strong>Category:</strong> <%= article.category || 'Uncategorized' %></div>
+          <div class="mb-2"><strong>Section ID:</strong> <code><%= article.sectionId || 'GLOBAL' %></code></div>
+          <div class="mb-2"><strong>Operation ID:</strong> <code><%= article.operationId || 'DEFAULT' %></code></div>
+          <div class="mb-2"><strong>Audience:</strong> <%= Array.isArray(article.audience) && article.audience.length ? article.audience.join(', ') : 'all' %></div>
+          <div class="mb-2"><strong>Content Mode:</strong> <%= article.contentMode || 'richtext' %></div>
+          <div class="mb-2"><strong>Updated:</strong> <%= new Date(article.updatedAt).toLocaleString() %></div>
+          <% if (Array.isArray(article.tags) && article.tags.length > 0) { %>
+            <div class="mb-1"><strong>Tags:</strong></div>
+            <div>
+              <% article.tags.forEach((tag) => { %>
+                <a class="badge bg-light text-dark border text-decoration-none me-1 mb-1" href="/help/center?q=<%= encodeURIComponent(tag) %>"><%= tag %></a>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-light fw-bold">Related Articles</div>
+        <div class="list-group list-group-flush">
+          <% if (!related || related.length === 0) { %>
+            <div class="list-group-item small text-muted">No related articles found.</div>
+          <% } else { %>
+            <% related.forEach((r) => { %>
+              <a class="list-group-item list-group-item-action" href="/help/article/<%= encodeURIComponent(r.slug) %>">
+                <div class="fw-bold small"><%= r.title %></div>
+                <div class="text-muted x-small"><%= r.category || 'Uncategorized' %></div>
+              </a>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .help-article-body h2 {
+    margin-top: 1rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  .help-article-body p,
+  .help-article-body li {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+</style>
+

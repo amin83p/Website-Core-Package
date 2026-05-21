@@ -1,0 +1,308 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h2 class="page-heading size-md m-0">HEIC Image Converter</h2>
+    <span class="badge bg-success text-white border">Server-Side Powered</span>
+  </div>
+
+  <div class="dash-hero mb-4 p-4">
+    <div class="row align-items-center">
+      <div class="col-md-1 text-center">
+        <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center mx-auto" 
+             style="width: 64px; height: 64px; font-size: 1.5rem;">
+          🚀
+        </div>
+      </div>
+      <div class="col-md-11">
+        <h3 class="fw-bold mb-1">High-Speed HEIC to JPEG</h3>
+        <p class="text-muted small mb-0">
+          Upload Apple HEIC images to convert them instantly using the server's high-performance engine.
+          Supports batch processing.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary d-flex justify-content-between align-items-center">
+          <span>Select Images</span>
+          <span class="badge bg-secondary" id="fileCountBadge">0 files selected</span>
+        </div>
+        <div class="card-body">
+           
+          <div id="dropZone" class="border-2 border-dashed rounded-3 p-5 text-center bg-light" 
+               style="border-style: dashed; border-color: #ccc; cursor: pointer; transition: all 0.2s;">
+              
+              <i class="bi bi-cloud-arrow-up fs-1 text-muted mb-3 d-block"></i>
+              <h5 class="fw-bold text-secondary">Drag & Drop HEIC files here</h5>
+              <p class="text-muted small">or click to browse files</p>
+              
+              <input type="file" id="fileInput" multiple accept=".heic,.HEIC" class="d-none">
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-3">
+             <button id="clearBtn" class="btn btn-outline-secondary btn-filled" disabled>
+               <i class="bi bi-x-lg me-1"></i> Clear
+             </button>
+             <button id="convertBtn" class="btn btn-primary btn-filled" disabled>
+               <i class="bi bi-arrow-repeat me-1"></i> Upload & Convert
+             </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12" id="resultsSection" style="display: none;">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-dark text-white border-0 fw-bold d-flex justify-content-between align-items-center">
+          <span>Conversion Results</span>
+          <button id="downloadAllBtn" class="btn btn-sm btn-light text-dark fw-bold" disabled>
+            <i class="bi bi-file-earmark-zip-fill me-1"></i> Download All (ZIP)
+          </button>
+        </div>
+        
+        <div class="card-body bg-light">
+          
+          <div id="loadingState" class="text-center py-5 d-none">
+             <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+             <h5 class="fw-bold text-secondary">Processing on Server...</h5>
+             <p class="text-muted small">This may take a few moments depending on file size.</p>
+          </div>
+
+          <div id="imageGrid" class="row g-3"></div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const convertBtn = document.getElementById('convertBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const resultsSection = document.getElementById('resultsSection');
+    const imageGrid = document.getElementById('imageGrid');
+    const loadingState = document.getElementById('loadingState');
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+    const fileCountBadge = document.getElementById('fileCountBadge');
+
+    let selectedFiles = [];
+    let convertedBlobs = []; // Stores { name: 'img.jpg', blob: Blob }
+
+    // --- 1. Drag & Drop Logic ---
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('bg-white', 'border-primary');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('bg-white', 'border-primary');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('bg-white', 'border-primary');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
+    function handleFiles(fileList) {
+        // Only allow HEIC
+        const validFiles = Array.from(fileList).filter(f => 
+            f.name.toLowerCase().endsWith('.heic') || f.name.toLowerCase().endsWith('.heif')
+        );
+
+        if (validFiles.length === 0) {
+            alert("Please select valid .HEIC files.");
+            return;
+        }
+
+        selectedFiles = [...selectedFiles, ...validFiles];
+        updateUI();
+    }
+
+    function updateUI() {
+        fileCountBadge.textContent = `${selectedFiles.length} file(s) queued`;
+        convertBtn.disabled = selectedFiles.length === 0;
+        clearBtn.disabled = selectedFiles.length === 0;
+        
+        if(selectedFiles.length > 0) {
+            dropZone.innerHTML = `
+                <i class="bi bi-images fs-1 text-primary mb-3 d-block"></i>
+                <h5 class="fw-bold text-dark">${selectedFiles.length} files ready</h5>
+                <p class="text-muted small">Click 'Upload & Convert' to start</p>
+            `;
+        } else {
+            dropZone.innerHTML = `
+                <i class="bi bi-cloud-arrow-up fs-1 text-muted mb-3 d-block"></i>
+                <h5 class="fw-bold text-secondary">Drag & Drop HEIC files here</h5>
+                <p class="text-muted small">or click to browse files</p>
+                <input type="file" id="fileInput" multiple accept=".heic,.HEIC" class="d-none">
+            `;
+        }
+    }
+
+    // --- 2. Clear Logic ---
+    clearBtn.addEventListener('click', () => {
+        selectedFiles = [];
+        convertedBlobs = [];
+        imageGrid.innerHTML = '';
+        resultsSection.style.display = 'none';
+        fileInput.value = ''; // Reset input
+        updateUI();
+    });
+
+    // --- 3. Server Conversion Logic ---
+    convertBtn.addEventListener('click', async () => {
+        resultsSection.style.display = 'block';
+        imageGrid.innerHTML = '';
+        loadingState.classList.remove('d-none');
+        convertBtn.disabled = true;
+        clearBtn.disabled = true;
+
+        const formData = new FormData();
+        selectedFiles.forEach(file => {
+            formData.append('heicFiles', file);
+        });
+
+        try {
+            const response = await fetch('/debug/heic-convert', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            loadingState.classList.add('d-none');
+
+            if (result.status === 'success') {
+                convertedBlobs = []; // Reset storage
+                
+                result.files.forEach((file, index) => {
+                    if (file.error) {
+                         // Render Error Card
+                         renderErrorCard(file.originalName);
+                    } else {
+                         // Convert Base64 back to Blob for cleaner handling/zipping
+                         const blob = base64ToBlob(file.data, 'image/jpeg');
+                         convertedBlobs.push({ name: file.name, blob: blob });
+                         renderSuccessCard(file.name, file.data);
+                    }
+                });
+
+                downloadAllBtn.disabled = convertedBlobs.length === 0;
+            } else {
+                alert('Server Error: ' + result.message);
+            }
+
+        } catch (err) {
+            console.error(err);
+            loadingState.classList.add('d-none');
+            alert('Network error occurred.');
+        } finally {
+            clearBtn.disabled = false;
+            selectedFiles = []; // Clear queue after upload
+            updateUI();
+        }
+    });
+
+    // Helper: Base64 to Blob
+    function base64ToBlob(base64, mimeType) {
+        const byteCharacters = atob(base64.split(',')[1]);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        return new Blob([byteArray], { type: mimeType });
+    }
+
+    function renderSuccessCard(fileName, imgSrc) {
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-4 col-lg-3 fade-in';
+        col.innerHTML = `
+            <div class="card h-100 shadow-sm border-0">
+               <div class="ratio ratio-1x1 bg-light border-bottom">
+                  <img src="${imgSrc}" class="img-fluid" style="object-fit: cover; width:100%; height:100%;">
+               </div>
+               <div class="card-body p-2">
+                  <div class="small fw-bold text-truncate" title="${fileName}">${fileName}</div>
+                  <div class="d-flex justify-content-between align-items-center mt-2">
+                     <span class="badge bg-success">Ready</span>
+                     <button class="btn btn-sm btn-outline-primary py-0 download-single">
+                        <i class="bi bi-download"></i>
+                     </button>
+                  </div>
+               </div>
+            </div>
+        `;
+        
+        // Bind single download click
+        col.querySelector('.download-single').onclick = () => {
+             saveAs(base64ToBlob(imgSrc, 'image/jpeg'), fileName);
+        };
+        
+        imageGrid.appendChild(col);
+    }
+
+    function renderErrorCard(fileName) {
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-4 col-lg-3 fade-in';
+        col.innerHTML = `
+            <div class="card h-100 shadow-sm border-0 border-danger">
+               <div class="ratio ratio-1x1 bg-danger bg-opacity-10 d-flex align-items-center justify-content-center">
+                  <i class="bi bi-exclamation-triangle-fill text-danger fs-1"></i>
+               </div>
+               <div class="card-body p-2">
+                  <div class="small fw-bold text-truncate text-danger" title="${fileName}">${fileName}</div>
+                  <div class="mt-2"><span class="badge bg-danger">Failed</span></div>
+               </div>
+            </div>
+        `;
+        imageGrid.appendChild(col);
+    }
+
+    // --- 4. Download All Logic (ZIP) ---
+    downloadAllBtn.addEventListener('click', async () => {
+        if (convertedBlobs.length === 0) return;
+
+        const zip = new JSZip();
+        convertedBlobs.forEach(item => {
+            zip.file(item.name, item.blob);
+        });
+
+        const originalText = downloadAllBtn.innerHTML;
+        downloadAllBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Zipping...`;
+        downloadAllBtn.disabled = true;
+        
+        try {
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, "converted_images.zip");
+        } finally {
+            downloadAllBtn.innerHTML = originalText;
+            downloadAllBtn.disabled = false;
+        }
+    });
+});
+</script>
+
+<style>
+  .fade-in { animation: fadeIn 0.5s ease-in; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .border-dashed { border-style: dashed !important; }
+</style>

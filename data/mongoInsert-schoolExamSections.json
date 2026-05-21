@@ -1,0 +1,349 @@
+[
+  {
+    "name": "school_exam",
+    "category": "SCHOOL",
+    "description": "Navigator: exam templates, allocations, taking exams, and teacher review.",
+    "homeURL": "/school/exams",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": false,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": true,
+    "mainDashboardDisplay": true,
+    "subsections": [
+      {
+        "id": "446001"
+      },
+      {
+        "id": "446002"
+      },
+      {
+        "id": "446003"
+      },
+      {
+        "id": "446004"
+      }
+    ],
+    "related": [],
+    "operations": [],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T21:41:10.391Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T21:41:10.392Z"
+    },
+    "id": "446000"
+  },
+  {
+    "name": "school_exam_template",
+    "category": "SCHOOL",
+    "description": "Exam templates, revisions, question bank, publish, and revision copies.",
+    "homeURL": "/school/exams/templates",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T21:41:10.391Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T21:41:10.392Z"
+    },
+    "id": "446001",
+    "navigatorSection": false,
+    "mainDashboardDisplay": false
+  },
+  {
+    "name": "school_exam_allocation",
+    "category": "SCHOOL",
+    "description": "Exam allocations, assignment generation, student add/exempt, and allocation lifecycle.",
+    "homeURL": "/school/exams/allocations",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T21:41:10.391Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T21:41:10.392Z"
+    },
+    "id": "446002",
+    "navigatorSection": false,
+    "mainDashboardDisplay": false
+  },
+  {
+    "name": "school_exam_taking",
+    "category": "SCHOOL",
+    "description": "Student take-exam flow: list assignments, attempts, save answers, submit.",
+    "homeURL": "/school/exams/take",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1024",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1025",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T21:41:10.391Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T21:41:10.392Z"
+    },
+    "id": "446003",
+    "navigatorSection": false,
+    "mainDashboardDisplay": false
+  },
+  {
+    "name": "school_exam_review",
+    "category": "SCHOOL",
+    "description": "Teacher review: assignment queue, per-student status, grading and attempt cleanup.",
+    "homeURL": "/school/exams/teacher-assignments",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T21:41:10.391Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T21:41:10.392Z"
+    },
+    "id": "446004",
+    "navigatorSection": false,
+    "mainDashboardDisplay": false
+  }
+]

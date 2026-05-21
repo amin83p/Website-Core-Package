@@ -1,0 +1,69 @@
+// MVC/routes/school/studentRoutes.js
+const express = require('express');
+const router = express.Router();
+const ctrl = require('../../controllers/school/studentController');
+const upload = require('../../middleware/upload'); 
+const { requireAuth } = require('../../middleware/authMiddleware');
+const { requireAccess } = require('../../middleware/accessMiddleware');
+const { trackActionState } = require('../../middleware/actionStateMiddleware');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+
+
+router.use(requireAuth);
+
+router.get('/', 
+          requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL), 
+          trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL), 
+          ctrl.listStudents);
+
+router.get('/archived',
+          requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
+          trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
+          ctrl.listArchivedStudents);
+
+router.post('/recover/:id',
+            requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
+            trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),
+            ctrl.recoverStudent);
+
+// Attachments (download / delete)
+router.get('/:id/attachments/:attId/download', 
+          requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DOWNLOAD_FILE), 
+          trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DOWNLOAD_FILE), 
+          ctrl.downloadAttachment);
+
+router.delete('/:id/attachments/:attId', 
+              requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE_FILE), 
+              trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE_FILE, { requireToken: true }), 
+              ctrl.deleteAttachment);
+
+router.get('/new', 
+          requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE), 
+          trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE), 
+          ctrl.showForm);
+router.post('/new', 
+            requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE), 
+            trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.CREATE, { requireToken: true }), 
+            upload('students', true).array('files', 5), 
+            ctrl.saveStudent);
+
+router.get('/edit/:id', 
+          requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE), 
+          trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE), 
+          ctrl.showForm);
+router.post('/edit/:id', 
+            requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE), 
+            trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }), 
+            upload('students', true).array('files', 5), 
+            ctrl.saveStudent);
+
+router.get('/delete/:id', 
+          requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE), 
+          trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE), 
+          ctrl.deleteStudent);
+router.delete('/delete/:id', 
+              requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE), 
+              trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE, { requireToken: true }), 
+              ctrl.deleteStudent);
+
+module.exports = router;

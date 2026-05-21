@@ -1,0 +1,625 @@
+<%
+  const isEdit = !!(symbol && symbol.id);
+  const tagsStr = (symbol && symbol.tags) ? symbol.tags.join(', ') : '';
+  const existingImageUrl = (symbol && symbol.type === 'image' && symbol.value) ? symbol.value : '';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Symbol' : 'Create New Symbol' %></h1>
+
+    <% if (isEdit) { %>
+      <span class="badge bg-primary border">ID <%= symbol.id %></span>
+    <% } else { %>
+      <span class="badge bg-success border">New Definition</span>
+    <% } %>
+  </div>
+
+    <form
+    id="symbolForm"
+    action="<%=(isEdit ? ('/symbols/edit/' + symbol.id) : '/symbols/new') +
+        ((typeof actionStateId !== 'undefined' && actionStateId) ? ('?actionStateId=' + encodeURIComponent(actionStateId)) : '')
+    %>"
+    method="POST"
+    enctype="multipart/form-data"
+    >
+
+      <input type="hidden" name="actionStateId" value="<%= (typeof actionStateId !== 'undefined') ? actionStateId : '' %>">
+
+      <!-- Keep EXACTLY ONE submitted "value" field in the HTML to avoid req.body.value arrays -->
+      <input type="hidden" id="finalValue" name="value" value="">
+
+      <div class="row">
+        <div class="col-md-7">
+          <div class="card p-3 mb-3 bg-light border-0">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Symbol Name</label>
+              <input
+                type="text"
+                name="name"
+                class="form-control size-md name-input"
+                value="<%= symbol ? symbol.name : '' %>"
+                placeholder="e.g. DASHBOARD_ICON"
+                required
+              >
+              <div class="form-text">Unique identifier. Uppercase underscores only.</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Tags / Labels</label>
+              <input
+                type="text"
+                name="tags"
+                class="form-control size-md tag-input"
+                value="<%= tagsStr %>"
+                placeholder="e.g. dashboard, home, navigation"
+              >
+              <div class="form-text">Comma separated. Used for searching and grouping.</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Symbol Type</label>
+
+              <div class="btn-group w-100" role="group" aria-label="Symbol type">
+                <input
+                  type="radio"
+                  class="btn-check type-selector"
+                  name="type"
+                  id="typeClass"
+                  value="class"
+                  <%= (!symbol || symbol.type === 'class') ? 'checked' : '' %>
+                >
+                <label class="btn btn-outline-primary" for="typeClass">
+                  <i class="bi bi-fonts me-2"></i>Icon Class
+                </label>
+
+                <input
+                  type="radio"
+                  class="btn-check type-selector"
+                  name="type"
+                  id="typeImage"
+                  value="image"
+                  <%= (symbol && symbol.type === 'image') ? 'checked' : '' %>
+                >
+                <label class="btn btn-outline-primary" for="typeImage">
+                  <i class="bi bi-image me-2"></i>Image File
+                </label>
+
+                <input
+                  type="radio"
+                  class="btn-check type-selector"
+                  name="type"
+                  id="typeRaw"
+                  value="raw"
+                  <%= (symbol && symbol.type === 'raw') ? 'checked' : '' %>
+                >
+                <label class="btn btn-outline-primary" for="typeRaw">
+                  <i class="bi bi-code-slash me-2"></i>Raw SVG
+                </label>
+              </div>
+
+              <div class="form-text">
+                You can switch types freely while editing. If you fill multiple inputs, you’ll be asked to choose one at submission time.
+              </div>
+            </div>
+
+            <div id="inputArea" class="card p-4 border shadow-sm">
+              <!-- CLASS -->
+              <div class="input-group-section" id="section-class">
+                <label class="form-label">CSS Class Name</label>
+
+                <!-- No name="value" here -->
+                <input
+                  type="text"
+                  id="inpClass"
+                  class="form-control font-monospace"
+                  value="<%= (symbol && symbol.type === 'class') ? (symbol.value || '') : '' %>"
+                  placeholder="e.g. bi bi-house-door-fill"
+                  autocomplete="off"
+                >
+
+                <div class="form-text">
+                  Enter the full class string for Bootstrap Icons, FontAwesome, etc.
+                </div>
+              </div>
+
+              <!-- IMAGE -->
+              <div class="input-group-section d-none" id="section-image">
+                <label class="form-label">Upload Image</label>
+
+                <input
+                  type="file"
+                  name="imageFile"
+                  id="inpImage"
+                  class="form-control"
+                  accept="image/*"
+                >
+
+                <!-- Keep existing image URL for edit mode, but do NOT submit it as "value" automatically -->
+                <input type="hidden" id="existingImageVal" value="<%= existingImageUrl %>">
+
+                <% if (existingImageUrl) { %>
+                  <div class="mt-2 text-muted small">
+                    Current:
+                    <a href="<%= existingImageUrl %>" target="_blank" rel="noopener"><%= existingImageUrl %></a>
+                  </div>
+                <% } %>
+
+                <div class="form-text">
+                  If you pick Image on submission: new upload will be sent if selected; otherwise the existing URL is used.
+                </div>
+              </div>
+
+              <!-- RAW -->
+              <div class="input-group-section d-none" id="section-raw">
+                <label class="form-label">SVG / HTML Code</label>
+
+                <!-- No name="value" here -->
+                <textarea
+                  id="inpRaw"
+                  class="form-control font-monospace"
+                  rows="5"
+                  placeholder="<svg ...> ... </svg>"
+                ><%= (symbol && symbol.type === 'raw') ? (symbol.value || '') : '' %></textarea>
+
+                <div class="form-text">
+                  Paste raw SVG markup. (It will render in the preview.)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-5">
+          <div class="card bg-white border h-100">
+            <div class="card-header bg-light fw-bold text-muted">Live Preview</div>
+
+            <div
+              class="card-body d-flex align-items-center justify-content-center bg-light"
+              style="
+                min-height:300px;
+                background-image: radial-gradient(#ddd 1px, transparent 1px);
+                background-size: 20px 20px;
+              "
+            >
+              <div id="previewContainer" class="text-center">
+                <span class="text-muted opacity-50">Preview will appear here</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top d-flex gap-2">
+        <button type="submit" class="btn btn-filled btn-primary btn-md" id="btnSave">Save Symbol</button>
+        <a href="/symbols" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('symbolForm');
+    if (!form) return;
+
+    const typeRadios = Array.from(document.querySelectorAll('.type-selector'));
+    const finalValue = document.getElementById('finalValue');
+
+    const sections = {
+      class: document.getElementById('section-class'),
+      image: document.getElementById('section-image'),
+      raw: document.getElementById('section-raw'),
+    };
+
+    const inputs = {
+      class: document.getElementById('inpClass'),
+      image: document.getElementById('inpImage'),
+      raw: document.getElementById('inpRaw'),
+    };
+
+    const existingImageVal = document.getElementById('existingImageVal');
+    const previewContainer = document.getElementById('previewContainer');
+
+    const nameInput = document.querySelector('.name-input');
+    const tagInput = document.querySelector('.tag-input');
+
+    function selectedType() {
+      return (document.querySelector('.type-selector:checked') || {}).value || 'class';
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function getTypeLabel(type) {
+      if (type === 'class') return 'Icon Class';
+      if (type === 'image') return 'Image';
+      if (type === 'raw') return 'Raw SVG';
+      return type;
+    }
+
+    function getTypeState(type) {
+      if (type === 'class') {
+        const v = inputs.class ? String(inputs.class.value || '').trim() : '';
+        return { type, label: getTypeLabel(type), filled: !!v, value: v, file: null };
+      }
+
+      if (type === 'raw') {
+        const v = inputs.raw ? String(inputs.raw.value || '').trim() : '';
+        return { type, label: getTypeLabel(type), filled: !!v, value: v, file: null };
+      }
+
+      if (type === 'image') {
+        const file = (inputs.image && inputs.image.files) ? inputs.image.files[0] : null;
+        const oldUrl = existingImageVal ? String(existingImageVal.value || '').trim() : '';
+        const filled = !!file || !!oldUrl;
+        // value here = old url (if any). If user uploads a new file, server should use the file.
+        return { type, label: getTypeLabel(type), filled, value: oldUrl, file };
+      }
+
+      return { type, label: getTypeLabel(type), filled: false, value: '', file: null };
+    }
+
+    function getFilledTypes() {
+      const candidates = ['class', 'image', 'raw'].map(getTypeState);
+      return candidates.filter(c => c.filled);
+    }
+
+    function summarizeType(state) {
+      if (state.type === 'class') {
+        return state.value ? `<code>${escapeHtml(state.value)}</code>` : '<span class="text-muted">(empty)</span>';
+      }
+      if (state.type === 'raw') {
+        if (!state.value) return '<span class="text-muted">(empty)</span>';
+        const snippet = state.value.length > 160 ? (state.value.slice(0, 160) + '…') : state.value;
+        return `<code>${escapeHtml(snippet)}</code>`;
+      }
+      if (state.type === 'image') {
+        if (state.file) return `<span><strong>New file:</strong> ${escapeHtml(state.file.name)}</span>`;
+        if (state.value) return `<span><strong>Existing URL:</strong> <code>${escapeHtml(state.value)}</code></span>`;
+        return '<span class="text-muted">(empty)</span>';
+      }
+      return '<span class="text-muted">(empty)</span>';
+    }
+
+    // UI switching: allow freely, never clear other inputs
+    function updateUI() {
+      const t = selectedType();
+
+      Object.values(sections).forEach(el => el && el.classList.add('d-none'));
+      if (sections[t]) sections[t].classList.remove('d-none');
+
+      // Light required rules for better UX (final enforcement happens on submit-choice)
+      if (inputs.class) inputs.class.required = (t === 'class');
+      if (inputs.raw) inputs.raw.required = (t === 'raw');
+
+      updatePreview();
+    }
+
+    // Preview logic
+    function updatePreview() {
+      const t = selectedType();
+      if (!previewContainer) return;
+
+      previewContainer.innerHTML = '';
+
+      if (t === 'class') {
+        const val = inputs.class ? String(inputs.class.value || '').trim() : '';
+        previewContainer.innerHTML = val
+          ? `<i class="${escapeHtml(val)}" style="font-size: 5rem;"></i>`
+          : `<span class="text-muted">Enter a class name</span>`;
+      }
+
+      if (t === 'image') {
+        const file = inputs.image && inputs.image.files ? inputs.image.files[0] : null;
+        const oldVal = existingImageVal ? String(existingImageVal.value || '').trim() : '';
+
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            previewContainer.innerHTML =
+              `<img src="${ev.target.result}" style="max-width:100%; max-height:250px;" class="shadow-sm rounded" />`;
+          };
+          reader.readAsDataURL(file);
+        } else if (oldVal) {
+          previewContainer.innerHTML =
+            `<img src="${escapeHtml(oldVal)}" style="max-width:100%; max-height:250px;" class="shadow-sm rounded" />`;
+        } else {
+          previewContainer.innerHTML = `<span class="text-muted">Select an image file</span>`;
+        }
+      }
+
+      if (t === 'raw') {
+        const val = inputs.raw ? String(inputs.raw.value || '').trim() : '';
+        previewContainer.innerHTML = val
+          ? val
+          : `<span class="text-muted">Paste SVG code</span>`;
+      }
+    }
+
+    typeRadios.forEach(r => r.addEventListener('change', updateUI));
+    if (inputs.class) inputs.class.addEventListener('input', updatePreview);
+    if (inputs.raw) inputs.raw.addEventListener('input', updatePreview);
+    if (inputs.image) inputs.image.addEventListener('change', updatePreview);
+
+    // Name/tag formatters (kept)
+    if (nameInput) {
+      nameInput.addEventListener('input', () => {
+        let val = nameInput.value.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+        nameInput.value = val;
+      });
+    }
+
+    if (tagInput) {
+      tagInput.addEventListener('change', () => {
+        const val = String(tagInput.value || '')
+          .toUpperCase()
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+          .join(', ');
+        tagInput.value = val;
+      });
+    }
+
+    function getCommonFields() {
+      return {
+        actionStateId: form.querySelector('input[name="actionStateId"]')?.value ?? '',
+        name: form.querySelector('input[name="name"]')?.value ?? '',
+        tags: form.querySelector('input[name="tags"]')?.value ?? '',
+      };
+    }
+
+function buildRequestFormData(chosenType) {
+  // Start from the actual form so hidden fields like actionStateId are included.
+  // (Your original file used `new FormData(form)` as well.) 
+  const fd = new FormData(form);
+
+  // Belt + suspenders: ensure actionStateId exists even if someone removed the hidden input
+  // but it still exists in the action URL query string.
+  const existingActionState = String(fd.get('actionStateId') || '').trim();
+  if (!existingActionState) {
+    try {
+      const url = new URL(form.action, window.location.origin);
+      const qsVal = String(url.searchParams.get('actionStateId') || '').trim();
+      if (qsVal) fd.set('actionStateId', qsVal);
+    } catch (e) {}
+  }
+
+  // Lock the selected type
+  fd.set('type', chosenType);
+
+  // CRITICAL: guarantee ONLY ONE `value` gets sent (prevents req.body.value arrays)
+  fd.delete('value');
+
+  // Also: only keep imageFile if they chose image
+  if (chosenType !== 'image') fd.delete('imageFile');
+
+  const state = getTypeState(chosenType);
+
+  if (chosenType === 'class') {
+    const v = String(state.value || '').trim();
+    finalValue.value = v;        // keeps your hidden input in sync
+    fd.set('value', v);          // send exactly one value
+  }
+
+  if (chosenType === 'raw') {
+    const v = String(state.value || '').trim();
+    finalValue.value = v;
+    fd.set('value', v);
+  }
+
+  if (chosenType === 'image') {
+    // If a new file is selected, send it; otherwise send existing URL in value (edit fallback).
+    const existingUrl = String(state.value || '').trim();
+    finalValue.value = existingUrl;
+    fd.set('value', existingUrl);
+
+    // Ensure the fd has only the chosen file (if any)
+    fd.delete('imageFile');
+    if (state.file) {
+      fd.append('imageFile', state.file);
+      // Optional: if your server expects value blank when uploading a new file, uncomment:
+      // fd.set('value', '');
+    }
+  }
+
+  return fd;
+}
+
+    async function chooseOneTypeViaModal(filledStates) {
+      // If the helper doesn't exist, fallback (but you asked for messageModal first)
+      if (typeof showMessageModal !== 'function') {
+        const choice = prompt(
+          'Multiple inputs have data. Type one: class, image, raw',
+          filledStates[0]?.type || 'class'
+        );
+        const t = String(choice || '').trim().toLowerCase();
+        return ['class','image','raw'].includes(t) ? t : null;
+      }
+
+      const current = selectedType();
+      const ordered = [...filledStates].sort((a,b) => (a.type === current ? -1 : 0) - (b.type === current ? -1 : 0));
+
+      const listHtml = ordered.map(s => {
+        return `
+          <div style="padding:10px 12px; border:1px solid rgba(0,0,0,0.08); border-radius:10px; margin-bottom:10px; background:#fff;">
+            <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
+              <div>
+                <div style="font-weight:800; color:#0d6efd;">${escapeHtml(s.label)}</div>
+                <div style="opacity:0.9; margin-top:6px;">${summarizeType(s)}</div>
+              </div>
+              <div style="white-space:nowrap;">
+                <span class="badge bg-light border text-muted">${escapeHtml(s.type.toUpperCase())}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const msg = `
+        <div style="line-height:1.6;">
+          <p style="margin:0 0 10px 0;">
+            You entered data in <strong>more than one</strong> input type.
+            To prevent sending ambiguous data to the server, choose <strong>one</strong> type to submit.
+          </p>
+          ${listHtml}
+          <p style="margin:10px 0 0 0; opacity:0.85;">
+            Only the selected type will be sent (and only its file, if applicable).
+          </p>
+        </div>
+      `;
+
+      // One button per filled type (plus cancel)
+      const buttons = [
+        ...ordered.map(s => ({
+          text: `Use ${s.label}`,
+          class: 'btn-primary',
+          value: s.type
+        })),
+        { text: 'Cancel', class: 'btn-secondary', value: null }
+      ];
+
+      const result = await showMessageModal({
+        title: 'Choose which value to submit',
+        icon: 'warning',
+        message: msg,
+        size: 'lg',
+        buttons
+      });
+
+      // Try to interpret whatever your showMessageModal returns
+      if (result && typeof result === 'object') {
+        if (result.value !== undefined) return result.value;
+        if (result.choice !== undefined) return result.choice;
+        if (result.text !== undefined) {
+          const btn = buttons.find(b => b.text === result.text);
+          return btn ? btn.value : null;
+        }
+      }
+
+      if (typeof result === 'number') {
+        const btn = buttons[result];
+        return btn ? btn.value : null;
+      }
+
+      if (typeof result === 'string') {
+        const btn = buttons.find(b => b.text === result);
+        return btn ? btn.value : null;
+      }
+
+      return null;
+    }
+
+    async function sendChosen(chosenType) {
+      const btn = document.getElementById('btnSave');
+      const originalText = btn ? btn.innerHTML : '';
+
+      if (btn) {
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+        btn.disabled = true;
+      }
+
+      try {
+        const fd = buildRequestFormData(chosenType);
+
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'X-AJAX-Request': 'true' },
+          body: fd,
+        });
+
+        const result = await response.json().catch(() => ({}));
+
+        if (result && result.status === 'success') {
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Success',
+              icon: 'success',
+              message: result.message || 'Symbol saved successfully.',
+              buttons: [{ text: 'OK', class: 'btn-success', value: 'ok' }]
+            });
+          }
+          window.location.href = '/symbols';
+          return;
+        }
+
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Error',
+            icon: 'error',
+            message: (result && result.message) ? result.message : 'Failed to save symbol.',
+            buttons: [{ text: 'OK', class: 'btn-danger', value: 'ok' }]
+          });
+        } else {
+          alert((result && result.message) ? result.message : 'Failed to save symbol.');
+        }
+      } catch (error) {
+        console.error('Submission Error', error);
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'System Error',
+            icon: 'error',
+            message: 'An unexpected error occurred during submission.',
+            buttons: [{ text: 'OK', class: 'btn-danger', value: 'ok' }]
+          });
+        } else {
+          alert('An unexpected error occurred.');
+        }
+      } finally {
+        if (btn) {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      }
+    }
+
+    // Submit: if multiple filled types, ask user to choose one; otherwise submit the only filled one
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const filled = getFilledTypes();
+
+      if (filled.length === 0) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Missing value',
+            icon: 'warning',
+            message: 'Please enter a value (Icon Class, Image, or Raw SVG) before saving.',
+            buttons: [{ text: 'OK', class: 'btn-warning', value: 'ok' }]
+          });
+        } else {
+          alert('Please enter a value before saving.');
+        }
+        return;
+      }
+
+      let chosenType = null;
+
+      if (filled.length === 1) {
+        chosenType = filled[0].type;
+      } else {
+        chosenType = await chooseOneTypeViaModal(filled);
+      }
+
+      if (!chosenType) return;
+
+      // Basic validation after choice
+      const state = getTypeState(chosenType);
+      if (chosenType === 'class' && !state.value) return;
+      if (chosenType === 'raw' && !state.value) return;
+      if (chosenType === 'image' && !state.file && !state.value) return;
+
+      await sendChosen(chosenType);
+    });
+
+    // Init
+    updateUI();
+  });
+</script>

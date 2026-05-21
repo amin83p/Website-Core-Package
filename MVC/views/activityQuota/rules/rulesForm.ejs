@@ -1,0 +1,708 @@
+<%
+  const p = (entry && typeof entry === 'object') ? entry : {};
+  const isEdit = Boolean(p.id);
+  const routeId = String(p.id || '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const options = (formOptions && typeof formOptions === 'object') ? formOptions : {};
+  const defaults = (options.defaults && typeof options.defaults === 'object') ? options.defaults : {};
+  const consumeTimingOptions = Array.isArray(options.consumeTimings) && options.consumeTimings.length
+    ? options.consumeTimings
+    : [
+      { value: 'on_attempt', label: 'On Attempt' },
+      { value: 'on_success', label: 'On Success' }
+    ];
+  const consumeTimingValue = String(p.consumeTiming || defaults.consumeTiming || 'on_attempt');
+  const actionUrl = isEdit
+    ? ('/activity-quota/rules/edit/' + encodeURIComponent(routeId))
+    : '/activity-quota/rules/new';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= title %></h1>
+    <div class="d-flex flex-column align-items-end gap-1">
+      <% if (isEdit) { %><span class="badge bg-primary border font-monospace">ID: <%= p.id %></span><% } %>
+      <a href="/activity-quota/rules" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to List
+      </a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1320px;">
+    <form id="activityQuotaRuleForm" action="<%= actionUrl %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+      <input type="hidden" name="definitionPlan" id="aqRulePlanInput">
+
+      <script type="application/json" id="aqRuleFormOptions"><%- JSON.stringify(options || {}) %></script>
+      <script type="application/json" id="aqRuleInitial"><%- JSON.stringify(p || {}) %></script>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary m-0 mb-3">General</h6>
+          <div class="row">
+            <div class="col-md-5 mb-3">
+              <label class="form-label">Rule Name *</label>
+              <input type="text" id="aqRuleNameInput" class="form-control size-md" value="<%= p.name || '' %>" required maxlength="220">
+            </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Consume Timing *</label>
+              <select id="aqConsumeTimingSelect" class="form-select size-md">
+                <% consumeTimingOptions.forEach((timingRow) => { const value = String((timingRow && timingRow.value) || '').trim(); const label = String((timingRow && timingRow.label) || value || ''); if (!value) return; %>
+                  <option value="<%= value %>" <%= consumeTimingValue === value ? 'selected' : '' %>><%= label %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-2 mb-3 d-flex align-items-end">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="aqRuleActiveInput" <%= p.active !== false ? 'checked' : '' %>>
+                <label class="form-check-label" for="aqRuleActiveInput">Active</label>
+              </div>
+            </div>
+            <div class="col-md-2 mb-3 d-flex align-items-end">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="aqRuleFallbackInput" <%= p.isFallback === true ? 'checked' : '' %>>
+                <label class="form-check-label" for="aqRuleFallbackInput">Fallback</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-12 mb-0">
+              <label class="form-label">Description</label>
+              <textarea id="aqRuleDescriptionInput" class="form-control size-md" rows="2" maxlength="3000" placeholder="Optional explanation for this rule..."><%= p.description || '' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary m-0 mb-3">Matcher</h6>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Section *</label>
+              <div class="input-group">
+                <input type="text" id="aqSectionIdInput" class="form-control size-md font-monospace" value="<%= p.sectionId || '' %>" readonly required>
+                <button type="button" class="btn btn-outline-primary" id="aqPickSectionBtn"><i class="bi bi-search"></i></button>
+              </div>
+              <div class="form-text" id="aqSectionNameText">Not selected</div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Operation *</label>
+              <div class="input-group">
+                <input type="text" id="aqOperationIdInput" class="form-control size-md font-monospace" value="<%= p.operationId || '' %>" readonly required>
+                <button type="button" class="btn btn-outline-primary" id="aqPickOperationBtn"><i class="bi bi-search"></i></button>
+              </div>
+              <div class="form-text" id="aqOperationNameText">Not selected</div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Source Event</label>
+              <div class="input-group">
+                <input type="text" id="aqSourceEventInput" class="form-control size-md font-monospace" value="<%= p.sourceEventType || '' %>" placeholder="Any">
+                <button type="button" class="btn btn-outline-primary" id="aqPickEventBtn"><i class="bi bi-search"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-primary m-0">Audience</h6>
+            <button type="button" class="btn btn-primary btn-filled btn-sm" id="aqPickUsersBtn">
+              <i class="bi bi-search me-1"></i> Add Target Users
+            </button>
+          </div>
+          <div id="aqTargetUsersContainer" class="border rounded p-3 bg-light-subtle"></div>
+          <div class="form-text mt-2" id="aqAudienceHelpText">Leave empty for generic rules.</div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4" id="aqValidityCard">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary m-0 mb-3">Validity (Date Range)</h6>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Start Date *</label>
+              <input type="date" id="aqValidityStartInput" class="form-control size-md" value="<%= (p.validity && p.validity.startDate) || '' %>" required>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">End Date *</label>
+              <input type="date" id="aqValidityEndInput" class="form-control size-md" value="<%= (p.validity && p.validity.endDate) || '' %>" required>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Timezone *</label>
+              <input type="text" id="aqValidityTimezoneInput" class="form-control size-md" value="<%= (p.validity && p.validity.timezone) || defaults.timezone || 'UTC' %>" required>
+            </div>
+          </div>
+          <div class="form-text mt-1" id="aqValidityHelpText">Rules apply only inside this date range.</div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary m-0 mb-3">Formula (base + multiplier × context value)</h6>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Base</th>
+                  <th>Multiplier</th>
+                  <th>Context Key</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% ['call', 'amount', 'token', 'volume'].forEach((metric) => { const row = (p.formula && p.formula[metric]) || (defaults.formula && defaults.formula[metric]) || {}; %>
+                  <tr>
+                    <td class="fw-bold text-uppercase"><%= metric %></td>
+                    <td><input type="number" min="0" step="0.000001" class="form-control size-md aq-formula-base" data-metric="<%= metric %>" value="<%= Number(row.base || 0) %>"></td>
+                    <td><input type="number" min="0" step="0.000001" class="form-control size-md aq-formula-multiplier" data-metric="<%= metric %>" value="<%= Number(row.multiplier || 0) %>"></td>
+                    <td><input type="text" class="form-control size-md aq-formula-context-key" data-metric="<%= metric %>" value="<%= row.contextKey || '' %>" placeholder="e.g. questionCount"></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" id="aqRuleSaveBtn" class="btn btn-filled btn-primary btn-md"><%= isEdit ? 'Update Rule' : 'Save Rule' %></button>
+        <a href="/activity-quota/rules" class="btn btn-filled btn-secondary btn-md" id="aqRuleCancelBtn" data-return-url="/activity-quota/rules">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('activityQuotaRuleForm');
+  if (!form) return;
+
+  function parseJsonScript(id) {
+    try {
+      const node = document.getElementById(id);
+      return JSON.parse((node && node.textContent) || '{}');
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async function showNotice(title, message, icon) {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title,
+        message,
+        icon: icon || 'warning',
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+    alert(title + ': ' + message);
+  }
+
+  const initial = parseJsonScript('aqRuleInitial');
+
+  const sectionIdInput = document.getElementById('aqSectionIdInput');
+  const sectionNameText = document.getElementById('aqSectionNameText');
+  const operationIdInput = document.getElementById('aqOperationIdInput');
+  const operationNameText = document.getElementById('aqOperationNameText');
+  const sourceEventInput = document.getElementById('aqSourceEventInput');
+  const targetUsersContainer = document.getElementById('aqTargetUsersContainer');
+  const fallbackInput = document.getElementById('aqRuleFallbackInput');
+  const activeInput = document.getElementById('aqRuleActiveInput');
+  const pickUsersBtn = document.getElementById('aqPickUsersBtn');
+  const validityStartInput = document.getElementById('aqValidityStartInput');
+  const validityEndInput = document.getElementById('aqValidityEndInput');
+  const validityTimezoneInput = document.getElementById('aqValidityTimezoneInput');
+  const validityHelpText = document.getElementById('aqValidityHelpText');
+  const audienceHelpText = document.getElementById('aqAudienceHelpText');
+  const rulePlanInput = document.getElementById('aqRulePlanInput');
+  const saveBtn = document.getElementById('aqRuleSaveBtn');
+  const cancelBtn = document.getElementById('aqRuleCancelBtn');
+
+  const state = {
+    section: {
+      id: sectionIdInput.value || '',
+      name: ''
+    },
+    operation: {
+      id: operationIdInput.value || '',
+      name: ''
+    },
+    nonFallbackValidity: {
+      startDate: String((validityStartInput && validityStartInput.value) || '').trim(),
+      endDate: String((validityEndInput && validityEndInput.value) || '').trim(),
+      timezone: String((validityTimezoneInput && validityTimezoneInput.value) || '').trim()
+    },
+    targetUsers: Array.isArray(initial.targetUserIds)
+      ? initial.targetUserIds.map((id) => ({ id: String(id || '').trim(), name: String(id || '').trim() })).filter((row) => row.id)
+      : []
+  };
+
+  function setSection(section) {
+    const row = (section && typeof section === 'object') ? section : {};
+    state.section = {
+      id: String(row.id || '').trim(),
+      name: String(row.name || row.id || '').trim()
+    };
+    sectionIdInput.value = state.section.id;
+    sectionNameText.textContent = state.section.name || 'Not selected';
+  }
+
+  function setOperation(operation) {
+    const row = (operation && typeof operation === 'object') ? operation : {};
+    state.operation = {
+      id: String(row.id || '').trim(),
+      name: String(row.name || row.id || '').trim()
+    };
+    operationIdInput.value = state.operation.id;
+    operationNameText.textContent = state.operation.name || 'Not selected';
+  }
+
+  function upsertTargetUser(user) {
+    const row = (user && typeof user === 'object') ? user : {};
+    const id = String(row.id || row.userId || '').trim();
+    if (!id) return;
+    const index = state.targetUsers.findIndex((item) => item.id === id);
+    const next = {
+      id,
+      name: String(row.name || row.username || row.email || id).trim(),
+      username: String(row.username || '').trim(),
+      email: String(row.email || '').trim()
+    };
+    if (index >= 0) {
+      state.targetUsers[index] = next;
+    } else {
+      state.targetUsers.push(next);
+    }
+  }
+
+  function removeTargetUser(id) {
+    const token = String(id || '').trim();
+    state.targetUsers = state.targetUsers.filter((row) => row.id !== token);
+    renderTargetUsers();
+  }
+
+  function renderTargetUsers() {
+    if (!targetUsersContainer) return;
+    if (!state.targetUsers.length) {
+      targetUsersContainer.innerHTML = '<div class="text-muted small">No target users selected. Rule applies generically.</div>';
+      return;
+    }
+    targetUsersContainer.innerHTML = state.targetUsers.map((row) => `
+      <div class="d-flex align-items-center justify-content-between border rounded px-3 py-2 mb-2 bg-white">
+        <div>
+          <div class="fw-bold small">${escapeHtml(row.name || row.id)}</div>
+          <div class="x-small text-muted font-monospace">${escapeHtml(row.id)}</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger" data-remove-user-id="${escapeHtml(row.id)}">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+    `).join('');
+  }
+
+  targetUsersContainer.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-remove-user-id]');
+    if (!btn) return;
+    removeTargetUser(btn.getAttribute('data-remove-user-id'));
+  });
+
+  function getFormulaState() {
+    const out = {};
+    ['call', 'amount', 'token', 'volume'].forEach((metric) => {
+      const baseInput = form.querySelector(`.aq-formula-base[data-metric="${metric}"]`);
+      const multiplierInput = form.querySelector(`.aq-formula-multiplier[data-metric="${metric}"]`);
+      const contextKeyInput = form.querySelector(`.aq-formula-context-key[data-metric="${metric}"]`);
+      const base = Number(baseInput && baseInput.value);
+      const multiplier = Number(multiplierInput && multiplierInput.value);
+      out[metric] = {
+        base: Number.isFinite(base) && base > 0 ? Number(base.toFixed(6)) : 0,
+        multiplier: Number.isFinite(multiplier) && multiplier > 0 ? Number(multiplier.toFixed(6)) : 0,
+        contextKey: String((contextKeyInput && contextKeyInput.value) || '').trim()
+      };
+    });
+    return out;
+  }
+
+  function hasAnyPositiveMetric(formula) {
+    return ['call', 'amount', 'token', 'volume'].some((metric) => {
+      const row = formula && formula[metric] ? formula[metric] : {};
+      return Number(row.base || 0) > 0 || Number(row.multiplier || 0) > 0;
+    });
+  }
+
+  function hasGenericPicker() {
+    return !!(window.GenericPicker && typeof window.GenericPicker.open === 'function');
+  }
+
+  function normalizeSelectedItems(items) {
+    return Array.isArray(items) ? items : [items];
+  }
+
+  async function fetchPickerRows(endpoint, params) {
+    const queryParams = new URLSearchParams(params || {});
+    if (!queryParams.has('page')) queryParams.set('page', '1');
+    if (!queryParams.has('limit')) queryParams.set('limit', '20');
+    const glue = endpoint.includes('?') ? '&' : '?';
+    const url = endpoint + glue + queryParams.toString();
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: {
+        'X-AJAX-Request': 'true',
+        'Accept': 'application/json'
+      }
+    });
+    if (!response.ok) return [];
+    const payload = await response.json().catch(() => ({}));
+    const rows = Array.isArray(payload && payload.results) ? payload.results : [];
+    return rows;
+  }
+
+  async function resolveSectionName(sectionId) {
+    const token = String(sectionId || '').trim();
+    if (!token) return '';
+    const rows = await fetchPickerRows('/activity-quota/rules/picker/sections', {
+      q: token,
+      searchFields: 'id,name,description,category'
+    });
+    const exact = rows.find((row) => {
+      const rowId = String((row && row.id) || '').trim().toUpperCase();
+      const rowName = String((row && row.name) || '').trim().toUpperCase();
+      const normalized = token.toUpperCase();
+      return rowId === normalized || rowName === normalized;
+    }) || rows[0];
+    return String((exact && (exact.name || exact.id)) || '').trim();
+  }
+
+  async function resolveOperationName(sectionId, operationId) {
+    const sectionToken = String(sectionId || '').trim();
+    const operationToken = String(operationId || '').trim();
+    if (!sectionToken || !operationToken) return '';
+    const rows = await fetchPickerRows('/activity-quota/rules/picker/operations', {
+      sectionId: sectionToken,
+      q: operationToken,
+      searchFields: 'id,name,description'
+    });
+    const exact = rows.find((row) => {
+      const rowId = String((row && row.id) || '').trim().toUpperCase();
+      const rowName = String((row && row.name) || '').trim().toUpperCase();
+      const normalized = operationToken.toUpperCase();
+      return rowId === normalized || rowName === normalized;
+    }) || rows[0];
+    return String((exact && (exact.name || exact.id)) || '').trim();
+  }
+
+  async function hydrateMatcherLabels() {
+    const currentSectionId = String(sectionIdInput.value || '').trim();
+    const currentOperationId = String(operationIdInput.value || '').trim();
+    if (!currentSectionId) return;
+
+    try {
+      const sectionName = await resolveSectionName(currentSectionId);
+      if (sectionName) {
+        setSection({ id: currentSectionId, name: sectionName });
+      }
+    } catch (_) {
+      // Keep existing fallback text when name lookup fails.
+    }
+
+    if (!currentOperationId) return;
+    try {
+      const operationName = await resolveOperationName(currentSectionId, currentOperationId);
+      if (operationName) {
+        setOperation({ id: currentOperationId, name: operationName });
+      }
+    } catch (_) {
+      // Keep existing fallback text when name lookup fails.
+    }
+  }
+
+  function collectPayload() {
+    const fallbackEnabled = !!fallbackInput.checked;
+    const payload = {
+      id: String(initial.id || '').trim(),
+      name: String((document.getElementById('aqRuleNameInput') || {}).value || '').trim(),
+      description: String((document.getElementById('aqRuleDescriptionInput') || {}).value || '').trim(),
+      active: !!((document.getElementById('aqRuleActiveInput') || {}).checked),
+      sectionId: String(sectionIdInput.value || '').trim(),
+      operationId: String(operationIdInput.value || '').trim(),
+      sourceEventType: String(sourceEventInput.value || '').trim(),
+      targetUserIds: state.targetUsers.map((row) => row.id),
+      isFallback: !!fallbackInput.checked,
+      consumeTiming: String((document.getElementById('aqConsumeTimingSelect') || {}).value || 'on_attempt').trim(),
+      validity: {
+        mode: fallbackEnabled ? 'always' : 'date_range',
+        startDate: fallbackEnabled ? '' : String((document.getElementById('aqValidityStartInput') || {}).value || '').trim(),
+        endDate: fallbackEnabled ? '' : String((document.getElementById('aqValidityEndInput') || {}).value || '').trim(),
+        timezone: String((document.getElementById('aqValidityTimezoneInput') || {}).value || 'UTC').trim()
+      },
+      formula: getFormulaState()
+    };
+    if (!payload.sourceEventType && !fallbackEnabled) delete payload.sourceEventType;
+    return payload;
+  }
+
+  function validatePayload(payload) {
+    if (!payload.name) return 'Rule name is required.';
+    if (!payload.sectionId) return 'Section is required.';
+    if (!payload.operationId) return 'Operation is required.';
+    if (!payload.validity.timezone) return 'Timezone is required.';
+    if (payload.isFallback) {
+      if (!payload.sourceEventType) return 'Fallback rules require a source event.';
+      if (payload.targetUserIds.length) return 'Fallback rules cannot have target users.';
+    } else {
+      if (!payload.validity.startDate || !payload.validity.endDate) return 'Start date and end date are required.';
+      if (payload.validity.endDate < payload.validity.startDate) return 'End date must be the same day or after start date.';
+    }
+    if (!hasAnyPositiveMetric(payload.formula)) return 'At least one metric formula must have a positive base or multiplier.';
+    return '';
+  }
+
+  async function openSectionPicker() {
+    if (!hasGenericPicker()) {
+      await showNotice('Picker unavailable', 'Generic picker is not initialized.');
+      return;
+    }
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    const presetFactory = window.GenericPickerPresets && typeof window.GenericPickerPresets.section === 'function'
+      ? window.GenericPickerPresets.section
+      : null;
+    const config = {
+      title: 'Select Section',
+      icon: 'bi-collection',
+      apiEndpoint: '/activity-quota/rules/picker/sections',
+      searchFields: 'id,name,description,category',
+      placeholder: 'Search sections...',
+      multiselect: false,
+      context,
+      onSelect: (item) => {
+        setSection(item);
+        setOperation({});
+      }
+    };
+    window.GenericPicker.open(presetFactory ? presetFactory(config) : config);
+  }
+
+  async function openOperationPicker() {
+    const sectionId = String(sectionIdInput.value || '').trim();
+    if (!sectionId) {
+      await showNotice('Section Required', 'Select a section first.');
+      return;
+    }
+    if (!hasGenericPicker()) {
+      await showNotice('Picker unavailable', 'Generic picker is not initialized.');
+      return;
+    }
+    const presetFactory = window.GenericPickerPresets && typeof window.GenericPickerPresets.operation === 'function'
+      ? window.GenericPickerPresets.operation
+      : null;
+    const sectionTitle = String(state.section.name || sectionId).trim();
+    const config = {
+      title: 'Select Operation (' + sectionTitle + ')',
+      icon: 'bi-gear',
+      apiEndpoint: '/activity-quota/rules/picker/operations?sectionId=' + encodeURIComponent(sectionId),
+      searchFields: 'id,name,description',
+      placeholder: 'Search operations for this section...',
+      multiselect: false,
+      context: {
+        label: 'Selected Section',
+        value: sectionTitle,
+        icon: 'bi bi-grid'
+      },
+      onSelect: (item) => {
+        setOperation(item);
+      }
+    };
+    window.GenericPicker.open(presetFactory ? presetFactory(config) : config);
+  }
+
+  async function openEventPicker() {
+    if (!hasGenericPicker()) {
+      await showNotice('Picker unavailable', 'Generic picker is not initialized.');
+      return;
+    }
+    window.GenericPicker.open({
+      title: 'Select Event Type',
+      icon: 'bi-activity',
+      apiEndpoint: '/activity-quota/rules/picker/events',
+      searchFields: 'id,name',
+      placeholder: 'Search event types...',
+      multiselect: false,
+      onSelect: (item) => {
+        const row = (item && typeof item === 'object') ? item : {};
+        sourceEventInput.value = String(row.id || '').trim();
+      }
+    });
+  }
+
+  async function openUsersPicker() {
+    if (!hasGenericPicker()) {
+      await showNotice('Picker unavailable', 'Generic picker is not initialized.');
+      return;
+    }
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    const presetFactory = window.GenericPickerPresets && typeof window.GenericPickerPresets.user === 'function'
+      ? window.GenericPickerPresets.user
+      : null;
+    const config = {
+      title: 'Select Target Users',
+      icon: 'bi-people',
+      apiEndpoint: '/activity-quota/rules/picker/users',
+      searchFields: 'id,username,email,name',
+      placeholder: 'Search users by id, username, or email...',
+      multiselect: true,
+      context,
+      onSelect: (items) => {
+        normalizeSelectedItems(items).forEach(upsertTargetUser);
+        renderTargetUsers();
+      }
+    };
+    window.GenericPicker.open(presetFactory ? presetFactory(config) : config);
+  }
+
+  function applyFallbackModeState() {
+    const fallbackEnabled = !!fallbackInput.checked;
+    if (fallbackEnabled) {
+      if (state.targetUsers.length) {
+        state.targetUsers = [];
+        renderTargetUsers();
+      }
+      if (activeInput) {
+        activeInput.checked = true;
+        activeInput.disabled = true;
+      }
+      if (pickUsersBtn) pickUsersBtn.disabled = true;
+      if (sourceEventInput) sourceEventInput.required = true;
+      if (validityStartInput) {
+        state.nonFallbackValidity.startDate = String(validityStartInput.value || '').trim();
+        validityStartInput.value = '';
+        validityStartInput.required = false;
+        validityStartInput.disabled = true;
+      }
+      if (validityEndInput) {
+        state.nonFallbackValidity.endDate = String(validityEndInput.value || '').trim();
+        validityEndInput.value = '';
+        validityEndInput.required = false;
+        validityEndInput.disabled = true;
+      }
+      if (validityTimezoneInput) {
+        state.nonFallbackValidity.timezone = String(validityTimezoneInput.value || '').trim();
+        validityTimezoneInput.required = true;
+        validityTimezoneInput.disabled = true;
+      }
+      if (audienceHelpText) {
+        audienceHelpText.textContent = 'Fallback rules are system-wide and cannot target users.';
+      }
+      if (validityHelpText) {
+        validityHelpText.textContent = 'Fallback rules are always active and do not use validity dates.';
+      }
+      return;
+    }
+
+    if (activeInput) activeInput.disabled = false;
+    if (pickUsersBtn) pickUsersBtn.disabled = false;
+    if (sourceEventInput) sourceEventInput.required = false;
+    if (validityStartInput) {
+      validityStartInput.disabled = false;
+      validityStartInput.required = true;
+      if (!String(validityStartInput.value || '').trim() && state.nonFallbackValidity.startDate) {
+        validityStartInput.value = state.nonFallbackValidity.startDate;
+      }
+    }
+    if (validityEndInput) {
+      validityEndInput.disabled = false;
+      validityEndInput.required = true;
+      if (!String(validityEndInput.value || '').trim() && state.nonFallbackValidity.endDate) {
+        validityEndInput.value = state.nonFallbackValidity.endDate;
+      }
+    }
+    if (validityTimezoneInput) {
+      validityTimezoneInput.disabled = false;
+      validityTimezoneInput.required = true;
+      if (!String(validityTimezoneInput.value || '').trim()) {
+        validityTimezoneInput.value = state.nonFallbackValidity.timezone || 'UTC';
+      }
+    }
+    if (audienceHelpText) {
+      audienceHelpText.textContent = 'Leave empty for generic rules.';
+    }
+    if (validityHelpText) {
+      validityHelpText.textContent = 'Rules apply only inside this date range.';
+    }
+  }
+
+  document.getElementById('aqPickSectionBtn').addEventListener('click', openSectionPicker);
+  document.getElementById('aqPickOperationBtn').addEventListener('click', openOperationPicker);
+  document.getElementById('aqPickEventBtn').addEventListener('click', openEventPicker);
+  document.getElementById('aqPickUsersBtn').addEventListener('click', openUsersPicker);
+  fallbackInput.addEventListener('change', applyFallbackModeState);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const payload = collectPayload();
+    const validationMessage = validatePayload(payload);
+    if (validationMessage) {
+      await showNotice('Validation', validationMessage);
+      return;
+    }
+    rulePlanInput.value = JSON.stringify(payload);
+
+    if (saveBtn) saveBtn.disabled = true;
+    if (cancelBtn) cancelBtn.disabled = true;
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        body: new URLSearchParams(new FormData(form)).toString()
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Save failed with status ' + response.status + '.'));
+      }
+      await showNotice('Success', result.message || 'Rule saved successfully.', 'success');
+      const redirectUrl = String((result && result.results && result.results.redirectUrl) || '').trim();
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+      }
+    } catch (error) {
+      await showNotice('Save Failed', error.message || 'Unable to save this rule.', 'error');
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+    }
+  });
+
+  setSection({ id: sectionIdInput.value, name: sectionIdInput.value });
+  setOperation({ id: operationIdInput.value, name: operationIdInput.value });
+  renderTargetUsers();
+  applyFallbackModeState();
+  hydrateMatcherLabels();
+});
+</script>

@@ -1,0 +1,131 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search operations...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="name">Name <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="trackState">Track <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="keepActive">Wait <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="active">Active <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="system">System <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="createDateTime">Created <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% operations.forEach(op => { %>
+        <tr>
+          <td><%= op.id %></td>
+          <td>
+             <%= op.name %>
+            <% if (op.system) { %>
+              <i class="bi bi-shield-lock-fill text-muted ms-1" title="System Operation"></i>
+            <% } %>
+          </td>
+
+          <td class="text-center">
+             <% if (op.trackState !== false) { %>
+                <i class="bi bi-eye-fill text-primary" title="Tracking Enabled"></i>
+             <% } else { %>
+                <i class="bi bi-eye-slash text-muted" title="Tracking Disabled"></i>
+             <% } %>
+          </td>
+
+          <td class="text-center">
+             <% if (op.keepActive) { %>
+                <i class="bi bi-hourglass-split text-info" title="Wait for Input (Keep Active)"></i>
+             <% } else { %>
+                <span class="text-muted text-opacity-25">—</span>
+             <% } %>
+          </td>
+
+          <td class="text-center">
+             <% if (op.active) { %>
+                <span class="badge bg-success">Active</span>
+            <% } else { %>
+                <span class="badge bg-secondary">Inactive</span>
+            <% } %>
+          </td>
+
+          <td class="text-center">
+             <% if (op.system) { %>
+                <span class="badge bg-primary">Yes</span>
+            <% } else { %>
+                <span class="badge bg-light text-dark border">No</span>
+            <% } %>
+          </td>
+
+          <% const audit = op.audit || {}; %>
+          <td>
+            <% if (audit.createDateTime) { %>
+              <%= new Date(audit.createDateTime).toLocaleString() %>
+              <% if (audit.createUser) { %>
+                <br><span class="text-muted small">by User <%= audit.createUser %></span>
+               <% } %>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (audit.lastUpdateDateTime) { %>
+              <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+              <% if (audit.lastUpdateUser) { %>
+                <br><span class="text-muted small">by User <%= audit.lastUpdateUser %></span>
+              <% } %>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+
+          <td class="table-actions text-end pe-4">
+            <% if (!op.system) { %>
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= op.id %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= op.id %>">
+                  <a href="/operations/edit/<%= op.id %>" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil-square me-2"></i>Edit
+                  </a>
+                  <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= op.id %>">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </button>
+                </div>
+              </div>
+            <% } else { %>
+              <span class="text-muted small fst-italic">Protected</span>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>

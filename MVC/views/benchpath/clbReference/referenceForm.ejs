@@ -1,0 +1,537 @@
+<%
+  const isEdit = !!(itemData && itemData.id);
+  const formAction = isEdit ? `/benchpath/${entity.routeBase}/edit/${itemData.id}` : `/benchpath/${entity.routeBase}/new`;
+  const refs = Array.isArray(itemData?.sourceRefs) && itemData.sourceRefs.length ? itemData.sourceRefs : [{}];
+  const csv = (v) => Array.isArray(v) ? v.join(', ') : '';
+  const toSet = (v) => new Set(Array.isArray(v) ? v.map((entry) => String(entry || '').trim()) : []);
+  const inSet = (setObj, id) => setObj.has(String(id || '').trim());
+  const selectedCompetencyIds = toSet(itemData?.competencyIds);
+  const selectedFeatureIds = toSet(itemData?.featureIds);
+  const selectedSampleTaskLabelIds = toSet(itemData?.sampleTaskLabelIds);
+  const selectedIndicatorIds = toSet(itemData?.indicatorIds);
+  const selectedRelatedIds = toSet(itemData?.relatedIds);
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? `Edit ${entity.title}` : `Create ${entity.title}` %></h1>
+    <% if (isEdit) { %><span class="badge bg-primary border">ID: <%= itemData.id %></span><% } %>
+  </div>
+
+  <div class="form-container" style="width:100%;max-width:1400px;">
+    <form id="clbReferenceForm" method="POST" action="<%= formAction %>">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="sourceRefs" id="sourceRefsInput">
+      <input type="hidden" name="relatedIds" id="relatedIdsInput" value="<%= csv(itemData?.relatedIds) %>">
+      <input type="hidden" name="communicativeContexts" id="communicativeContextsInput" value="<%= csv(itemData?.communicativeContexts) %>">
+      <input type="hidden" name="descriptorDimensions" id="descriptorDimensionsInput" value="<%= csv(itemData?.descriptorDimensions) %>">
+      <input type="hidden" name="tags" id="tagsInput" value="<%= csv(itemData?.tags) %>">
+
+      <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#core-pane" type="button">Core</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#relations-pane" type="button">Relations</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#semantic-pane" type="button">Semantics</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#trace-pane" type="button">Traceability</button></li>
+      </ul>
+
+      <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
+        <div class="tab-pane fade show active" id="core-pane">
+          <div class="row g-2">
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">ID *</label><input class="form-control" name="id" value="<%= itemData?.id || '' %>" <%= isEdit ? 'readonly' : '' %> required></div>
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">Slug *</label><input class="form-control" name="slug" value="<%= itemData?.slug || '' %>" required></div>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-4 mb-3"><label class="form-label">Code</label><input class="form-control" name="code" value="<%= itemData?.code || '' %>"></div>
+            <div class="col-md-8 mb-3"><label class="form-label fw-bold">Title *</label><input class="form-control" name="title" value="<%= itemData?.title || '' %>" required></div>
+          </div>
+          <div class="mb-3"><label class="form-label">Short Title</label><input class="form-control" name="shortTitle" value="<%= itemData?.shortTitle || '' %>"></div>
+          <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"><%= itemData?.description || '' %></textarea></div>
+          <div class="mb-3"><label class="form-label">Domain Notes</label><textarea class="form-control" name="domainNotes" rows="2"><%= itemData?.domainNotes || '' %></textarea></div>
+          <div class="row g-2">
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">Status *</label><select class="form-select" name="status" required><option value="">Select...</option><% statusOptions.forEach((opt)=>{ %><option value="<%= opt %>" <%= itemData?.status===opt?'selected':'' %>><%= opt %></option><% }) %></select></div>
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">Review Status *</label><select class="form-select" name="reviewStatus" required><option value="">Select...</option><% reviewStatusOptions.forEach((opt)=>{ %><option value="<%= opt %>" <%= itemData?.reviewStatus===opt?'selected':'' %>><%= opt %></option><% }) %></select></div>
+          </div>
+          <div class="d-flex gap-4 flex-wrap">
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="isActive" name="isActive" value="true" <%= itemData ? (itemData.isActive?'checked':'') : 'checked' %>><label class="form-check-label fw-bold" for="isActive">isActive</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="isSystem" name="isSystem" value="true" <%= itemData?.isSystem?'checked':'' %>><label class="form-check-label fw-bold" for="isSystem">isSystem</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="isLocked" name="isLocked" value="true" <%= itemData?.isLocked?'checked':'' %>><label class="form-check-label fw-bold" for="isLocked">isLocked</label></div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="relations-pane">
+          <div class="alert alert-light border small mb-3">Dependency-aware filtering is active for relation selectors.</div>
+          <div class="row g-2">
+            <div class="col-md-4 mb-3"><label class="form-label fw-bold">Framework</label><select class="form-select" name="frameworkId" id="frameworkId"><option value="">Select...</option><% (options.frameworks || []).forEach((row)=>{ %><option value="<%= row.id %>" <%= itemData?.frameworkId===row.id?'selected':'' %>><%= row.title || row.id %> (<%= row.id %>)</option><% }) %></select></div>
+            <div class="col-md-4 mb-3"><label class="form-label fw-bold">Skill</label><select class="form-select" name="skillId" id="skillId"><option value="">Select...</option><% (options.skills || []).forEach((row)=>{ %><option value="<%= row.id %>" data-framework-id="<%= row.frameworkId || '' %>" <%= itemData?.skillId===row.id?'selected':'' %>><%= row.title || row.id %> (<%= row.id %>)</option><% }) %></select></div>
+            <div class="col-md-4 mb-3"><label class="form-label fw-bold">Stage</label><select class="form-select" name="stageId" id="stageId"><option value="">Select...</option><% (options.stages || []).forEach((row)=>{ %><option value="<%= row.id %>" data-framework-id="<%= row.frameworkId || '' %>" <%= itemData?.stageId===row.id?'selected':'' %>><%= row.label || row.title || row.id %> (<%= row.id %>)</option><% }) %></select></div>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-4 mb-3"><label class="form-label fw-bold">Benchmark</label><select class="form-select" name="benchmarkId" id="benchmarkId"><option value="">Select...</option><% (options.benchmarks || []).forEach((row)=>{ %><option value="<%= row.id %>" data-framework-id="<%= row.frameworkId || '' %>" data-skill-id="<%= row.skillId || '' %>" data-stage-id="<%= row.stageId || '' %>" <%= itemData?.benchmarkId===row.id?'selected':'' %>><%= row.title || row.id %> (<%= row.id %>)</option><% }) %></select></div>
+            <div class="col-md-4 mb-3"><label class="form-label fw-bold">Competency Area</label><select class="form-select" name="competencyAreaId" id="competencyAreaId"><option value="">Select...</option><% (options.competencyAreas || []).forEach((row)=>{ %><option value="<%= row.id %>" data-framework-id="<%= row.frameworkId || '' %>" data-skill-id="<%= row.skillId || '' %>" <%= itemData?.competencyAreaId===row.id?'selected':'' %>><%= row.title || row.id %> (<%= row.id %>)</option><% }) %></select></div>
+            <div class="col-md-4 mb-3"><label class="form-label fw-bold">Competency</label><select class="form-select" name="competencyId" id="competencyId"><option value="">Select...</option><% (options.competencies || []).forEach((row)=>{ %><option value="<%= row.id %>" data-framework-id="<%= row.frameworkId || '' %>" data-skill-id="<%= row.skillId || '' %>" data-benchmark-id="<%= row.benchmarkId || '' %>" data-competency-area-id="<%= row.competencyAreaId || '' %>" <%= itemData?.competencyId===row.id?'selected':'' %>><%= row.title || row.id %> (<%= row.id %>)</option><% }) %></select></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Related IDs</label>
+            <div class="row g-2 mb-2">
+              <div class="col-md-8">
+                <select class="form-select" id="relatedPickerType">
+                  <option value="clbFramework">Framework</option>
+                  <option value="clbStage">Stage</option>
+                  <option value="clbSkill">Skill</option>
+                  <option value="clbBenchmark">Benchmark</option>
+                  <option value="clbCompetencyArea">Competency Area</option>
+                  <option value="clbCompetency">Competency</option>
+                  <option value="clbIndicator">Indicator</option>
+                  <option value="clbProfileOfAbility">Profile Of Ability</option>
+                  <option value="clbFeatureOfCommunication">Feature Of Communication</option>
+                  <option value="clbSampleTaskLabel">Sample Task Label</option>
+                </select>
+              </div>
+              <div class="col-md-4 d-grid">
+                <button type="button" class="btn btn-outline-primary" id="pickRelatedIdBtn"><i class="bi bi-plus-circle me-1"></i>Pick Related ID</button>
+              </div>
+            </div>
+            <div id="relatedIdChips" class="d-flex flex-wrap gap-2">
+              <% Array.from(selectedRelatedIds).forEach((rid) => { %>
+                <span class="badge rounded-pill bg-light text-dark border px-3 py-2 related-chip" data-id="<%= rid %>">
+                  <span class="me-2"><%= rid %></span>
+                  <button type="button" class="btn btn-sm p-0 text-danger related-chip-remove" data-id="<%= rid %>" style="line-height:1;">&times;</button>
+                </span>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="semantic-pane">
+          <% if (entityFormMeta) { %><div class="alert alert-primary border-primary-subtle small"><b><%= entityFormMeta.semanticTitle %>:</b> <%= entityFormMeta.semanticHelp %></div><% } %>
+
+          <%
+            const semanticPartialMap = {
+              competencyAreas: 'competencyAreas',
+              benchmarks: 'benchmarks',
+              competencies: 'competencies',
+              indicators: 'indicators',
+              profileOfAbility: 'profileOfAbility',
+              featuresOfCommunication: 'featuresOfCommunication',
+              sampleTaskLabels: 'sampleTaskLabels'
+            };
+            const semanticPartial = semanticPartialMap[entityKey];
+          %>
+          <% if (semanticPartial) { %>
+            <%- include(`semantic/${semanticPartial}`, {
+              inSet,
+              selectedCompetencyIds,
+              selectedFeatureIds,
+              selectedSampleTaskLabelIds,
+              selectedIndicatorIds
+            }) %>
+          <% } %>
+        </div>
+
+        <div class="tab-pane fade" id="trace-pane">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Tags</label>
+            <div class="d-flex gap-2 mb-2">
+              <input type="text" class="form-control" id="tagsChipText" placeholder="Type tag and press Enter">
+              <button type="button" class="btn btn-outline-primary" id="tagsAddChip">Add</button>
+            </div>
+            <div id="tagsChipContainer" class="d-flex flex-wrap gap-2"></div>
+          </div>
+          <label class="form-label fw-bold">Source References</label>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0" id="refsTable">
+              <thead class="table-light"><tr><th>Source</th><th>Fragment</th><th>Page Start</th><th>Page End</th><th>Note</th><th></th></tr></thead>
+              <tbody>
+                <% refs.forEach((ref)=>{ %>
+                  <tr class="ref-row">
+                    <td><select class="form-select form-select-sm ref-source-id"><option value="">Select source...</option><% (options.sources || []).forEach((src)=>{ %><option value="<%= src.id %>" <%= ref.sourceId===src.id?'selected':'' %>><%= src.title || src.id %> (<%= src.id %>)</option><% }) %></select></td>
+                    <td><select class="form-select form-select-sm ref-fragment-id"><option value="">No fragment</option><% (options.fragments || []).forEach((frg)=>{ %><option value="<%= frg.id %>" data-source-id="<%= frg.sourceId || '' %>" <%= ref.fragmentId===frg.id?'selected':'' %>><%= frg.title || frg.id %> (<%= frg.id %>)</option><% }) %></select></td>
+                    <td><input type="number" min="1" class="form-control form-control-sm ref-page-start" value="<%= Array.isArray(ref.pages) ? (ref.pages[0] || '') : '' %>"></td>
+                    <td><input type="number" min="1" class="form-control form-control-sm ref-page-end" value="<%= Array.isArray(ref.pages) ? (ref.pages[1] || '') : '' %>"></td>
+                    <td><input class="form-control form-control-sm ref-note" value="<%= ref.note || '' %>"></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger remove-ref">Remove</button></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="addRefBtn">Add Source Ref</button>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-save me-1"></i> Save</button>
+        <a href="/benchpath/<%= entity.routeBase %>" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/benchpath/<%= entity.routeBase %>">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+  (function () {
+    const form = document.getElementById('clbReferenceForm');
+    if (!form) return;
+
+    const framework = document.getElementById('frameworkId');
+    const skill = document.getElementById('skillId');
+    const stage = document.getElementById('stageId');
+    const benchmark = document.getElementById('benchmarkId');
+    const competencyArea = document.getElementById('competencyAreaId');
+    const competency = document.getElementById('competencyId');
+    const profileOfAbility = document.getElementById('profileOfAbilityId');
+    const scopeSkill = document.getElementById('scopeSkillId');
+    const scopeBenchmark = document.getElementById('scopeBenchmarkId');
+    const scopeCompetency = document.getElementById('scopeCompetencyId');
+    const linkedBenchmark = document.getElementById('linkedBenchmarkId');
+    const linkedCompetency = document.getElementById('linkedCompetencyId');
+    const relatedIdInput = document.getElementById('relatedIdsInput');
+    const relatedIdChips = document.getElementById('relatedIdChips');
+    const relatedPickerType = document.getElementById('relatedPickerType');
+    const pickRelatedIdBtn = document.getElementById('pickRelatedIdBtn');
+    const communicativeContextsInput = document.getElementById('communicativeContextsInput');
+    const descriptorDimensionsInput = document.getElementById('descriptorDimensionsInput');
+    const tagsInput = document.getElementById('tagsInput');
+
+    const relatedState = new Set((String(relatedIdInput?.value || '') || '')
+      .split(',')
+      .map((v) => String(v || '').trim())
+      .filter(Boolean));
+
+    function buildSetFromCsv(value) {
+      return new Set(
+        String(value || '')
+          .split(',')
+          .map((token) => String(token || '').trim())
+          .filter(Boolean)
+      );
+    }
+
+    function initChipEditor(hiddenInputEl, textInputId, addButtonId, containerId, emptyMessage) {
+      const textInput = document.getElementById(textInputId);
+      const addButton = document.getElementById(addButtonId);
+      const container = document.getElementById(containerId);
+      if (!hiddenInputEl || !textInput || !addButton || !container) {
+        return null;
+      }
+
+      const state = buildSetFromCsv(hiddenInputEl.value);
+
+      function syncHiddenInput() {
+        hiddenInputEl.value = Array.from(state).join(', ');
+      }
+
+      function render() {
+        container.innerHTML = '';
+        if (!state.size) {
+          const msg = document.createElement('span');
+          msg.className = 'text-muted small';
+          msg.textContent = emptyMessage || 'No items selected.';
+          container.appendChild(msg);
+          return;
+        }
+
+        Array.from(state).forEach((value) => {
+          const chip = document.createElement('span');
+          chip.className = 'badge rounded-pill bg-light text-dark border px-3 py-2 d-inline-flex align-items-center gap-2';
+          chip.dataset.value = value;
+
+          const label = document.createElement('span');
+          label.textContent = value;
+
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'btn btn-sm p-0 text-danger';
+          remove.style.lineHeight = '1';
+          remove.innerHTML = '&times;';
+          remove.addEventListener('click', () => {
+            state.delete(value);
+            syncHiddenInput();
+            render();
+          });
+
+          chip.appendChild(label);
+          chip.appendChild(remove);
+          container.appendChild(chip);
+        });
+      }
+
+      function addFromText() {
+        const value = String(textInput.value || '').trim();
+        if (!value) return;
+        state.add(value);
+        textInput.value = '';
+        syncHiddenInput();
+        render();
+      }
+
+      addButton.addEventListener('click', addFromText);
+      textInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ',') {
+          event.preventDefault();
+          addFromText();
+        }
+      });
+
+      syncHiddenInput();
+      render();
+      return { state, syncHiddenInput, render };
+    }
+
+    function updateRelatedHiddenInput() {
+      if (!relatedIdInput) return;
+      relatedIdInput.value = Array.from(relatedState).join(', ');
+    }
+
+    function renderRelatedChips() {
+      if (!relatedIdChips) return;
+      const values = Array.from(relatedState);
+      if (!values.length) {
+        relatedIdChips.innerHTML = '<span class="text-muted small">No related IDs selected.</span>';
+        return;
+      }
+      relatedIdChips.innerHTML = values.map((id) => `
+        <span class="badge rounded-pill bg-light text-dark border px-3 py-2 related-chip" data-id="${id}">
+          <span class="me-2">${id}</span>
+          <button type="button" class="btn btn-sm p-0 text-danger related-chip-remove" data-id="${id}" style="line-height:1;">&times;</button>
+        </span>
+      `).join('');
+    }
+
+    function normalizePickedId(item) {
+      const id = String(item?.id || '').trim();
+      return id || null;
+    }
+
+    function openPickerByPreset(presetName, fallbackTitle) {
+      if (!window.GenericPicker || typeof window.GenericPicker.open !== 'function') {
+        if (typeof window.showMessageModal === 'function') {
+          window.showMessageModal({
+            title: 'Picker Not Available',
+            icon: 'error',
+            message: 'Generic picker is not available on this page.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        }
+        return;
+      }
+
+      const config = {
+        title: fallbackTitle || 'Select Item',
+        onSelect(item) {
+          const id = normalizePickedId(item);
+          if (!id) return;
+          relatedState.add(id);
+          updateRelatedHiddenInput();
+          renderRelatedChips();
+        }
+      };
+
+      let pickerConfig = config;
+      if (window.GenericPickerPresets && typeof window.GenericPickerPresets[presetName] === 'function') {
+        pickerConfig = window.GenericPickerPresets[presetName](config);
+      } else if (window.GenericPickerPresets && typeof window.GenericPickerPresets.normalizeConfig === 'function') {
+        pickerConfig = window.GenericPickerPresets.normalizeConfig({ preset: presetName, ...config });
+      }
+
+      window.GenericPicker.open(pickerConfig);
+    }
+
+    pickRelatedIdBtn?.addEventListener('click', () => {
+      const preset = String(relatedPickerType?.value || '').trim();
+      if (!preset) return;
+      openPickerByPreset(preset, 'Select Related Item');
+    });
+
+    relatedIdChips?.addEventListener('click', (event) => {
+      const btn = event.target.closest('.related-chip-remove');
+      if (!btn) return;
+      const id = String(btn.dataset.id || '').trim();
+      if (!id) return;
+      relatedState.delete(id);
+      updateRelatedHiddenInput();
+      renderRelatedChips();
+    });
+
+    function matches(optionValue, selectedValue) {
+      return !selectedValue || !optionValue || String(optionValue) === String(selectedValue);
+    }
+
+    function filterSelect(select, predicateFn) {
+      if (!select) return;
+      const selected = String(select.value || '').trim();
+      let selectedVisible = !selected;
+      Array.from(select.options).forEach((option, idx) => {
+        if (idx === 0) return;
+        const visible = Boolean(predicateFn(option));
+        option.hidden = !visible;
+        option.disabled = !visible;
+        if (visible && String(option.value) === selected) selectedVisible = true;
+      });
+      if (!selectedVisible) select.value = '';
+    }
+
+    function filterCheckboxes(selector, criteria) {
+      document.querySelectorAll(selector).forEach((row) => {
+        const visible = Object.entries(criteria).every(([key, selected]) => {
+          const optionValue = String(row.dataset[key] || '').trim();
+          return matches(optionValue, selected);
+        });
+        row.style.display = visible ? '' : 'none';
+      });
+    }
+
+    function applyDependencyFilters() {
+      const fw = String(framework?.value || '').trim();
+      const sk = String(skill?.value || '').trim();
+      const st = String(stage?.value || '').trim();
+      const bm = String(benchmark?.value || '').trim();
+      const ca = String(competencyArea?.value || '').trim();
+      const scopeSk = String(scopeSkill?.value || '').trim();
+      const scopeBm = String(scopeBenchmark?.value || '').trim();
+      const linkedBm = String(linkedBenchmark?.value || '').trim();
+
+      filterSelect(skill, (opt) => matches(opt.dataset.frameworkId, fw));
+      filterSelect(stage, (opt) => matches(opt.dataset.frameworkId, fw));
+      filterSelect(benchmark, (opt) => matches(opt.dataset.frameworkId, fw) && matches(opt.dataset.skillId, sk) && matches(opt.dataset.stageId, st));
+      filterSelect(competencyArea, (opt) => matches(opt.dataset.frameworkId, fw) && matches(opt.dataset.skillId, sk));
+      filterSelect(competency, (opt) => matches(opt.dataset.frameworkId, fw) && matches(opt.dataset.skillId, sk) && matches(opt.dataset.benchmarkId, bm) && matches(opt.dataset.competencyAreaId, ca));
+
+      filterSelect(profileOfAbility, (opt) => matches(opt.dataset.frameworkId, fw) && matches(opt.dataset.skillId, sk) && matches(opt.dataset.benchmarkId, bm));
+      filterSelect(scopeSkill, (opt) => matches(opt.dataset.frameworkId, fw));
+      filterSelect(scopeBenchmark, (opt) => matches(opt.dataset.frameworkId, fw) && matches(opt.dataset.skillId, scopeSk || sk));
+      filterSelect(scopeCompetency, (opt) => matches(opt.dataset.frameworkId, fw) && matches(opt.dataset.skillId, scopeSk || sk) && matches(opt.dataset.benchmarkId, scopeBm || bm));
+      filterSelect(linkedBenchmark, (opt) => matches(opt.dataset.frameworkId, fw) && matches(opt.dataset.skillId, sk));
+      filterSelect(linkedCompetency, (opt) => matches(opt.dataset.frameworkId, fw) && matches(opt.dataset.skillId, sk) && matches(opt.dataset.benchmarkId, linkedBm || bm));
+
+      filterCheckboxes('.dep-cb-competencies', { frameworkId: fw, skillId: sk, benchmarkId: bm });
+      filterCheckboxes('.dep-cb-indicators', { frameworkId: fw, skillId: sk, benchmarkId: bm, competencyId: String(competency?.value || '').trim() });
+      filterCheckboxes('.dep-cb-features', { frameworkId: fw, skillId: sk, benchmarkId: bm, competencyId: String(competency?.value || '').trim() });
+      filterCheckboxes('.dep-cb-sample-task-labels', { frameworkId: fw, skillId: sk, benchmarkId: bm, competencyId: String(competency?.value || '').trim() });
+    }
+
+    [framework, skill, stage, benchmark, competencyArea, competency, scopeSkill, scopeBenchmark, linkedBenchmark].forEach((el) => el?.addEventListener('change', applyDependencyFilters));
+
+    function filterRefFragmentRows() {
+      document.querySelectorAll('#refsTable .ref-row').forEach((row) => {
+        const sourceSelect = row.querySelector('.ref-source-id');
+        const fragmentSelect = row.querySelector('.ref-fragment-id');
+        const sourceId = String(sourceSelect?.value || '').trim();
+        const selectedFragment = String(fragmentSelect?.value || '').trim();
+        let selectedVisible = !selectedFragment;
+        Array.from(fragmentSelect.options).forEach((opt, idx) => {
+          if (idx === 0) return;
+          const optionSource = String(opt.dataset.sourceId || '').trim();
+          const visible = !sourceId || !optionSource || optionSource === sourceId;
+          opt.hidden = !visible;
+          opt.disabled = !visible;
+          if (visible && String(opt.value) === selectedFragment) selectedVisible = true;
+        });
+        if (!selectedVisible) fragmentSelect.value = '';
+      });
+    }
+
+    document.getElementById('refsTable')?.addEventListener('change', (event) => {
+      if (event.target?.classList?.contains('ref-source-id')) filterRefFragmentRows();
+    });
+
+    document.getElementById('addRefBtn')?.addEventListener('click', () => {
+      const tbody = document.querySelector('#refsTable tbody');
+      const tr = document.createElement('tr');
+      tr.className = 'ref-row';
+      tr.innerHTML = `
+        <td><select class="form-select form-select-sm ref-source-id"><option value="">Select source...</option><% (options.sources || []).forEach((src)=>{ %><option value="<%= src.id %>"><%= src.title || src.id %> (<%= src.id %>)</option><% }) %></select></td>
+        <td><select class="form-select form-select-sm ref-fragment-id"><option value="">No fragment</option><% (options.fragments || []).forEach((frg)=>{ %><option value="<%= frg.id %>" data-source-id="<%= frg.sourceId || '' %>"><%= frg.title || frg.id %> (<%= frg.id %>)</option><% }) %></select></td>
+        <td><input type="number" min="1" class="form-control form-control-sm ref-page-start"></td>
+        <td><input type="number" min="1" class="form-control form-control-sm ref-page-end"></td>
+        <td><input class="form-control form-control-sm ref-note"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-ref">Remove</button></td>
+      `;
+      tbody.appendChild(tr);
+      filterRefFragmentRows();
+    });
+
+    form.addEventListener('click', (event) => {
+      if (event.target?.classList?.contains('remove-ref')) event.target.closest('.ref-row')?.remove();
+    });
+
+    function collectSourceRefs() {
+      const refs = [];
+      document.querySelectorAll('#refsTable .ref-row').forEach((row) => {
+        const sourceId = String(row.querySelector('.ref-source-id')?.value || '').trim();
+        if (!sourceId) return;
+        const fragmentId = String(row.querySelector('.ref-fragment-id')?.value || '').trim() || null;
+        const pageStart = Number.parseInt(row.querySelector('.ref-page-start')?.value || '', 10);
+        const pageEnd = Number.parseInt(row.querySelector('.ref-page-end')?.value || '', 10);
+        const note = String(row.querySelector('.ref-note')?.value || '').trim() || null;
+        refs.push({ sourceId, fragmentId, pages: Number.isFinite(pageStart) && Number.isFinite(pageEnd) ? [pageStart, pageEnd] : null, note });
+      });
+      return refs;
+    }
+
+    let isSubmitting = false;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (isSubmitting) return;
+      isSubmitting = true;
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      document.getElementById('sourceRefsInput').value = JSON.stringify(collectSourceRefs());
+
+      try {
+        const payload = new URLSearchParams(new FormData(form));
+        const response = await fetch(form.action, {
+          method: (form.method || 'POST').toUpperCase(),
+          headers: { 'x-ajax-request': '1', Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: payload
+        });
+        const result = await response.json().catch(() => ({ status: 'error', message: `Server returned HTTP ${response.status}.` }));
+        const ok = response.ok && result?.status === 'success';
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({ title: ok ? 'Saved' : 'Save Failed', icon: ok ? 'success' : 'error', message: result?.message || (ok ? 'Saved successfully.' : 'Unable to save.'), buttons: [{ text: 'OK', class: ok ? 'btn-success' : 'btn-danger' }] });
+        }
+        if (ok) window.location.href = '/benchpath/<%= entity.routeBase %>';
+      } catch (error) {
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({ title: 'Save Failed', icon: 'error', message: error?.message || 'Unexpected network error.', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        }
+      } finally {
+        isSubmitting = false;
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+
+    const communicativeContextsEditor = initChipEditor(
+      communicativeContextsInput,
+      'communicativeContextsChipText',
+      'communicativeContextsAddChip',
+      'communicativeContextsChipContainer',
+      'No communicative contexts added.'
+    );
+    const descriptorDimensionsEditor = initChipEditor(
+      descriptorDimensionsInput,
+      'descriptorDimensionsChipText',
+      'descriptorDimensionsAddChip',
+      'descriptorDimensionsChipContainer',
+      'No descriptor dimensions added.'
+    );
+    const tagsEditor = initChipEditor(
+      tagsInput,
+      'tagsChipText',
+      'tagsAddChip',
+      'tagsChipContainer',
+      'No tags added.'
+    );
+
+    updateRelatedHiddenInput();
+    renderRelatedChips();
+    communicativeContextsEditor?.syncHiddenInput?.();
+    descriptorDimensionsEditor?.syncHiddenInput?.();
+    tagsEditor?.syncHiddenInput?.();
+    applyDependencyFilters();
+    filterRefFragmentRows();
+  })();
+</script>

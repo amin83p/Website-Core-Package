@@ -1,0 +1,123 @@
+<div class="sections-page">
+  <% const wizardStep = (task && task.extensions && task.extensions.wizard && (task.extensions.wizard.currentStep || task.extensions.wizard.lastSavedStep)) ? (task.extensions.wizard.currentStep || task.extensions.wizard.lastSavedStep) : 1; %>
+  <% const wizardUrl = task.status === 'draft'
+    ? `/benchpath/tasks/new-wizard/${wizardStep}?draftId=${encodeURIComponent(task.id)}`
+    : `/benchpath/tasks/edit-wizard/${task.id}/${wizardStep}`; %>
+  <% const pkg = packageView || {}; %>
+  <% const readiness = pkg.readiness || {}; %>
+  <% const learner = pkg.learnerTaskSheet || {}; %>
+  <% const assessment = pkg.teacherAssessmentSheet || {}; %>
+  <% const pbla = pkg.pblaEvidenceRecord || {}; %>
+
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0">BenchPath Task Package</h1>
+    <div class="d-flex align-items-center gap-2">
+      <a href="/benchpath/tasks" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-arrow-left me-1"></i> Back To List
+      </a>
+      <a href="<%= wizardUrl %>" class="btn btn-filled btn-primary btn-md">
+        <i class="bi bi-signpost-split me-1"></i> Open Wizard
+      </a>
+      <a href="/benchpath/tasks/package/<%= task.id %>" class="btn btn-outline-info btn-md">
+        <i class="bi bi-file-earmark-text me-1"></i> Package
+      </a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-light fw-bold">Task Summary</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6"><strong>ID:</strong> <span class="font-monospace"><%= task.id %></span></div>
+        <div class="col-md-6"><strong>Status:</strong> <span class="badge bg-secondary"><%= task.status %></span></div>
+        <div class="col-md-6"><strong>Title:</strong> <%= task.title || '-' %></div>
+        <div class="col-md-6"><strong>Skill:</strong> <%= task.skill || '-' %></div>
+        <div class="col-md-6"><strong>Selected Benchmark:</strong> <%= task.selectedBenchmarkId || '-' %></div>
+        <div class="col-md-6"><strong>Task Type:</strong> <%= task.taskType || '-' %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-light fw-bold d-flex align-items-center justify-content-between">
+      <span>Package Readiness</span>
+      <span class="badge <%= readiness.isReady ? 'bg-success' : 'bg-warning text-dark' %>"><%= readiness.isReady ? 'Ready' : 'Needs Items' %></span>
+    </div>
+    <div class="card-body">
+      <% if ((readiness.missingItems || []).length) { %>
+        <div class="alert alert-warning mb-3">
+          <div class="fw-bold mb-1">Missing Items</div>
+          <ul class="mb-0 ps-3">
+            <% (readiness.missingItems || []).forEach((item) => { %>
+              <li><%= item %></li>
+            <% }) %>
+          </ul>
+        </div>
+      <% } %>
+      <div class="row g-2">
+        <% (readiness.checks || []).forEach((check) => { %>
+          <div class="col-md-6">
+            <div class="border rounded p-2 h-100">
+              <div class="fw-bold text-capitalize"><%= check.id %></div>
+              <div class="small text-muted"><%= check.message %></div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+      <div class="mt-3 d-flex align-items-center gap-2 flex-wrap">
+        <a href="/benchpath/tasks/package/<%= task.id %>/learner" class="btn btn-outline-primary btn-sm">Learner Task Sheet</a>
+        <a href="/benchpath/tasks/package/<%= task.id %>/assessment" class="btn btn-outline-primary btn-sm">Teacher Assessment Sheet</a>
+        <a href="/benchpath/tasks/package/<%= task.id %>/pbla-record" class="btn btn-outline-primary btn-sm">PBLA Evidence Record</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-light fw-bold">Learner Task Sheet</div>
+    <div class="card-body">
+      <div><strong>Scenario:</strong> <%= learner.learnerScenario || '-' %></div>
+      <div class="mt-2"><strong>Learner Instructions:</strong> <%= learner.learnerInstructions || '-' %></div>
+      <div class="mt-2"><strong>Allowed Supports:</strong> <%= learner.allowedSupports || '-' %></div>
+      <div class="mt-2"><strong>Expected Output:</strong> <%= learner.expectedOutputArtifact || '-' %></div>
+      <div class="mt-2"><strong>Success Reminder:</strong> <%= learner.successReminder || '-' %></div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-light fw-bold">Teacher Assessment Sheet</div>
+    <div class="card-body">
+      <div><strong>Benchmark:</strong> <%= assessment.benchmark || '-' %></div>
+      <div class="mt-2"><strong>Competencies:</strong> <%= (assessment.competencies || []).map((row) => row.title || row.id).join(', ') || '-' %></div>
+      <div class="mt-2"><strong>Indicators:</strong> <%= (assessment.indicators || []).map((row) => row.title || row.id).join(', ') || '-' %></div>
+      <div class="mt-2"><strong>Observable Evidence:</strong></div>
+      <ul class="mb-0 ps-3">
+        <% (assessment.observableEvidenceChecklist || []).forEach((row) => { %>
+          <li><%= row %></li>
+        <% }) %>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-light fw-bold">PBLA Evidence Record</div>
+    <div class="card-body">
+      <div><strong>Class / Unit / Theme:</strong> <%= pbla.classUnitTheme || '-' %></div>
+      <div class="mt-2"><strong>Artifact Type:</strong> <%= pbla.artifactType || '-' %></div>
+      <div class="mt-2"><strong>Portfolio Fit:</strong> <%= pbla.portfolioFitSummary?.classification || '-' %></div>
+      <div class="mt-2"><strong>Validation:</strong> <%= pbla.validationSummary?.isValid ? 'Valid' : 'Needs Review' %></div>
+    </div>
+  </div>
+
+  <% if (canShowRaw) { %>
+    <details class="card border-0 shadow-sm">
+      <summary class="card-header bg-light fw-bold" style="cursor: pointer;">Developer JSON (Raw Task + Package)</summary>
+      <div class="card-body">
+        <div class="fw-bold mb-2">Task JSON</div>
+        <pre class="mb-3" style="white-space: pre-wrap;"><%= JSON.stringify(task, null, 2) %></pre>
+        <div class="fw-bold mb-2">Package JSON</div>
+        <pre class="mb-0" style="white-space: pre-wrap;"><%= JSON.stringify(packageView || {}, null, 2) %></pre>
+      </div>
+    </details>
+  <% } %>
+</div>
+

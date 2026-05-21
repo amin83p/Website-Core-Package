@@ -1,0 +1,314 @@
+[
+  {
+    "active": true,
+    "email": "900000_student_1772254486524_1@sample.school.local",
+    "username": "900000_student_1772254486524_1@sample.school.local",
+    "passwordHash": "$2b$10$x.QZIDN63GVwvAg2iwaMMePHSdSXcF2VFbaVwIzR05oGFEErP7sEK",
+    "status": "active",
+    "registrationSource": "admin_create",
+    "accessLevel": 1,
+    "personId": "144922",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-04-24T17:23:21.766Z",
+        "accessProfileIds": []
+      }
+    ],
+    "primaryOrgId": 900000,
+    "isEmailVerified": false,
+    "lastLoginAt": null,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-24T17:23:21.766Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-24T17:23:21.766Z"
+    },
+    "id": "364482"
+  },
+  {
+    "active": true,
+    "email": "900000_teacher_1772254486571_1@sample.school.local",
+    "username": "900000_teacher_1772254486571_1@sample.school.local",
+    "passwordHash": "$2b$10$KyoFD.dOTVD85rylRN96Oe8NtehmQq5j.ORN5bOaeXB7652CTfAsS",
+    "status": "active",
+    "registrationSource": "admin_create",
+    "accessLevel": 1,
+    "personId": "153279",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-05-05T17:55:09.419Z",
+        "accessProfileIds": [
+          "191019"
+        ],
+        "directAccessProfileIds": [],
+        "managedAccessProfiles": [
+          {
+            "profileId": "191019",
+            "sourceType": "activity_quota_package",
+            "sourceRefId": "PTEPKG2026050531691",
+            "sourceLabel": "PTE - Two Month Access",
+            "locked": true,
+            "createdAt": "2026-05-05T17:55:10.757Z",
+            "createdBy": "ROOT_001"
+          }
+        ]
+      }
+    ],
+    "primaryOrgId": 900000,
+    "isEmailVerified": false,
+    "lastLoginAt": null,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-05-05T17:55:09.419Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-05-05T17:55:10.757Z"
+    },
+    "id": "379136"
+  },
+  {
+    "active": true,
+    "email": "amin83p@gmail.com",
+    "username": "javad",
+    "passwordHash": "$2b$10$feutcow2DT2Irr0/8/fOB.SFgM51FriyuxevkZiH5T9WnatOkgY5y",
+    "status": "active",
+    "registrationSource": "admin_create",
+    "personId": "146788",
+    "accessLevel": 1,
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student",
+          "pte_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.557Z",
+        "directAccessProfileIds": [],
+        "managedAccessProfiles": [
+          {
+            "profileId": "191019",
+            "sourceType": "activity_quota_package",
+            "sourceRefId": "PTEPKG2026043088651",
+            "sourceLabel": "Amin Sample",
+            "locked": true,
+            "createdAt": "2026-04-30T05:25:18.565Z",
+            "createdBy": "ROOT_001"
+          }
+        ],
+        "accessProfileIds": [
+          "191019"
+        ]
+      }
+    ],
+    "primaryOrgId": 900000,
+    "systemAccessProfileId": null,
+    "isEmailVerified": true,
+    "lastLoginAt": "2026-05-14T02:20:58.606Z",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-08T04:04:40.007Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-05-13T05:10:25.109Z"
+    },
+    "id": "441227",
+    "activeProfileMode": "SYSTEM",
+    "password": "$2b$10$feutcow2DT2Irr0/8/fOB.SFgM51FriyuxevkZiH5T9WnatOkgY5y",
+    "passwordUpdatedAt": "2026-05-13T05:11:15.144Z",
+    "authProviders": {
+      "microsoft": {
+        "email": "apaknejad@equilibrium.ab.ca",
+        "tenantId": "29885c0c-8943-4d92-89c4-fe3dea719263",
+        "objectId": "8a46a0bd-d174-45f8-87bf-b53ef715c247",
+        "displayName": "Amin Paknejad",
+        "linkedAt": "2026-05-12T05:57:31.651Z",
+        "lastLoginAt": "2026-05-12T06:07:40.071Z"
+      }
+    },
+    "lastLoginProvider": "password"
+  },
+  {
+    "id": "646044",
+    "accessLevel": 1,
+    "active": true,
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-10T06:40:31.373Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-16T23:08:02.876Z"
+    },
+    "email": "amirpeivand@icloud.com",
+    "isEmailVerified": true,
+    "lastLoginAt": "2026-04-17T09:56:07.483Z",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_teacher"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-10T06:40:21.967Z",
+        "accessProfileIds": [
+          "ACC577716"
+        ]
+      }
+    ],
+    "passwordHash": "$2b$10$6wRK43VdRAIF2iPbwEjYyu.huYt1PChWJm/Xxhxakl/Rzeanm81Fu",
+    "personId": "560378",
+    "primaryOrgId": 900000,
+    "registrationSource": "admin_create",
+    "status": "active",
+    "systemAccessProfileId": null,
+    "username": "amir"
+  },
+  {
+    "id": "666417",
+    "accessLevel": 1,
+    "active": true,
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-19T20:18:18.465Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-02-27T21:35:34.082Z"
+    },
+    "email": "sabbaghan@ucalgary.ca",
+    "isEmailVerified": false,
+    "lastLoginAt": null,
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-19T20:18:17.257Z",
+        "accessProfileIds": [
+          "ACC676571"
+        ]
+      }
+    ],
+    "passwordHash": "$2b$10$9L/KeLvZFyVTGJZ2gc.hzOeLD4LnQWxcyPjnfM.n6x5xvzg8uuRoS",
+    "personId": "313786",
+    "primaryOrgId": 900000,
+    "registrationSource": "admin_create",
+    "status": "active",
+    "systemAccessProfileId": null,
+    "username": "sabbaghan@ucalgary.ca"
+  },
+  {
+    "active": true,
+    "email": "amin83p@hotmail.com",
+    "username": "amin83p@hotmail.com",
+    "passwordHash": "$2b$10$hJmnICuRyPn3M8g.kLLYEu4J.GaKWR0Ul42UURQEecSLfmvlo130S",
+    "status": "active",
+    "registrationSource": "self",
+    "accessLevel": 1,
+    "personId": "526625",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "roles": [
+          "member",
+          "pte_student_public"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-05-11T01:20:35.838Z",
+        "leftAt": null,
+        "name": "Amin Paknejad"
+      }
+    ],
+    "primaryOrgId": 900000,
+    "isEmailVerified": false,
+    "lastLoginAt": "2026-05-11T01:20:53.621Z",
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-11T01:20:35.948Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-11T01:20:35.948Z"
+    },
+    "id": "728610"
+  },
+  {
+    "id": "816147",
+    "accessLevel": 1,
+    "active": true,
+    "activeProfileMode": "LOCAL",
+    "audit": {
+      "createUser": "1",
+      "createDateTime": "2025-11-24T03:50:24.298Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-24T18:40:12.681Z"
+    },
+    "email": "elahe.ghorbanchian89@gmail.com",
+    "isEmailVerified": false,
+    "lastLoginAt": "2026-04-04T04:46:03.652Z",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "developer",
+          "credit_customer"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2025-11-22T00:00:00Z",
+        "accessProfileIds": [
+          "ACC676571"
+        ]
+      },
+      {
+        "orgId": 464355,
+        "name": "Mohammad",
+        "roles": [
+          "member"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2025-11-22T00:00:00Z",
+        "accessProfileIds": []
+      },
+      {
+        "orgId": 486219,
+        "name": "Kalam-Melal",
+        "roles": [
+          "member"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2025-12-06T00:00:00Z",
+        "accessProfileIds": []
+      }
+    ],
+    "passwordHash": "$2b$10$35QTtTm1AoUNW0o.7iR6YOs45UUw5JkkSEy84UKVDH/fX8dXZ5BdK",
+    "personId": "760360",
+    "primaryOrgId": 900000,
+    "registrationSource": "org_admin_create",
+    "status": "active",
+    "systemAccessProfileId": null,
+    "username": "Elahe"
+  }
+]

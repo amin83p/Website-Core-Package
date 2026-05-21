@@ -1,0 +1,70 @@
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl, 
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  manageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>'
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search periods...',
+  fields: [
+      { name: 'status', label: 'Status', type: 'select', options: ['open', 'locked', 'processed'] }
+  ]
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Period Name</th>
+        <th>Start Date</th>
+        <th>End Date</th>
+        <th>Submission Deadline</th>
+        <th class="text-center">Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if(data.length === 0) { %>
+         <tr><td colspan="6" class="text-center py-4 text-muted">No timesheet periods configured.</td></tr>
+      <% } %>
+      
+      <% data.forEach(item => { %>
+        <tr>
+          <td class="ps-4 fw-bold text-dark"><i class="bi bi-calendar-range me-2 text-muted"></i><%= item.name %></td>
+          <td class="small text-muted"><%= item.startDate %></td>
+          <td class="small text-muted"><%= item.endDate %></td>
+          <td class="small fw-bold text-danger"><i class="bi bi-exclamation-circle me-1"></i><%= item.submissionDeadline %></td>
+          <td class="text-center">
+             <% 
+               let badgeClass = 'bg-secondary';
+               if(item.status === 'open') badgeClass = 'bg-success';
+               if(item.status === 'locked') badgeClass = 'bg-warning text-dark';
+             %>
+             <span class="badge <%= badgeClass %> px-2 py-1"><%= (item.status || 'unknown').toUpperCase() %></span>
+          </td>
+          <td class="table-actions">
+             <a href="/<%= newUrl %>/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+             <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="<%= newUrl %>" hidden></span>
+
+<%- include('../../partials/pagination', { 
+    pagination, 
+    filters, 
+    baseUrlPath: newUrl 
+}) %>
+
+<%- include('../../partials/tablePages-end') %>

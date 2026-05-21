@@ -1,0 +1,134 @@
+<%
+  const ui = accessUi || {};
+  const canUpdate = ui.canUpdate === true;
+  const canDelete = ui.canDelete === true;
+  const hasRowActions = canUpdate || canDelete;
+%>
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  manageBtns: Array.isArray(manageBtns) ? manageBtns : []
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search grouped credits by group id, users, sections, operations, source...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Date / Group ID</th>
+        <th>Users</th>
+        <th>Sections / Operations</th>
+        <th>Source</th>
+        <th>Entries</th>
+        <th>Creator</th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">No grouped credit records found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const creator = item.creator || {}; %>
+        <% const source = item.source || {}; %>
+        <% const summary = item.summary || {}; %>
+        <% const users = Array.isArray(item.users) ? item.users : []; %>
+        <% const sections = Array.isArray(item.sections) ? item.sections : []; %>
+        <% const operationLabels = []; %>
+        <% sections.slice(0, 2).forEach((section) => { %>
+          <% const ops = Array.isArray(section.operations) ? section.operations : []; %>
+          <% ops.slice(0, 2).forEach((op) => operationLabels.push(op.name ? (op.name + ' (' + op.id + ')') : op.id)); %>
+        <% }); %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.dateTime ? new Date(item.dateTime).toLocaleString() : '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= Number(summary.userCount || users.length || 0) %> users</div>
+            <div class="x-small text-muted">
+              <% if (!users.length) { %>
+                -
+              <% } else { %>
+                <%= users.slice(0, 2).map((u) => (u.name ? (u.name + ' (' + u.id + ')') : u.id)).join(', ') %><%= users.length > 2 ? ', ...' : '' %>
+              <% } %>
+            </div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= Number(summary.sectionCount || sections.length || 0) %> sections</div>
+            <div class="x-small text-muted">
+              <% if (!sections.length) { %>
+                -
+              <% } else { %>
+                <%= sections.slice(0, 2).map((s) => (s.name ? (s.name + ' (' + s.id + ')') : s.id)).join(', ') %><%= sections.length > 2 ? ', ...' : '' %>
+              <% } %>
+            </div>
+            <div class="x-small text-muted">
+              <%= Number(summary.operationCount || 0) %> operations
+              <% if (operationLabels.length) { %>
+                | <%= operationLabels.join(', ') %><%= Number(summary.operationCount || 0) > operationLabels.length ? ', ...' : '' %>
+              <% } %>
+            </div>
+          </td>
+          <td>
+            <div class="small text-dark"><%= source.eventType || 'manual_credit' %></div>
+            <div class="x-small text-muted font-monospace"><%= source.eventId || '-' %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= Number(summary.ledgerEntryCount || (Array.isArray(item.ledgerEntryIds) ? item.ledgerEntryIds.length : 0) || 0) %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= creator.displayName || (creator.type === 'system' ? 'System' : '-') %></div>
+            <div class="x-small text-muted font-monospace"><%= creator.userId || 'System' %></div>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <% if (hasRowActions) { %>
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= item.id %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                  <% if (canUpdate) { %>
+                    <a href="/activity-quota/add-credit/groups/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-pencil-square me-2"></i>Edit Group
+                    </a>
+                  <% } %>
+                  <% if (canDelete) { %>
+                    <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>" data-delete-url="/activity-quota/add-credit/groups/delete/<%= item.id %>">
+                      <i class="bi bi-trash me-2"></i>Delete Group
+                    </button>
+                  <% } %>
+                </div>
+              </div>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: 'activity-quota/add-credit/groups'
+}) %>
+
+<%- include('../../partials/tablePages-end') %>

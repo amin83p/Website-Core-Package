@@ -1,0 +1,1297 @@
+<%
+  const pageData = (typeof data !== 'undefined' && data && typeof data === 'object') ? data : {};
+  const content = pageData.content && typeof pageData.content === 'object' ? pageData.content : {};
+  const defaults = pageData.defaults && typeof pageData.defaults === 'object' ? pageData.defaults : {};
+  const contentJson = JSON.stringify(content).replace(/</g, '\\u003c');
+  const defaultsJson = JSON.stringify(defaults).replace(/</g, '\\u003c');
+%>
+
+<div class="sections-page public-page-content-settings">
+  <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="page-heading size-md text-start m-0"><i class="bi bi-window-sidebar me-2"></i>Public Page Content</h1>
+      <div class="text-muted small mt-1">Manage editable content for Home, Projects, and About without changing the page design.</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <% if (pageData.updatedAt) { %>
+        <span class="badge bg-light text-dark border">Updated <%= new Date(pageData.updatedAt).toLocaleString() %></span>
+      <% } %>
+      <a href="/" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener noreferrer">
+        <i class="bi bi-box-arrow-up-right me-1"></i>View Site
+      </a>
+    </div>
+  </div>
+
+  <form id="publicPageContentForm" action="/systemSettings/public-pages" method="POST" class="form-container wide" style="max-width: 1440px;">
+    <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+    <input type="hidden" name="contentJson" id="publicPageContentJson" value="<%= contentJson %>">
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+      <ul class="nav nav-tabs" id="publicPageContentTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active fw-semibold" id="home-content-tab" data-bs-toggle="tab" data-bs-target="#home-content-pane" type="button" role="tab" aria-controls="home-content-pane" aria-selected="true">
+            <i class="bi bi-house me-1"></i>Home
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="projects-content-tab" data-bs-toggle="tab" data-bs-target="#projects-content-pane" type="button" role="tab" aria-controls="projects-content-pane" aria-selected="false">
+            <i class="bi bi-stars me-1"></i>Projects
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="about-content-tab" data-bs-toggle="tab" data-bs-target="#about-content-pane" type="button" role="tab" aria-controls="about-content-pane" aria-selected="false">
+            <i class="bi bi-person-workspace me-1"></i>About
+          </button>
+        </li>
+      </ul>
+
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="publicPageContentReloadBtn">
+          <i class="bi bi-arrow-clockwise me-1"></i>Reload
+        </button>
+        <button type="submit" class="btn btn-primary btn-sm fw-semibold" id="publicPageContentSaveBtn">
+          <i class="bi bi-save me-1"></i>Save Public Content
+        </button>
+      </div>
+    </div>
+
+    <div class="tab-content pt-2" id="publicPageContentTabContent">
+      <div class="tab-pane fade show active" id="home-content-pane" role="tabpanel" aria-labelledby="home-content-tab" tabindex="0">
+        <div class="settings-grid">
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-magic text-primary me-2"></i>Home Hero</h2>
+                <p>Top headline, intro copy, and primary actions.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="home.hero.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Title</label>
+                  <input type="text" class="form-control" data-content-path="home.hero.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Subtitle</label>
+                  <textarea class="form-control" rows="3" data-content-path="home.hero.subtitle"></textarea>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Label</label>
+                  <input type="text" class="form-control" data-content-path="home.hero.primaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="home.hero.primaryHref">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Label</label>
+                  <input type="text" class="form-control" data-content-path="home.hero.secondaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="home.hero.secondaryHref">
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-images text-primary me-2"></i>Image Showcase</h2>
+                <p>Optional saved slides. If empty, the Home page uses the existing upload-folder slideshow fallback.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="home.imageShowcase">
+                <i class="bi bi-plus-lg me-1"></i>Add Slide
+              </button>
+            </div>
+            <div class="settings-card-body repeatable-body" id="homeImageShowcaseRows"></div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-bar-chart text-primary me-2"></i>Highlight Chips</h2>
+                <p>Short metrics below the Home hero.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="home.highlights">
+                <i class="bi bi-plus-lg me-1"></i>Add Highlight
+              </button>
+            </div>
+            <div class="settings-card-body repeatable-body" id="homeHighlightRows"></div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-grid-3x3-gap text-primary me-2"></i>Feature Cards</h2>
+                <p>Section heading and cards that describe the value proposition.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="home.features">
+                <i class="bi bi-plus-lg me-1"></i>Add Feature
+              </button>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Section Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="home.featureSection.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Section Title</label>
+                  <input type="text" class="form-control" data-content-path="home.featureSection.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Section Body</label>
+                  <textarea class="form-control" rows="2" data-content-path="home.featureSection.body"></textarea>
+                </div>
+              </div>
+              <div class="repeatable-body" id="homeFeatureRows"></div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-diagram-3 text-primary me-2"></i>Solutions And Scope</h2>
+                <p>Core solutions, service tags, and current focus note.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="home.solutions.items">
+                <i class="bi bi-plus-lg me-1"></i>Add Solution
+              </button>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Solutions Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="home.solutions.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Solutions Title</label>
+                  <input type="text" class="form-control" data-content-path="home.solutions.title">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Scope Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="home.serviceScope.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Scope Title</label>
+                  <input type="text" class="form-control" data-content-path="home.serviceScope.title">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Service Tags</label>
+                  <textarea class="form-control" rows="5" data-content-list-path="home.serviceScope.tags"></textarea>
+                  <div class="form-text">One tag per line.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Current Focus Title</label>
+                  <input type="text" class="form-control mb-2" data-content-path="home.serviceScope.noteTitle">
+                  <label class="form-label fw-bold">Current Focus Body</label>
+                  <textarea class="form-control" rows="3" data-content-path="home.serviceScope.noteBody"></textarea>
+                </div>
+              </div>
+              <div class="repeatable-body" id="homeSolutionRows"></div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-life-preserver text-primary me-2"></i>Support Cards</h2>
+                <p>Bottom support/contact cards.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="home.supportCards">
+                <i class="bi bi-plus-lg me-1"></i>Add Card
+              </button>
+            </div>
+            <div class="settings-card-body repeatable-body" id="homeSupportCardRows"></div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-megaphone text-primary me-2"></i>Home Final CTA</h2>
+                <p>Final call-to-action block.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <%- include('./publicPageContentSettingsFields/finalCta', { prefix: 'home.finalCta', includeEyebrow: true }) %>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="projects-content-pane" role="tabpanel" aria-labelledby="projects-content-tab" tabindex="0">
+        <div class="settings-grid">
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-stars text-primary me-2"></i>Projects Hero</h2>
+                <p>Top Projects page content and actions.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="projects.hero.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Title</label>
+                  <input type="text" class="form-control" data-content-path="projects.hero.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Subtitle</label>
+                  <textarea class="form-control" rows="3" data-content-path="projects.hero.subtitle"></textarea>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Label</label>
+                  <input type="text" class="form-control" data-content-path="projects.hero.primaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="projects.hero.primaryHref">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Label</label>
+                  <input type="text" class="form-control" data-content-path="projects.hero.secondaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="projects.hero.secondaryHref">
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-bar-chart text-primary me-2"></i>Projects Highlights</h2>
+                <p>Hero chips for project positioning.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="projects.highlights">
+                <i class="bi bi-plus-lg me-1"></i>Add Highlight
+              </button>
+            </div>
+            <div class="settings-card-body repeatable-body" id="projectsHighlightRows"></div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-kanban text-primary me-2"></i>Project Examples</h2>
+                <p>Heading and repeatable project cards.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="projects.projectItems">
+                <i class="bi bi-plus-lg me-1"></i>Add Project
+              </button>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Section Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="projects.projectSection.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Section Title</label>
+                  <input type="text" class="form-control" data-content-path="projects.projectSection.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Section Body</label>
+                  <textarea class="form-control" rows="2" data-content-path="projects.projectSection.body"></textarea>
+                </div>
+              </div>
+              <div class="repeatable-body" id="projectsProjectRows"></div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-person-badge text-primary me-2"></i>Resume Context</h2>
+                <p>Side-card context, bullets, and note.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3">
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Icon</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="projects.resumeContext.icon">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Kicker</label>
+                  <input type="text" class="form-control" data-content-path="projects.resumeContext.kicker">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Title</label>
+                  <input type="text" class="form-control" data-content-path="projects.resumeContext.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Intro</label>
+                  <textarea class="form-control" rows="2" data-content-path="projects.resumeContext.intro"></textarea>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Points</label>
+                  <textarea class="form-control" rows="6" data-content-list-path="projects.resumeContext.points"></textarea>
+                  <div class="form-text">One point per line.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Note Title</label>
+                  <input type="text" class="form-control mb-2" data-content-path="projects.resumeContext.noteTitle">
+                  <label class="form-label fw-bold">Note Body</label>
+                  <textarea class="form-control" rows="4" data-content-path="projects.resumeContext.noteBody"></textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-tags text-primary me-2"></i>Service Areas</h2>
+                <p>Project domains shown as tags.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="projects.servicePanel.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Title</label>
+                  <input type="text" class="form-control" data-content-path="projects.servicePanel.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Tags</label>
+                  <textarea class="form-control" rows="5" data-content-list-path="projects.servicePanel.tags"></textarea>
+                  <div class="form-text">One tag per line.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-megaphone text-primary me-2"></i>Projects Final CTA</h2>
+                <p>Final call-to-action block.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <%- include('./publicPageContentSettingsFields/finalCta', { prefix: 'projects.finalCta', includeEyebrow: false }) %>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="about-content-pane" role="tabpanel" aria-labelledby="about-content-tab" tabindex="0">
+        <div class="settings-grid">
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-person-workspace text-primary me-2"></i>About Hero</h2>
+                <p>Portfolio hero, intro, and actions.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="about.hero.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Title</label>
+                  <input type="text" class="form-control" data-content-path="about.hero.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Subtitle</label>
+                  <textarea class="form-control" rows="3" data-content-path="about.hero.subtitle"></textarea>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Label</label>
+                  <input type="text" class="form-control" data-content-path="about.hero.primaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="about.hero.primaryHref">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Label</label>
+                  <input type="text" class="form-control" data-content-path="about.hero.secondaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="about.hero.secondaryHref">
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-bar-chart text-primary me-2"></i>About Highlights</h2>
+                <p>Hero highlight chips.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="about.highlights">
+                <i class="bi bi-plus-lg me-1"></i>Add Highlight
+              </button>
+            </div>
+            <div class="settings-card-body repeatable-body" id="aboutHighlightRows"></div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-grid text-primary me-2"></i>Capability Fields</h2>
+                <p>Fields shown in the capability map.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="about.fields">
+                <i class="bi bi-plus-lg me-1"></i>Add Field
+              </button>
+            </div>
+            <div class="settings-card-body repeatable-body" id="aboutFieldRows"></div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-briefcase text-primary me-2"></i>Experience Portfolio</h2>
+                <p>Section heading and repeatable experience entries.</p>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="about.experiences">
+                <i class="bi bi-plus-lg me-1"></i>Add Experience
+              </button>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Section Eyebrow</label>
+                  <input type="text" class="form-control" data-content-path="about.experienceSection.eyebrow">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Section Title</label>
+                  <input type="text" class="form-control" data-content-path="about.experienceSection.title">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Section Body</label>
+                  <textarea class="form-control" rows="2" data-content-path="about.experienceSection.body"></textarea>
+                </div>
+              </div>
+              <div class="repeatable-body" id="aboutExperienceRows"></div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-megaphone text-primary me-2"></i>About Footer CTA</h2>
+                <p>Bottom call-to-action block.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Title</label>
+                  <input type="text" class="form-control" data-content-path="about.footerCta.title">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Body</label>
+                  <input type="text" class="form-control" data-content-path="about.footerCta.body">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Label</label>
+                  <input type="text" class="form-control" data-content-path="about.footerCta.primaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Primary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="about.footerCta.primaryHref">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Label</label>
+                  <input type="text" class="form-control" data-content-path="about.footerCta.secondaryLabel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Secondary Link</label>
+                  <input type="text" class="form-control font-monospace" data-content-path="about.footerCta.secondaryHref">
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<%- include('../partials/modal_MediaManager') %>
+
+<style>
+  .public-page-content-settings .form-container {
+    background: #ffffff;
+    border: 1px solid #e3e8ef;
+    border-radius: 12px;
+    box-shadow: 0 16px 34px rgba(15, 40, 70, 0.08);
+    padding: 1rem;
+  }
+
+  .public-page-content-settings .settings-grid {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .public-page-content-settings .settings-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(15, 40, 70, 0.05);
+    overflow: hidden;
+  }
+
+  .public-page-content-settings .settings-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 1rem 1.15rem;
+    background: linear-gradient(135deg, #f8fbff, #eef5fb);
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .public-page-content-settings .settings-card-header h2 {
+    font-size: 1rem;
+    font-weight: 800;
+    margin: 0 0 0.25rem 0;
+    color: #18253f;
+  }
+
+  .public-page-content-settings .settings-card-header p {
+    margin: 0;
+    color: #667085;
+    font-size: 0.85rem;
+  }
+
+  .public-page-content-settings .settings-card-body {
+    padding: 1.15rem;
+  }
+
+  .public-page-content-settings .repeatable-body {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .public-page-content-settings .repeatable-row {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fbfdff;
+    padding: 0.9rem;
+  }
+
+  .public-page-content-settings .repeatable-row-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.8rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .public-page-content-settings .repeatable-row-title {
+    font-weight: 800;
+    color: #1d2b45;
+  }
+
+  .public-page-content-settings .row-tools {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    justify-content: flex-end;
+  }
+
+  .public-page-content-settings .row-order {
+    width: 5.4rem;
+  }
+
+  .public-page-content-settings textarea {
+    min-height: 92px;
+  }
+
+  .public-page-content-settings .public-media-picker-group textarea {
+    min-height: 92px;
+  }
+
+  .public-page-content-settings .public-media-picker-btn {
+    min-width: 2.8rem;
+    white-space: nowrap;
+  }
+
+  .public-page-content-settings .empty-repeatable {
+    border: 1px dashed #b8c4d2;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    color: #667085;
+    background: #f8fafc;
+  }
+
+  @media (max-width: 768px) {
+    .public-page-content-settings .settings-card-header,
+    .public-page-content-settings .repeatable-row-header {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .public-page-content-settings .row-tools {
+      justify-content: flex-start;
+    }
+  }
+</style>
+
+<script>
+(() => {
+  const defaults = <%- defaultsJson %>;
+  const state = {
+    content: <%- contentJson %>
+  };
+  const mediaManagerModalEl = document.getElementById('mediaManagerModal');
+  const mediaManagerModal = (window.bootstrap && window.bootstrap.Modal && mediaManagerModalEl)
+    ? window.bootstrap.Modal.getOrCreateInstance(mediaManagerModalEl)
+    : null;
+  const mediaManagerModalApi = (window.MediaManagerModal && typeof window.MediaManagerModal.open === 'function')
+    ? window.MediaManagerModal
+    : null;
+  const publicMediaLibraryCache = new Map();
+  const PUBLIC_PAGE_MEDIA_LAST_FOLDER_KEY = 'publicPageContent.mediaManager.lastFolder';
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value || {}));
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function pathParts(path) {
+    return String(path || '').split('.').filter(Boolean);
+  }
+
+  function getByPath(path, source = state.content) {
+    return pathParts(path).reduce((acc, key) => (acc && Object.prototype.hasOwnProperty.call(acc, key) ? acc[key] : undefined), source);
+  }
+
+  function setByPath(path, value) {
+    const parts = pathParts(path);
+    let target = state.content;
+    while (parts.length > 1) {
+      const key = parts.shift();
+      if (!target[key] || typeof target[key] !== 'object' || Array.isArray(target[key])) target[key] = {};
+      target = target[key];
+    }
+    target[parts[0]] = value;
+  }
+
+  function ensureArray(path) {
+    const existing = getByPath(path);
+    if (Array.isArray(existing)) return existing;
+    const fallback = getByPath(path, defaults);
+    const next = Array.isArray(fallback) ? clone(fallback) : [];
+    setByPath(path, next);
+    return next;
+  }
+
+  function linesToArray(value) {
+    return String(value || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  }
+
+  function paragraphsToArray(value) {
+    return String(value || '').split(/\n\s*\n/).map((line) => line.trim()).filter(Boolean);
+  }
+
+  function arrayToLines(value) {
+    return Array.isArray(value) ? value.join('\n') : String(value || '');
+  }
+
+  function arrayToParagraphs(value) {
+    return Array.isArray(value) ? value.join('\n\n') : String(value || '');
+  }
+
+  function pipeRowsToText(value, keys) {
+    return (Array.isArray(value) ? value : []).map((row) => keys.map((key) => row && row[key] ? String(row[key]) : '').join(' | ')).join('\n');
+  }
+
+  function textToPipeRows(value, keys) {
+    return String(value || '').split(/\r?\n/).map((line) => {
+      const parts = line.split('|').map((part) => part.trim());
+      const row = {};
+      keys.forEach((key, index) => { row[key] = parts[index] || ''; });
+      return row;
+    }).filter((row) => keys.some((key) => row[key]));
+  }
+
+  function fieldValue(row, field) {
+    const value = row && Object.prototype.hasOwnProperty.call(row, field.name) ? row[field.name] : field.defaultValue;
+    if (field.kind === 'lines') return arrayToLines(value);
+    if (field.kind === 'paragraphs') return arrayToParagraphs(value);
+    if (field.kind === 'pipeRows') return pipeRowsToText(value, field.keys || []);
+    return value == null ? '' : String(value);
+  }
+
+  function readFieldValue(input, field) {
+    if (field.kind === 'lines') return linesToArray(input.value);
+    if (field.kind === 'paragraphs') return paragraphsToArray(input.value);
+    if (field.kind === 'pipeRows') return textToPipeRows(input.value, field.keys || []);
+    return input.value;
+  }
+
+  function cleanText(value, max = 1200) {
+    const token = String(value == null ? '' : value).replace(/\0/g, '').trim();
+    return token.length > max ? token.slice(0, max) : token;
+  }
+
+  function normalizeFolderToken(value) {
+    const token = cleanText(value, 800).replace(/\\/g, '/');
+    if (!token || token === '/' || token === '.') return '';
+    const parts = token.split('/').map((part) => cleanText(part, 200)).filter(Boolean);
+    if (parts.some((part) => part === '.' || part === '..' || part.includes('..'))) return '';
+    return parts.join('/').replace(/^\/+/, '').replace(/\/+$/, '');
+  }
+
+  function getActionStateToken() {
+    return cleanText(document.querySelector('#publicPageContentForm input[name="actionStateId"]')?.value || '');
+  }
+
+  function appendActionState(url, actionStateToken = getActionStateToken()) {
+    const token = cleanText(actionStateToken);
+    if (!token) return url;
+    return `${url}${url.includes('?') ? '&' : '?'}actionStateId=${encodeURIComponent(token)}`;
+  }
+
+  function getLastPublicPageMediaFolder() {
+    try {
+      return normalizeFolderToken(window.localStorage?.getItem(PUBLIC_PAGE_MEDIA_LAST_FOLDER_KEY));
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function rememberPublicPageMediaFolder(folder) {
+    const normalized = normalizeFolderToken(folder);
+    try {
+      window.localStorage?.setItem(PUBLIC_PAGE_MEDIA_LAST_FOLDER_KEY, normalized);
+    } catch (_) {
+      // localStorage can be unavailable in locked-down browsers; the picker still works.
+    }
+  }
+
+  async function fetchPublicPageMediaLibrary(options = {}) {
+    const hasFolder = Object.prototype.hasOwnProperty.call(options || {}, 'folder');
+    const folder = normalizeFolderToken(options.folder);
+    const cacheKey = hasFolder ? `folder:${folder}` : '__default__';
+    if (!options.forceRefresh && publicMediaLibraryCache.has(cacheKey)) {
+      return publicMediaLibraryCache.get(cacheKey);
+    }
+
+    const endpointBase = appendActionState('/systemSettings/public-pages/media/library');
+    const endpoint = hasFolder
+      ? `${endpointBase}${endpointBase.includes('?') ? '&' : '?'}folder=${encodeURIComponent(folder)}`
+      : endpointBase;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'X-AJAX-Request': 'true',
+        'Accept': 'application/json'
+      },
+      credentials: 'include'
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.status !== 'success') {
+      throw new Error((result && result.message) || `Unable to load public page media (status ${response.status}).`);
+    }
+
+    const pageSize = Number.parseInt(String(result?.defaults?.pageSize || result?.pageSize || ''), 10);
+    const rawDefaultFolder = Object.prototype.hasOwnProperty.call(result || {}, 'defaultFolder')
+      ? result.defaultFolder
+      : 'misc/public-pages';
+    const payload = {
+      rows: Array.isArray(result.results) ? result.results : [],
+      message: cleanText(result.message) || 'Public page media loaded.',
+      scopeFolder: cleanText(result.scopeFolder, 120),
+      folders: Array.isArray(result.folders) ? result.folders : [],
+      currentFolder: normalizeFolderToken(result.currentFolder || folder),
+      parentFolder: normalizeFolderToken(result.parentFolder),
+      defaultFolder: normalizeFolderToken(rawDefaultFolder),
+      defaults: Number.isFinite(pageSize) && !Number.isNaN(pageSize) && pageSize > 0 ? { pageSize } : null
+    };
+    rememberPublicPageMediaFolder(payload.currentFolder);
+    publicMediaLibraryCache.set(cacheKey, payload);
+    return payload;
+  }
+
+  async function uploadPublicPageMediaFiles(files = [], options = {}) {
+    const inputFiles = Array.isArray(files) ? files.filter(Boolean) : [];
+    if (!inputFiles.length) throw new Error('No files selected for upload.');
+
+    const actionStateToken = getActionStateToken();
+    const uploadFolder = normalizeFolderToken(options.currentFolder || getLastPublicPageMediaFolder() || 'misc/public-pages');
+    const formData = new FormData();
+    inputFiles.forEach((file) => formData.append('files', file));
+    formData.set('folder', uploadFolder);
+    if (actionStateToken) formData.set('actionStateId', actionStateToken);
+
+    const response = await fetch(appendActionState('/systemSettings/public-pages/media/upload', actionStateToken), {
+      method: 'POST',
+      headers: {
+        'X-AJAX-Request': 'true',
+        'Accept': 'application/json',
+        'X-Action-State-Id': actionStateToken
+      },
+      credentials: 'include',
+      body: formData
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.status !== 'success') {
+      throw new Error((result && result.message) || `Unable to upload public page media (status ${response.status}).`);
+    }
+    publicMediaLibraryCache.clear();
+    return {
+      rows: Array.isArray(result.results) ? result.results : [],
+      message: cleanText(result.message) || 'Public page media uploaded.'
+    };
+  }
+
+  function resolveMediaRowUrl(row = {}) {
+    const url = cleanText(row.url || row.publicUrl || row.fileUrl || row.previewUrl || row.downloadUrl, 1600);
+    if (url) return url;
+    const pathToken = cleanText(row.path, 1600).replace(/\\/g, '/');
+    const match = pathToken.match(/\/uploads\/(.+)$/i);
+    if (match && match[1]) return `/uploads/${match[1].replace(/^\/+/, '')}`;
+    if (/^uploads\//i.test(pathToken)) return `/${pathToken}`;
+    if (/^\/uploads\//i.test(pathToken)) return pathToken;
+    return '';
+  }
+
+  function buildPipeRowText(row = {}) {
+    const url = resolveMediaRowUrl(row);
+    if (!url) return '';
+    const label = cleanText(row.name || row.originalName || row.filename || 'Media', 260) || 'Media';
+    return `${label} | ${url}`;
+  }
+
+  function applyMediaSelectionToField(input, field, selectedRows = []) {
+    const rows = Array.isArray(selectedRows) ? selectedRows : [];
+    if (!input || !rows.length) return;
+
+    const picker = field.mediaPicker || {};
+    if (picker.mode === 'appendPipeRows') {
+      const existingLines = String(input.value || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const nextLines = rows.map(buildPipeRowText).filter(Boolean);
+      input.value = [...existingLines, ...nextLines].join('\n');
+    } else {
+      input.value = resolveMediaRowUrl(rows[0]) || input.value;
+    }
+
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    syncContentJson();
+  }
+
+  async function openPublicPageMediaPicker(button) {
+    if (!mediaManagerModalApi || typeof mediaManagerModalApi.open !== 'function') {
+      await showPublicPageMessage('Media Library Unavailable', 'The media manager is not available on this page.', 'error');
+      return false;
+    }
+
+    const targetInput = document.getElementById(button.dataset.targetInput || '');
+    if (!targetInput) {
+      await showPublicPageMessage('Media Target Missing', 'The target media field could not be found.', 'error');
+      return false;
+    }
+
+    const field = {
+      name: button.dataset.fieldName || '',
+      mediaPicker: {
+        mediaKind: cleanText(button.dataset.mediaKind).toLowerCase() || 'any',
+        mode: cleanText(button.dataset.mediaMode) || 'replace',
+        maxSelection: Number.parseInt(button.dataset.maxSelection || '1', 10) || 1,
+        title: cleanText(button.dataset.mediaTitle) || 'Select Media',
+        defaultView: cleanText(button.dataset.defaultView).toLowerCase() || 'tile'
+      }
+    };
+
+    if (typeof mediaManagerModalApi.setModalCompat === 'function' && mediaManagerModalEl && mediaManagerModal) {
+      mediaManagerModalApi.setModalCompat({
+        modalEl: mediaManagerModalEl,
+        modalInstance: mediaManagerModal,
+        open: (instance) => {
+          if (instance && typeof instance.show === 'function') instance.show();
+          return true;
+        },
+        close: (instance) => {
+          if (instance && typeof instance.hide === 'function') instance.hide();
+          return true;
+        }
+      });
+    }
+
+    await mediaManagerModalApi.open({
+      title: field.mediaPicker.title,
+      mode: 'assign',
+      mediaKind: ['image', 'audio', 'any'].includes(field.mediaPicker.mediaKind) ? field.mediaPicker.mediaKind : 'any',
+      maxSelection: Math.max(1, field.mediaPicker.maxSelection),
+      defaultView: ['tile', 'thumbs', 'list', 'detail'].includes(field.mediaPicker.defaultView) ? field.mediaPicker.defaultView : 'tile',
+      forceRefresh: true,
+      defaultFolder: getLastPublicPageMediaFolder() || 'misc/public-pages',
+      onRefresh: async (query = {}) => fetchPublicPageMediaLibrary({ folder: query && query.folder, forceRefresh: true }),
+      onUpload: async (files, context) => uploadPublicPageMediaFiles(files, context),
+      onApply: async (selectedRows) => {
+        const rows = Array.isArray(selectedRows) ? selectedRows : [];
+        if (!rows.length) throw new Error('Select at least one file.');
+        applyMediaSelectionToField(targetInput, field, rows);
+      }
+    });
+    return true;
+  }
+
+  const commonHighlightFields = [
+    { name: 'value', label: 'Value / Title', col: 'col-md-4' },
+    { name: 'label', label: 'Label / Body', col: 'col-md-8' }
+  ];
+
+  const stepBodyFields = [
+    { name: 'step', label: 'Step', col: 'col-md-2' },
+    { name: 'title', label: 'Title', col: 'col-md-4' },
+    { name: 'body', label: 'Body', kind: 'textarea', col: 'col-md-6' }
+  ];
+
+  const schemas = {
+    'home.imageShowcase': {
+      containerId: 'homeImageShowcaseRows',
+      title: 'Slide',
+      empty: { src: '', alt: '', title: '', caption: '', durationMs: 4500, active: true },
+      fields: [
+        { name: 'src', label: 'Image URL', col: 'col-md-5', mediaPicker: { mediaKind: 'image', mode: 'replace', maxSelection: 1, title: 'Select Home Slide Image', defaultView: 'tile' } },
+        { name: 'alt', label: 'Alt Text', col: 'col-md-4' },
+        { name: 'durationMs', label: 'Duration (ms)', col: 'col-md-3' },
+        { name: 'title', label: 'Caption Title', col: 'col-md-5' },
+        { name: 'caption', label: 'Caption Body', kind: 'textarea', col: 'col-md-7' }
+      ]
+    },
+    'home.highlights': { containerId: 'homeHighlightRows', title: 'Highlight', empty: { value: '', label: '', active: true }, fields: commonHighlightFields },
+    'home.features': {
+      containerId: 'homeFeatureRows',
+      title: 'Feature',
+      empty: { icon: 'bi-check2-circle', tone: 'primary', title: '', body: '', active: true },
+      fields: [
+        { name: 'icon', label: 'Icon', col: 'col-md-3' },
+        { name: 'tone', label: 'Tone', col: 'col-md-2' },
+        { name: 'title', label: 'Title', col: 'col-md-3' },
+        { name: 'body', label: 'Body', kind: 'textarea', col: 'col-md-4' }
+      ]
+    },
+    'home.solutions.items': { containerId: 'homeSolutionRows', title: 'Solution', empty: { step: '', title: '', body: '', active: true }, fields: stepBodyFields },
+    'home.supportCards': {
+      containerId: 'homeSupportCardRows',
+      title: 'Support Card',
+      empty: { icon: 'bi-gear-wide-connected', variant: 'service', kicker: '', title: '', body: '', primaryLabel: '', primaryHref: '', secondaryLabel: '', secondaryHref: '', subtext: '', active: true },
+      fields: [
+        { name: 'icon', label: 'Icon', col: 'col-md-3' },
+        { name: 'variant', label: 'Variant (service/coffee)', col: 'col-md-3' },
+        { name: 'kicker', label: 'Kicker', col: 'col-md-3' },
+        { name: 'title', label: 'Title', col: 'col-md-3' },
+        { name: 'body', label: 'Body', kind: 'textarea', col: 'col-md-6' },
+        { name: 'subtext', label: 'Subtext', col: 'col-md-6' },
+        { name: 'primaryLabel', label: 'Primary Label', col: 'col-md-3' },
+        { name: 'primaryHref', label: 'Primary Link', col: 'col-md-3' },
+        { name: 'secondaryLabel', label: 'Secondary Label', col: 'col-md-3' },
+        { name: 'secondaryHref', label: 'Secondary Link', col: 'col-md-3' }
+      ]
+    },
+    'projects.highlights': { containerId: 'projectsHighlightRows', title: 'Highlight', empty: { value: '', label: '', active: true }, fields: commonHighlightFields },
+    'projects.projectItems': { containerId: 'projectsProjectRows', title: 'Project', empty: { step: '', title: '', body: '', active: true }, fields: stepBodyFields },
+    'about.highlights': { containerId: 'aboutHighlightRows', title: 'Highlight', empty: { value: '', label: '', active: true }, fields: commonHighlightFields },
+    'about.fields': {
+      containerId: 'aboutFieldRows',
+      title: 'Capability Field',
+      empty: { name: '', icon: 'bi-check2-circle', active: true },
+      fields: [
+        { name: 'name', label: 'Name', col: 'col-md-8' },
+        { name: 'icon', label: 'Icon', col: 'col-md-4' }
+      ]
+    },
+    'about.experiences': {
+      containerId: 'aboutExperienceRows',
+      title: 'Experience',
+      empty: { role: '', org: '', period: '', focus: '', highlights: [], summary: [], attachments: [], media: [], active: true },
+      fields: [
+        { name: 'role', label: 'Role', col: 'col-md-5' },
+        { name: 'org', label: 'Organization', col: 'col-md-3' },
+        { name: 'period', label: 'Period', col: 'col-md-2' },
+        { name: 'focus', label: 'Focus', col: 'col-md-2' },
+        { name: 'highlights', label: 'Highlights (one per line)', kind: 'lines', col: 'col-md-6' },
+        { name: 'summary', label: 'Summary Paragraphs (blank line between paragraphs)', kind: 'paragraphs', col: 'col-md-6' },
+        { name: 'attachments', label: 'Attachments (name | url)', kind: 'pipeRows', keys: ['name', 'url'], col: 'col-md-6', mediaPicker: { mediaKind: 'any', mode: 'appendPipeRows', maxSelection: 10, title: 'Select Attachment Files', defaultView: 'list' } },
+        { name: 'media', label: 'Media (caption | url)', kind: 'pipeRows', keys: ['comment', 'url'], col: 'col-md-6', mediaPicker: { mediaKind: 'image', mode: 'appendPipeRows', maxSelection: 10, title: 'Select About Media Images', defaultView: 'tile' } }
+      ]
+    }
+  };
+
+  function renderFixedFields() {
+    document.querySelectorAll('[data-content-path]').forEach((input) => {
+      const value = getByPath(input.dataset.contentPath);
+      input.value = value == null ? '' : String(value);
+    });
+    document.querySelectorAll('[data-content-list-path]').forEach((input) => {
+      input.value = arrayToLines(getByPath(input.dataset.contentListPath));
+    });
+  }
+
+  function collectFixedFields() {
+    document.querySelectorAll('[data-content-path]').forEach((input) => {
+      setByPath(input.dataset.contentPath, input.value);
+    });
+    document.querySelectorAll('[data-content-list-path]').forEach((input) => {
+      setByPath(input.dataset.contentListPath, linesToArray(input.value));
+    });
+  }
+
+  function collectRows(key) {
+    const schema = schemas[key];
+    const container = schema ? document.getElementById(schema.containerId) : null;
+    if (!schema || !container) return [];
+
+    return Array.from(container.querySelectorAll('[data-repeatable-row]')).map((rowEl, index) => {
+      const row = {};
+      schema.fields.forEach((field) => {
+        const input = rowEl.querySelector(`[data-row-field="${field.name}"]`);
+        row[field.name] = input ? readFieldValue(input, field) : '';
+      });
+      const activeInput = rowEl.querySelector('[data-row-active]');
+      const orderInput = rowEl.querySelector('[data-row-order]');
+      row.active = activeInput ? activeInput.checked : true;
+      row.order = Number.parseInt(orderInput?.value || '', 10) || ((index + 1) * 10);
+      return row;
+    });
+  }
+
+  function collectAllRows() {
+    Object.keys(schemas).forEach((key) => {
+      setByPath(key, collectRows(key));
+    });
+  }
+
+  function syncContentJson() {
+    collectFixedFields();
+    collectAllRows();
+    const input = document.getElementById('publicPageContentJson');
+    if (input) input.value = JSON.stringify(state.content);
+    return state.content;
+  }
+
+  function renderFieldControlHtml(field, id, isTextarea) {
+    const controlHtml = isTextarea
+      ? `<textarea id="${id}" class="form-control" rows="${field.kind === 'paragraphs' || field.kind === 'pipeRows' ? 5 : 3}" data-row-field="${field.name}"></textarea>`
+      : `<input id="${id}" type="text" class="form-control" data-row-field="${field.name}">`;
+
+    const picker = field.mediaPicker;
+    if (!picker) return controlHtml;
+
+    return `
+      <div class="input-group public-media-picker-group">
+        ${controlHtml}
+        <button type="button"
+                class="btn btn-outline-primary public-media-picker-btn"
+                data-public-page-media-picker="true"
+                data-target-input="${escapeHtml(id)}"
+                data-field-name="${escapeHtml(field.name)}"
+                data-media-kind="${escapeHtml(picker.mediaKind || 'any')}"
+                data-media-mode="${escapeHtml(picker.mode || 'replace')}"
+                data-max-selection="${Number.parseInt(picker.maxSelection || 1, 10) || 1}"
+                data-media-title="${escapeHtml(picker.title || 'Select Media')}"
+                data-default-view="${escapeHtml(picker.defaultView || 'tile')}"
+                title="Browse media library">
+          <i class="bi bi-images"></i>
+        </button>
+      </div>
+    `;
+  }
+
+  function renderRows(key) {
+    const schema = schemas[key];
+    const container = schema ? document.getElementById(schema.containerId) : null;
+    if (!schema || !container) return;
+    const rows = ensureArray(key);
+    container.innerHTML = '';
+
+    if (!rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-repeatable';
+      empty.textContent = `No ${schema.title.toLowerCase()} rows yet.`;
+      container.appendChild(empty);
+      return;
+    }
+
+    rows.forEach((row, index) => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'repeatable-row';
+      rowEl.dataset.repeatableRow = String(index);
+
+      const header = document.createElement('div');
+      header.className = 'repeatable-row-header';
+      const rowSubtitle = row.title || row.role || row.value || row.name || row.src || 'Editable row';
+      header.innerHTML = `
+        <div>
+          <div class="repeatable-row-title">${escapeHtml(schema.title)} ${index + 1}</div>
+          <div class="text-muted small">${escapeHtml(rowSubtitle)}</div>
+        </div>
+        <div class="row-tools">
+          <label class="form-check form-switch mb-0 d-inline-flex align-items-center gap-2">
+            <input class="form-check-input" type="checkbox" data-row-active ${row.active === false ? '' : 'checked'}>
+            <span class="small fw-semibold">Active</span>
+          </label>
+          <input type="number" class="form-control form-control-sm row-order" data-row-order value="${Number.parseInt(row.order || ((index + 1) * 10), 10)}" title="Order">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-row-action="up" data-key="${key}" data-index="${index}" title="Move up"><i class="bi bi-arrow-up"></i></button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-row-action="down" data-key="${key}" data-index="${index}" title="Move down"><i class="bi bi-arrow-down"></i></button>
+          <button type="button" class="btn btn-outline-danger btn-sm" data-row-action="remove" data-key="${key}" data-index="${index}" title="Remove"><i class="bi bi-trash"></i></button>
+        </div>
+      `;
+      rowEl.appendChild(header);
+
+      const grid = document.createElement('div');
+      grid.className = 'row g-3';
+      schema.fields.forEach((field) => {
+        const col = document.createElement('div');
+        col.className = field.col || 'col-md-6';
+        const id = `${schema.containerId}-${index}-${field.name}`;
+        const isTextarea = ['textarea', 'lines', 'paragraphs', 'pipeRows'].includes(field.kind);
+        col.innerHTML = `
+          <label class="form-label fw-bold" for="${id}">${field.label}</label>
+          ${renderFieldControlHtml(field, id, isTextarea)}
+        `;
+        const input = col.querySelector('[data-row-field]');
+        input.value = fieldValue(row, field);
+        grid.appendChild(col);
+      });
+      rowEl.appendChild(grid);
+      container.appendChild(rowEl);
+    });
+  }
+
+  function renderAllRows() {
+    Object.keys(schemas).forEach(renderRows);
+  }
+
+  document.addEventListener('click', async (event) => {
+    const mediaPickerBtn = event.target.closest('[data-public-page-media-picker]');
+    if (mediaPickerBtn) {
+      event.preventDefault();
+      await openPublicPageMediaPicker(mediaPickerBtn);
+      return;
+    }
+
+    const addBtn = event.target.closest('[data-add-row]');
+    if (addBtn) {
+      const key = addBtn.dataset.addRow;
+      const schema = schemas[key];
+      if (!schema) return;
+      setByPath(key, collectRows(key));
+      const rows = ensureArray(key);
+      rows.push({ ...clone(schema.empty), order: (rows.length + 1) * 10, active: true });
+      renderRows(key);
+      syncContentJson();
+      return;
+    }
+
+    const actionBtn = event.target.closest('[data-row-action]');
+    if (!actionBtn) return;
+    const key = actionBtn.dataset.key;
+    const schema = schemas[key];
+    const index = Number.parseInt(actionBtn.dataset.index || '', 10);
+    if (!schema || Number.isNaN(index)) return;
+    const rows = collectRows(key);
+    const action = actionBtn.dataset.rowAction;
+
+    if (action === 'up' && index > 0) {
+      [rows[index - 1], rows[index]] = [rows[index], rows[index - 1]];
+    } else if (action === 'down' && index < rows.length - 1) {
+      [rows[index + 1], rows[index]] = [rows[index], rows[index + 1]];
+    } else if (action === 'remove') {
+      rows.splice(index, 1);
+    }
+
+    setByPath(key, rows.map((row, rowIndex) => ({ ...row, order: (rowIndex + 1) * 10 })));
+    renderRows(key);
+    syncContentJson();
+  });
+
+  document.getElementById('publicPageContentReloadBtn')?.addEventListener('click', () => {
+    window.location.reload();
+  });
+
+  async function showPublicPageMessage(title, message, icon) {
+    if (typeof showMessageModal === 'function') {
+      return showMessageModal({ title, icon, message, buttons: [{ text: 'OK', class: icon === 'success' ? 'btn-primary' : 'btn-danger' }] });
+    }
+    if (typeof showModal === 'function') {
+      return showModal(title, message, icon);
+    }
+    alert(`${title}: ${message}`);
+    return null;
+  }
+
+  const form = document.getElementById('publicPageContentForm');
+  form?.addEventListener('input', syncContentJson);
+  form?.addEventListener('change', syncContentJson);
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const saveBtn = document.getElementById('publicPageContentSaveBtn');
+    const originalHtml = saveBtn ? saveBtn.innerHTML : '';
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Saving...';
+    }
+
+    try {
+      const contentPayload = syncContentJson();
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify({
+          content: contentPayload,
+          actionStateId: form.querySelector('input[name="actionStateId"]')?.value || ''
+        })
+      });
+      const json = await response.json();
+      if (!response.ok || json.status !== 'success') throw new Error(json.message || 'Unable to save public page content.');
+      state.content = json.data?.content || contentPayload;
+      renderFixedFields();
+      renderAllRows();
+      syncContentJson();
+      await showPublicPageMessage('Saved', json.message || 'Public page content saved.', 'success');
+    } catch (error) {
+      await showPublicPageMessage('Save Failed', error.message || 'Unable to save public page content.', 'error');
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalHtml;
+      }
+    }
+  });
+
+  renderFixedFields();
+  renderAllRows();
+  syncContentJson();
+})();
+</script>

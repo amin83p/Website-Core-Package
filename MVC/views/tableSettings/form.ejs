@@ -1,0 +1,402 @@
+<%
+  const isEdit = mode === 'edit';
+  const rec = record || {};
+  
+  // Default structure if empty
+  let currentSettings = rec.settings || { columns: [] };
+  
+  // If user provided raw JSON that isn't the standard { columns: [] } format, wrap it or handle gracefully
+  // For the visual editor to work, we expect a 'columns' array.
+  // If it's a flat object (like { pageSize: 10 }), we might show raw editor by default.
+  const hasColumns = Array.isArray(currentSettings.columns);
+%>
+
+<div class="sections-page">
+  <%- include('../partials/formPage_PageTitle', {
+    isEditMode: isEdit,
+    name: 'Table Setting',
+    id: isEdit ? `${tableId}` : 'New Configuration'
+  }) %>
+
+  <div class="form-container" style="max-width: 1000px;">
+    
+    <form id="settingForm" onsubmit="return false;">
+      
+      <div class="card bg-light border-0 mb-4 shadow-sm">
+        <div class="card-body">
+          <div class="row align-items-end">
+            <div class="col-md-5">
+              <label class="form-label small fw-bold text-muted">User ID</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-person"></i></span>
+                <input type="text" id="userId" class="form-control fw-bold" 
+                       value="<%= userId || rec.userId || '' %>" 
+                       <%= isEdit ? 'readonly' : 'required' %>>
+                
+                <% if (!isEdit) { %>
+                  <button type="button" class="btn btn-outline-primary" id="pickUserBtn">Select</button>
+                <% } %>
+              </div>
+            </div>
+
+            <div class="col-md-5">
+              <label class="form-label small fw-bold text-muted">Table ID</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-table"></i></span>
+                <input type="text" id="tableId" class="form-control fw-bold" 
+                       placeholder="e.g. Users_Management"
+                       value="<%= tableId || rec.tableId || '' %>" 
+                       <%= isEdit ? 'readonly' : 'required' %>>
+              </div>
+            </div>
+            
+            <div class="col-md-2 text-end">
+                <div class="form-check form-switch d-inline-block">
+                    <input class="form-check-input" type="checkbox" id="rawModeToggle" <%= !hasColumns ? 'checked' : '' %>>
+                    <label class="form-check-label small" for="rawModeToggle">Raw JSON</label>
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="visualEditor" class="<%= !hasColumns ? 'd-none' : '' %>">
+          
+          <div class="alert alert-light border d-flex align-items-center p-3 mb-3">
+            <i class="bi bi-layout-three-columns fs-4 text-primary me-3"></i>
+            <div>
+                <div class="fw-bold text-dark">Column Configuration</div>
+                <div class="small text-muted">Drag rows to reorder. Uncheck 'Visible' to hide columns.</div>
+            </div>
+          </div>
+
+          <div class="table-responsive border rounded bg-white shadow-sm mb-3">
+            <table class="table table-hover align-middle mb-0" id="columnsTable">
+                <thead class="table-light sticky-top">
+                    <tr class="text-uppercase small text-muted">
+                        <th style="width: 40px;"></th>
+                        <th style="width: 50px;" class="text-center">Vis</th>
+                        <th>Data Key (Internal)</th>
+                        <th>Display Label</th>
+                        <th style="width: 120px;">Width</th>
+                        <th style="width: 50px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="columnsBody">
+                    </tbody>
+            </table>
+          </div>
+          
+          <div class="d-flex justify-content-between">
+              <button type="button" class="btn btn-outline-primary btn-sm btn-filled" id="addColumnBtn">
+                  <i class="bi bi-plus-lg me-1"></i> Add Column
+              </button>
+              <span class="text-muted small fst-italic">Note: 'Order' is determined by row position.</span>
+          </div>
+      </div>
+
+      <div id="rawEditor" class="<%= hasColumns ? 'd-none' : '' %>">
+        <textarea id="settingsJson" class="form-control font-monospace size-sm" rows="15" 
+                  style="background-color: #212529; color: #00ff9d; border-radius: 8px;"
+                  spellcheck="false"><%= JSON.stringify(currentSettings, null, 2) %></textarea>
+        <div id="jsonError" class="text-danger small mt-1" style="display:none;">
+            <i class="bi bi-exclamation-circle me-1"></i> <span>Invalid JSON</span>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top d-flex gap-2">
+        <button type="button" class="btn btn-filled btn-primary btn-md px-4" id="saveBtn">
+            <i class="bi bi-save me-2"></i> <%= isEdit ? 'Update Configuration' : 'Save Configuration' %>
+        </button>
+        <a href="/tablesettings" class="btn btn-filled btn-secondary btn-md px-4">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script type="application/json" id="initData">
+    <%- JSON.stringify(currentSettings || {}) %>
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // --- STATE ---
+    let configState = {};
+    try {
+        configState = JSON.parse(document.getElementById('initData').textContent);
+    } catch(e) { configState = {}; }
+
+    // Ensure structure for visual editor
+    if (!configState.columns || !Array.isArray(configState.columns)) {
+        configState.columns = []; 
+    }
+
+    // --- ELEMENTS ---
+    const tableBody = document.getElementById('columnsBody');
+    const rawInput = document.getElementById('settingsJson');
+    const rawToggle = document.getElementById('rawModeToggle');
+    const visualEditor = document.getElementById('visualEditor');
+    const rawEditor = document.getElementById('rawEditor');
+    
+    // --- RENDER TABLE ---
+    function renderTable() {
+        tableBody.innerHTML = '';
+        const columns = configState.columns.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        if (columns.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No columns configured. Add one or paste JSON.</td></tr>`;
+            return;
+        }
+
+        columns.forEach((col, index) => {
+            const tr = document.createElement('tr');
+            tr.draggable = true;
+            tr.classList.add('draggable-row');
+            tr.dataset.index = index;
+
+            tr.innerHTML = `
+                <td class="drag-handle text-muted text-center" style="cursor:grab;"><i class="bi bi-grip-vertical"></i></td>
+                <td class="text-center">
+                    <input type="checkbox" class="form-check-input vis-check" ${col.visible ? 'checked' : ''} data-index="${index}">
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm font-monospace key-input" value="${col.key || ''}" data-index="${index}" placeholder="e.g. email">
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm label-input" value="${col.label || col.defaultLabel || ''}" data-index="${index}">
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm width-input" value="${col.width || ''}" data-index="${index}" placeholder="auto">
+                </td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger border-0 remove-row" data-index="${index}">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </td>
+            `;
+            tableBody.appendChild(tr);
+        });
+
+        bindTableEvents();
+    }
+
+    function bindTableEvents() {
+        // 1. Value Changes
+        const updateState = (idx, field, val) => {
+            configState.columns[idx][field] = val;
+            syncToRaw(); // Keep JSON updated
+        };
+
+        tableBody.querySelectorAll('.vis-check').forEach(el => 
+            el.addEventListener('change', e => updateState(e.target.dataset.index, 'visible', e.target.checked))
+        );
+        tableBody.querySelectorAll('.key-input').forEach(el => 
+            el.addEventListener('input', e => updateState(e.target.dataset.index, 'key', e.target.value))
+        );
+        tableBody.querySelectorAll('.label-input').forEach(el => 
+            el.addEventListener('input', e => updateState(e.target.dataset.index, 'label', e.target.value))
+        );
+        tableBody.querySelectorAll('.width-input').forEach(el => 
+            el.addEventListener('input', e => updateState(e.target.dataset.index, 'width', e.target.value))
+        );
+
+        // 2. Remove Row
+        tableBody.querySelectorAll('.remove-row').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const idx = parseInt(e.currentTarget.dataset.index);
+                configState.columns.splice(idx, 1);
+                // Re-index orders
+                configState.columns.forEach((c, i) => c.order = i + 1);
+                renderTable();
+                syncToRaw();
+            });
+        });
+
+        // 3. Drag & Drop Reordering
+        let dragSrcEl = null;
+        
+        tableBody.querySelectorAll('.draggable-row').forEach(row => {
+            row.addEventListener('dragstart', function(e) {
+                dragSrcEl = this;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', this.innerHTML);
+                this.style.opacity = '0.4';
+            });
+
+            row.addEventListener('dragover', function(e) {
+                if (e.preventDefault) e.preventDefault(); 
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            });
+
+            row.addEventListener('drop', function(e) {
+                if (e.stopPropagation) e.stopPropagation(); 
+                if (dragSrcEl !== this) {
+                    // Swap data in array
+                    const srcIdx = parseInt(dragSrcEl.dataset.index);
+                    const targetIdx = parseInt(this.dataset.index);
+                    
+                    const item = configState.columns.splice(srcIdx, 1)[0];
+                    configState.columns.splice(targetIdx, 0, item);
+                    
+                    // Update Order property
+                    configState.columns.forEach((c, i) => c.order = i + 1);
+                    
+                    renderTable();
+                    syncToRaw();
+                }
+                return false;
+            });
+
+            row.addEventListener('dragend', function() {
+                this.style.opacity = '1';
+            });
+        });
+    }
+
+    // Add Row
+    document.getElementById('addColumnBtn').addEventListener('click', () => {
+        configState.columns.push({
+            key: `col_${configState.columns.length + 1}`,
+            label: 'New Column',
+            visible: true,
+            width: '',
+            order: configState.columns.length + 1
+        });
+        renderTable();
+        syncToRaw();
+    });
+
+    // --- SYNC LOGIC ---
+    function syncToRaw() {
+        rawInput.value = JSON.stringify(configState, null, 4);
+    }
+
+    function syncToVisual() {
+        try {
+            const parsed = JSON.parse(rawInput.value);
+            // Validation: Must be object with columns array
+            if (!parsed.columns || !Array.isArray(parsed.columns)) {
+                if(Array.isArray(parsed)) { 
+                    // Handle case where user pasted just array
+                    configState = { columns: parsed };
+                } else {
+                    // Fallback
+                    configState = parsed; // Just save whatever structure
+                    return false; // Cannot visualize
+                }
+            } else {
+                configState = parsed;
+            }
+            renderTable();
+            return true;
+        } catch (e) {
+            alert("Invalid JSON. Fix syntax before switching.");
+            return false;
+        }
+    }
+
+    // --- TOGGLE MODES ---
+    rawToggle.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            syncToRaw();
+            visualEditor.classList.add('d-none');
+            rawEditor.classList.remove('d-none');
+        } else {
+            if (syncToVisual()) {
+                rawEditor.classList.add('d-none');
+                visualEditor.classList.remove('d-none');
+            } else {
+                e.target.checked = true; // Stay in raw mode
+            }
+        }
+    });
+
+    // --- SUBMIT ---
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+        const userId = document.getElementById('userId').value.trim();
+        const tableId = document.getElementById('tableId').value.trim();
+        
+        // Ensure state is fresh
+        if (rawToggle.checked) {
+            // In raw mode, text area is truth
+            try {
+                configState = JSON.parse(rawInput.value);
+            } catch(e) {
+                alert("Invalid JSON. Cannot save."); return;
+            }
+        }
+
+        if (!userId || !tableId) {
+            alert("User ID and Table ID are required."); return;
+        }
+
+        const isEdit = <%= isEdit %>;
+        const url = isEdit 
+            ? `/tablesettings/edit/${userId}/${tableId}`
+            : `/tablesettings/new/${userId}/${tableId}`;
+
+        try {
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify(configState)
+            });
+
+            const result = await resp.json();
+
+            if (result.status === 'success') {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Success', message: result.message, icon: 'success', buttons: [{ text: 'OK', class: 'btn-success' }] });
+                } else { alert(result.message); }
+                window.location.href = '/tablesettings';
+            } else {
+                throw new Error(result.message || 'Unknown error');
+            }
+        } catch (err) {
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({ title: 'Error', message: err.message, icon: 'error', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+            } else { alert('Error: ' + err.message); }
+        } finally {
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = false;
+            btn.innerText = isEdit ? 'Update Configuration' : 'Save Configuration';
+        }
+    });
+
+    // --- USER PICKER ---
+    const pickBtn = document.getElementById('pickUserBtn');
+    if (pickBtn) {
+        pickBtn.addEventListener('click', () => {
+            GenericPicker.open(GenericPickerPresets.user({
+                title: 'Select User',
+                context: GenericPickerContexts.allUsers(),
+                onSelect: (item) => {
+                    document.getElementById('userId').value = item.id;
+                }
+            }));
+        });
+    }
+
+    // Init
+    if (configState.columns && configState.columns.length > 0) {
+        renderTable();
+    } else {
+        // If data exists but isn't column structure, force raw mode
+        if (Object.keys(configState).length > 0 && !configState.columns) {
+            rawToggle.checked = true;
+            rawToggle.dispatchEvent(new Event('change'));
+        } else {
+            renderTable();
+        }
+    }
+});
+</script>

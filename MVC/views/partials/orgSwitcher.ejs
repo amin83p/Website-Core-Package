@@ -1,0 +1,750 @@
+<% if (typeof user !== 'undefined' && user) { %>
+  <% 
+    const currentOrgId = user.activeOrgId;
+    const availableOrgs = Array.isArray(user.allowedOrgs) ? user.allowedOrgs : [];
+    const switchableOrgs = availableOrgs.filter((org) => {
+        const orgId = String(org?.orgId || '').trim();
+        if (!orgId) return false;
+        if (orgId === 'SYSTEM') return true;
+        return org?.isSelectable !== false;
+    });
+    const canSwitchOrganizations = switchableOrgs.length > 1;
+    let activeOrgName = 'System / Global'; 
+    let activeOrgRole = 'System Admin';
+    if (currentOrgId) {
+        const activeOrg = availableOrgs.find(o => String(o.orgId) === String(currentOrgId)) || {};
+        activeOrgName = activeOrg.name || activeOrg.orgName || activeOrg.organizationName || ('Org ' + currentOrgId);
+        activeOrgRole = (Array.isArray(activeOrg.roles) && activeOrg.roles.length ? activeOrg.roles.join(', ') : (activeOrg.role || 'Member'));
+    } else {
+        const sysOrg = availableOrgs.find(o => o.orgId === 'SYSTEM');
+        if (sysOrg) { 
+            activeOrgName = sysOrg.name; 
+            activeOrgRole = (Array.isArray(sysOrg.roles) && sysOrg.roles.length ? sysOrg.roles.join(', ') : sysOrg.role); 
+        }
+    }
+  %>
+
+  <% if (!canSwitchOrganizations) { %>
+    <div
+        id="orgSwitchStatic"
+        class="btn btn-sm w-100 d-flex align-items-center justify-content-between border bg-light shadow-sm py-2 px-3 pe-none"
+        title="Active Organization">
+        <div class="d-flex align-items-center overflow-hidden">
+            <i class="bi bi-building-fill text-primary me-2"></i>
+            <div class="text-start overflow-hidden">
+                <div class="fw-bold text-dark text-truncate" id="orgSwitchCurrentName" style="font-size: 0.85rem; max-width: 180px;" title="<%= activeOrgName %>">
+                    <%= activeOrgName %>
+                </div>
+                <div class="small text-muted text-truncate" id="orgSwitchCurrentRole" style="max-width: 180px;" title="<%= activeOrgRole %>">
+                    <%= activeOrgRole %>
+                </div>
+            </div>
+        </div>
+        <i class="bi bi-lock text-muted ms-2" aria-hidden="true"></i>
+    </div>
+  <% } else { %>
+  <button type="button"
+          id="orgSwitchButton"
+          class="btn btn-sm w-100 d-flex align-items-center justify-content-between border bg-light shadow-sm py-2 px-3"
+          title="Switch Organization">
+      
+      <div class="d-flex align-items-center overflow-hidden">
+          <i class="bi bi-building-fill text-primary me-2"></i>
+          <div class="text-start overflow-hidden">
+              <div class="fw-bold text-dark text-truncate" id="orgSwitchCurrentName" style="font-size: 0.85rem; max-width: 180px;" title="<%= activeOrgName %>">
+                  <%= activeOrgName %>
+              </div>
+              <div class="small text-muted text-truncate" id="orgSwitchCurrentRole" style="max-width: 180px;" title="<%= activeOrgRole %>">
+                  <%= activeOrgRole %>
+              </div>
+          </div>
+      </div>
+
+      <i class="bi bi-arrow-left-right text-muted ms-2"></i>
+  </button>
+
+  <div class="modal fade" id="orgSwitchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow-lg org-switch-quick-content">
+        <div class="modal-header border-bottom bg-light py-3 px-4">
+          <div class="w-100 d-flex flex-column gap-2">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="d-flex align-items-center gap-2">
+                <h5 class="modal-title fw-bold mb-0">Switch Context</h5>
+                <span class="badge rounded-pill text-bg-light border"><%= availableOrgs.length %> available</span>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="input-group input-group-lg org-switch-quick-search">
+              <span class="input-group-text bg-transparent border-0 ps-0 text-primary">
+                <i class="bi bi-search"></i>
+              </span>
+              <input
+                type="text"
+                id="orgModalSearch"
+                class="form-control border-0 bg-transparent shadow-none fw-bold text-dark"
+                placeholder="Type to find an organization..."
+                autocomplete="off"
+                aria-label="Search organizations">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-body p-0 org-switch-quick-body">
+          <% if (availableOrgs.length === 0) { %>
+            <div class="text-center py-5 text-muted"><p class="small mb-0 fs-6">No available organizations found.</p></div>
+          <% } else { %>
+            <div class="list-group list-group-flush org-list-container" id="orgModalList" role="listbox" aria-label="Available organizations">
+              <% availableOrgs.forEach(org => { 
+                   let isActive = (!currentOrgId && org.orgId === 'SYSTEM') || (currentOrgId && String(org.orgId) === String(currentOrgId));
+                   const isSystem = org.orgId === 'SYSTEM';
+                   const isSelectable = isSystem ? true : (org.isSelectable !== false);
+                   const disabledReason = String(org.switchDisabledReason || '').trim();
+              %>
+                <button
+                  type="button"
+                  class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-3 px-4 org-option <%= isActive ? 'active-org' : '' %>"
+                  data-org-id="<%= org.orgId %>"
+                  data-selectable="<%= isSelectable ? 'true' : 'false' %>"
+                  data-disabled-reason="<%= disabledReason %>"
+                  role="option"
+                  aria-selected="<%= isActive ? 'true' : 'false' %>">
+                  <div class="d-flex align-items-center gap-3 overflow-hidden">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 org-option-icon <%= isSystem ? 'bg-danger-subtle text-danger' : (isSelectable ? (isActive ? 'bg-primary text-white' : 'bg-light text-secondary') : 'bg-light text-muted') %>">
+                      <i class="bi <%= isSystem ? 'bi-globe' : 'bi-building' %> fs-5"></i>
+                    </div>
+                    <div class="overflow-hidden text-start">
+                      <div class="fw-bold text-truncate org-option-name <%= isSystem ? 'text-danger' : (isSelectable ? 'text-dark' : 'text-muted') %>">
+                        <%= org.name || org.orgName || org.organizationName || ('Org ' + org.orgId) %>
+                      </div>
+                      <div class="small text-muted text-truncate org-option-meta">
+                        <%= isSystem ? 'Global / System Mode' : ((Array.isArray(org.roles) && org.roles.length ? org.roles.join(', ') : (org.role || 'Member'))) %> 
+                        <% if(!isSystem) { %> <span class="opacity-50 ms-1" style="font-size:0.85em">#<%= org.orgId %></span> <% } %>
+                      </div>
+                      <% if (!isSelectable && disabledReason) { %>
+                        <div class="small text-danger-emphasis mt-1 org-option-disabled-reason"><%= disabledReason %></div>
+                      <% } %>
+                    </div>
+                  </div>
+                  <div class="d-flex align-items-center gap-2 ms-3">
+                    <% if (!isSelectable && !isSystem) { %>
+                      <span class="badge text-bg-light border">Disabled</span>
+                    <% } %>
+                    <span class="org-option-check text-primary <%= isActive ? '' : 'd-none' %>">
+                      <i class="bi bi-check-circle-fill fs-5"></i>
+                    </span>
+                  </div>
+                </button>
+              <% }) %>
+            </div>
+            <div id="noOrgModalMatch" class="text-center py-5 d-none text-muted">
+              <i class="bi bi-search fs-4 d-block mb-2 opacity-25"></i>
+              <span>No organizations found.</span>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="modal-footer bg-light py-2 px-4 justify-content-between align-items-center">
+          <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Quick Organization Navigation</small>
+          <small class="text-muted" style="font-size: 0.7rem;">
+            <span class="badge bg-white border text-secondary me-1 shadow-sm">Up</span>
+            <span class="badge bg-white border text-secondary me-1 shadow-sm">Down</span>
+            <span class="badge bg-white border text-secondary me-1 shadow-sm">Enter</span>
+            <span class="badge bg-white border text-secondary shadow-sm">Esc</span>
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="orgSwitchConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-sm">
+        <div class="modal-header border-bottom-0 pb-2">
+          <h5 class="modal-title fw-bold">Switch Organization</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0" id="orgSwitchConfirmMessage">
+            Do you want to reload the page after switching to the new organization or just switch to the new organization without reloading?
+          </p>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" id="orgSwitchAjaxBtn" class="btn btn-outline-secondary">
+            <i class="bi bi-wifi-off me-1"></i> Switch without reloading
+          </button>
+          <button type="button" id="orgSwitchReloadBtn" class="btn btn-primary">
+            <i class="bi bi-arrow-repeat me-1"></i> Reload page
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    #orgSwitchModal .org-switch-quick-content {
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    #orgSwitchModal .org-switch-quick-search {
+      border-radius: 14px;
+      border: 1px solid #d5deea;
+      background: #fff;
+      padding-left: 0.55rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+
+    #orgSwitchModal #orgModalSearch {
+      font-size: 1.08rem;
+      letter-spacing: 0.01em;
+    }
+
+    #orgSwitchModal .org-switch-quick-body {
+      height: 60vh;
+      overflow-y: auto;
+    }
+
+    #orgModalList.org-list-container {
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    #orgModalList .org-option {
+      border: 0;
+      border-bottom: 1px solid #eef2f6;
+      background: #fff;
+      transition: background-color 0.16s ease, box-shadow 0.16s ease;
+      cursor: pointer;
+    }
+
+    #orgModalList .org-option:hover {
+      background: #f8fbff;
+    }
+
+    #orgModalList .org-option.org-option-active {
+      background: #e8f1ff;
+      box-shadow: inset 3px 0 0 #0d6efd;
+    }
+
+    #orgModalList .org-option.active-org {
+      background: #f1f7ff;
+    }
+
+    #orgModalList .org-option .org-option-icon {
+      width: 44px;
+      height: 44px;
+    }
+
+    #orgModalList .org-option .org-option-name {
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+
+    #orgModalList .org-option .org-option-meta {
+      font-size: 0.9rem;
+      line-height: 1.3;
+      margin-top: 2px;
+    }
+
+    #orgModalList .org-option .org-option-disabled-reason {
+      font-size: 0.85rem;
+      line-height: 1.3;
+    }
+
+    #orgModalList .org-option[data-selectable="false"] {
+      opacity: 0.55;
+      cursor: not-allowed !important;
+      filter: grayscale(20%);
+    }
+
+    #orgModalList .org-option:focus-visible {
+      outline: 2px solid rgba(13, 110, 253, 0.4);
+      outline-offset: -2px;
+    }
+
+    #orgModalList.switching {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+  </style>
+
+  <script>
+    let orgSwitchInFlight = false;
+    let pendingOrgId = null;
+    let orgActiveVisibleIndex = -1;
+    let orgSwitchLoadingToken = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initOrgSwitcher();
+        const chooserButton = document.getElementById('orgSwitchButton');
+        if (chooserButton) {
+            chooserButton.addEventListener('click', () => {
+                if (typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
+                const chooserEl = document.getElementById('orgSwitchModal');
+                if (!chooserEl) return;
+                const chooserInstance = bootstrap.Modal.getOrCreateInstance(chooserEl);
+                chooserInstance.show();
+            });
+        }
+    });
+
+    function getVisibleOrgOptions({ selectableOnly = false } = {}) {
+        const rows = Array.from(document.querySelectorAll('#orgModalList .org-option'));
+        return rows.filter((item) => {
+            if (!item) return false;
+            if (item.style.display === 'none') return false;
+            if (!selectableOnly) return true;
+            return String(item.getAttribute('data-selectable') || 'false') === 'true' && !item.disabled;
+        });
+    }
+
+    function applyOrgActiveItemStyles(activeItem) {
+        const rows = document.querySelectorAll('#orgModalList .org-option');
+        rows.forEach((item) => {
+            const isActive = item === activeItem;
+            item.classList.toggle('org-option-active', isActive);
+            item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+    }
+
+    function setOrgActiveVisibleIndex(index, options = {}) {
+        const { scroll = true } = options;
+        const visibleSelectable = getVisibleOrgOptions({ selectableOnly: true });
+        if (!visibleSelectable.length) {
+            orgActiveVisibleIndex = -1;
+            applyOrgActiveItemStyles(null);
+            return null;
+        }
+
+        const bounded = Math.max(0, Math.min(index, visibleSelectable.length - 1));
+        orgActiveVisibleIndex = bounded;
+        const activeItem = visibleSelectable[bounded];
+        applyOrgActiveItemStyles(activeItem);
+        if (scroll && activeItem && typeof activeItem.scrollIntoView === 'function') {
+            activeItem.scrollIntoView({ block: 'nearest' });
+        }
+        return activeItem;
+    }
+
+    function filterOrgOptions(termInput = '') {
+        const term = String(termInput || '').toLowerCase().trim();
+        const listContainer = document.getElementById('orgModalList');
+        if (!listContainer) return [];
+        const items = listContainer.querySelectorAll('.org-option');
+        let visibleCount = 0;
+        items.forEach((item) => {
+            const text = (item.textContent || '').toLowerCase();
+            const isVisible = !term || text.includes(term);
+            item.style.display = isVisible ? 'flex' : 'none';
+            if (isVisible) visibleCount += 1;
+        });
+
+        const noMatch = document.getElementById('noOrgModalMatch');
+        if (noMatch) noMatch.classList.toggle('d-none', visibleCount !== 0);
+
+        const visibleSelectable = getVisibleOrgOptions({ selectableOnly: true });
+        const hasCurrentActive = visibleSelectable.some((item) => item.classList.contains('org-option-active'));
+        if (!hasCurrentActive) {
+            setOrgActiveVisibleIndex(0, { scroll: false });
+        }
+        return visibleSelectable;
+    }
+
+    function initOrgSwitcher() {
+        const searchInput = document.getElementById('orgModalSearch');
+        const listContainer = document.getElementById('orgModalList');
+        const modalEl = document.getElementById('orgSwitchModal');
+
+        function focusOrgSearchInput() {
+            if (!searchInput) return;
+            window.setTimeout(() => {
+                searchInput.focus();
+                searchInput.select();
+            }, 120);
+        }
+
+        if (searchInput && listContainer && modalEl) {
+            modalEl.addEventListener('shown.bs.modal', () => {
+                searchInput.value = '';
+                filterOrgOptions('');
+                setOrgActiveVisibleIndex(0, { scroll: false });
+                focusOrgSearchInput();
+            });
+
+            searchInput.addEventListener('input', (e) => {
+                filterOrgOptions(e.target.value);
+            });
+
+            searchInput.addEventListener('keydown', async (event) => {
+                const visibleSelectable = getVisibleOrgOptions({ selectableOnly: true });
+                if (!visibleSelectable.length) return;
+
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (orgActiveVisibleIndex < 0) {
+                        setOrgActiveVisibleIndex(0);
+                        return;
+                    }
+                    const delta = event.key === 'ArrowDown' ? 1 : -1;
+                    const next = (orgActiveVisibleIndex + delta + visibleSelectable.length) % visibleSelectable.length;
+                    setOrgActiveVisibleIndex(next);
+                    return;
+                }
+
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const activeItem = orgActiveVisibleIndex >= 0 && orgActiveVisibleIndex < visibleSelectable.length
+                        ? visibleSelectable[orgActiveVisibleIndex]
+                        : visibleSelectable[0];
+                    if (!activeItem) return;
+                    const orgId = String(activeItem.getAttribute('data-org-id') || '').trim();
+                    if (!orgId) return;
+                    await openOrgSwitchConfirm(orgId);
+                    return;
+                }
+
+                if (event.key === 'Home') {
+                    event.preventDefault();
+                    setOrgActiveVisibleIndex(0);
+                    return;
+                }
+
+                if (event.key === 'End') {
+                    event.preventDefault();
+                    const lastIndex = visibleSelectable.length - 1;
+                    if (lastIndex >= 0) setOrgActiveVisibleIndex(lastIndex);
+                }
+            });
+        }
+
+        const modalElement = document.getElementById('orgSwitchModal');
+        if (modalElement) document.body.appendChild(modalElement);
+        bindOrgSwitchHandlers();
+    }
+
+    function resolveOrgNameFromUser(userContext, orgId) {
+        const activeOrgs = Array.isArray(userContext?.allowedOrgs) ? userContext.allowedOrgs : [];
+        const target = activeOrgs.find((org) => String(org.orgId) === String(orgId));
+        if (!target) return orgId || '';
+        return target.name || target.orgName || target.organizationName || (`Org ${orgId}`);
+    }
+
+    function getDisplayedActiveOrgName(userContext) {
+        const orgId = userContext?.activeOrgId;
+        const orgs = Array.isArray(userContext?.allowedOrgs) ? userContext.allowedOrgs : [];
+        if (!orgId) return 'System / Global';
+        if (String(orgId) === 'SYSTEM') return 'System / Global';
+        const matched = orgs.find((org) => String(org.orgId) === String(orgId));
+        return matched?.name || matched?.orgName || matched?.organizationName || (`Org ${orgId}`);
+    }
+
+    function getDisplayedActiveOrgRole(userContext) {
+        const orgId = userContext?.activeOrgId;
+        const orgs = Array.isArray(userContext?.allowedOrgs) ? userContext.allowedOrgs : [];
+        if (!orgId) return 'System Admin';
+        if (String(orgId) === 'SYSTEM') return 'System Admin';
+        const matched = orgs.find((org) => String(org.orgId) === String(orgId));
+        const role = Array.isArray(matched?.roles) && matched.roles.length ? matched.roles.join(', ') : (matched?.role || 'Member');
+        return role || 'Member';
+    }
+
+    function setOrgSwitchBusy(isBusy) {
+        orgSwitchInFlight = Boolean(isBusy);
+        const list = document.getElementById('orgModalList');
+        if (list) {
+            if (orgSwitchInFlight) list.classList.add('switching');
+            else list.classList.remove('switching');
+        }
+
+        if (orgSwitchInFlight) {
+            if (typeof window.showLoading === 'function') {
+                if (!orgSwitchLoadingToken) {
+                    orgSwitchLoadingToken = window.showLoading({
+                        title: 'Switching Organization',
+                        note: 'Please wait while we update your access context.',
+                        operation: 'Organization Context Switch'
+                    });
+                } else if (typeof window.updateLoading === 'function') {
+                    window.updateLoading({
+                        title: 'Switching Organization',
+                        note: 'Please wait while we update your access context.',
+                        operation: 'Organization Context Switch'
+                    });
+                }
+            }
+            return;
+        }
+
+        if (typeof window.hideLoading === 'function') {
+            if (orgSwitchLoadingToken) window.hideLoading(orgSwitchLoadingToken);
+            else window.hideLoading();
+        }
+        orgSwitchLoadingToken = null;
+    }
+
+    async function prepareOrgSwitchBusyUi() {
+        if (typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
+        const chooserEl = document.getElementById('orgSwitchModal');
+        if (!chooserEl) return;
+        if (chooserEl.classList.contains('show')) {
+            const chooserInstance = bootstrap.Modal.getOrCreateInstance(chooserEl);
+            chooserInstance.hide();
+            await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+    }
+
+    async function openOrgSwitchConfirm(orgId) {
+        if (orgSwitchInFlight) return;
+        pendingOrgId = String(orgId || '').trim();
+        if (!pendingOrgId) return;
+
+        const orgName = resolveOrgNameFromUser(window.currentUserContext || null, pendingOrgId);
+        const promptMessage = `Do you want to reload the page after switching to <b>${orgName || 'the selected organization'}</b>, or switch without reloading?`;
+
+        if (typeof showMessageModal !== 'function') {
+            await globalSwitchOrganization(pendingOrgId, { reload: true });
+            return;
+        }
+
+        const choice = await showMessageModal({
+            title: 'Switch Organization',
+            icon: 'warning',
+            message: promptMessage,
+            buttons: [
+                { text: 'Switch without reloading', class: 'btn-secondary' },
+                { text: 'Reload page', class: 'btn-primary' }
+            ]
+        });
+
+        if (choice === 'Switch without reloading') {
+            await globalSwitchOrganization(pendingOrgId, { reload: false });
+            return;
+        }
+        if (choice === 'Reload page') {
+            await globalSwitchOrganization(pendingOrgId, { reload: true });
+        }
+    }
+
+    function applyOrgContextFromServer(userContext) {
+        if (!userContext || typeof userContext !== 'object') return;
+        if (!window.currentUserContext) window.currentUserContext = {};
+        window.currentUserContext = userContext;
+
+        const activeOrgId = String(userContext.activeOrgId || '').trim() || 'SYSTEM';
+        const activeName = getDisplayedActiveOrgName(userContext);
+        const activeRole = getDisplayedActiveOrgRole(userContext);
+
+        const headerName = document.getElementById('orgSwitchCurrentName');
+        const headerRole = document.getElementById('orgSwitchCurrentRole');
+        if (headerName) {
+            headerName.textContent = activeName;
+            headerName.title = activeName;
+        }
+        if (headerRole) {
+            headerRole.textContent = activeRole;
+            headerRole.title = activeRole;
+        }
+
+        document.querySelectorAll('.org-option').forEach((row) => {
+            const thisOrgId = String(row.getAttribute('data-org-id') || '').trim();
+            const isActive = String(thisOrgId) === String(activeOrgId);
+            row.classList.toggle('active-org', isActive);
+            row.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            const checkEl = row.querySelector('.org-option-check');
+            if (checkEl) checkEl.classList.toggle('d-none', !isActive);
+        });
+
+        const dashName = document.getElementById('dashboardActiveOrgName');
+        const dashRole = document.getElementById('dashboardActiveOrgRole');
+        const dashChip = document.getElementById('dashboardActiveOrgChip');
+        const dashIcon = document.getElementById('dashboardActiveOrgIcon');
+        const dashCard = document.getElementById('dashboardActiveContextCard');
+        const isSystemContext = String(activeOrgId).toUpperCase() === 'SYSTEM';
+
+        if (dashName) {
+            dashName.textContent = activeName;
+            dashName.title = activeName;
+        }
+        if (dashRole) {
+            dashRole.textContent = activeRole;
+            dashRole.title = activeRole;
+        }
+        if (dashChip) {
+            dashChip.textContent = isSystemContext ? 'SYSTEM' : `ORG ${activeOrgId}`;
+            dashChip.title = dashChip.textContent;
+        }
+        if (dashIcon) {
+            dashIcon.classList.remove('bi-building-fill', 'bi-globe2');
+            dashIcon.classList.add(isSystemContext ? 'bi-globe2' : 'bi-building-fill');
+        }
+        if (dashCard) {
+            dashCard.classList.toggle('is-system-context', isSystemContext);
+            dashCard.classList.toggle('is-org-context', !isSystemContext);
+        }
+
+        if (userContext?.allowedOrgs && Array.isArray(userContext.allowedOrgs)) {
+            document.dispatchEvent(new CustomEvent('org:context-updated', {
+                detail: { user: userContext }
+            }));
+        }
+    }
+
+    function bindOrgSwitchHandlers() {
+        const list = document.getElementById('orgModalList');
+        if (!list) return;
+
+        if (list.dataset.boundHover !== '1') {
+            list.dataset.boundHover = '1';
+            list.addEventListener('mouseenter', (event) => {
+                const el = event.target.closest('.org-option');
+                if (!el) return;
+                const visibleSelectable = getVisibleOrgOptions({ selectableOnly: true });
+                const activeIndex = visibleSelectable.findIndex((item) => item === el);
+                if (activeIndex >= 0) setOrgActiveVisibleIndex(activeIndex, { scroll: false });
+            }, true);
+        }
+
+        if (list.dataset.boundClick === '1') return;
+        list.dataset.boundClick = '1';
+
+        list.addEventListener('click', async (event) => {
+            const el = event.target.closest('.org-option');
+            if (!el || orgSwitchInFlight) return;
+            const orgId = String(el.getAttribute('data-org-id') || '').trim();
+            const selectable = String(el.getAttribute('data-selectable') || 'false') === 'true';
+            const disabledReason = String(el.getAttribute('data-disabled-reason') || '').trim();
+            if (!orgId) return;
+
+            const visibleSelectable = getVisibleOrgOptions({ selectableOnly: true });
+            const activeIndex = visibleSelectable.findIndex((item) => item === el);
+            if (activeIndex >= 0) setOrgActiveVisibleIndex(activeIndex, { scroll: false });
+
+            if (!selectable) {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({
+                        title: 'Organization Unavailable',
+                        icon: 'warning',
+                        message: disabledReason || 'This organization cannot be selected right now.',
+                        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                    });
+                } else {
+                    alert(disabledReason || 'This organization cannot be selected right now.');
+                }
+                return;
+            }
+            await openOrgSwitchConfirm(orgId);
+        });
+    }
+
+    async function globalSwitchOrganization(orgId, options = {}) {
+        const { reload = true } = options;
+        if (orgSwitchInFlight) return;
+        const selected = document.querySelector(`.org-option[data-org-id="${String(orgId)}"]`);
+        if (selected && selected.getAttribute('data-selectable') === 'false') {
+            const disabledReason = String(selected.getAttribute('data-disabled-reason') || '').trim();
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'Organization Unavailable',
+                    icon: 'warning',
+                    message: disabledReason || 'This organization cannot be selected right now.',
+                    buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                });
+            } else {
+                alert(disabledReason || 'This organization cannot be selected right now.');
+            }
+            return;
+        }
+
+        let timeoutHandle = null;
+        let controller = null;
+        try {
+            document.body.style.cursor = 'wait';
+            await prepareOrgSwitchBusyUi();
+            setOrgSwitchBusy(true);
+            controller = new AbortController();
+            timeoutHandle = setTimeout(() => controller.abort(), 45000);
+            
+            const response = await fetch('/switch-org', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-AJAX-Request': 'true'
+                },
+                body: JSON.stringify({ orgId: orgId }),
+                signal: controller.signal
+            });
+            
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                if (reload) {
+                    window.location.reload();
+                    return;
+                }
+
+                if (result.user && typeof result.user === 'object') {
+                    applyOrgContextFromServer(result.user);
+                    if (typeof showMessageModal === 'function') {
+                        await showMessageModal({
+                            title: 'Context Switched',
+                            icon: 'success',
+                            message: `Organization has been changed to <strong>${getDisplayedActiveOrgName(result.user)}</strong> without reloading the page.`,
+                            buttons: [{ text: 'OK', class: 'btn-success' }]
+                        });
+                    }
+                } else {
+                    if (typeof showMessageModal === 'function') {
+                        await showMessageModal({
+                            title: 'Context Switched',
+                            icon: 'success',
+                            message: 'Context switched. Reload the page to ensure all sections use the new organization.',
+                            buttons: [{ text: 'OK', class: 'btn-success' }]
+                        });
+                    }
+                }
+            } else { 
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({
+                        title: 'Access Denied',
+                        icon: 'error',
+                        message: result.message || 'Failed to switch organization.',
+                        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                    });
+                } else {
+                    alert(result.message);
+                }
+            }
+        } catch (error) { 
+            console.error(error); 
+            const msg = (error && error.name === 'AbortError')
+              ? 'Switching organization timed out. Please try again.'
+              : 'A network error occurred while switching context.';
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'Network Error',
+                    icon: 'error',
+                    message: msg,
+                    buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                });
+            } else {
+                alert(msg);
+            }
+        } finally { 
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            document.body.style.cursor = 'default';
+            setOrgSwitchBusy(false);
+        }
+    }
+
+    if (!window.currentUserContext) {
+        window.currentUserContext = <%- JSON.stringify({
+            id: user.id,
+            activeOrgId: user.activeOrgId,
+            allowedOrgs: user.allowedOrgs
+        }) %>;
+    }
+  </script>
+<% } %>
+<% } %>

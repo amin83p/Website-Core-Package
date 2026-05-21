@@ -1,0 +1,61 @@
+/* .modal-header.text-info { background-color: #e7f1ff; }
+.modal-header.text-success { background-color: #e8f9ee; }
+.modal-header.text-warning { background-color: #fff8e1; }
+.modal-header.text-danger { background-color: #fdeaea; }
+.modal-header i { font-size: 1.5rem; margin-right: 10px; }
+.modal-footer .btn { color: #fff !important; }
+.modal-footer .btn-warning { color: #212529 !important; background-color: #ffc107 !important; } */
+
+/* ==========================================================================
+   Modal Styles (Moved from modal.css for Consolidation)
+   ========================================================================== */
+.modal-header {
+  display: flex;
+  align-items: center;
+}
+
+.modal-header i {
+  font-size: 1.5rem;
+  margin-right: 10px;
+}
+
+.modal-header.text-info {
+  background-color: #e7f1ff;
+}
+
+.modal-header.text-success {
+  background-color: #e8f9ee;
+}
+
+.modal-header.text-warning {
+  background-color: #fff8e1;
+}
+
+.modal-header.text-danger {
+  background-color: #fdeaea;
+}
+
+.modal-header h5 {
+  margin: 0;
+}
+
+.modal-footer .btn {
+  color: var(--color-white) !important;
+}
+
+.modal-footer .btn-secondary {
+  background-color: var(--color-secondary) !important;
+  border-color: var(--color-secondary) !important;
+}
+
+.modal-footer .btn-warning {
+  color: var(--color-text) !important;
+  background-color: var(--color-warning) !important;
+  border-color: var(--color-warning) !important;
+}
+
+.modal-footer .btn-light {
+  color: var(--color-text) !important;
+  background-color: var(--color-light) !important;
+  border-color: var(--color-light) !important;
+}

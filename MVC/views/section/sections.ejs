@@ -1,0 +1,249 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print
+}) %>
+
+  <%- include('../partials/tablePages-search', {
+    placeholder: 'Search sections...',
+    fields: []
+  }) %>
+  <%
+    const navigatorFilter = (filters && typeof filters.navigatorSection !== 'undefined')
+      ? String(filters.navigatorSection)
+      : '';
+  %>
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <label for="navigatorSectionFilter" class="form-label mb-0 fw-semibold">Section Type:</label>
+    <select id="navigatorSectionFilter" class="form-select form-select-sm" style="max-width: 220px;">
+      <option value="" <%= navigatorFilter === '' ? 'selected' : '' %>>All</option>
+      <option value="true" <%= navigatorFilter === 'true' ? 'selected' : '' %>>Navigator</option>
+      <option value="false" <%= navigatorFilter === 'false' ? 'selected' : '' %>>Standard</option>
+    </select>
+  </div>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="name">
+          Name <span class="sort-icon"></span>
+        </th>
+        
+        <th class="draggable" data-column="category">
+          Category <span class="sort-icon"></span>
+        </th>
+        
+        <th class="draggable" data-column="description">
+          Description <span class="sort-icon"></span>
+        </th>
+        <th class="draggable" data-column="homeURL">Home URL <span class="sort-icon"></span></th>
+    
+        <th class="draggable" data-column="message">
+          Dashboard Message <span class="sort-icon"></span>
+        </th>
+        <th class="draggable" data-column="mainDashboardDisplay">
+          Main dashboard <span class="sort-icon"></span>
+        </th>
+        <th class="draggable" data-column="dashboardDisplay">
+          Show in Dashboard <span class="sort-icon"></span>
+        </th>
+        <th class="draggable" data-column="subsections">
+          Subsections <span class="sort-icon"></span>
+        </th>
+        <th class="draggable" data-column="related">
+          Related Sections <span class="sort-icon"></span>
+        </th>
+    
+        <th class="draggable" data-column="active">
+          Active <span class="sort-icon"></span>
+        </th>
+        <th class="draggable" data-column="minimumAccessRequirement">
+          Access Level <span class="sort-icon"></span>
+        </th>
+        <th class="draggable" data-column="operations">
+          Operations <span class="sort-icon"></span>
+        </th>
+        
+        <th class="draggable" data-column="createDateTime">Created<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated<span class="sort-icon"></span></th>
+    
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach(section => { %>
+        <%
+          const audit = section.audit || {};
+          const createDateTime = audit.createDateTime || section.createDateTime;
+          const lastUpdateDateTime = audit.lastUpdateDateTime || section.lastUpdateDateTime;
+          const createUser = audit.createUser || section.createUser;
+          const lastUpdateUser = audit.lastUpdateUser || section.lastUpdateUser;
+        %>
+        <tr>
+          <td><%= section.name %></td>
+          
+          <td>
+              <% 
+                let badgeClass = 'bg-secondary';
+                if(section.category === 'SYSTEM') badgeClass = 'bg-danger';
+                if(section.category === 'ORGANIZATION') badgeClass = 'bg-info text-dark';
+                if(section.category === 'SECURITY') badgeClass = 'bg-warning text-dark';
+                if(section.category === 'GENERAL') badgeClass = 'bg-light text-dark border';
+              %>
+              <span class="badge <%= badgeClass %>"><%= section.category || 'GENERAL' %></span>
+          </td>
+
+          <td><%= section.description %></td>
+          <td><%= section.homeURL || '' %></td>
+          <td><%= section.message || '' %></td>
+
+          <td>
+            <% if (section.mainDashboardDisplay) { %>
+                <span class="badge bg-success">Yes</span>
+            <% } else { %>
+                <span class="badge bg-light text-dark border">No</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (section.dashboardDisplay) { %>
+                <span class="badge bg-primary">Yes</span>
+            <% } else { %>
+                <span class="badge bg-light text-dark border">No</span>
+            <% } %>
+          </td>
+   
+          <td>
+            <% 
+              const subs = section.subsections || [];
+              const subNames = subs.map(s => {
+                if (typeof s === 'object' && s !== null) return s.name || s.id;
+                const found = (allSections || []).find(x => String(x.id) === String(s));
+                return found ? found.name : s;
+              });
+            %>
+            <%= subNames.join(', ') %>
+          </td>
+    
+          <td>
+            <% 
+              const rels = section.related || [];
+              const relNames = rels.map(r => {
+                if (typeof r === 'object' && r !== null) return r.name || r.id;
+                const found = (allSections || []).find(x => String(x.id) === String(r));
+                return found ? found.name : r;
+              });
+            %>
+            <%= relNames.join(', ') %>
+          </td>
+    
+          <td>
+            <% if (section.active) { %>
+                <span class="badge bg-success">Active</span>
+            <% } else { %>
+                <span class="badge bg-secondary">No</span>
+            <% } %>
+          </td>
+
+          <td><%= section.minimumAccessRequirement %></td>
+          <td><%= (section.operations || []).map(op => op.name).join(', ') %></td>
+          <td>
+            <% if (createDateTime) { %>
+              <%= new Date(createDateTime).toLocaleString() %>
+              <% if (createUser) { %>
+                <br><span class="text-muted small">by <%= createUser %></span>
+              <% } %>
+            <% } else { %>
+              —
+            <% } %>
+          </td>
+          <td>
+            <% if (lastUpdateDateTime) { %>
+              <%= new Date(lastUpdateDateTime).toLocaleString() %>
+              <% if (lastUpdateUser) { %>
+                <br><span class="text-muted small">by <%= lastUpdateUser %></span>
+              <% } %>
+            <% } else { %>
+              —
+            <% } %>
+          </td>
+    
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= section.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= section.id %>">
+                <a href="/<%=newUrl%>/edit/<%= section.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= section.id %>">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+    
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+<script>
+  (function () {
+    const STORAGE_KEY = 'sections.navigatorSectionFilter.v1';
+    const selectEl = document.getElementById('navigatorSectionFilter');
+    if (!selectEl) return;
+
+    const params = new URLSearchParams(window.location.search || '');
+    const urlValue = String(params.get('navigatorSection') || '');
+    const storedValue = String(localStorage.getItem(STORAGE_KEY) || '');
+
+    // If URL already has explicit value, persist it as latest preference.
+    if (urlValue === 'true' || urlValue === 'false') {
+      localStorage.setItem(STORAGE_KEY, urlValue);
+      selectEl.value = urlValue;
+    } else if (storedValue === 'true' || storedValue === 'false') {
+      // Auto-restore remembered filter when URL has none.
+      params.set('navigatorSection', storedValue);
+      params.set('page', '1');
+      window.location.replace(window.location.pathname + '?' + params.toString());
+      return;
+    } else {
+      selectEl.value = '';
+    }
+
+    function navigateWithFilter(value) {
+      const nextParams = new URLSearchParams(window.location.search || '');
+      if (value === 'true' || value === 'false') {
+        nextParams.set('navigatorSection', value);
+        localStorage.setItem(STORAGE_KEY, value);
+      } else {
+        nextParams.delete('navigatorSection');
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      nextParams.set('page', '1');
+      window.location.href = window.location.pathname + (nextParams.toString() ? ('?' + nextParams.toString()) : '');
+    }
+
+    selectEl.addEventListener('change', function () {
+      navigateWithFilter(String(selectEl.value || ''));
+    });
+  })();
+</script>

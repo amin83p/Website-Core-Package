@@ -1,0 +1,44 @@
+[
+  {
+    "id": "PTESP2026042583428",
+    "orgId": "ORG-1",
+    "testType": "core",
+    "questionType": "speaking_respond_to_situation",
+    "scoringConfig": {
+      "method": "hybrid_ai_audio",
+      "maxScore": 5,
+      "traits": [
+        "appropriacy",
+        "pronunciation",
+        "fluency"
+      ],
+      "traitWeights": {
+        "appropriacy": 0.5,
+        "pronunciation": 0.25,
+        "fluency": 0.25
+      },
+      "contentCoverageMin": 0.6,
+      "minResponseSeconds": 20,
+      "idealWpmMin": 85,
+      "idealWpmMax": 155,
+      "offTopicPenalty": 0.25
+    },
+    "profileVersion": 1,
+    "creator": {
+      "type": "user",
+      "displayName": "USR-1",
+      "userId": "USR-1",
+      "username": "",
+      "email": "",
+      "orgId": "ORG-1"
+    },
+    "audit": {
+      "createUser": "USR-1",
+      "createDateTime": "2026-04-25T20:15:51.337Z",
+      "lastUpdateUser": "USR-1",
+      "lastUpdateDateTime": "2026-04-25T20:15:51.337Z"
+    },
+    "createdAt": "2026-04-25T20:15:51.338Z",
+    "updatedAt": "2026-04-25T20:15:51.338Z"
+  }
+]

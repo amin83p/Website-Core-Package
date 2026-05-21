@@ -1,0 +1,136 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print
+}) %>
+
+  <%- include('../partials/tablePages-search', {
+    placeholder: 'Search policies...',
+    fields: []
+  }) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="policyName">Policy Name<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="orgId">Scope<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="userName">Assigned User<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="active">Status<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="validity">Validity Period<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="sections">Sections<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated<span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% (data || []).forEach(policy => { %>
+        <%
+           // Calculate Validity String
+           const start = policy.validityPeriod?.startDate ? new Date(policy.validityPeriod.startDate).toLocaleDateString() : null;
+           const end = policy.validityPeriod?.endDate ? new Date(policy.validityPeriod.endDate).toLocaleDateString() : null;
+           
+           let validityStr = 'Indefinite';
+           if (start && end) validityStr = `${start} to ${end}`;
+           else if (start) validityStr = `From ${start}`;
+           else if (end) validityStr = `Until ${end}`;
+
+           // Audit info
+           const audit = policy.audit || {};
+           const lastUpdateDateTime = audit.lastUpdateDateTime || policy.lastUpdateDateTime;
+           const lastUpdateUser = audit.lastUpdateUser || policy.lastUpdateUser;
+        %>
+        <tr>
+          <td><code><%= policy.id %></code></td>
+          
+          <td class="fw-bold text-primary">
+            <i class="bi bi-shield-lock me-2"></i><%= policy.policyName || '—' %>
+          </td>
+
+          <td>
+            <% if (policy.orgId) { %>
+               <span class="badge bg-info text-dark" title="Org ID: <%= policy.orgId %>">
+                  <i class="bi bi-building me-1"></i><%= policy.orgName || ('Org ' + policy.orgId) %>
+               </span>
+            <% } else { %>
+               <span class="badge bg-secondary">
+                  <i class="bi bi-globe me-1"></i>Global
+               </span>
+            <% } %>
+          </td>
+          
+          <td>
+            <% if (policy.userName) { %>
+                <i class="bi bi-person me-1 text-muted"></i><%= policy.userName %>
+            <% } else { %>
+                 <span class="text-muted fst-italic">Unassigned</span>
+            <% } %>
+          </td>
+
+          <td>
+              <% if (policy.active) { %>
+                  <span class="badge bg-success">Active</span>
+              <% } else { %>
+                  <span class="badge bg-secondary">Inactive</span>
+              <% } %>          
+          </td>
+          
+          <td><span class="badge bg-light text-dark border small"><%= validityStr %></span></td>
+
+          <td>
+            <% if (policy.sections && policy.sections.length > 0) { %>
+                <span class="badge bg-light text-dark border"><%= policy.sections.length %> Section(s)</span>
+            <% } else { %>
+                <span class="text-muted small">None</span>
+            <% } %>
+          </td>
+
+          <td>
+             <% if (lastUpdateDateTime) { %>
+              <%= new Date(lastUpdateDateTime).toLocaleString() %>
+              <% if (lastUpdateUser) { %>
+                <br><span class="text-muted small">by <%= lastUpdateUser %></span>
+              <% } %>
+            <% } else { %>
+              —
+            <% } %>
+          </td>
+
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= policy.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= policy.id %>">
+                <a href="/<%=newUrl%>/edit/<%= policy.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= policy.id %>">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>

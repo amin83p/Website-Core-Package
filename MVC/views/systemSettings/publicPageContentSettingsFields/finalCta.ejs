@@ -1,0 +1,48 @@
+<div class="row g-3">
+  <% if (includeEyebrow) { %>
+    <div class="col-md-4">
+      <label class="form-label fw-bold">Eyebrow</label>
+      <input type="text" class="form-control" data-content-path="<%= prefix %>.eyebrow">
+    </div>
+  <% } %>
+  <div class="<%= includeEyebrow ? 'col-md-8' : 'col-md-6' %>">
+    <label class="form-label fw-bold">Title</label>
+    <input type="text" class="form-control" data-content-path="<%= prefix %>.title">
+  </div>
+  <div class="<%= includeEyebrow ? 'col-12' : 'col-md-6' %>">
+    <label class="form-label fw-bold">Body</label>
+    <input type="text" class="form-control" data-content-path="<%= prefix %>.body">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-bold">Signed-in Label</label>
+    <input type="text" class="form-control" data-content-path="<%= prefix %>.signedInPrimaryLabel">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-bold">Signed-in Link</label>
+    <input type="text" class="form-control font-monospace" data-content-path="<%= prefix %>.signedInPrimaryHref">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-bold">Guest Primary Label</label>
+    <input type="text" class="form-control" data-content-path="<%= prefix %>.guestPrimaryLabel">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-bold">Guest Primary Link</label>
+    <input type="text" class="form-control font-monospace" data-content-path="<%= prefix %>.guestPrimaryHref">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-bold">Guest Secondary Label</label>
+    <input type="text" class="form-control" data-content-path="<%= prefix %>.guestSecondaryLabel">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-bold">Guest Secondary Link</label>
+    <input type="text" class="form-control font-monospace" data-content-path="<%= prefix %>.guestSecondaryHref">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-bold">Contact Label</label>
+    <input type="text" class="form-control" data-content-path="<%= prefix %>.contactLabel">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-bold">Contact Link</label>
+    <input type="text" class="form-control font-monospace" data-content-path="<%= prefix %>.contactHref">
+  </div>
+</div>

@@ -1,0 +1,888 @@
+<style>
+  .program-registration-primary-actions .btn {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .program-registration-primary-actions .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(13, 110, 253, 0.25);
+  }
+  .program-registration-primary-actions .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 4px 14px rgba(13, 110, 253, 0.35);
+  }
+  .program-registration-action-group .btn {
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .program-registration-action-group .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+  .program-registration-result-card .card-body > .d-flex:first-child {
+    border-bottom: 1px solid rgba(23, 50, 77, 0.08);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem !important;
+  }
+</style>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-person-check-fill me-2"></i><%= title %></h1>
+    <div class="d-flex gap-2">
+      <a href="/school/programs/registrations" class="btn btn-outline-secondary btn-sm"><i class="bi bi-card-list me-1"></i> Registrations</a>
+      <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="programRegistrationForm" method="POST" action="/school/programs/register-students/apply">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="studentIds" id="hid_studentIds" value="[]">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-5">
+              <label class="form-label fw-bold">Program *</label>
+              <div class="input-group">
+                <input type="hidden" name="programId" id="inp_programId" value="">
+                <input type="text" id="inp_programLabel" class="form-control bg-white" value="" placeholder="Select program..." readonly required>
+                <button type="button" class="btn btn-outline-primary" id="btnPickProgram"><i class="bi bi-search"></i></button>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">Registration Date *</label>
+              <input type="date" class="form-control" name="effectiveDate" id="inp_effectiveDate" value="<%= new Date().toISOString().slice(0,10) %>" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">External Reference</label>
+              <input type="text" class="form-control" name="externalReference" id="inp_externalReference" placeholder="Optional external reference">
+            </div>
+          </div>
+
+          <div class="mt-4 d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-bold">Selected Students</div>
+              <div class="small text-muted">Add students one by one. The preview will validate fee category, student account, duplicate registration, and matching program fees.</div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" id="btnAddStudent"><i class="bi bi-plus-circle me-1"></i>Add Student</button>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Fee Category</th>
+                  <th>Student Account</th>
+                  <th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="selectedStudentsTbody">
+                <tr><td colspan="4" class="text-center text-muted py-4">No students selected yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label fw-bold">Note</label>
+            <textarea class="form-control" name="note" id="inp_note" rows="2" placeholder="Optional note to store on each registration"></textarea>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mt-4 program-registration-primary-actions">
+            <button type="button" class="btn btn-outline-primary rounded-pill px-4 shadow-sm" id="btnPreview"><i class="bi bi-eye me-1"></i>Preview Registration</button>
+            <button type="submit" class="btn btn-primary rounded-pill px-4 shadow" id="btnApply" disabled><i class="bi bi-save me-1"></i>Save Draft Registrations</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="fw-bold">Preview</div>
+            <div class="small text-muted" id="previewSummary">Run preview to see registration readiness and fee postings.</div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Status</th>
+                  <th>Fee Category</th>
+                  <th>Student Account</th>
+                  <th>Total Fee</th>
+                  <th>Transactions</th>
+                  <th>Issues</th>
+                </tr>
+              </thead>
+              <tbody id="previewTbody">
+                <tr><td colspan="7" class="text-center text-muted py-4">No preview available yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="card border-0 shadow-sm mt-4 program-registration-result-card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+          <div>
+            <div class="fw-bold text-primary"><i class="bi bi-folder-check me-1"></i>This registration</div>
+            <div class="small text-muted">Drafts you save from this page appear here. Use <a href="/school/programs/registrations" class="text-decoration-none">Program registrations</a> to browse all records.</div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Registration</th>
+                <th>Student</th>
+                <th>Program</th>
+                <th>Status</th>
+                <th>Finance</th>
+                <th>Academic</th>
+                <th>Note</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="recentRegistrationsTbody">
+              <tr id="recentRegistrationsEmptyRow">
+                <td colspan="8" class="text-center text-muted py-4">No drafts saved in this session yet. Run preview, then save draft registrations to see results here.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="transactionPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="transactionPreviewModalTitle">Transaction Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="transactionPreviewModalBody">
+        <div class="text-muted">No transaction details available.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const programs = <%- JSON.stringify(programs || []) %>;
+  const canManageRegistrations = <%- JSON.stringify(Boolean(canManageRegistrations)) %>;
+  const programMap = new Map(programs.map((item) => [String(item.id || ''), item]));
+  const selectedStudents = [];
+  let lastPreview = [];
+  let transactionPreviewModal = null;
+  let previewInProgress = false;
+
+  function showMsg(opts) {
+    if (typeof showMessageModal === 'function') return showMessageModal(opts);
+    alert(opts?.message || 'Done');
+    return Promise.resolve();
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function syncHiddenState() {
+    document.getElementById('hid_studentIds').value = JSON.stringify(selectedStudents.map((item) => item.id));
+  }
+
+  function ensureTransactionPreviewModal() {
+    const modalEl = document.getElementById('transactionPreviewModal');
+    if (!modalEl || !window.bootstrap || typeof window.bootstrap.Modal !== 'function') return null;
+    if (!transactionPreviewModal) {
+      transactionPreviewModal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+    }
+    return transactionPreviewModal;
+  }
+
+  function renderTransactionDetailHtml(row) {
+    const transactions = Array.isArray(row?.previewTransactions) ? row.previewTransactions : [];
+    const issues = Array.isArray(row?.issues) ? row.issues : [];
+    const summary = '<div class="mb-3">' +
+      '<div class="fw-bold">' + escapeHtml(row.studentName || row.studentId || 'Student') + '</div>' +
+      '<div class="small text-muted">Fee Category: ' + escapeHtml(row.feeCategory || '-') + ' | Student Account: <span class="font-monospace">' + escapeHtml(row.studentAccountId || '-') + '</span></div>' +
+      '<div class="small text-muted">Total Fee: <span class="fw-bold">' + escapeHtml(Number(row.totalAmount || 0).toFixed(2)) + '</span></div>' +
+    '</div>';
+
+    const issueBlock = issues.length
+      ? '<div class="alert alert-warning border-warning py-2">' + issues.map(function (issue) {
+          return '<div>' + escapeHtml(issue) + '</div>';
+        }).join('') + '</div>'
+      : '';
+
+    if (!transactions.length) {
+      return summary + issueBlock + '<div class="text-muted">No transaction rows were generated for this preview.</div>';
+    }
+
+    const rows = transactions.map(function (tx, index) {
+      return '<tr>' +
+        '<td>' + (index + 1) + '</td>' +
+        '<td><div class="fw-bold font-monospace">' + escapeHtml(tx.debitAccount?.code || '-') + '</div><div class="small text-muted">' + escapeHtml(tx.debitAccount?.name || '-') + '</div></td>' +
+        '<td><div class="fw-bold font-monospace">' + escapeHtml(tx.creditAccount?.code || '-') + '</div><div class="small text-muted">' + escapeHtml(tx.creditAccount?.name || '-') + '</div></td>' +
+        '<td class="fw-bold">' + escapeHtml(Number(tx.amount || 0).toFixed(2)) + ' ' + escapeHtml(tx.currency || '') + '</td>' +
+        '<td><div class="small text-muted">' + escapeHtml(tx.memo || '-') + '</div></td>' +
+      '</tr>';
+    }).join('');
+
+    return summary + issueBlock +
+      '<div class="table-responsive">' +
+        '<table class="table table-sm align-middle mb-0">' +
+          '<thead><tr><th>#</th><th>Debit Account</th><th>Credit Account</th><th>Amount</th><th>Memo</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>';
+  }
+
+  function openTransactionPreview(index) {
+    const row = lastPreview[index];
+    if (!row) return;
+    const modal = ensureTransactionPreviewModal();
+    if (!modal) return;
+    document.getElementById('transactionPreviewModalTitle').textContent = 'Transaction Details - ' + (row.studentName || row.studentId || 'Student');
+    document.getElementById('transactionPreviewModalBody').innerHTML = renderTransactionDetailHtml(row);
+    modal.show();
+  }
+
+  function renderSelectedStudents() {
+    const tbody = document.getElementById('selectedStudentsTbody');
+    if (!selectedStudents.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No students selected yet.</td></tr>';
+      syncHiddenState();
+      return;
+    }
+
+    tbody.innerHTML = selectedStudents.map(function (student, idx) {
+      const fullName = [student.firstName, student.lastName].filter(Boolean).join(' ').trim() || student.id;
+      return '<tr>' +
+        '<td><div class="fw-bold">' + escapeHtml(fullName) + '</div><div class="small text-muted font-monospace">' + escapeHtml(student.id) + '</div></td>' +
+        '<td>' + escapeHtml(student.feeCategory || '-') + '</td>' +
+        '<td><span class="small font-monospace">' + escapeHtml(student.studentAccountId || '-') + '</span></td>' +
+        '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-del-student="' + idx + '"><i class="bi bi-trash"></i></button></td>' +
+      '</tr>';
+    }).join('');
+
+    tbody.querySelectorAll('button[data-del-student]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const index = Number(btn.getAttribute('data-del-student'));
+        if (Number.isNaN(index) || index < 0 || index >= selectedStudents.length) return;
+        selectedStudents.splice(index, 1);
+        renderSelectedStudents();
+      });
+    });
+
+    syncHiddenState();
+  }
+
+  function renderPreview() {
+    const tbody = document.getElementById('previewTbody');
+    const summary = document.getElementById('previewSummary');
+    if (!lastPreview.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No preview available yet.</td></tr>';
+      summary.textContent = 'Run preview to see registration readiness and fee postings.';
+      document.getElementById('btnApply').disabled = true;
+      return;
+    }
+
+    const readyCount = lastPreview.filter((row) => row.status !== 'error').length;
+    summary.textContent = readyCount + ' of ' + lastPreview.length + ' students are ready or partially ready for draft save.';
+    tbody.innerHTML = lastPreview.map(function (row, index) {
+      const badge = row.status === 'error'
+        ? 'bg-danger'
+        : (row.status === 'warning' ? 'bg-warning text-dark' : 'bg-success');
+      const issues = Array.isArray(row.issues) && row.issues.length
+        ? row.issues.map(function (issue) { return '<div>' + escapeHtml(issue) + '</div>'; }).join('')
+        : '<span class="text-muted">None</span>';
+      const txCount = Array.isArray(row.previewTransactions) ? row.previewTransactions.length : 0;
+      const txLabel = txCount
+        ? row.previewTransactions.map(function (tx) {
+            return '<div><span class="font-monospace">' + escapeHtml((tx.debitAccount?.code || '-') + ' / ' + (tx.creditAccount?.code || '-')) + '</span> ' +
+              '<span class="text-muted">(' + escapeHtml(String(tx.amount || 0)) + ' ' + escapeHtml(tx.currency || '') + ')</span></div>';
+          }).join('') +
+          '<div class="mt-2"><button type="button" class="btn btn-outline-primary btn-sm" data-preview-detail="' + index + '"><i class="bi bi-eye me-1"></i>View Details</button></div>'
+        : '<span class="text-muted">None</span>';
+      return '<tr>' +
+        '<td><div class="fw-bold">' + escapeHtml(row.studentName || row.studentId) + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.studentId || '') + '</div></td>' +
+        '<td><span class="badge ' + badge + '">' + escapeHtml(row.status) + '</span></td>' +
+        '<td>' + escapeHtml(row.feeCategory || '-') + '</td>' +
+        '<td><span class="small font-monospace">' + escapeHtml(row.studentAccountId || '-') + '</span></td>' +
+        '<td class="fw-bold">' + escapeHtml(Number(row.totalAmount || 0).toFixed(2)) + '</td>' +
+        '<td class="small">' + txLabel + '</td>' +
+        '<td class="small">' + issues + '</td>' +
+      '</tr>';
+    }).join('');
+
+    tbody.querySelectorAll('button[data-preview-detail]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const index = Number(btn.getAttribute('data-preview-detail'));
+        if (Number.isNaN(index)) return;
+        openTransactionPreview(index);
+      });
+    });
+
+    document.getElementById('btnApply').disabled = readyCount === 0;
+  }
+
+  function findRecentRegistrationRow(registrationId) {
+    const target = String(registrationId || '').trim();
+    if (!target) return null;
+    const rows = Array.from(document.querySelectorAll('#recentRegistrationsTbody tr[data-registration-row]'));
+    return rows.find(function (row) {
+      return String(row.getAttribute('data-registration-row') || '').trim() === target;
+    }) || null;
+  }
+
+  function updateRecentRegistrationRowAfterApprove(registrationId, studentName, result) {
+    const row = findRecentRegistrationRow(registrationId);
+    if (!row) return;
+
+    const postedTx = Number(result?.summary?.postedTransactionCount || 0);
+    const postedAcademic = Number(result?.summary?.postedAcademicEntryCount || 0);
+
+    const statusCell = row.querySelector('td[data-col="status"]');
+    if (statusCell) {
+      statusCell.innerHTML =
+        '<div><span class="badge bg-success">verified</span></div>' +
+        '<div class="small text-muted mt-1">Record: registered</div>';
+    }
+
+    const financeCell = row.querySelector('td[data-col="finance"]');
+    if (financeCell && Number.isFinite(postedTx)) {
+      financeCell.innerHTML =
+        '<div>Posted: <span class="fw-bold">' + String(postedTx) + '</span> / ' + String(postedTx) + '</div>' +
+        '<div>Reversed: <span class="fw-bold">0</span></div>';
+    }
+
+    const academicCell = row.querySelector('td[data-col="academic"]');
+    if (academicCell && Number.isFinite(postedAcademic)) {
+      academicCell.innerHTML =
+        '<div>Posted: <span class="fw-bold">' + String(postedAcademic) + '</span> / ' + String(postedAcademic) + '</div>' +
+        '<div>Voided: <span class="fw-bold">0</span></div>';
+    }
+
+    const actionCell = row.querySelector('td[data-col="actions"]');
+    if (actionCell) {
+      const detailsLink = actionCell.querySelector('a[href*="/school/programs/registrations/"]');
+      if (detailsLink) {
+        detailsLink.innerHTML = '<i class="bi bi-box-arrow-up-right me-1"></i>Details';
+      }
+
+      const approveBtn = actionCell.querySelector('button[data-approve-registration]');
+      if (approveBtn) approveBtn.remove();
+
+      const rollbackBtn = actionCell.querySelector('button[data-rollback-registration]');
+      if (rollbackBtn) {
+        rollbackBtn.disabled = false;
+        rollbackBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>Rollback';
+      } else if (canManageRegistrations) {
+        const noAction = actionCell.querySelector('span.text-muted.small');
+        if (noAction) {
+          noAction.textContent = 'Rollback available from Details';
+        } else {
+          const hint = document.createElement('span');
+          hint.className = 'text-muted small';
+          hint.textContent = 'Rollback available from Details';
+          actionCell.appendChild(hint);
+        }
+      }
+    }
+  }
+
+  function updateRecentRegistrationRowAfterRollback(registrationId, result) {
+    const row = findRecentRegistrationRow(registrationId);
+    if (!row) return;
+
+    const isWarning = String(result?.status || '').toLowerCase() === 'warning';
+    const verificationLabel = isWarning ? 'failed' : 'rolled_back';
+    const verificationClass = isWarning ? 'bg-danger' : 'bg-secondary';
+    const recordStatus = isWarning ? 'error' : 'rolled_back';
+    const reversalCount = Number(result?.rollback?.reversalCount || 0);
+    const voidedCount = Number(result?.rollback?.voidedEntryCount || 0);
+
+    const statusCell = row.querySelector('td[data-col="status"]');
+    if (statusCell) {
+      statusCell.innerHTML =
+        '<div><span class="badge ' + verificationClass + '">' + escapeHtml(verificationLabel) + '</span></div>' +
+        '<div class="small text-muted mt-1">Record: ' + escapeHtml(recordStatus) + '</div>';
+    }
+
+    const financeCell = row.querySelector('td[data-col="finance"]');
+    if (financeCell && Number.isFinite(reversalCount)) {
+      const postedText = (financeCell.querySelector('div:first-child')?.innerHTML) || 'Posted: <span class="fw-bold">0</span> / 0';
+      financeCell.innerHTML = '<div>' + postedText + '</div><div>Reversed: <span class="fw-bold">' + String(reversalCount) + '</span></div>';
+    }
+
+    const academicCell = row.querySelector('td[data-col="academic"]');
+    if (academicCell && Number.isFinite(voidedCount)) {
+      const postedText = (academicCell.querySelector('div:first-child')?.innerHTML) || 'Posted: <span class="fw-bold">0</span> / 0';
+      academicCell.innerHTML = '<div>' + postedText + '</div><div>Voided: <span class="fw-bold">' + String(voidedCount) + '</span></div>';
+    }
+
+    const actionCell = row.querySelector('td[data-col="actions"]');
+    if (actionCell) {
+      const detailsLink = actionCell.querySelector('a[href*="/school/programs/registrations/"]');
+      if (detailsLink) {
+        detailsLink.innerHTML = '<i class="bi bi-box-arrow-up-right me-1"></i>Details';
+      }
+      const approveBtn = actionCell.querySelector('button[data-approve-registration]');
+      if (approveBtn) approveBtn.remove();
+      const rollbackBtn = actionCell.querySelector('button[data-rollback-registration]');
+      if (rollbackBtn) rollbackBtn.remove();
+
+      let hint = actionCell.querySelector('span.text-muted.small');
+      if (!hint) {
+        hint = document.createElement('span');
+        hint.className = 'text-muted small';
+        actionCell.appendChild(hint);
+      }
+      hint.textContent = isWarning ? 'Rollback completed with issues' : 'Rolled back';
+    }
+  }
+
+  function removeRecentEmptyStateIfNeeded() {
+    const emptyRow = document.getElementById('recentRegistrationsEmptyRow');
+    if (emptyRow) emptyRow.remove();
+  }
+
+  function buildRecentRegistrationRowHtml(model) {
+    const registrationId = String(model.id || '').trim();
+    const registrationDate = String(model.registrationDate || '').trim() || '-';
+    const studentName = String(model.studentName || model.studentId || registrationId).trim() || registrationId;
+    const studentId = String(model.studentId || '').trim();
+    const programLabel = String(model.programLabel || '').trim() || String(document.getElementById('inp_programLabel')?.value || '').trim() || '-';
+    const feeCategory = String(model.feeCategorySnapshot || '').trim() || '-';
+    const verificationStatus = String(model.verificationStatus || 'pending').trim().toLowerCase();
+    const statusClass = verificationStatus === 'verified'
+      ? 'bg-success'
+      : (verificationStatus === 'partial'
+        ? 'bg-warning text-dark'
+        : (verificationStatus === 'rolled_back'
+          ? 'bg-secondary'
+          : (verificationStatus === 'failed' ? 'bg-danger' : 'bg-info text-dark')));
+    const recordStatus = String(model.status || 'draft').trim();
+    const financePosted = Number(model.finance?.posted || 0);
+    const financeExpected = Number(model.finance?.expected || 0);
+    const financeReversed = Number(model.finance?.reversed || 0);
+    const academicPosted = Number(model.academic?.posted || 0);
+    const academicExpected = Number(model.academic?.expected || 0);
+    const academicVoided = Number(model.academic?.voided || 0);
+    const note = String(model.note || '').trim() || '-';
+    const canApprove = Boolean(model.canApprove);
+    const canRollback = Boolean(model.canRollback);
+    const termRegistrationsCount = Number(model.termRegistrationsCount || 0);
+
+    let actionsHtml = '<div class="d-flex flex-wrap gap-2 justify-content-end align-items-center program-registration-action-group">';
+    actionsHtml += '<a href="/school/programs/registrations/' + encodeURIComponent(registrationId) + '" class="btn btn-sm btn-primary rounded-pill shadow-sm px-3"><i class="bi bi-box-arrow-up-right me-1"></i>' + (recordStatus.toLowerCase() === 'draft' ? 'Review Draft' : 'Details') + '</a>';
+    if (canManageRegistrations && canApprove) {
+      actionsHtml +=
+        '<button type="button" class="btn btn-sm btn-success rounded-pill shadow-sm px-3" data-approve-registration="' + escapeHtml(registrationId) + '" data-approve-student="' + escapeHtml(studentName) + '">' +
+        '<i class="bi bi-check2-circle me-1"></i>Approve &amp; Post</button>';
+    }
+    if (canManageRegistrations && canRollback) {
+      actionsHtml +=
+        '<button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" data-rollback-registration="' + escapeHtml(registrationId) + '" data-rollback-student="' + escapeHtml(studentName) + '">' +
+        '<i class="bi bi-arrow-counterclockwise me-1"></i>' + (recordStatus.toLowerCase() === 'draft' ? 'Cancel Draft' : 'Rollback') + '</button>';
+    } else if (canManageRegistrations && termRegistrationsCount > 0) {
+      actionsHtml += '<span class="text-muted small">Rollback blocked (term registrations exist)</span>';
+    } else if (canManageRegistrations) {
+      actionsHtml += '<span class="text-muted small">No action</span>';
+    }
+    actionsHtml += '</div>';
+
+    return '' +
+      '<td>' +
+        '<div class="fw-bold font-monospace"><a href="/school/programs/registrations/' + encodeURIComponent(registrationId) + '">' + escapeHtml(registrationId) + '</a></div>' +
+        '<div class="small text-muted">' + escapeHtml(registrationDate) + '</div>' +
+      '</td>' +
+      '<td>' +
+        '<div class="fw-bold">' + escapeHtml(studentName) + '</div>' +
+        '<div class="small text-muted font-monospace">' + escapeHtml(studentId || '-') + '</div>' +
+      '</td>' +
+      '<td>' +
+        '<div class="fw-bold">' + escapeHtml(programLabel) + '</div>' +
+        '<div class="small text-muted">' + escapeHtml(feeCategory) + '</div>' +
+      '</td>' +
+      '<td data-col="status">' +
+        '<div><span class="badge ' + statusClass + '">' + escapeHtml(verificationStatus) + '</span></div>' +
+        '<div class="small text-muted mt-1">Record: ' + escapeHtml(recordStatus) + '</div>' +
+      '</td>' +
+      '<td class="small" data-col="finance">' +
+        '<div>Posted: <span class="fw-bold">' + escapeHtml(financePosted) + '</span> / ' + escapeHtml(financeExpected) + '</div>' +
+        '<div>Reversed: <span class="fw-bold">' + escapeHtml(financeReversed) + '</span></div>' +
+      '</td>' +
+      '<td class="small" data-col="academic">' +
+        '<div>Posted: <span class="fw-bold">' + escapeHtml(academicPosted) + '</span> / ' + escapeHtml(academicExpected) + '</div>' +
+        '<div>Voided: <span class="fw-bold">' + escapeHtml(academicVoided) + '</span></div>' +
+      '</td>' +
+      '<td class="small" style="min-width:220px;">' + escapeHtml(note) + '</td>' +
+      '<td class="text-end align-middle" data-col="actions">' + actionsHtml + '</td>';
+  }
+
+  function upsertRecentRegistrationDraftRow(rowResult, previewByStudentId) {
+    const registrationId = String(rowResult?.registrationId || '').trim();
+    if (!registrationId) return;
+
+    const studentId = String(rowResult?.studentId || '').trim();
+    const previewRow = previewByStudentId?.get(studentId) || {};
+    const draftModel = {
+      id: registrationId,
+      registrationDate: document.getElementById('inp_effectiveDate')?.value || '',
+      studentName: rowResult?.studentName || previewRow?.studentName || studentId,
+      studentId: studentId || previewRow?.studentId || '',
+      programLabel: document.getElementById('inp_programLabel')?.value || '',
+      feeCategorySnapshot: previewRow?.feeCategory || '',
+      verificationStatus: 'pending',
+      status: 'draft',
+      finance: {
+        posted: 0,
+        expected: Number(rowResult?.transactionCount || 0),
+        reversed: 0
+      },
+      academic: {
+        posted: 0,
+        expected: 0,
+        voided: 0
+      },
+      note: String(document.getElementById('inp_note')?.value || '').trim(),
+      canApprove: true,
+      canRollback: true,
+      termRegistrationsCount: 0
+    };
+
+    let rowEl = findRecentRegistrationRow(registrationId);
+    if (!rowEl) {
+      removeRecentEmptyStateIfNeeded();
+      rowEl = document.createElement('tr');
+      rowEl.setAttribute('data-registration-row', registrationId);
+      const tbody = document.getElementById('recentRegistrationsTbody');
+      if (tbody) tbody.prepend(rowEl);
+    }
+    rowEl.innerHTML = buildRecentRegistrationRowHtml(draftModel);
+    bindRecentActionButtons(rowEl);
+  }
+
+  async function handleRollbackButtonClick(btn) {
+    const registrationId = String(btn?.getAttribute('data-rollback-registration') || '').trim();
+    const studentName = String(btn?.getAttribute('data-rollback-student') || registrationId).trim();
+    if (!registrationId || !btn) return;
+
+    let confirmed = false;
+    if (typeof window.showMessageModal === 'function') {
+      const result = await window.showMessageModal({
+        title: 'Rollback Registration?',
+        icon: 'warning',
+        message: 'Rollback registration for <b>' + escapeHtml(studentName) + '</b>?<br><br>This will reverse finance postings and void academic entries when they exist.',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Rollback', class: 'btn-danger' }
+        ]
+      });
+      confirmed = result === 'Rollback';
+    } else {
+      confirmed = window.confirm('Rollback registration for ' + studentName + '? This will reverse finance postings and void academic entries when they exist.');
+    }
+    if (!confirmed) return;
+
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Rolling back...';
+    try {
+      const body = new URLSearchParams({ note: 'Manual rollback from Student Program Registration page' });
+      const response = await fetch('/school/programs/register-students/rollback/' + encodeURIComponent(registrationId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: body.toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Rollback In Progress', replayTitle: 'Rollback Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status === 'error') throw new Error(result.message || 'Rollback failed.');
+      await showMsg({
+        title: 'Rollback Result',
+        icon: result.status === 'warning' ? 'warning' : 'success',
+        message: result.message || 'Rollback completed.',
+        buttons: [{ text: 'OK', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+      });
+      updateRecentRegistrationRowAfterRollback(registrationId, result);
+    } catch (error) {
+      await showMsg({
+        title: 'Rollback Error',
+        icon: 'error',
+        message: error.message || 'Rollback failed.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  async function handleApproveButtonClick(btn) {
+    const registrationId = String(btn?.getAttribute('data-approve-registration') || '').trim();
+    const studentName = String(btn?.getAttribute('data-approve-student') || registrationId).trim();
+    if (!registrationId || !btn) return;
+
+    let confirmed = false;
+    if (typeof window.showMessageModal === 'function') {
+      const result = await window.showMessageModal({
+        title: 'Approve Draft?',
+        icon: 'warning',
+        message: 'Approve and post the draft registration for <b>' + escapeHtml(studentName) + '</b>?<br><br>This will post finance transactions and academic entries.',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Approve & Post', class: 'btn-success' }
+        ]
+      });
+      confirmed = result === 'Approve & Post';
+    } else {
+      confirmed = window.confirm('Approve and post the draft registration for ' + studentName + '?');
+    }
+    if (!confirmed) return;
+
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Posting...';
+    try {
+      const body = new URLSearchParams();
+      body.set('note', 'Approved from Student Program Registration page');
+      const response = await fetch('/school/programs/register-students/approve/' + encodeURIComponent(registrationId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: body.toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Approval In Progress', replayTitle: 'Approval Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status === 'error') throw new Error(result.message || 'Approval failed.');
+      await showMsg({
+        title: 'Approval Result',
+        icon: result.status === 'warning' ? 'warning' : 'success',
+        message: result.message || 'Draft approved.',
+        buttons: [{ text: 'OK', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+      });
+      updateRecentRegistrationRowAfterApprove(registrationId, studentName, result);
+    } catch (error) {
+      await showMsg({
+        title: 'Approval Error',
+        icon: 'error',
+        message: error.message || 'Approval failed.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  function bindRecentActionButtons(scope) {
+    const root = scope && scope.querySelectorAll ? scope : document;
+    root.querySelectorAll('button[data-rollback-registration]').forEach(function (btn) {
+      if (btn.dataset.boundRollback === '1') return;
+      btn.dataset.boundRollback = '1';
+      btn.addEventListener('click', function () { handleRollbackButtonClick(btn); });
+    });
+    root.querySelectorAll('button[data-approve-registration]').forEach(function (btn) {
+      if (btn.dataset.boundApprove === '1') return;
+      btn.dataset.boundApprove = '1';
+      btn.addEventListener('click', function () { handleApproveButtonClick(btn); });
+    });
+  }
+
+  document.getElementById('btnPickProgram').addEventListener('click', function () {
+    GenericPicker.open(GenericPickerPresets.program({
+      title: 'Select Program',
+      onSelect: function (item) {
+        const id = String(item.id || '').trim();
+        if (!id) return;
+        document.getElementById('inp_programId').value = id;
+        document.getElementById('inp_programLabel').value = [String(item.code || id), String(item.name || '')].filter(Boolean).join(' - ');
+      }
+    }));
+  });
+
+  document.getElementById('btnAddStudent').addEventListener('click', function () {
+    function addStudentsToSelection(items) {
+      const rows = Array.isArray(items) ? items : [items];
+      rows.forEach(function (item) {
+        const id = String(item?.id || '').trim();
+        if (!id) return;
+        if (selectedStudents.some((student) => String(student.id) === id)) return;
+        selectedStudents.push({
+          id: id,
+          firstName: item.firstName || item.name?.first || '',
+          lastName: item.lastName || item.name?.last || '',
+          feeCategory: item.feeCategory || '',
+          studentAccountId: item.studentAccountId || ''
+        });
+      });
+      renderSelectedStudents();
+    }
+
+    GenericPicker.open(GenericPickerPresets.student({
+      title: 'Select Student',
+      multiselect: true,
+      placeholder: 'Search students, select multiple, then Add Selected...',
+      onSelect: function (items) {
+        addStudentsToSelection(items);
+      }
+    }));
+  });
+
+  document.getElementById('btnPreview').addEventListener('click', async function () {
+    const previewBtn = document.getElementById('btnPreview');
+    if (!previewBtn || previewInProgress) return;
+    const originalPreviewHtml = previewBtn.innerHTML;
+    previewInProgress = true;
+    previewBtn.disabled = true;
+    previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Previewing...';
+    if (typeof showLoading === 'function') showLoading();
+    try {
+      const programId = document.getElementById('inp_programId').value.trim();
+      if (!programId) throw new Error('Select a program first.');
+      if (!selectedStudents.length) throw new Error('Select at least one student.');
+
+      syncHiddenState();
+      const data = new URLSearchParams(new FormData(document.getElementById('programRegistrationForm')));
+      data.delete('actionStateId');
+      const response = await fetch('/school/programs/register-students/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: data.toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Preview In Progress', replayTitle: 'Preview Already Completed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status !== 'success') throw new Error(result.message || 'Preview failed.');
+      lastPreview = Array.isArray(result.preview) ? result.preview : [];
+      renderPreview();
+    } catch (error) {
+      lastPreview = [];
+      renderPreview();
+      await showMsg({
+        title: 'Preview Error',
+        icon: 'error',
+        message: error.message || 'Failed to preview registrations.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      previewInProgress = false;
+      previewBtn.disabled = false;
+      previewBtn.innerHTML = originalPreviewHtml;
+      if (typeof hideLoading === 'function') hideLoading();
+    }
+  });
+
+  document.getElementById('programRegistrationForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnApply');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving drafts...';
+
+    try {
+      const programId = document.getElementById('inp_programId').value.trim();
+      if (!programId) throw new Error('Select a program first.');
+      if (!selectedStudents.length) throw new Error('Select at least one student.');
+      if (!lastPreview.length) throw new Error('Run preview first.');
+
+      syncHiddenState();
+      const data = new URLSearchParams(new FormData(document.getElementById('programRegistrationForm')));
+      const response = await fetch('/school/programs/register-students/apply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: data.toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Completed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status === 'error' && !Array.isArray(result.results)) {
+        throw new Error(result.message || 'Registration failed.');
+      }
+
+      const lines = (result.results || []).map(function (row) {
+        return (row.studentName || row.studentId) + ': ' + row.status + (row.message ? ' - ' + row.message : '');
+      }).join('<br>');
+      const modalIcon = result.status === 'warning'
+        ? 'warning'
+        : (result.status === 'success' ? 'success' : 'error');
+      const modalButtonClass = result.status === 'warning'
+        ? 'btn-warning'
+        : (result.status === 'success' ? 'btn-success' : 'btn-danger');
+
+      await showMsg({
+        title: 'Draft Save Result',
+        icon: modalIcon,
+        message: lines || result.message || 'Completed.',
+        buttons: [{ text: 'OK', class: modalButtonClass }]
+      });
+      if (result.status === 'success' || result.status === 'warning') {
+        const previewByStudentId = new Map((lastPreview || []).map(function (row) {
+          return [String(row?.studentId || '').trim(), row];
+        }));
+        (result.results || []).forEach(function (row) {
+          if (String(row?.status || '').toLowerCase() === 'draft') {
+            upsertRecentRegistrationDraftRow(row, previewByStudentId);
+          }
+        });
+      } else {
+        lastPreview = [];
+        renderPreview();
+      }
+    } catch (error) {
+      await showMsg({
+        title: 'Registration Error',
+        icon: 'error',
+        message: error.message || 'Failed to register students.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  });
+
+  bindRecentActionButtons(document);
+
+  renderSelectedStudents();
+  renderPreview();
+  ensureTransactionPreviewModal();
+})();
+</script>

@@ -1,0 +1,18 @@
+<div class="row g-2">
+  <div class="col-md-6 mb-3">
+    <label class="form-label fw-bold">Area Family Code</label>
+    <input class="form-control" name="areaFamilyCode" value="<%= itemData?.areaFamilyCode || '' %>">
+  </div>
+  <div class="col-md-6 mb-3">
+    <label class="form-label fw-bold">Communicative Contexts</label>
+    <div class="d-flex gap-2 mb-2">
+      <input type="text" class="form-control" id="communicativeContextsChipText" placeholder="Type context and press Enter">
+      <button type="button" class="btn btn-outline-primary" id="communicativeContextsAddChip">Add</button>
+    </div>
+    <div id="communicativeContextsChipContainer" class="d-flex flex-wrap gap-2"></div>
+  </div>
+</div>
+<div class="mb-3">
+  <label class="form-label">Progression Notes</label>
+  <textarea class="form-control" name="progressionNotes" rows="3"><%= itemData?.progressionNotes || '' %></textarea>
+</div>

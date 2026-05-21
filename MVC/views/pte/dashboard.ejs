@@ -1,0 +1,595 @@
+<%
+  const name = String(firstName || 'Learner').trim() || 'Learner';
+  const heroItems = Array.isArray(heroActions) ? heroActions : [];
+  const sections = Array.isArray(primarySections) ? primarySections : [];
+  const activityItems = Array.isArray(activityLinks) ? activityLinks : [];
+%>
+
+<style>
+  .pte-learner-hub {
+    --hub-ink: #172033;
+    --hub-muted: #65758b;
+    --hub-panel: rgba(255, 255, 255, 0.84);
+    --hub-border: rgba(19, 38, 71, 0.12);
+    --hub-shadow: 0 28px 70px rgba(19, 38, 71, 0.14);
+    --hub-mint: #15b68c;
+    --hub-amber: #f4a51c;
+    --hub-coral: #ef5d53;
+    color: var(--hub-ink);
+    position: relative;
+    isolation: isolate;
+    padding-bottom: 2rem;
+  }
+
+  .pte-learner-hub::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(circle at 8% 8%, rgba(21, 182, 140, 0.18), transparent 32rem),
+      radial-gradient(circle at 92% 4%, rgba(244, 165, 28, 0.2), transparent 30rem),
+      radial-gradient(circle at 50% 92%, rgba(239, 93, 83, 0.12), transparent 34rem),
+      linear-gradient(135deg, #f8fbff 0%, #eef6f5 46%, #fff8ed 100%);
+  }
+
+  .pte-learner-hub::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.38;
+    background-image:
+      linear-gradient(rgba(23, 32, 51, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(23, 32, 51, 0.055) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(to bottom, #000, transparent 82%);
+  }
+
+  .pte-hub-hero {
+    border: 1px solid var(--hub-border);
+    border-radius: 2rem;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72)),
+      linear-gradient(120deg, rgba(21, 182, 140, 0.14), rgba(244, 165, 28, 0.12));
+    box-shadow: var(--hub-shadow);
+    overflow: hidden;
+    position: relative;
+    padding: clamp(1.35rem, 3vw, 2.35rem);
+  }
+
+  .pte-hub-hero::before {
+    content: "";
+    position: absolute;
+    width: 28rem;
+    height: 28rem;
+    border-radius: 50%;
+    right: -9rem;
+    top: -12rem;
+    background: conic-gradient(from 20deg, rgba(21, 182, 140, 0.9), rgba(244, 165, 28, 0.9), rgba(239, 93, 83, 0.82), rgba(21, 182, 140, 0.9));
+    opacity: 0.22;
+    filter: blur(2px);
+  }
+
+  .pte-hub-hero-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+    gap: clamp(1.3rem, 3vw, 2.25rem);
+    align-items: center;
+  }
+
+  .pte-hub-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid rgba(21, 182, 140, 0.28);
+    border-radius: 999px;
+    background: rgba(21, 182, 140, 0.1);
+    color: #0a6f58;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    padding: 0.42rem 0.72rem;
+  }
+
+  .pte-hub-title {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(2.15rem, 5vw, 4.6rem);
+    line-height: 0.94;
+    letter-spacing: -0.055em;
+    margin: 1rem 0 0.85rem;
+  }
+
+  .pte-hub-subtitle {
+    max-width: 60rem;
+    color: var(--hub-muted);
+    font-size: clamp(1rem, 1.8vw, 1.2rem);
+    line-height: 1.7;
+    margin: 0;
+  }
+
+  .pte-hub-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.4rem;
+  }
+
+  .pte-hub-primary-action,
+  .pte-hub-soft-action {
+    border-radius: 999px;
+    font-weight: 800;
+    padding: 0.78rem 1.05rem;
+  }
+
+  .pte-hub-primary-action {
+    border: 0;
+    color: #fff;
+    background: linear-gradient(135deg, #132647, #15b68c);
+    box-shadow: 0 16px 34px rgba(21, 182, 140, 0.28);
+  }
+
+  .pte-hub-soft-action {
+    border: 1px solid var(--hub-border);
+    color: var(--hub-ink);
+    background: rgba(255, 255, 255, 0.76);
+  }
+
+  .pte-hub-score-card {
+    border: 1px solid rgba(255, 255, 255, 0.58);
+    border-radius: 1.6rem;
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 20px 50px rgba(19, 38, 71, 0.1);
+    backdrop-filter: blur(16px);
+    padding: 1.15rem;
+  }
+
+  .pte-hub-orbit {
+    position: relative;
+    min-height: 260px;
+    display: grid;
+    place-items: center;
+  }
+
+  .pte-hub-orbit-ring {
+    position: absolute;
+    border: 1px dashed rgba(19, 38, 71, 0.18);
+    border-radius: 50%;
+    animation: pteHubSpin 22s linear infinite;
+  }
+
+  .pte-hub-orbit-ring.one {
+    width: 14rem;
+    height: 14rem;
+  }
+
+  .pte-hub-orbit-ring.two {
+    width: 10rem;
+    height: 10rem;
+    animation-duration: 15s;
+    animation-direction: reverse;
+  }
+
+  .pte-hub-orbit-core {
+    width: 8.2rem;
+    height: 8.2rem;
+    border-radius: 2rem;
+    display: grid;
+    place-items: center;
+    background: #132647;
+    color: #fff;
+    box-shadow: 0 22px 50px rgba(19, 38, 71, 0.28);
+    transform: rotate(-6deg);
+  }
+
+  .pte-hub-orbit-core i {
+    font-size: 3.3rem;
+  }
+
+  .pte-hub-mini-stat {
+    position: absolute;
+    border: 1px solid var(--hub-border);
+    border-radius: 1.1rem;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0.72rem 0.84rem;
+    box-shadow: 0 12px 28px rgba(19, 38, 71, 0.12);
+  }
+
+  .pte-hub-mini-stat strong {
+    display: block;
+    font-size: 1.05rem;
+  }
+
+  .pte-hub-mini-stat span {
+    color: var(--hub-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .pte-hub-mini-stat.practice {
+    left: 0;
+    top: 1.1rem;
+  }
+
+  .pte-hub-mini-stat.mock {
+    right: 0;
+    top: 5.5rem;
+  }
+
+  .pte-hub-mini-stat.feedback {
+    left: 2rem;
+    bottom: 0.7rem;
+  }
+
+  .pte-hub-section-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+
+  .pte-hub-main-card {
+    --card-accent: var(--hub-mint);
+    border: 1px solid var(--hub-border);
+    border-radius: 1.6rem;
+    background: var(--hub-panel);
+    box-shadow: 0 18px 46px rgba(19, 38, 71, 0.1);
+    overflow: hidden;
+    position: relative;
+    min-height: 100%;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+
+  .pte-hub-main-card:hover {
+    transform: translateY(-5px);
+    border-color: color-mix(in srgb, var(--card-accent), #ffffff 32%);
+    box-shadow: 0 26px 58px rgba(19, 38, 71, 0.16);
+  }
+
+  .pte-hub-main-card.accent-mint {
+    --card-accent: var(--hub-mint);
+  }
+
+  .pte-hub-main-card.accent-amber {
+    --card-accent: var(--hub-amber);
+  }
+
+  .pte-hub-main-card.accent-coral {
+    --card-accent: var(--hub-coral);
+  }
+
+  .pte-hub-card-topline {
+    height: 0.42rem;
+    background: linear-gradient(90deg, var(--card-accent), color-mix(in srgb, var(--card-accent), #ffffff 42%));
+  }
+
+  .pte-hub-card-body {
+    padding: 1.1rem;
+  }
+
+  .pte-hub-card-icon {
+    width: 3.35rem;
+    height: 3.35rem;
+    display: grid;
+    place-items: center;
+    border-radius: 1.1rem;
+    background: color-mix(in srgb, var(--card-accent), #ffffff 82%);
+    color: color-mix(in srgb, var(--card-accent), #000000 24%);
+    font-size: 1.55rem;
+    margin-bottom: 0.95rem;
+  }
+
+  .pte-hub-card-eyebrow {
+    color: color-mix(in srgb, var(--card-accent), #000000 28%);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 900;
+  }
+
+  .pte-hub-card-title {
+    font-size: 1.35rem;
+    font-weight: 900;
+    margin: 0.16rem 0 0.45rem;
+  }
+
+  .pte-hub-card-description {
+    color: var(--hub-muted);
+    line-height: 1.58;
+    min-height: 5rem;
+  }
+
+  .pte-hub-card-link-list {
+    display: grid;
+    gap: 0.48rem;
+    margin: 1rem 0;
+  }
+
+  .pte-hub-card-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    border: 1px solid rgba(19, 38, 71, 0.1);
+    border-radius: 0.9rem;
+    background: rgba(255, 255, 255, 0.62);
+    color: var(--hub-ink);
+    text-decoration: none;
+    font-weight: 800;
+    padding: 0.58rem 0.7rem;
+  }
+
+  .pte-hub-card-link:hover {
+    color: color-mix(in srgb, var(--card-accent), #000000 34%);
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .pte-hub-card-cta {
+    width: 100%;
+    border: 0;
+    border-radius: 1rem;
+    background: var(--card-accent);
+    color: #fff;
+    font-weight: 900;
+    padding: 0.82rem 1rem;
+    text-decoration: none;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .pte-hub-report-panel {
+    margin-top: 1.25rem;
+    border: 1px solid var(--hub-border);
+    border-radius: 1.6rem;
+    background: rgba(19, 38, 71, 0.9);
+    color: #fff;
+    overflow: hidden;
+    box-shadow: var(--hub-shadow);
+  }
+
+  .pte-hub-report-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap: 1rem;
+    padding: 1.2rem;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(21, 182, 140, 0.22), transparent 18rem),
+      radial-gradient(circle at 88% 80%, rgba(244, 165, 28, 0.24), transparent 18rem);
+  }
+
+  .pte-hub-report-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.48rem;
+    color: #9eeed7;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+  }
+
+  .pte-hub-report-title {
+    margin: 0.65rem 0 0.45rem;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(1.6rem, 3vw, 2.45rem);
+    line-height: 1;
+  }
+
+  .pte-hub-report-copy {
+    color: rgba(255, 255, 255, 0.72);
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  .pte-hub-report-links {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .pte-hub-report-link {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 1.1rem;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    text-decoration: none;
+    padding: 0.85rem;
+  }
+
+  .pte-hub-report-link:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .pte-hub-report-link-icon {
+    width: 2.7rem;
+    height: 2.7rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.9rem;
+    background: rgba(255, 255, 255, 0.16);
+    color: #9eeed7;
+    font-size: 1.25rem;
+  }
+
+  .pte-hub-report-link strong {
+    display: block;
+  }
+
+  .pte-hub-report-link span {
+    display: block;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.86rem;
+    margin-top: 0.15rem;
+  }
+
+  @keyframes pteHubSpin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 1199.98px) {
+    .pte-hub-section-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .pte-hub-card-description {
+      min-height: 0;
+    }
+  }
+
+  @media (max-width: 991.98px) {
+    .pte-hub-hero-grid,
+    .pte-hub-report-inner {
+      grid-template-columns: 1fr;
+    }
+
+    .pte-hub-orbit {
+      min-height: 220px;
+    }
+  }
+
+  @media (max-width: 575.98px) {
+    .pte-learner-hub {
+      margin-left: -0.25rem;
+      margin-right: -0.25rem;
+    }
+
+    .pte-hub-hero,
+    .pte-hub-report-panel,
+    .pte-hub-main-card {
+      border-radius: 1.25rem;
+    }
+
+    .pte-hub-mini-stat {
+      position: static;
+      margin: 0.35rem;
+    }
+
+    .pte-hub-orbit {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      min-height: auto;
+      padding-top: 0.5rem;
+    }
+
+    .pte-hub-orbit-ring,
+    .pte-hub-orbit-core {
+      display: none;
+    }
+  }
+</style>
+
+<div class="pte-learner-hub">
+  <section class="pte-hub-hero mb-3" aria-labelledby="pteLearnerHubTitle">
+    <div class="pte-hub-hero-grid">
+      <div>
+        <span class="pte-hub-eyebrow"><i class="bi bi-lightning-charge-fill"></i> PTE Learner Space</span>
+        <h1 id="pteLearnerHubTitle" class="pte-hub-title">Hey <%= name %>, choose your next PTE move.</h1>
+        <p class="pte-hub-subtitle">
+          Practice with purpose, sit mock exams when you are ready, and use feedback to make the next attempt sharper.
+          This page keeps the learner tools in one focused place.
+        </p>
+        <% if (heroItems.length) { %>
+          <div class="pte-hub-actions">
+            <% heroItems.forEach((action) => { %>
+              <a href="<%= action.href %>" class="btn <%= action.variant === 'primary' ? 'pte-hub-primary-action' : 'pte-hub-soft-action' %>">
+                <i class="bi <%= action.icon || 'bi-arrow-right-circle' %> me-1"></i> <%= action.label || 'Open' %>
+              </a>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+
+      <aside class="pte-hub-score-card" aria-label="PTE learner tools summary">
+        <div class="pte-hub-orbit">
+          <div class="pte-hub-orbit-ring one"></div>
+          <div class="pte-hub-orbit-ring two"></div>
+          <div class="pte-hub-orbit-core"><i class="bi bi-mortarboard-fill"></i></div>
+          <div class="pte-hub-mini-stat practice">
+            <strong>Practice</strong>
+            <span>Skills and smart plans</span>
+          </div>
+          <div class="pte-hub-mini-stat mock">
+            <strong>Mock</strong>
+            <span>Exam-like sessions</span>
+          </div>
+          <div class="pte-hub-mini-stat feedback">
+            <strong>Feedback</strong>
+            <span>Scores and comments</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <% if (sections.length) { %>
+    <section class="pte-hub-section-grid" aria-label="PTE learner actions">
+      <% sections.forEach((section) => { %>
+        <article class="pte-hub-main-card accent-<%= section.accent || 'mint' %>">
+          <div class="pte-hub-card-topline"></div>
+          <div class="pte-hub-card-body">
+            <div class="pte-hub-card-icon"><i class="bi <%= section.icon || 'bi-grid' %>"></i></div>
+            <div class="pte-hub-card-eyebrow"><%= section.eyebrow || '' %></div>
+            <h2 class="pte-hub-card-title"><%= section.title || '' %></h2>
+            <p class="pte-hub-card-description"><%= section.description || '' %></p>
+
+            <% if (Array.isArray(section.links) && section.links.length) { %>
+              <div class="pte-hub-card-link-list">
+                <% section.links.forEach((link) => { %>
+                  <a href="<%= link.href %>" class="pte-hub-card-link">
+                    <span><i class="bi <%= link.icon || 'bi-arrow-right-circle' %> me-2"></i><%= link.label %></span>
+                    <i class="bi bi-arrow-up-right"></i>
+                  </a>
+                <% }) %>
+              </div>
+            <% } %>
+
+            <% if (section.href) { %>
+              <a href="<%= section.href %>" class="pte-hub-card-cta">
+                <%= section.cta || 'Open' %> <i class="bi bi-arrow-right"></i>
+              </a>
+            <% } %>
+          </div>
+        </article>
+      <% }) %>
+    </section>
+  <% } %>
+
+  <% if (activityItems.length) { %>
+    <section class="pte-hub-report-panel" aria-labelledby="pteHubActivityTitle">
+      <div class="pte-hub-report-inner">
+        <div>
+          <span class="pte-hub-report-kicker"><i class="bi bi-activity"></i> PTE Activity</span>
+          <h2 id="pteHubActivityTitle" class="pte-hub-report-title">Track attempts and credits before you practice.</h2>
+          <p class="pte-hub-report-copy">
+            Open your attempt history to review previous sessions, or check remaining quota and recent activity consumption before starting more practice.
+          </p>
+        </div>
+
+        <div class="pte-hub-report-links">
+          <% activityItems.forEach((item) => { %>
+            <a href="<%= item.href %>" class="pte-hub-report-link">
+              <span class="pte-hub-report-link-icon"><i class="bi <%= item.icon || 'bi-patch-check' %>"></i></span>
+              <span>
+                <strong><%= item.title || '' %></strong>
+                <span><%= item.description || '' %></span>
+              </span>
+              <i class="bi bi-arrow-up-right"></i>
+            </a>
+          <% }) %>
+        </div>
+      </div>
+    </section>
+  <% } %>
+</div>

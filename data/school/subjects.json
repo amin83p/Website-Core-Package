@@ -1,0 +1,1241 @@
+[
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB5-6",
+    "title": "EAL- CLB 5-6",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Intermediate",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:44:17.831Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:44:17.831Z"
+    },
+    "id": "152104"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB11-12",
+    "title": "EAL- CLB 11-12",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Expert",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:48:39.996Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:48:39.996Z"
+    },
+    "id": "261174"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB9-10",
+    "title": "EAL- CLB 9-10",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Advanced",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:47:35.083Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:47:35.084Z"
+    },
+    "id": "333560"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB3-4",
+    "title": "EAL- CLB 3-4",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:43:21.434Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:43:21.434Z"
+    },
+    "id": "345325"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB10-11",
+    "title": "EAL- CLB 10-11",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Expert",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:48:15.779Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:48:15.779Z"
+    },
+    "id": "348536"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB8-9",
+    "title": "EAL- CLB 8-9",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Advanced",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:47:14.552Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:47:14.552Z"
+    },
+    "id": "430030"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB6-7",
+    "title": "EAL- CLB 6-7",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Intermediate",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:44:43.169Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:44:43.169Z"
+    },
+    "id": "441147"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB7-8",
+    "title": "EAL- CLB 7-8",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Intermediate",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:46:08.175Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:46:08.175Z"
+    },
+    "id": "539856"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB4-5",
+    "title": "EAL- CLB 4-5",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:43:46.301Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:43:46.301Z"
+    },
+    "id": "648041"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB2-3",
+    "title": "EAL- CLB 2-3",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:43:00.744Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:43:00.744Z"
+    },
+    "id": "779977"
+  },
+  {
+    "orgId": "900000",
+    "code": "EAL-CLB1-2",
+    "title": "EAL- CLB 1-2",
+    "status": "active",
+    "description": "",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "prerequisites": [],
+    "attachments": [],
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:42:32.294Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-31T02:42:32.294Z"
+    },
+    "id": "957950"
+  },
+  {
+    "id": "SUB-CMP-B1JHM",
+    "academicUnit": {
+      "departmentId": "DEP_1771788798860",
+      "departmentCode": "CMP",
+      "departmentName": "Computer deptartment"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-01T21:08:01.612Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-01T21:08:01.612Z"
+    },
+    "code": "COMPUTER-LEVEL 3 - One On One",
+    "configuration": {
+      "defaultHours": 24,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 2400,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 2130,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "Computer Training Level 3 - One On One"
+  },
+  {
+    "id": "SUB-CMP-F798D",
+    "academicUnit": {
+      "departmentId": "DEP_1771788798860",
+      "departmentCode": "CMP",
+      "departmentName": "Computer deptartment"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-01T21:07:28.826Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-01T21:01:53.278Z"
+    },
+    "code": "COMPUTER-LEVEL 1 - One On One",
+    "configuration": {
+      "defaultHours": 24,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 2400,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 2130,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "Computer Training Level 1 - One On One"
+  },
+  {
+    "id": "SUB-CMP-GCLPQ",
+    "academicUnit": {
+      "departmentId": "DEP_1771788798860",
+      "departmentCode": "CMP",
+      "departmentName": "Computer deptartment"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-01T21:07:44.780Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-01T21:07:44.781Z"
+    },
+    "code": "COMPUTER-LEVEL 2 - One On One",
+    "configuration": {
+      "defaultHours": 24,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 2400,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 2130,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "Computer Training Level 2 - One On One"
+  },
+  {
+    "id": "SUB-CMP-MYSNN",
+    "academicUnit": {
+      "departmentId": "DEP_1771788798860",
+      "departmentCode": "CMP",
+      "departmentName": "Computer deptartment"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-01T20:59:25.950Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-01T20:54:55.397Z"
+    },
+    "code": "COMPUTER-LEVEL 1 - Group Class",
+    "configuration": {
+      "defaultHours": 24,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 1600,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 1540,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "Computer Training Level 1 - Group Class"
+  },
+  {
+    "id": "SUB-CMP-S2ON0",
+    "academicUnit": {
+      "departmentId": "DEP_1771788798860",
+      "departmentCode": "CMP",
+      "departmentName": "Computer deptartment"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-01T21:09:57.576Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-01T21:09:57.576Z"
+    },
+    "code": "ONE-HANDED TYPING - Group Class",
+    "configuration": {
+      "defaultHours": 24,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 1600,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 1540,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "ONE-HANDED TYPING - Group Class"
+  },
+  {
+    "id": "SUB-CMP-SO5S2",
+    "academicUnit": {
+      "departmentId": "DEP_1771788798860",
+      "departmentCode": "CMP",
+      "departmentName": "Computer deptartment"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-01T21:10:32.614Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-01T21:10:32.614Z"
+    },
+    "code": "ONE-HANDED TYPING - One On One",
+    "configuration": {
+      "defaultHours": 24,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 3600,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 3080,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "ONE-HANDED TYPING - One On One"
+  },
+  {
+    "id": "SUB-CMP-VJAG8",
+    "academicUnit": {
+      "departmentId": "DEP_1771788798860",
+      "departmentCode": "CMP",
+      "departmentName": "Computer deptartment"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-01T21:01:27.558Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-01T21:01:27.558Z"
+    },
+    "code": "COMPUTER-LEVEL 2 - Group Class",
+    "configuration": {
+      "defaultHours": 24,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 1600,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 1540,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-06-30",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "Computer Training Level 2 - Group Class"
+  },
+  {
+    "id": "SUB-EAL-YCJS2",
+    "academicUnit": {
+      "departmentId": "DEP_1771788762810",
+      "departmentCode": "EAL",
+      "departmentName": "English as an Additional Language"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-01T20:47:18.720Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-01T20:47:18.720Z"
+    },
+    "code": "EAL-BASIC",
+    "configuration": {
+      "defaultHours": 192,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 50,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [
+      {
+        "feeCategory": "__ALL__",
+        "amount": 6230,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "Domestic",
+        "amount": 5410,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      },
+      {
+        "feeCategory": "WCB Alberta",
+        "amount": 6200,
+        "currency": "CAD",
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "EAL-Basic Literacy"
+  },
+  {
+    "id": "SUB-EQU-LINC-OIFCI",
+    "academicUnit": {
+      "departmentId": "DEP_1771788678638",
+      "departmentCode": "LINC",
+      "departmentName": "LINC Department"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-29T05:54:33.721Z",
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-20T17:07:22.237Z"
+    },
+    "code": "LINC-PRE",
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "LINC-PRE-CLB"
+  },
+  {
+    "id": "SUB-LINC-9FF0F",
+    "academicUnit": {
+      "departmentId": "DEP_1771788678638",
+      "departmentCode": "LINC",
+      "departmentName": "LINC Department"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-29T05:55:00.497Z",
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-22T19:37:08.316Z"
+    },
+    "code": "LINC-1-2",
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Beginner",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "LINC-CLB-1-2"
+  },
+  {
+    "id": "SUB-LINC-G7QLY",
+    "academicUnit": {
+      "departmentId": "DEP_1771788678638",
+      "departmentCode": "LINC",
+      "departmentName": "LINC Department"
+    },
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-29T05:55:15.530Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-01T20:45:20.653Z"
+    },
+    "code": "LINC-3-4",
+    "configuration": {
+      "defaultHours": 150,
+      "credits": 3,
+      "level": "Intermediate",
+      "deliveryMethod": "Hybrid"
+    },
+    "defaultScoreRules": {
+      "minPassingScore": 70,
+      "minPassingAverage": null,
+      "mustPass": true,
+      "allowCompensation": false,
+      "notes": ""
+    },
+    "description": "",
+    "feeRules": [],
+    "orgId": "900000",
+    "prerequisites": [],
+    "status": "active",
+    "title": "LINC-PRE-2-3"
+  }
+]

@@ -1,0 +1,947 @@
+<%
+  const stateFilters = filters || {};
+  const hasActionStateFiltersApplied = Boolean(
+    String(stateFilters.id || '').trim()
+    || String(stateFilters.userId || '').trim()
+    || String(stateFilters.sectionId || '').trim()
+    || String(stateFilters.targetKey || '').trim()
+    || String(stateFilters.operationId || '').trim()
+    || String(stateFilters.status || '').trim()
+    || String(stateFilters.startDate || '').trim()
+    || String(stateFilters.endDate || '').trim()
+  );
+%>
+
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName,
+  print,
+  btn_export: true,
+  optionalBtns: [`
+    <button type="button" id="run-retention-cleanup-btn" class="btn btn-filled btn-warning text-dark me-2">
+      <i class="bi bi-broom-fill me-1"></i> Run Retention Cleanup
+    </button>
+    <button type="button" id="delete-all-logs-btn" class="btn btn-filled btn-danger text-white me-2">
+      <i class="bi bi-trash-fill me-1"></i> Delete All Data
+    </button>
+  `]
+}) %>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-primary">
+            <div class="text-muted small text-uppercase fw-bold">Total Activities</div>
+            <div class="fs-4 fw-bold text-dark"><%= summary?.totalActivities || 0 %></div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-success">
+            <div class="text-muted small text-uppercase fw-bold">Total Volume</div>
+            <div class="fs-4 fw-bold text-dark">
+                <% 
+                   const totalVol = Number(summary?.totalVolumeKB || 0);
+                   let volDisplay = totalVol.toFixed(2) + ' KB';
+                   if (totalVol > 1024) volDisplay = (totalVol / 1024).toFixed(2) + ' MB';
+                %>
+                <%= volDisplay %>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-warning">
+            <div class="text-muted small text-uppercase fw-bold">Active Sessions</div>
+            <div class="fs-4 fw-bold text-dark">
+                <%= summary?.activeSessions || 0 %>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-danger">
+            <div class="text-muted small text-uppercase fw-bold">Failures</div>
+            <div class="fs-4 fw-bold text-dark">
+                <%= summary?.failures || 0 %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+        <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Activity States</div>
+        <button
+            id="actionStateFilterToggleBtn"
+            type="button"
+            class="btn btn-outline-secondary btn-sm px-2"
+            data-bs-toggle="collapse"
+            data-bs-target="#actionStateFilterCollapse"
+            aria-expanded="<%= hasActionStateFiltersApplied ? 'true' : 'false' %>"
+            aria-controls="actionStateFilterCollapse"
+            aria-label="<%= hasActionStateFiltersApplied ? 'Close filters' : 'Open filters' %>">
+            <i id="actionStateFilterToggleIcon" class="bi <%= hasActionStateFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+        </button>
+    </div>
+    <div class="collapse<%= hasActionStateFiltersApplied ? ' show' : '' %>" id="actionStateFilterCollapse">
+        <div class="card-body p-4">
+            <form method="GET" action="">
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Action ID</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-hash"></i></span>
+                        <input type="text" name="id" class="form-control border-start-0 ps-0" placeholder="e.g. ASI..." value="<%= filters.id || '' %>">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">User ID</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-person"></i></span>
+                        <input type="text" name="userId" class="form-control border-start-0 ps-0" placeholder="e.g. 1001" value="<%= filters.userId || '' %>">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Section</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-collection"></i></span>
+                        <input type="text" name="sectionId" class="form-control border-start-0 ps-0" placeholder="e.g. USERS" value="<%= filters.sectionId || '' %>">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Target Object</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-bullseye"></i></span>
+                        <input type="text" name="targetKey" class="form-control border-start-0 ps-0" placeholder="e.g. user_555" value="<%= filters.targetKey || '' %>">
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Operation</label>
+                    <input type="text" name="operationId" class="form-control form-control-sm" placeholder="e.g. EDIT" value="<%= filters.operationId || '' %>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All Statuses</option>
+                        <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
+                        <option value="attempted" <%= filters.status === 'attempted' ? 'selected' : '' %>>Attempted</option>
+                        <option value="in_progress" <%= filters.status === 'in_progress' ? 'selected' : '' %>>In Progress</option>
+                        <option value="retryable_error" <%= filters.status === 'retryable_error' ? 'selected' : '' %>>Retryable Error</option>
+                        <option value="completed" <%= filters.status === 'completed' ? 'selected' : '' %>>Completed</option>
+                        <option value="cancelled" <%= filters.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+                        <option value="failed" <%= filters.status === 'failed' ? 'selected' : '' %>>Failed</option>
+                        <option value="terminated" <%= filters.status === 'terminated' ? 'selected' : '' %>>Terminated</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Date Range</label>
+                    <div class="input-group input-group-sm">
+                        <input type="date" name="startDate" class="form-control" title="Start Date" value="<%= filters.startDate || '' %>">
+                        <span class="input-group-text bg-light border-start-0 border-end-0 text-muted">to</span>
+                        <input type="date" name="endDate" class="form-control" title="End Date" value="<%= filters.endDate || '' %>">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm w-100 btn-filled">
+                            <i class="bi bi-funnel-fill me-1"></i> Filter
+                        </button>
+                        <a href="/actionStates" class="btn btn-outline-secondary btn-sm" title="Reset">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">Track ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="userId">User <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="sectionId">Context <span class="sort-icon"></span></th>
+        <th>Origin <span class="sort-icon"></span></th> <th class="draggable" data-column="targetKey">Target <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="attemptCount">Count <span class="sort-icon"></span></th>
+        <th class="draggable text-end" data-column="volumeUsageKB">Data <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="startedAt">Started <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (data && data.length > 0) { %>
+        <% data.forEach(item => { 
+            // Extract Initial IP if available
+            const initIP = item.initialContext ? item.initialContext.ip : '-';
+            const method = item.initialContext ? item.initialContext.method : '';
+            const requestId = item.initialContext ? (item.initialContext.requestId || '') : '';
+            const actorDisplayName = item.initialContext ? (item.initialContext.displayName || item.initialContext.username || '') : '';
+            const sectionName = item.sectionDisplayName || item.sectionId || '-';
+            const operationName = item.operationDisplayName || item.operationId || '-';
+            const showSectionId = item.sectionId && sectionName !== item.sectionId;
+            const showOperationId = item.operationId && operationName !== item.operationId;
+        %>
+          <tr class="cursor-pointer view-details-row" data-id="<%= item.id %>">
+            <td><span class="font-monospace text-primary small fw-bold"><%= item.id %></span></td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2 border" style="width: 24px; height: 24px;">
+                        <i class="bi bi-person text-secondary" style="font-size: 0.75rem;"></i>
+                    </div>
+                    <div>
+                        <span class="small fw-semibold"><%= actorDisplayName || item.userId %></span>
+                        <% if (actorDisplayName) { %><div class="x-small text-muted"><%= item.userId %></div><% } %>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="d-flex align-items-center gap-1">
+                    <span class="badge bg-light text-dark border"><%= sectionName %></span>
+                    <i class="bi bi-chevron-right x-small text-muted"></i>
+                    <span class="text-muted small fw-bold"><%= operationName %></span>
+                </div>
+                <% if (showSectionId || showOperationId) { %>
+                  <div class="x-small text-muted mt-1">
+                    <% if (showSectionId) { %>Section ID: <span class="font-monospace"><%= item.sectionId %></span><% } %>
+                    <% if (showSectionId && showOperationId) { %> | <% } %>
+                    <% if (showOperationId) { %>Operation ID: <span class="font-monospace"><%= item.operationId %></span><% } %>
+                  </div>
+                <% } %>
+            </td>
+            <td> <div class="small font-monospace text-muted">
+                    <% if(method) { %><span class="badge bg-secondary-subtle text-dark border me-1" style="font-size: 0.65rem;"><%= method %></span><% } %>
+                    <%= initIP %>
+                    <% if (requestId) { %><div class="x-small text-muted mt-1">Req: <span class="font-monospace"><%= requestId %></span></div><% } %>
+                </div>
+            </td>
+            <td>
+                <div class="text-truncate" style="max-width: 120px;">
+                    <span class="font-monospace small text-muted"><%= item.targetKey || '-' %></span>
+                </div>
+            </td>
+            <td class="text-center">
+                <% if (item.status === 'completed') { %>
+                    <span class="badge bg-success">Success</span>
+                <% } else if (item.status === 'active' || item.status === 'attempted' || item.status === 'in_progress' || item.status === 'retryable_error') { %>
+                    <span class="badge bg-primary">Active</span>
+                <% } else if (item.status === 'failed') { %>
+                    <span class="badge bg-danger">Failed</span>
+                <% } else { %>
+                    <span class="badge bg-secondary"><%= item.status %></span>
+                <% } %>
+            </td>
+            <td class="text-center">
+                <span class="badge rounded-pill bg-light text-dark border"><%= item.attemptCount %></span>
+            </td>
+            <td class="text-end font-monospace small"><%= (item.volumeUsageKB || 0).toFixed(2) %> KB</td>
+            <td><div class="small"><%= new Date(item.startedAt || item.createdAt).toLocaleString() %></div></td>
+            <td class="table-actions text-end pe-4">
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= item.id %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                  <button class="btn btn-outline-primary btn-sm view-details-btn" data-id="<%= item.id %>">
+                    <i class="bi bi-eye me-2"></i>View Details
+                  </button>
+                </div>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      <% } else { %>
+        <tr>
+          <td colspan="10" class="text-center text-muted py-5">No activity records found.</td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: 'actionStates'
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<div class="modal fade" id="actionStateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      
+      <div class="modal-header border-bottom-0 pb-0">
+        <div>
+            <div class="text-muted x-small text-uppercase fw-bold ls-1">Activity Log</div>
+            <h5 class="modal-title fw-bold" id="detailIdDisplay"></h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body p-0">
+          
+          <div id="modalLoading" class="text-center py-5">
+              <div class="spinner-border text-primary" role="status"></div>
+              <p class="mt-2 text-muted fw-bold">Decrypting secure payload...</p>
+          </div>
+          
+          <div id="modalContent" class="d-none">
+              
+              <div class="bg-dark text-white px-4 py-3">
+                  <div class="row align-items-center">
+                      <div class="col-md-6 border-end border-secondary">
+                          <div class="text-uppercase x-small text-white-50 fw-bold mb-1">Target Object</div>
+                          <div class="d-flex align-items-center gap-2">
+                              <span class="badge bg-primary" id="headOp"></span>
+                              <span class="font-monospace" id="headTarget"></span>
+                          </div>
+                      </div>
+                      <div class="col-md-6 ps-4">
+                          <div class="text-uppercase x-small text-white-50 fw-bold mb-1">Session Origin</div>
+                          <div class="d-flex align-items-center gap-3">
+                              <div><i class="bi bi-globe me-1 text-info"></i> <span id="headIP" class="font-monospace small"></span></div>
+                              <div class="text-truncate small text-white-50" id="headUA" style="max-width: 250px;"></div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="bg-light border-bottom px-4 py-2">
+                  <div class="row text-center divide-x">
+                      <div class="col py-2">
+                          <div class="text-uppercase x-small text-muted fw-bold">Duration</div>
+                          <div class="fw-bold text-dark" id="summaryDuration">-</div>
+                      </div>
+                      <div class="col border-start py-2">
+                          <div class="text-uppercase x-small text-muted fw-bold">Attempts</div>
+                          <div class="fw-bold text-dark" id="summaryAttempts">-</div>
+                      </div>
+                      <div class="col border-start py-2">
+                          <div class="text-uppercase x-small text-muted fw-bold">Volume</div>
+                          <div class="fw-bold text-dark" id="summaryVolume">-</div>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="row g-0" style="height: 550px;">
+                  
+                  <div class="col-md-5 border-end bg-white h-100 d-flex flex-column">
+                      <div class="p-2 border-bottom bg-light d-flex justify-content-between align-items-center">
+                          <h6 class="fw-bold mb-0 text-secondary ps-2"><i class="bi bi-clock-history me-2"></i>Execution Path</h6>
+                      </div>
+                      
+                      <div id="containerTimeline" class="flex-grow-1 overflow-auto p-3">
+                          <div class="timeline-wrapper" id="historyTimeline"></div>
+                      </div>
+                  </div>
+
+                  <div class="col-md-7 h-100 d-flex flex-column overflow-auto">
+                      
+                      <div class="p-3 bg-white border-bottom">
+                          <div class="d-flex align-items-center justify-content-between">
+                              <div class="d-flex align-items-center">
+                                  <div class="avatar-sm bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold border" style="width:40px;height:40px;">
+                                      <i class="bi bi-person-fill fs-5"></i>
+                                  </div>
+                                  <div>
+                                      <div class="x-small text-uppercase text-muted fw-bold">Initiated By</div>
+                                      <div id="detailUserContainer"></div> 
+                                  </div>
+                              </div>
+                              
+                              <div class="text-end">
+                                  <div class="x-small text-uppercase text-muted fw-bold">Access Scope</div>
+                                  <div class="d-flex align-items-center justify-content-end gap-1">
+                                      <span id="detailSectionContainer"></span>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div class="d-flex flex-column flex-grow-1">
+                          <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-light border-bottom">
+                              <span class="fw-bold text-secondary small"><i class="bi bi-diagram-3 me-2"></i>Change Set</span>
+                              
+                              <div class="d-flex gap-2">
+                                  <div class="btn-group" role="group">
+                                      <input type="radio" class="btn-check" name="payloadView" id="viewChanges" autocomplete="off" checked>
+                                      <label class="btn btn-xs btn-outline-secondary" for="viewChanges" title="Change Set"><i class="bi bi-list-check"></i> Changes</label>
+
+                                      <input type="radio" class="btn-check" name="payloadView" id="viewJson" autocomplete="off">
+                                      <label class="btn btn-xs btn-outline-secondary" for="viewJson" title="Raw JSON"><i class="bi bi-braces"></i> JSON</label>
+                                    
+                                      <input type="radio" class="btn-check" name="payloadView" id="viewForm" autocomplete="off">
+                                      <label class="btn btn-xs btn-outline-secondary" for="viewForm" title="Form View"><i class="bi bi-ui-checks"></i> Form</label>
+                                  </div>
+
+                                  <button class="btn btn-xs btn-outline-secondary" id="copyPayloadBtn" title="Copy to Clipboard">
+                                      <i class="bi bi-clipboard"></i>
+                                  </button>
+                              </div>
+                          </div>
+                          
+                          <div class="flex-grow-1 position-relative bg-light">
+                              <div id="changeViewContainer" class="h-100 overflow-auto p-3 bg-white">
+                                  <div id="changeSetBuilder"></div>
+                                  <div class="border-top pt-3 mt-3">
+                                      <div class="d-flex align-items-center justify-content-between mb-2">
+                                          <span class="fw-bold text-secondary small"><i class="bi bi-clock-history me-1"></i>History Over Time</span>
+                                      </div>
+                                      <div id="entityTimeline" class="small"></div>
+                                  </div>
+                              </div>
+
+                              <pre id="jsonViewContainer" class="m-0 p-4 bg-dark text-warning font-monospace h-100 d-none" style="overflow: auto; border-radius: 0;"><code id="detailPayload"></code></pre>
+                              
+                              <div id="formViewContainer" class="d-none h-100 overflow-auto p-4 bg-white">
+                                  <div id="payloadFormBuilder" class="row g-3"></div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+              </div>
+          </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    function initCollapseToggleIcon(options = {}) {
+        const collapseEl = document.getElementById(String(options.collapseId || ''));
+        const buttonEl = document.getElementById(String(options.buttonId || ''));
+        const iconEl = document.getElementById(String(options.iconId || ''));
+        if (!collapseEl || !buttonEl || !iconEl) return;
+
+        const openIcon = String(options.openIcon || 'bi-chevron-down');
+        const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+        const setState = (expanded) => {
+            iconEl.classList.remove(openIcon, closeIcon);
+            iconEl.classList.add(expanded ? closeIcon : openIcon);
+            buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            buttonEl.setAttribute('aria-label', expanded ? 'Close filters' : 'Open filters');
+        };
+
+        setState(collapseEl.classList.contains('show'));
+        collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+        collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+
+    initCollapseToggleIcon({
+        collapseId: 'actionStateFilterCollapse',
+        buttonId: 'actionStateFilterToggleBtn',
+        iconId: 'actionStateFilterToggleIcon',
+        openIcon: 'bi-chevron-down',
+        closeIcon: 'bi-chevron-up'
+    });
+
+    const modalEl = document.getElementById('actionStateModal');
+    const bsModal = new bootstrap.Modal(modalEl);
+    const detailsCache = {
+        payload: null,
+        changeEvents: [],
+        entityTimeline: []
+    };
+    
+    // UI Elements
+    const els = {
+        id: document.getElementById('detailIdDisplay'),
+        userCon: document.getElementById('detailUserContainer'), 
+        secCon: document.getElementById('detailSectionContainer'),
+        
+        // Header Context
+        headOp: document.getElementById('headOp'),
+        headTarget: document.getElementById('headTarget'),
+        headIP: document.getElementById('headIP'),
+        headUA: document.getElementById('headUA'),
+        
+        // Summary Stats
+        sumDur: document.getElementById('summaryDuration'),
+        sumAtt: document.getElementById('summaryAttempts'),
+        sumVol: document.getElementById('summaryVolume'),
+        
+        // History
+        timeline: document.getElementById('historyTimeline'),
+
+        // Payload + Diff
+        viewChanges: document.getElementById('viewChanges'),
+        viewJson: document.getElementById('viewJson'),
+        viewForm: document.getElementById('viewForm'),
+        conChange: document.getElementById('changeViewContainer'),
+        conJson: document.getElementById('jsonViewContainer'),
+        conForm: document.getElementById('formViewContainer'),
+        changeSet: document.getElementById('changeSetBuilder'),
+        entityTimeline: document.getElementById('entityTimeline'),
+        payloadCode: document.getElementById('detailPayload'),
+        payloadForm: document.getElementById('payloadFormBuilder')
+    };
+
+    function toFiniteNumber(value) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : 0;
+    }
+
+    function resolveVolumeKB(record) {
+        if (!record || typeof record !== 'object') return 0;
+        const direct = toFiniteNumber(record.volumeUsageKB);
+        if (direct > 0) return direct;
+
+        const nested = [
+            record?.progress?.volumeKB,
+            record?.result?.volumeKB,
+            record?.failure?.volumeKB,
+            record?.retryableError?.volumeKB
+        ].reduce((sum, value) => sum + toFiniteNumber(value), 0);
+        if (nested > 0) return nested;
+
+        if (Array.isArray(record?.history)) {
+            return record.history.reduce((sum, row) => sum + toFiniteNumber(row?.volumeKB), 0);
+        }
+        return 0;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function togglePayloadView(mode = 'changes') {
+        const isChanges = mode === 'changes';
+        const isJson = mode === 'json';
+        const isForm = mode === 'form';
+
+        els.conChange.classList.toggle('d-none', !isChanges);
+        els.conJson.classList.toggle('d-none', !isJson);
+        els.conForm.classList.toggle('d-none', !isForm);
+    }
+
+    function renderChangeSet(changeEvents = []) {
+        if (!Array.isArray(changeEvents) || !changeEvents.length) {
+            els.changeSet.innerHTML = '<div class="text-muted small">No structured change events recorded for this action.</div>';
+            return;
+        }
+
+        const html = changeEvents.map((event, index) => {
+            const summary = event?.summary || {};
+            const actor = event?.actor || {};
+            const changes = Array.isArray(event?.changes) ? event.changes : [];
+            const eventAt = event?.at ? new Date(event.at).toLocaleString() : '-';
+            const actorName = actor.displayName || actor.username || actor.userId || '-';
+
+            let changesHtml = '<div class="text-muted small fst-italic">No field-level changes captured.</div>';
+            if ((String(event?.mode || '').toLowerCase() === 'create') && changes.length === 0) {
+                changesHtml = '<div class="text-muted small fst-italic">Create snapshot saved. Open JSON/Form tabs to view object details.</div>';
+            }
+            if (changes.length) {
+                const rows = changes.map((row) => `
+                    <tr>
+                        <td class="font-monospace x-small">${escapeHtml(row.path)}</td>
+                        <td class="x-small text-uppercase">${escapeHtml(row.type)}</td>
+                        <td class="font-monospace x-small text-break">${escapeHtml(JSON.stringify(row.from))}</td>
+                        <td class="font-monospace x-small text-break">${escapeHtml(JSON.stringify(row.to))}</td>
+                    </tr>
+                `).join('');
+                changesHtml = `
+                    <div class="table-scroll-wrapper border rounded">
+                      <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                          <tr>
+                            <th>Path</th>
+                            <th>Type</th>
+                            <th>From</th>
+                            <th>To</th>
+                          </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                      </table>
+                    </div>
+                `;
+            }
+
+            return `
+              <div class="border rounded p-2 mb-3 bg-light">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <div>
+                    <span class="badge bg-primary me-1">${escapeHtml(event.mode || 'update')}</span>
+                    <span class="badge bg-dark">${escapeHtml(event.entityType || '-')}</span>
+                    <span class="font-monospace small ms-1">${escapeHtml(event.entityId || '-')}</span>
+                  </div>
+                  <span class="text-muted x-small">${escapeHtml(eventAt)}</span>
+                </div>
+                <div class="x-small text-muted mb-2">
+                  By: <strong>${escapeHtml(actorName)}</strong> |
+                  Added: ${Number(summary.addedCount || 0)} |
+                  Changed: ${Number(summary.changedCount || 0)} |
+                  Hidden Audit: ${Number(summary.hiddenAuditCount || 0)}
+                </div>
+                ${changesHtml}
+              </div>
+            `;
+        }).join('');
+
+        els.changeSet.innerHTML = html;
+    }
+
+    function renderEntityTimeline(rows = []) {
+        if (!Array.isArray(rows) || !rows.length) {
+            els.entityTimeline.innerHTML = '<div class="text-muted">No cross-action timeline found for this entity.</div>';
+            return;
+        }
+
+        const html = rows.map((row) => {
+            const event = row?.event || {};
+            const actor = event?.actor || {};
+            const summary = event?.summary || {};
+            const actorName = actor.displayName || actor.username || actor.userId || row?.userId || '-';
+            const atDisplay = row?.at ? new Date(row.at).toLocaleString() : '-';
+            return `
+              <div class="border-start ps-2 mb-2">
+                <div class="fw-semibold x-small">${escapeHtml(atDisplay)} - ${escapeHtml(actorName)}</div>
+                <div class="x-small text-muted">
+                  ${escapeHtml(event.mode || 'update')} | ${escapeHtml(event.entityType || '-')} |
+                  +${Number(summary.addedCount || 0)} / ~${Number(summary.changedCount || 0)}
+                </div>
+                <div class="x-small text-muted">Action State: <span class="font-monospace">${escapeHtml(row.actionStateId || '-')}</span></div>
+              </div>
+            `;
+        }).join('');
+
+        els.entityTimeline.innerHTML = html;
+    }
+
+    // Toggle Payload Views
+    els.viewChanges.addEventListener('change', () => {
+        togglePayloadView('changes');
+    });
+    els.viewJson.addEventListener('change', () => {
+        togglePayloadView('json');
+    });
+    els.viewForm.addEventListener('change', () => {
+        togglePayloadView('form');
+    });
+    
+    togglePayloadView('changes');
+
+    document.querySelectorAll('.view-details-btn, .view-details-row').forEach(el => {
+        el.addEventListener('click', async (e) => {
+            if(el.classList.contains('view-details-row') && e.target.closest('.view-details-btn')) return;
+            if (el.classList.contains('view-details-row') && e.target.closest('.row-actions-wrap, .row-actions-menu, .btn-row-actions-toggle')) return;
+            const id = el.getAttribute('data-id');
+            loadDetails(id);
+        });
+    });
+
+    async function loadDetails(id) {
+        document.getElementById('modalLoading').classList.remove('d-none');
+        document.getElementById('modalContent').classList.add('d-none');
+        
+        els.viewChanges.checked = true;
+        togglePayloadView('changes');
+        
+        bsModal.show();
+
+        try {
+            const res = await fetch(`/actionStates/details/${id}`, { headers: { 'X-AJAX-Request': 'true' } });
+            if (!res.ok) throw new Error("Failed to load details");
+            
+            const json = await res.json();
+            const rec = json.record;
+            const meta = json.meta || {};
+            const payload = json.decryptedPayload;
+            const changeEvents = Array.isArray(json.changeEvents) ? json.changeEvents : [];
+            const entityTimeline = Array.isArray(json.entityTimeline) ? json.entityTimeline : [];
+            const ctx = rec.initialContext || {}; // ✅ Get Context
+
+            detailsCache.payload = payload || null;
+            detailsCache.changeEvents = changeEvents;
+            detailsCache.entityTimeline = entityTimeline;
+
+            els.id.textContent = rec.id;
+            
+            // Header Context
+            els.headOp.textContent = meta.opName || rec.operationId;
+            els.headTarget.textContent = rec.targetKey || 'Global';
+            els.headIP.textContent = ctx.ip || 'Unknown IP';
+            els.headUA.textContent = ctx.userAgent || '-';
+            els.headUA.title = ctx.userAgent || '';
+
+            // User Link
+            els.userCon.innerHTML = `
+                <a href="/users/edit/${rec.userId}" class="fw-bold text-dark text-decoration-none hover-primary" target="_blank">
+                    ${meta.userName} <i class="bi bi-box-arrow-up-right x-small text-muted ms-1"></i>
+                </a>
+                <div class="x-small text-muted">ID: ${rec.userId}</div>
+                ${meta.username ? `<div class="x-small text-muted">Username: <span class="font-monospace">${meta.username}</span></div>` : ''}
+                ${meta.requestId ? `<div class="x-small text-muted">Request: <span class="font-monospace">${meta.requestId}</span></div>` : ''}
+            `;
+            
+            // Section Link
+            els.secCon.innerHTML = `
+                <a href="/sections/edit/${rec.sectionId}" class="badge bg-secondary text-decoration-none fs-6" target="_blank">
+                    <i class="bi bi-collection me-1"></i> ${meta.sectionName}
+                </a>
+            `;
+
+            // Metrics
+            const start = new Date(rec.startedAt || rec.createdAt).getTime();
+            const last = new Date(rec.lastActiveAt || rec.updatedAt || rec.startedAt || rec.createdAt).getTime();
+            const diffMs = last - start;
+            els.sumDur.textContent = (diffMs / 1000).toFixed(2) + 's';
+            els.sumAtt.textContent = rec.attemptCount || 0;
+            els.sumVol.textContent = resolveVolumeKB(rec).toFixed(2) + ' KB';
+
+            // History Timeline with Context
+            let tlHtml = '';
+            if (rec.history && rec.history.length) {
+                rec.history.forEach((h, idx) => {
+                    let dotClass = '';
+                    // Status Coloring
+                    if (h.status.includes('success') || h.status.includes('completed')) dotClass = 'success';
+                    else if (h.status.includes('fail') || h.status.includes('error')) dotClass = 'fail';
+                    else if (h.status.includes('start')) dotClass = 'start';
+
+                    const date = new Date(h.ts);
+                    
+                    // ✅ Show Context (Method/URL)
+                    let ctxHtml = '';
+                    if (h.context && h.context.method) {
+                        ctxHtml = `
+                            <div class="mt-1 p-1 bg-light border rounded font-monospace" style="font-size: 0.7rem;">
+                                <span class="fw-bold text-dark">${h.context.method}</span> 
+                                <span class="text-muted text-break">${h.context.url}</span>
+                            </div>`;
+                    }
+
+                    tlHtml += `
+                        <div class="timeline-item pb-3 border-start ps-3 position-relative" style="margin-left: 10px;">
+                            <div class="timeline-dot ${dotClass}" style="left: -5px;"></div>
+                            <div class="d-flex justify-content-between">
+                                <div class="fw-bold text-dark small">${h.status}</div>
+                                <div class="text-muted x-small">${date.toLocaleTimeString()}</div>
+                            </div>
+                            <div class="text-muted x-small fst-italic">${h.details || ''}</div>
+                            ${ctxHtml}
+                        </div>
+                    `;
+                });
+            } else { 
+                tlHtml = '<div class="text-muted small p-3">No history recorded.</div>';
+            }
+            els.timeline.innerHTML = tlHtml;
+
+            // Change Set + Timeline
+            renderChangeSet(changeEvents);
+            renderEntityTimeline(entityTimeline);
+
+            // Legacy Payload fallback
+            if (payload) els.payloadCode.textContent = JSON.stringify(payload, null, 4);
+            else els.payloadCode.textContent = "// No data payload saved.";
+
+            // Form Builder
+            els.payloadForm.innerHTML = '';
+            if (payload && typeof payload === 'object') {
+                Object.keys(payload).forEach(key => {
+                    const val = payload[key];
+                    let inputHtml = '';
+                    if (typeof val === 'object' && val !== null) {
+                        inputHtml = `<textarea class="form-control font-monospace size-sm bg-light" rows="3" readonly>${JSON.stringify(val, null, 2)}</textarea>`;
+                    } else {
+                        inputHtml = `<input type="text" class="form-control font-monospace size-sm bg-light" value="${val}" readonly>`;
+                    }
+                    const col = document.createElement('div');
+                    col.className = 'col-12';
+                    col.innerHTML = `<label class="form-label x-small text-uppercase fw-bold text-muted mb-1">${key}</label>${inputHtml}`;
+                    els.payloadForm.appendChild(col);
+                });
+            } else {
+                els.payloadForm.innerHTML = `<div class="text-center text-muted py-5"><i>No structured data.</i></div>`;
+            }
+
+            document.getElementById('modalLoading').classList.add('d-none');
+            document.getElementById('modalContent').classList.remove('d-none');
+        } catch (err) {
+            console.error(err);
+            document.getElementById('modalLoading').innerHTML = `<div class="alert alert-danger m-3">Error: ${err.message}</div>`;
+        }
+    }
+
+    // Copy Button
+    document.getElementById('copyPayloadBtn').addEventListener('click', () => {
+        let text = '';
+        if (els.viewChanges.checked) {
+            text = JSON.stringify({
+                changeEvents: detailsCache.changeEvents || [],
+                entityTimeline: detailsCache.entityTimeline || []
+            }, null, 2);
+        } else if (els.viewJson.checked) {
+            text = els.payloadCode.textContent;
+        } else {
+            text = JSON.stringify(detailsCache.payload || {}, null, 2);
+        }
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.getElementById('copyPayloadBtn');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check2"></i>';
+            setTimeout(() => btn.innerHTML = orig, 1500);
+        });
+    });
+});
+</script>
+
+<script>
+  (function () {
+    const btn = document.getElementById('run-retention-cleanup-btn');
+    if (!btn) return;
+
+    btn.addEventListener('click', () => {
+      showMessageModal({
+        title: 'Run Cleanup',
+        icon: 'warning',
+        message: 'This will run Action State retention cleanup now. Continue?',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Run Cleanup', class: 'btn-warning btn-md' }
+        ]
+      }).then(async (result) => {
+        if (result !== 'Run Cleanup') return;
+
+        if (typeof window.requestProtectedAction === 'function') {
+          await window.requestProtectedAction();
+        } else {
+          await showMessageModal({
+            title: 'Verification Code',
+            icon: 'error',
+            message: 'Admin Verification System not loaded.',
+            buttons: [{ text: 'Close', class: 'btn-secondary btn-md' }]
+          });
+          return;
+        }
+
+        btn.disabled = true;
+        try {
+          const resp = await fetch('/actionStates/retention-cleanup', {
+            method: 'POST',
+            headers: {
+              'x-ajax-request': '1',
+              'Accept': 'application/json'
+            },
+            credentials: 'same-origin'
+          });
+
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || data.status !== 'success') {
+            throw new Error(data?.message || 'Cleanup failed.');
+          }
+
+          await showMessageModal({
+            title: 'Cleanup Completed',
+            icon: 'success',
+            message: data.message || 'Retention cleanup completed.',
+            buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+          });
+          window.location.href = '/actionStates';
+        } catch (err) {
+          await showMessageModal({
+            title: 'Cleanup Failed',
+            icon: 'error',
+            message: err.message || 'Cleanup request failed.',
+            buttons: [{ text: 'Close', class: 'btn-secondary btn-md' }]
+          });
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  })();
+</script>
+
+<script>
+  (function () {
+    const FETCH_URL = '/actionStates/delete-all';
+    const btn = document.getElementById('delete-all-logs-btn');
+
+    if (!btn) return;
+
+    btn.addEventListener('click', () => {
+      showMessageModal({
+        title: 'Confirm Delete',
+        icon: 'warning',
+        message: 'This action will permanently delete ALL stored data. This cannot be undone.',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Delete', class: 'btn-danger btn-md' }
+        ]
+      }).then(async (result) => {
+        if (result !== 'Delete') return;  
+        if (typeof window.requestProtectedAction === 'function') {
+            await window.requestProtectedAction();
+        } else {
+          showMessageModal({
+              title: 'Verification Code',
+              icon: 'error',
+              message: 'Admin Verification System not loaded. Proceeding...',
+              buttons: [ { text: 'Ok', class: 'btn-danger btn-md' } ]
+            });
+            return;
+        }
+        
+        btn.disabled = true;
+        try {
+          const resp = await fetch(FETCH_URL, {
+            method: 'GET', 
+            headers: {
+              'x-ajax-request': '1',       
+              'Accept': 'application/json' 
+            },
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) {
+            let data;
+            try { data = await resp.json(); } catch (e) { data = null; }
+            const serverMessage = data?.message || 'Delete failed due to a server error.';
+            await showMessageModal({
+              title: 'Delete Failed',
+              icon: 'error',
+              message: serverMessage,
+              buttons: [{ text: 'Close', class: 'btn-secondary btn-md' }]
+            });
+            return;
+          }
+
+          await showMessageModal({
+            title: 'All data Deleted',
+            icon: 'success',
+            message: 'All stored data was deleted successfully.',
+            buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+          });
+          window.location.href = '/actionStates';
+        } catch (err) {
+          await showMessageModal({
+            title: 'Network Error',
+            icon: 'error',
+            message: `Request failed: ${err.message}`,
+            buttons: [{ text: 'Close', class: 'btn-secondary btn-md' }]
+          });
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  })();
+</script>

@@ -1,0 +1,1588 @@
+[
+  {
+    "id": "ACC_1110",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "1110",
+    "description": "Physical cash",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Cash on Hand",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_CASH_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1130",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "1130",
+    "description": "Main operating bank",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Operating Bank",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_CASH_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1140",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "1140",
+    "description": "Payroll bank",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Payroll Bank",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_CASH_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1210",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "1210",
+    "description": "Outstanding student balances",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Student Accounts Receivable",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_AR_CTRL",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1220",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:17:31.803Z",
+      "lastUpdateDateTime": "2026-02-26T06:32:25.195Z"
+    },
+    "code": "1220",
+    "description": "Master head account for student receivable category control accounts.",
+    "headCategory": "student_all",
+    "isControl": true,
+    "level": 3,
+    "name": "Student_All_Control",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_AR_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1221",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:25:36.239Z",
+      "lastUpdateDateTime": "2026-02-26T06:32:25.195Z"
+    },
+    "code": "1221",
+    "description": "Domestic student receivable control account.",
+    "headCategory": "student_domestic",
+    "isControl": true,
+    "level": 4,
+    "name": "Student_Domestic",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1220",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1222",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:25:36.239Z",
+      "lastUpdateDateTime": "2026-02-26T06:32:25.195Z"
+    },
+    "code": "1222",
+    "description": "International student receivable control account.",
+    "headCategory": "student_international",
+    "isControl": true,
+    "level": 4,
+    "name": "Student_International",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1220",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1223",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:25:36.239Z",
+      "lastUpdateDateTime": "2026-02-26T06:32:25.195Z"
+    },
+    "code": "1223",
+    "description": "Corporate-sponsored student receivable control account.",
+    "headCategory": "student_corporate",
+    "isControl": true,
+    "level": 4,
+    "name": "Student_Corporate",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1220",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1224",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:25:36.239Z",
+      "lastUpdateDateTime": "2026-02-26T06:32:25.195Z"
+    },
+    "code": "1224",
+    "description": "Scholarship student receivable control account.",
+    "headCategory": "student_scholarship",
+    "isControl": true,
+    "level": 4,
+    "name": "Student_Scholarship",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1220",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1225",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:25:36.239Z",
+      "lastUpdateDateTime": "2026-02-26T06:32:25.195Z"
+    },
+    "code": "1225",
+    "description": "Government funded student receivable control account.",
+    "headCategory": "student_government_funded",
+    "isControl": true,
+    "level": 4,
+    "name": "Student_Government_Funded",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1220",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1226",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:25:36.239Z",
+      "lastUpdateDateTime": "2026-02-26T06:32:25.195Z"
+    },
+    "code": "1226",
+    "description": "Other student receivable control account.",
+    "headCategory": "student_other",
+    "isControl": true,
+    "level": 4,
+    "name": "Student_Other",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1220",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1227",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:32:25.195Z"
+    },
+    "code": "1227",
+    "description": "LINC Alberta student receivable control account.",
+    "headCategory": "student_linc_alberta",
+    "isControl": true,
+    "level": 4,
+    "name": "Student_LINC_Alberta",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1220",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1228",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:32:25.195Z"
+    },
+    "code": "1228",
+    "description": "WCB Alberta student receivable control account.",
+    "headCategory": "student_wcb_alberta",
+    "isControl": true,
+    "level": 4,
+    "name": "Student_WCB_Alberta",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1220",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1230",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:17:31.803Z"
+    },
+    "code": "1230",
+    "description": "Head control account for parent-linked receivable subaccounts.",
+    "headCategory": "parents",
+    "isControl": true,
+    "level": 3,
+    "name": "Parents Receivable Control",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_AR_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1240",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:17:31.803Z"
+    },
+    "code": "1240",
+    "description": "Head control account for sponsor/organization receivable subaccounts.",
+    "headCategory": "organizations",
+    "isControl": true,
+    "level": 3,
+    "name": "Sponsored Organizations Receivable Control",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_AR_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1290",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:17:31.803Z"
+    },
+    "code": "1290",
+    "description": "Head control account for other receivable subaccounts.",
+    "headCategory": "other",
+    "isControl": true,
+    "level": 3,
+    "name": "Other Party Receivable Control",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_AR_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1530",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "1530",
+    "description": "Contra asset",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Accumulated Depreciation",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_FA_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486530_268",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.530Z"
+    },
+    "code": "STU_STU52105",
+    "description": "Auto-created for generated sample student STU52105.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "Hossein Norouzi (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1221",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486535_802",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.535Z"
+    },
+    "code": "STU_STU60319",
+    "description": "Auto-created for generated sample student STU60319.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "Sample Liam Taylor King (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1222",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486539_62",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.539Z"
+    },
+    "code": "STU_STU71718",
+    "description": "Auto-created for generated sample student STU71718.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "Sample Noah Miller Wright (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1223",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486543_469",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.543Z"
+    },
+    "code": "STU_STU89840",
+    "description": "Auto-created for generated sample student STU89840.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "Sample Emma Wilson Scott (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1224",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486547_738",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.547Z"
+    },
+    "code": "STU_STU22389",
+    "description": "Auto-created for generated sample student STU22389.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "Sample Mia Moore Green (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1225",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486551_145",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.551Z"
+    },
+    "code": "STU_STU50562",
+    "description": "Auto-created for generated sample student STU50562.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "Sample Olivia Clark Baker (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1227",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486555_639",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.555Z"
+    },
+    "code": "STU_STU78469",
+    "description": "Auto-created for generated sample student STU78469.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "Sample Lucas Hall Adams (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1228",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486560_570",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.560Z"
+    },
+    "code": "STU_STU50124",
+    "description": "Auto-created for generated sample student STU50124.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "Javad Amini Foroushani (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1226",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486564_834",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.564Z"
+    },
+    "code": "STU_STU19489",
+    "description": "Auto-created for generated sample student STU19489.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "John Redmath (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1221",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486568_424",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.568Z"
+    },
+    "code": "STU_STU20600",
+    "description": "Auto-created for generated sample student STU20600.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 5,
+    "name": "Sample Sofia King Brown (Student)",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1222",
+    "partyRole": "student",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_1772254486574_498",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.574Z"
+    },
+    "code": "TCH_TCH68960",
+    "description": "Auto-created for generated sample teacher TCH68960.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Alaleh Ahmadi (Teacher)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2120",
+    "partyRole": "teacher",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1772254486579_591",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.579Z"
+    },
+    "code": "TCH_TCH58304",
+    "description": "Auto-created for generated sample teacher TCH58304.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Sample Liam Taylor King (Teacher)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2120",
+    "partyRole": "teacher",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1772254486584_635",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.584Z"
+    },
+    "code": "TCH_TCH26663",
+    "description": "Auto-created for generated sample teacher TCH26663.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Sample Noah Miller Wright (Teacher)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2120",
+    "partyRole": "teacher",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1772254486589_294",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.589Z"
+    },
+    "code": "TCH_TCH49223",
+    "description": "Auto-created for generated sample teacher TCH49223.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Sample Emma Wilson Scott (Teacher)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2120",
+    "partyRole": "teacher",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1772254486594_584",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.594Z"
+    },
+    "code": "TCH_TCH82311",
+    "description": "Auto-created for generated sample teacher TCH82311.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Sample Mia Moore Green (Teacher)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2120",
+    "partyRole": "teacher",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1772254486599_455",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.599Z"
+    },
+    "code": "STF_STF31285",
+    "description": "Auto-created for generated sample staff STF31285.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Sample Ava Williams Young (Staff)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2130",
+    "partyRole": "staff",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1772254486603_467",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.603Z"
+    },
+    "code": "STF_STF14262",
+    "description": "Auto-created for generated sample staff STF14262.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Sample Liam Taylor King (Staff)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2130",
+    "partyRole": "staff",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1772254486608_699",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.608Z"
+    },
+    "code": "STF_STF43890",
+    "description": "Auto-created for generated sample staff STF43890.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Sample Noah Miller Wright (Staff)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2130",
+    "partyRole": "staff",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1772254486613_765",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.613Z"
+    },
+    "code": "STF_STF13273",
+    "description": "Auto-created for generated sample staff STF13273.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Sample Emma Wilson Scott (Staff)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2130",
+    "partyRole": "staff",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1772254486618_920",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.618Z"
+    },
+    "code": "STF_STF11459",
+    "description": "Auto-created for generated sample staff STF11459.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Sample Mia Moore Green (Staff)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2130",
+    "partyRole": "staff",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_1773354051916_829",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-12T22:20:51.916Z",
+      "lastUpdateDateTime": "2026-03-12T22:21:05.983Z"
+    },
+    "code": "TCH_TCH26298",
+    "description": "Auto-created for teacher TCH26298.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 4,
+    "name": "Amir Peivandzani (Teacher)",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_2120",
+    "partyRole": "teacher",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2110",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "2110",
+    "description": "Vendor balances",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Trade Payables",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_AP_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2120",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:17:31.803Z"
+    },
+    "code": "2120",
+    "description": "Head control account for teacher payable subaccounts.",
+    "headCategory": "teachers",
+    "isControl": true,
+    "level": 3,
+    "name": "Teacher Payables Control",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_AP_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2130",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:17:31.803Z"
+    },
+    "code": "2130",
+    "description": "Head control account for staff payable subaccounts.",
+    "headCategory": "staff",
+    "isControl": true,
+    "level": 3,
+    "name": "Staff Payables Control",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_AP_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2140",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-26T06:17:31.803Z"
+    },
+    "code": "2140",
+    "description": "Head control account for vendor payable subaccounts.",
+    "headCategory": "vendors",
+    "isControl": true,
+    "level": 3,
+    "name": "Vendor Payables Control",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_AP_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2310",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "2310",
+    "description": "Tuition in advance",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Deferred Tuition Revenue",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_DEFERRED_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2311",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "2311",
+    "description": "Program enrollment fees billed or received before they are earned.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Deferred Program Enrollment Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_DEFERRED_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2312",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "2312",
+    "description": "Term registration fees billed or received before the term service period is earned.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Deferred Term Registration Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_DEFERRED_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2313",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "2313",
+    "description": "Administrative and application fees held in deferred revenue until recognized.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Deferred Administrative and Application Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_DEFERRED_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2314",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "2314",
+    "description": "Student insurance charges collected in advance pending recognition or settlement.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Deferred Student Insurance Recoveries",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_DEFERRED_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2315",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "2315",
+    "description": "Student service and activity charges billed before recognition.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Deferred Student Services and Activity Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_DEFERRED_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2316",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "2316",
+    "description": "Technology, supplies, and materials charges collected before recognition.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Deferred Technology and Materials Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_DEFERRED_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2460",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "2460",
+    "description": "Amounts collected from students for insurance and payable to insurers or benefit providers.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Student Insurance Clearing Payable",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_LIAB_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_2510",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "2510",
+    "description": "Security/student deposits",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Student Deposits",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_LIAB_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_3100",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "3100",
+    "description": "Retained earnings",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 2,
+    "name": "Retained Earnings",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_EQUITY_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "equity"
+  },
+  {
+    "id": "ACC_4110",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "4110",
+    "description": "Domestic tuition",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Tuition Revenue - Domestic",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_TUITION_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4120",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "4120",
+    "description": "International tuition",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Tuition Revenue - International",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_TUITION_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4210",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "4210",
+    "description": "Registration fees",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Registration Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_FEES_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4211",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "4211",
+    "description": "One-time fees charged when a student is admitted or registered into a program.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Program Enrollment Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_FEES_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4212",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "4212",
+    "description": "One-time fees charged when a student registers into a program term or semester.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Term Registration Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_FEES_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4213",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "4213",
+    "description": "Non-refundable application, admission, and administrative processing fees.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Administrative and Application Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_FEES_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4214",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "4214",
+    "description": "Insurance-related charges billed to students when treated as institutional fee recoveries.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Student Insurance Fee Recoveries",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_FEES_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4215",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "4215",
+    "description": "Ancillary one-time charges for student services, campus activity, and support programs.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Student Services and Activity Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_FEES_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4216",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-03-01T00:00:00.000Z"
+    },
+    "code": "4216",
+    "description": "One-time charges for software access, learning platforms, books, kits, and materials.",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Technology and Materials Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_FEES_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4230",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "4230",
+    "description": "Lab/practicum fees",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Lab and Practicum Fees",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_FEES_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_4420",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "4420",
+    "description": "Waivers/discounts",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 3,
+    "name": "Fee Waivers and Discounts",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_CONTRA_INC_CTRL",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_5110",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "5110",
+    "description": "Instructor payroll",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 2,
+    "name": "Teaching Salaries",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_EXP_ROOT",
+    "partyRole": "teacher",
+    "status": "active",
+    "type": "expense"
+  },
+  {
+    "id": "ACC_5120",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "5120",
+    "description": "Admin payroll",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 2,
+    "name": "Administrative Salaries",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_EXP_ROOT",
+    "partyRole": "staff",
+    "status": "active",
+    "type": "expense"
+  },
+  {
+    "id": "ACC_5310",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "5310",
+    "description": "Facility rent",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 2,
+    "name": "Rent Expense",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_EXP_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "expense"
+  },
+  {
+    "id": "ACC_5320",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "5320",
+    "description": "Utilities",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 2,
+    "name": "Utilities Expense",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_EXP_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "expense"
+  },
+  {
+    "id": "ACC_5410",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "5410",
+    "description": "IT and software",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 2,
+    "name": "IT and Software Expense",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_EXP_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "expense"
+  },
+  {
+    "id": "ACC_5510",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "5510",
+    "description": "Bank fees",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 2,
+    "name": "Bank Charges",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_EXP_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "expense"
+  },
+  {
+    "id": "ACC_5540",
+    "allowPost": true,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "5540",
+    "description": "Refunds and adjustments",
+    "headCategory": "none",
+    "isControl": false,
+    "level": 2,
+    "name": "Refund and Adjustment Expense",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_EXP_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "expense"
+  },
+  {
+    "id": "ACC_AP_CTRL",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "2100",
+    "description": "Payables",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 2,
+    "name": "Accounts Payable",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_LIAB_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_AR_CTRL",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "1200",
+    "description": "Receivables",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 2,
+    "name": "Accounts Receivable",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_ASSET_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_ASSET_ROOT",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z",
+      "lastUpdateDateTime": "2026-02-26T06:40:47.157Z"
+    },
+    "code": "1000",
+    "description": "Top-level assets",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 1,
+    "name": "Assets",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": null,
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_CASH_CTRL",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "1100",
+    "description": "Cash and bank balances",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 2,
+    "name": "Cash and Bank",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_ASSET_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_CONTRA_INC_CTRL",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "4400",
+    "description": "Discount and waiver reductions",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 2,
+    "name": "Contra Revenue",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_INCOME_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_DEFERRED_CTRL",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "2300",
+    "description": "Unearned income",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 2,
+    "name": "Deferred Revenue",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_LIAB_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_EQUITY_ROOT",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "3000",
+    "description": "Top-level equity",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 1,
+    "name": "Equity",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": null,
+    "partyRole": "none",
+    "status": "active",
+    "type": "equity"
+  },
+  {
+    "id": "ACC_EXP_ROOT",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "5000",
+    "description": "Top-level expenses",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 1,
+    "name": "Expenses",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": null,
+    "partyRole": "none",
+    "status": "active",
+    "type": "expense"
+  },
+  {
+    "id": "ACC_FA_CTRL",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "1500",
+    "description": "Fixed assets",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 2,
+    "name": "Property and Equipment",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_ASSET_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
+    "id": "ACC_FEES_CTRL",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "4200",
+    "description": "Non-tuition fees",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 2,
+    "name": "Academic Fees Revenue",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_INCOME_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_INCOME_ROOT",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "4000",
+    "description": "Top-level income",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 1,
+    "name": "Income",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": null,
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  },
+  {
+    "id": "ACC_LIAB_ROOT",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "2000",
+    "description": "Top-level liabilities",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 1,
+    "name": "Liabilities",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": null,
+    "partyRole": "none",
+    "status": "active",
+    "type": "liability"
+  },
+  {
+    "id": "ACC_TUITION_CTRL",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-02-24T00:00:00.000Z"
+    },
+    "code": "4100",
+    "description": "Tuition streams",
+    "headCategory": "none",
+    "isControl": true,
+    "level": 2,
+    "name": "Tuition Revenue",
+    "normalBalance": "credit",
+    "orgId": "900000",
+    "parentId": "ACC_INCOME_ROOT",
+    "partyRole": "none",
+    "status": "active",
+    "type": "income"
+  }
+]

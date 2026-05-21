@@ -1,0 +1,39 @@
+[
+  {
+    "orgId": "900000",
+    "name": "APRIL-01",
+    "startDate": "2026-04-01",
+    "endDate": "2026-04-15",
+    "submissionDeadline": "2026-04-13",
+    "status": "open",
+    "notes": "",
+    "id": "392547"
+  },
+  {
+    "id": "TSP_1771795649084",
+    "audit": {
+      "createDateTime": "2026-02-22T21:27:29.084Z"
+    },
+    "endDate": "2026-02-15",
+    "name": "FEB-01",
+    "notes": "",
+    "orgId": "900000",
+    "startDate": "2026-02-01",
+    "status": "open",
+    "submissionDeadline": "2026-02-13"
+  },
+  {
+    "id": "TSP_1771800364541",
+    "audit": {
+      "createDateTime": "2026-02-22T22:46:04.541Z",
+      "lastUpdateDateTime": "2026-03-12T22:13:24.706Z"
+    },
+    "endDate": "2026-03-31",
+    "name": "2026-MARCH-01",
+    "notes": "",
+    "orgId": "900000",
+    "startDate": "2026-03-01",
+    "status": "open",
+    "submissionDeadline": "2026-03-30"
+  }
+]

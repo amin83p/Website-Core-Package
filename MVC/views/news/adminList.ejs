@@ -1,0 +1,196 @@
+<% 
+  // Configuration for the Partials
+  const tableName = 'News_Management';
+  // 'newUrl' is used by the partial to generate the "Add" button link (/news/manage/new)
+  // and by the edit buttons (/news/manage/edit/:id)
+  const newUrl = 'news/manage'; 
+  const newLabel = 'Compose Article';
+  const rowCount = Array.isArray(typeof data !== 'undefined' ? data : []) ? data.length : 0;
+  const safePagination = pagination && typeof pagination === 'object'
+    ? pagination
+    : {
+        startItem: rowCount ? 1 : 0,
+        endItem: rowCount,
+        totalItems: rowCount,
+        totalPages: 1,
+        currentPage: 1,
+        limit: rowCount || 20
+      };
+%>
+
+<%- include('../partials/tablePages-start', {
+  title: 'Manage News',
+  newUrl: newUrl, 
+  newLabel: newLabel,
+  user: user,
+  tableName: tableName,
+  print: true,
+  btn_export: true,
+  manageBtns: ['<a href="/dashboard" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> New Dashboard</a>']
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search news by title, category, or author...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="meta.title">Title<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="meta.category">Category<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="meta.author">Author<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="visibility">Visibility<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="meta.publishDate">Published<span class="sort-icon"></span></th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (data && data.length > 0) { %>
+        <% data.forEach((item, rowIndex) => { %>
+          <%
+            const safeItem = item && typeof item === 'object' ? item : {};
+            const safeMeta = safeItem.meta && typeof safeItem.meta === 'object' ? safeItem.meta : {};
+            const safeAuthor = safeMeta.author && typeof safeMeta.author === 'object' ? safeMeta.author : {};
+            const safeId = safeItem.id || safeItem._id ? String(safeItem.id || safeItem._id) : '';
+            const safeRowActionId = safeId || `news-row-${rowIndex}`;
+            const safeTitle = safeMeta.title || safeItem.title || safeItem.name || (safeId ? `News ${safeId}` : 'Untitled News');
+            const safeCategory = safeMeta.category || safeItem.category || 'General';
+            const safeAuthorName = safeAuthor.displayName || safeItem.authorName || 'System';
+            const safeVisibility = safeItem.visibility || 'public';
+            const safeStatus = safeItem.status || (safeItem.active === false ? 'archived' : 'draft');
+            const rawPublishDate = safeMeta.publishDate || safeItem.createdAt || safeItem.audit?.createDateTime || '';
+            const publishDate = rawPublishDate ? new Date(rawPublishDate) : null;
+            const hasPublishDate = publishDate && !Number.isNaN(publishDate.getTime());
+            const previewTarget = safeMeta.slug || safeId || '';
+          %>
+          <tr>
+            <td>
+                <div class="fw-bold text-truncate" style="max-width: 350px;" title="<%= safeTitle %>">
+                    <%= safeTitle %>
+                </div>
+            </td>
+            <td>
+                <span class="badge bg-light text-secondary border"><%= safeCategory %></span>
+            </td>
+            <td><%= safeAuthorName %></td>
+            <td>
+                <% if (safeVisibility === 'public') { %>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">Public</span>
+                <% } else if (safeVisibility === 'users') { %>
+                    <span class="badge bg-info-subtle text-info border border-info-subtle">Logged In</span>
+                <% } else { %>
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Org Scope</span>
+                <% } %>
+            </td>
+            <td>
+                <% if (safeStatus === 'published') { %>
+                    <span class="badge bg-success">Published</span>
+                <% } else if (safeStatus === 'archived') { %>
+                    <span class="badge bg-secondary">Archived</span>
+                <% } else { %>
+                    <span class="badge bg-warning text-dark">Draft</span>
+                <% } %>
+            </td>
+            <td>
+                <%= hasPublishDate ? publishDate.toLocaleDateString() : '-' %>
+                <div class="text-muted x-small"><%= hasPublishDate ? publishDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '' %></div>
+            </td>
+
+          <td class="text-end">
+                <div class="row-actions-wrap">
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                      data-row-actions-id="<%= safeRowActionId %>"
+                      title="Row actions">
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <div class="row-actions-menu d-none" data-row-actions-id="<%= safeRowActionId %>">
+                      <% if (previewTarget) { %>
+                      <a href="/news/article/<%= previewTarget %>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Preview">
+                        <i class="bi bi-eye me-2"></i>Preview
+                      </a>
+                      <% } else { %>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" title="Preview unavailable" disabled>
+                        <i class="bi bi-eye me-2"></i>Preview
+                      </button>
+                      <% } %>
+
+                      <% if (safeId) { %>
+                      <a href="/news/manage/stats/<%= safeId %>" class="btn btn-outline-info btn-sm" title="Engagement Stats">
+                        <i class="bi bi-graph-up me-2"></i>Engagement Stats
+                      </a>
+
+                      <a href="/news/manage/edit/<%= safeId %>" class="btn btn-outline-primary btn-sm" title="Edit">
+                        <i class="bi bi-pencil me-2"></i>Edit
+                      </a>
+
+                      <button type="button" class="btn btn-outline-danger btn-sm delete-news-btn" data-id="<%= safeId %>" title="Delete">
+                        <i class="bi bi-trash me-2"></i>Delete
+                      </button>
+                      <% } else { %>
+                      <button type="button" class="btn btn-outline-info btn-sm" title="Stats unavailable" disabled>
+                        <i class="bi bi-graph-up me-2"></i>Engagement Stats
+                      </button>
+                      <button type="button" class="btn btn-outline-primary btn-sm" title="Edit unavailable" disabled>
+                        <i class="bi bi-pencil me-2"></i>Edit
+                      </button>
+                      <button type="button" class="btn btn-outline-danger btn-sm" title="Delete unavailable" disabled>
+                        <i class="bi bi-trash me-2"></i>Delete
+                      </button>
+                      <% } %>
+                    </div>
+                </div>
+          </td>
+            </tr>
+        <% }) %>
+      <% } else { %>
+        <tr>
+            <td colspan="7" class="text-center py-5 text-muted">
+                No news articles found.
+            </td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: safePagination,
+    filters: typeof filters !== 'undefined' ? filters : {}, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.delete-news-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const id = e.currentTarget.dataset.id;
+            
+            // 1. Confirm
+            if (typeof showMessageModal === 'function') {
+                const confirmed = await showMessageModal({
+                    title: 'Delete Article',
+                    message: 'Are you sure you want to delete this news article? This cannot be undone.',
+                    icon: 'warning',
+                    buttons: [
+                        { text: 'Cancel', class: 'btn-secondary', value: false },
+                        { text: 'Delete', class: 'btn-danger', value: true }
+                    ]
+                });
+                if (!confirmed) return;
+            } else {
+                if (!confirm('Delete this article permanently?')) return;
+            }
+
+            // 2. Action
+            window.location.href = `/news/manage/delete/${id}`;
+        });
+    });
+});
+</script>

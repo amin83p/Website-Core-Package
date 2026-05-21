@@ -1,0 +1,115 @@
+{
+  "meta": {
+    "schemaVersion": "1.0.0",
+    "entityType": "clbFramework",
+    "layer": "reference",
+    "authority": "official",
+    "isReadMostly": true,
+    "defaultLocale": "en-CA",
+    "generatedAt": "2026-03-20T00:00:00.000Z",
+    "updatedAt": "2026-03-22T06:14:35.881Z"
+  },
+  "itemsById": {
+    "framework:clb": {
+      "id": "framework:clb",
+      "approvedAt": null,
+      "approvedBy": null,
+      "authors": [
+        "Centre for Canadian Language Benchmarks"
+      ],
+      "code": "CLB",
+      "country": null,
+      "createdAt": "2026-03-20T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "National framework of reference for adult ESL in Canada.",
+      "edition": "2012",
+      "extensions": {
+        "futureRelatedFrameworks": [
+          "NCLC"
+        ],
+        "supportsPortfolioBasedAssessment": true,
+        "supportsWizardBootstrap": true
+      },
+      "frameworkFeatures": [
+        "task_based",
+        "competency_based",
+        "descriptive",
+        "multi_skill",
+        "real_world_oriented"
+      ],
+      "frameworkType": "framework_of_reference",
+      "globalNotes": [
+        "The CLB is a framework of reference for adult ESL in Canada.",
+        "The CLB is not a test.",
+        "The CLB is not a curriculum.",
+        "The CLB is not a syllabus."
+      ],
+      "isActive": true,
+      "isLocked": true,
+      "isSystem": true,
+      "language": "en",
+      "notIntendedAs": [
+        "test",
+        "curriculum",
+        "syllabus"
+      ],
+      "notes": null,
+      "orgId": "SYSTEM",
+      "publisher": "Centre for Canadian Language Benchmarks",
+      "purpose": [
+        "planning",
+        "teaching",
+        "assessment",
+        "curriculum_development",
+        "resource_development",
+        "reporting"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": null,
+      "skillIds": [
+        "skill:listening",
+        "skill:speaking",
+        "skill:reading",
+        "skill:writing"
+      ],
+      "slug": "clb",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:introduction:001",
+          "pages": [
+            1,
+            2
+          ],
+          "note": "Framework definition and general description"
+        }
+      ],
+      "stageIds": [
+        "stage:1",
+        "stage:2",
+        "stage:3"
+      ],
+      "status": "approved",
+      "supportedBenchmarks": {
+        "minimum": 1,
+        "maximum": 12,
+        "totalCount": 12
+      },
+      "tags": [
+        "official",
+        "clb",
+        "framework",
+        "reference"
+      ],
+      "title": "Canadian Language Benchmarks",
+      "updatedAt": "2026-03-22T06:14:35.881Z",
+      "updatedBy": "ROOT_001",
+      "version": 3,
+      "versionLabel": "Canadian Language Benchmarks 2012"
+    }
+  },
+  "allIds": [
+    "framework:clb"
+  ],
+  "indexes": {}
+}

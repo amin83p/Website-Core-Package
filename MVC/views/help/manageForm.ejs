@@ -1,0 +1,356 @@
+<%
+  const h = item || {};
+  const isEdit = !!h.id;
+  const audienceList = Array.isArray(h.audience) ? h.audience : ['all'];
+  const presetAudiences = ['all', 'admins', 'school_staff', 'school_teacher', 'school_student', 'support', 'parents'];
+  const customAudience = audienceList.filter((a) => !presetAudiences.includes(String(a || '').toLowerCase())).join(', ');
+  const tagCsv = Array.isArray(h.tags) ? h.tags.join(', ') : '';
+  const contentMode = String(h.contentMode || 'richtext').trim().toLowerCase() === 'html_page' ? 'html_page' : 'richtext';
+%>
+
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Help Item' : 'New Help Item' %></h1>
+    <% if (isEdit) { %>
+      <span class="badge bg-primary border font-monospace">ID: <%= h.id %></span>
+    <% } %>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="helpManageForm" action="<%= isEdit ? '/help/manage/edit/' + h.id : '/help/manage/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      <div class="row g-4">
+        <div class="col-lg-8">
+          <div class="card border-0 shadow-sm p-4">
+            <div class="row">
+              <div class="col-md-8 mb-3">
+                <label class="form-label">Title *</label>
+                <input type="text" class="form-control size-md" name="title" id="inp_title" required value="<%= h.title || '' %>">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Slug *</label>
+                <input type="text" class="form-control size-md" name="slug" id="inp_slug" required value="<%= h.slug || '' %>">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Category *</label>
+                <input type="text" class="form-control size-md" name="category" required value="<%= h.category || '' %>" placeholder="School Modules">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Section ID</label>
+                <input type="hidden" name="sectionId" id="hid_sectionId" value="<%= h.sectionId || '' %>">
+                <div class="input-group">
+                  <input type="text" class="form-control size-md text-uppercase bg-white" id="sectionPickerDisplay" value="<%= h.sectionId || '' %>" placeholder="Select section..." readonly>
+                  <button type="button" class="btn btn-outline-primary" id="btnPickSection"><i class="bi bi-diagram-3 me-1"></i>Pick</button>
+                </div>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Operation ID</label>
+                <input type="hidden" name="operationId" id="hid_operationId" value="<%= h.operationId || '' %>">
+                <div class="input-group">
+                  <input type="text" class="form-control size-md text-uppercase bg-white" id="operationPickerDisplay" value="<%= h.operationId || '' %>" placeholder="Select operation..." readonly>
+                  <button type="button" class="btn btn-outline-primary" id="btnPickOperation"><i class="bi bi-gear me-1"></i>Pick</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-3 mb-3">
+                <label class="form-label">Priority</label>
+                <input type="number" class="form-control size-md" name="priority" value="<%= Number.isFinite(Number(h.priority)) ? Number(h.priority) : 0 %>">
+              </div>
+              <div class="col-md-9 mb-3">
+                <label class="form-label">Tags (comma separated)</label>
+                <input type="text" class="form-control size-md" name="tags" value="<%= tagCsv %>" placeholder="wizard, classes, picker">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Summary *</label>
+              <textarea class="form-control size-md" name="summary" rows="2" required placeholder="Short description for search and list pages"><%= h.summary || '' %></textarea>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Content Source</label>
+              <div class="d-flex flex-wrap gap-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="contentMode" id="modeRichtext" value="richtext" <%= contentMode === 'richtext' ? 'checked' : '' %>>
+                  <label class="form-check-label" for="modeRichtext">Rich Text</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="contentMode" id="modeHtmlPage" value="html_page" <%= contentMode === 'html_page' ? 'checked' : '' %>>
+                  <label class="form-check-label" for="modeHtmlPage">Assigned HTML Page</label>
+                </div>
+              </div>
+            </div>
+
+            <div id="richTextBlock" class="mb-3">
+              <label class="form-label">Rich Text Content *</label>
+              <div id="helpEditorContainer" class="border rounded" style="min-height: 420px;"></div>
+              <input type="hidden" name="contentHtml" id="hiddenContentHtml" value="<%- h.contentHtml || '' %>">
+              <div class="form-text">You can insert images, links, lists, and formatted blocks.</div>
+            </div>
+
+            <div id="htmlPageBlock" class="mb-3">
+              <label class="form-label">HTML Page Path / URL *</label>
+              <div class="input-group">
+                <input type="text" class="form-control size-md" name="contentPagePath" id="inp_contentPagePath" value="<%= h.contentPagePath || '' %>" placeholder="/school/departments/help or https://...">
+                <button type="button" class="btn btn-outline-primary" id="btnPickHelpPage"><i class="bi bi-search me-1"></i>Pick</button>
+              </div>
+              <div class="form-text">Use an internal route path or an external URL.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card border-0 shadow-sm p-4 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="form-label fw-bold m-0">Target Audience</label>
+              <span class="small text-muted">Visible tags</span>
+            </div>
+            <div class="row g-2">
+              <% presetAudiences.forEach((aud) => { %>
+                <div class="col-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="audience" id="aud_<%= aud %>" value="<%= aud %>" <%= audienceList.map((x)=>String(x).toLowerCase()).includes(aud) ? 'checked' : '' %>>
+                    <label class="form-check-label" for="aud_<%= aud %>"><%= aud %></label>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+            <div class="mt-3">
+              <label class="form-label small">Additional audience tags</label>
+              <input type="text" class="form-control size-md" name="customAudiences" value="<%= customAudience %>" placeholder="alumni, finance-team">
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm p-4 mb-3">
+            <label class="form-label fw-bold">Status</label>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="activeSwitch" name="active" <%= h.active !== false ? 'checked' : '' %>>
+              <label class="form-check-label" for="activeSwitch">Active</label>
+            </div>
+            <div class="small text-muted mt-2">Inactive items stay in records but are hidden from help center results.</div>
+          </div>
+
+          <div class="card border-0 shadow-sm p-4">
+            <div class="small text-muted mb-2">Preview</div>
+            <a class="btn btn-outline-primary btn-filled w-100 mb-2 <%= h.slug ? '' : 'disabled' %>" href="<%= h.slug ? '/help/article/' + encodeURIComponent(h.slug) : '#' %>">
+              Open Current Article
+            </a>
+            <a class="btn btn-outline-secondary w-100" href="/help/manage">Back To List</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><%= isEdit ? 'Update Help Item' : 'Save Help Item' %></button>
+        <a href="/help/manage" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/help/manage">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('helpManageForm');
+  const titleInput = document.getElementById('inp_title');
+  const slugInput = document.getElementById('inp_slug');
+  const hiddenContent = document.getElementById('hiddenContentHtml');
+  const richTextBlock = document.getElementById('richTextBlock');
+  const htmlPageBlock = document.getElementById('htmlPageBlock');
+  const htmlPageInput = document.getElementById('inp_contentPagePath');
+  const modeRichtext = document.getElementById('modeRichtext');
+  const modeHtmlPage = document.getElementById('modeHtmlPage');
+  const pickHelpPageBtn = document.getElementById('btnPickHelpPage');
+  const hidSectionId = document.getElementById('hid_sectionId');
+  const hidOperationId = document.getElementById('hid_operationId');
+  const sectionPickerDisplay = document.getElementById('sectionPickerDisplay');
+  const operationPickerDisplay = document.getElementById('operationPickerDisplay');
+  const pickSectionBtn = document.getElementById('btnPickSection');
+  const pickOperationBtn = document.getElementById('btnPickOperation');
+
+  const editor = new Quill('#helpEditorContainer', {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ color: [] }, { background: [] }],
+        [{ align: [] }],
+        ['link', 'image'],
+        ['clean']
+      ]
+    }
+  });
+  editor.root.innerHTML = hiddenContent.value || '';
+
+  let slugTouched = Boolean(slugInput.value);
+  slugInput.addEventListener('input', () => { slugTouched = true; });
+
+  function slugify(text) {
+    const slug = String(text || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return slug || '';
+  }
+
+  titleInput.addEventListener('input', () => {
+    if (!slugTouched) slugInput.value = slugify(titleInput.value);
+  });
+
+  function syncModeUi() {
+    const isRichtext = modeRichtext.checked;
+    richTextBlock.style.display = isRichtext ? '' : 'none';
+    htmlPageBlock.style.display = isRichtext ? 'none' : '';
+    if (isRichtext) {
+      htmlPageInput.removeAttribute('required');
+    } else {
+      htmlPageInput.setAttribute('required', 'required');
+    }
+  }
+
+  modeRichtext.addEventListener('change', syncModeUi);
+  modeHtmlPage.addEventListener('change', syncModeUi);
+  syncModeUi();
+
+  function updateOperationPickerState() {
+    const hasSection = Boolean(String(hidSectionId?.value || '').trim());
+    if (pickOperationBtn) pickOperationBtn.disabled = !hasSection;
+    if (!hasSection) {
+      hidOperationId.value = '';
+      operationPickerDisplay.value = '';
+    }
+  }
+
+  function setSectionValue(nextVal) {
+    const normalized = String(nextVal || '').trim().toUpperCase();
+    const prev = String(hidSectionId.value || '').trim().toUpperCase();
+    hidSectionId.value = normalized;
+    sectionPickerDisplay.value = normalized;
+    if (normalized !== prev) {
+      hidOperationId.value = '';
+      operationPickerDisplay.value = '';
+    }
+    updateOperationPickerState();
+  }
+
+  function setOperationValue(nextVal) {
+    const normalized = String(nextVal || '').trim().toUpperCase();
+    hidOperationId.value = normalized;
+    operationPickerDisplay.value = normalized;
+  }
+
+  pickSectionBtn?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.normalizeConfig({
+      title: 'Select Section',
+      icon: 'bi-diagram-3',
+      apiEndpoint: '/help/manage/sections',
+      placeholder: 'Search section by name or id...',
+      renderer: (item) => `
+        <div>
+          <div class="fw-bold text-dark">${item.name || item.id || ''}</div>
+          <div class="small text-muted font-monospace">${item.sectionNumericId || ''}</div>
+          <div class="x-small text-muted">${item.category || ''} ${item.homeURL ? ' | ' + item.homeURL : ''}</div>
+        </div>
+      `,
+      onSelect: (item) => {
+        setSectionValue(item.id || item.name || '');
+      }
+    }));
+  });
+
+  pickOperationBtn?.addEventListener('click', () => {
+    const selectedSection = String(hidSectionId?.value || '').trim().toUpperCase();
+    if (!selectedSection) {
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({
+          title: 'Section Required',
+          message: 'Please select section first.',
+          icon: 'info',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+      } else {
+        alert('Please select section first.');
+      }
+      return;
+    }
+
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.normalizeConfig({
+      title: `Select Operation (${selectedSection})`,
+      icon: 'bi-gear',
+      apiEndpoint: `/help/manage/operations?sectionId=${encodeURIComponent(selectedSection)}`,
+      placeholder: 'Search operation...',
+      renderer: (item) => `
+        <div>
+          <div class="fw-bold text-dark">${item.name || item.id || ''}</div>
+          <div class="small text-muted font-monospace">${item.code || ''}</div>
+        </div>
+      `,
+      onSelect: (item) => {
+        setOperationValue(item.id || item.name || '');
+      }
+    }));
+  });
+
+  setSectionValue(hidSectionId?.value || '');
+  if (String(hidOperationId?.value || '').trim()) {
+    setOperationValue(hidOperationId.value);
+  }
+
+  pickHelpPageBtn?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.helpPage({
+      title: 'Select Help Page',
+      placeholder: 'Search pages by path or section...',
+      apiEndpoint: '/help/manage/pages',
+      icon: 'bi-file-earmark-richtext',
+      renderer: (item) => `
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="fw-bold text-dark">${item.name || item.path || item.id}</div>
+            <div class="small text-muted font-monospace">${item.path || item.id || ''}</div>
+            <div class="x-small text-muted">${item.category || ''} ${item.sectionName ? ' | ' + item.sectionName : ''}</div>
+          </div>
+          <i class="bi bi-chevron-right text-muted"></i>
+        </div>
+      `,
+      onSelect: (item) => {
+        htmlPageInput.value = String(item.path || item.id || '').trim();
+      }
+    }));
+  });
+
+  form.addEventListener('submit', (e) => {
+    const richContent = (editor.root.innerHTML || '').trim();
+    hiddenContent.value = richContent;
+
+    if (modeRichtext.checked) {
+      if (!richContent || richContent === '<p><br></p>') {
+        e.preventDefault();
+        if (typeof showMessageModal === 'function') {
+          showMessageModal({
+            title: 'Validation',
+            message: 'Please provide rich text help content.',
+            icon: 'warning',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        } else {
+          alert('Please provide rich text help content.');
+        }
+      }
+    }
+  });
+});
+</script>

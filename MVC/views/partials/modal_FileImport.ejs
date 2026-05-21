@@ -1,0 +1,109 @@
+<style>
+  .status-update {
+    padding: 6px 12px;
+    border-bottom: 1px solid #eee;
+    font-size: 0.85rem;
+  }
+  .status-update:last-child {
+    border-bottom: none;
+  }
+  /* Custom scrollbar for log window */
+  #detailedStatus::-webkit-scrollbar {
+    width: 6px;
+  }
+  #detailedStatus::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+    border-radius: 4px;
+  }
+</style>
+
+<div class="modal fade" id="fileImportModal" tabindex="-100" aria-labelledby="fileImportModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 550px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+
+      <div class="modal-header border-bottom-0 pb-0 bg-white">
+        <h5 class="modal-title fw-bold text-primary" id="fileImportModalLabel">
+            <i class="bi bi-cloud-upload-fill me-2"></i>Import Data
+        </h5>
+        <button type="button" class="btn-close close-on-complete" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body pt-2">
+        <form id="fileImportForm" enctype="multipart/form-data">
+          <input type="hidden" name="tableName" id="importTableName">
+
+          <div id="setupContent">
+            
+            <div class="alert alert-light border shadow-sm d-flex align-items-center p-3 mb-4 rounded-3">
+              <div class="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center me-3" 
+                   style="width: 48px; height: 48px; min-width: 48px;">
+                <i class="bi bi-box-arrow-in-down fs-4"></i>
+              </div>
+              <div>
+                <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                    Data Ingestion
+                </div>
+                <div class="fw-bold fs-5 text-dark">Upload Records</div>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label for="importFile" class="form-label fw-bold text-secondary small text-uppercase">Select File</label>
+              <div class="input-group input-group-lg">
+                  <input class="form-control" type="file" id="importFile" name="importFile" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" required>
+              </div>
+              <div class="form-text text-muted fst-italic ps-1">
+                  Supported formats: .csv, .xlsx
+              </div>
+            </div>
+
+            <div class="card bg-light border-0 p-3 rounded-3">
+                <div class="form-check form-switch d-flex align-items-center gap-2">
+                    <input class="form-check-input ms-0" type="checkbox" id="hasHeader" name="hasHeader" checked style="cursor: pointer; width: 3em; height: 1.5em;">
+                    <label class="form-check-label fw-bold text-dark cursor-pointer pt-1" for="hasHeader" style="cursor: pointer;">
+                        First row contains headers
+                    </label>
+                </div>
+            </div>
+          </div>
+
+          <div id="progressContent" style="display:none;">
+            <div class="d-flex justify-content-between mb-1">
+                <span class="fw-bold text-primary small">Processing...</span>
+                <span class="small text-muted" id="importPercentText">0%</span>
+            </div>
+            <div id="importProgress" class="progress mb-3" style="height: 10px;">
+                <div id="importProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%"></div>
+            </div>
+            
+            <div class="card bg-light border-0">
+                <div class="card-header bg-transparent border-bottom-0 py-1 px-3">
+                    <small class="text-muted fw-bold">Live Log</small>
+                </div>
+                <div id="detailedStatus" class="card-body p-0" style="height: 200px; overflow-y: auto; font-family: monospace;">
+                    </div>
+            </div>
+            
+            <div id="importMessage" class="mt-3 alert shadow-sm" style="display:none;"></div>
+          </div>
+          
+        </form>
+      </div>
+
+      <div class="modal-footer bg-light border-top-0 py-3">
+        
+        <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4 close-on-complete" data-bs-dismiss="modal" id="closeModalBtn" style="display:none;">Close</button>
+        
+        <a id="downloadReportBtn" class="btn btn-warning btn-sm rounded-pill px-4 shadow-sm text-dark fw-bold" style="display:none;" target="_blank" href="#">
+            <i class="bi bi-file-earmark-text me-2"></i>Download Log
+        </a>
+
+        <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal" id="cancelImportBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm" id="startImportBtn" form="fileImportForm">
+            <i class="bi bi-play-circle me-1"></i> Start Import
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>

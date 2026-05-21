@@ -1,0 +1,219 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-23T03:53:11.456Z",
+    "referenceDir": "C:\\Users\\KATANA\\Desktop\\myWebsite\\Website-Node-Express-Core\\data\\benchpath\\reference",
+    "script": "scripts/benchpath/reference/referenceIntegrityAudit.js"
+  },
+  "summary": {
+    "pass": true,
+    "errorCount": 0,
+    "warningCount": 2
+  },
+  "structuralSummary": {
+    "sources": {
+      "allIdsCount": 19,
+      "itemsByIdCount": 19,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "sourceFragments": {
+      "allIdsCount": 243,
+      "itemsByIdCount": 243,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbFrameworks": {
+      "allIdsCount": 1,
+      "itemsByIdCount": 1,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbSkills": {
+      "allIdsCount": 4,
+      "itemsByIdCount": 4,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbStages": {
+      "allIdsCount": 3,
+      "itemsByIdCount": 3,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbCompetencyAreas": {
+      "allIdsCount": 16,
+      "itemsByIdCount": 16,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbBenchmarks": {
+      "allIdsCount": 48,
+      "itemsByIdCount": 48,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbCompetencies": {
+      "allIdsCount": 69,
+      "itemsByIdCount": 69,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbProfileOfAbility": {
+      "allIdsCount": 48,
+      "itemsByIdCount": 48,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbIndicators": {
+      "allIdsCount": 69,
+      "itemsByIdCount": 69,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbFeaturesOfCommunication": {
+      "allIdsCount": 27,
+      "itemsByIdCount": 27,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    },
+    "clbSampleTaskLabels": {
+      "allIdsCount": 69,
+      "itemsByIdCount": 69,
+      "missingItemsForAllIds": 0,
+      "itemKeysMissingFromAllIds": 0,
+      "duplicateIdsInAllIds": 0
+    }
+  },
+  "issues": {
+    "errors": [],
+    "warnings": [
+      {
+        "severity": "warning",
+        "code": "naming_drift_profile_file",
+        "message": "Reference uses clb.profile-of-ability.json (singular), while plural variants appear in notes/maps.",
+        "file": "naming",
+        "entity": null,
+        "itemId": null,
+        "detail": null,
+        "suggestion": "Standardize on clb.profile-of-ability.json and profileOfAbility in all maps/loaders."
+      },
+      {
+        "severity": "warning",
+        "code": "naming_drift_source_file",
+        "message": "Reference uses source.json while design docs often refer to sources.json.",
+        "file": "naming",
+        "entity": null,
+        "itemId": null,
+        "detail": null,
+        "suggestion": "Keep source.json as canonical runtime name or introduce a controlled alias layer; avoid mixed usage in docs and loaders."
+      }
+    ]
+  },
+  "namingDrift": {
+    "detected": true,
+    "issues": [
+      {
+        "code": "naming_drift_source_file",
+        "message": "Reference uses source.json while design docs often refer to sources.json.",
+        "suggestion": "Keep source.json as canonical runtime name or introduce a controlled alias layer; avoid mixed usage in docs and loaders."
+      },
+      {
+        "code": "naming_drift_profile_file",
+        "message": "Reference uses clb.profile-of-ability.json (singular), while plural variants appear in notes/maps.",
+        "suggestion": "Standardize on clb.profile-of-ability.json and profileOfAbility in all maps/loaders."
+      }
+    ],
+    "tokenMatches": {
+      "source.json": [
+        "MVC\\models\\benchpath\\sourceModel.js",
+        "MVC\\services\\benchpath\\data\\migrationDryRunService.js",
+        "scripts\\benchpath\\reference\\extractClbBenchmarkFragments.js"
+      ],
+      "sources.json": [],
+      "profileOfAbility": [
+        "MVC\\controllers\\benchpath\\clbReferenceController.js",
+        "MVC\\models\\benchpath\\referenceCatalogModel.js",
+        "MVC\\models\\benchpath\\sourceFragmentModel.js",
+        "MVC\\repositories\\benchpath\\index.js",
+        "MVC\\routes\\benchpath\\clbProfileOfAbilityRoutes.js",
+        "MVC\\services\\benchpath\\data\\entityRegistry.js",
+        "MVC\\services\\benchpath\\data\\integrityValidationService.js",
+        "scripts\\benchpath\\reference\\backfillCanonicalReferenceText.js",
+        "scripts\\benchpath\\reference\\extractClbBenchmarkFragments.js"
+      ],
+      "profilesOfAbility": [],
+      "clb.profile-of-ability.json": [
+        "MVC\\models\\benchpath\\referenceCatalogModel.js",
+        "MVC\\services\\benchpath\\data\\migrationDryRunService.js",
+        "scripts\\benchpath\\reference\\backfillCanonicalReferenceText.js"
+      ],
+      "clb.profiles-of-ability.json": []
+    }
+  },
+  "extractionMap": {
+    "path": "C:\\Users\\KATANA\\Desktop\\myWebsite\\Website-Node-Express-Core\\data\\benchpath\\reference\\benchpath-reference-extraction-map.json",
+    "updated": true,
+    "targetFiles": [
+      {
+        "entity": "clbCompetencyAreas",
+        "file": "data/benchpath/reference/clb.competency-areas.json",
+        "count": 16,
+        "status": "completed",
+        "note": "Canonical competency areas by skill."
+      },
+      {
+        "entity": "clbBenchmarks",
+        "file": "data/benchpath/reference/clb.benchmarks.json",
+        "count": 48,
+        "status": "completed",
+        "note": "Canonical benchmark records by skill/level."
+      },
+      {
+        "entity": "clbCompetencies",
+        "file": "data/benchpath/reference/clb.competencies.json",
+        "count": 69,
+        "status": "mixed/canonical+seed",
+        "note": "Competency statements and benchmark links."
+      },
+      {
+        "entity": "clbProfileOfAbility",
+        "file": "data/benchpath/reference/clb.profile-of-ability.json",
+        "count": 48,
+        "status": "mixed/canonical+seed",
+        "note": "Profile descriptors per skill+benchmark."
+      },
+      {
+        "entity": "clbIndicators",
+        "file": "data/benchpath/reference/clb.indicators.json",
+        "count": 69,
+        "status": "mixed/canonical+seed",
+        "note": "Competency-linked indicators."
+      },
+      {
+        "entity": "clbFeaturesOfCommunication",
+        "file": "data/benchpath/reference/clb.features-of-communication.json",
+        "count": 27,
+        "status": "mixed/canonical+seed",
+        "note": "Feature descriptors for benchmark/competency context."
+      },
+      {
+        "entity": "clbSampleTaskLabels",
+        "file": "data/benchpath/reference/clb.sample-task-labels.json",
+        "count": 69,
+        "status": "mixed/canonical+seed",
+        "note": "Official sample task labels."
+      }
+    ]
+  }
+}

@@ -1,0 +1,968 @@
+<%
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const summaryData = (summary && typeof summary === 'object') ? summary : {};
+  const timelineMaxRangeDays = Number(maxRangeDays || 7);
+  const allowUserPicker = Boolean(canPickUsers);
+
+  function toList(raw) {
+    if (Array.isArray(raw)) {
+      return Array.from(new Set(raw
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)));
+    }
+    const token = String(raw || '').trim();
+    if (!token) return [];
+    return Array.from(new Set(token
+      .split(',')
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)));
+  }
+
+  const defaultUserId = String(allowUserPicker ? (stateFilters.userId || '') : (stateFilters.userId || user?.id || '')).trim();
+  const selectedSummary = String(selectedUserSummary || '').trim();
+  const showAllUsersMode = allowUserPicker && !defaultUserId;
+  const defaultUserLabel = String(
+    (showAllUsersMode ? 'All users' : '')
+      || selectedSummary
+      || user?.displayName
+      || user?.name
+      || user?.username
+      || defaultUserId
+      || '-'
+  ).trim();
+
+  function orgLabel(org) {
+    if (!org || typeof org !== 'object') return '';
+    const name = String(org?.identity?.displayName || org?.name || '').trim();
+    const id = String(org?.id || '').trim();
+    if (name && id && name !== id) return `${name} (${id})`;
+    return name || id;
+  }
+
+  const sectionRows = Array.isArray(sections) ? sections : [];
+  const operationRows = Array.isArray(operations) ? operations : [];
+  const organizationRows = Array.isArray(organizations) ? organizations : [];
+
+  const sectionLookupRows = sectionRows.map((row) => ({
+    id: String(row?.id || '').trim(),
+    name: String(row?.name || row?.id || '').trim()
+  })).filter((row) => row.id);
+  sectionLookupRows.push({ id: '000000', name: 'SYSTEM' });
+  sectionLookupRows.push({ id: '0000000', name: 'SYSTEM' });
+
+  const operationLookupRows = operationRows.map((row) => ({
+    id: String(row?.id || '').trim(),
+    name: String(row?.name || row?.id || '').trim()
+  })).filter((row) => row.id);
+
+  const orgLookupRows = organizationRows.map((row) => ({
+    id: String(row?.id || '').trim(),
+    name: orgLabel(row)
+  })).filter((row) => row.id && row.name);
+
+  const sectionLookupMap = {};
+  sectionLookupRows.forEach((row) => { sectionLookupMap[row.id] = row.name; });
+  const operationLookupMap = {};
+  operationLookupRows.forEach((row) => { operationLookupMap[row.id] = row.name; });
+  const orgLookupMap = {};
+  orgLookupRows.forEach((row) => { orgLookupMap[row.id] = row.name; });
+
+  const selectedSectionIds = toList(stateFilters.sectionIds || stateFilters.sectionId);
+  const selectedOperationIds = toList(stateFilters.operationIds || stateFilters.operationId);
+  const selectedOrgIds = toList(stateFilters.orgIds || stateFilters.orgId);
+  const selectedSectionRows = selectedSectionIds.map((id) => ({ id, name: sectionLookupMap[id] || id }));
+  const selectedOperationRows = selectedOperationIds.map((id) => ({ id, name: operationLookupMap[id] || id }));
+  const selectedOrgRows = selectedOrgIds.map((id) => ({ id, name: orgLookupMap[id] || id }));
+
+  const hasAdvancedFilters = Boolean(
+    String(stateFilters.status || '').trim()
+    || String(stateFilters.source || '').trim()
+    || String(stateFilters.q || '').trim()
+    || selectedSectionIds.length
+    || selectedOperationIds.length
+    || selectedOrgIds.length
+  );
+%>
+
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel: null,
+  user,
+  tableName: null,
+  print,
+  btn_export: true,
+  manageBtns: [
+    '<a href="/dashboard/section-nav/SYSTEM_SECURITY" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Security Dashboard</a>'
+  ]
+}) %>
+
+<style>
+  .ta-timeline-layout {
+    width: 100%;
+  }
+  .ta-timeline-card {
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 0.95rem;
+    padding: 0.8rem 0.95rem 0.95rem;
+    margin-bottom: 0.9rem;
+    background: #fff;
+  }
+  .ta-timeline-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.45rem;
+  }
+  .ta-timeline-label {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #1f2937;
+  }
+  .ta-timeline-meta {
+    font-size: 0.74rem;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .ta-timeline-range {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.45rem;
+    font-size: 0.79rem;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .ta-timeline-track {
+    --ta-cols: 24;
+    position: relative;
+    width: 100%;
+    height: 40px;
+    border-radius: 999px;
+    border: 1px solid rgba(100, 116, 139, 0.35);
+    background: linear-gradient(90deg, rgba(22, 163, 74, 0.18) 0%, rgba(147, 51, 234, 0.18) 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 2px 8px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+  .ta-timeline-grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--ta-cols, 24), minmax(0, 1fr));
+    pointer-events: none;
+  }
+  .ta-timeline-grid > span {
+    border-right: 1px solid rgba(255, 255, 255, 0.35);
+  }
+  .ta-timeline-grid > span:last-child {
+    border-right: 0;
+  }
+  .ta-timeline-segments {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--ta-cols, 24), minmax(0, 1fr));
+  }
+  .ta-hour-segment {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 0.12s ease;
+  }
+  .ta-hour-segment:hover,
+  .ta-hour-segment:focus-visible {
+    background-color: rgba(15, 23, 42, 0.18);
+    outline: none;
+  }
+  .ta-hour-axis {
+    margin-top: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.73rem;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .ta-hour-summary {
+    margin-top: 0.65rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+  .ta-hour-chip {
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    padding: 0.18rem 0.6rem;
+    font-size: 0.74rem;
+    color: #334155;
+    background: #fff;
+    line-height: 1.2;
+  }
+  .ta-hour-chip-btn {
+    cursor: pointer;
+  }
+  .ta-hour-chip-btn:hover,
+  .ta-hour-chip-btn:focus-visible {
+    border-color: rgba(30, 64, 175, 0.45);
+    background: rgba(239, 246, 255, 0.9);
+    color: #1e3a8a;
+    outline: none;
+  }
+  .ta-range-shortcuts .btn {
+    min-width: 96px;
+  }
+  .ta-filter-list .ta-filter-item {
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 0.55rem;
+    padding: 0.35rem 0.45rem;
+    background: #fff;
+  }
+  .ta-filter-item-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #1e293b;
+  }
+  .ta-filter-item-id {
+    font-size: 0.68rem;
+    line-height: 1.1;
+    color: #64748b;
+    font-family: var(--bs-font-monospace);
+  }
+  .ta-filter-empty {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+  .ta-focus-card {
+    border: 1px solid rgba(59, 130, 246, 0.24);
+    background: rgba(239, 246, 255, 0.55);
+  }
+  .ta-focus-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.15rem;
+  }
+  .ta-focus-subtitle {
+    font-size: 0.76rem;
+    color: #475569;
+    font-weight: 600;
+    margin-bottom: 0.45rem;
+  }
+  .ta-timeline-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 0.75rem;
+  }
+  .ta-timeline-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .ta-view-toggle {
+    box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.08);
+  }
+  .ta-view-toggle .btn {
+    font-weight: 700;
+  }
+  .ta-timeline-mode {
+    font-size: 0.78rem;
+    color: #475569;
+    font-weight: 600;
+  }
+  .ta-empty {
+    border: 1px dashed rgba(148, 163, 184, 0.8);
+    border-radius: 0.85rem;
+    padding: 1rem;
+    text-align: center;
+    color: #64748b;
+    background: rgba(248, 250, 252, 0.8);
+    font-size: 0.84rem;
+  }
+  .ta-chunk-row {
+    cursor: pointer;
+  }
+  .ta-chunk-row:hover > td,
+  .ta-chunk-row:focus-within > td {
+    background: rgba(239, 246, 255, 0.9);
+  }
+  .ta-modal-json {
+    margin: 0;
+    max-height: 320px;
+    overflow: auto;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 0.5rem;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 0.7rem 0.8rem;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .ta-card-actions {
+    margin-top: 0.55rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+  .ta-chunk-matrix-table th[scope="row"] {
+    background: rgba(248, 250, 252, 0.9);
+    min-width: 160px;
+    position: sticky;
+    left: 0;
+    z-index: 2;
+  }
+  .ta-chunk-matrix-table thead th {
+    white-space: nowrap;
+  }
+  .ta-chunk-table-value-link {
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .ta-activity-chart-shell {
+    width: 100%;
+  }
+  .ta-activity-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    align-items: center;
+    font-size: 0.78rem;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+  .ta-legend-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+  }
+  .ta-legend-requests {
+    background: #fdba74;
+    border: 1px solid #fb923c;
+  }
+  .ta-legend-attempts {
+    background: #fed7aa;
+    border: 1px solid #fdba74;
+  }
+  .ta-activity-chart-scroll {
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+  .ta-activity-chart {
+    --ta-chart-cols: 1;
+    min-width: max(360px, calc(var(--ta-chart-cols) * 52px));
+    display: grid;
+    grid-template-columns: repeat(var(--ta-chart-cols), minmax(40px, 1fr));
+    align-items: end;
+    gap: 0.35rem;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 0.7rem;
+    padding: 0.65rem 0.6rem 0.55rem;
+    background: linear-gradient(180deg, rgba(255, 237, 213, 0.28) 0%, rgba(255, 255, 255, 0.95) 62%);
+  }
+  .ta-activity-col {
+    min-width: 40px;
+  }
+  .ta-activity-bars {
+    height: 190px;
+    border-radius: 0.45rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: repeating-linear-gradient(
+      to top,
+      rgba(148, 163, 184, 0.07) 0,
+      rgba(148, 163, 184, 0.07) 1px,
+      transparent 1px,
+      transparent 20%
+    );
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.17rem;
+    padding: 0.35rem 0.16rem;
+  }
+  .ta-activity-bar {
+    width: 40%;
+    min-height: 2px;
+    border-radius: 0.25rem 0.25rem 0 0;
+  }
+  .ta-activity-bar-requests {
+    background: #fdba74;
+    border: 1px solid #fb923c;
+    border-bottom: 0;
+  }
+  .ta-activity-bar-attempts {
+    background: #fed7aa;
+    border: 1px solid #fdba74;
+    border-bottom: 0;
+  }
+  .ta-activity-values {
+    margin-top: 0.28rem;
+    font-size: 0.67rem;
+    text-align: center;
+    color: #7c2d12;
+    white-space: nowrap;
+  }
+  .ta-activity-label {
+    margin-top: 0.12rem;
+    font-size: 0.65rem;
+    text-align: center;
+    color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ta-line-graph-host {
+    width: 100%;
+  }
+  .ta-line-card {
+    border: 1px solid rgba(45, 212, 191, 0.34);
+    border-radius: 1rem;
+    padding: 0.9rem;
+    background:
+      radial-gradient(circle at 12% 18%, rgba(34, 211, 238, 0.18), transparent 30%),
+      linear-gradient(135deg, rgba(8, 47, 73, 0.96), rgba(15, 23, 42, 0.98) 58%, rgba(49, 46, 129, 0.94));
+    box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.18);
+  }
+  .ta-line-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.9rem;
+    margin-bottom: 0.8rem;
+  }
+  .ta-line-title {
+    color: #f8fafc;
+    font-weight: 800;
+    font-size: 0.95rem;
+  }
+  .ta-line-subtitle {
+    color: rgba(226, 232, 240, 0.72);
+    font-weight: 600;
+    font-size: 0.76rem;
+    margin-top: 0.12rem;
+  }
+  .ta-line-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    color: rgba(226, 232, 240, 0.84);
+    font-size: 0.74rem;
+    font-weight: 700;
+  }
+  .ta-line-swatch {
+    display: inline-block;
+    width: 1.4rem;
+    height: 0.22rem;
+    border-radius: 999px;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+    box-shadow: 0 0 0.8rem currentColor;
+  }
+  .ta-line-swatch-logs {
+    background: #22d3ee;
+    color: #22d3ee;
+  }
+  .ta-line-swatch-attempts {
+    background: #facc15;
+    color: #facc15;
+  }
+  .ta-line-scroll {
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+  }
+  .ta-line-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-width: 760px;
+  }
+  .ta-line-grid-line {
+    stroke: rgba(148, 163, 184, 0.22);
+    stroke-width: 1;
+  }
+  .ta-line-axis {
+    stroke: rgba(226, 232, 240, 0.44);
+    stroke-width: 1.2;
+  }
+  .ta-line-axis-number {
+    fill: #67e8f9;
+    font-size: 11px;
+    font-weight: 800;
+    paint-order: stroke;
+    stroke: rgba(15, 23, 42, 0.78);
+    stroke-width: 2px;
+    stroke-linejoin: round;
+  }
+  .ta-line-axis-number-x {
+    fill: #fde68a;
+  }
+  .ta-line-axis-title {
+    fill: rgba(226, 232, 240, 0.82);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+  .ta-line-fill {
+    fill: url(#taLineFill);
+    opacity: 0.55;
+  }
+  .ta-line-path {
+    fill: none;
+    stroke: #22d3ee;
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: url(#taLineGlow);
+  }
+  .ta-line-path-attempts {
+    fill: none;
+    stroke: #facc15;
+    stroke-width: 2.4;
+    stroke-dasharray: 7 5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: url(#taLineGlowWarm);
+  }
+  .ta-line-dot {
+    fill: #e0f2fe;
+    stroke: #22d3ee;
+    stroke-width: 2.4;
+    cursor: pointer;
+    filter: url(#taLineDotGlow);
+  }
+  .ta-line-dot:hover,
+  .ta-line-dot:focus {
+    fill: #fff;
+    stroke: #facc15;
+  }
+  .ta-line-note {
+    margin-top: 0.7rem;
+    color: rgba(226, 232, 240, 0.72);
+    font-size: 0.74rem;
+    font-weight: 600;
+  }
+  @media (max-width: 576px) {
+    .ta-timeline-toolbar,
+    .ta-line-card-head {
+      align-items: stretch;
+      flex-direction: column;
+    }
+    .ta-timeline-actions {
+      justify-content: flex-start;
+    }
+    .ta-view-toggle {
+      width: 100%;
+    }
+    .ta-view-toggle .btn {
+      flex: 1 1 0;
+    }
+  }
+</style>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white py-2 px-3 d-flex align-items-center justify-content-between">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Timeline Filters</div>
+    <div class="small text-muted">Hourly timeline - max range: <%= timelineMaxRangeDays %> days</div>
+  </div>
+  <div class="card-body p-3">
+    <form id="trackActivityFilterForm" method="GET" action="/security/track-activity">
+      <input type="hidden" name="maxRows" value="<%= Number(stateFilters.maxRows || 2500) %>">
+      <input type="hidden" name="limit" value="<%= Number(stateFilters.limit || 2500) %>">
+      <input type="hidden" id="trackActivityUserIdInput" name="userId" value="<%= defaultUserId %>">
+
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-4">
+          <label class="form-label small fw-bold text-muted text-uppercase">User</label>
+          <div class="input-group">
+            <input
+              id="trackActivityUserSummary"
+              type="text"
+              class="form-control size-md"
+              value="<%= defaultUserLabel %>"
+              readonly>
+            <% if (allowUserPicker) { %>
+              <button id="trackActivityPickUserBtn" type="button" class="btn btn-outline-primary">
+                <i class="bi bi-person-plus"></i>
+              </button>
+              <button id="trackActivityResetUserBtn" type="button" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+            <% } %>
+          </div>
+          <% if (!allowUserPicker) { %>
+            <div class="form-text">Your scope is fixed to your own activity.</div>
+          <% } %>
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label small fw-bold text-muted text-uppercase">Start (Date & Time)</label>
+          <input
+            id="trackActivityStartAt"
+            type="datetime-local"
+            name="startAt"
+            class="form-control size-md"
+            value="<%= stateFilters.startAt || '' %>">
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label small fw-bold text-muted text-uppercase">End (Date & Time)</label>
+          <input
+            id="trackActivityEndAt"
+            type="datetime-local"
+            name="endAt"
+            class="form-control size-md"
+            value="<%= stateFilters.endAt || '' %>">
+        </div>
+        <div class="col-lg-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-filled btn-md w-100">
+            <i class="bi bi-play-fill"></i> Run
+          </button>
+        </div>
+        <div class="col-12">
+          <label class="form-label small fw-bold text-muted text-uppercase mb-1">Quick Range</label>
+          <div id="trackActivityRangeShortcuts" class="ta-range-shortcuts d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-range-shortcut="today">Today</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-range-shortcut="yesterday">Yesterday</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-range-shortcut="last2">2 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-range-shortcut="last3">3 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-range-shortcut="last4">4 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-range-shortcut="last5">5 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-range-shortcut="last6">6 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-range-shortcut="weekly">Weekly</button>
+          </div>
+          <div class="form-text">Shortcuts set Start and End quickly. Click Run to fetch timeline.</div>
+        </div>
+      </div>
+
+      <div class="mt-3 border rounded-3 overflow-hidden">
+        <div class="bg-light d-flex align-items-center justify-content-between py-2 px-3">
+          <div class="small fw-bold text-muted text-uppercase">Advanced Filters</div>
+          <button
+            id="trackActivityAdvancedToggleBtn"
+            type="button"
+            class="btn btn-outline-secondary btn-sm px-2"
+            data-bs-toggle="collapse"
+            data-bs-target="#trackActivityAdvancedCollapse"
+            aria-expanded="<%= hasAdvancedFilters ? 'true' : 'false' %>"
+            aria-controls="trackActivityAdvancedCollapse"
+            aria-label="Open advanced filters">
+            <i id="trackActivityAdvancedToggleIcon" class="bi <%= hasAdvancedFilters ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+          </button>
+        </div>
+        <div class="collapse <%= hasAdvancedFilters ? 'show' : '' %>" id="trackActivityAdvancedCollapse">
+          <div class="p-3">
+            <div class="row g-3">
+              <div class="col-lg-3 col-md-4">
+                <label class="form-label small fw-bold text-muted text-uppercase">Status</label>
+                <input type="text" name="status" class="form-control size-md" placeholder="e.g. success" value="<%= stateFilters.status || '' %>">
+              </div>
+              <div class="col-lg-9 col-md-8">
+                <label class="form-label small fw-bold text-muted text-uppercase">Search</label>
+                <input type="text" name="q" class="form-control size-md" placeholder="summary / context / request" value="<%= stateFilters.q || '' %>">
+              </div>
+              <div class="col-lg-4 col-md-6">
+                <label class="form-label small fw-bold text-muted text-uppercase">Section</label>
+                <input type="hidden" name="sectionId" id="trackActivitySectionIdsInput" value="<%= selectedSectionIds.join(',') %>">
+                <div class="input-group">
+                  <input
+                    id="trackActivitySectionSummary"
+                    type="text"
+                    class="form-control size-md"
+                    value="<%= selectedSectionRows.length ? (selectedSectionRows.length + ' selected') : '' %>"
+                    placeholder="All Sections"
+                    readonly>
+                  <button id="trackActivityPickSectionBtn" type="button" class="btn btn-outline-primary" title="Pick sections">
+                    <i class="bi bi-collection"></i>
+                  </button>
+                  <button id="trackActivityClearSectionBtn" type="button" class="btn btn-outline-secondary" title="Clear sections">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+                <div id="trackActivitySectionSelectedList" class="ta-filter-list mt-2">
+                  <% if (!selectedSectionRows.length) { %>
+                    <div class="ta-filter-empty">All Sections</div>
+                  <% } else { %>
+                    <% selectedSectionRows.forEach((row) => { %>
+                      <div class="ta-filter-item d-flex align-items-start justify-content-between gap-2 mb-1">
+                        <div class="overflow-hidden">
+                          <div class="ta-filter-item-title text-truncate"><%= row.name %></div>
+                          <div class="ta-filter-item-id text-truncate"><%= row.id %></div>
+                        </div>
+                      </div>
+                    <% }) %>
+                  <% } %>
+                </div>
+              </div>
+              <div class="col-lg-4 col-md-6">
+                <label class="form-label small fw-bold text-muted text-uppercase">Operation</label>
+                <input type="hidden" name="operationId" id="trackActivityOperationIdsInput" value="<%= selectedOperationIds.join(',') %>">
+                <div class="input-group">
+                  <input
+                    id="trackActivityOperationSummary"
+                    type="text"
+                    class="form-control size-md"
+                    value="<%= selectedOperationRows.length ? (selectedOperationRows.length + ' selected') : '' %>"
+                    placeholder="All Operations"
+                    readonly>
+                  <button id="trackActivityPickOperationBtn" type="button" class="btn btn-outline-primary" title="Pick operations">
+                    <i class="bi bi-gear"></i>
+                  </button>
+                  <button id="trackActivityClearOperationBtn" type="button" class="btn btn-outline-secondary" title="Clear operations">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+                <div id="trackActivityOperationSelectedList" class="ta-filter-list mt-2">
+                  <% if (!selectedOperationRows.length) { %>
+                    <div class="ta-filter-empty">All Operations</div>
+                  <% } else { %>
+                    <% selectedOperationRows.forEach((row) => { %>
+                      <div class="ta-filter-item d-flex align-items-start justify-content-between gap-2 mb-1">
+                        <div class="overflow-hidden">
+                          <div class="ta-filter-item-title text-truncate"><%= row.name %></div>
+                          <div class="ta-filter-item-id text-truncate"><%= row.id %></div>
+                        </div>
+                      </div>
+                    <% }) %>
+                  <% } %>
+                </div>
+              </div>
+              <div class="col-lg-4 col-md-6">
+                <label class="form-label small fw-bold text-muted text-uppercase">Organization</label>
+                <input type="hidden" name="orgId" id="trackActivityOrgIdsInput" value="<%= selectedOrgIds.join(',') %>">
+                <div class="input-group">
+                  <input
+                    id="trackActivityOrgSummary"
+                    type="text"
+                    class="form-control size-md"
+                    value="<%= selectedOrgRows.length ? (selectedOrgRows.length + ' selected') : '' %>"
+                    placeholder="All Organizations"
+                    readonly>
+                  <button id="trackActivityPickOrgBtn" type="button" class="btn btn-outline-primary" title="Pick organizations">
+                    <i class="bi bi-building"></i>
+                  </button>
+                  <button id="trackActivityClearOrgBtn" type="button" class="btn btn-outline-secondary" title="Clear organizations">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+                <div id="trackActivityOrgSelectedList" class="ta-filter-list mt-2">
+                  <% if (!selectedOrgRows.length) { %>
+                    <div class="ta-filter-empty">All Organizations</div>
+                  <% } else { %>
+                    <% selectedOrgRows.forEach((row) => { %>
+                      <div class="ta-filter-item d-flex align-items-start justify-content-between gap-2 mb-1">
+                        <div class="overflow-hidden">
+                          <div class="ta-filter-item-title text-truncate"><%= row.name %></div>
+                          <div class="ta-filter-item-id text-truncate"><%= row.id %></div>
+                        </div>
+                      </div>
+                    <% }) %>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+              <a href="/security/track-activity" class="btn btn-outline-secondary btn-md">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+              </a>
+              <button type="submit" class="btn btn-primary btn-filled btn-md">
+                <i class="bi bi-funnel-fill me-1"></i>Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-4 col-md-6">
+    <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-primary">
+      <div class="text-muted small text-uppercase fw-bold">Total Requests</div>
+      <div id="taCardRequests" class="fs-4 fw-bold text-dark"><%= Number(summaryData.totalEvents || 0).toLocaleString() %></div>
+    </div>
+  </div>
+  <div class="col-lg-4 col-md-6">
+    <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-success">
+      <div class="text-muted small text-uppercase fw-bold">Attempt-like Requests</div>
+      <div id="taCardAttempts" class="fs-4 fw-bold text-dark">0</div>
+    </div>
+  </div>
+  <div class="col-lg-4 col-md-6">
+    <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-info">
+      <div class="text-muted small text-uppercase fw-bold">Busiest Chunk</div>
+      <div id="taCardBusiest" class="fs-6 fw-bold text-dark">-</div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between">
+    <div class="fw-bold text-dark"><i class="bi bi-clock-history me-2"></i>Activity Timeline</div>
+    <div id="trackActivityTimelineMeta" class="small text-muted">No timeline data loaded yet.</div>
+  </div>
+  <div class="card-body">
+    <div id="trackActivityTimelineAlert" class="mb-2"></div>
+    <div id="trackActivityTimelineLayout" class="ta-timeline-layout">
+      <div class="ta-timeline-toolbar">
+        <div id="trackActivityTimelineMode" class="ta-timeline-mode">Set filters and click Run to load timeline.</div>
+        <div class="ta-timeline-actions">
+          <div class="btn-group btn-group-sm ta-view-toggle" role="group" aria-label="Activity timeline view">
+            <button id="trackActivityShadeViewBtn" type="button" class="btn btn-primary btn-sm" data-track-activity-view="shade">
+              <i class="bi bi-grid-3x3-gap me-1"></i>Shading
+            </button>
+            <button id="trackActivityLineViewBtn" type="button" class="btn btn-outline-primary btn-sm" data-track-activity-view="line">
+              <i class="bi bi-graph-up-arrow me-1"></i>Line Graph
+            </button>
+          </div>
+          <button id="trackActivityTimelineBackBtn" type="button" class="btn btn-outline-secondary btn-sm d-none">
+            <i class="bi bi-arrow-left me-1"></i>Back
+          </button>
+          <button id="trackActivityTimelineResetZoomBtn" type="button" class="btn btn-outline-primary btn-sm d-none">
+            <i class="bi bi-diagram-3 me-1"></i>All Days
+          </button>
+        </div>
+      </div>
+      <div id="trackActivityTimelineFocusHost" class="d-none"></div>
+      <div id="trackActivityTimelineDaysHost"></div>
+      <div id="trackActivityLineGraphHost" class="ta-line-graph-host d-none"></div>
+      <div id="trackActivityTimelineSummary" class="ta-hour-summary"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="trackActivityChunkModal" tabindex="-1" aria-labelledby="trackActivityChunkModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="trackActivityChunkModalTitle">Chunk Activity</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="trackActivityChunkModalMeta" class="small text-muted mb-2">-</div>
+        <div id="trackActivityChunkModalSummary" class="mb-3"></div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="min-width: 180px;">Timestamp</th>
+                <th style="min-width: 120px;">Source</th>
+                <th style="min-width: 120px;">Status</th>
+                <th style="min-width: 180px;">User</th>
+                <th style="min-width: 180px;">Section</th>
+                <th style="min-width: 180px;">Operation</th>
+                <th style="min-width: 140px;">Request ID</th>
+                <th style="min-width: 150px;">Action State</th>
+                <th style="min-width: 320px;">Activity</th>
+              </tr>
+            </thead>
+            <tbody id="trackActivityChunkModalRows">
+              <tr>
+                <td colspan="9" class="text-muted text-center py-3">Click a timeline badge to inspect events.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="trackActivityEventModal" tabindex="-1" aria-labelledby="trackActivityEventModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="trackActivityEventModalTitle">Event Detail</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="trackActivityEventModalMeta" class="small text-muted mb-3">-</div>
+        <div id="trackActivityEventModalSummary" class="mb-3"></div>
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="small fw-bold text-muted text-uppercase mb-2">Event Payload</div>
+            <pre id="trackActivityEventModalPayload" class="ta-modal-json">Select a row to load event details.</pre>
+          </div>
+          <div class="col-lg-6">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="small fw-bold text-muted text-uppercase">Action State</div>
+              <button id="trackActivityEventModalLoadActionBtn" type="button" class="btn btn-outline-primary btn-sm d-none">
+                <i class="bi bi-search me-1"></i>Load Full Details
+              </button>
+            </div>
+            <div id="trackActivityEventModalActionSummary" class="small mb-2 text-muted">No Action State linked to this log event.</div>
+            <pre id="trackActivityEventModalActionPayload" class="ta-modal-json">-</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="trackActivityChunkTableModal" tabindex="-1" aria-labelledby="trackActivityChunkTableModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="trackActivityChunkTableModalTitle">Chunk Table</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="trackActivityChunkTableModalMeta" class="small text-muted mb-3">-</div>
+        <div id="trackActivityChunkTableModalHost" class="table-responsive">
+          <div class="text-muted">Select a timeline first.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="trackActivityChunkChartModal" tabindex="-1" aria-labelledby="trackActivityChunkChartModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="trackActivityChunkChartModalTitle">Activity Chart</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="trackActivityChunkChartModalMeta" class="small text-muted mb-3">-</div>
+        <div id="trackActivityChunkChartModalHost">
+          <div class="text-muted">Select a timeline first.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.__trackActivityConfig = {
+    maxRangeDays: <%= timelineMaxRangeDays %>,
+    canPickUsers: <%= allowUserPicker ? 'true' : 'false' %>,
+    defaultUserId: <%- JSON.stringify(defaultUserId) %>,
+    defaultUserLabel: <%- JSON.stringify(defaultUserLabel) %>,
+    filters: {
+      sectionIds: <%- JSON.stringify(selectedSectionIds) %>,
+      operationIds: <%- JSON.stringify(selectedOperationIds) %>,
+      orgIds: <%- JSON.stringify(selectedOrgIds) %>
+    },
+    lookups: {
+      sections: <%- JSON.stringify(sectionLookupRows) %>,
+      operations: <%- JSON.stringify(operationLookupRows) %>,
+      orgs: <%- JSON.stringify(orgLookupRows) %>
+    }
+  };
+</script>
+<script src="/scripts/trackActivityTimeline.js"></script>
+<%- include('../partials/modal_GenericPicker') %>
+<%- include('../partials/tablePages-end') %>

@@ -1,0 +1,25 @@
+[
+  {
+    "name": "Smoke Group 1774557078536-297",
+    "orgId": "ORG-1774557078536-297",
+    "id": "565354"
+  },
+  {
+    "name": "Smoke Group 1774556750651-330",
+    "orgId": "ORG-1774556750651-330",
+    "id": "985315"
+  },
+  {
+    "id": "GRP1001",
+    "active": true,
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-17T01:25:55.357Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-02-17T01:25:55.357Z"
+    },
+    "description": "This is the list for public users to receive the newsletter emails.",
+    "name": "Public News Letter",
+    "orgId": "SYSTEM"
+  }
+]

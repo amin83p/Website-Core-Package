@@ -1,0 +1,28 @@
+/* ==========================================================================
+   User Profile Page Styles
+   ========================================================================== */
+.profile-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: var(--spacing-md);
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.profile-avatar {
+  width: calc(100px * var(--size-md));
+  height: calc(100px * var(--size-md));
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-primary);
+}
+
+.profile-details p {
+  margin: 0 0 var(--spacing-sm);
+  font-size: calc(1rem * var(--size-md));
+}

@@ -1,0 +1,234 @@
+{
+  "id": "TASK_1770243513868",
+  "title": "Blood found on Nancy Guthrie’s porch belongs to her, sheriff says. “We believe Nancy is still out there”",
+  "description": "<h2><strong>Where things stand</strong></h2><p><strong>• A concerning scene:</strong>&nbsp;Pima County Sheriff Chris Nanos said they believe Nancy Guthrie was “<a href=\"https://www.cnn.com/us/live-news/savannah-guthrie-missing-mother-investigation-02-05-26?post-id=cml9us84q00003b6plgnjoaux\" target=\"_blank\" style=\"color: rgb(12, 12, 12);\"><strong>removed from the house against her will</strong></a>” and told investigators to call the homicide team when the&nbsp;<a href=\"https://www.cnn.com/us/live-news/savannah-guthrie-missing-mother-investigation-02-05-26?post-id=cml9v1xdb00003b6p5aysjfx2\" target=\"_blank\" style=\"color: rgb(12, 12, 12);\"><strong>disturbing scene</strong></a>&nbsp;was described to him.</p><p>“<strong>No proof of life:”&nbsp;</strong>There has been&nbsp;<a href=\"https://www.cnn.com/us/live-news/savannah-guthrie-missing-mother-investigation-02-05-26?post-id=cml9syup9000h3b6pj137lolg\" target=\"_blank\" style=\"color: rgb(12, 12, 12);\"><strong>“no proof of life”</strong></a>&nbsp;and no follow-up communication connected to the ransom letter linked to the disappearance of Guthrie<strong>, FBI Special Agent </strong>in Charge Heith Janke said. The ransom letter mentioned&nbsp;<a href=\"https://www.cnn.com/us/live-news/savannah-guthrie-missing-mother-investigation-02-05-26?post-id=cml9sq45i000c356pd08s97d3\" target=\"_blank\" style=\"color: rgb(12, 12, 12);\"><strong>two deadlines</strong></a>, including a first deadline of 5 p.m. today and a second deadline for next Monday.</p><p>•&nbsp;<strong>Still no suspects:&nbsp;</strong>Investigators believe Guthrie was taken from her home&nbsp;<a href=\"https://www.cnn.com/2026/02/04/us/investigation-challenges-nancy-guthrie\" target=\"_blank\" style=\"color: rgb(12, 12, 12);\"><strong>against her will</strong></a>, but there are&nbsp;<a href=\"https://www.cnn.com/us/live-news/savannah-guthrie-missing-mother-investigation-02-05-26?post-id=cml9rfx9y00003b6pm11dn8ab\" target=\"_blank\" style=\"color: rgb(12, 12, 12);\"><strong>no suspects</strong></a>&nbsp;yet, the sheriff’s department reiterated today. “We want her back,” Nanos said at a news conference a short time ago.</p><p>•&nbsp;<strong>Leads coming in:&nbsp;</strong>The sheriff said investigators are following leads as they wait for other evidence, like lab reports, to come in. Blood found on the porch of Guthrie’s home “came back to Nancy,” Nanos said.</p><p><strong>• $50,000 reward:&nbsp;</strong>The FBI&nbsp;<a href=\"https://www.cnn.com/us/live-news/savannah-guthrie-missing-mother-investigation-02-05-26?post-id=cml9sjjgr0005356pzlkvrhgu\" target=\"_blank\" style=\"color: rgb(12, 12, 12);\"><strong>announced a $50,000 reward</strong></a><a href=\"https://www.fbi.gov/wanted/kidnap/nancy-guthrie/@@download.pdf\" target=\"_blank\" style=\"color: rgb(12, 12, 12);\"><strong>&nbsp;</strong></a>for information leading to the recovery of Guthrie and/or “the arrest and conviction of anyone involved in her disappearance.”</p>",
+  "projectName": "General",
+  "phaseName": "Planning",
+  "priority": "medium",
+  "status": "in_progress",
+  "dates": {
+    "start": "2026-02-04",
+    "due": "2026-03-18"
+  },
+  "assignments": [
+    {
+      "userId": "SYS_ROOT_001",
+      "name": "amin",
+      "role": "viewer",
+      "status": "active"
+    },
+    {
+      "userId": "816147",
+      "name": "e",
+      "role": "executor",
+      "status": "active",
+      "joinedAt": "2026-02-04T23:49:55.587Z"
+    },
+    {
+      "userId": "357011",
+      "name": "kalam",
+      "role": "owner",
+      "status": "active",
+      "joinedAt": "2026-02-04T23:49:55.587Z"
+    },
+    {
+      "userId": "125901",
+      "name": "a",
+      "role": "viewer",
+      "status": "disabled",
+      "joinedAt": "2026-02-04T23:49:55.587Z"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "CP_1770248995587_NEW_0",
+      "title": "Step one",
+      "weight": 51,
+      "criteria": "Open source repository of plugins primarily intended for knowledge workers to use in Claude Cowork\r\n\r\nResources\r\n Readme\r\nLicense\r\n Apache-2.0 license\r\n Activity\r\n Custom properties\r\nStars\r\n 5.8k stars\r\nWatchers\r\n 77 watching\r\nForks\r\n 472 forks\r\nReport repository",
+      "dates": {
+        "original": "2026-01-02",
+        "current": "2026-01-28"
+      },
+      "updates": [
+        {
+          "timestamp": "2026-02-05T00:08:22.821Z",
+          "userId": "SYS_ROOT_001",
+          "userName": "amin",
+          "note": "sdfsdfsdfs",
+          "changes": {
+            "newDate": "2026-01-21",
+            "newWeight": 11
+          }
+        },
+        {
+          "timestamp": "2026-02-05T00:09:13.998Z",
+          "userId": "SYS_ROOT_001",
+          "userName": "amin",
+          "note": "FGHFGHDFGH",
+          "changes": {
+            "newDate": "2026-01-20",
+            "newWeight": 12
+          }
+        },
+        {
+          "timestamp": "2026-02-07T02:47:33.061Z",
+          "userId": "SYS_ROOT_001",
+          "userName": "amin",
+          "note": "Open source repository of plugins primarily intended for knowledge workers to use in Claude Cowork\r\n\r\nResources\r\n Readme\r\nLicense\r\n Apache-2.0 license\r\n Activity\r\n Custom properties\r\nStars\r\n 5.8k stars\r\nWatchers\r\n 77 watching\r\nForks\r\n 472 forks\r\nReport repository",
+          "changes": {
+            "newDate": "2026-01-28",
+            "newWeight": 51
+          }
+        },
+        {
+          "timestamp": "2026-02-07T02:49:52.305Z",
+          "userId": "SYS_ROOT_001",
+          "userName": "amin",
+          "note": "sfgzdghzedbhzedtgnxgftjm,vhk.vb nv cghmcghjf\r\ndfhj\r\ndf\r\nhj\r\ndfh\r\nj\r\ndf\r\nhj\r\ndf\r\ndfh",
+          "changes": {}
+        }
+      ],
+      "deliverables": [
+        {
+          "id": "DEL_1770500183174",
+          "filename": "P2uS2.jpg",
+          "url": "/uploads/GLOBAL/tasks/TASK_1770243513868/P2uS2_1770500183170.jpg",
+          "size": 133219,
+          "mimetype": "image/jpeg",
+          "description": "Managing the list of all possible operations in the software.",
+          "checkpointId": "CP_1770248995587_NEW_0",
+          "uploadedAt": "2026-02-07T21:36:23.174Z",
+          "uploadedBy": "SYS_ROOT_001"
+        }
+      ],
+      "status": "active",
+      "lockStep": "",
+      "lockStatus": "completed"
+    },
+    {
+      "id": "CP_1770248995587_NEW_1",
+      "title": "Step Two",
+      "weight": 20,
+      "criteria": "<p>6\n7\n8\n9\n10</p>",
+      "dates": {
+        "original": "2026-02-15",
+        "current": "2026-02-15"
+      },
+      "updates": [],
+      "deliverables": [],
+      "status": "active",
+      "lockStep": "1",
+      "lockStatus": "completed"
+    },
+    {
+      "id": "CP_1770332786884_2_425",
+      "title": "Step 03",
+      "weight": 30,
+      "criteria": "<h1><strong>Italy calls fear over ICE presence at Olympics ‘completely unfounded’</strong></h1><ul><li>February 4</li><li><a href=\"https://www.cbc.ca/player/news\" target=\"_blank\" style=\"color: rgb(215, 50, 50);\">News</a></li><li>Duration</li><li>2:07</li></ul><p>Italy’s government calls public concern over the presence of U.S. Immigration and Customs Enforcement agents at the Olympic Winter Games ‘completely unfounded’ as the American agency will perform no ‘operational police role.’</p>",
+      "dates": {
+        "original": "2026-11-12",
+        "current": "2026-11-12"
+      },
+      "updates": [],
+      "deliverables": [],
+      "status": "active",
+      "lockStep": "2",
+      "lockStatus": "completed"
+    }
+  ],
+  "deliverables": [],
+  "activityLog": [
+    {
+      "action": "created",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-04T22:18:33.868Z",
+      "details": "Task created"
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-06T07:18:26.495Z",
+      "details": "Uploaded file: 586z85g51u_WEB_258278.jpg",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770243513868/586z85g51u_WEB_258278_1770362306489.jpg",
+        "filename": "586z85g51u_WEB_258278.jpg"
+      }
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-06T07:20:09.936Z",
+      "details": "Uploaded file: dust_collector.jpg",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770243513868/dust_collector_1770362409931.jpg",
+        "filename": "dust_collector.jpg"
+      }
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-07T04:24:22.181Z",
+      "details": "Uploaded file: 1101307937-People-man-and-boy-planting-tree.jpg.webp",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770243513868/1101307937-People-man-and-boy-planting-tree_jpg_1770438262175.webp",
+        "filename": "1101307937-People-man-and-boy-planting-tree.jpg.webp"
+      }
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-07T06:55:22.842Z",
+      "details": "Uploaded file: 1651154114381.jpeg",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770243513868/1651154114381_1770447322836.jpeg",
+        "filename": "1651154114381.jpeg"
+      }
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-07T21:36:23.174Z",
+      "details": "Uploaded file: P2uS2.jpg",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770243513868/P2uS2_1770500183170.jpg",
+        "filename": "P2uS2.jpg"
+      }
+    },
+    {
+      "id": "ACT_1770511647745",
+      "action": "comment",
+      "userId": "SYS_ROOT_001",
+      "userName": "amin",
+      "timestamp": "2026-02-08T00:47:27.745Z",
+      "details": "I read the message and wrote a correction report to be attached to the main report.\r\n",
+      "parentId": "ACT_1770506485419",
+      "checkpointId": null,
+      "file": null
+    },
+    {
+      "id": "ACT_1770511676854",
+      "action": "comment",
+      "userId": "SYS_ROOT_001",
+      "userName": "amin",
+      "timestamp": "2026-02-08T00:47:56.854Z",
+      "details": "I read the message and wrote a correction report to be attached to the main report.\r\n",
+      "parentId": "ACT_1770511665515",
+      "checkpointId": null,
+      "file": null
+    },
+    {
+      "id": "ACT_1770512051939",
+      "action": "comment",
+      "userId": "SYS_ROOT_001",
+      "userName": "amin",
+      "timestamp": "2026-02-08T00:54:11.939Z",
+      "details": "fghfgh",
+      "parentId": "ACT_1770511686808",
+      "checkpointId": null,
+      "file": null
+    }
+  ],
+  "updatedAt": "2026-02-08T00:54:35.956Z",
+  "createdAt": "2026-02-04T22:18:33.868Z",
+  "progress": 0
+}

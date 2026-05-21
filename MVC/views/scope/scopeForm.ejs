@@ -1,0 +1,505 @@
+<%
+  const isEdit = !!(scope && scope.id);
+%>
+
+<div class="sections-page">
+  <%- include('../partials/formPage_PageTitle', {
+    isEditMode: isEdit,
+    name: 'Scope',
+    id: scope?.id || 0
+  }) %>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="scopeForm" action="<%= scope ? '/scopes/edit/' + scope.id : '/scopes/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      <input type="hidden" name="definitionJson" id="definitionJsonInput" value="">
+
+      <div class="row mb-3">
+        <div class="col-md-8">
+          <label class="form-label">Name *</label>
+          <input
+            type="text"
+            id="scopeNameInput"
+            name="name"
+            class="form-control size-md name-input"
+            value="<%= scope ? scope.name : '' %>"
+            pattern="^[A-Z][A-Z_]*[A-Z]$"
+            placeholder="e.g. ORGANIZATION"
+            required>
+          <small class="form-text">Uppercase letters and underscores only.</small>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Level *</label>
+          <input
+            type="number"
+            name="level"
+            class="form-control size-md"
+            value="<%= scope ? scope.level : '0' %>"
+            min="0"
+            max="100"
+            required>
+          <small class="form-text text-muted">Higher number = higher privilege (0 to 100).</small>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-control size-md" rows="3" placeholder="Describe how this scope should behave..."><%= scope ? scope.description : '' %></textarea>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white border-0 pb-0">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <div class="fw-bold">Scope Definition</div>
+              <div class="text-muted small">Define how this scope resolves data boundaries dynamically at runtime.</div>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="applyModeDefaultsBtn">
+              <i class="bi bi-magic me-1"></i>Apply Recommended Defaults
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="row g-3 mb-3">
+            <div class="col-lg-4">
+              <label class="form-label">Mode *</label>
+              <select class="form-select size-md" id="scopeModeInput"></select>
+            </div>
+            <div class="col-lg-4">
+              <label class="form-label">Organization Binding</label>
+              <select class="form-select size-md" id="scopeOrgSourceInput"></select>
+            </div>
+            <div class="col-lg-4">
+              <label class="form-label">Department Binding</label>
+              <select class="form-select size-md" id="scopeDepartmentSourceInput"></select>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-lg-4">
+              <label class="form-label">Division Binding</label>
+              <select class="form-select size-md" id="scopeDivisionSourceInput"></select>
+            </div>
+            <div class="col-lg-4">
+              <label class="form-label">Owner Binding</label>
+              <select class="form-select size-md" id="scopeOwnerSourceInput"></select>
+            </div>
+            <div class="col-lg-4">
+              <label class="form-label">User Binding</label>
+              <select class="form-select size-md" id="scopeUserSourceInput"></select>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-lg-4">
+              <label class="form-label">Person Binding</label>
+              <select class="form-select size-md" id="scopePersonSourceInput"></select>
+            </div>
+            <div class="col-lg-8">
+              <label class="form-label">Runtime Notes</label>
+              <div class="alert alert-light border mb-0 small" id="scopeSummaryPreview"></div>
+            </div>
+          </div>
+
+          <div class="border rounded p-3 bg-light-subtle mb-3">
+            <div class="fw-bold mb-2">Record Field Mapping</div>
+            <div class="small text-muted mb-3">These field names tell repositories which record properties the scope should target by default.</div>
+            <div class="row g-3">
+              <div class="col-lg-4">
+                <label class="form-label">Organization Field</label>
+                <input type="text" class="form-control size-md" id="scopeOrgFieldInput" placeholder="orgId">
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label">Department Field</label>
+                <input type="text" class="form-control size-md" id="scopeDepartmentFieldInput" placeholder="departmentId">
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label">Division Field</label>
+                <input type="text" class="form-control size-md" id="scopeDivisionFieldInput" placeholder="divisionId">
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label">Owner Field</label>
+                <input type="text" class="form-control size-md" id="scopeOwnerFieldInput" placeholder="createdByUserId">
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label">User Field</label>
+                <input type="text" class="form-control size-md" id="scopeUserFieldInput" placeholder="userId">
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label">Person Field</label>
+                <input type="text" class="form-control size-md" id="scopePersonFieldInput" placeholder="personId">
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-lg-4">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="scopeIncludeGlobalInput">
+                <label class="form-check-label" for="scopeIncludeGlobalInput">Include Global Records</label>
+              </div>
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="scopeTreatDepartmentAsOrgInput">
+                <label class="form-check-label" for="scopeTreatDepartmentAsOrgInput">Treat Department As Organization</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="scopeTreatDivisionAsOrgInput">
+                <label class="form-check-label" for="scopeTreatDivisionAsOrgInput">Treat Division As Organization</label>
+              </div>
+            </div>
+            <div class="col-lg-8">
+              <label class="form-label d-flex justify-content-between align-items-center">
+                <span>Advanced Definition JSON</span>
+                <button type="button" class="btn btn-outline-info btn-sm" id="applyJsonToFormBtn">
+                  <i class="bi bi-arrow-repeat me-1"></i>Apply JSON To Form
+                </button>
+              </label>
+              <textarea class="form-control font-monospace size-md" id="scopeDefinitionJsonEditor" rows="10"></textarea>
+              <small class="form-text text-muted">Edit the generated JSON only when you need advanced control, then apply it back to the form.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="activeCheck" name="active" <%= (scope && scope.active) ? 'checked' : '' %>>
+          <label class="form-check-label" for="activeCheck">Active</label>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save</button>
+        <a href="/scopes" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/scopes">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="application/json" id="initScopeDefinition"><%- JSON.stringify(scopeDefinition || {}) %></script>
+<script type="application/json" id="scopeDefinitionOptions"><%- JSON.stringify(scopeDefinitionOptions || {}) %></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('scopeForm');
+  const nameInput = document.getElementById('scopeNameInput');
+  const definitionJsonInput = document.getElementById('definitionJsonInput');
+  const activeCheck = document.getElementById('activeCheck');
+  const editor = document.getElementById('scopeDefinitionJsonEditor');
+  const summaryPreview = document.getElementById('scopeSummaryPreview');
+  const initDefinition = JSON.parse(document.getElementById('initScopeDefinition').textContent || '{}');
+  const options = JSON.parse(document.getElementById('scopeDefinitionOptions').textContent || '{}');
+
+  const modeInput = document.getElementById('scopeModeInput');
+  const orgSourceInput = document.getElementById('scopeOrgSourceInput');
+  const departmentSourceInput = document.getElementById('scopeDepartmentSourceInput');
+  const divisionSourceInput = document.getElementById('scopeDivisionSourceInput');
+  const ownerSourceInput = document.getElementById('scopeOwnerSourceInput');
+  const userSourceInput = document.getElementById('scopeUserSourceInput');
+  const personSourceInput = document.getElementById('scopePersonSourceInput');
+  const orgFieldInput = document.getElementById('scopeOrgFieldInput');
+  const departmentFieldInput = document.getElementById('scopeDepartmentFieldInput');
+  const divisionFieldInput = document.getElementById('scopeDivisionFieldInput');
+  const ownerFieldInput = document.getElementById('scopeOwnerFieldInput');
+  const userFieldInput = document.getElementById('scopeUserFieldInput');
+  const personFieldInput = document.getElementById('scopePersonFieldInput');
+  const includeGlobalInput = document.getElementById('scopeIncludeGlobalInput');
+  const treatDepartmentAsOrgInput = document.getElementById('scopeTreatDepartmentAsOrgInput');
+  const treatDivisionAsOrgInput = document.getElementById('scopeTreatDivisionAsOrgInput');
+  const applyModeDefaultsBtn = document.getElementById('applyModeDefaultsBtn');
+  const applyJsonToFormBtn = document.getElementById('applyJsonToFormBtn');
+
+  function optionLabel(list, value) {
+    const item = (list || []).find((entry) => entry.value === value);
+    return item ? item.label : String(value || '');
+  }
+
+  function sanitizeField(value, fallback) {
+    const clean = String(value || '').trim().replace(/[^A-Za-z0-9_.]/g, '');
+    return clean || fallback;
+  }
+
+  function recommendedDefinition(mode) {
+    const base = {
+      mode: mode || 'organization',
+      bindings: {
+        orgSource: 'none',
+        departmentSource: 'none',
+        divisionSource: 'none',
+        ownerSource: 'none',
+        userSource: 'none',
+        personSource: 'none'
+      },
+      targetFields: {
+        orgField: (options.defaultTargetFields || {}).orgField || 'orgId',
+        departmentField: (options.defaultTargetFields || {}).departmentField || 'departmentId',
+        divisionField: (options.defaultTargetFields || {}).divisionField || 'divisionId',
+        ownerField: (options.defaultTargetFields || {}).ownerField || 'createdByUserId',
+        userField: (options.defaultTargetFields || {}).userField || 'userId',
+        personField: (options.defaultTargetFields || {}).personField || 'personId'
+      },
+      options: {
+        includeGlobal: false,
+        treatDepartmentAsOrganization: false,
+        treatDivisionAsOrganization: false
+      }
+    };
+
+    if (base.mode === 'global') {
+      base.options.includeGlobal = true;
+    } else if (base.mode === 'admin' || base.mode === 'organization') {
+      base.bindings.orgSource = 'activeOrgId';
+    } else if (base.mode === 'department') {
+      base.bindings.orgSource = 'activeOrgId';
+      base.bindings.departmentSource = 'userDepartments';
+      base.options.treatDepartmentAsOrganization = true;
+    } else if (base.mode === 'division') {
+      base.bindings.orgSource = 'activeOrgId';
+      base.bindings.divisionSource = 'userDivisions';
+      base.options.treatDivisionAsOrganization = true;
+    } else if (base.mode === 'owner') {
+      base.bindings.orgSource = 'activeOrgId';
+      base.bindings.ownerSource = 'userId';
+    } else if (base.mode === 'user') {
+      base.bindings.orgSource = 'activeOrgId';
+      base.bindings.userSource = 'userId';
+      base.bindings.personSource = 'personId';
+    }
+
+    return base;
+  }
+
+  function normalizeDefinition(input) {
+    const fallback = recommendedDefinition(input?.mode || 'organization');
+    const source = input && typeof input === 'object' ? input : {};
+    const bindings = source.bindings && typeof source.bindings === 'object' ? source.bindings : {};
+    const targetFields = source.targetFields && typeof source.targetFields === 'object' ? source.targetFields : {};
+    const opts = source.options && typeof source.options === 'object' ? source.options : {};
+
+    return {
+      mode: source.mode || fallback.mode,
+      bindings: {
+        orgSource: bindings.orgSource || fallback.bindings.orgSource,
+        departmentSource: bindings.departmentSource || fallback.bindings.departmentSource,
+        divisionSource: bindings.divisionSource || fallback.bindings.divisionSource,
+        ownerSource: bindings.ownerSource || fallback.bindings.ownerSource,
+        userSource: bindings.userSource || fallback.bindings.userSource,
+        personSource: bindings.personSource || fallback.bindings.personSource
+      },
+      targetFields: {
+        orgField: sanitizeField(targetFields.orgField, fallback.targetFields.orgField),
+        departmentField: sanitizeField(targetFields.departmentField, fallback.targetFields.departmentField),
+        divisionField: sanitizeField(targetFields.divisionField, fallback.targetFields.divisionField),
+        ownerField: sanitizeField(targetFields.ownerField, fallback.targetFields.ownerField),
+        userField: sanitizeField(targetFields.userField, fallback.targetFields.userField),
+        personField: sanitizeField(targetFields.personField, fallback.targetFields.personField)
+      },
+      options: {
+        includeGlobal: opts.includeGlobal === true || fallback.options.includeGlobal === true,
+        treatDepartmentAsOrganization: opts.treatDepartmentAsOrganization === true || fallback.options.treatDepartmentAsOrganization === true,
+        treatDivisionAsOrganization: opts.treatDivisionAsOrganization === true || fallback.options.treatDivisionAsOrganization === true
+      }
+    };
+  }
+
+  function readDefinitionFromForm() {
+    return normalizeDefinition({
+      mode: modeInput.value,
+      bindings: {
+        orgSource: orgSourceInput.value,
+        departmentSource: departmentSourceInput.value,
+        divisionSource: divisionSourceInput.value,
+        ownerSource: ownerSourceInput.value,
+        userSource: userSourceInput.value,
+        personSource: personSourceInput.value
+      },
+      targetFields: {
+        orgField: orgFieldInput.value,
+        departmentField: departmentFieldInput.value,
+        divisionField: divisionFieldInput.value,
+        ownerField: ownerFieldInput.value,
+        userField: userFieldInput.value,
+        personField: personFieldInput.value
+      },
+      options: {
+        includeGlobal: includeGlobalInput.checked,
+        treatDepartmentAsOrganization: treatDepartmentAsOrgInput.checked,
+        treatDivisionAsOrganization: treatDivisionAsOrgInput.checked
+      }
+    });
+  }
+
+  function writeDefinitionToForm(definition) {
+    const normalized = normalizeDefinition(definition);
+    modeInput.value = normalized.mode;
+    orgSourceInput.value = normalized.bindings.orgSource;
+    departmentSourceInput.value = normalized.bindings.departmentSource;
+    divisionSourceInput.value = normalized.bindings.divisionSource;
+    ownerSourceInput.value = normalized.bindings.ownerSource;
+    userSourceInput.value = normalized.bindings.userSource;
+    personSourceInput.value = normalized.bindings.personSource;
+    orgFieldInput.value = normalized.targetFields.orgField;
+    departmentFieldInput.value = normalized.targetFields.departmentField;
+    divisionFieldInput.value = normalized.targetFields.divisionField;
+    ownerFieldInput.value = normalized.targetFields.ownerField;
+    userFieldInput.value = normalized.targetFields.userField;
+    personFieldInput.value = normalized.targetFields.personField;
+    includeGlobalInput.checked = normalized.options.includeGlobal === true;
+    treatDepartmentAsOrgInput.checked = normalized.options.treatDepartmentAsOrganization === true;
+    treatDivisionAsOrgInput.checked = normalized.options.treatDivisionAsOrganization === true;
+    syncDefinitionOutputs();
+  }
+
+  function summarize(definition) {
+    const parts = [optionLabel(options.modes, definition.mode)];
+    if (definition.bindings.orgSource !== 'none') parts.push('Org: ' + optionLabel((options.bindings || {}).orgSource, definition.bindings.orgSource));
+    if (definition.bindings.departmentSource !== 'none') parts.push('Dept: ' + optionLabel((options.bindings || {}).departmentSource, definition.bindings.departmentSource));
+    if (definition.bindings.divisionSource !== 'none') parts.push('Division: ' + optionLabel((options.bindings || {}).divisionSource, definition.bindings.divisionSource));
+    if (definition.bindings.ownerSource !== 'none') parts.push('Owner: ' + optionLabel((options.bindings || {}).ownerSource, definition.bindings.ownerSource));
+    if (definition.bindings.userSource !== 'none') parts.push('User: ' + optionLabel((options.bindings || {}).userSource, definition.bindings.userSource));
+    if (definition.bindings.personSource !== 'none') parts.push('Person: ' + optionLabel((options.bindings || {}).personSource, definition.bindings.personSource));
+    if (definition.options.includeGlobal) parts.push('Includes Global');
+    if (definition.options.treatDepartmentAsOrganization) parts.push('Dept=>Org');
+    if (definition.options.treatDivisionAsOrganization) parts.push('Division=>Org');
+    return parts.join(' | ');
+  }
+
+  function syncDefinitionOutputs() {
+    const definition = readDefinitionFromForm();
+    const pretty = JSON.stringify(definition, null, 2);
+    definitionJsonInput.value = pretty;
+    if (editor) editor.value = pretty;
+    if (summaryPreview) summaryPreview.textContent = summarize(definition);
+  }
+
+  function populateSelect(select, items) {
+    if (!select) return;
+    select.innerHTML = (items || []).map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
+  }
+
+  populateSelect(modeInput, options.modes || []);
+  populateSelect(orgSourceInput, (options.bindings || {}).orgSource || []);
+  populateSelect(departmentSourceInput, (options.bindings || {}).departmentSource || []);
+  populateSelect(divisionSourceInput, (options.bindings || {}).divisionSource || []);
+  populateSelect(ownerSourceInput, (options.bindings || {}).ownerSource || []);
+  populateSelect(userSourceInput, (options.bindings || {}).userSource || []);
+  populateSelect(personSourceInput, (options.bindings || {}).personSource || []);
+
+  if (nameInput) {
+    nameInput.addEventListener('input', (e) => {
+      let val = e.target.value.toUpperCase();
+      val = val.replace(/\s+/g, '_');
+      val = val.replace(/[^A-Z0-9_]/g, '');
+      e.target.value = val;
+    });
+  }
+
+  [
+    modeInput,
+    orgSourceInput,
+    departmentSourceInput,
+    divisionSourceInput,
+    ownerSourceInput,
+    userSourceInput,
+    personSourceInput,
+    orgFieldInput,
+    departmentFieldInput,
+    divisionFieldInput,
+    ownerFieldInput,
+    userFieldInput,
+    personFieldInput,
+    includeGlobalInput,
+    treatDepartmentAsOrgInput,
+    treatDivisionAsOrgInput
+  ].forEach((el) => {
+    if (!el) return;
+    el.addEventListener('change', syncDefinitionOutputs);
+    if (el.tagName === 'INPUT' && el.type === 'text') el.addEventListener('input', syncDefinitionOutputs);
+  });
+
+  applyModeDefaultsBtn?.addEventListener('click', () => {
+    writeDefinitionToForm(recommendedDefinition(modeInput.value));
+  });
+
+  applyJsonToFormBtn?.addEventListener('click', async () => {
+    try {
+      const parsed = JSON.parse(editor.value || '{}');
+      writeDefinitionToForm(parsed);
+    } catch (error) {
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Invalid JSON',
+          icon: 'warning',
+          message: 'The advanced JSON is not valid. Fix it before applying.',
+          buttons: [{ text: 'OK', class: 'btn-warning btn-md' }]
+        });
+      } else {
+        alert('The advanced JSON is not valid.');
+      }
+    }
+  });
+
+  writeDefinitionToForm(initDefinition);
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      syncDefinitionOutputs();
+
+      const formData = new FormData(form);
+      if (activeCheck) formData.set('active', activeCheck.checked ? 'true' : 'false');
+      formData.set('definitionJson', definitionJsonInput.value || '{}');
+      const data = new URLSearchParams(formData);
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: data.toString()
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Success',
+              icon: 'success',
+              message: result.message || 'Scope saved successfully.',
+              size: 'md',
+              buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+            });
+          }
+          window.location.href = '/scopes';
+          return;
+        }
+
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Error',
+            icon: 'error',
+            message: result.message || 'Failed to save scope.',
+            size: 'md',
+            buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+          });
+        } else {
+          alert(result.message || 'Failed to save scope.');
+        }
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Error',
+            icon: 'error',
+            message: 'Unexpected error occurred.',
+            size: 'md',
+            buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+          });
+        }
+      }
+    });
+  }
+});
+</script>

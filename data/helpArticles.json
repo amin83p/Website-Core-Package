@@ -1,0 +1,103 @@
+[
+  {
+    "title": "Smoke Help 1774557078536-297",
+    "slug": "smoke-help-1774557078536-297",
+    "active": true,
+    "id": "344613"
+  },
+  {
+    "title": "Smoke Help 1774556750651-330",
+    "slug": "smoke-help-1774556750651-330",
+    "active": true,
+    "id": "650498"
+  },
+  {
+    "id": "HELP_GLOBAL_OVERVIEW",
+    "active": true,
+    "audience": [
+      "all"
+    ],
+    "category": "Getting Started",
+    "contentHtml": "<h2>What is this page?</h2><p>This Help Center is the single entry point for user guidance. You can browse categories, search by keyword, or open context help using a section and operation.</p><h2>How context help works</h2><p>When your page provides a section and operation ID, the system resolves help in this order:</p><ol><li>Exact match: section + operation</li><li>Section default: section only</li><li>Global default: this article</li></ol><h2>Tips</h2><ul><li>Use search for quick results.</li><li>Use tags to narrow down topics.</li><li>Check related articles at the bottom of each page.</li></ul>",
+    "operationId": "",
+    "priority": 0,
+    "sectionId": "",
+    "slug": "help-center-overview",
+    "summary": "How to use the integrated help center and find context-specific guidance.",
+    "tags": [
+      "help",
+      "navigation",
+      "overview"
+    ],
+    "title": "Help Center Overview",
+    "updatedAt": "2026-03-10T00:00:00.000Z"
+  },
+  {
+    "id": "HELP_SCHOOL_CLASSES_CREATE",
+    "active": true,
+    "audience": [
+      "school_staff",
+      "admins"
+    ],
+    "category": "School Modules",
+    "contentHtml": "<h2>Before saving</h2><ul><li>Select a valid department.</li><li>Set class code and class name.</li><li>Confirm term and program mapping as required.</li></ul><h2>Validation flow</h2><p>The form validates required fields before submit. In wizard mode, users can save or cancel from any step.</p><h2>After save</h2><p>Review generated records and verify linked program and term references.</p>",
+    "operationId": "CREATE",
+    "priority": 80,
+    "sectionId": "SCHOOL_CLASSES",
+    "slug": "classes-create-operation",
+    "summary": "Specific instructions for creating classes and validating required fields.",
+    "tags": [
+      "classes",
+      "create",
+      "operation"
+    ],
+    "title": "Create Class (Operation Guide)",
+    "updatedAt": "2026-03-10T00:00:00.000Z"
+  },
+  {
+    "id": "HELP_SCHOOL_CLASSES_DEFAULT",
+    "active": true,
+    "audience": [
+      "school_staff",
+      "admins"
+    ],
+    "category": "School Modules",
+    "contentHtml": "<h2>Classes setup</h2><p>Use the Classes form for standard entry and the Classes wizard for guided setup. Department selection depends on valid department records and matching picker endpoint setup.</p><h2>Common issues</h2><ul><li>Picker returns non-JSON response: verify route returns JSON for X-AJAX-Request.</li><li>No department results: confirm departments exist and search fields are configured.</li><li>Wizard step visibility: ensure step configuration only renders fields for the active step.</li></ul>",
+    "operationId": "",
+    "priority": 30,
+    "sectionId": "SCHOOL_CLASSES",
+    "slug": "classes-module-help",
+    "summary": "General guidance for managing classes forms, wizards, and pickers.",
+    "tags": [
+      "classes",
+      "wizard",
+      "department",
+      "school"
+    ],
+    "title": "Classes Module Help",
+    "updatedAt": "2026-03-10T00:00:00.000Z"
+  },
+  {
+    "id": "HELP_SYSTEM_RATE_MONITOR",
+    "active": true,
+    "audience": [
+      "admins",
+      "support"
+    ],
+    "category": "Security and Policies",
+    "contentHtml": "<h2>Feature purpose</h2><p>Request Rate Monitor tracks request bursts and can enforce limits. It is designed for gradual rollout from monitor mode to enforce mode.</p><h2>Monitor vs enforce</h2><p>If logs show DENIED but monitorOnly is true, the request exceeded limit but was not blocked. To block, use enforce mode at route or group level.</p><h2>Policy levels</h2><ul><li>Website policy defines global defaults and route catalog.</li><li>Organization policy can define custom routes.</li><li>Exact route rules are evaluated before group rules.</li></ul><h2>Troubleshooting quick checks</h2><ol><li>Confirm requestControl.enabled is true.</li><li>Verify path/method/matchType are correct.</li><li>Check if route mode is enforce or inherits monitor.</li><li>Inspect logs for routeSpecific and rateLimitGroup.</li></ol>",
+    "operationId": "OP9003",
+    "priority": 100,
+    "sectionId": "000000",
+    "slug": "request-rate-monitor",
+    "summary": "Understand monitor vs enforce behavior, phases, route overrides, and troubleshooting.",
+    "tags": [
+      "rate-limit",
+      "monitor",
+      "429",
+      "security"
+    ],
+    "title": "Request Rate Monitor",
+    "updatedAt": "2026-03-10T00:00:00.000Z"
+  }
+]

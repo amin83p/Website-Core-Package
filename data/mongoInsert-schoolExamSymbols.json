@@ -1,0 +1,72 @@
+[
+  {
+    "name": "SCHOOL_EXAM",
+    "type": "class",
+    "value": "bi bi-mortarboard-fill",
+    "tags": ["SCHOOL_EXAM", "446000"],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T22:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T22:00:00.000Z"
+    },
+    "orgId": "SYSTEM",
+    "id": "SYM_SCHOOL_EXAM_446000"
+  },
+  {
+    "name": "SCHOOL_EXAM_TEMPLATE",
+    "type": "class",
+    "value": "bi bi-journal-richtext",
+    "tags": ["SCHOOL_EXAM_TEMPLATE", "446001"],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T22:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T22:00:00.000Z"
+    },
+    "orgId": "SYSTEM",
+    "id": "SYM_SCHOOL_EXAM_446001"
+  },
+  {
+    "name": "SCHOOL_EXAM_ALLOCATION",
+    "type": "class",
+    "value": "bi bi-calendar2-check",
+    "tags": ["SCHOOL_EXAM_ALLOCATION", "446002"],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T22:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T22:00:00.000Z"
+    },
+    "orgId": "SYSTEM",
+    "id": "SYM_SCHOOL_EXAM_446002"
+  },
+  {
+    "name": "SCHOOL_EXAM_TAKING",
+    "type": "class",
+    "value": "bi bi-pencil-square",
+    "tags": ["SCHOOL_EXAM_TAKING", "446003"],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T22:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T22:00:00.000Z"
+    },
+    "orgId": "SYSTEM",
+    "id": "SYM_SCHOOL_EXAM_446003"
+  },
+  {
+    "name": "SCHOOL_EXAM_REVIEW",
+    "type": "class",
+    "value": "bi bi-clipboard-check",
+    "tags": ["SCHOOL_EXAM_REVIEW", "446004"],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-07T22:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-07T22:00:00.000Z"
+    },
+    "orgId": "SYSTEM",
+    "id": "SYM_SCHOOL_EXAM_446004"
+  }
+]

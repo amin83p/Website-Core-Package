@@ -1,0 +1,202 @@
+{
+  "meta": {
+    "mode": "apply",
+    "generatedAt": "2026-03-22T09:13:23.034Z",
+    "startedAt": "2026-03-22T09:13:23.012Z",
+    "sampleLimit": 100,
+    "referenceDir": "C:\\Users\\KATANA\\Desktop\\myWebsite\\Website-Node-Express-Core\\data\\benchpath\\reference",
+    "backupDir": "C:\\Users\\KATANA\\Desktop\\myWebsite\\Website-Node-Express-Core\\Reports\\benchpath-migration-backup-2026-03-22T09-13-23-033Z",
+    "backupsCreated": 0,
+    "filesWritten": 0
+  },
+  "summary": {
+    "recordsScanned": 157,
+    "recordsChanged": 0,
+    "fieldsCoerced": 0,
+    "invalidRelationsFound": 0,
+    "recordsSkipped": 0,
+    "indexesRebuilt": 0
+  },
+  "entities": [
+    {
+      "entityType": "sources",
+      "fileName": "source.json",
+      "recordCount": 19,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "sourceFragments",
+      "fileName": "source-fragments.json",
+      "recordCount": 13,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbFrameworks",
+      "fileName": "clb.framework.json",
+      "recordCount": 1,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbStages",
+      "fileName": "clb.stages.json",
+      "recordCount": 3,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbSkills",
+      "fileName": "clb.skills.json",
+      "recordCount": 4,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbCompetencyAreas",
+      "fileName": "clb.competency-areas.json",
+      "recordCount": 16,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbBenchmarks",
+      "fileName": "clb.benchmarks.json",
+      "recordCount": 48,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbCompetencies",
+      "fileName": "clb.competencies.json",
+      "recordCount": 5,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbIndicators",
+      "fileName": "clb.indicators.json",
+      "recordCount": 0,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbProfileOfAbility",
+      "fileName": "clb.profile-of-ability.json",
+      "recordCount": 48,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbFeaturesOfCommunication",
+      "fileName": "clb.features-of-communication.json",
+      "recordCount": 0,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    },
+    {
+      "entityType": "clbSampleTaskLabels",
+      "fileName": "clb.sample-task-labels.json",
+      "recordCount": 0,
+      "recordsChanged": 0,
+      "fieldsCoerced": 0,
+      "invalidRelationsFound": 0,
+      "recordsSkipped": 0,
+      "indexesRebuilt": 0,
+      "samples": {
+        "coercedRecords": [],
+        "shapeIssues": [],
+        "integrityIssues": []
+      }
+    }
+  ]
+}

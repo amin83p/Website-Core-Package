@@ -1,0 +1,6022 @@
+[
+  {
+    "id": "MA_1770787352925_6553",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Are ideas not arranged coherently?",
+    "band": 4,
+    "baseKey": "CC4-1",
+    "createdAt": "2026-02-11T05:22:32.925Z",
+    "criterion": "CC",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Deterministic CC arrangement gate strengthened to reduce fallback volatility on sectioned-but-weak responses.]",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC4-1",
+    "rubric_anchor": "Not arranged coherently and there is no clear progression...",
+    "scope": "essay",
+    "scoredAnswers": [
+      "no"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphCount",
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles",
+      "topicSentenceByParagraph",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphCount",
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles",
+        "topicSentenceByParagraph",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "CC$",
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-04-23T23:35:48.387Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787352961_6976",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there no clear progression from start to finish?",
+    "band": 4,
+    "baseKey": "CC4-2",
+    "createdAt": "2026-02-11T05:22:32.961Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Virtual sentence recovery alignment: long run-on body paragraphs use recovered local units before development collapse.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC4-2",
+    "rubric_anchor": "No clear progression in the response",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:32.961Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787352986_4200",
+    "answer_type": "Boolean",
+    "atomic_question": "Are basic cohesive devices sometimes inaccurate?",
+    "band": 4,
+    "baseKey": "CC4-3",
+    "createdAt": "2026-02-11T05:22:32.986Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Virtual sentence recovery alignment: long run-on body paragraphs use recovered local units before development collapse.] [CC4 deterministic cohesion-control alignment]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC4-3",
+    "rubric_anchor": "Uses some basic cohesive devices but these may be inaccurate...",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "lexical.topRepeatedWords",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "lexical.topRepeatedWords",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:32.986Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353011_3331",
+    "answer_type": "Boolean",
+    "atomic_question": "Are cohesive devices repetitive?",
+    "band": 4,
+    "baseKey": "CC4-4",
+    "createdAt": "2026-02-11T05:22:33.011Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Virtual sentence recovery alignment: long run-on body paragraphs use recovered local units before development collapse.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC4-4",
+    "rubric_anchor": "... or repetitive",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.011Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353035_5146",
+    "answer_type": "Categorical (absent/confusing/ok)",
+    "atomic_question": "Is paragraphing absent or confusing?",
+    "band": 4,
+    "baseKey": "CC4-5",
+    "createdAt": "2026-02-11T05:22:33.035Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "absent",
+      "confusing"
+    ],
+    "notes": "First version (v1) imported via CSV. [Single-subquestion high-band gating tightened with stance, effective length, and body-development checks.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC4-5",
+    "rubric_anchor": "May not write in paragraphs or their use may be confusing?",
+    "scoredAnswers": [
+      "ok"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphCount",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphCount",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.035Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353062_284",
+    "answer_type": "Boolean",
+    "atomic_question": "Is grammatical range very limited?",
+    "band": 4,
+    "baseKey": "GRA4-1",
+    "createdAt": "2026-02-11T05:22:33.062Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Single-subquestion high-band gating tightened with stronger stance, effective length, support depth, and prompt-echo checks.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA4-1",
+    "rubric_anchor": "Very limited range of structures... rare use of subordinate clauses",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl",
+      "grammarControl.errorFrequency",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.clarityImpactFromGrammar"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl",
+        "grammarControl.errorFrequency",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.clarityImpactFromGrammar"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.062Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353080_6945",
+    "answer_type": "Boolean/Count",
+    "atomic_question": "Is subordination rare?",
+    "band": 4,
+    "baseKey": "GRA4-2",
+    "createdAt": "2026-02-11T05:22:33.080Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Single-subquestion high-band gating tightened to require consistent stance and fully developed support.] [Aligned to Step3 grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA4-2",
+    "rubric_anchor": "Same clause (\"rare use of subordinate clauses\")",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl",
+      "grammarControl.errorFreeSentenceShareBand"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl",
+        "grammarControl.errorFreeSentenceShareBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.080Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353104_7527",
+    "answer_type": "Boolean",
+    "atomic_question": "Do grammar errors predominate overall?",
+    "band": 4,
+    "baseKey": "GRA4-3",
+    "createdAt": "2026-02-11T05:22:33.104Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA4-3",
+    "rubric_anchor": "Errors predominate...",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.subjectVerbAgreement",
+      "grammarControl.articleControl",
+      "grammarControl.prepositionControl",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.subjectVerbAgreement",
+        "grammarControl.articleControl",
+        "grammarControl.prepositionControl",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.104Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353128_8045",
+    "answer_type": "Boolean",
+    "atomic_question": "Is punctuation often faulty?",
+    "band": 4,
+    "baseKey": "GRA4-4",
+    "createdAt": "2026-02-11T05:22:33.128Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA4-4",
+    "rubric_anchor": "... punctuation is often faulty",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl",
+      "grammarControl.errorFrequency",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.errorFreeSentenceShareBand"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl",
+        "grammarControl.errorFrequency",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.errorFreeSentenceShareBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.128Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353150_3346",
+    "answer_type": "Boolean",
+    "atomic_question": "Are there some accurate structures despite many errors?",
+    "band": 4,
+    "baseKey": "GRA4-5",
+    "createdAt": "2026-02-11T05:22:33.150Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA4-5",
+    "rubric_anchor": "Some structures are accurate but errors predominate",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl",
+      "grammarControl.errorFrequency",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.clarityImpactFromGrammar"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl",
+        "grammarControl.errorFrequency",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.clarityImpactFromGrammar"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.150Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787353175_4520",
+    "answer_type": "Boolean",
+    "atomic_question": "Is vocabulary only basic overall?",
+    "band": 4,
+    "baseKey": "LR4-1",
+    "createdAt": "2026-02-11T05:22:33.175Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR4-1",
+    "rubric_anchor": "Uses only basic vocabulary...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.precisionBand",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.precisionBand",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.175Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353202_3678",
+    "answer_type": "Boolean",
+    "atomic_question": "Is vocabulary repetitive?",
+    "band": 4,
+    "baseKey": "LR4-2",
+    "createdAt": "2026-02-11T05:22:33.202Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl evidence for LR5-7 stability]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR4-2",
+    "rubric_anchor": "... used repetitively",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "lexical.topRepeatedWords",
+      "lexical.referencingDensity"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "lexical.topRepeatedWords",
+        "lexical.referencingDensity"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.202Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353222_4348",
+    "answer_type": "Boolean",
+    "atomic_question": "Is vocabulary sometimes inappropriate for the task (meaning/register)?",
+    "band": 4,
+    "baseKey": "LR4-3",
+    "createdAt": "2026-02-11T05:22:33.222Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR4-3",
+    "rubric_anchor": "... inappropriate for the task",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.precisionBand",
+      "lexicalControl.collocationControl",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.precisionBand",
+        "lexicalControl.collocationControl",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.222Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353240_7343",
+    "answer_type": "Boolean",
+    "atomic_question": "Are spelling/word-formation issues frequent enough to show limited control?",
+    "band": 4,
+    "baseKey": "LR4-4",
+    "createdAt": "2026-02-11T05:22:33.240Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl evidence for LR5-7 stability]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR4-4",
+    "rubric_anchor": "Limited control of word formation and/or spelling; errors may cause strain...",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.240Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353267_4809",
+    "answer_type": "Ordinal (none/some/strain)",
+    "atomic_question": "Do lexical errors cause strain for the reader?",
+    "band": 4,
+    "baseKey": "LR4-5",
+    "createdAt": "2026-02-11T05:22:33.267Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "strain"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl evidence for LR5-7 stability]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR4-5",
+    "rubric_anchor": "... errors may cause strain for the reader",
+    "scoredAnswers": [
+      "none",
+      "some"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.clarityImpactFromLexis",
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.awkwardExpressionCountBand"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.clarityImpactFromLexis",
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.awkwardExpressionCountBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.267Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353286_4538",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the response minimal/tangential to the task?",
+    "band": 4,
+    "baseKey": "TR4-1",
+    "createdAt": "2026-02-11T05:22:33.286Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Prompt-echo effective-content support added: raw length plus effective non-copied content.] [Robust prompt-restatement diagnostics added for distorted learner copying.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR4-1",
+    "rubric_anchor": "Responds to the task only in a minimal way or the answer is tangential; the format may be inappropriate",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.effectiveContentRatio",
+      "step2.taskEcho.copiedWordEstimate",
+      "step2.taskEcho.anchorReuseCount",
+      "step2.taskEcho.reusedPromptPhraseCount",
+      "step2.taskEcho.reusedPromptSentenceLikeCount",
+      "step2.taskEcho.matchedUnitDiagnostics",
+      "step2.taskEcho.severity",
+      "answersBySubquestion",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.effectiveContentRatio",
+        "step2.taskEcho.copiedWordEstimate",
+        "step2.taskEcho.anchorReuseCount",
+        "step2.taskEcho.reusedPromptPhraseCount",
+        "step2.taskEcho.reusedPromptSentenceLikeCount",
+        "step2.taskEcho.matchedUnitDiagnostics",
+        "step2.taskEcho.severity",
+        "answersBySubquestion",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.286Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353302_1330",
+    "answer_type": "Categorical (none/unclear/clear)",
+    "atomic_question": "Is a position present but unclear?",
+    "band": 4,
+    "baseKey": "TR4-2",
+    "createdAt": "2026-02-11T05:22:33.302Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "none",
+      "unclear"
+    ],
+    "notes": "First version (v1) imported via CSV. [Position-state alignment: inconsistent stance is routed here (unclear) instead of 'no position'.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR4-2",
+    "rubric_anchor": "Presents a position but this is unclear",
+    "scoredAnswers": [
+      "clear"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.302Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353321_7636",
+    "answer_type": "Boolean",
+    "atomic_question": "Are main ideas difficult to identify?",
+    "band": 4,
+    "baseKey": "TR4-3",
+    "createdAt": "2026-02-11T05:22:33.321Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR4-3",
+    "rubric_anchor": "Main ideas... difficult to identify...",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.321Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353341_7394",
+    "answer_type": "Boolean",
+    "atomic_question": "Are main ideas repetitive?",
+    "band": 4,
+    "baseKey": "TR4-4",
+    "createdAt": "2026-02-11T05:22:33.341Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR4-4",
+    "rubric_anchor": "Main ideas... may be repetitive",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.341Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787353360_8218",
+    "answer_type": "Boolean",
+    "atomic_question": "Are main ideas often irrelevant to the task?",
+    "band": 4,
+    "baseKey": "TR4-5",
+    "createdAt": "2026-02-11T05:22:33.360Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR4-5",
+    "rubric_anchor": "Main ideas... irrelevant",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.360Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353381_4420",
+    "answer_type": "Boolean",
+    "atomic_question": "Are ideas not well supported (little explanation/example)?",
+    "band": 4,
+    "baseKey": "TR4-6",
+    "createdAt": "2026-02-11T05:22:33.381Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Virtual sentence recovery alignment: long run-on body paragraphs use recovered local units before development collapse.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR4-6",
+    "rubric_anchor": "Main ideas... not well supported",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.381Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353403_6022",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there some organisation (ideas grouped, not totally random)?",
+    "band": 5,
+    "baseKey": "CC5-1",
+    "createdAt": "2026-02-11T05:22:33.403Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC5-1",
+    "rubric_anchor": "Presents information with some organisation...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.403Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787353420_1587",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there a lack of overall progression (weak start→end flow)?",
+    "band": 5,
+    "baseKey": "CC5-2",
+    "createdAt": "2026-02-11T05:22:33.420Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Prompt-echo and virtual sentence recovery alignment for run-on development checks.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC5-2",
+    "rubric_anchor": "... but there may be a lack of overall progression",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts",
+      "topicSentenceByParagraph",
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.topRepeatedWords",
+      "lexical.referencingDensity"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts",
+        "topicSentenceByParagraph",
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.topRepeatedWords",
+        "lexical.referencingDensity"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.420Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353437_8641",
+    "answer_type": "Boolean",
+    "atomic_question": "Are cohesive devices inadequate (too few/insufficient guidance)?",
+    "band": 5,
+    "baseKey": "CC5-3",
+    "createdAt": "2026-02-11T05:22:33.437Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Deterministic cohesion-adequacy guard strengthened for mid-band CC stability.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC5-3",
+    "rubric_anchor": "Makes inadequate... use of cohesive devices",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.437Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353456_940",
+    "answer_type": "Boolean",
+    "atomic_question": "Are cohesive devices sometimes inaccurate (wrong logical relation signaled)?",
+    "band": 5,
+    "baseKey": "CC5-4",
+    "createdAt": "2026-02-11T05:22:33.456Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Deterministic accuracy/no-issue guard added for obvious cohesion-linking patterns.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC5-4",
+    "rubric_anchor": "Makes ... inaccurate ... use of cohesive devices",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "lexical.topRepeatedWords",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "lexical.topRepeatedWords",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.456Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353477_791",
+    "answer_type": "Boolean",
+    "atomic_question": "Are cohesive devices overused (distracting/mechanical)?",
+    "band": 5,
+    "baseKey": "CC5-5",
+    "createdAt": "2026-02-11T05:22:33.477Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Deterministic overuse/mechanical-linking checks strengthened to reduce fallback swings.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC5-5",
+    "rubric_anchor": "Makes ... overuse of cohesive devices",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.477Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353499_4625",
+    "answer_type": "Boolean",
+    "atomic_question": "Is repetition caused by weak referencing/substitution?",
+    "band": 5,
+    "baseKey": "CC5-6",
+    "createdAt": "2026-02-11T05:22:33.499Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Prompt-echo and virtual sentence recovery alignment for run-on development checks.] [Deterministic repetition/reference weakness rule strengthened for lower CC flip-rate.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC5-6",
+    "rubric_anchor": "May be repetitive because of lack of referencing and substitution?",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.topRepeatedWords",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.topRepeatedWords",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.499Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353566_2397",
+    "answer_type": "Boolean",
+    "atomic_question": "Is paragraphing absent (single block)?",
+    "band": 5,
+    "baseKey": "CC5-7",
+    "createdAt": "2026-02-11T05:22:33.566Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC5-7",
+    "rubric_anchor": "May not write in paragraphs...?",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphCount",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphCount",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.566Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353593_7508",
+    "answer_type": "Boolean",
+    "atomic_question": "Is paragraphing present but inadequate (weak/incorrect breaks)?",
+    "band": 5,
+    "baseKey": "CC5-8",
+    "createdAt": "2026-02-11T05:22:33.593Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC5-8",
+    "rubric_anchor": "... or paragraphing may be inadequate",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphCount",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphCount",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.593Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353617_1104",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the range of grammatical structures limited?",
+    "band": 5,
+    "baseKey": "GRA5-1",
+    "createdAt": "2026-02-11T05:22:33.617Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA5-1",
+    "rubric_anchor": "Uses only a limited range of structures",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.617Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353638_4997",
+    "answer_type": "Boolean",
+    "atomic_question": "Are complex sentences attempted?",
+    "band": 5,
+    "baseKey": "GRA5-2",
+    "createdAt": "2026-02-11T05:22:33.638Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA5-2",
+    "rubric_anchor": "Attempts complex sentences...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.638Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353659_8857",
+    "answer_type": "Boolean",
+    "atomic_question": "Are complex sentences generally less accurate than simple ones?",
+    "band": 5,
+    "baseKey": "GRA5-3",
+    "createdAt": "2026-02-11T05:22:33.659Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA5-3",
+    "rubric_anchor": "... but these tend to be less accurate than simple sentences",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl",
+      "grammarControl.errorFrequency",
+      "grammarControl.clarityImpactFromGrammar"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl",
+        "grammarControl.errorFrequency",
+        "grammarControl.clarityImpactFromGrammar"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.659Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353678_6704",
+    "answer_type": "Boolean",
+    "atomic_question": "Are grammatical errors frequent?",
+    "band": 5,
+    "baseKey": "GRA5-4",
+    "createdAt": "2026-02-11T05:22:33.678Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA5-4",
+    "rubric_anchor": "May make frequent grammatical errors...?",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.complexSentenceControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.complexSentenceControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.678Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353700_4768",
+    "answer_type": "Boolean",
+    "atomic_question": "Is punctuation often faulty?",
+    "band": 5,
+    "baseKey": "GRA5-5",
+    "createdAt": "2026-02-11T05:22:33.700Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA5-5",
+    "rubric_anchor": "... and punctuation may be faulty",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl",
+      "grammarControl.clarityImpactFromGrammar"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl",
+        "grammarControl.clarityImpactFromGrammar"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.700Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353715_1829",
+    "answer_type": "Ordinal (none/some)",
+    "atomic_question": "Do grammar/punctuation errors cause difficulty for the reader?",
+    "band": 5,
+    "baseKey": "GRA5-6",
+    "createdAt": "2026-02-11T05:22:33.715Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "some"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA5-6",
+    "rubric_anchor": "Errors can cause some difficulty for the reader",
+    "scoredAnswers": [
+      "none"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl",
+      "grammarControl.clarityImpactFromGrammar"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl",
+        "grammarControl.clarityImpactFromGrammar"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.715Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353731_5753",
+    "answer_type": "Boolean",
+    "atomic_question": "Is vocabulary range limited overall?",
+    "band": 5,
+    "baseKey": "LR5-1",
+    "createdAt": "2026-02-11T05:22:33.731Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl evidence for LR5-7 stability]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR5-1",
+    "rubric_anchor": "Uses a limited range of vocabulary...",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.precisionBand",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.precisionBand",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.731Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353763_5073",
+    "answer_type": "Boolean",
+    "atomic_question": "Despite being limited, is vocabulary minimally adequate for the task?",
+    "band": 5,
+    "baseKey": "LR5-2",
+    "createdAt": "2026-02-11T05:22:33.763Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl evidence for LR5-7 stability]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR5-2",
+    "rubric_anchor": "... but this is minimally adequate for the task",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.precisionBand",
+      "lexicalControl.collocationControl",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.precisionBand",
+        "lexicalControl.collocationControl",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.763Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353785_7227",
+    "answer_type": "Boolean",
+    "atomic_question": "Are spelling/word-formation errors noticeable?",
+    "band": 5,
+    "baseKey": "LR5-3",
+    "createdAt": "2026-02-11T05:22:33.785Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl evidence for LR5-7 stability]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR5-3",
+    "rubric_anchor": "May make noticeable errors in spelling and/or word formation...?",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.785Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353808_3483",
+    "answer_type": "Ordinal (none/some)",
+    "atomic_question": "Do lexical errors cause some difficulty for the reader?",
+    "band": 5,
+    "baseKey": "LR5-4",
+    "createdAt": "2026-02-11T05:22:33.808Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "some"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl evidence for LR5-7 stability]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR5-4",
+    "rubric_anchor": "... that may cause some difficulty for the reader",
+    "scoredAnswers": [
+      "none"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.clarityImpactFromLexis",
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.awkwardExpressionCountBand"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.clarityImpactFromLexis",
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.awkwardExpressionCountBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.808Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353830_8211",
+    "answer_type": "Boolean",
+    "atomic_question": "Does the response address the task only partially?",
+    "band": 5,
+    "baseKey": "TR5-1",
+    "createdAt": "2026-02-11T05:22:33.830Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Robust prompt-restatement diagnostics added for distorted learner copying.] [Single-subquestion high-band gating tightened to require real development, not only coverage indexing.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR5-1",
+    "rubric_anchor": "Addresses the task only partially...",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.effectiveContentRatio",
+      "step2.taskEcho.copiedWordEstimate",
+      "step2.taskEcho.anchorReuseCount",
+      "step2.taskEcho.reusedPromptPhraseCount",
+      "step2.taskEcho.reusedPromptSentenceLikeCount",
+      "step2.taskEcho.matchedUnitDiagnostics",
+      "step2.taskEcho.severity",
+      "answersBySubquestion",
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.effectiveContentRatio",
+        "step2.taskEcho.copiedWordEstimate",
+        "step2.taskEcho.anchorReuseCount",
+        "step2.taskEcho.reusedPromptPhraseCount",
+        "step2.taskEcho.reusedPromptSentenceLikeCount",
+        "step2.taskEcho.matchedUnitDiagnostics",
+        "step2.taskEcho.severity",
+        "answersBySubquestion",
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.830Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353855_1846",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the format inappropriate in places (not consistently essay-like / wrong response form)?",
+    "band": 5,
+    "baseKey": "TR5-2",
+    "createdAt": "2026-02-11T05:22:33.855Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR5-2",
+    "rubric_anchor": "... the format may be inappropriate in places",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.855Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787353880_3358",
+    "answer_type": "Categorical (none/yes)",
+    "atomic_question": "Is a position/opinion expressed?",
+    "band": 5,
+    "baseKey": "TR5-3",
+    "createdAt": "2026-02-11T05:22:33.880Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "none"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR5-3",
+    "rubric_anchor": "Expresses a position...",
+    "scoredAnswers": [
+      "yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.880Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787353909_1187",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the development of the position not always clear?",
+    "band": 5,
+    "baseKey": "TR5-4",
+    "createdAt": "2026-02-11T05:22:33.909Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR5-4",
+    "rubric_anchor": "... but the development is not always clear",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.909Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353946_3664",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there no conclusion drawn?",
+    "band": 5,
+    "baseKey": "TR5-5",
+    "createdAt": "2026-02-11T05:22:33.946Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR5-5",
+    "rubric_anchor": "... and there may be no conclusions drawn",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.946Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787353974_530",
+    "answer_type": "Boolean",
+    "atomic_question": "Are main ideas limited (few distinct points)?",
+    "band": 5,
+    "baseKey": "TR5-6",
+    "createdAt": "2026-02-11T05:22:33.974Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR5-6",
+    "rubric_anchor": "Presents some main ideas but these are limited...",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:33.974Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354003_5172",
+    "answer_type": "Boolean",
+    "atomic_question": "Are main ideas not sufficiently developed?",
+    "band": 5,
+    "baseKey": "TR5-7",
+    "createdAt": "2026-02-11T05:22:34.003Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Prompt-echo effective-content support added: development checks now use effective non-copied length.] [Virtual sentence recovery alignment: run-on body paragraphs are checked with recovered local units.] [Robust prompt-restatement diagnostics added for distorted learner copying.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR5-7",
+    "rubric_anchor": "... and not sufficiently developed",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.effectiveContentRatio",
+      "step2.taskEcho.copiedWordEstimate",
+      "step2.taskEcho.anchorReuseCount",
+      "step2.taskEcho.reusedPromptPhraseCount",
+      "step2.taskEcho.reusedPromptSentenceLikeCount",
+      "step2.taskEcho.matchedUnitDiagnostics",
+      "step2.taskEcho.severity",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices",
+      "topicSentenceByParagraph",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.effectiveContentRatio",
+        "step2.taskEcho.copiedWordEstimate",
+        "step2.taskEcho.anchorReuseCount",
+        "step2.taskEcho.reusedPromptPhraseCount",
+        "step2.taskEcho.reusedPromptSentenceLikeCount",
+        "step2.taskEcho.matchedUnitDiagnostics",
+        "step2.taskEcho.severity",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices",
+        "topicSentenceByParagraph",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.003Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354045_6872",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there irrelevant detail that distracts from the task?",
+    "band": 5,
+    "baseKey": "TR5-8",
+    "createdAt": "2026-02-11T05:22:34.045Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR5-8",
+    "rubric_anchor": "There may be irrelevant detail",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.045Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787354084_6958",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there clear overall progression (start→end flow is coherent)?",
+    "band": 6,
+    "baseKey": "CC6-1",
+    "createdAt": "2026-02-11T05:22:34.084Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Prompt-echo and virtual sentence recovery alignment for run-on development checks.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC6-1",
+    "rubric_anchor": "Arranges information and ideas coherently and there is a clear overall progression",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts",
+      "topicSentenceByParagraph",
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.topRepeatedWords",
+      "lexical.referencingDensity"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts",
+        "topicSentenceByParagraph",
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.topRepeatedWords",
+        "lexical.referencingDensity"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.084Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354112_7819",
+    "answer_type": "Boolean",
+    "atomic_question": "Are cohesive devices generally effective?",
+    "band": 6,
+    "baseKey": "CC6-2",
+    "createdAt": "2026-02-11T05:22:34.112Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC6-2",
+    "rubric_anchor": "Uses cohesive devices effectively...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.112Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354146_9702",
+    "answer_type": "Boolean",
+    "atomic_question": "Is cohesion sometimes faulty or mechanical?",
+    "band": 6,
+    "baseKey": "CC6-3",
+    "createdAt": "2026-02-11T05:22:34.146Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Robust prompt-restatement diagnostics added for distorted learner copying.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC6-3",
+    "rubric_anchor": "... but cohesion... may be faulty or mechanical",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts",
+      "topicSentenceByParagraph",
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.topRepeatedWords",
+      "lexical.referencingDensity"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts",
+        "topicSentenceByParagraph",
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.topRepeatedWords",
+        "lexical.referencingDensity"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.146Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354170_1594",
+    "answer_type": "Boolean",
+    "atomic_question": "Is referencing sometimes unclear/inappropriate?",
+    "band": 6,
+    "baseKey": "CC6-4",
+    "createdAt": "2026-02-11T05:22:34.170Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Step 4 stability patch: widened deterministic referencing rule to avoid null fall-through on gate-critical routing.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC6-4",
+    "rubric_anchor": "May not always use referencing clearly or appropriately?",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.topRepeatedWords",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.topRepeatedWords",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.170Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354195_8628",
+    "answer_type": "Boolean",
+    "atomic_question": "Is paragraphing present but not always logical?",
+    "band": 6,
+    "baseKey": "CC6-5",
+    "createdAt": "2026-02-11T05:22:34.195Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC6-5",
+    "rubric_anchor": "Uses paragraphing, but not always logically",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphCount",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphRoles",
+      "topicSentenceByParagraph"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphCount",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphRoles",
+        "topicSentenceByParagraph"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.195Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354216_2722",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there a mix of simple and complex sentence forms?",
+    "band": 6,
+    "baseKey": "GRA6-1",
+    "createdAt": "2026-02-11T05:22:34.216Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA6-1",
+    "rubric_anchor": "Uses a mix of simple and complex sentence forms",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.216Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354239_8209",
+    "answer_type": "Boolean",
+    "atomic_question": "Are there some grammar/punctuation errors?",
+    "band": 6,
+    "baseKey": "GRA6-2",
+    "createdAt": "2026-02-11T05:22:34.239Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA6-2",
+    "rubric_anchor": "Makes some errors in grammar and punctuation...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.clarityImpactFromGrammar"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.clarityImpactFromGrammar"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.239Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787354262_1195",
+    "answer_type": "Ordinal (rarely/sometimes/often)",
+    "atomic_question": "Do grammar/punctuation errors rarely reduce communication?",
+    "band": 6,
+    "baseKey": "GRA6-3",
+    "createdAt": "2026-02-11T05:22:34.262Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "sometimes",
+      "often"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA6-3",
+    "rubric_anchor": "... but they rarely reduce communication",
+    "scoredAnswers": [
+      "rarely"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.262Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354292_7779",
+    "answer_type": "Boolean",
+    "atomic_question": "Is vocabulary range adequate for the task?",
+    "band": 6,
+    "baseKey": "LR6-1",
+    "createdAt": "2026-02-11T05:22:34.292Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR6-1",
+    "rubric_anchor": "Uses an adequate range of vocabulary for the task",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.precisionBand",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.precisionBand",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.292Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354316_6161",
+    "answer_type": "Boolean",
+    "atomic_question": "Are less common lexical items attempted?",
+    "band": 6,
+    "baseKey": "LR6-2",
+    "createdAt": "2026-02-11T05:22:34.316Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR6-2",
+    "rubric_anchor": "Attempts to use less common vocabulary...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.collocationControl",
+      "lexicalControl.precisionBand"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.collocationControl",
+        "lexicalControl.precisionBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.316Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354337_7717",
+    "answer_type": "Boolean",
+    "atomic_question": "Are there some inaccuracies when attempting less common vocabulary?",
+    "band": 6,
+    "baseKey": "LR6-3",
+    "createdAt": "2026-02-11T05:22:34.337Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR6-3",
+    "rubric_anchor": "... but with some inaccuracy",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.precisionBand",
+      "lexicalControl.awkwardExpressionCountBand"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.precisionBand",
+        "lexicalControl.awkwardExpressionCountBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.337Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787354352_6970",
+    "answer_type": "Ordinal (none/some_non_impeding/impeding)",
+    "atomic_question": "Are spelling/word-formation errors present but do not impede communication?",
+    "band": 6,
+    "baseKey": "LR6-4",
+    "createdAt": "2026-02-11T05:22:34.352Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "impeding"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR6-4",
+    "rubric_anchor": "Makes some errors in spelling and/or word formation, but they do not impede communication",
+    "scoredAnswers": [
+      "none",
+      "some_non_impeding"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.352Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354369_3801",
+    "answer_type": "Boolean",
+    "atomic_question": "Does the response address all parts of the task at least once?",
+    "band": 6,
+    "baseKey": "TR6-1",
+    "createdAt": "2026-02-11T05:22:34.369Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Robust prompt-restatement diagnostics added for distorted learner copying.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR6-1",
+    "rubric_anchor": "Addresses all parts of the task...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.effectiveContentRatio",
+      "step2.taskEcho.copiedWordEstimate",
+      "step2.taskEcho.anchorReuseCount",
+      "step2.taskEcho.reusedPromptPhraseCount",
+      "step2.taskEcho.reusedPromptSentenceLikeCount",
+      "step2.taskEcho.matchedUnitDiagnostics",
+      "step2.taskEcho.severity",
+      "answersBySubquestion",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.effectiveContentRatio",
+        "step2.taskEcho.copiedWordEstimate",
+        "step2.taskEcho.anchorReuseCount",
+        "step2.taskEcho.reusedPromptPhraseCount",
+        "step2.taskEcho.reusedPromptSentenceLikeCount",
+        "step2.taskEcho.matchedUnitDiagnostics",
+        "step2.taskEcho.severity",
+        "answersBySubquestion",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.369Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354388_8796",
+    "answer_type": "Boolean",
+    "atomic_question": "Is coverage uneven across task parts (some weaker than others)?",
+    "band": 6,
+    "baseKey": "TR6-2",
+    "createdAt": "2026-02-11T05:22:34.388Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Prompt-echo effective-content support added for uneven-coverage checks.] [Robust prompt-restatement diagnostics added for distorted learner copying.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR6-2",
+    "rubric_anchor": "... although some parts may be more fully covered than others",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.effectiveContentRatio",
+      "step2.taskEcho.copiedWordEstimate",
+      "step2.taskEcho.anchorReuseCount",
+      "step2.taskEcho.reusedPromptPhraseCount",
+      "step2.taskEcho.reusedPromptSentenceLikeCount",
+      "step2.taskEcho.matchedUnitDiagnostics",
+      "step2.taskEcho.severity",
+      "answersBySubquestion",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.effectiveContentRatio",
+        "step2.taskEcho.copiedWordEstimate",
+        "step2.taskEcho.anchorReuseCount",
+        "step2.taskEcho.reusedPromptPhraseCount",
+        "step2.taskEcho.reusedPromptSentenceLikeCount",
+        "step2.taskEcho.matchedUnitDiagnostics",
+        "step2.taskEcho.severity",
+        "answersBySubquestion",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.388Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354418_2008",
+    "answer_type": "Categorical (none/irrelevant/relevant)",
+    "atomic_question": "Is the position relevant to the question?",
+    "band": 6,
+    "baseKey": "TR6-3",
+    "createdAt": "2026-02-11T05:22:34.418Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "none",
+      "irrelevant"
+    ],
+    "notes": "First version (v1) imported via CSV. [Step 4 stability patch: deterministic high-band relevance gate for consistent support relevance checks.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR6-3",
+    "rubric_anchor": "Presents a relevant position...",
+    "scoredAnswers": [
+      "relevant"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.418Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354440_7502",
+    "answer_type": "Boolean",
+    "atomic_question": "Does the conclusion become unclear (weak/uncertain restatement of position)?",
+    "band": 6,
+    "baseKey": "TR6-4",
+    "createdAt": "2026-02-11T05:22:34.440Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR6-4",
+    "rubric_anchor": "... although the conclusions may become unclear...",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.440Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354463_7326",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the conclusion repetitive (repeats without adding closure)?",
+    "band": 6,
+    "baseKey": "TR6-5",
+    "createdAt": "2026-02-11T05:22:34.463Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR6-5",
+    "rubric_anchor": "... or repetitive",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.463Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787354483_9131",
+    "answer_type": "Boolean",
+    "atomic_question": "Are main ideas in the body generally relevant?",
+    "band": 6,
+    "baseKey": "TR6-6",
+    "createdAt": "2026-02-11T05:22:34.483Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR6-6",
+    "rubric_anchor": "Presents relevant main ideas...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.483Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354500_3809",
+    "answer_type": "Boolean",
+    "atomic_question": "Is at least one main idea inadequately developed or unclear?",
+    "band": 6,
+    "baseKey": "TR6-7",
+    "createdAt": "2026-02-11T05:22:34.500Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV. [Mid-band TR/CC recalibration: underlength, coverage depth, progression, repetition, referencing.] [Prompt-echo and virtual sentence recovery alignment for run-on development checks.]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR6-7",
+    "rubric_anchor": "... but some may be inadequately developed/unclear",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.effectiveContentRatio",
+      "step2.taskEcho.severity",
+      "answersBySubquestion",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices",
+      "topicSentenceByParagraph",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.effectiveContentRatio",
+        "step2.taskEcho.severity",
+        "answersBySubquestion",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices",
+        "topicSentenceByParagraph",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.500Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354521_6787",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there clear progression throughout (not just overall)?",
+    "band": 7,
+    "baseKey": "CC7-1",
+    "createdAt": "2026-02-11T05:22:34.521Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC7-1",
+    "rubric_anchor": "Logically organises... clear progression throughout",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.521Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354555_9289",
+    "answer_type": "Boolean",
+    "atomic_question": "Is a range of cohesive devices used appropriately?",
+    "band": 7,
+    "baseKey": "CC7-2",
+    "createdAt": "2026-02-11T05:22:34.555Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC7-2",
+    "rubric_anchor": "Uses a range of cohesive devices appropriately...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.555Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354579_1555",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there some under-/over-use of cohesive devices (minor imbalance)?",
+    "band": 7,
+    "baseKey": "CC7-3",
+    "createdAt": "2026-02-11T05:22:34.579Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC7-3",
+    "rubric_anchor": "... although there may be some under-/over-use",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.579Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787354603_4044",
+    "answer_type": "Boolean",
+    "atomic_question": "Does each paragraph have a clear central topic?",
+    "band": 7,
+    "baseKey": "CC7-4",
+    "createdAt": "2026-02-11T05:22:34.603Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC7-4",
+    "rubric_anchor": "Clear central topic within each paragraph",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphCount",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphCount",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.603Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354624_1182",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there a variety of complex structures?",
+    "band": 7,
+    "baseKey": "GRA7-1",
+    "createdAt": "2026-02-11T05:22:34.624Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA7-1",
+    "rubric_anchor": "Uses a variety of complex structures",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl",
+      "grammarControl.errorFrequency"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl",
+        "grammarControl.errorFrequency"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.624Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354645_7438",
+    "answer_type": "Boolean",
+    "atomic_question": "Are error-free sentences frequent?",
+    "band": 7,
+    "baseKey": "GRA7-2",
+    "createdAt": "2026-02-11T05:22:34.645Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA7-2",
+    "rubric_anchor": "Produces frequent error-free sentences",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.errorFrequency",
+      "grammarControl.clarityImpactFromGrammar"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.errorFrequency",
+        "grammarControl.clarityImpactFromGrammar"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.645Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354665_1380",
+    "answer_type": "Boolean",
+    "atomic_question": "Is overall grammar/punctuation control good?",
+    "band": 7,
+    "baseKey": "GRA7-3",
+    "createdAt": "2026-02-11T05:22:34.665Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA7-3",
+    "rubric_anchor": "Has good control of grammar and punctuation...?",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.subjectVerbAgreement",
+      "grammarControl.articleControl",
+      "grammarControl.prepositionControl",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.subjectVerbAgreement",
+        "grammarControl.articleControl",
+        "grammarControl.prepositionControl",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.665Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354686_4371",
+    "answer_type": "Ordinal (none/few/occasional/frequent)",
+    "atomic_question": "Are errors present but only a few (not frequent)?",
+    "band": 7,
+    "baseKey": "GRA7-4",
+    "createdAt": "2026-02-11T05:22:34.686Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "frequent"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA7-4",
+    "rubric_anchor": "... but may make a few errors",
+    "scoredAnswers": [
+      "none",
+      "few",
+      "occasional"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.clarityImpactFromGrammar"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.clarityImpactFromGrammar"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.686Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354705_6809",
+    "answer_type": "Boolean",
+    "atomic_question": "Is vocabulary range sufficient to allow some flexibility and precision?",
+    "band": 7,
+    "baseKey": "LR7-1",
+    "createdAt": "2026-02-11T05:22:34.705Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR7-1",
+    "rubric_anchor": "Uses a sufficient range of vocabulary to allow some flexibility and precision",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.precisionBand",
+      "lexicalControl.collocationControl",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.precisionBand",
+        "lexicalControl.collocationControl",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.705Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354730_9124",
+    "answer_type": "Boolean",
+    "atomic_question": "Are less common lexical items used with some awareness of style/collocation?",
+    "band": 7,
+    "baseKey": "LR7-2",
+    "createdAt": "2026-02-11T05:22:34.730Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR7-2",
+    "rubric_anchor": "Uses less common lexical items... with some awareness of style and collocation",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.collocationControl",
+      "lexicalControl.precisionBand"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.collocationControl",
+        "lexicalControl.precisionBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.730Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354754_7310",
+    "answer_type": "Ordinal (none/rare/occasional/frequent)",
+    "atomic_question": "Are lexical errors (choice/spelling/formation) occasional (not frequent)?",
+    "band": 7,
+    "baseKey": "LR7-3",
+    "createdAt": "2026-02-11T05:22:34.754Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "frequent"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR7-3",
+    "rubric_anchor": "May produce occasional errors in word choice, spelling and/or word formation?",
+    "scoredAnswers": [
+      "none",
+      "rare",
+      "occasional"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.clarityImpactFromLexis",
+      "lexicalControl.awkwardExpressionCountBand"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.clarityImpactFromLexis",
+        "lexicalControl.awkwardExpressionCountBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.754Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354778_1975",
+    "answer_type": "Boolean",
+    "atomic_question": "Does the response address all parts of the task?",
+    "band": 7,
+    "baseKey": "TR7-1",
+    "createdAt": "2026-02-11T05:22:34.778Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR7-1",
+    "rubric_anchor": "Addresses all parts of the task",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "answersBySubquestion",
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices",
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.severity",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "answersBySubquestion",
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices",
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.severity",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.778Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354802_5924",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the position clear throughout the response (consistent and explicit)?",
+    "band": 7,
+    "baseKey": "TR7-2",
+    "createdAt": "2026-02-11T05:22:34.802Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR7-2",
+    "rubric_anchor": "Presents a clear position throughout the response",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.802Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354831_6501",
+    "answer_type": "Boolean",
+    "atomic_question": "Are main ideas presented, extended, and supported (not just listed)?",
+    "band": 7,
+    "baseKey": "TR7-3",
+    "createdAt": "2026-02-11T05:22:34.831Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR7-3",
+    "rubric_anchor": "Presents, extends and supports main ideas...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.831Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354856_6780",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there a tendency to overgeneralise (broad claims without nuance)?",
+    "band": 7,
+    "baseKey": "TR7-4",
+    "createdAt": "2026-02-11T05:22:34.856Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR7-4",
+    "rubric_anchor": "... may be a tendency to overgeneralise",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.856Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787354879_8988",
+    "answer_type": "Boolean",
+    "atomic_question": "Do supporting ideas sometimes lack focus (drift from main point)?",
+    "band": 7,
+    "baseKey": "TR7-5",
+    "createdAt": "2026-02-11T05:22:34.879Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR7-5",
+    "rubric_anchor": "... and/or supporting ideas may lack focus",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.879Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_1770787354903_2410",
+    "answer_type": "Boolean",
+    "atomic_question": "Are ideas sequenced logically (clear ordering of points)?",
+    "band": 8,
+    "baseKey": "CC8-1",
+    "createdAt": "2026-02-11T05:22:34.903Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. High-band ceiling calibration updated for 8/9 boundary reliability.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC8-1",
+    "rubric_anchor": "Sequences information and ideas logically",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts",
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "lexical.topRepeatedWords"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts",
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "lexical.topRepeatedWords"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.903Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354934_5000",
+    "answer_type": "Boolean",
+    "atomic_question": "Is cohesion well managed overall (links + referencing work consistently)?",
+    "band": 8,
+    "baseKey": "CC8-2",
+    "createdAt": "2026-02-11T05:22:34.934Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. High-band ceiling calibration updated for 8/9 boundary reliability.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC8-2",
+    "rubric_anchor": "Manages all aspects of cohesion well",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts",
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "lexical.topRepeatedWords"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts",
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "lexical.topRepeatedWords"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.934Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787354961_7239",
+    "answer_type": "Boolean",
+    "atomic_question": "Is paragraphing sufficient and appropriate?",
+    "band": 8,
+    "baseKey": "CC8-3",
+    "createdAt": "2026-02-11T05:22:34.961Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC8-3",
+    "rubric_anchor": "Uses paragraphing sufficiently and appropriately",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphCount",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphRoles"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphCount",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphRoles"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.961Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787354990_3598",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there a wide range of sentence structures?",
+    "band": 8,
+    "baseKey": "GRA8-1",
+    "createdAt": "2026-02-11T05:22:34.990Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA8-1",
+    "rubric_anchor": "Uses a wide range of structures",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl",
+      "grammarControl.errorFrequency"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl",
+        "grammarControl.errorFrequency"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:34.990Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355015_4983",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the majority of sentences error-free?",
+    "band": 8,
+    "baseKey": "GRA8-2",
+    "createdAt": "2026-02-11T05:22:35.015Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA8-2",
+    "rubric_anchor": "The majority of sentences are error-free",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.errorFrequency",
+      "grammarControl.clarityImpactFromGrammar"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.errorFrequency",
+        "grammarControl.clarityImpactFromGrammar"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.015Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355048_2907",
+    "answer_type": "Ordinal (none/very_occasional/occasional/frequent)",
+    "atomic_question": "Are grammar/punctuation errors only very occasional?",
+    "band": 8,
+    "baseKey": "GRA8-3",
+    "createdAt": "2026-02-11T05:22:35.048Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "occasional",
+      "frequent"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA8-3",
+    "rubric_anchor": "Makes only very occasional errors or inappropriacies",
+    "scoredAnswers": [
+      "none",
+      "very_occasional"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.048Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787355075_8531",
+    "answer_type": "Boolean",
+    "atomic_question": "Is vocabulary wide range, used fluently/flexibly for precise meaning?",
+    "band": 8,
+    "baseKey": "LR8-1",
+    "createdAt": "2026-02-11T05:22:35.075Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR8-1",
+    "rubric_anchor": "Wide range of vocabulary... fluently and flexibly to convey precise meanings",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.precisionBand",
+      "lexicalControl.collocationControl",
+      "lexicalControl.clarityImpactFromLexis",
+      "lexicalControl.awkwardExpressionCountBand"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.precisionBand",
+        "lexicalControl.collocationControl",
+        "lexicalControl.clarityImpactFromLexis",
+        "lexicalControl.awkwardExpressionCountBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.075Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355099_8647",
+    "answer_type": "Boolean",
+    "atomic_question": "Are uncommon lexical items used skilfully, with at most occasional inaccuracies?",
+    "band": 8,
+    "baseKey": "LR8-2",
+    "createdAt": "2026-02-11T05:22:35.099Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR8-2",
+    "rubric_anchor": "Skilfully uses uncommon lexical items but... occasional inaccuracies...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.precisionBand",
+      "lexicalControl.collocationControl",
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.precisionBand",
+        "lexicalControl.collocationControl",
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.099Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787355122_829",
+    "answer_type": "Ordinal (none/rare/occasional/frequent)",
+    "atomic_question": "Are spelling/word-formation errors rare?",
+    "band": 8,
+    "baseKey": "LR8-3",
+    "createdAt": "2026-02-11T05:22:35.122Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "occasional",
+      "frequent"
+    ],
+    "notes": "First version (v1) imported via CSV. [Aligned to Step3 rich lexicalControl/grammarControl evidence]",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR8-3",
+    "rubric_anchor": "Produces rare errors in spelling and/or word formation",
+    "scoredAnswers": [
+      "none",
+      "rare"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.clarityImpactFromLexis",
+      "lexicalControl.awkwardExpressionCountBand"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.clarityImpactFromLexis",
+        "lexicalControl.awkwardExpressionCountBand"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.122Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787355163_2660",
+    "answer_type": "Boolean",
+    "atomic_question": "Are all task parts addressed with sufficient coverage (not just mentioned)?",
+    "band": 8,
+    "baseKey": "TR8-1",
+    "createdAt": "2026-02-11T05:22:35.163Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR8-1",
+    "rubric_anchor": "Sufficiently addresses all parts of the task",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "answersBySubquestion",
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices",
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.severity",
+      "step2.taskEcho.reusedPromptSentenceLikeCount",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "answersBySubquestion",
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices",
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.severity",
+        "step2.taskEcho.reusedPromptSentenceLikeCount",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.163Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355189_3107",
+    "answer_type": "Boolean",
+    "atomic_question": "Are ideas relevant, extended, and supported to a well-developed level?",
+    "band": 8,
+    "baseKey": "TR8-2",
+    "createdAt": "2026-02-11T05:22:35.189Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR8-2",
+    "rubric_anchor": "Well-developed response... relevant, extended and supported ideas",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.189Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355215_1783",
+    "answer_type": "Boolean",
+    "atomic_question": "Is supporting content consistently relevant (low/no off-topic detail)?",
+    "band": 8,
+    "baseKey": "TR8-3",
+    "createdAt": "2026-02-11T05:22:35.215Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR8-3",
+    "rubric_anchor": "Same anchor (relevance)",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.215Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1770787355237_8054",
+    "answer_type": "Boolean",
+    "atomic_question": "Does cohesion attract no attention (smooth, natural, no noticeable misuse/mechanical linking)?",
+    "band": 9,
+    "baseKey": "CC9-1",
+    "createdAt": "2026-02-11T05:22:35.237Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. High-band ceiling calibration updated for 8/9 boundary reliability.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC9-1",
+    "rubric_anchor": "Uses cohesion... attracts no attention",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts",
+      "structure.conclusionSignpostFoundInLast",
+      "structure.misplacedConclusionSignpost",
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "lexical.topRepeatedWords"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts",
+        "structure.conclusionSignpostFoundInLast",
+        "structure.misplacedConclusionSignpost",
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "lexical.topRepeatedWords"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.237Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355262_699",
+    "answer_type": "Boolean",
+    "atomic_question": "Is paragraphing skilfully managed (breaks consistently support the argument)?",
+    "band": 9,
+    "baseKey": "CC9-2",
+    "createdAt": "2026-02-11T05:22:35.262Z",
+    "criterion": "CC",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. High-band ceiling calibration updated for 8/9 boundary reliability.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC9-2",
+    "rubric_anchor": "Skilfully manages paragraphing",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphCount",
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts",
+      "structure.conclusionSignpostFoundInLast",
+      "structure.misplacedConclusionSignpost",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphCount",
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts",
+        "structure.conclusionSignpostFoundInLast",
+        "structure.misplacedConclusionSignpost",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.262Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355288_6310",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there a wide structural range with full flexibility and accuracy?",
+    "band": 9,
+    "baseKey": "GRA9-1",
+    "createdAt": "2026-02-11T05:22:35.288Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. High-band ceiling calibration updated for 8/9 boundary reliability.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA9-1",
+    "rubric_anchor": "Wide range of structures with full flexibility and accuracy",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl",
+      "grammarControl.errorFrequency",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.subjectVerbAgreement",
+      "grammarControl.articleControl",
+      "grammarControl.prepositionControl",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl",
+        "grammarControl.errorFrequency",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.subjectVerbAgreement",
+        "grammarControl.articleControl",
+        "grammarControl.prepositionControl",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.288Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355317_1336",
+    "answer_type": "Ordinal (none/rare_slips/very_occasional/occasional/frequent)",
+    "atomic_question": "Are grammar/punctuation errors only rare minor slips?",
+    "band": 9,
+    "baseKey": "GRA9-2",
+    "createdAt": "2026-02-11T05:22:35.317Z",
+    "criterion": "GRA",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "very_occasional",
+      "occasional",
+      "frequent"
+    ],
+    "notes": "First version (v1) imported via CSV. High-band ceiling calibration updated for 8/9 boundary reliability.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA9-2",
+    "rubric_anchor": "Rare minor errors occur only as 'slips'",
+    "scoredAnswers": [
+      "none",
+      "rare_slips"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.subjectVerbAgreement",
+      "grammarControl.articleControl",
+      "grammarControl.prepositionControl",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.subjectVerbAgreement",
+        "grammarControl.articleControl",
+        "grammarControl.prepositionControl",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.317Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355343_7193",
+    "answer_type": "Boolean",
+    "atomic_question": "Is lexical control very natural and sophisticated (not just \"wide\")?",
+    "band": 9,
+    "baseKey": "LR9-1",
+    "createdAt": "2026-02-11T05:22:35.343Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV. High-band ceiling calibration updated for 8/9 boundary reliability.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR9-1",
+    "rubric_anchor": "Wide range of vocabulary with very natural and sophisticated control of lexical features",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.rangeBand",
+      "lexicalControl.precisionBand",
+      "lexicalControl.collocationControl",
+      "lexicalControl.awkwardExpressionCountBand",
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.repetitionImpact",
+      "lexicalControl.clarityImpactFromLexis"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.rangeBand",
+        "lexicalControl.precisionBand",
+        "lexicalControl.collocationControl",
+        "lexicalControl.awkwardExpressionCountBand",
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.repetitionImpact",
+        "lexicalControl.clarityImpactFromLexis"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.343Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355364_1653",
+    "answer_type": "Ordinal (none/rare_slips/occasional/frequent)",
+    "atomic_question": "Are lexical errors rare minor slips only?",
+    "band": 9,
+    "baseKey": "LR9-2",
+    "createdAt": "2026-02-11T05:22:35.364Z",
+    "criterion": "LR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "occasional",
+      "frequent"
+    ],
+    "notes": "First version (v1) imported via CSV. High-band ceiling calibration updated for 8/9 boundary reliability.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR9-2",
+    "rubric_anchor": "Rare minor errors occur only as 'slips'",
+    "scoredAnswers": [
+      "none",
+      "rare_slips"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexicalControl.awkwardExpressionCountBand",
+      "lexicalControl.spellingImpact",
+      "lexicalControl.wordFormationImpact",
+      "lexicalControl.repetitionImpact",
+      "lexicalControl.clarityImpactFromLexis",
+      "lexicalControl.precisionBand",
+      "lexicalControl.collocationControl"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexicalControl.awkwardExpressionCountBand",
+        "lexicalControl.spellingImpact",
+        "lexicalControl.wordFormationImpact",
+        "lexicalControl.repetitionImpact",
+        "lexicalControl.clarityImpactFromLexis",
+        "lexicalControl.precisionBand",
+        "lexicalControl.collocationControl"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.364Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355388_2105",
+    "answer_type": "Boolean",
+    "atomic_question": "Are all task parts addressed fully (no part treated superficially)?",
+    "band": 9,
+    "baseKey": "TR9-1",
+    "createdAt": "2026-02-11T05:22:35.388Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR9-1",
+    "rubric_anchor": "Fully addresses all parts of the task",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "answersBySubquestion",
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices",
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.severity",
+      "step2.taskEcho.reusedPromptPhraseCount",
+      "step2.taskEcho.reusedPromptSentenceLikeCount",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "answersBySubquestion",
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices",
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.severity",
+        "step2.taskEcho.reusedPromptPhraseCount",
+        "step2.taskEcho.reusedPromptSentenceLikeCount",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.388Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355413_7580",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the position fully developed (clear + consistent + well defended)?",
+    "band": 9,
+    "baseKey": "TR9-2",
+    "createdAt": "2026-02-11T05:22:35.413Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR9-2",
+    "rubric_anchor": "Presents a fully developed position...",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "position.stance",
+      "position.stanceSentenceIndex",
+      "position.contradictionSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "position.stance",
+        "position.stanceSentenceIndex",
+        "position.contradictionSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.413Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355438_4653",
+    "answer_type": "Boolean",
+    "atomic_question": "Are ideas fully extended and well supported throughout the body?",
+    "band": 9,
+    "baseKey": "TR9-3",
+    "createdAt": "2026-02-11T05:22:35.438Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR9-3",
+    "rubric_anchor": "... with relevant, fully extended and well supported ideas",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.438Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1770787355464_4773",
+    "answer_type": "Boolean",
+    "atomic_question": "Is support consistently relevant (near-zero off-topic content)?",
+    "band": 9,
+    "baseKey": "TR9-4",
+    "createdAt": "2026-02-11T05:22:35.464Z",
+    "criterion": "TR",
+    "description": "",
+    "is_active": true,
+    "notScoredAnswers": [
+      "No"
+    ],
+    "notes": "First version (v1) imported via CSV.",
+    "orgId": "900000",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR9-4",
+    "rubric_anchor": "Same clause (relevance)",
+    "scoredAnswers": [
+      "Yes"
+    ],
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "tags": "v1",
+    "title": "Micro-assessments (v1)",
+    "updatedAt": "2026-02-11T05:22:35.464Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1775949000037_3001",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Does the response fail to address the task adequately?",
+    "band": 3,
+    "baseKey": "TR3-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring. [Robust prompt-restatement diagnostics added for distorted learner copying.]",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR3-1",
+    "rubric_anchor": "Does not adequately address any part of the task",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "step1.stats.wordCount",
+      "step2.taskEcho.effectiveContentWordCount",
+      "step2.taskEcho.effectiveContentRatio",
+      "step2.taskEcho.copiedWordEstimate",
+      "step2.taskEcho.anchorReuseCount",
+      "step2.taskEcho.reusedPromptPhraseCount",
+      "step2.taskEcho.reusedPromptSentenceLikeCount",
+      "step2.taskEcho.matchedUnitDiagnostics",
+      "step2.taskEcho.severity",
+      "answersBySubquestion[*]",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "step1.stats.wordCount",
+        "step2.taskEcho.effectiveContentWordCount",
+        "step2.taskEcho.effectiveContentRatio",
+        "step2.taskEcho.copiedWordEstimate",
+        "step2.taskEcho.anchorReuseCount",
+        "step2.taskEcho.reusedPromptPhraseCount",
+        "step2.taskEcho.reusedPromptSentenceLikeCount",
+        "step2.taskEcho.matchedUnitDiagnostics",
+        "step2.taskEcho.severity",
+        "answersBySubquestion[*]",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000074_3002",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there no clear position expressed?",
+    "band": 3,
+    "baseKey": "TR3-2",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring. [Absence-only alignment: contradictory stance is no longer treated as no-clear-position here.]",
+    "operationalizedOnlyEligible": true,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR3-2",
+    "rubric_anchor": "Does not express a clear position",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "position.stance",
+      "position.stanceSentenceIndex"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "position.stance",
+        "position.stanceSentenceIndex"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000185_3005",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the range of cohesive devices very limited, with weak or unclear logical links between ideas?",
+    "band": 3,
+    "baseKey": "CC3-2",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "CC",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; paragraph-scoped body cohesion item. [Virtual sentence recovery alignment for run-on body progression/cohesion reads.]",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "body",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC3-2",
+    "rubric_anchor": "May use a very limited range of cohesive devices, and those used may not indicate a logical relationship between ideas",
+    "scope": "paragraph",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity",
+      "topicSentenceByParagraph[*].topicSentenceIndex",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity",
+        "topicSentenceByParagraph[*].topicSentenceIndex",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "CC$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_1775949000222_3006",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the range of words and expressions very limited, with very limited control of word formation and spelling?",
+    "band": 3,
+    "baseKey": "LR3-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "LR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR3-1",
+    "rubric_anchor": "Uses only a very limited range of words and expressions with very limited control of word formation and/or spelling",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexical.sophisticationProfile",
+      "lexical_error_profile.frequency",
+      "spellcheck.errorCount",
+      "spellcheck.errorRate"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexical.sophisticationProfile",
+        "lexical_error_profile.frequency",
+        "spellcheck.errorCount",
+        "spellcheck.errorRate"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "LR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000259_3007",
+    "actionStateId": "",
+    "answer_type": "Ordinal (none/some/severe)",
+    "atomic_question": "Do lexical, word-formation, or spelling errors severely distort the message?",
+    "band": 3,
+    "baseKey": "LR3-2",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "LR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "severe"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR3-2",
+    "rubric_anchor": "Errors may severely distort the message",
+    "scope": "essay",
+    "scoredAnswers": [
+      "none",
+      "some"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexical.sophisticationProfile",
+      "lexical_error_profile.frequency",
+      "spellcheck.errorCount",
+      "spellcheck.errorRate"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexical.sophisticationProfile",
+        "lexical_error_profile.frequency",
+        "spellcheck.errorCount",
+        "spellcheck.errorRate"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "LR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000296_3008",
+    "actionStateId": "",
+    "answer_type": "Ordinal (none/some/distort)",
+    "atomic_question": "Do grammar and punctuation errors predominate and distort meaning?",
+    "band": 3,
+    "baseKey": "GRA3-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "GRA",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "distort"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA3-1",
+    "rubric_anchor": "Attempts sentence forms but errors in grammar and punctuation predominate and distort the meaning",
+    "scope": "essay",
+    "scoredAnswers": [
+      "none",
+      "some"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "grammarControl.errorFrequency",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl",
+      "grammarControl.subjectVerbAgreement",
+      "grammarControl.articleControl",
+      "grammarControl.prepositionControl"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "grammarControl.errorFrequency",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl",
+        "grammarControl.subjectVerbAgreement",
+        "grammarControl.articleControl",
+        "grammarControl.prepositionControl"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "GRA$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000333_3009",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Does the response barely address the task?",
+    "band": 2,
+    "baseKey": "TR2-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR2-1",
+    "rubric_anchor": "Barely responds to the task",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "answersBySubquestion[*]",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "answersBySubquestion[*]",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000370_3010",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is no position expressed?",
+    "band": 2,
+    "baseKey": "TR2-2",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": true,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR2-2",
+    "rubric_anchor": "Does not express a position",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "position.stance",
+      "position.stanceSentenceIndex"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "position.stance",
+        "position.stanceSentenceIndex"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000481_3013",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the vocabulary range extremely limited, with essentially no control of word formation and spelling?",
+    "band": 2,
+    "baseKey": "LR2-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "LR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR2-1",
+    "rubric_anchor": "Uses an extremely limited range of vocabulary; essentially no control of word formation and/or spelling",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexical.sophisticationProfile",
+      "lexical_error_profile.frequency",
+      "spellcheck.errorCount",
+      "spellcheck.errorRate"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexical.sophisticationProfile",
+        "lexical_error_profile.frequency",
+        "spellcheck.errorCount",
+        "spellcheck.errorRate"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "LR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000518_3014",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Can the writer not use sentence forms except in memorised phrases?",
+    "band": 2,
+    "baseKey": "GRA2-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "GRA",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA2-1",
+    "rubric_anchor": "Cannot use sentence forms except in memorised phrases",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl",
+      "grammarControl.errorFrequency",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.sentenceBoundaryControl"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl",
+        "grammarControl.errorFrequency",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.sentenceBoundaryControl"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "GRA$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000555_3015",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is the answer completely unrelated to the task?",
+    "band": 1,
+    "baseKey": "TR1-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR1-1",
+    "rubric_anchor": "Answer is completely unrelated to the task",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "answersBySubquestion[*]",
+      "bodySupport[*].evidenceSentenceIndices",
+      "position.stanceSentenceIndex"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "answersBySubquestion[*]",
+        "bodySupport[*].evidenceSentenceIndices",
+        "position.stanceSentenceIndex"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000592_3016",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Does the script fail to communicate any message?",
+    "band": 1,
+    "baseKey": "CC1-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "CC",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC1-1",
+    "rubric_anchor": "Fails to communicate any message",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "cohesion.densityPer100ExcludingBasic",
+      "lexical.referencingDensity",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "cohesion.densityPer100ExcludingBasic",
+        "lexical.referencingDensity",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "CC$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000629_3017",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Can the writer use only a few isolated words?",
+    "band": 1,
+    "baseKey": "LR1-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "LR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "LR1-1",
+    "rubric_anchor": "Can only use a few isolated words",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "lexical.sophisticationProfile",
+      "spellcheck.errorCount",
+      "spellcheck.errorRate"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "lexical.sophisticationProfile",
+        "spellcheck.errorCount",
+        "spellcheck.errorRate"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "LR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_1775949000666_3018",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Can the writer not use sentence forms at all?",
+    "band": 1,
+    "baseKey": "GRA1-1",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "GRA",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Band 1-3 extension starter set drafted from the public IELTS Task 2 descriptors; review before scoring-rule wiring.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_B_LR_GRA",
+    "question_key": "GRA1-1",
+    "rubric_anchor": "Cannot use sentence forms at all",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "grammarControl.structureRange",
+      "grammarControl.complexSentenceControl",
+      "grammarControl.errorFrequency",
+      "grammarControl.errorFreeSentenceShareBand",
+      "grammarControl.clarityImpactFromGrammar",
+      "grammarControl.punctuationControl",
+      "grammarControl.sentenceBoundaryControl"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "grammarControl.structureRange",
+        "grammarControl.complexSentenceControl",
+        "grammarControl.errorFrequency",
+        "grammarControl.errorFreeSentenceShareBand",
+        "grammarControl.clarityImpactFromGrammar",
+        "grammarControl.punctuationControl",
+        "grammarControl.sentenceBoundaryControl"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "GRA$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 3
+  },
+  {
+    "id": "MA_CC2_1A_SPLIT",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there very little overall control of organisational features across the response?",
+    "band": 2,
+    "baseKey": "CC2-1A",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "CC",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Split from original CC2-1; essay-scope overall organisational control item. [Section-skeleton safeguard: intro/body/body/conclusion structure no longer auto-collapses to very-little-control.]",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC2-1A",
+    "rubric_anchor": "Has very little control of organisational features",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts",
+      "structure.hasIntro",
+      "structure.hasConclusion",
+      "topicSentenceByParagraph[*].topicSentenceIndex",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts",
+        "structure.hasIntro",
+        "structure.hasConclusion",
+        "topicSentenceByParagraph[*].topicSentenceIndex",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "CC$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_CC2_1B_SPLIT",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Does this body paragraph show very little control of organisational features?",
+    "band": 2,
+    "baseKey": "CC2-1B",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "CC",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Split from original CC2-1; paragraph-scope body organisational control item. [Single-sentence body paragraphs now require broader weak signals before lowest-band trigger.] [Virtual sentence recovery alignment: run-on body paragraphs use recovered local sentence units.]",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "body",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC2-1B",
+    "rubric_anchor": "Has very little control of organisational features",
+    "scope": "paragraph",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "structure.paragraphRoles",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount",
+      "topicSentenceByParagraph[*].topicSentenceIndex",
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices",
+      "structure.hasIntro",
+      "structure.hasConclusion"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "structure.paragraphRoles",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount",
+        "topicSentenceByParagraph[*].topicSentenceIndex",
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices",
+        "structure.hasIntro",
+        "structure.hasConclusion"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "CC$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_CC3_1A_SPLIT",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is there no clear overall progression across the response?",
+    "band": 3,
+    "baseKey": "CC3-1A",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "CC",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Split from original CC3-1; essay-scope overall progression item. [Sectioned run-on protection: no-progression is not auto-triggered from topic-sentence sparsity alone.]",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC3-1A",
+    "rubric_anchor": "Does not organise ideas logically",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphRoles",
+      "structure.paragraphSentenceCounts",
+      "structure.hasIntro",
+      "structure.hasConclusion",
+      "topicSentenceByParagraph[*].topicSentenceIndex"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphRoles",
+        "structure.paragraphSentenceCounts",
+        "structure.hasIntro",
+        "structure.hasConclusion",
+        "topicSentenceByParagraph[*].topicSentenceIndex"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "CC$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 2
+  },
+  {
+    "id": "MA_CC3_1B_SPLIT",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is this body paragraph not organised logically?",
+    "band": 3,
+    "baseKey": "CC3-1B",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "CC",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Split from original CC3-1; paragraph-scope body organisation item. [Virtual sentence recovery alignment for run-on paragraph organisation signals.]",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "body",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "CC3-1B",
+    "rubric_anchor": "Does not organise ideas logically",
+    "scope": "paragraph",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount",
+      "topicSentenceByParagraph[*].topicSentenceIndex",
+      "bodySupport[*].evidenceSentenceIndices",
+      "cohesion.densityPer100ExcludingBasic",
+      "cohesion.distinctConnectorsExcludingBasic",
+      "cohesion.usageMapExcludingBasic",
+      "lexical.referencingDensity"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount",
+        "topicSentenceByParagraph[*].topicSentenceIndex",
+        "bodySupport[*].evidenceSentenceIndices",
+        "cohesion.densityPer100ExcludingBasic",
+        "cohesion.distinctConnectorsExcludingBasic",
+        "cohesion.usageMapExcludingBasic",
+        "lexical.referencingDensity"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "CC$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_TR2_3A_SPLIT",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Are there only one or two ideas across the whole response?",
+    "band": 2,
+    "baseKey": "TR2-3A",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Split from original TR2-3; essay-scope idea count item.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR2-3A",
+    "rubric_anchor": "May attempt to present one or two ideas...",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "answersBySubquestion[*]",
+      "bodySupport[*].evidenceSentenceIndices",
+      "topicSentenceByParagraph[*].topicSentenceIndex"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "answersBySubquestion[*]",
+        "bodySupport[*].evidenceSentenceIndices",
+        "topicSentenceByParagraph[*].topicSentenceIndex"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_TR2_3B_SPLIT",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Does this body paragraph show no real development?",
+    "band": 2,
+    "baseKey": "TR2-3B",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Split from original TR2-3; paragraph-level development item. [Virtual sentence recovery alignment for run-on body development evidence.]",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "body",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR2-3B",
+    "rubric_anchor": "... but there is no development",
+    "scope": "paragraph",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices",
+      "topicSentenceByParagraph[*].topicSentenceIndex",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices",
+        "topicSentenceByParagraph[*].topicSentenceIndex",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_TR3_3A_SPLIT",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Are there only a few relevant ideas across the response?",
+    "band": 3,
+    "baseKey": "TR3-3A",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Split from original TR3-3; essay-scope idea count / coverage item.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "any",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR3-3A",
+    "rubric_anchor": "Presents a few ideas...",
+    "scope": "essay",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "answersBySubquestion[*]",
+      "bodySupport[*].evidenceSentenceIndices",
+      "topicSentenceByParagraph[*].topicSentenceIndex"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "answersBySubquestion[*]",
+        "bodySupport[*].evidenceSentenceIndices",
+        "topicSentenceByParagraph[*].topicSentenceIndex"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_TR3_3B_SPLIT",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is this body paragraph largely undeveloped?",
+    "band": 3,
+    "baseKey": "TR3-3B",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Split from original TR3-3; paragraph-level development item. [Virtual sentence recovery alignment for run-on body development evidence.]",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "body",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR3-3B",
+    "rubric_anchor": "... ideas are largely undeveloped ...",
+    "scope": "paragraph",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "deterministic",
+    "signal_kind": "deterministic",
+    "signal_signals": [
+      "bodySupport[*].hasExplanation",
+      "bodySupport[*].hasExample",
+      "bodySupport[*].evidenceSentenceIndices",
+      "topicSentenceByParagraph[*].topicSentenceIndex",
+      "structure.paragraphSentenceCounts",
+      "structure.paragraphVirtualSentenceCounts",
+      "perParagraphFeatures[*].sentenceCount",
+      "perParagraphFeatures[*].virtualSentenceCount",
+      "perParagraphFeatures[*].paragraphWordCount"
+    ],
+    "signal_source": {
+      "kind": "deterministic",
+      "signals": [
+        "bodySupport[*].hasExplanation",
+        "bodySupport[*].hasExample",
+        "bodySupport[*].evidenceSentenceIndices",
+        "topicSentenceByParagraph[*].topicSentenceIndex",
+        "structure.paragraphSentenceCounts",
+        "structure.paragraphVirtualSentenceCounts",
+        "perParagraphFeatures[*].sentenceCount",
+        "perParagraphFeatures[*].virtualSentenceCount",
+        "perParagraphFeatures[*].paragraphWordCount"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 1
+  },
+  {
+    "id": "MA_TR3_3C_SPLIT",
+    "actionStateId": "",
+    "answer_type": "Boolean",
+    "atomic_question": "Is this body paragraph largely irrelevant to the task or stated position?",
+    "band": 3,
+    "baseKey": "TR3-3C",
+    "createdAt": "2026-04-11T20:30:00.000Z",
+    "criterion": "TR",
+    "description": "",
+    "expectedEvidenceType": "sentence_indices",
+    "feedbackRole": "general",
+    "is_active": true,
+    "notScoredAnswers": [
+      "Yes"
+    ],
+    "notes": "Split from original TR3-3; paragraph-level relevance item.",
+    "operationalizedOnlyEligible": false,
+    "orgId": "900000",
+    "paragraphRoleConstraint": "body",
+    "prompt_group": "PROMPT_A_TR_CC",
+    "question_key": "TR3-3C",
+    "rubric_anchor": "... ideas may be ... irrelevant",
+    "scope": "paragraph",
+    "scoredAnswers": [
+      "No"
+    ],
+    "signalClassification": "hybrid",
+    "signal_kind": "hybrid",
+    "signal_signals": [
+      "answersBySubquestion[*]",
+      "bodySupport[*].evidenceSentenceIndices",
+      "position.stanceSentenceIndex"
+    ],
+    "signal_source": {
+      "kind": "hybrid",
+      "signals": [
+        "answersBySubquestion[*]",
+        "bodySupport[*].evidenceSentenceIndices",
+        "position.stanceSentenceIndex"
+      ],
+      "upstream_steps": []
+    },
+    "subconstruct": "TR$",
+    "tags": "v2-lowband",
+    "title": "Micro-assessments (v2 low-band)",
+    "updatedAt": "2026-04-11T20:30:00.000Z",
+    "weight": 1
+  }
+]

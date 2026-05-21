@@ -1,0 +1,557 @@
+<%
+  const c = customer || {};
+  const isEdit = !!c.id;
+  const routeId = (c.id || '');
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const initPersonOrganizationsJson = JSON.stringify(typeof personOrganizations !== 'undefined' ? (personOrganizations || []) : []).replace(/</g, '\\u003c');
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-person-vcard me-2"></i><%= title %></h1>
+    <a href="/credit/customers" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1200px;">
+    <form id="creditCustomerForm" action="<%= isEdit ? '/credit/customers/edit/' + routeId : '/credit/customers/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
+      <input type="hidden" name="personName" id="personName" value="<%= c.personName || '' %>">
+      <input type="hidden" name="personEmail" id="personEmail" value="<%= c.personEmail || '' %>">
+      <input type="hidden" name="personPhone" id="personPhone" value="<%= c.personPhone || '' %>">
+      <input type="hidden" name="newPersonEmails" id="hid_newPersonEmails" value="[]">
+      <input type="hidden" name="newPersonPhones" id="hid_newPersonPhones" value="[]">
+      <input type="hidden" name="newPersonAddresses" id="hid_newPersonAddresses" value="[]">
+      <script type="application/json" id="init_personOrganizations"><%- initPersonOrganizationsJson %></script>
+
+      <ul class="nav nav-tabs mb-4" id="customerTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">Step 1: Person</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-profile" type="button">Step 2: Customer Profile</button></li>
+      </ul>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4 tab-content">
+          <div class="tab-pane fade show active" id="tab-general">
+            <% if (!isEdit) { %>
+              <div class="alert alert-light border shadow-sm mb-4">
+                <div class="fw-bold mb-2"><i class="bi bi-person-plus me-2"></i>Person Source</div>
+                <div class="d-flex flex-wrap gap-4">
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="personMode" id="personModeExisting" value="existing" checked>
+                    <label class="form-check-label fw-bold" for="personModeExisting">Use Existing Person</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="personMode" id="personModeNew" value="new">
+                    <label class="form-check-label fw-bold" for="personModeNew">Create New Person</label>
+                  </div>
+                </div>
+              </div>
+            <% } else { %>
+              <input type="hidden" name="personMode" value="existing">
+            <% } %>
+
+            <div id="existingPersonBlock">
+              <div class="row">
+                <div class="col-md-8 mb-3">
+                  <label class="form-label fw-bold">Select Person *</label>
+                  <div class="input-group">
+                    <input type="hidden" name="personId" id="inp_personId" value="<%= c.personId || '' %>" required>
+                    <input type="text" id="inp_personName" class="form-control size-md bg-white border-primary fw-bold" placeholder="Search Person Directory..." value="<%= personName || '' %>" readonly required>
+                    <button type="button" class="btn btn-primary" id="btnPickPerson" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
+                  </div>
+                  <div class="form-text small">Links this customer profile to a global person identity.</div>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label fw-bold">Customer Code</label>
+                  <input type="text" name="customerCode" class="form-control size-md text-uppercase" placeholder="Auto if blank" value="<%= c.customerCode || '' %>">
+                </div>
+              </div>
+              <div class="card border shadow-sm bg-light-subtle mb-3">
+                <div class="card-header bg-light fw-bold">
+                  <i class="bi bi-diagram-3 me-2"></i>Current Person Role Composition
+                </div>
+                <div class="card-body" id="personRoleSummary"></div>
+              </div>
+            </div>
+
+            <% if (!isEdit) { %>
+              <div id="newPersonBlock" class="d-none">
+                <div class="card shadow-sm border-0 mb-3">
+                  <div class="card-body">
+                    <h6 class="fw-bold text-uppercase text-muted mb-3"><i class="bi bi-person-bounding-box me-2"></i>Profile & Identity</h6>
+                    <div class="row g-3 mb-3">
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">First Name *</label>
+                        <input type="text" name="newPersonFirstName" id="inp_newPersonFirstName" class="form-control size-md" placeholder="First name">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">Middle Name</label>
+                        <input type="text" name="newPersonMiddleName" id="inp_newPersonMiddleName" class="form-control size-md" placeholder="Middle name (optional)">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">Last Name *</label>
+                        <input type="text" name="newPersonLastName" id="inp_newPersonLastName" class="form-control size-md" placeholder="Last name">
+                      </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                      <div class="col-md-6">
+                        <label class="form-label fw-bold">Preferred Name</label>
+                        <input type="text" name="newPersonPreferredName" id="inp_newPersonPreferredName" class="form-control size-md" placeholder="Optional preferred name">
+                      </div>
+                      <div class="col-md-6">
+                        <div class="form-check form-switch mt-4 pt-1">
+                          <input class="form-check-input" type="checkbox" id="inp_newPersonActive" name="newPersonActive" checked>
+                          <label class="form-check-label fw-bold" for="inp_newPersonActive">Active Person Profile</label>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label fw-bold">Gender *</label>
+                        <select name="newPersonGender" id="inp_newPersonGender" class="form-select size-md">
+                          <option value="">-- Select Gender --</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="nonbinary">Non-binary</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label fw-bold">Date of Birth *</label>
+                        <input type="date" name="newPersonDateOfBirth" id="inp_newPersonDateOfBirth" class="form-control size-md">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-lg-6">
+                    <div class="card shadow-sm border-0 h-100">
+                      <div class="card-header bg-light fw-bold text-uppercase small text-muted"><i class="bi bi-envelope-paper me-2"></i>Communication</div>
+                      <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <label class="form-label mb-0 fw-bold">Email Addresses *</label>
+                          <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddNewPersonEmail"><i class="bi bi-plus-lg"></i> Add</button>
+                        </div>
+                        <div id="newPersonEmailsList" class="mb-4"></div>
+                        <hr class="text-muted opacity-25">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <label class="form-label mb-0 fw-bold">Phone Numbers</label>
+                          <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddNewPersonPhone"><i class="bi bi-plus-lg"></i> Add</button>
+                        </div>
+                        <div id="newPersonPhonesList"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-lg-6">
+                    <div class="card shadow-sm border-0 h-100">
+                      <div class="card-header bg-light fw-bold text-uppercase small text-muted"><i class="bi bi-geo-alt me-2"></i>Addresses</div>
+                      <div class="card-body bg-light-subtle">
+                        <button class="btn btn-outline-secondary btn-sm mb-2" type="button" id="btnAddNewPersonAddressManual">Add Address</button>
+                        <div id="newPersonAddressesList"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-12 mb-3">
+                    <label class="form-label fw-bold">Person Notes</label>
+                    <textarea name="newPersonNotes" id="inp_newPersonNotes" class="form-control size-md" rows="2" placeholder="Optional internal notes for person profile..."></textarea>
+                  </div>
+                </div>
+              </div>
+            <% } %>
+          </div>
+
+          <div class="tab-pane fade" id="tab-profile">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Status</label>
+                <select name="status" class="form-select size-md">
+                  <option value="active" <%= String(c.status || 'active') === 'active' ? 'selected' : '' %>>Active</option>
+                  <option value="inactive" <%= String(c.status || '') === 'inactive' ? 'selected' : '' %>>Inactive</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Email (Auto from person)</label>
+                <input type="text" class="form-control size-md bg-light" id="previewEmail" readonly value="<%= c.personEmail || '' %>">
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Phone (Auto from person)</label>
+                <input type="text" class="form-control size-md bg-light" id="previewPhone" readonly value="<%= c.personPhone || '' %>">
+              </div>
+            </div>
+            <div class="mb-1">
+              <label class="form-label fw-bold">Notes</label>
+              <textarea name="notes" class="form-control size-md" rows="3" placeholder="Customer notes, qualification remarks, and financing context."><%= c.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="button" class="btn btn-outline-primary btn-md" id="btnWizardPrev">Back</button>
+        <button type="button" class="btn btn-filled btn-primary btn-md fw-bold px-4" id="btnWizardNext">Next</button>
+        <button type="submit" class="btn btn-filled btn-success btn-md fw-bold px-4 d-none" id="btnWizardSubmit">Save Profile</button>
+        <a href="/credit/customers" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('creditCustomerForm');
+  const personIdInput = document.getElementById('inp_personId');
+  const personNameView = document.getElementById('inp_personName');
+  const personNameInput = document.getElementById('personName');
+  const personEmailInput = document.getElementById('personEmail');
+  const personPhoneInput = document.getElementById('personPhone');
+  const previewEmail = document.getElementById('previewEmail');
+  const previewPhone = document.getElementById('previewPhone');
+  const personRoleSummary = document.getElementById('personRoleSummary');
+  const isEdit = <%- JSON.stringify(isEdit) %>;
+
+  let selectedPersonOrganizations = (() => {
+    try { return JSON.parse(document.getElementById('init_personOrganizations')?.textContent || '[]'); } catch (_) { return []; }
+  })();
+
+  let newPersonEmails = [{ type: 'primary', email: '', isPrimary: true }];
+  let newPersonPhones = [];
+  let newPersonAddresses = [];
+
+  const hidNewPersonEmails = document.getElementById('hid_newPersonEmails');
+  const hidNewPersonPhones = document.getElementById('hid_newPersonPhones');
+  const hidNewPersonAddresses = document.getElementById('hid_newPersonAddresses');
+  const newPersonEmailsList = document.getElementById('newPersonEmailsList');
+  const newPersonPhonesList = document.getElementById('newPersonPhonesList');
+  const newPersonAddressesList = document.getElementById('newPersonAddressesList');
+
+  const wizardTabTargets = ['#tab-general', '#tab-profile'];
+  const btnWizardPrev = document.getElementById('btnWizardPrev');
+  const btnWizardNext = document.getElementById('btnWizardNext');
+  const btnWizardSubmit = document.getElementById('btnWizardSubmit');
+  let currentWizardStep = 0;
+
+  function safeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  }
+
+  function syncNewPersonHiddenState() {
+    if (hidNewPersonEmails) hidNewPersonEmails.value = JSON.stringify(newPersonEmails);
+    if (hidNewPersonPhones) hidNewPersonPhones.value = JSON.stringify(newPersonPhones);
+    if (hidNewPersonAddresses) hidNewPersonAddresses.value = JSON.stringify(newPersonAddresses);
+  }
+
+  function normalizePersonRoles(org) {
+    const rawRoles = Array.isArray(org?.roles) && org.roles.length ? org.roles : (org?.role ? [org.role] : []);
+    return Array.from(new Set(rawRoles.map((role) => String(role || '').trim()).filter(Boolean)));
+  }
+
+  function formatRoleLabel(roleValue) {
+    return String(roleValue || '').split('_').map((part) => part ? part[0].toUpperCase() + part.slice(1) : '').join(' ');
+  }
+
+  function renderPersonRoleSummary() {
+    if (!personRoleSummary) return;
+    const orgs = Array.isArray(selectedPersonOrganizations) ? selectedPersonOrganizations : [];
+    if (!orgs.length) {
+      personRoleSummary.innerHTML = '<div class="text-muted small">No organization role assignments are available for the selected person yet.</div>';
+      return;
+    }
+    personRoleSummary.innerHTML = orgs.map((org) => {
+      const orgLabel = safeHtml(org?.orgName || org?.orgId || 'Unknown Organization');
+      const roles = normalizePersonRoles(org);
+      const roleBadges = roles.length
+        ? roles.map((role) => `<span class="badge text-bg-primary-subtle text-primary-emphasis border me-1 mb-1">${safeHtml(formatRoleLabel(role))}</span>`).join('')
+        : '<span class="text-muted small">No roles assigned</span>';
+      return (
+        '<div class="border rounded p-3 mb-2 bg-white">' +
+          `<div class="fw-bold">${orgLabel}</div>` +
+          `<div class="small text-muted mb-2">Org ID: ${safeHtml(org?.orgId || '-')}</div>` +
+          `<div>${roleBadges}</div>` +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function syncPersonModeUI() {
+    const modeExisting = document.getElementById('personModeExisting');
+    const modeNew = document.getElementById('personModeNew');
+    if (!modeExisting && !modeNew) return;
+    const selectedMode = modeNew && modeNew.checked ? 'new' : 'existing';
+    const existingBlock = document.getElementById('existingPersonBlock');
+    const newBlock = document.getElementById('newPersonBlock');
+
+    const requiredFields = [
+      document.getElementById('inp_newPersonFirstName'),
+      document.getElementById('inp_newPersonLastName'),
+      document.getElementById('inp_newPersonGender'),
+      document.getElementById('inp_newPersonDateOfBirth')
+    ].filter(Boolean);
+
+    if (selectedMode === 'new') {
+      if (existingBlock) existingBlock.classList.add('d-none');
+      if (newBlock) newBlock.classList.remove('d-none');
+      if (personIdInput) personIdInput.required = false;
+      if (personNameView) personNameView.required = false;
+      requiredFields.forEach((el) => { el.required = true; });
+      return;
+    }
+
+    if (existingBlock) existingBlock.classList.remove('d-none');
+    if (newBlock) newBlock.classList.add('d-none');
+    if (personIdInput) personIdInput.required = true;
+    if (personNameView) personNameView.required = true;
+    requiredFields.forEach((el) => { el.required = false; });
+  }
+
+  function renderNewPersonEmails() {
+    if (!newPersonEmailsList) return;
+    newPersonEmailsList.innerHTML = '';
+    if (!newPersonEmails.length) newPersonEmails = [{ type: 'primary', email: '', isPrimary: true }];
+
+    newPersonEmails.forEach((row, index) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'input-group mb-2';
+      wrap.innerHTML =
+        '<select class="form-select size-md bg-light border-end-0" style="max-width: 130px;">' +
+          '<option value="primary">Primary</option>' +
+          '<option value="work">Work</option>' +
+          '<option value="personal">Personal</option>' +
+        '</select>' +
+        '<input type="email" class="form-control size-md" placeholder="email@example.com">' +
+        '<button type="button" class="btn btn-outline-danger"><i class="bi bi-x-lg"></i></button>';
+
+      const typeSelect = wrap.querySelector('select');
+      const emailInput = wrap.querySelector('input');
+      const removeBtn = wrap.querySelector('button');
+
+      typeSelect.value = String(row.type || 'work');
+      emailInput.value = String(row.email || '');
+
+      typeSelect.addEventListener('change', () => { newPersonEmails[index].type = typeSelect.value; syncNewPersonHiddenState(); });
+      emailInput.addEventListener('input', () => { newPersonEmails[index].email = emailInput.value; syncNewPersonHiddenState(); });
+      removeBtn.addEventListener('click', () => { newPersonEmails.splice(index, 1); renderNewPersonEmails(); });
+
+      newPersonEmailsList.appendChild(wrap);
+    });
+    syncNewPersonHiddenState();
+  }
+
+  function renderNewPersonPhones() {
+    if (!newPersonPhonesList) return;
+    newPersonPhonesList.innerHTML = '';
+    newPersonPhones.forEach((row, index) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'input-group mb-2';
+      wrap.innerHTML =
+        '<select class="form-select size-md bg-light border-end-0" style="max-width: 130px;">' +
+          '<option value="mobile">Mobile</option>' +
+          '<option value="work">Work</option>' +
+          '<option value="home">Home</option>' +
+        '</select>' +
+        '<input type="text" class="form-control size-md" placeholder="(555) 123-4567">' +
+        '<button type="button" class="btn btn-outline-danger"><i class="bi bi-x-lg"></i></button>';
+
+      const typeSelect = wrap.querySelector('select');
+      const numberInput = wrap.querySelector('input');
+      const removeBtn = wrap.querySelector('button');
+
+      typeSelect.value = String(row.type || 'mobile');
+      numberInput.value = String(row.number || '');
+
+      typeSelect.addEventListener('change', () => { newPersonPhones[index].type = typeSelect.value; syncNewPersonHiddenState(); });
+      numberInput.addEventListener('input', () => { newPersonPhones[index].number = numberInput.value; syncNewPersonHiddenState(); });
+      removeBtn.addEventListener('click', () => { newPersonPhones.splice(index, 1); renderNewPersonPhones(); });
+
+      newPersonPhonesList.appendChild(wrap);
+    });
+    syncNewPersonHiddenState();
+  }
+
+  function renderNewPersonAddresses() {
+    if (!newPersonAddressesList) return;
+    newPersonAddressesList.innerHTML = '';
+    newPersonAddresses.forEach((row, index) => {
+      const card = document.createElement('div');
+      card.className = 'card mb-3 border shadow-sm';
+      card.innerHTML =
+        '<div class="card-body p-3 bg-white rounded">' +
+          '<div class="d-flex justify-content-between mb-2">' +
+            '<select class="form-select form-select-sm border-0 bg-light fw-bold text-uppercase px-2 addr-type" style="width:auto;">' +
+              '<option value="home">HOME</option><option value="work">WORK</option><option value="other">OTHER</option>' +
+            '</select>' +
+            '<button class="btn btn-sm text-danger addr-remove" type="button"><i class="bi bi-trash"></i></button>' +
+          '</div>' +
+          '<input class="form-control size-md mb-2 addr-line1" placeholder="Street Address">' +
+          '<div class="row g-2">' +
+            '<div class="col-6"><input class="form-control size-md addr-city" placeholder="City"></div>' +
+            '<div class="col-3"><input class="form-control size-md addr-prov" placeholder="Prov"></div>' +
+            '<div class="col-3"><input class="form-control size-md addr-post" placeholder="Postal"></div>' +
+          '</div>' +
+        '</div>';
+
+      const typeEl = card.querySelector('.addr-type');
+      const line1El = card.querySelector('.addr-line1');
+      const cityEl = card.querySelector('.addr-city');
+      const provEl = card.querySelector('.addr-prov');
+      const postEl = card.querySelector('.addr-post');
+
+      typeEl.value = String(row.type || 'home');
+      line1El.value = String(row.line1 || '');
+      cityEl.value = String(row.city || '');
+      provEl.value = String(row.province || '');
+      postEl.value = String(row.postalCode || '');
+
+      typeEl.addEventListener('change', () => { newPersonAddresses[index].type = typeEl.value; syncNewPersonHiddenState(); });
+      line1El.addEventListener('input', () => { newPersonAddresses[index].line1 = line1El.value; syncNewPersonHiddenState(); });
+      cityEl.addEventListener('input', () => { newPersonAddresses[index].city = cityEl.value; syncNewPersonHiddenState(); });
+      provEl.addEventListener('input', () => { newPersonAddresses[index].province = provEl.value; syncNewPersonHiddenState(); });
+      postEl.addEventListener('input', () => { newPersonAddresses[index].postalCode = postEl.value; syncNewPersonHiddenState(); });
+      card.querySelector('.addr-remove').addEventListener('click', () => { newPersonAddresses.splice(index, 1); renderNewPersonAddresses(); });
+
+      newPersonAddressesList.appendChild(card);
+    });
+    syncNewPersonHiddenState();
+  }
+
+  function updateWizardButtons() {
+    if (btnWizardPrev) btnWizardPrev.classList.toggle('d-none', currentWizardStep === 0);
+    if (btnWizardNext) btnWizardNext.classList.toggle('d-none', currentWizardStep === wizardTabTargets.length - 1);
+    if (btnWizardSubmit) btnWizardSubmit.classList.toggle('d-none', currentWizardStep !== wizardTabTargets.length - 1);
+  }
+
+  function showWizardStep(index) {
+    currentWizardStep = Math.min(Math.max(index, 0), wizardTabTargets.length - 1);
+    const target = wizardTabTargets[currentWizardStep];
+    const btn = document.querySelector('#customerTabs [data-bs-target="' + target + '"]');
+    if (btn) new bootstrap.Tab(btn).show();
+    updateWizardButtons();
+  }
+
+  function syncPersonFieldsFromPersonItem(item) {
+    const first = String(item?.name?.first || '').trim();
+    const last = String(item?.name?.last || '').trim();
+    const fullName = `${first} ${last}`.trim() || String(item?.id || '');
+    const email = String(item?.contact?.emails?.find?.((x) => x?.isPrimary)?.email || item?.contact?.email || item?.email || '').trim();
+    const phone = String(item?.contact?.phones?.[0]?.number || item?.phone || '').trim();
+
+    personIdInput.value = String(item?.id || '');
+    personNameView.value = fullName;
+    personNameInput.value = fullName;
+    personEmailInput.value = email;
+    personPhoneInput.value = phone;
+    previewEmail.value = email;
+    previewPhone.value = phone;
+    selectedPersonOrganizations = Array.isArray(item?.organizations) ? item.organizations : [];
+    renderPersonRoleSummary();
+  }
+
+  const pickBtn = document.getElementById('btnPickPerson');
+  if (pickBtn && !pickBtn.disabled) {
+    pickBtn.addEventListener('click', () => {
+      GenericPicker.open(GenericPickerPresets.person({
+        title: 'Select Person',
+        placeholder: 'Search by name or email...',
+        onSelect: (item) => {
+          syncPersonFieldsFromPersonItem(item);
+          const modeExisting = document.getElementById('personModeExisting');
+          if (modeExisting) {
+            modeExisting.checked = true;
+            syncPersonModeUI();
+          }
+        }
+      }));
+    });
+  }
+
+  const modeExisting = document.getElementById('personModeExisting');
+  const modeNew = document.getElementById('personModeNew');
+  if (modeExisting) modeExisting.addEventListener('change', syncPersonModeUI);
+  if (modeNew) modeNew.addEventListener('change', syncPersonModeUI);
+
+  const btnAddNewPersonEmail = document.getElementById('btnAddNewPersonEmail');
+  const btnAddNewPersonPhone = document.getElementById('btnAddNewPersonPhone');
+  const btnAddNewPersonAddressManual = document.getElementById('btnAddNewPersonAddressManual');
+  if (btnAddNewPersonEmail) btnAddNewPersonEmail.addEventListener('click', () => { newPersonEmails.push({ type: 'work', email: '', isPrimary: false }); renderNewPersonEmails(); });
+  if (btnAddNewPersonPhone) btnAddNewPersonPhone.addEventListener('click', () => { newPersonPhones.push({ type: 'mobile', number: '' }); renderNewPersonPhones(); });
+  if (btnAddNewPersonAddressManual) btnAddNewPersonAddressManual.addEventListener('click', () => { newPersonAddresses.push({ type: 'home', line1: '', city: '', province: '', postalCode: '' }); renderNewPersonAddresses(); });
+
+  if (btnWizardPrev) btnWizardPrev.addEventListener('click', () => showWizardStep(currentWizardStep - 1));
+  if (btnWizardNext) btnWizardNext.addEventListener('click', () => showWizardStep(currentWizardStep + 1));
+
+  document.querySelectorAll('#customerTabs .nav-link').forEach((tabBtn) => {
+    tabBtn.addEventListener('shown.bs.tab', () => {
+      const target = tabBtn.getAttribute('data-bs-target');
+      currentWizardStep = Math.max(0, wizardTabTargets.indexOf(target));
+      updateWizardButtons();
+    });
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = document.getElementById('btnWizardSubmit');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    try {
+      const personMode = document.querySelector('input[name="personMode"]:checked')?.value || 'existing';
+      if (personMode === 'existing') {
+        if (!String(personIdInput.value || '').trim()) throw new Error('Please select a Person before saving.');
+      } else {
+        const firstName = document.getElementById('inp_newPersonFirstName')?.value?.trim();
+        const lastName = document.getElementById('inp_newPersonLastName')?.value?.trim();
+        const gender = document.getElementById('inp_newPersonGender')?.value?.trim();
+        const dob = document.getElementById('inp_newPersonDateOfBirth')?.value?.trim();
+        const emails = (newPersonEmails || []).filter((x) => String(x?.email || '').trim());
+        if (!firstName || !lastName || !gender || !dob) throw new Error('Please complete all required New Person fields.');
+        if (!emails.length) throw new Error('At least one email is required for the new person.');
+      }
+
+      syncNewPersonHiddenState();
+      const fd = new FormData(form);
+      const body = new URLSearchParams();
+      for (const [k, v] of fd.entries()) body.append(k, v);
+
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+        body: body.toString()
+      });
+      const result = await response.json();
+      if (result.status !== 'success') throw new Error(result.message || 'Save failed.');
+
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({ title: 'Success', icon: 'success', message: result.message || 'Customer saved.', buttons: [{ text: 'OK', class: 'btn-success' }] });
+      }
+      window.location.href = '/credit/customers';
+    } catch (error) {
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({ title: 'Error', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-danger' }] });
+      } else {
+        alert(error.message);
+      }
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+    }
+  });
+
+  renderPersonRoleSummary();
+  renderNewPersonEmails();
+  renderNewPersonPhones();
+  renderNewPersonAddresses();
+  syncPersonModeUI();
+  showWizardStep(0);
+  if (isEdit) {
+    personNameInput.value = personNameView.value || personNameInput.value;
+    previewEmail.value = personEmailInput.value || previewEmail.value;
+    previewPhone.value = personPhoneInput.value || previewPhone.value;
+  }
+});
+</script>

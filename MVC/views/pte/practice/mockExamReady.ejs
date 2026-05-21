@@ -1,0 +1,199 @@
+<%
+  const row = test && typeof test === 'object' ? test : {};
+  const active = activeSession && typeof activeSession === 'object' ? activeSession : null;
+  const errors = Array.isArray(row?.validationState?.errors) ? row.validationState.errors : [];
+  const warnings = Array.isArray(row?.validationState?.warnings) ? row.validationState.warnings : [];
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-shield-check me-2"></i>Mock Exam Readiness</h1>
+      <div class="text-muted mt-2"><%= row.title || 'PTE Mock Exam' %></div>
+    </div>
+    <a href="/pte/practice/mock-exams" class="btn btn-outline-secondary btn-md">
+      <i class="bi bi-arrow-left me-1"></i> Mock Exams
+    </a>
+  </div>
+
+  <script id="pteMockReadyJson" type="application/json"><%- JSON.stringify(row || {}).replace(/</g, '\\u003c') %></script>
+  <input type="hidden" id="pteMockReadyActionStateId" value="">
+
+  <% if (active) { %>
+    <div class="alert alert-warning">
+      You already have an in-progress strict mock exam. Continue that exam before starting another one.
+      <a class="alert-link" href="/pte/practice/mock-exams/session/<%= encodeURIComponent(active.id) %>">Continue exam</a>
+    </div>
+  <% } %>
+
+  <% if (errors.length) { %>
+    <div class="alert alert-danger">
+      <strong>This test cannot start yet.</strong>
+      <ul class="mb-0 mt-2">
+        <% errors.slice(0, 8).forEach((error) => { %>
+          <li><%= error %></li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
+
+  <% if (warnings.length) { %>
+    <div class="alert alert-warning">
+      <strong>Warnings:</strong>
+      <ul class="mb-0 mt-2">
+        <% warnings.slice(0, 6).forEach((warning) => { %>
+          <li><%= warning %></li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h5 fw-bold mb-3">Strict Exam Rules</h2>
+          <div class="d-grid gap-2">
+            <div class="border rounded p-3 bg-light-subtle"><i class="bi bi-clock-history me-1"></i> Once started, the timer keeps running after refresh or closing the browser.</div>
+            <div class="border rounded p-3 bg-light-subtle"><i class="bi bi-arrow-right-circle me-1"></i> You can only move forward. Previous navigation is blocked.</div>
+            <div class="border rounded p-3 bg-light-subtle"><i class="bi bi-mic-mute me-1"></i> Speaking responses are one recording only. Re-recording is blocked.</div>
+            <div class="border rounded p-3 bg-light-subtle"><i class="bi bi-headphones me-1"></i> Prompt audio is one play only for listening/speaking audio items.</div>
+            <div class="border rounded p-3 bg-light-subtle"><i class="bi bi-eye-slash me-1"></i> Scores and feedback are hidden until the exam is finished.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h5 fw-bold mb-3">Equipment Check</h2>
+          <div class="mb-3">
+            <div class="small text-muted">Test type</div>
+            <div class="fw-bold"><%= row.detectedTestTypeLabel || 'PTE Academic' %></div>
+          </div>
+          <div class="mb-3">
+            <div class="small text-muted">Estimated duration</div>
+            <div class="fw-bold"><%= row.estimatedMinutes || '-' %> minutes</div>
+          </div>
+          <button type="button" class="btn btn-outline-primary w-100 mb-2" id="pteMockMicCheckBtn" data-no-wait="true">
+            <i class="bi bi-mic me-1"></i> Check Microphone
+          </button>
+          <button type="button" class="btn btn-outline-secondary w-100 mb-3" id="pteMockAudioCheckBtn" data-no-wait="true">
+            <i class="bi bi-volume-up me-1"></i> Audio Playback Works
+          </button>
+          <div class="small mb-3" id="pteMockEquipmentStatus">Microphone and audio checks are required before start.</div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" value="1" id="pteMockConfirmRules">
+            <label class="form-check-label fw-bold" for="pteMockConfirmRules">
+              I understand this is a strict mock exam and the timer will not pause.
+            </label>
+          </div>
+          <button type="button" class="btn btn-filled btn-danger w-100" id="pteMockStartBtn" disabled>
+            <i class="bi bi-play-circle me-1"></i> Start Strict Mock Exam
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const test = (() => {
+    try { return JSON.parse(document.getElementById('pteMockReadyJson')?.textContent || '{}'); } catch (_) { return {}; }
+  })();
+  const micBtn = document.getElementById('pteMockMicCheckBtn');
+  const audioBtn = document.getElementById('pteMockAudioCheckBtn');
+  const startBtn = document.getElementById('pteMockStartBtn');
+  const confirmBox = document.getElementById('pteMockConfirmRules');
+  const statusNode = document.getElementById('pteMockEquipmentStatus');
+  const actionStateNode = document.getElementById('pteMockReadyActionStateId');
+  let actionStateId = String(actionStateNode?.value || '').trim();
+  const equipment = { microphone: '', audio: '' };
+
+  function sync() {
+    const ready = equipment.microphone === 'passed' && equipment.audio && confirmBox?.checked;
+    if (startBtn) startBtn.disabled = !ready || test.ready === false;
+    if (statusNode) {
+      statusNode.textContent = `Microphone: ${equipment.microphone || 'pending'} | Audio: ${equipment.audio || 'pending'}`;
+      statusNode.className = ready ? 'small mb-3 text-success' : 'small mb-3 text-muted';
+    }
+  }
+
+  async function requestStartToken() {
+    const response = await fetch('/pte/practice/mock-exams/start/token', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'X-AJAX-Request': 'true' },
+      credentials: 'include'
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.status !== 'success') {
+      throw new Error((result && result.message) || 'Unable to prepare the start token.');
+    }
+    actionStateId = String(result?.results?.actionStateId || actionStateId || '').trim();
+    if (actionStateNode) actionStateNode.value = actionStateId;
+  }
+
+  micBtn?.addEventListener('click', async () => {
+    micBtn.disabled = true;
+    try {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        throw new Error('This browser does not support microphone access.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      equipment.microphone = 'passed';
+    } catch (error) {
+      equipment.microphone = '';
+      alert(error.message || 'Microphone check failed.');
+    } finally {
+      micBtn.disabled = false;
+      sync();
+    }
+  });
+
+  audioBtn?.addEventListener('click', () => {
+    equipment.audio = 'passed';
+    sync();
+  });
+  confirmBox?.addEventListener('change', sync);
+
+  startBtn?.addEventListener('click', async () => {
+    startBtn.disabled = true;
+    startBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Starting...';
+    try {
+      if (!actionStateId) await requestStartToken();
+      const body = new URLSearchParams();
+      body.set('actionStateId', actionStateId);
+      body.set('runtimePlan', JSON.stringify({
+        testVersionId: test.id,
+        confirmationAccepted: true,
+        equipmentCheck: equipment,
+        source: { module: 'pte_mock_exam_ui' }
+      }));
+      const response = await fetch('/pte/practice/mock-exams/start?actionStateId=' + encodeURIComponent(actionStateId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        credentials: 'include',
+        body: body.toString()
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || 'Unable to start mock exam.');
+      }
+      window.location.href = result?.results?.redirectUrl || '/pte/practice/mock-exams';
+    } catch (error) {
+      alert(error.message || 'Unable to start mock exam.');
+      startBtn.disabled = false;
+      startBtn.innerHTML = '<i class="bi bi-play-circle me-1"></i> Start Strict Mock Exam';
+    }
+  });
+
+  sync();
+})();
+</script>

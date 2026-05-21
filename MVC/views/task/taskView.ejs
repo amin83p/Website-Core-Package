@@ -1,0 +1,780 @@
+<% 
+    // --- 1. PREPARE DATA ---
+    const perms = (typeof permissions !== 'undefined') ? permissions : { 
+        canEdit: false, canSubmit: false, canApprove: false, canComment: false, canFeedback: false 
+    };
+    const stateId = (typeof actionStateId !== 'undefined') ? actionStateId : '';
+
+    let allFiles = [];
+    if (task.deliverables && Array.isArray(task.deliverables)) {
+        allFiles = [...task.deliverables.map(f => ({...f, isGlobal: true}))];
+    }
+    if (task.checkpoints && Array.isArray(task.checkpoints)) {
+        task.checkpoints.forEach(cp => {
+            if (cp.deliverables && Array.isArray(cp.deliverables)) {
+                allFiles = [...allFiles, ...cp.deliverables.map(f => ({
+                    ...f, stepName: cp.title, checkpointId: cp.id, isGlobal: false
+                }))];
+            }
+        });
+    }
+    allFiles.sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+
+
+    // ✅ NEW LOGIC: Extract Comments for the Modal
+    let rawComments = [];
+    if (task.activityLog && Array.isArray(task.activityLog)) {
+        rawComments = task.activityLog.filter(act => act.action === 'comment');
+    }
+    // Top 3 for the sidebar
+    let latestComments = [...rawComments].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 3);    
+%>
+
+<style>
+    /* TIMELINE */
+    .timeline-wrapper { position: relative; padding-left: 24px; border-left: 2px solid #e9ecef; }
+    .timeline-dot { position: absolute; left: -29px; top: 20px; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid #0d6efd; z-index: 2; }
+    
+    /* CARDS */
+    .checkpoint-card { position: relative; z-index: 1; margin-bottom: 1.5rem; transition: transform 0.2s, box-shadow 0.2s; border: 0; border-left: 4px solid #0d6efd; background: #fff; }
+    .checkpoint-card:hover { transform: translateY(-2px); box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1) !important; }
+
+    /* STATUS VARIANTS */
+    .checkpoint-card.completed { border-left-color: #198754; } .checkpoint-card.completed .timeline-dot { border-color: #198754; background: #198754; }
+    .checkpoint-card.submitted { border-left-color: #ffc107; } .checkpoint-card.submitted .timeline-dot { border-color: #ffc107; background: #ffc107; }
+    .checkpoint-card.merged { border-left-color: #0dcaf0; background-color: #f8fcff; } .checkpoint-card.merged .timeline-dot { border-color: #0dcaf0; background: #0dcaf0; }
+    .checkpoint-card.deleted { border-left-color: #6c757d; background-color: #f9f9f9; opacity: 0.7; } .checkpoint-card.deleted .card-title { text-decoration: line-through; color: #6c757d; } .checkpoint-card.deleted .timeline-dot { border-color: #6c757d; background: #6c757d; }
+
+    /* UTILS */
+    .text-pre-wrap { white-space: pre-wrap; }
+    .avatar-sm { width: 32px; height: 32px; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; }
+    .history-update-card { font-size: 0.9rem; border-left: 3px solid #dee2e6; background-color: #fff; }
+    .history-update-card:hover { background-color: #f8f9fa; }
+    
+    /* CHAT */
+    .comment-bubble { background: #f8f9fa; border-radius: 12px; padding: 10px 15px; position: relative; font-size: 0.9rem; border: 1px solid #e9ecef; }
+    .chat-bubble.owner-message { background-color: #fff5f5; border-color: #ffcccc; }
+    .chat-bubble.owner-message .user-name { color: #dc3545 !important; font-weight: 900; text-transform: uppercase; }
+    .chat-bubble.owner-message::before { content: '★ OWNER'; position: absolute; right: 10px; top: 8px; font-size: 0.6rem; background: #dc3545; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+    
+    /* UI */
+    .card-header.cursor-pointer { cursor: pointer; } .card-header.cursor-pointer:hover { background-color: #f8f9fa; }
+    .modal-header { cursor: move; user-select: none; } 
+    .resizable-modal-content { resize: both; overflow: hidden; position: relative; min-width: 400px; min-height: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
+    .modal-resize-grip { position: absolute; bottom: 0; right: 0; width: 15px; height: 15px; cursor: nwse-resize; z-index: 20; pointer-events: none; }
+    #textReaderContent { padding: 30px; min-height: 100%; line-height: 1.8; font-size: 1.1rem; white-space: pre-wrap; word-wrap: break-word; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; border-radius: 0 0 4px 4px; transition: background-color 0.3s, color 0.3s; }
+    .reader-theme-light { background-color: #ffffff; color: #212529; } .reader-theme-sepia { background-color: #f8f5e6 !important; color: #5b4636 !important; } .reader-theme-dark { background-color: #212529 !important; color: #e9ecef !important; }
+    #textReaderModal .modal-body { padding: 0; display: flex; flex-direction: column; height: 100%; }
+    .hover-highlight:hover { background-color: rgba(0,0,0,0.03); cursor: zoom-in; }
+    .locked-overlay { opacity: 0.6; pointer-events: none; background-color: #f8f9fa; }
+</style>
+
+<div class="container-fluid py-4 tasks-page" style="width: 100%; max-width: 100%;">
+    
+    <div class="d-flex justify-content-between align-items-end mb-4 pb-3 border-bottom">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-secondary border"><%= task.phaseName || 'Phase' %></span>
+                <span class="text-muted small font-monospace">ID: <%= task.id.split('_')[1] || task.id %></span>
+            </div>
+            <h2 class="fw-bold m-0 text-dark"><%= task.title %></h2>
+            <div class="text-muted small mt-1">
+                <i class="bi bi-folder2-open me-1"></i> <%= task.projectName %>
+            </div>
+        </div>
+        
+        <div class="text-end">
+            <div class="d-flex flex-column align-items-end gap-2">
+                <div>
+                    <% if(task.priority === 'critical') { %> <span class="badge bg-danger">CRITICAL</span> <% } %>
+                    <span class="badge bg-white text-dark border"><%= task.status.toUpperCase().replace('_', ' ') %></span>
+                </div>
+                <div class="d-flex align-items-center gap-2 bg-light p-2 rounded border">
+                    <span class="small fw-bold text-muted">Progress</span>
+                    <div class="progress" style="width: 120px; height: 8px;">
+                        <div id="task-progress-bar" class="progress-bar <%= task.progress >= 100 ? 'bg-success' : 'bg-primary' %>" 
+                             role="progressbar" style="width: <%= task.progress || 0 %>%"></div>
+                    </div>
+                    <span id="task-progress-text" class="fw-bold small text-primary"><%= task.progress || 0 %>%</span>
+                </div>
+                
+                <% if(perms.canEdit) { %>
+                    <a href="/tasks/edit/<%= task.id %>" class="btn btn-sm btn-outline-primary mt-1">
+                        <i class="bi bi-pencil-square me-1"></i> Edit Structure
+                    </a>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-0 pt-3 pb-3 d-flex justify-content-between align-items-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#descCollapse" aria-expanded="true">
+                    <h6 class="fw-bold text-secondary m-0"><i class="bi bi-card-text me-2"></i>Task Description</h6>
+                    <i class="bi bi-chevron-down text-muted"></i>
+                </div>
+                <div id="descCollapse" class="collapse show">
+                    <div class="card-body pt-0">
+                        <div class="small text-muted mb-0 text-pre-wrap hover-highlight" onclick="event.stopPropagation(); openReader('Task Description', '<%= task.description%>')"><%- task.description || 'No description provided.' %></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-3 mb-4">
+            
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-white border-0 pt-3 pb-0 d-flex justify-content-between align-items-center cursor-pointer" onclick="openFullCommentsModal()" title="View all comments">
+                    <h6 class="fw-bold text-secondary m-0"><i class="bi bi-chat-dots me-2"></i>Latest Comments</h6>
+                </div>
+                <div class="card-body p-0">
+                    <% if(latestComments.length > 0) { %>
+                        <div class="list-group list-group-flush">
+                            <% latestComments.forEach(c => { %>
+                                <div class="list-group-item border-0 px-3 py-2">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <div class="avatar-sm rounded-circle bg-secondary text-white small me-2"><%= (c.userName||'U').charAt(0).toUpperCase() %></div>
+                                        <div class="small fw-bold text-dark"><%= c.userName %></div>
+                                        <div class="x-small text-muted ms-auto"><%= new Date(c.timestamp).toLocaleDateString() %></div>
+                                    </div>
+                                    <div class="small text-muted text-truncate ps-1 border-start border-2 ms-2"><%= c.details %></div>
+                                </div>
+                            <% }) %>
+                        </div>
+                        <div class="card-footer bg-white border-0 pt-0 text-center">
+                            <button class="btn btn-xs btn-link text-decoration-none" onclick="openFullCommentsModal()">View All</button>
+                        </div>
+                    <% } else { %>
+                        <div class="text-center p-3 text-muted small fst-italic">No comments yet.</div>
+                    <% } %>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-white border-0 pt-3 pb-0 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold text-secondary m-0"><i class="bi bi-people-fill me-2"></i>Team</h6>
+                    <span class="badge bg-light text-dark border"><%= (task.assignments||[]).filter(a=>a.status!=='disabled').length %> Active</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <% (task.assignments || []).forEach(assignee => { %>
+                            <div class="list-group-item px-3 py-2 border-0 d-flex align-items-center gap-2 <%= assignee.status === 'disabled' ? 'bg-light opacity-50' : '' %>">
+                                <div class="rounded-circle bg-dark text-white fw-bold avatar-sm shadow-sm"><%= (assignee.name || 'U').charAt(0).toUpperCase() %></div>
+                                <div class="flex-grow-1 overflow-hidden"><div class="small fw-bold text-truncate"><%= assignee.name %></div><div class="x-small text-muted"><%= assignee.role %></div></div>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+                <% if(perms.canEdit) { %>
+                <div class="card-footer bg-white border-0 pt-0 pb-3"><a href="/tasks/edit/<%= task.id %>" class="btn btn-sm btn-outline-primary w-100 border-dashed"><i class="bi bi-gear-fill me-1"></i> Manage Team & Roles</a></div>
+                <% } %>
+            </div>
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-white border-0 pt-3 pb-0 d-flex justify-content-between">
+                    <h6 class="fw-bold text-secondary m-0"><i class="bi bi-paperclip me-2"></i>All Files</h6>
+                    <span class="badge bg-light text-dark border" id="sidebar-file-count"><%= allFiles.length %></span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" id="sidebar-files-list" style="max-height: 300px; overflow-y: auto;">
+                    <% if(allFiles.length > 0) { %>
+                            <% allFiles.forEach(f => { %>
+                                <div class="list-group-item px-3 py-2 border-0 d-flex justify-content-between align-items-center file-row" data-url="<%= f.url %>">
+                                    <a href="<%= f.url %>" target="_blank" class="text-decoration-none text-dark d-flex align-items-center gap-2 overflow-hidden">
+                                        <i class="bi bi-file-earmark-text text-primary"></i><span class="text-truncate small"><%= f.filename %></span>
+                                    </a>
+                                    <% if(f.isGlobal && perms.canEdit) { %>
+                                        <i class="bi bi-trash text-danger cursor-pointer small" onclick="deleteFile('<%= f.url %>', null)"></i>
+                                    <% } else if(!f.isGlobal) { %>
+                                        <i class="bi bi-trash text-muted cursor-pointer small opacity-50" 
+                                            onclick="showMsg('File Attached to Step', 'This file belongs to step: <br><b><%= f.stepName %></b>.<br><br>Please go to the timeline card for this step to delete it.', 'warning')">
+                                        </i>
+                                    <% } %>
+                                </div>
+                            <% }) %>
+                    <% } else { %><div class="text-center p-3 text-muted small fst-italic no-files-msg">No files found.</div><% } %>
+                    </div>
+                    <% if(perms.canEdit || perms.canSubmit) { %><div class="p-2 border-top"><button class="btn btn-sm btn-outline-secondary w-100 border-dashed" onclick="openUploadModal('')"><i class="bi bi-plus-lg"></i> Add General File</button></div><% } %>
+                </div>
+            </div>
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-white border-0 pt-3 pb-0"><h6 class="fw-bold text-secondary m-0"><i class="bi bi-calendar3 me-2"></i>Schedule</h6></div>
+                <div class="card-body">
+                    <% const tStart = (task.dates && task.dates.start) ? task.dates.start : 'TBD'; const tDue = (task.dates && task.dates.due) ? task.dates.due : 'TBD'; const isOverdue = (tDue !== 'TBD' && new Date(tDue) < new Date() && task.status !== 'done'); %>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom"><span class="small text-muted">Start Date</span><span class="fw-bold small text-dark"><%= tStart %></span></div>
+                    <div class="d-flex justify-content-between align-items-center mb-3"><span class="small text-muted">Due Date</span><span class="fw-bold small <%= isOverdue ? 'text-danger bg-danger-subtle px-2 py-1 rounded' : 'text-dark' %>"><%= tDue %></span></div>
+                    <% if(perms.canEdit) { %><a href="/tasks/edit/<%= task.id %>" class="btn btn-xs btn-light text-muted w-100">Edit Global Dates</a><% } %>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-9">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-primary m-0"><i class="bi bi-bezier2 me-2"></i>Execution Timeline</h5>
+                <span class="text-muted small"><%= (task.checkpoints||[]).length %> Steps defined</span>
+            </div>
+
+            <div class="timeline-wrapper ms-2">
+                <% if(task.checkpoints && task.checkpoints.length > 0) { %>
+                    <% task.checkpoints.forEach((cp, idx) => { 
+                        const status = cp.status || 'active';
+                        // Default Disabled Status
+                        let isDisabled = (status === 'deleted' || status === 'merged' || status === 'completed' || status === 'submitted');
+                        const isCollapsed = (status === 'completed' || status === 'deleted' || status === 'merged');
+                        // Lock Check
+                        let isLockedByDep = false;
+                        let depMsg = "";
+                        
+                        if(cp.lockStep) {
+                            const depIdx = parseInt(cp.lockStep) - 1;
+                            if (depIdx >= 0 && depIdx < task.checkpoints.length) {
+                                const depCp = task.checkpoints[depIdx];
+                                const requiredStatus = cp.lockStatus || 'completed';
+                                if (depCp.status !== requiredStatus) {
+                                    isLockedByDep = true;
+                                    isDisabled = true; 
+                                    depMsg = `Locked until Step ${cp.lockStep} is ${requiredStatus}`;
+                                }
+                            }
+                        }
+
+                        let currentD = cp.dates?.current || cp.date || 'TBD';
+                        let originalD = cp.dates?.original || cp.date || '';
+                        const isDateChanged = (originalD && currentD !== 'TBD' && originalD !== currentD);
+                    %>
+                    
+                    <div class="card shadow-sm checkpoint-card <%= status %> <%= isLockedByDep ? 'locked-overlay' : '' %>" 
+                         id="cp-<%= cp.id %>" 
+                         data-status="<%= status %>" 
+                         data-weight="<%= cp.weight || 0 %>"
+                         data-step-index="<%= idx + 1 %>"
+                         data-lock-step="<%= cp.lockStep %>"
+                         data-lock-status="<%= cp.lockStatus || 'completed' %>">
+                         
+                        <span class="timeline-dot"></span>
+                        
+                        <div class="card-header bg-white border-bottom-0 pt-3 pb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="fw-bold m-0 card-title d-flex align-items-center gap-2">
+                                        <%= cp.title %>
+                                        <% if(cp.weight > 0) { %><span class="badge bg-light text-secondary border fw-normal" style="font-size: 0.75rem;"><%= cp.weight %>%</span><% } %>
+                                        
+                                        <% if(isLockedByDep) { %>
+                                            <span class="badge bg-warning text-dark border" id="lock-badge-<%= cp.id %>"><i class="bi bi-lock-fill me-1"></i> <%= depMsg %></span>
+                                        <% } else { %>
+                                            <span class="badge bg-warning text-dark border d-none" id="lock-badge-<%= cp.id %>"></span>
+                                        <% } %>
+                                    </h5>
+                                    
+                                    <div class="text-muted small mt-1 d-flex align-items-center gap-2">
+                                        <i class="bi bi-calendar-event"></i>
+                                        <% if(isDateChanged) { %>
+                                            <span class="text-decoration-line-through opacity-75"><%= originalD %></span>
+                                            <span class="text-danger fw-bold"><%= currentD %></span>
+                                        <% } else { %>
+                                            <span class="fw-bold"><%= currentD %></span>
+                                        <% } %>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2 align-items-center">
+                                    <div id="status-badge-<%= cp.id %>">
+                                        <% if(status === 'completed') { %> <span class="badge bg-success shadow-sm">Completed</span>
+                                        <% } else if(status === 'submitted') { %> <span class="badge bg-warning text-dark shadow-sm">Submitted</span>
+                                        <% } else if(status === 'deleted') { %> <span class="badge bg-secondary">Deleted</span>
+                                        <% } else if(status === 'merged') { %> <span class="badge bg-info text-dark">Merged</span>
+                                        <% } else { %> <span class="badge bg-primary">Active</span> <% } %>
+                                    </div>
+                                    
+                                    <button class="btn btn-sm btn-light border" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-<%= cp.id %>" aria-expanded="<%= !isCollapsed %>" title="Toggle Details" onclick="event.stopPropagation()">
+                                        <i class="bi bi-arrows-collapse"></i>
+                                    </button>
+
+                                    <div id="dropdown-wrapper-<%= cp.id %>" class="<%= isLockedByDep ? 'd-none' : '' %>">
+                                        <% if(perms.canSubmit || perms.canApprove || perms.canEdit) { %>
+                                        <div class="dropdown" onclick="event.stopPropagation()">
+                                            <button class="btn btn-sm btn-light border" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow">
+                                                <li><h6 class="dropdown-header">Change Status</h6></li>
+                                                <% if(perms.canSubmit) { %><li><button class="dropdown-item" onclick="updateStatus('<%= cp.id %>', 'submitted')"><i class="bi bi-send me-2 text-warning"></i> Submit for Review</button></li><% } %>
+                                                <% if(perms.canApprove) { %><li><button class="dropdown-item" onclick="updateStatus('<%= cp.id %>', 'completed')"><i class="bi bi-check-circle me-2 text-success"></i> Approve & Complete</button></li><% } %>
+                                                <% if(perms.canEdit || perms.canApprove) { %>
+                                                <li><button class="dropdown-item" onclick="updateStatus('<%= cp.id %>', 'active')"><i class="bi bi-play-circle me-2 text-primary"></i> Set Active (Unlock)</button></li>
+                                                <li><button class="dropdown-item" onclick="updateStatus('<%= cp.id %>', 'merged')"><i class="bi bi-sign-merge-right me-2 text-info"></i> Set Merged</button></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><button class="dropdown-item text-danger" onclick="updateStatus('<%= cp.id %>', 'deleted')"><i class="bi bi-trash me-2"></i> Delete Step</button></li>
+                                                <% } %>
+                                            </ul>
+                                        </div>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="collapse-<%= cp.id %>" class="collapse <%= isCollapsed ? '' : 'show' %>">
+                            <div class="card-body border-top pt-0">
+                                <ul class="nav nav-tabs card-header-tabs mt-3" id="tab-<%= cp.id %>" role="tablist">
+                                    <li class="nav-item"><button class="nav-link active py-2 small" data-bs-toggle="tab" data-bs-target="#panel-overview-<%= cp.id %>">Overview</button></li>
+                                    <li class="nav-item"><button class="nav-link py-2 small" data-bs-toggle="tab" data-bs-target="#panel-files-<%= cp.id %>">Files <span class="badge bg-secondary opacity-75 rounded-pill ms-1" id="cp-file-count-<%= cp.id %>"><%= (cp.deliverables||[]).length %></span></button></li>
+                                    <li class="nav-item"><button class="nav-link py-2 small" data-bs-toggle="tab" data-bs-target="#panel-history-<%= cp.id %>">History</button></li>
+                                </ul>
+
+                                <div class="tab-content mt-3">
+                                    <div class="tab-pane fade show active" id="panel-overview-<%= cp.id %>">
+                                        <% if(cp.criteria) { %>
+                                            <div class="bg-light p-3 rounded border-start border-4 border-secondary small mb-3 hover-highlight" onclick="openReader('Criteria: <%= cp.title %>', `<%= cp.criteria %>`)">
+                                                <strong class="d-block text-secondary text-uppercase x-small mb-1">Definition of Done</strong>
+                                                <div class="text-pre-wrap text-dark"><%- cp.criteria %></div>
+                                            </div>
+                                        <% } %>
+                                        
+                                        <div id="actions-cp-<%= cp.id %>" class="d-flex flex-wrap gap-2 mt-3 <%= isDisabled ? 'd-none' : '' %>">
+                                            <% if(perms.canComment) { %><button class="btn btn-sm btn-outline-primary" onclick="openCommentModal('<%= cp.id %>', '<%= cp.title %>')"><i class="bi bi-chat-left-text me-1"></i> Add Comment</button><% } %>
+                                            <% if(perms.canEdit) { %><button class="btn btn-sm btn-outline-secondary" onclick="openUpdateModal('<%= cp.id %>', '<%= cp.title %>', '<%= currentD %>', '<%= cp.weight %>', `<%= (cp.criteria||'').replace(/`/g, '\\`') %>`)"><i class="bi bi-pencil me-1"></i> Edit Details</button><% } %>
+                                            <% if(perms.canSubmit || perms.canEdit) { %><button class="btn btn-sm btn-outline-secondary" onclick="openUploadModal('<%= cp.id %>')"><i class="bi bi-paperclip me-1"></i> Add File</button><% } %>
+                                        </div>
+
+                                        <div id="lock-msg-cp-<%= cp.id %>" class="alert alert-danger py-2 small mt-3 mb-0 <%= isLockedByDep ? '' : 'd-none' %>">
+                                            <i class="bi bi-lock-fill me-1"></i> <span id="lock-msg-text-<%= cp.id %>"><%= depMsg %></span>
+                                        </div>
+
+                                        <div id="status-warning-cp-<%= cp.id %>" class="alert alert-warning py-2 small mt-3 mb-0 <%= isDisabled && !isLockedByDep ? '' : 'd-none' %>">
+                                            <i class="bi bi-lock-fill me-1"></i> This step is <strong id="locked-status-text-<%= cp.id %>"><%= status %></strong>. Unlock to make changes.
+                                        </div>
+                                    </div>
+
+                                    <div class="tab-pane fade" id="panel-files-<%= cp.id %>">
+                                        <div class="list-group list-group-flush mb-3" id="cp-files-list-<%= cp.id %>">
+                                        <% if(cp.deliverables && cp.deliverables.length > 0) { %>
+                                                <% cp.deliverables.forEach(f => { %>
+                                                    <div class="list-group-item p-2 border-0 d-flex justify-content-between align-items-center bg-light rounded mb-1 file-row" data-url="<%= f.url %>">
+                                                        <div class="d-flex align-items-center gap-2 overflow-hidden">
+                                                            <i class="bi bi-file-earmark-text text-primary fs-5"></i>
+                                                            <div class="overflow-hidden">
+                                                                <a href="<%= f.url %>" target="_blank" class="fw-bold text-dark text-decoration-none text-truncate d-block"><%= f.filename %></a>
+                                                                <% if(f.description === '[Definition]') { %><span class="badge bg-warning text-dark border x-small ms-1">Definition</span><% } else { %><div class="x-small text-muted"><%= f.description || 'No description' %></div><% } %>
+                                                            </div>
+                                                        </div>
+                                                        <div class="d-flex gap-2">
+                                                            <a href="<%= f.url %>" download class="btn btn-sm btn-light border"><i class="bi bi-download"></i></a>
+                                                            <% if(!isDisabled && (perms.canEdit || f.uploadedBy === user.id)) { %>
+                                                                <button class="btn btn-sm btn-light border text-danger" onclick="deleteFile('<%= f.url %>', '<%= cp.id %>')"><i class="bi bi-trash"></i></button>
+                                                            <% } %>
+                                                        </div>
+                                                    </div>
+                                                <% }) %>
+                                        <% } else { %>
+                                            <div class="text-center p-4 text-muted small bg-light rounded border-dashed no-files-msg"><i class="bi bi-paperclip fs-4 d-block mb-2 opacity-50"></i> No files attached.</div>
+                                        <% } %>
+                                        </div>
+                                        <div id="file-actions-cp-<%= cp.id %>" class="text-end mt-2 <%= isDisabled ? 'd-none' : '' %>">
+                                            <% if(perms.canSubmit || perms.canEdit) { %><button class="btn btn-sm btn-primary" onclick="openUploadModal('<%= cp.id %>')">Upload New File</button><% } %>
+                                        </div>
+                                    </div>
+
+                                    <div class="tab-pane fade" id="panel-history-<%= cp.id %>">
+                                        <div id="history-container-<%= cp.id %>">
+                                        <% 
+                                            const cpComments = (task.activityLog || []).filter(act => act.checkpointId === cp.id).map(c => ({...c, type: 'comment'}));
+                                            const cpUpdates = (cp.updates || []).map(u => ({...u, type: 'update'}));
+                                            const combinedHistory = [...cpComments, ...cpUpdates].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+                                        %>
+                                        <% if(combinedHistory.length === 0) { %>
+                                            <div class="text-center p-3 text-muted small no-history-msg">No activity recorded.</div>
+                                        <% } else { %>
+                                            <div class="d-flex flex-column gap-3">
+                                                <% combinedHistory.forEach(item => { %>
+                                                    <% if(item.type === 'comment') { %>
+                                                        <div class="d-flex gap-2">
+                                                            <div class="avatar-sm rounded-circle bg-secondary text-white flex-shrink-0"><%= (item.userName||'U').charAt(0) %></div>
+                                                            <div>
+                                                                <div class="comment-bubble"><strong><%= item.userName %>:</strong> <%= item.details %><% if(item.file) { %><div class="mt-1 border-top pt-1"><a href="<%= item.file.url %>" target="_blank"><i class="bi bi-paperclip"></i> <%= item.file.filename %></a></div><% } %></div>
+                                                                <div class="x-small text-muted ms-1"><%= new Date(item.timestamp).toLocaleString() %></div>
+                                                            </div>
+                                                        </div>
+                                                    <% } else { 
+                                                        let readableContent = `<h5 class='fw-bold mb-3'>Update Log</h5>`;
+                                                        readableContent += `<table class='table table-sm table-bordered'><tbody>`;
+                                                        readableContent += `<tr><td class='bg-light fw-bold' style='width:30%'>User</td><td>${item.userName}</td></tr>`;
+                                                        readableContent += `<tr><td class='bg-light fw-bold'>Date</td><td>${new Date(item.timestamp).toLocaleString()}</td></tr>`;
+                                                        readableContent += `<tr><td class='bg-light fw-bold'>Reason</td><td>${item.note || '-'}</td></tr>`;
+                                                        readableContent += `</tbody></table>`;
+                                                        if(item.changes && Object.keys(item.changes).length > 0) {
+                                                            readableContent += `<h6 class='fw-bold mt-3 mb-2'>Changes</h6><table class='table table-sm table-striped'><thead><tr><th>Field</th><th>New Value</th></tr></thead><tbody>`;
+                                                            if(item.changes.newDate) readableContent += `<tr><td>Due Date</td><td>${item.changes.newDate}</td></tr>`;
+                                                            if(item.changes.newWeight) readableContent += `<tr><td>Weight</td><td>${item.changes.newWeight}%</td></tr>`;
+                                                            readableContent += `</tbody></table>`;
+                                                        }
+                                                    %>
+                                                        <div class="history-update-card p-2 rounded cursor-pointer" onclick="openReader('Update Details', `<%= readableContent %>`)">
+                                                            <div class="d-flex justify-content-between align-items-center mb-1"><strong class="small text-primary"><%= item.userName %> updated step</strong><span class="x-small text-muted"><%= new Date(item.timestamp).toLocaleDateString() %></span></div>
+                                                            <div class="text-dark small mb-1 text-truncate" style="max-width: 90%; font-style: italic;">"<%= item.note %>"</div>
+                                                        </div>
+                                                    <% } %>
+                                                <% }) %>
+                                            </div>
+                                        <% } %>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <% }) %>
+                <% } else { %>
+                    <div class="text-center py-5 text-muted border rounded bg-light">
+                        <i class="bi bi-list-check fs-1 text-secondary mb-2"></i>
+                        <p>No checkpoints defined.</p>
+                        <% if(perms.canEdit) { %>
+                        <a href="/tasks/edit/<%= task.id %>" class="btn btn-primary btn-sm">Add Checkpoints</a>
+                        <% } %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('taskCommentModal') %>
+<%- include('../partials/modal_ImageViewer') %>
+<%- include('../partials/modal_GenericPicker') %>
+
+<div class="modal fade" id="textReaderModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content resizable-modal-content"><div class="modal-header bg-light border-bottom-0 pb-2"><h5 class="modal-title fw-bold" id="textReaderTitle">Reading View</h5><div class="ms-auto d-flex align-items-center gap-2 me-3"><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" onclick="adjustFont(-1)"><i class="bi bi-dash-lg"></i></button><button class="btn btn-outline-secondary" onclick="adjustFont(1)"><i class="bi bi-plus-lg"></i></button></div><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" onclick="setTheme('light')"><i class="bi bi-brightness-high"></i></button><button class="btn btn-outline-secondary" onclick="setTheme('sepia')"><i class="bi bi-journal-text"></i></button><button class="btn btn-outline-secondary" onclick="setTheme('dark')"><i class="bi bi-moon"></i></button></div></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body pt-0"><div id="textReaderContent" class="reader-theme-light"></div></div><div class="modal-resize-grip"><svg viewBox="0 0 10 10" width="100%" height="100%" fill="#adb5bd"><path d="M10 10 L10 2 L2 10 Z" /></svg></div></div></div></div>
+<div class="modal fade" id="commentModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content resizable-modal-content"><form id="commentForm"><input type="hidden" name="actionStateId" value="<%= stateId %>"><input type="hidden" name="taskId" value="<%= task.id %>"><input type="hidden" name="checkpointId" id="commentCpId"><div class="modal-header"><h5 class="modal-title">Add Comment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="alert alert-info py-2 small mb-3">Discussion for: <strong id="commentCpTitleDisplay"></strong></div><div class="mb-3"><label class="form-label fw-bold">Comment</label><textarea name="comment" class="form-control" rows="3" required></textarea></div><div class="mb-3"><label class="form-label small text-muted">Attach File</label><input type="file" name="file" class="form-control"></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Post</button></div></form><div class="modal-resize-grip"><svg viewBox="0 0 10 10" width="100%" height="100%" fill="#adb5bd"><path d="M10 10 L10 2 L2 10 Z" /></svg></div></div></div></div>
+<div class="modal fade" id="uploadDeliverableModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content resizable-modal-content"><form id="uploadForm"><input type="hidden" name="actionStateId" value="<%= stateId %>"><input type="hidden" name="taskId" value="<%= task.id %>"><input type="hidden" name="checkpointId" id="uploadCpId"><div class="modal-header"><h5 class="modal-title">Upload File</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">File</label><input type="file" name="file" class="form-control" required></div><div class="mb-3"><label class="form-label">Note</label><input type="text" name="description" class="form-control" placeholder="Description"></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button type="submit" id="btnUploadSubmit" class="btn btn-primary">Upload</button></div></form><div class="modal-resize-grip"><svg viewBox="0 0 10 10" width="100%" height="100%" fill="#adb5bd"><path d="M10 10 L10 2 L2 10 Z" /></svg></div></div></div></div>
+<div class="modal fade" id="updateCheckpointModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content resizable-modal-content"><form action="/tasks/checkpoint/update" method="POST"><input type="hidden" name="actionStateId" value="<%= stateId %>"><input type="hidden" name="taskId" value="<%= task.id %>"><input type="hidden" name="checkpointId" id="modalCpId"><div class="modal-header"><h5 class="modal-title">Update Checkpoint</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label>Title</label><input type="text" class="form-control" id="modalCpTitle" readonly></div><div class="row g-2 mb-3"><div class="col-6"><label>New Date</label><input type="date" name="newDate" id="modalCpDate" class="form-control"></div><div class="col-6"><label>Weight (%)</label><input type="number" name="newWeight" id="modalCpWeight" class="form-control"></div></div><div class="mb-3"><label>Criteria</label><textarea name="newCriteria" id="modalCpCriteria" class="form-control" rows="3"></textarea></div><div class="mb-3"><label class="text-danger">Reason *</label><textarea name="note" class="form-control" rows="2" required></textarea></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary">Save Changes</button></div></form><div class="modal-resize-grip"><svg viewBox="0 0 10 10" width="100%" height="100%" fill="#adb5bd"><path d="M10 10 L10 2 L2 10 Z" /></svg></div></div></div></div>
+
+<script>
+    const serverComments = <%- JSON.stringify(rawComments) %>;
+    const currentUserId = '<%= user.id %>';
+</script>
+<script>
+    let currentFontSize = 1.1;
+    function openReader(title, content) { document.getElementById('textReaderTitle').textContent = title; document.getElementById('textReaderContent').innerHTML = content; new bootstrap.Modal(document.getElementById('textReaderModal')).show(); }
+    function adjustFont(delta) { currentFontSize += (delta * 0.1); if(currentFontSize < 0.8) currentFontSize = 0.8; if(currentFontSize > 2.0) currentFontSize = 2.0; document.getElementById('textReaderContent').style.fontSize = currentFontSize + 'rem'; }
+    function setTheme(theme) { document.getElementById('textReaderContent').className = `reader-theme-${theme}`; }
+    
+    document.addEventListener('DOMContentLoaded', () => { 
+        document.querySelectorAll('.modal-header').forEach(header => { 
+            const dialog = header.closest('.modal-dialog'); 
+            if(!dialog) return; 
+            let isDragging = false, startX, startY, startLeft, startTop; 
+            header.addEventListener('mousedown', (e) => { 
+                if(e.target.closest('button') || e.target.closest('.btn-group')) return; 
+                isDragging = true; startX = e.clientX; startY = e.clientY; header.style.cursor = 'grabbing'; 
+                const rect = dialog.getBoundingClientRect(); 
+                dialog.style.margin = '0'; dialog.style.position = 'absolute'; 
+                dialog.style.left = rect.left + 'px'; dialog.style.top = rect.top + 'px'; 
+                startLeft = rect.left; startTop = rect.top; 
+            }); 
+            window.addEventListener('mousemove', (e) => { 
+                if (!isDragging) return; 
+                e.preventDefault(); 
+                const dx = e.clientX - startX; const dy = e.clientY - startY; 
+                dialog.style.left = `${startLeft + dx}px`; dialog.style.top = `${startTop + dy}px`; 
+            }); 
+            window.addEventListener('mouseup', () => { if(isDragging) { isDragging = false; header.style.cursor = 'move'; } }); 
+        }); 
+    });
+    
+    function openUpdateModal(id, title, date, weight, criteria) { document.getElementById('modalCpId').value = id; document.getElementById('modalCpTitle').value = title; document.getElementById('modalCpDate').value = date === 'TBD' ? '' : date; document.getElementById('modalCpWeight').value = weight; document.getElementById('modalCpCriteria').value = criteria; new bootstrap.Modal(document.getElementById('updateCheckpointModal')).show(); }
+    function openUploadModal(id) { document.getElementById('uploadCpId').value = id; new bootstrap.Modal(document.getElementById('uploadDeliverableModal')).show(); }
+    function openCommentModal(id, title) { document.getElementById('commentCpId').value = id; document.getElementById('commentCpTitleDisplay').textContent = title; new bootstrap.Modal(document.getElementById('commentModal')).show(); }
+    
+    async function showMsg(t, m, i='info') { 
+        if(typeof showMessageModal === 'function') 
+            await showMessageModal({
+                title:t, message:m, 
+                icon:i, 
+                buttons:[{text:'OK', class:'btn-primary'}]}); 
+        else alert(m); 
+    }
+    async function confirmMsg(t, m) { if(typeof showMessageModal === 'function') { const res = await showMessageModal({title:t, message:m, icon:'warning', buttons:[{text:'Cancel', class:'btn-secondary'}, {text:'Confirm', class:'btn-primary'}]}); return res === 'Confirm'; } return confirm(m); }
+    
+function createFileRowHTML(f, isSidebar) {
+        let deleteBtn = '';
+        if(f.isGlobal || !isSidebar) { 
+            deleteBtn = `<i class="bi bi-trash text-danger cursor-pointer small" onclick="deleteFile('${f.url}', '${f.checkpointId || ''}')"></i>`; 
+        } 
+        else { 
+            deleteBtn = `<i class="bi bi-trash text-muted cursor-pointer small opacity-50" onclick="showMsg('File Attached to Step', 'This file belongs to step: <br><b>${f.stepName || 'Step'}</b>.<br><br>Please go to the timeline card for this step to delete it.', 'warning')"></i>`; 
+        }
+        
+        const desc = f.description === '[Definition]' 
+            ? '<span class="badge bg-warning text-dark border x-small ms-1">Definition</span>' 
+            : `<div class="x-small text-muted">${f.description || 'No description'}</div>`;
+        
+        const iconClass = isSidebar 
+            ? 'bi-file-earmark-text text-primary' 
+            : 'bi-file-earmark-text text-primary fs-5';
+        
+        let containerClass = isSidebar 
+            ? "list-group-item px-3 py-2 border-0 d-flex justify-content-between align-items-center file-row" 
+            : "list-group-item p-2 border-0 d-flex justify-content-between align-items-center bg-light rounded mb-1 file-row";
+        
+        // ✅ UPDATED: Link now calls ImageViewer.open()
+        return `<div class="${containerClass}" data-url="${f.url}"><div class="${isSidebar ? '' : 'd-flex align-items-center gap-2 overflow-hidden'}">${!isSidebar ? `<i class="${iconClass}"></i>` : ''}<a href="javascript:void(0)" onclick="ImageViewer.open('${f.url}', '${f.filename}', '${f.mimetype || ''}')" class="text-decoration-none text-dark d-flex align-items-center gap-2 overflow-hidden">${isSidebar ? `<i class="${iconClass}"></i>` : ''}<span class="text-truncate small fw-bold">${f.filename}</span></a>${!isSidebar ? desc : ''}</div>${isSidebar ? '' : `<div class="d-flex gap-2"><a href="${f.url}" download class="btn btn-sm btn-light border"><i class="bi bi-download"></i></a> ${deleteBtn}</div>`}${isSidebar ? deleteBtn : ''}</div>`;
+    }
+
+    async function updateStatus(cpId, status) { 
+        if(!await confirmMsg("Update Status?", "Change status to " + status + "?")) return;
+        try { 
+            const res = await fetch('/tasks/checkpoint/status', { method: 'POST', headers: {'Content-Type':'application/json', 'X-AJAX-Request':'true'}, body: JSON.stringify({ taskId: '<%= task.id %>', checkpointId: cpId, status: status, actionStateId: '<%= stateId %>' }) });
+            const data = await res.json();
+            if(res.ok && data.status === 'success') {
+                const card = document.getElementById('cp-' + cpId);
+                const badgeContainer = document.getElementById('status-badge-' + cpId);
+                const oldStatus = card.dataset.status;
+                card.classList.remove(oldStatus); card.classList.add(status); card.dataset.status = status;
+                
+                let badgeHtml = '';
+                if(status === 'completed') badgeHtml = '<span class="badge bg-success shadow-sm">Completed</span>';
+                else if(status === 'submitted') badgeHtml = '<span class="badge bg-warning text-dark shadow-sm">Submitted</span>';
+                else if(status === 'deleted') badgeHtml = '<span class="badge bg-secondary">Deleted</span>';
+                else if(status === 'merged') badgeHtml = '<span class="badge bg-info text-dark">Merged</span>';
+                else badgeHtml = '<span class="badge bg-primary">Active</span>';
+                badgeContainer.innerHTML = badgeHtml;
+
+                // 3. REFRESH LOCKS
+                refreshLocks();
+                
+                // 4. REFRESH PROGRESS
+                refreshProgress();
+
+                await showMsg('Success', 'Status updated successfully.', 'success');
+            } else { await showMsg('Error', data.message || 'Failed to update status', 'error'); }
+        } catch(e) { await showMsg('Error', 'Network failed', 'error'); } 
+    }
+
+    function refreshLocks() {
+        const allCards = document.querySelectorAll('.checkpoint-card');
+        const stepStatusMap = {};
+        
+        allCards.forEach(card => {
+            const idx = card.dataset.stepIndex;
+            const status = card.dataset.status;
+            stepStatusMap[idx] = status;
+        });
+
+        allCards.forEach(card => {
+            const cpId = card.id.replace('cp-', '');
+            const lockStep = card.dataset.lockStep;
+            const lockStatus = card.dataset.lockStatus || 'completed';
+            const currentStatus = card.dataset.status;
+            
+            let isLocked = false;
+            let depMsg = '';
+            
+            if (lockStep && stepStatusMap[lockStep]) {
+                const depStatus = stepStatusMap[lockStep];
+                if (depStatus !== lockStatus) {
+                    isLocked = true;
+                    depMsg = `Locked until Step ${lockStep} is ${lockStatus}`;
+                }
+            }
+            
+            const isFinished = ['completed', 'submitted', 'deleted', 'merged'].includes(currentStatus);
+            const isDisabled = isLocked || isFinished;
+
+            const actionsDiv = document.getElementById(`actions-cp-${cpId}`);
+            const lockMsgDiv = document.getElementById(`lock-msg-cp-${cpId}`);
+            const statusMsgDiv = document.getElementById(`status-warning-cp-${cpId}`);
+            const statusMsgText = document.getElementById(`locked-status-text-${cpId}`);
+            const lockBadge = document.getElementById(`lock-badge-${cpId}`);
+            const dropdown = document.getElementById(`dropdown-wrapper-${cpId}`);
+            const fileActions = document.getElementById(`file-actions-cp-${cpId}`);
+
+            if (isLocked) card.classList.add('locked-overlay');
+            else card.classList.remove('locked-overlay');
+
+            if (lockBadge) {
+                if (isLocked) {
+                    lockBadge.innerHTML = `<i class="bi bi-lock-fill me-1"></i> ${depMsg}`;
+                    lockBadge.classList.remove('d-none');
+                } else {
+                    lockBadge.classList.add('d-none');
+                }
+            }
+
+            if (dropdown) {
+                if (isLocked) dropdown.classList.add('d-none');
+                else dropdown.classList.remove('d-none');
+            }
+
+            if (actionsDiv) {
+                if (isDisabled) actionsDiv.classList.add('d-none');
+                else actionsDiv.classList.remove('d-none');
+            }
+            
+            if (fileActions) {
+                if (isDisabled) fileActions.classList.add('d-none');
+                else fileActions.classList.remove('d-none');
+            }
+
+            if (lockMsgDiv) {
+                if (isLocked) {
+                    lockMsgDiv.innerHTML = `<i class="bi bi-lock-fill me-1"></i> ${depMsg}`;
+                    lockMsgDiv.classList.remove('d-none');
+                    if(statusMsgDiv) statusMsgDiv.classList.add('d-none'); 
+                } else {
+                    lockMsgDiv.classList.add('d-none');
+                    if(statusMsgDiv) {
+                        if (isFinished) {
+                            statusMsgDiv.classList.remove('d-none');
+                            if(statusMsgText) statusMsgText.innerText = currentStatus;
+                        } else {
+                            statusMsgDiv.classList.add('d-none');
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function refreshProgress() {
+        const allCards = document.querySelectorAll('.checkpoint-card');
+        let totalW = 0;
+        let completedW = 0;
+
+        allCards.forEach(card => {
+            const w = parseInt(card.dataset.weight) || 0;
+            const status = card.dataset.status;
+            
+            if (status !== 'deleted' && status !== 'merged') {
+                totalW += w;
+                if (status === 'completed') completedW += w;
+            }
+        });
+
+        let pct = 0;
+        if (totalW > 0) {
+            pct = Math.round((completedW / totalW) * 100);
+        } else {
+            const activeCount = Array.from(allCards).filter(c => c.dataset.status !== 'deleted' && c.dataset.status !== 'merged').length;
+            const completedCount = Array.from(allCards).filter(c => c.dataset.status === 'completed').length;
+            if(activeCount > 0) pct = Math.round((completedCount / activeCount) * 100);
+        }
+        if (pct > 100) pct = 100;
+
+        const bar = document.getElementById('task-progress-bar');
+        const text = document.getElementById('task-progress-text');
+        
+        if(bar) {
+            bar.style.width = pct + '%';
+            bar.setAttribute('aria-valuenow', pct);
+            if(pct >= 100) { bar.classList.remove('bg-primary'); bar.classList.add('bg-success'); }
+            else { bar.classList.remove('bg-success'); bar.classList.add('bg-primary'); }
+        }
+        if(text) text.innerText = pct + '%';
+    }
+
+    async function deleteFile(url, cpId) { 
+        if(!await confirmMsg("Delete File?", "Are you sure you want to permanently delete this file?")) return;
+        try { 
+            const res = await fetch('/tasks/deliverable/delete', { method: 'POST', headers: {'Content-Type':'application/json', 'X-AJAX-Request':'true'}, body: JSON.stringify({ taskId: '<%= task.id %>', fileUrl: url, checkpointId: cpId, actionStateId: '<%= stateId %>' }) });
+            const data = await res.json(); 
+            if(data.status === 'success') {
+                document.querySelectorAll(`.file-row[data-url="${url}"]`).forEach(row => row.remove());
+                const sbBadge = document.getElementById('sidebar-file-count');
+                if(sbBadge) sbBadge.innerText = Math.max(0, parseInt(sbBadge.innerText) - 1);
+                if(cpId) {
+                    const cpBadge = document.getElementById('cp-file-count-' + cpId);
+                    if(cpBadge) cpBadge.innerText = Math.max(0, parseInt(cpBadge.innerText) - 1);
+                    const list = document.getElementById('cp-files-list-' + cpId);
+                    if(list && list.children.length === 0) list.innerHTML = '<div class="text-center p-4 text-muted small bg-light rounded border-dashed no-files-msg"><i class="bi bi-paperclip fs-4 d-block mb-2 opacity-50"></i> No files attached.</div>';
+                }
+                const sbList = document.getElementById('sidebar-files-list');
+                if(sbList && sbList.children.length === 0) sbList.innerHTML = '<div class="text-center p-3 text-muted small fst-italic no-files-msg">No files found.</div>';
+                await showMsg('Deleted', 'File removed.', 'success');
+            } else await showMsg('Error', data.message, 'error');
+        } catch(e) { await showMsg('Error', 'Network failed', 'error'); } 
+    }
+    
+    document.getElementById('uploadForm').addEventListener('submit', async function(e) { 
+        e.preventDefault(); 
+        const fd = new FormData(this); 
+        const actionId = '<%= stateId %>'; 
+        const submitBtn = this.querySelector('button[type="submit"]'); 
+        const originalText = submitBtn.innerHTML; submitBtn.innerHTML = 'Uploading...'; 
+        submitBtn.disabled = true;
+        
+        try { 
+            const url = `/tasks/deliverable/upload?actionStateId=${encodeURIComponent(actionId)}`;            
+            const res = await fetch(url, { method:'POST', headers:{'X-AJAX-Request':'true'}, body:fd }); 
+            const data = await res.json(); 
+            if(data.status === 'success') { 
+                const f = data.file; 
+                const modalEl = document.getElementById('uploadDeliverableModal');
+                const modal = bootstrap.Modal.getInstance(modalEl); 
+                const sidebarList = document.getElementById('sidebar-files-list'); 
+                if(sidebarList) { 
+                    const emptyMsg = sidebarList.querySelector('.no-files-msg');
+                    if(emptyMsg) emptyMsg.remove(); 
+                    f.isGlobal = !f.checkpointId; 
+                    if(f.checkpointId) { 
+                        const stepTitleEl = document.querySelector(`#cp-${f.checkpointId} .card-title`);
+                        f.stepName = stepTitleEl ? stepTitleEl.innerText.trim() : 'Step'; 
+                    } 
+                    sidebarList.insertAdjacentHTML('afterbegin', createFileRowHTML(f, true));
+                    const sbBadge = document.getElementById('sidebar-file-count'); 
+                    if(sbBadge) sbBadge.innerText = parseInt(sbBadge.innerText) + 1;
+                } 
+                if(f.checkpointId) { 
+                    const cpList = document.getElementById(`cp-files-list-${f.checkpointId}`);
+                    if(cpList) { 
+                        const emptyMsg = cpList.querySelector('.no-files-msg');
+                        if(emptyMsg) emptyMsg.remove(); 
+                        cpList.insertAdjacentHTML('afterbegin', createFileRowHTML(f, false)); 
+                        const cpBadge = document.getElementById('cp-file-count-' + f.checkpointId); 
+                        if(cpBadge) cpBadge.innerText = parseInt(cpBadge.innerText) + 1;
+                    }
+                } 
+                modal.hide();
+                await showMsg('Success', 'File attached successfully.', 'success'); 
+                this.reset(); 
+            } else { 
+                await showMsg('Error', data.message, 'error');
+            } 
+        } catch(e) { 
+            await showMsg('Error', 'Failed', 'error');
+        } 
+        finally { 
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false; 
+        }
+    });
+
+    document.getElementById('commentForm').addEventListener('submit', async function(e) { 
+        e.preventDefault(); 
+        const fd = new FormData(this); 
+        const actionId = '<%= stateId %>';
+        try { 
+            const url = `/tasks/comment/add?actionStateId=${encodeURIComponent(actionId)}`;            
+            const res = await fetch(url, { method:'POST', headers:{'X-AJAX-Request':'true'}, body:fd });
+            const d = await res.json(); 
+            if(d.status === 'success') { 
+                const modal = bootstrap.Modal.getInstance(document.getElementById('commentModal')); 
+                modal.hide(); 
+                this.reset(); 
+                const cpId = fd.get('checkpointId');
+                const historyContainer = document.getElementById(`history-container-${cpId}`); 
+                if(historyContainer) { 
+                    const emptyMsg = historyContainer.querySelector('.no-history-msg');
+                    if(emptyMsg) emptyMsg.remove(); 
+                    const item = d.entry; 
+                    const newHtml = `<div class="d-flex gap-2"><div class="avatar-sm rounded-circle bg-secondary text-white flex-shrink-0">${(item.userName||'U').charAt(0)}</div><div><div class="comment-bubble"><strong>${item.userName}:</strong> ${item.details}${item.file ? `<div class="mt-1 border-top pt-1"><a href="${item.file.url}" target="_blank"><i class="bi bi-paperclip"></i> ${item.file.filename}</a></div>` : ''}</div><div class="x-small text-muted ms-1">${new Date().toLocaleString()}</div></div></div>`;
+                    const wrapper = historyContainer.querySelector('.d-flex.flex-column'); 
+                    if(wrapper) wrapper.insertAdjacentHTML('afterbegin', newHtml); 
+                    else historyContainer.insertAdjacentHTML('afterbegin', `<div class="d-flex flex-column gap-3">${newHtml}</div>`);
+                } 
+                await showMsg('Success', 'Comment added.', 'success');
+            } else await showMsg('Error', d.message, 'error'); 
+        } catch(e) { 
+            await showMsg('Error', 'Failed', 'error');
+        } 
+    });
+</script>

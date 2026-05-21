@@ -1,0 +1,35 @@
+{
+  "name": "SCHOOL_GRADEBOOK",
+  "category": "SCHOOL",
+  "description": "Session grades matrix: gradebooks, quizzes, assignments, and weighted final scores.",
+  "homeURL": "/school/grades-matrix",
+  "message": "",
+  "inactiveMessage": "",
+  "active": true,
+  "dashboardDisplay": true,
+  "trackState": true,
+  "minimumAccessRequirement": 5,
+  "subsections": [],
+  "related": [],
+  "operations": [
+    { "id": "OP1001", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+    { "id": "OP1002", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+    { "id": "OP1003", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+    { "id": "OP1004", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+    { "id": "OP1005", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+    { "id": "OP1006", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+    { "id": "OP1010", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+    { "id": "OP1012", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+    { "id": "OP1013", "sessionAttempts": 5, "sessionTime": 15, "active": true },
+    { "id": "OP1022", "sessionAttempts": 5, "sessionTime": 15, "active": true }
+  ],
+  "audit": {
+    "createUser": "SYS_ROOT_001",
+    "createDateTime": "2026-03-30T12:00:00.000Z",
+    "lastUpdateUser": "SYS_ROOT_001",
+    "lastUpdateDateTime": "2026-03-30T12:00:00.000Z"
+  },
+  "id": "778769",
+  "navigatorSection": false,
+  "mainDashboardDisplay": false
+}

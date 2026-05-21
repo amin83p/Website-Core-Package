@@ -1,0 +1,132 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  print,
+  btn_export: true
+}) %>
+
+  <%- include('../partials/tablePages-search', {
+    placeholder: 'Search persons...',
+    fields: []
+  }) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="personId">ID<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="fullName">Name<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="preferredName">Preferred Name<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="primaryEmail">Email<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="primaryPhone">Phone<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="active">Active<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="organizations">Organizations<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="userId">User<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="createDateTime">Created<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated<span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% (data || []).forEach(person => { %>
+        <%
+          const n = person.name || {};
+          const personId = person.id;
+          const fullName = [n.first, n.middle, n.last].filter(Boolean).join(' ');
+
+          const dem = person.demographics || {};
+          const contact = person.contact || {};
+          const emails = contact.emails || [];
+          const phones = contact.phones || [];
+
+          const primaryEmailObj = emails.find(e => e.isPrimary) || emails[0];
+          const primaryEmail = primaryEmailObj ? primaryEmailObj.email : (contact.email || '');
+
+          const primaryPhoneObj = phones[0];
+          const primaryPhone = primaryPhoneObj ? primaryPhoneObj.number : '';
+
+          const orgs = person.organizations || [];
+          const orgNames = orgs
+            .map(o => o.displayLabel || (o.orgId ? (o.name ? `${o.name} (${o.orgId})` : `Org #${o.orgId}`) : o.name))
+            .filter(Boolean);
+
+          const audit = person.audit || {};
+          const createDateTime = audit.createDateTime || person.createDateTime;
+          const lastUpdateDateTime = audit.lastUpdateDateTime || person.lastUpdateDateTime;
+          const createUser = audit.createUser || person.createUser;
+          const lastUpdateUser = audit.lastUpdateUser || person.lastUpdateUser;
+        %>
+        <tr>
+          <td><%= personId || '—' %></td>
+          <td><%= fullName || '—' %></td>
+          <td><%= n.preferred || '—' %></td>
+          <td><%= primaryEmail || '—' %></td>
+          <td><%= primaryPhone || '—' %></td>
+          <td>
+              <% if (person.active) { %>
+                  <span class="badge bg-success">Active</span>
+              <% } else { %>
+                  <span class="badge bg-secondary">Inactive</span>
+              <% } %>          
+          </td>
+          <td><%= orgNames.length ? orgNames.join(', ') : '—' %></td>
+          <td>              
+            <a href="/<%=newUrl%>/edit/<%= person.id %>" class=""><span class="badge bg-light text-dark border">...</span></a>
+          </td>
+          <td>
+            <% if (createDateTime) { %>
+              <%= new Date(createDateTime).toLocaleString() %>
+              <% if (createUser) { %>
+                <br><span class="text-muted small">by <%= createUser %></span>
+              <% } %>
+            <% } else { %>
+              —
+            <% } %>
+          </td>
+          <td>
+            <% if (lastUpdateDateTime) { %>
+              <%= new Date(lastUpdateDateTime).toLocaleString() %>
+              <% if (lastUpdateUser) { %>
+                <br><span class="text-muted small">by <%= lastUpdateUser %></span>
+              <% } %>
+            <% } else { %>
+              —
+            <% } %>
+          </td>
+
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= person.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= person.id %>">
+                <a href="/<%=newUrl%>/edit/<%= person.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= person.id %>">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>

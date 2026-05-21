@@ -1,0 +1,571 @@
+<%
+  const reportFilters = filters || {};
+  const hasActivityReportFiltersApplied = Boolean(
+    String(reportFilters.startDate || '').trim()
+    || String(reportFilters.endDate || '').trim()
+    || String(reportFilters.sectionId || '').trim()
+    || String(reportFilters.operationId || '').trim()
+    || String(reportFilters.rateLimitGroup || '').trim()
+    || String(reportFilters.userId || '').trim()
+  );
+%>
+
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl, 
+  newLabel: null,
+  user,
+  tableName,
+  print,
+  btn_export: true,
+  optionalBtns: [`
+    <button type="button" id="delete-all-logs-btn" class="btn btn-filled btn-danger text-white me-2">
+      <i class="bi bi-trash-fill me-1"></i> Delete All Logs
+    </button>
+  `]
+
+}) %>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg col-md-4">
+    <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-primary">
+      <div class="text-muted small text-uppercase fw-bold">Total Logs</div>
+      <div class="fs-4 fw-bold text-dark"><%= summary?.totalLogs || 0 %></div>
+    </div>
+  </div>
+  <div class="col-lg col-md-4">
+    <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-info">
+      <div class="text-muted small text-uppercase fw-bold">Total Volume</div>
+      <div class="fs-4 fw-bold text-dark">
+        <% 
+          const totalVol = Number(summary?.totalVolumeKB || 0);
+          let volDisplay = totalVol.toFixed(2) + ' KB';
+          if (totalVol > 1024) volDisplay = (totalVol / 1024).toFixed(2) + ' MB';
+        %>
+        <%= volDisplay %>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg col-md-4">
+    <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-success">
+      <div class="text-muted small text-uppercase fw-bold">Success</div>
+      <div class="fs-4 fw-bold text-dark"><%= summary?.successCount || 0 %></div>
+    </div>
+  </div>
+  <div class="col-lg col-md-4">
+    <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-danger">
+      <div class="text-muted small text-uppercase fw-bold">Failures</div>
+      <div class="fs-4 fw-bold text-dark"><%= summary?.failureCount || 0 %></div>
+    </div>
+  </div>
+  <div class="col-lg col-md-4">
+    <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-warning">
+      <div class="text-muted small text-uppercase fw-bold">Denied / Blocked</div>
+      <div class="fs-4 fw-bold text-dark"><%= summary?.deniedCount || 0 %></div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Activity Logs</div>
+    <button
+      id="activityReportFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#activityReportFilterCollapse"
+      aria-expanded="<%= hasActivityReportFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="activityReportFilterCollapse"
+      aria-label="<%= hasActivityReportFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="activityReportFilterToggleIcon" class="bi <%= hasActivityReportFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasActivityReportFiltersApplied ? ' show' : '' %>" id="activityReportFilterCollapse">
+    <div class="card-body p-4">
+      <form id="filterForm" action="/<%=newUrl%>" method="GET">
+      <div class="row g-3 mb-3">
+        <div class="col-md-2">
+          <label class="form-label small fw-bold text-muted text-uppercase">Start</label>
+          <input type="date" name="startDate" class="form-control form-control-sm" value="<%= filters.startDate || '' %>">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-bold text-muted text-uppercase">End</label>
+          <input type="date" name="endDate" class="form-control form-control-sm" value="<%= filters.endDate || '' %>">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-bold text-muted text-uppercase">Section</label>
+          <select name="sectionId" class="form-select form-select-sm">
+            <option value="">All Sections</option>
+            <% sections.forEach(s => { %>
+              <option value="<%= s.id %>" <%= filters.sectionId === s.id ? 'selected' : '' %>>
+                <%= s.name %>
+              </option>
+            <% }) %>
+            <option value="000000" <%= filters.sectionId === '000000' ? 'selected' : '' %>>SYSTEM</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-bold text-muted text-uppercase">Operation</label>
+          <select name="operationId" class="form-select form-select-sm">
+            <option value="">All Operations</option>
+            <% operations.forEach(o => { %>
+              <option value="<%= o.id %>" <%= filters.operationId === o.id ? 'selected' : '' %>>
+                <%= o.name %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-bold text-muted text-uppercase">Rate Group</label>
+          <select name="rateLimitGroup" class="form-select form-select-sm">
+            <option value="">All Groups</option>
+            <% (rateGroupOptions || []).forEach(g => { %>
+              <option value="<%= g %>" <%= String(filters.rateLimitGroup || '').toLowerCase() === String(g).toLowerCase() ? 'selected' : '' %>>
+                <%= g %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-bold text-muted text-uppercase">User ID</label>
+          <input type="text" name="userId" class="form-control form-control-sm" placeholder="e.g. 1001" value="<%= filters.userId || '' %>">
+        </div>
+      </div>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-10">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="small text-muted fw-bold me-1">Quick Group:</span>
+            <button type="button" class="btn btn-sm <%= !filters.rateLimitGroup ? 'btn-primary text-white' : 'btn-outline-primary' %> quick-rate-group" data-rate-group="">All</button>
+            <button type="button" class="btn btn-sm <%= String(filters.rateLimitGroup || '').toLowerCase() === 'auth' ? 'btn-primary text-white' : 'btn-outline-primary' %> quick-rate-group" data-rate-group="auth">Auth</button>
+            <button type="button" class="btn btn-sm <%= String(filters.rateLimitGroup || '').toLowerCase() === 'picker' ? 'btn-primary text-white' : 'btn-outline-primary' %> quick-rate-group" data-rate-group="picker">Picker</button>
+            <button type="button" class="btn btn-sm <%= String(filters.rateLimitGroup || '').toLowerCase() === 'write' ? 'btn-primary text-white' : 'btn-outline-primary' %> quick-rate-group" data-rate-group="write">Write</button>
+            <button type="button" class="btn btn-sm <%= String(filters.rateLimitGroup || '').toLowerCase() === 'heavy' ? 'btn-primary text-white' : 'btn-outline-primary' %> quick-rate-group" data-rate-group="heavy">Heavy</button>
+            <button type="button" class="btn btn-sm <%= String(filters.rateLimitGroup || '').toLowerCase() === 'global' ? 'btn-primary text-white' : 'btn-outline-primary' %> quick-rate-group" data-rate-group="global">Global</button>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100 btn-filled">
+              <i class="bi bi-funnel-fill me-1"></i> Filter
+            </button>
+            <a href="/<%=newUrl%>" class="btn btn-outline-secondary btn-sm" title="Reset">
+              <i class="bi bi-arrow-counterclockwise"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="timestamp">Time <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="level">Level <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="section">Section <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="operation">Operation <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="user">User <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="details">Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (logs && logs.length > 0) { %>
+        <% logs.forEach(log => { %>
+          <tr>
+            <td class="text-nowrap small">
+              <%= log.formattedDate %>
+            </td>
+
+            <td>
+              <% if (log.status === 'FAILURE' || log.status === 'ERROR') { %>
+                <span class="badge bg-danger">ERR</span>
+              <% } else if (log.status === 'DENIED') { %>
+                <span class="badge bg-warning text-dark">DENY</span>
+              <% } else { %>
+                <span class="badge bg-light text-muted border">INF</span>
+              <% } %>
+            </td>
+
+            <td class="small fw-bold text-secondary">
+              <%= log.sectionDisplay || log.sectionName %>
+            </td>
+
+            <td class="small">
+              <%= log.operationDisplay || log.operationName %>
+            </td>
+
+            <td class="small">
+              <% const actor = log.actorIdentity || {}; %>
+              <% if (actor.isSystem) { %>
+                <span class="text-muted fst-italic"><%= actor.primary || 'System' %></span>
+              <% } else { %>
+                <span class="fw-bold"><%= actor.primary || ('User ' + (log.userId || '')) %></span>
+              <% } %>
+              <% if (actor.secondary) { %>
+                <br><span class="text-muted x-small"><%= actor.secondary %></span>
+              <% } %>
+            </td>
+
+            <td>
+              <% if (log.status === 'SUCCESS') { %>
+                <span class="text-success small fw-bold">Success</span>
+              <% } else if (log.status === 'FAILURE') { %>
+                <span class="text-danger small fw-bold">Failed</span>
+              <% } else { %>
+                <span class="text-dark small"><%= log.status %></span>
+              <% } %>
+            </td>
+
+
+           <td class="table-actions">
+              <button type="button" 
+                      class="btn btn-sm btn-filled btn-info text-white view-details-btn" 
+                      onclick="showLogDetails('<%= log.id %>')">
+                   <i class="bi bi-eye-fill me-1"></i> Details
+              </button>
+              
+              <script id="log-data-<%= log.id %>" type="application/json">
+                <%- JSON.stringify(log.details || {}, null, 2) %>
+              </script>
+            </td>
+          </tr>
+        <% }) %>
+      <% } else { %>
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">
+            No logs found matching your criteria.
+          </td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<div class="modal fade" id="logDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+      
+      <div class="modal-header bg-light border-bottom-0 pb-0">
+        <h5 class="modal-title fw-bold text-primary">
+          <i class="bi bi-file-earmark-code me-2"></i>Log Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        
+        <div id="logSummary" class="d-flex flex-wrap gap-2 mb-3">
+          </div>
+
+        <details class="mb-3 border rounded-3 bg-light overflow-hidden">
+          <summary class="px-3 py-2 fw-bold text-secondary d-flex align-items-center gap-2" 
+                   style="cursor: pointer; font-size: 0.9rem; user-select: none;">
+            <i class="bi bi-list-ul"></i> View All Fields
+          </summary>
+          <div id="logFullStructure" class="p-3 bg-white border-top" style="max-height: 300px; overflow-y: auto;">
+            </div>
+        </details>
+
+        <div class="position-relative mt-2">
+          <small class="text-muted fw-bold ms-1 mb-1 d-block text-uppercase" style="font-size: 0.7rem;">Raw JSON</small>
+          <button class="btn btn-sm btn-light border shadow-sm position-absolute top-0 end-0 m-2" 
+                  onclick="copyLogData()" title="Copy to Clipboard" style="z-index: 10;">
+            <i class="bi bi-clipboard"></i>
+          </button>
+          <pre id="logDetailContent" class="p-3 bg-white border rounded shadow-sm" 
+               style="font-size: 0.85rem; min-height: 150px; background-color: #fcfcfc !important; white-space: pre-wrap;"></pre>
+        </div>
+      </div>
+
+      <div class="modal-footer border-top-0 pt-0">
+        <button type="button" class="btn btn-secondary btn-sm btn-filled px-4" data-bs-dismiss="modal" style="border-radius: 20px;">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const DELAY_MS = 0; // ✅ Adjust time here (e.g. 500, 800, 1000)
+
+  document.addEventListener('DOMContentLoaded', () => {
+    function initCollapseToggleIcon(options = {}) {
+      const collapseEl = document.getElementById(String(options.collapseId || ''));
+      const buttonEl = document.getElementById(String(options.buttonId || ''));
+      const iconEl = document.getElementById(String(options.iconId || ''));
+      if (!collapseEl || !buttonEl || !iconEl) return;
+
+      const openIcon = String(options.openIcon || 'bi-chevron-down');
+      const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+      const setState = (expanded) => {
+        iconEl.classList.remove(openIcon, closeIcon);
+        iconEl.classList.add(expanded ? closeIcon : openIcon);
+        buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        buttonEl.setAttribute('aria-label', expanded ? 'Close filters' : 'Open filters');
+      };
+
+      setState(collapseEl.classList.contains('show'));
+      collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+      collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+
+    initCollapseToggleIcon({
+      collapseId: 'activityReportFilterCollapse',
+      buttonId: 'activityReportFilterToggleBtn',
+      iconId: 'activityReportFilterToggleIcon',
+      openIcon: 'bi-chevron-down',
+      closeIcon: 'bi-chevron-up'
+    });
+
+    
+    // 1. Handle Filter Form (Search)
+    const filterForm = document.getElementById('filterForm');
+    const rateGroupSelect = filterForm ? filterForm.querySelector('select[name="rateLimitGroup"]') : null;
+    if (filterForm) {
+      filterForm.addEventListener('submit', (e) => {
+        e.preventDefault(); // Stop immediate submit
+        showLoading();
+        setTimeout(() => {
+          filterForm.submit(); // Submit after delay
+        }, DELAY_MS);
+      });
+    }
+
+    // 1.5 Quick filter buttons for rate-limit groups
+    document.querySelectorAll('.quick-rate-group').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!filterForm || !rateGroupSelect) return;
+        rateGroupSelect.value = btn.dataset.rateGroup || '';
+        if (typeof filterForm.requestSubmit === 'function') {
+          filterForm.requestSubmit();
+        } else {
+          filterForm.submit();
+        }
+      });
+    });
+
+    // 2. Handle Pagination Links
+    const pageLinks = document.querySelectorAll('.pagination-custom-container a');
+    pageLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        // Ignore disabled links or '#' placeholder
+        if (link.classList.contains('disabled') || link.getAttribute('href') === '#') return;
+
+        e.preventDefault(); // Stop immediate navigation
+        showLoading();
+        
+        const targetUrl = link.getAttribute('href');
+        setTimeout(() => {
+          window.location.href = targetUrl; // Go after delay
+        }, DELAY_MS);
+      });
+    });
+  });
+
+  // 3. Handle Items Per Page Dropdown
+
+  // --- Existing Modal Logic Below ---
+  let currentLogDataStr = "";
+
+  function showLogDetails(logId) {
+    const scriptEl = document.getElementById('log-data-' + logId);
+    if (!scriptEl) return;
+    
+    const rawJson = scriptEl.textContent;
+    currentLogDataStr = rawJson; 
+    const data = JSON.parse(rawJson);
+
+    // Populate Summary
+    const summaryContainer = document.getElementById('logSummary');
+    summaryContainer.innerHTML = '';
+    const highlightKeys = ['method', 'url', 'statusCode', 'ip', 'browser', 'targetUserId', 'errorMessage', 'status', 'requestId'];
+    const appendSummaryChip = (label, value) => {
+      if (value === undefined || value === null || value === '') return;
+      const div = document.createElement('div');
+      div.className = 'summary-chip';
+      div.innerHTML = `<span class="summary-label">${label}</span><span class="summary-value">${value}</span>`;
+      summaryContainer.appendChild(div);
+    };
+    
+    highlightKeys.forEach(key => {
+      appendSummaryChip(key, data[key]);
+    });
+
+    if (data.actor && typeof data.actor === 'object') {
+      appendSummaryChip('actorType', data.actor.actorType);
+      appendSummaryChip('actorName', data.actor.displayName);
+      appendSummaryChip('actorUser', data.actor.username);
+      appendSummaryChip('actorId', data.actor.userId);
+      appendSummaryChip('actorOrg', data.actor.orgId);
+    }
+
+    // Populate Structure
+    const tableContainer = document.getElementById('logFullStructure');
+    // Safety check if container exists (it should based on previous code)
+    if(tableContainer) tableContainer.innerHTML = generateKeyValueHtml(data);
+
+    // Populate Raw JSON
+    const formattedHtml = syntaxHighlight(data);
+    document.getElementById('logDetailContent').innerHTML = formattedHtml;
+    
+    const modal = new bootstrap.Modal(document.getElementById('logDetailModal'));
+    modal.show();
+  }
+
+  function generateKeyValueHtml(obj) {
+    if (!obj || Object.keys(obj).length === 0) return '<div class="text-muted fst-italic">No details available.</div>';
+    let html = '<div class="d-flex flex-column gap-2">';
+    for (const [key, value] of Object.entries(obj)) {
+      let displayValue = value;
+      let valueClass = 'text-dark'; 
+
+      if (typeof value === 'string') valueClass = 'text-success';
+      else if (typeof value === 'number') valueClass = 'text-primary';
+      else if (typeof value === 'boolean') valueClass = 'text-warning fw-bold';
+      else if (typeof value === 'object' && value !== null) {
+        displayValue = JSON.stringify(value);
+        valueClass = 'text-muted small font-monospace';
+      }
+
+      html += `
+        <div class="d-flex align-items-start border-bottom pb-2">
+          <div class="fw-bold text-secondary" style="width: 140px; font-size: 0.85rem; word-break: break-word;">${key}</div>
+          <div class="${valueClass}" style="flex: 1; font-size: 0.9rem; word-break: break-all;">${displayValue}</div>
+        </div>
+      `;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function copyLogData() {
+    navigator.clipboard.writeText(currentLogDataStr).then(() => {
+      const btn = document.querySelector('#logDetailModal .bi-clipboard').parentElement;
+      const originalContent = btn.innerHTML;
+      btn.classList.replace('btn-light', 'btn-success');
+      btn.classList.add('text-white');
+      btn.innerHTML = '<i class="bi bi-check"></i>';
+      setTimeout(() => {
+        btn.innerHTML = originalContent;
+        btn.classList.replace('btn-success', 'btn-light');
+        btn.classList.remove('text-white');
+      }, 2000);
+    });
+  }
+
+  function syntaxHighlight(json) {
+    if (typeof json != 'string') json = JSON.stringify(json, undefined, 2);
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        var cls = 'json-number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) cls = 'json-key';
+            else cls = 'json-string';
+        } else if (/true|false/.test(match)) cls = 'json-boolean';
+        else if (/null/.test(match)) cls = 'json-null';
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
+  }
+</script>
+<script>
+  (function () {
+    // Adjust if your route is different
+    const FETCH_URL = '/logs/delete-all';
+    const btn = document.getElementById('delete-all-logs-btn');
+
+    if (!btn) return; // Safe-guard if button is not present
+
+    btn.addEventListener('click', () => {
+      // Use your existing modal API
+      showMessageModal({
+        title: 'Confirm Delete',
+        icon: 'warning',
+        message: 'This action will permanently delete ALL stored logs. This cannot be undone.',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Delete', class: 'btn-danger btn-md' }
+        ]
+      }).then(async (result) => {
+        if (result !== 'Delete') return;
+        if (typeof window.requestProtectedAction === 'function') {
+            await window.requestProtectedAction(); 
+        } else {
+            // Fallback if the modal script isn't loaded for some reason
+          showMessageModal({
+              title: 'Verification Code',
+              icon: 'error',
+              message: 'Admin Verification System not loaded. Proceeding...',
+              buttons: [
+                { text: 'Ok', class: 'btn-danger btn-md' }
+              ]
+            });
+            console.warn('Admin Verification System not loaded. Proceeding...');
+            return;
+        }
+        // Optionally show a small “working” indicator
+        btn.disabled = true;
+
+        try {
+          const resp = await fetch(FETCH_URL, {
+            method: 'GET', // matches router.get
+            headers: {
+              'x-ajax-request': '1',       // lets the server return JSON on error
+              'Accept': 'application/json' // prefer JSON error details when possible
+              // If you use CSRF on GETs (rare), include it here:
+              // 'CSRF-Token': getCsrfTokenSomehow()
+            },
+            credentials: 'same-origin'
+          });
+
+          if (!resp.ok) {
+            // Controller returns JSON on 500 when x-ajax-request header is set
+            let data;
+            try { data = await resp.json(); } catch (e) { data = null; }
+            const serverMessage = data?.message || 'Delete failed due to a server error.';
+            await showMessageModal({
+              title: 'Delete Failed',
+              icon: 'error',
+              message: serverMessage,
+              buttons: [{ text: 'Close', class: 'btn-secondary btn-md' }]
+            });
+            return;
+          }
+
+          // On success, the controller issues res.redirect('/logs').
+          // fetch follows the redirect and returns the final response (HTML),
+          // so we don't need its body—just navigate client-side for consistency.
+          await showMessageModal({
+            title: 'All Logs Deleted',
+            icon: 'success',
+            message: 'All stored logs were deleted successfully.',
+            buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+          });
+
+          // Navigate to the logs page to reflect the updated state
+          window.location.href = '/logs';
+        } catch (err) {
+          await showMessageModal({
+            title: 'Network Error',
+            icon: 'error',
+            message: `Request failed: ${err.message}`,
+            buttons: [{ text: 'Close', class: 'btn-secondary btn-md' }]
+          });
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  })();
+</script>

@@ -1,0 +1,685 @@
+<%
+  const p = policy || {};
+  const validity = p.validityPeriod || {};
+  const network = p.network || { ipWhitelist: [], ipBlacklist: [] };
+  const security = p.security || { mfaRequired: false, allowedMfaTypes: [] };
+  const session = p.sessionControl || { maxSessions: 5, maxDuration: 480, idleTimeout: 30 };
+  const schedule = p.globalSchedule || { weekdays: {} };
+  const currentConfiguredSections = p.sections || [];
+  const systemScopes = typeof scopes !== 'undefined' ? scopes : [];
+
+  const isEditMode = !!p.id;
+  // 1. Resolve User Display
+  let displayUser = '';
+  if (typeof targetUserName !== 'undefined' && targetUserName) { 
+      displayUser = targetUserName;
+  } else if (typeof users !== 'undefined' && p.userId) { 
+      const u = users.find(u => String(u.id) === String(p.userId));
+      displayUser = u ? `${u.username || u.email} (${u.id})` : p.userId;
+  } else { 
+      displayUser = p.userId || '';
+  }
+
+  // 2. Resolve Org Display
+  let currentOrgId = p.orgId || '';
+  let currentOrgName = 'Global / System';
+  if (currentOrgId && typeof organizations !== 'undefined') { 
+      const o = organizations.find(org => String(org.id) === String(currentOrgId));
+      if (o) currentOrgName = o.name || ('Org #' + currentOrgId);
+      else currentOrgName = 'Org #' + currentOrgId;
+  }
+%>
+
+<div class="sections-page">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0"><%= isEditMode ? 'Edit Access Policy' : 'Create New Access Policy' %></h1>
+      <% if (isEditMode) { %>
+          <span class="badge bg-primary border">ID: <%= p.id %></span>
+      <% } else { %>
+          <span class="badge bg-success border">New Policy</span>
+      <% } %>
+    </div>
+
+  <div class="form-container" style="width: 100%; max-width: 100%;">
+    <form id="policyForm" 
+          data-mode="<%= isEditMode ? 'edit' : 'new' %>" 
+          action="<%= isEditMode ? '/accessPolicies/edit/' + p.id : '/accessPolicies/new' %>" 
+          method="POST">
+
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      <input type="hidden" id="networkHidden" name="network">
+      <input type="hidden" id="securityHidden" name="security">
+      <input type="hidden" id="scheduleHidden" name="globalSchedule">
+      <input type="hidden" id="sectionsHidden" name="sections">
+      
+      <input type="file" id="importConfigFile" accept=".json" style="display: none;">
+
+      <script type="application/json" id="initNetwork"><%- JSON.stringify(network) %></script>
+      <script type="application/json" id="initSecurity"><%- JSON.stringify(security) %></script>
+      <script type="application/json" id="initSession"><%- JSON.stringify(session) %></script>
+      <script type="application/json" id="initSchedule"><%- JSON.stringify(schedule) %></script>
+      <script type="application/json" id="initConfiguredSections"><%- JSON.stringify(currentConfiguredSections) %></script>
+      <script type="application/json" id="initSystemScopes"><%- JSON.stringify(systemScopes) %></script>
+
+      <ul class="nav nav-tabs mb-4" role="tablist" id="policyTabs">
+        <li class="nav-item"><button class="nav-link active" id="btn-tab-general" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General & Scope</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-session" data-bs-toggle="tab" data-bs-target="#tab-session" type="button">Session Control</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-schedule" data-bs-toggle="tab" data-bs-target="#tab-schedule" type="button">Global Schedule</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-security" data-bs-toggle="tab" data-bs-target="#tab-security" type="button">Network & Security</button></li>
+        <li class="nav-item"><button class="nav-link" id="btn-tab-sections" data-bs-toggle="tab" data-bs-target="#tab-sections" type="button">Section & Operations</button></li>
+      </ul>
+
+      <div class="tab-content">
+        
+        <div class="tab-pane fade show active" id="tab-general">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Target User *</label>
+              <div class="input-group">
+                 <input type="hidden" name="userId" id="selectedUserId" value="<%= p.userId || '' %>">
+                 <input type="text" id="selectedUserName" class="form-control size-md bg-white" placeholder="No user selected" value="<%= displayUser %>" readonly>
+                 <% if (!isEditMode) { %>
+                    <button type="button" class="btn btn-outline-primary" id="openUserPickerBtn"><i class="bi bi-search"></i> Select</button>
+                 <% } else { %>
+                    <button type="button" class="btn btn-outline-secondary" disabled>Locked</button>
+                 <% } %>
+              </div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Policy Scope *</label>
+              <div class="input-group">
+                <input type="hidden" name="orgId" id="selectedOrgId" value="<%= currentOrgId %>">
+                <input type="text" id="selectedOrgName" class="form-control size-md bg-white" placeholder="Global / System" value="<%= currentOrgName %>" readonly>
+                <% if (!isEditMode) { %>
+                    <button type="button" class="btn btn-outline-primary" id="openOrgPickerBtn" title="Select Organization"><i class="bi bi-building"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" id="clearOrgBtn" title="Set to Global"><i class="bi bi-globe"></i> Global</button>
+                <% } else { %>
+                    <button type="button" class="btn btn-outline-secondary" disabled>Locked</button>
+                <% } %>
+              </div>
+              <div class="form-text x-small text-muted">Defines if this policy applies everywhere (Global) or only within a specific Organization.</div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Policy Name *</label>
+              <input type="text" name="policyName" id="policyNameInput" class="form-control size-md" value="<%= p.policyName || '' %>" required>
+            </div>
+
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Valid From</label>
+              <input type="date" name="validStartDate" id="validStartInput" class="form-control size-md" value="<%= validity.startDate ? new Date(validity.startDate).toISOString().split('T')[0] : '' %>">
+            </div>
+
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Valid Until</label>
+              <input type="date" name="validEndDate" id="validEndInput" class="form-control size-md" value="<%= validity.endDate ? new Date(validity.endDate).toISOString().split('T')[0] : '' %>">
+            </div>
+
+            <div class="col-md-12 mb-3">
+               <div class="form-check form-switch pb-2">
+                <input class="form-check-input" type="checkbox" id="activeCheck" name="active" <%= p.active !== false ? 'checked' : '' %>> 
+                <label class="form-check-label" for="activeCheck">Policy Active</label>
+               </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-session">
+            <div class="alert alert-info py-2 mb-4 small">
+                <i class="bi bi-info-circle me-1"></i> These settings apply to this user after Website and Organization guardrails. Website policy remains highest priority.
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-0 bg-light">
+                         <div class="card-body text-center">
+                            <div class="mb-3 text-primary"><i class="bi bi-pc-display fs-1"></i></div>
+                            <h6 class="fw-bold">Max Active Devices</h6>
+                            <p class="text-muted small">Number of concurrent sessions allowed.</p>
+                            <input type="number" id="inp_maxSessions" class="form-control text-center fw-bold fs-5" value="<%= session.maxSessions %>" min="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-0 bg-light">
+                        <div class="card-body text-center">
+                            <div class="mb-3 text-success"><i class="bi bi-hourglass-split fs-1"></i></div>
+                            <h6 class="fw-bold">Absolute Timeout</h6>
+                            <p class="text-muted small">Max session duration in minutes.</p>
+                            <input type="number" id="inp_maxDuration" class="form-control text-center fw-bold fs-5" value="<%= session.maxDuration %>" min="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                     <div class="card h-100 shadow-sm border-0 bg-light">
+                        <div class="card-body text-center">
+                            <div class="mb-3 text-warning"><i class="bi bi-moon-stars fs-1"></i></div>
+                            <h6 class="fw-bold">Idle Timeout</h6>
+                            <p class="text-muted small">Auto-logout minutes after inactivity.</p>
+                            <input type="number" id="inp_idleTimeout" class="form-control text-center fw-bold fs-5" value="<%= session.idleTimeout %>" min="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-schedule">
+          <div class="row mb-3">
+             <div class="col-md-3">
+                <select id="scheduleDaySelect" class="form-select size-md">
+                  <option value="Monday">Monday</option><option value="Tuesday">Tuesday</option><option value="Wednesday">Wednesday</option>
+                  <option value="Thursday">Thursday</option><option value="Friday">Friday</option><option value="Saturday">Saturday</option><option value="Sunday">Sunday</option>
+               </select>
+             </div>
+             <div class="col-md-3"><input type="time" id="scheduleStart" class="form-control size-md"></div>
+             <div class="col-md-3"><input type="time" id="scheduleEnd" class="form-control size-md"></div>
+             <div class="col-md-3">
+               <button type="button" class="btn btn-primary btn-filled btn-md w-100" id="addScheduleBtn"><i class="bi bi-plus-lg me-1"></i> Add Time Slot</button>
+             </div>
+          </div>
+          <div id="scheduleContainer" class="border rounded p-3 bg-light" style="min-height: 200px;"></div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-security">
+          <div class="row">
+            <div class="col-md-6 border-end">
+               <h6 class="fw-bold text-primary mb-2">IP Whitelist</h6>
+               <div class="input-group mb-2">
+                 <input type="text" id="inp_whitelist" class="form-control size-md" placeholder="e.g. 192.168.1.5">
+                 <button type="button" class="btn btn-primary btn-filled" id="btn_add_whitelist">Add IP</button>
+               </div>
+               <div class="table-responsive mb-4" style="max-height: 200px; overflow-y: auto;">
+                 <table class="table table-sm table-striped table-bordered"><thead><tr><th>Whitelisted IP</th><th style="width: 80px;">Action</th></tr></thead><tbody id="table_whitelist"></tbody></table>
+               </div>
+
+               <h6 class="fw-bold text-danger mb-2">IP Blacklist</h6>
+               <div class="input-group mb-2">
+                 <input type="text" id="inp_blacklist" class="form-control size-md" placeholder="e.g. 203.0.113.1">
+                 <button type="button" class="btn btn-danger btn-filled" id="btn_add_blacklist">Block IP</button>
+               </div>
+               <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                 <table class="table table-sm table-striped table-bordered"><thead><tr><th>Blacklisted IP</th><th style="width: 80px;">Action</th></tr></thead><tbody id="table_blacklist"></tbody></table>
+               </div>
+            </div>
+            <div class="col-md-6 ps-4">
+              <h6 class="fw-bold">Multi-Factor Authentication</h6>
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="mfaCheck" <%= security.mfaRequired ? 'checked' : '' %>>
+                <label class="form-check-label" for="mfaCheck">Require MFA</label>
+              </div>
+              <label class="form-label small">Allowed Types</label>
+              <div class="card p-2">
+                 <div class="form-check">
+                  <input class="form-check-input mfa-type-chk" type="checkbox" value="authenticator_app" <%= (security.allowedMfaTypes||[]).includes('authenticator_app') ? 'checked' : '' %>>
+                  <label class="form-check-label">Authenticator App</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input mfa-type-chk" type="checkbox" value="sms" <%= (security.allowedMfaTypes||[]).includes('sms') ? 'checked' : '' %>>
+                  <label class="form-check-label">SMS / Text</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-sections">
+             <div class="row h-100">
+             <div class="col-md-3 border-end bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0 text-primary">Configured Sections</h6>
+                    <span class="badge bg-secondary" id="secCountBadge">0</span>
+                </div>
+                <input type="text" id="sectionSearch" class="form-control size-sm mb-2" placeholder="Filter list...">
+                <div class="list-group list-group-flush overflow-auto" id="sectionsSidebar" style="max-height: 600px; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <div class="text-center text-muted small p-3">No sections added.</div>
+                </div>
+             </div>
+             <div class="col-md-9 py-3">
+                <div class="card p-3 mb-4 bg-light border-0">
+                    <label class="form-label fw-bold">Add Section Policy</label>
+                    <div class="d-flex gap-2">
+                         <button type="button" class="btn btn-primary btn-filled w-100" id="addSectionConfigBtn">
+                             <i class="bi bi-search me-1"></i> Add Section from List
+                         </button>
+                    </div>
+                </div>
+                <div id="sectionsContainer" class="accordion"></div>
+             </div>
+           </div>
+        </div>
+
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top d-flex justify-content-between align-items-center">
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-dark btn-sm" id="btnExportConfig">
+                <i class="bi bi-download me-1"></i> Export Config
+            </button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="btnImportConfig">
+                <i class="bi bi-upload me-1"></i> Import Config
+            </button>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a href="/accessPolicies" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/accessPolicies"> Cancel </a>
+            <button type="submit" class="btn btn-filled btn-primary btn-md">Save Policy</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  // --- 1. STATE INITIALIZATION ---
+  function readJson(id, fallback) {
+    try { return JSON.parse(document.getElementById(id).textContent || ''); } catch { return fallback; }
+  }
+  function parseNonNegativeInt(rawValue, fallback) {
+    if (rawValue === undefined || rawValue === null || rawValue === '') return fallback;
+    const parsed = Number.parseInt(String(rawValue), 10);
+    if (!Number.isFinite(parsed) || Number.isNaN(parsed)) return fallback;
+    return parsed >= 0 ? parsed : fallback;
+  }
+
+  // State Variables
+  let session = readJson('initSession', { maxSessions: 5, maxDuration: 480, idleTimeout: 30 });
+  let network = readJson('initNetwork', { ipWhitelist: [], ipBlacklist: [] });
+  let security = readJson('initSecurity', { mfaRequired: false, allowedMfaTypes: [] });
+  let schedule = readJson('initSchedule', { weekdays: {} });
+  let configuredSections = readJson('initConfiguredSections', []);
+  const systemScopes = readJson('initSystemScopes', []);
+  const form = document.getElementById('policyForm');
+
+  // --- 2a. USER PICKER ---
+  const userPickerBtn = document.getElementById('openUserPickerBtn');
+  const userIdInput = document.getElementById('selectedUserId');
+  const userNameInput = document.getElementById('selectedUserName');
+  const orgIdInput = document.getElementById('selectedOrgId'); 
+
+  if (userPickerBtn) {
+    userPickerBtn.addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.user({
+            title: 'Select User',
+            placeholder: 'Search by username or email...',
+            context: GenericPickerContexts.activeOrganizationScope(),
+            onSelect: async (item) => {
+                userIdInput.value = item.id;
+                userNameInput.value = `${item.name} (${item.email})`;
+                await checkUserPolicy(item.id, orgIdInput.value);
+            }
+        }));
+    });
+  }
+
+  // --- 2b. ORG PICKER ---
+  const orgPickerBtn = document.getElementById('openOrgPickerBtn');
+  const clearOrgBtn = document.getElementById('clearOrgBtn');
+  const orgNameInput = document.getElementById('selectedOrgName');
+
+  if (orgPickerBtn) {
+      orgPickerBtn.addEventListener('click', () => {
+          GenericPicker.open(GenericPickerPresets.organization({
+              title: 'Select Organization Scope',
+              context: GenericPickerContexts.organizationSpecificPolicy(),
+              onSelect: async (item) => {
+                  orgIdInput.value = item.id;
+                  orgNameInput.value = item.identity?.displayName || item.name || `Org #${item.id}`;
+                  if(userIdInput.value) await checkUserPolicy(userIdInput.value, item.id);
+               }
+          }));
+      });
+      clearOrgBtn.addEventListener('click', async () => {
+          orgIdInput.value = "";
+          orgNameInput.value = "Global / System";
+          if(userIdInput.value) await checkUserPolicy(userIdInput.value, null);
+      });
+  }
+
+  async function checkUserPolicy(userId, orgId) {
+     if (!userId) return;
+     try {
+       const query = orgId ? `?orgId=${orgId}` : '?orgId=';
+       const resp = await fetch(`/accessPolicies/check-user/${userId}${query}`);
+       const data = await resp.json();
+       if (data.status === 'success' && data.exists) {
+          const scopeName = orgId ? `Organization #${orgId}` : 'Global Scope';
+          await showMsg('Policy Exists', `User (ID: ${userId}) already has a policy in <b>${scopeName}</b>.`, 'warning', 'btn-warning');
+          userIdInput.value = "";
+          userNameInput.value = "";
+       }
+     } catch (err) { console.error('Policy check failed', err); }
+  }
+
+  async function showMsg(title, message, icon='info', btn_class='btn-primary') {
+    if (typeof showMessageModal === 'function') {
+      return await showMessageModal({ title, message, icon, buttons: [{ text: 'OK', class: btn_class }] });
+    } else { alert(message); }
+  }
+
+  // --- 3. NETWORK (IP TABLES) ---
+  function renderIPTable(tableId, array, type) { 
+     const tbody = document.getElementById(tableId);
+     if (!tbody) return;
+     tbody.innerHTML = '';
+     if (array.length === 0) { tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted small">No IPs configured</td></tr>`; return; }
+     array.forEach((ip, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td><code>${ip}</code></td><td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger remove-ip" data-idx="${index}"><i class="bi bi-trash"></i></button></td>`;
+        tbody.appendChild(row);
+     });
+     tbody.querySelectorAll('.remove-ip').forEach(btn => {
+        btn.addEventListener('click', () => { array.splice(parseInt(btn.dataset.idx), 1); renderIPTable(tableId, array, type); });
+     });
+  }
+  document.getElementById('btn_add_whitelist').addEventListener('click', () => {
+     const val = document.getElementById('inp_whitelist').value.trim();
+     if (val && !network.ipWhitelist.includes(val)) { network.ipWhitelist.push(val); renderIPTable('table_whitelist', network.ipWhitelist, 'white'); document.getElementById('inp_whitelist').value = ''; }
+  });
+  document.getElementById('btn_add_blacklist').addEventListener('click', () => {
+     const val = document.getElementById('inp_blacklist').value.trim();
+     if (val && !network.ipBlacklist.includes(val)) { network.ipBlacklist.push(val); renderIPTable('table_blacklist', network.ipBlacklist, 'black'); document.getElementById('inp_blacklist').value = ''; }
+  });
+  renderIPTable('table_whitelist', network.ipWhitelist, 'white');
+  renderIPTable('table_blacklist', network.ipBlacklist, 'black');
+
+  // --- 4. EXPORT / IMPORT LOGIC (NEW) ---
+  
+  // A. EXPORT
+  document.getElementById('btnExportConfig').addEventListener('click', () => {
+      // 1. Gather current state
+      const exportData = {
+          _type: "WES_ACCESS_POLICY_CONFIG",
+          _exportedAt: new Date().toISOString(),
+          // We intentionally EXCLUDE userId, orgId, id, policyName to make it a template
+          active: document.getElementById('activeCheck').checked,
+          validityPeriod: {
+             startDate: document.getElementById('validStartInput').value,
+             endDate: document.getElementById('validEndInput').value
+          },
+          network: network,
+          security: {
+              mfaRequired: document.getElementById('mfaCheck').checked,
+              allowedMfaTypes: Array.from(document.querySelectorAll('.mfa-type-chk:checked')).map(cb => cb.value)
+          },
+          sessionControl: {
+              maxSessions: parseNonNegativeInt(document.getElementById('inp_maxSessions').value, 5),
+              maxDuration: parseNonNegativeInt(document.getElementById('inp_maxDuration').value, 480),
+              idleTimeout: parseNonNegativeInt(document.getElementById('inp_idleTimeout').value, 30)
+          },
+          globalSchedule: schedule,
+          sections: configuredSections
+      };
+
+      // 2. Create Download
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", "access_policy_config.json");
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+  });
+
+  // B. IMPORT
+  const fileInput = document.getElementById('importConfigFile');
+  document.getElementById('btnImportConfig').addEventListener('click', () => {
+      fileInput.value = ''; // Reset
+      fileInput.click();
+  });
+
+  fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+          try {
+              const data = JSON.parse(ev.target.result);
+              
+              // Basic Validation
+              if (!data.sessionControl || !data.sections) {
+                  throw new Error("Invalid policy configuration file.");
+              }
+
+              if (await confirmAction('Import Configuration?', 'This will overwrite your current rule settings (Network, Schedule, Sections). Identity fields will be preserved.')) {
+                  applyConfiguration(data);
+              }
+          } catch (err) {
+              console.error(err);
+              showMsg('Import Failed', 'Could not parse the policy file. ' + err.message, 'error', 'btn-danger');
+          }
+      };
+      reader.readAsText(file);
+  });
+
+  async function confirmAction(title, msg) {
+      if (typeof showMessageModal === 'function') {
+          const res = await showMessageModal({ 
+              title: title, 
+              message: msg, 
+              icon: 'warning', 
+              buttons: [
+                  { text: 'Cancel', class: 'btn-secondary' },
+                  { text: 'Import', class: 'btn-warning' }
+              ] 
+          });
+          return res === 'Import';
+      }
+      return confirm(msg);
+  }
+
+  function applyConfiguration(data) {
+      // 1. Update State Variables
+      if (data.network) network = data.network;
+      if (data.security) security = data.security;
+      if (data.sessionControl) session = data.sessionControl;
+      if (data.globalSchedule) schedule = data.globalSchedule;
+      if (data.sections) configuredSections = data.sections;
+
+      // 2. Update UI Fields
+      
+      // General
+      if (data.active !== undefined) document.getElementById('activeCheck').checked = data.active;
+      if (data.validityPeriod?.startDate) document.getElementById('validStartInput').value = data.validityPeriod.startDate;
+      if (data.validityPeriod?.endDate) document.getElementById('validEndInput').value = data.validityPeriod.endDate;
+
+      // Session
+      document.getElementById('inp_maxSessions').value = parseNonNegativeInt(session.maxSessions, 5);
+      document.getElementById('inp_maxDuration').value = parseNonNegativeInt(session.maxDuration, 480);
+      document.getElementById('inp_idleTimeout').value = parseNonNegativeInt(session.idleTimeout, 30);
+
+      // Security
+      document.getElementById('mfaCheck').checked = !!security.mfaRequired;
+      const mfaTypes = security.allowedMfaTypes || [];
+      document.querySelectorAll('.mfa-type-chk').forEach(chk => {
+          chk.checked = mfaTypes.includes(chk.value);
+      });
+
+      // 3. Re-Render Complex Components
+      renderIPTable('table_whitelist', network.ipWhitelist, 'white');
+      renderIPTable('table_blacklist', network.ipBlacklist, 'black');
+      renderSchedule();
+      renderSections();
+
+      showMsg('Success', 'Configuration loaded successfully.', 'success', 'btn-success');
+  }
+
+  // --- 5. SUBMIT ---
+  form.addEventListener('submit', async (e) => {
+     e.preventDefault();
+     
+     session.maxSessions = parseNonNegativeInt(document.getElementById('inp_maxSessions').value, 5);
+     session.maxDuration = parseNonNegativeInt(document.getElementById('inp_maxDuration').value, 480);
+     session.idleTimeout = parseNonNegativeInt(document.getElementById('inp_idleTimeout').value, 30);
+
+     security.mfaRequired = document.getElementById('mfaCheck').checked;
+     security.allowedMfaTypes = Array.from(document.querySelectorAll('.mfa-type-chk:checked')).map(cb => cb.value);
+
+     const payload = {
+         actionStateId: form.querySelector('input[name="actionStateId"]').value,
+         userId: document.getElementById('selectedUserId').value,
+         orgId: document.getElementById('selectedOrgId').value,
+         policyName: form.querySelector('input[name="policyName"]').value,
+         validityPeriod: {
+             startDate: document.getElementById('validStartInput').value,
+             endDate: document.getElementById('validEndInput').value
+         },
+         active: document.getElementById('activeCheck').checked,
+         network: network,
+         security: security,
+         sessionControl: session, 
+         globalSchedule: schedule,
+         sections: configuredSections
+     };
+     try {
+        const resp = await fetch(form.action, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' }, 
+          body: JSON.stringify(payload)
+        });
+        const result = await resp.json();
+        await showMsg(result.status === 'success' ? 'Success' : 'Error', result.message || 'Done.', result.status === 'success' ? 'success' : 'error', result.status === 'success' ? 'btn-success' : 'btn-danger');
+        if (result.status === 'success') window.location.href = '/accessPolicies';
+     } catch (err) { console.error(err); await showMsg('Error', 'An unexpected error occurred.', 'error', 'btn-danger');
+     }
+  });
+
+  // --- 6. SCHEDULE ---
+  const scheduleContainer = document.getElementById('scheduleContainer');
+  function getMinutes(timeStr) { if(!timeStr) return 0;
+    const [h, m] = timeStr.split(':').map(Number); return (h * 60) + m;
+  }
+  function renderSchedule() {
+      scheduleContainer.innerHTML = '';
+      const days = Object.keys(schedule.weekdays || {});
+      if(days.length === 0) { scheduleContainer.innerHTML = '<div class="text-muted small text-center p-3">No schedule defined (Access allowed 24/7).</div>'; return;
+      }
+      days.forEach(day => {
+          const times = schedule.weekdays[day];
+          if(times.length === 0) return;
+          times.sort((a,b) => getMinutes(a.start) - getMinutes(b.start));
+          const row = document.createElement('div');
+          row.className = 'mb-2 p-2 border rounded bg-white shadow-sm';
+          let html = `<div class="fw-bold text-primary mb-1 border-bottom pb-1 small text-uppercase">${day}</div><div class="d-flex flex-wrap gap-2">`;
+          times.forEach((t, idx) => { html += `<span class="badge bg-light text-dark border d-flex align-items-center"><i class="bi bi-clock me-1 text-muted"></i> ${t.start} - ${t.end} <i class="bi bi-x-circle-fill text-danger ms-2 cursor-pointer remove-schedule-item" data-day="${day}" data-idx="${idx}" title="Remove"></i></span>`; });
+          html += `</div>`;
+          row.innerHTML = html;
+          scheduleContainer.appendChild(row);
+      });
+      scheduleContainer.querySelectorAll('.remove-schedule-item').forEach(btn => {
+          btn.addEventListener('click', e => { const d = e.target.dataset.day; const i = parseInt(e.target.dataset.idx); schedule.weekdays[d].splice(i, 1); if(schedule.weekdays[d].length === 0) delete schedule.weekdays[d]; renderSchedule(); });
+      });
+  }
+  document.getElementById('addScheduleBtn').addEventListener('click', async () => {
+     const d = document.getElementById('scheduleDaySelect').value;
+     const s = document.getElementById('scheduleStart').value;
+     const e = document.getElementById('scheduleEnd').value;
+     if(!s || !e) { await showMsg('Missing Input', 'Please select both Start and End times.', 'warning', 'btn-warning'); return; }
+     if (getMinutes(s) >= getMinutes(e)) { await showMsg('Invalid Time Range', 'End time must be greater than Start time.', 'warning', 'btn-warning'); return; }
+     if(!schedule.weekdays) schedule.weekdays = {}; if(!schedule.weekdays[d]) schedule.weekdays[d] = [];
+     
+     let hasConflict = false;
+     for (let slot of schedule.weekdays[d]) {
+         if (getMinutes(s) < getMinutes(slot.end) && getMinutes(e) > getMinutes(slot.start)) { hasConflict = true; break; }
+     }
+     if (hasConflict) { await showMsg('Schedule Conflict', `The time slot <b>${s} - ${e}</b> overlaps with an existing slot on <b>${d}</b>.`, 'error', 'btn-danger');
+        return; }
+     schedule.weekdays[d].push({start:s, end:e}); renderSchedule();
+  });
+  renderSchedule();
+
+  // --- 7. SECTIONS & OPERATIONS ---
+  const sectionsContainer = document.getElementById('sectionsContainer');
+  const sectionsSidebar = document.getElementById('sectionsSidebar');
+  const secCountBadge = document.getElementById('secCountBadge');
+  const addSectionConfigBtn = document.getElementById('addSectionConfigBtn');
+
+  function renderSections() {
+     const openItem = sectionsContainer.querySelector('.accordion-collapse.show');
+     const openIndex = openItem ? openItem.id.replace('collapseSec', '') : null;
+     sectionsContainer.innerHTML = ''; sectionsSidebar.innerHTML = ''; 
+     secCountBadge.textContent = configuredSections.length;
+     if (configuredSections.length === 0) { sectionsSidebar.innerHTML = '<div class="text-center text-muted small p-3">No sections added.</div>';
+     }
+
+     configuredSections.forEach((secPolicy, index) => {
+        const tl = secPolicy.timeLimits || {};
+        const ops = secPolicy.operations || [];
+        const accType = secPolicy.accessType || 'custom';
+        const isFrozen = (accType === 'full_access' || accType === 'full_ban');
+        const isBanned = (accType === 'full_ban');
+        const headerId = `headingSec${index}`; const collapseId = `collapseSec${index}`;
+
+        const sideItem = document.createElement('a');
+        sideItem.href = "#";
+        sideItem.className = "list-group-item list-group-item-action py-2 section-nav-item";
+        sideItem.innerHTML = `<div class="d-flex w-100 justify-content-between align-items-center"><span class="fw-bold text-truncate" style="max-width: 140px;">${secPolicy.sectionName || secPolicy.sectionId}</span><small class="badge ${isBanned ? 'bg-danger' : 'bg-success'}">${isBanned ? 'BANNED' : 'Active'}</small></div><small class="text-muted d-block text-truncate" style="font-size: 0.75rem;">ID: ${secPolicy.sectionId}</small>`;
+        sideItem.addEventListener('click', (e) => { e.preventDefault(); const el = document.getElementById(collapseId); if (!el) return; new bootstrap.Collapse(el, { toggle: false }).show(); setTimeout(() => el.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150); });
+        sectionsSidebar.appendChild(sideItem);
+
+        const item = document.createElement('div');
+        item.className = `accordion-item mb-2 border ${isBanned ? 'border-danger' : ''}`;
+        const isShow = (openIndex && openIndex == index) ? 'show' : '';
+        const isCollapsed = (openIndex && openIndex == index) ? '' : 'collapsed';
+        item.innerHTML = `<h2 class="accordion-header" id="${headerId}"><button class="accordion-button ${isCollapsed} py-2 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}"><strong>${secPolicy.sectionName || secPolicy.sectionId}</strong><span class="ms-auto badge ${isBanned ? 'bg-danger' : 'bg-success'} me-2">${isBanned ? 'BANNED' : 'Active'}</span></button></h2><div id="${collapseId}" class="accordion-collapse collapse ${isShow}" data-bs-parent="#sectionsContainer"><div class="accordion-body bg-light"><div class="d-flex justify-content-between mb-3 border-bottom pb-2"><div class="d-flex align-items-center gap-2"><h6 class="${isBanned ? 'text-danger' : 'text-primary'} fw-bold m-0">Configuration</h6><select class="form-select form-select-sm sec-acc-type" style="width:auto;" data-index="${index}"><option value="custom" ${accType=='custom'?'selected':''}>Custom Settings</option><option value="full_access" ${accType=='full_access'?'selected':''}>Full Access (No Limits)</option><option value="full_ban" ${accType=='full_ban'?'selected':''}>Full Ban (Suspended)</option></select></div><button type="button" class="btn btn-sm btn-outline-danger remove-section btn-filled" data-index="${index}">Remove</button></div><div class="row g-2 mb-3"><div class="col-md-3"><label class="small fw-bold">Max Session (min)</label><input type="number" class="form-control size-sm sec-max-sess" value="${tl.maxSessionDurationMinutes||''}" data-index="${index}" ${isFrozen ? 'disabled' : ''}></div><div class="col-md-3"><label class="small fw-bold">Max Attempts</label><input type="number" class="form-control size-sm sec-idle" value="${tl.maxAttemptsPerSession||''}" data-index="${index}" ${isFrozen ? 'disabled' : ''}></div></div>
+        
+        <div class="card p-2 border-0 shadow-sm mt-3"><h6 class="fw-bold text-dark border-bottom pb-1 mb-2">Operation Overrides</h6><div class="row mb-3 ${isFrozen ? 'd-none' : ''}"><div class="col-md-12 d-flex gap-2"><button type="button" class="btn btn-sm btn-outline-primary w-100 add-op-btn btn-filled" data-index="${index}"><i class="bi bi-search me-1"></i> Add Operation Override</button><button type="button" class="btn btn-sm btn-outline-secondary w-100 add-all-op-btn btn-filled" data-index="${index}"><i class="bi bi-collection me-1"></i> Add All Operations</button></div></div><div class="table-responsive"><table class="table table-sm table-bordered bg-white"><thead class="table-light"><tr><th>Operation</th><th style="width: 140px;">Access</th><th style="width: 150px;">Scope</th><th>Attempts</th><th>Session</th><th style="width:50px"></th></tr></thead><tbody>${ops.length === 0 ? '<tr><td colspan="6" class="text-center text-muted small">No overrides configured</td></tr>' : ''}${ops.map((op, opIdx) => { const opAcc = op.accessType || 'custom'; const isOpFrozen = (opAcc === 'full_access' || opAcc === 'full_ban' || isFrozen); const currentScope = op.scopeId || ''; return `<tr><td><div class="fw-bold">${op.operationName || ''}</div><div class="small text-muted">${op.operationId}</div></td><td><select class="form-select form-select-sm p-0 border-0 op-acc-type" data-sec="${index}" data-op="${opIdx}" ${isFrozen ? 'disabled' : ''}><option value="custom" ${opAcc=='custom'?'selected':''}>Custom</option><option value="full_access" ${opAcc=='full_access'?'selected':''}>Full Access</option><option value="full_ban" ${opAcc=='full_ban'?'selected':''}>Ban</option></select></td><td><select class="form-select form-select-sm p-0 border-0 op-scope" data-sec="${index}" data-op="${opIdx}" ${isOpFrozen ? 'disabled' : ''}><option value="" ${!currentScope ? 'selected' : ''}>Default</option>${systemScopes.map(sc => `<option value="${sc.id}" ${currentScope === sc.id ? 'selected' : ''}>${sc.name}</option>`).join('')}</select></td><td><input type="number" class="form-control form-control-sm border-0 op-attempts" placeholder="Limit" value="${op.executionLimits?.maxAttemptsPerSession || ''}" data-sec="${index}" data-op="${opIdx}" ${isOpFrozen ? 'disabled' : ''}></td><td><input type="number" class="form-control form-control-sm border-0 op-sess" placeholder="Mins" value="${op.timeLimits?.maxSessionDurationMinutes || ''}" data-sec="${index}" data-op="${opIdx}" ${isOpFrozen ? 'disabled' : ''}></td><td>${!isFrozen ? `<i class="bi bi-trash text-danger cursor-pointer remove-op" data-sec="${index}" data-op="${opIdx}"></i>` : ''}</td></tr>`}).join('')}</tbody></table></div></div></div></div>`;
+        sectionsContainer.appendChild(item);
+     });
+     // BINDINGS
+     document.querySelectorAll('.remove-section').forEach(btn => btn.addEventListener('click', e => { configuredSections.splice(parseInt(e.target.dataset.index), 1); renderSections(); }));
+     document.querySelectorAll('.add-op-btn').forEach(btn => btn.addEventListener('click', e => { e.preventDefault(); const idx = parseInt(e.target.dataset.index); GenericPicker.open(GenericPickerPresets.operation({ onSelect: async (item) => { if (configuredSections[idx].operations.find(o => o.operationId === item.id)) { await showMsg('Duplicate', 'Operation already configured.', 'warning', 'btn-warning'); return; } configuredSections[idx].operations.push({ operationId: item.id, operationName: item.name, accessType: 'custom', accessState: { status: 'active' }, scopeId: '', executionLimits: {}, timeLimits: {}, throughputLimits: {} }); renderSections(); } })); }));
+     document.querySelectorAll('.add-all-op-btn').forEach(btn => btn.addEventListener('click', async (e) => { e.preventDefault(); const idx = parseInt(e.target.dataset.index); const secId = configuredSections[idx].sectionId; const originalText = e.target.innerHTML; e.target.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...`; e.target.disabled = true; try { const resp = await fetch(`/sections?q=${secId}&type=exact_match&searchFields=id`, { headers: {'X-AJAX-Request': 'true'} }); const data = await resp.json(); const sectionDef = (data.results || []).find(s => String(s.id) === String(secId)); if (!sectionDef) { await showMsg('Error', 'Section definition not found.', 'error', 'btn-danger'); return; } const reso = await fetch(`/operations`, { headers: {'X-AJAX-Request': 'true'} }); const data_opt = await reso.json(); const regOps = sectionDef.operations || []; if (regOps.length === 0) { await showMsg('Info', 'No operations registered for this section.', 'info', 'btn-primary'); return; } let addedCount = 0; if(!configuredSections[idx].operations) configuredSections[idx].operations = [];
+     regOps.forEach(opRef => { if (!configuredSections[idx].operations.find(existing => existing.operationId === opRef.id)) { configuredSections[idx].operations.push({ operationId: opRef.id, operationName: opRef.name || (data_opt.results || []).find(s => String(s.id) === String(opRef.id)).name, accessType: 'custom', accessState: { status: 'active' }, scopeId: '', executionLimits: { maxAttemptsPerSession: opRef.sessionAttempts }, timeLimits: { maxSessionDurationMinutes: opRef.sessionTime }, throughputLimits: {} }); addedCount++; } });
+     if(addedCount > 0) { renderSections(); await showMsg('Success', `Added ${addedCount} operations.`, 'success', 'btn-success');
+     } else { await showMsg('Info', 'All operations are already added.', 'info', 'btn-primary'); } } catch (err) { console.error(err);
+     await showMsg('Error', 'Failed to retrieve operations list.', 'error', 'btn-danger'); } finally { e.target.innerHTML = originalText; e.target.disabled = false; } }));
+     document.querySelectorAll('.remove-op').forEach(btn => btn.addEventListener('click', e => { configuredSections[e.target.dataset.sec].operations.splice(e.target.dataset.op, 1); renderSections(); }));
+     const bindChange = (cls, fn) => document.querySelectorAll(cls).forEach(i => i.addEventListener('change', e => { fn(e); renderSections(); }));
+     bindChange('.sec-acc-type', e => configuredSections[parseInt(e.target.dataset.index)].accessType = e.target.value);
+     bindChange('.op-acc-type', e => configuredSections[parseInt(e.target.dataset.sec)].operations[e.target.dataset.op].accessType = e.target.value);
+     bindChange('.op-scope', e => configuredSections[parseInt(e.target.dataset.sec)].operations[e.target.dataset.op].scopeId = e.target.value);
+     const bindSectionInput = (cls, pathFn) => document.querySelectorAll('.' + cls).forEach(i => i.addEventListener('input', e => { const idx = parseInt(e.target.dataset.index); let val = e.target.type === 'number' ? parseInt(e.target.value) : e.target.value; if (isNaN(val) && e.target.type === 'number') val = null; pathFn(configuredSections[idx], val); }));
+     bindSectionInput('sec-max-sess', (obj, v) => { if(!obj.timeLimits) obj.timeLimits={}; obj.timeLimits.maxSessionDurationMinutes = v; });
+     bindSectionInput('sec-idle', (obj, v) => { if(!obj.timeLimits) obj.timeLimits={}; obj.timeLimits.maxAttemptsPerSession = v; });
+     const bindOpInput = (cls, pathFn) => document.querySelectorAll('.' + cls).forEach(i => i.addEventListener('input', e => { const op = configuredSections[e.target.dataset.sec].operations[e.target.dataset.op]; let val = parseInt(e.target.value); if(isNaN(val)) val = null; pathFn(op, val); }));
+     bindOpInput('op-attempts', (op, v) => { if(!op.executionLimits) op.executionLimits={}; op.executionLimits.maxAttemptsPerSession = v; });
+     bindOpInput('op-sess', (op, v) => { if(!op.timeLimits) op.timeLimits={}; op.timeLimits.maxSessionDurationMinutes = v; });
+  }
+
+  // --- 8. SIDEBAR FILTER ---
+  document.getElementById('sectionSearch').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      document.querySelectorAll('.section-nav-item').forEach(item => {
+          item.style.display = item.textContent.toLowerCase().includes(term) ? '' : 'none';
+      });
+  });
+  if(addSectionConfigBtn) {
+      addSectionConfigBtn.addEventListener('click', () => {
+         GenericPicker.open(GenericPickerPresets.section({
+            onSelect: async (item) => {
+                 if (configuredSections.find(s => s.sectionId === item.id)) { await showMsg('Duplicate', 'Section already configured.', 'warning', 'btn-warning'); return; }
+                 configuredSections.push({ sectionId: item.id, sectionName: item.name, accessType: 'custom', accessState: { status: 'active' }, timeLimits: {}, operations: [] });
+                 renderSections();
+            }
+         }));
+      });
+  }
+  renderSections();
+});
+</script>
+<style>
+  .accordion-button:not(.collapsed) { background-color: #f8f9fa; color: #000; }
+  .cursor-pointer { cursor: pointer; }
+  .modal { z-index: 1060; }
+  #sectionsSidebar::-webkit-scrollbar { width: 6px; }
+  #sectionsSidebar::-webkit-scrollbar-track { background: #f1f1f1; }
+  #sectionsSidebar::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+  #sectionsSidebar::-webkit-scrollbar-thumb:hover { background: #555; }
+  .nav-tabs .nav-link.active { font-weight: bold; color: #0d6efd; border-top: 3px solid #0d6efd; }
+</style>

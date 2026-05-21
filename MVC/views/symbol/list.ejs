@@ -1,0 +1,157 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print
+}) %>
+
+<%- include('../partials/tablePages-search', {
+    placeholder: 'Search symbols by name, tag, or value...',
+    fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        
+        <th class="draggable" data-column="name">Name <span class="sort-icon"></span></th>
+        
+        <th class="draggable" data-column="orgId">Scope <span class="sort-icon"></span></th>
+        
+        <th class="draggable" data-column="type">Type <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="tags">Tags <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="value">Value / Source <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (data.length === 0) { %>
+        <tr><td colspan="8" class="text-center p-4">No symbols found in storage.</td></tr>
+      <% } %>
+      <% data.forEach(sym => { %>
+        <tr>
+          <td><code><%= sym.id %></code></td>
+
+          <td class="fw-bold text-primary"><%= sym.name %></td>
+
+          <td>
+            <% if (sym.orgId) { %>
+               <span class="badge bg-info text-dark" title="Org ID: <%= sym.orgId %>">
+                  <i class="bi bi-building me-1"></i><%= sym.orgName || ('Org ' + sym.orgId) %>
+               </span>
+            <% } else { %>
+               <span class="badge bg-secondary">
+                  <i class="bi bi-globe me-1"></i>Global
+               </span>
+            <% } %>
+          </td>
+
+          <td>
+            <% if (sym.type === 'class') { %>
+                <span class="badge bg-info text-dark border">Icon Class</span>
+            <% } else if (sym.type === 'image') { %>
+                <span class="badge bg-warning text-dark border">Image File</span>
+            <% } else { %>
+                <span class="badge bg-secondary border">Raw / SVG</span>
+            <% } %>
+          </td>
+
+          <td>
+            <% (sym.tags || []).forEach(tag => { %>
+                <span class="badge bg-light text-secondary border fw-normal me-1"><%= tag %></span>
+            <% }) %>
+          </td>
+
+          <td class="text-muted small font-monospace text-truncate" style="max-width: 200px;">
+             <%= sym.value %>
+          </td>
+
+          <td>
+            <% if (sym.audit && sym.audit.lastUpdateDateTime) { %>
+                <%= new Date(sym.audit.lastUpdateDateTime).toLocaleString() %>
+                <br><span class="text-muted x-small">by <%= sym.audit.lastUpdateUser %></span>
+            <% } else { %> - <% } %>
+          </td>
+
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= sym.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= sym.id %>">
+                <button type="button" class="btn btn-outline-secondary btn-sm view-btn"
+                  data-type="<%= sym.type %>"
+                  data-name="<%= sym.name %>"
+                  data-val="<%= sym.value %>">
+                  <i class="bi bi-eye me-2"></i>View Details
+                </button>
+                <a href="/symbols/edit/<%= sym.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= sym.id %>">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const type = btn.dataset.type;
+            const val = btn.dataset.val;
+            const name = btn.dataset.name;
+            let htmlContent = '';
+
+            if (type === 'class') {
+                htmlContent = `<div class="text-center p-5"><i class="${val}" style="font-size: 4rem;"></i><br><br><code class="bg-light p-1 border rounded">${val}</code></div>`;
+            } else if (type === 'image') {
+                htmlContent = `<div class="text-center p-3">
+                                  <img src="${val}" 
+                                       style="max-width: 100%; max-height: 300px;" 
+                                       class="border rounded shadow-sm"
+                                       onerror="this.onerror=null; this.src=''; this.innerHTML='<span class=\'text-danger\'>Image not found (404)</span>';">
+                               </div>`;
+            } else {
+                htmlContent = `<div class="text-center p-4 border rounded bg-light overflow-auto">${val.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
+            }
+
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: `Preview: ${name}`,
+                    message: htmlContent,  
+                    html: htmlContent,
+                    icon: 'info',
+                    buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                });
+            } else {
+                alert(`Value: ${val}`);
+            }
+        });
+    });
+});
+</script>

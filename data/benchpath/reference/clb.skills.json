@@ -1,0 +1,397 @@
+{
+  "meta": {
+    "schemaVersion": "1.0.0",
+    "entityType": "clbSkills",
+    "layer": "reference",
+    "authority": "official",
+    "isReadMostly": true,
+    "defaultLocale": "en-CA",
+    "generatedAt": "2026-03-20T00:00:00.000Z",
+    "updatedAt": "2026-03-22T05:38:49.362Z"
+  },
+  "itemsById": {
+    "skill:listening": {
+      "id": "skill:listening",
+      "approvedAt": "2026-03-20T00:00:00.000Z",
+      "approvedBy": "admin",
+      "assessmentCharacteristics": {
+        "primaryEvidenceModes": [
+          "audio",
+          "live",
+          "selected_response",
+          "short_answer",
+          "teacher_observation"
+        ],
+        "defaultAssessmentApproach": "criterion_referenced",
+        "supportsPortfolioEvidence": true,
+        "supportsDeterministicChecks": true,
+        "supportsAiAssistance": true
+      },
+      "benchmarkIds": [
+        "benchmark:listening:1",
+        "benchmark:listening:2",
+        "benchmark:listening:3",
+        "benchmark:listening:4",
+        "benchmark:listening:5",
+        "benchmark:listening:6",
+        "benchmark:listening:7",
+        "benchmark:listening:8",
+        "benchmark:listening:9",
+        "benchmark:listening:10",
+        "benchmark:listening:11",
+        "benchmark:listening:12"
+      ],
+      "code": "L",
+      "competencyAreaIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "createdAt": "2026-03-20T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Listening skill in the Canadian Language Benchmarks.",
+      "displayOrder": 1,
+      "extensions": {
+        "futureRubricSupport": true,
+        "futureWizardSupport": true
+      },
+      "frameworkCode": "CLB",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": true,
+      "isSystem": true,
+      "modality": "receptive",
+      "notes": null,
+      "orgId": "SYSTEM",
+      "reviewStatus": "reviewed",
+      "shortTitle": "Listening",
+      "slug": "listening",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageIds": [
+        "stage:1",
+        "stage:2",
+        "stage:3"
+      ],
+      "status": "approved",
+      "supportedBenchmarkRange": {
+        "minimum": 1,
+        "maximum": 12,
+        "totalCount": 12
+      },
+      "tags": [
+        "official",
+        "clb",
+        "skill",
+        "listening",
+        "receptive"
+      ],
+      "teachingCharacteristics": {
+        "taskBased": true,
+        "realWorldOriented": true,
+        "oftenIntegratedWithOtherSkills": true,
+        "canUseVisualSupport": true
+      },
+      "title": "Listening",
+      "updatedAt": "2026-03-20T00:00:00.000Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "skill:reading": {
+      "id": "skill:reading",
+      "approvedAt": "2026-03-20T00:00:00.000Z",
+      "approvedBy": "admin",
+      "assessmentCharacteristics": {
+        "primaryEvidenceModes": [
+          "text",
+          "selected_response",
+          "short_answer",
+          "teacher_observation",
+          "checklist"
+        ],
+        "defaultAssessmentApproach": "criterion_referenced",
+        "supportsPortfolioEvidence": true,
+        "supportsDeterministicChecks": true,
+        "supportsAiAssistance": true
+      },
+      "benchmarkIds": [
+        "benchmark:reading:1",
+        "benchmark:reading:2",
+        "benchmark:reading:3",
+        "benchmark:reading:4",
+        "benchmark:reading:5",
+        "benchmark:reading:6",
+        "benchmark:reading:7",
+        "benchmark:reading:8",
+        "benchmark:reading:9",
+        "benchmark:reading:10",
+        "benchmark:reading:11",
+        "benchmark:reading:12"
+      ],
+      "code": "R",
+      "competencyAreaIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "createdAt": "2026-03-20T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Reading skill in the Canadian Language Benchmarks.",
+      "displayOrder": 3,
+      "extensions": {
+        "futureRubricSupport": true,
+        "futureWizardSupport": true
+      },
+      "frameworkCode": "CLB",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": true,
+      "isSystem": true,
+      "modality": "receptive",
+      "notes": null,
+      "orgId": "SYSTEM",
+      "reviewStatus": "reviewed",
+      "shortTitle": "Reading",
+      "slug": "reading",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageIds": [
+        "stage:1",
+        "stage:2",
+        "stage:3"
+      ],
+      "status": "approved",
+      "supportedBenchmarkRange": {
+        "minimum": 1,
+        "maximum": 12,
+        "totalCount": 12
+      },
+      "tags": [
+        "official",
+        "clb",
+        "skill",
+        "reading",
+        "receptive"
+      ],
+      "teachingCharacteristics": {
+        "taskBased": true,
+        "realWorldOriented": true,
+        "oftenIntegratedWithOtherSkills": true,
+        "canUseVisualSupport": true
+      },
+      "title": "Reading",
+      "updatedAt": "2026-03-20T00:00:00.000Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "skill:speaking": {
+      "id": "skill:speaking",
+      "approvedAt": "2026-03-20T00:00:00.000Z",
+      "approvedBy": "admin",
+      "assessmentCharacteristics": {
+        "primaryEvidenceModes": [
+          "audio",
+          "video",
+          "live",
+          "teacher_observation",
+          "checklist"
+        ],
+        "defaultAssessmentApproach": "criterion_referenced",
+        "supportsPortfolioEvidence": true,
+        "supportsDeterministicChecks": false,
+        "supportsAiAssistance": true
+      },
+      "benchmarkIds": [
+        "benchmark:speaking:1",
+        "benchmark:speaking:2",
+        "benchmark:speaking:3",
+        "benchmark:speaking:4",
+        "benchmark:speaking:5",
+        "benchmark:speaking:6",
+        "benchmark:speaking:7",
+        "benchmark:speaking:8",
+        "benchmark:speaking:9",
+        "benchmark:speaking:10",
+        "benchmark:speaking:11",
+        "benchmark:speaking:12"
+      ],
+      "code": "S",
+      "competencyAreaIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "createdAt": "2026-03-20T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Speaking skill in the Canadian Language Benchmarks.",
+      "displayOrder": 2,
+      "extensions": {
+        "futureRubricSupport": true,
+        "futureWizardSupport": true
+      },
+      "frameworkCode": "CLB",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": true,
+      "isSystem": true,
+      "modality": "productive",
+      "notes": null,
+      "orgId": "SYSTEM",
+      "reviewStatus": "reviewed",
+      "shortTitle": "Speaking",
+      "slug": "speaking",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageIds": [
+        "stage:1",
+        "stage:2",
+        "stage:3"
+      ],
+      "status": "approved",
+      "supportedBenchmarkRange": {
+        "minimum": 1,
+        "maximum": 12,
+        "totalCount": 12
+      },
+      "tags": [
+        "official",
+        "clb",
+        "skill",
+        "speaking",
+        "productive"
+      ],
+      "teachingCharacteristics": {
+        "taskBased": true,
+        "realWorldOriented": true,
+        "oftenIntegratedWithOtherSkills": true,
+        "canUseVisualSupport": true
+      },
+      "title": "Speaking",
+      "updatedAt": "2026-03-20T00:00:00.000Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "skill:writing": {
+      "id": "skill:writing",
+      "approvedAt": "2026-03-20T00:00:00.000Z",
+      "approvedBy": "admin",
+      "assessmentCharacteristics": {
+        "primaryEvidenceModes": [
+          "text",
+          "upload",
+          "teacher_observation",
+          "checklist",
+          "short_answer"
+        ],
+        "defaultAssessmentApproach": "criterion_referenced",
+        "supportsPortfolioEvidence": true,
+        "supportsDeterministicChecks": true,
+        "supportsAiAssistance": true
+      },
+      "benchmarkIds": [
+        "benchmark:writing:1",
+        "benchmark:writing:2",
+        "benchmark:writing:3",
+        "benchmark:writing:4",
+        "benchmark:writing:5",
+        "benchmark:writing:6",
+        "benchmark:writing:7",
+        "benchmark:writing:8",
+        "benchmark:writing:9",
+        "benchmark:writing:10",
+        "benchmark:writing:11",
+        "benchmark:writing:12"
+      ],
+      "code": "W",
+      "competencyAreaIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "createdAt": "2026-03-20T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Writing skill in the Canadian Language Benchmarks.",
+      "displayOrder": 4,
+      "extensions": {
+        "futureRubricSupport": true,
+        "futureWizardSupport": true
+      },
+      "frameworkCode": "CLB",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": true,
+      "isSystem": true,
+      "modality": "productive",
+      "notes": null,
+      "orgId": "SYSTEM",
+      "reviewStatus": "reviewed",
+      "shortTitle": "Writing",
+      "slug": "writing",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageIds": [
+        "stage:1",
+        "stage:2",
+        "stage:3"
+      ],
+      "status": "approved",
+      "supportedBenchmarkRange": {
+        "minimum": 1,
+        "maximum": 12,
+        "totalCount": 12
+      },
+      "tags": [
+        "official",
+        "clb",
+        "skill",
+        "writing",
+        "productive"
+      ],
+      "teachingCharacteristics": {
+        "taskBased": true,
+        "realWorldOriented": true,
+        "oftenIntegratedWithOtherSkills": true,
+        "canUseVisualSupport": true
+      },
+      "title": "Writing",
+      "updatedAt": "2026-03-20T00:00:00.000Z",
+      "updatedBy": "system",
+      "version": 1
+    }
+  },
+  "allIds": [
+    "skill:listening",
+    "skill:reading",
+    "skill:speaking",
+    "skill:writing"
+  ],
+  "indexes": {}
+}

@@ -1,0 +1,355 @@
+<%- include('../partials/tablePages-start', {
+  title: 'My Active Sessions',
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: false,
+  print
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search by User ID or IP...',
+  fields: [] 
+}) %>
+
+<div class="alert alert-info border-info border-opacity-25 bg-info-subtle text-info-emphasis shadow-sm mb-4">
+    <i class="bi bi-shield-check me-2"></i>
+    Review your active sessions below. If you see a device you don't recognize, terminate it immediately.
+</div>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th>Device / Browser</th>
+        <th>Location (IP)</th>
+        <th class="text-center">Current Context</th>
+        <th>Login Time</th>
+        <th>Last Activity</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% sessions.forEach(sess => { %>
+        <% 
+           // Determine if this is the "Current" session (if ID passed)
+           // Or fallback to checking current login time match if needed
+           const isCurrent = (typeof currentSessionId !== 'undefined' && String(sess.id) === String(currentSessionId));
+        %>
+        <tr class="<%= isCurrent ? 'bg-primary-subtle bg-opacity-10' : '' %>">
+          
+          <td>
+             <div class="d-flex align-items-center gap-2">
+                 <% 
+                    const ua = sess.deviceFingerprint?.browser || 'Unknown Device';
+                    let icon = 'bi-laptop';
+                    if (ua.toLowerCase().includes('mobile')) icon = 'bi-phone';
+                 %>
+                 <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                    <i class="bi <%= icon %> text-primary"></i>
+                 </div>
+                 <div>
+                    <div class="fw-bold text-dark small">
+                        <%= ua.length > 40 ? ua.substring(0,40) + '...' : ua %>
+                    </div>
+                    <% if (isCurrent) { %>
+                        <span class="badge bg-primary mt-1" style="font-size: 0.65rem;">THIS DEVICE</span>
+                    <% } %>
+                 </div>
+             </div>
+          </td>
+
+          <td class="font-monospace text-secondary pt-3"><%= sess.deviceFingerprint?.ip || 'Unknown' %></td>
+
+          <td class="text-center pt-3">
+             <span class="badge bg-light text-secondary border">Org #<%= sess.currentOrgId %></span>
+          </td>
+
+          <td class="text-muted small pt-3"><%= new Date(sess.createdAt).toLocaleString() %></td>
+
+          <td class="pt-3">
+             <% 
+                const diffMins = Math.floor((new Date() - new Date(sess.lastActivityAt)) / 1000 / 60);
+             %>
+             <span class="<%= diffMins < 5 ? 'text-success fw-bold' : 'text-muted' %> small">
+                <%= diffMins === 0 ? 'Just now' : diffMins + ' mins ago' %>
+             </span>
+          </td>
+
+          <td class="table-actions text-end pe-4 pt-2">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= sess.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= sess.id %>">
+                <button class="btn btn-outline-primary btn-sm btn-view-details"
+                        data-id="<%= sess.id %>"
+                        title="View Details">
+                  <i class="bi bi-eye me-2"></i>View Details
+                </button>
+                <% if (!isCurrent) { %>
+                  <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= sess.id %>">
+                    <i class="bi bi-box-arrow-right me-2"></i>Log Out
+                  </button>
+                <% } else { %>
+                  <span class="btn btn-outline-secondary btn-sm disabled text-muted" role="button" aria-disabled="true">
+                    <i class="bi bi-circle-fill me-2"></i>Current Session
+                  </span>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="sessions" hidden></span>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<div class="modal fade" id="sessionDetailsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Session Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        
+        <div id="sessionModalLoading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div class="mt-2 text-muted">Loading details...</div>
+        </div>
+
+        <div id="sessionModalContent" class="d-none">
+            
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h6 class="text-uppercase text-muted x-small fw-bold mb-2">User Identity</h6>
+                    <div class="bg-light p-3 rounded border h-100">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-person-circle fs-4 text-secondary me-3"></i>
+                            <div>
+                                <div id="modalUsername" class="fw-bold text-dark"></div>
+                                <div id="modalUserEmail" class="small text-muted"></div>
+                            </div>
+                        </div>
+                        <div class="small text-muted mt-2 border-top pt-2">
+                            User ID: <span id="modalUserId" class="font-monospace text-dark"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mt-3 mt-md-0">
+                    <h6 class="text-uppercase text-muted x-small fw-bold mb-2">Session Info</h6>
+                    <div class="bg-light p-3 rounded border h-100">
+                        
+                        <div class="mb-2">
+                            <span class="small text-muted d-block">Session ID:</span>
+                            <div class="font-monospace x-small bg-white p-1 border rounded text-break text-muted user-select-all" 
+                                 id="modalSessionId" 
+                                 style="max-height: 60px; overflow-y: auto;">
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="small text-muted">Current Org:</span>
+                            <span id="modalCurrentOrg" class="badge bg-white text-dark border"></span>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small text-muted">Status:</span>
+                            <span id="modalStatus"></span>
+                        </div>
+
+                        <div class="mt-3 pt-2 border-top">
+                            <div class="d-flex justify-content-between x-small mb-1">
+                                <span class="text-muted">Session Validity</span>
+                                <span class="fw-bold" id="modalTimeRemaining"></span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div id="modalProgressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h6 class="text-uppercase text-muted x-small fw-bold mb-2">Device & Timing</h6>
+                    <div class="table-responsive border rounded">
+                        <table class="table table-sm mb-0 small">
+                            <tbody>
+                                <tr>
+                                    <td class="bg-light text-muted w-25 ps-3">IP Address</td>
+                                    <td id="modalIp" class="font-monospace"></td>
+                                    <td class="bg-light text-muted w-25 ps-3">Created At</td>
+                                    <td id="modalCreated"></td>
+                                </tr>
+                                <tr>
+                                    <td class="bg-light text-muted ps-3">User Agent</td>
+                                    <td id="modalUa" class="text-break" colspan="3"></td>
+                                </tr>
+                                <tr>
+                                    <td class="bg-light text-muted ps-3">Last Activity</td>
+                                    <td id="modalLastActive"></td>
+                                    <td class="bg-light text-muted ps-3">Expires At</td>
+                                    <td id="modalExpiry"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="text-uppercase text-muted x-small fw-bold mb-2">Organization History</h6>
+            <div class="table-responsive border rounded" style="max-height: 200px; overflow-y: auto;">
+                <table class="table table-sm table-hover mb-0 small">
+                    <thead class="bg-light sticky-top">
+                        <tr>
+                            <th class="ps-3">Time</th>
+                            <th>Action</th>
+                            <th>Org ID</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalHistoryBody">
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const modalEl = document.getElementById('sessionDetailsModal');
+    const modal = new bootstrap.Modal(modalEl);
+    const loadingDiv = document.getElementById('sessionModalLoading');
+    const contentDiv = document.getElementById('sessionModalContent');
+
+    document.querySelectorAll('.btn-view-details').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const id = e.currentTarget.dataset.id;
+            
+            // Show Modal & Loading
+            modal.show();
+            loadingDiv.classList.remove('d-none');
+            contentDiv.classList.add('d-none');
+
+            try {
+                const res = await fetch(`/sessions/${id}/details`, {
+                    headers: { 'X-AJAX-Request': 'true' }
+                });
+                const json = await res.json();
+
+                if (json.status === 'success' && json.session) {
+                    populateModal(json.session);
+                    loadingDiv.classList.add('d-none');
+                    contentDiv.classList.remove('d-none');
+                } else {
+                    throw new Error(json.message || 'Failed to load details');
+                }
+            } catch (err) {
+                console.error(err);
+                loadingDiv.innerHTML = `<div class="text-danger">Error: ${err.message}</div>`;
+            }
+        });
+    });
+
+    function populateModal(s) {
+        // Identity
+        document.getElementById('modalUsername').textContent = s.username;
+        document.getElementById('modalUserEmail').textContent = s.userEmail;
+        document.getElementById('modalUserId').textContent = s.userId;
+        document.getElementById('modalSessionId').textContent = s.id; // Now breaks nicely
+        document.getElementById('modalCurrentOrg').textContent = `Org #${s.currentOrgId}`;
+
+        // Status Badge
+        const statusEl = document.getElementById('modalStatus');
+        statusEl.textContent = s.status.toUpperCase();
+        statusEl.className = s.status === 'active' ? 'badge bg-success' : 'badge bg-secondary';
+
+        // Progress Bar Calculation
+        const createdAt = new Date(s.createdAt).getTime();
+        const expiryAt = new Date(s.absoluteExpiry).getTime();
+        const now = Date.now();
+        
+        let percentage = 0;
+        let timeLabel = "Expired";
+        let barClass = "bg-secondary";
+
+        if (now < expiryAt) {
+            const totalDuration = expiryAt - createdAt;
+            const elapsed = now - createdAt;
+            percentage = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+            
+            // Calculate remaining
+            const diffMs = expiryAt - now;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHrs = Math.floor(diffMins / 60);
+            
+            if (diffHrs > 0) timeLabel = `${diffHrs}h ${diffMins % 60}m left`;
+            else timeLabel = `${diffMins} min left`;
+
+            // Color Logic (Green -> Yellow -> Red)
+            if (percentage > 90) barClass = "bg-danger"; // Near end
+            else if (percentage > 75) barClass = "bg-warning";
+            else barClass = "bg-success";
+        } else {
+            percentage = 100;
+            barClass = "bg-secondary";
+        }
+
+        const bar = document.getElementById('modalProgressBar');
+        bar.style.width = `${percentage}%`;
+        bar.className = `progress-bar ${barClass}`;
+        document.getElementById('modalTimeRemaining').textContent = timeLabel;
+
+        // Device & Time
+        document.getElementById('modalIp').textContent = s.deviceFingerprint?.ip || '-';
+        document.getElementById('modalUa').textContent = s.deviceFingerprint?.browser || '-';
+        document.getElementById('modalCreated').textContent = s.formattedCreated;
+        document.getElementById('modalLastActive').textContent = s.formattedLastActive;
+        document.getElementById('modalExpiry').textContent = s.formattedExpiry;
+
+        // History
+        const tbody = document.getElementById('modalHistoryBody');
+        tbody.innerHTML = '';
+        if (s.orgHistory && s.orgHistory.length > 0) {
+            s.orgHistory.forEach(h => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="ps-3 text-muted">${new Date(h.enteredAt).toLocaleString()}</td>
+                    <td><span class="badge bg-light text-dark border">${h.action}</span></td>
+                    <td class="font-monospace">#${h.orgId}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted p-3">No history available</td></tr>';
+        }
+    }
+});
+</script>

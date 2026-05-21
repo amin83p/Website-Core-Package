@@ -1,0 +1,273 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="page-heading size-md m-0">Dashboard Styler</h2>
+        <p class="text-muted mb-0">Customize the look of the main landing page.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/styles" class="btn btn-outline-secondary btn-sm">Back</a>
+        <button type="submit" form="dashForm" class="btn btn-primary btn-sm btn-filled">
+            <i class="bi bi-save-fill me-1"></i> Save Changes
+        </button>
+    </div>
+  </div>
+
+  <div class="row g-4">
+      
+      <div class="col-lg-4">
+          <div class="card border-0 shadow-lg sticky-top" style="top: 20px;">
+              <div class="card-header bg-dark text-white fw-bold">
+                  Dashboard Settings
+              </div>
+              <div class="card-body bg-light">
+                  <form id="dashForm" action="/styles/dashboard/save" method="POST">
+                      
+                      <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
+                          <li class="nav-item">
+                              <button class="nav-link active small py-1" data-bs-toggle="pill" data-bs-target="#tab-hero" type="button">Hero</button>
+                          </li>
+                          <li class="nav-item">
+                              <button class="nav-link small py-1" data-bs-toggle="pill" data-bs-target="#tab-modules" type="button">Modules</button>
+                          </li>
+                      </ul>
+
+                      <div class="tab-content">
+                          
+                          <div class="tab-pane fade show active" id="tab-hero">
+                              <h6 class="fw-bold text-primary mb-3">Welcome Banner</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Gradient Start</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= dashVars.heroBg1 %>" oninput="updatePreview('--dash-hero-bg-1', this.value)">
+                                      <input type="text" name="--dash-hero-bg-1" id="val_heroBg1" class="form-control font-monospace" value="<%= dashVars.heroBg1 %>">
+                                  </div>
+                              </div>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Gradient End</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= dashVars.heroBg2 %>" oninput="updatePreview('--dash-hero-bg-2', this.value)">
+                                      <input type="text" name="--dash-hero-bg-2" id="val_heroBg2" class="form-control font-monospace" value="<%= dashVars.heroBg2 %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Text Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= dashVars.heroText %>" oninput="updatePreview('--dash-hero-text', this.value)">
+                                      <input type="text" name="--dash-hero-text" id="val_heroText" class="form-control font-monospace" value="<%= dashVars.heroText %>">
+                                  </div>
+                              </div>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Corner Radius</span>
+                                      <span id="hRadVal" class="text-primary"><%= dashVars.heroRadius %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="40" step="1" 
+                                         value="<%= parseInt(dashVars.heroRadius) %>"
+                                         oninput="updatePreview('--dash-hero-radius', this.value + 'px'); document.getElementById('hRadVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--dash-hero-radius" id="val_heroRadius" value="<%= dashVars.heroRadius %>">
+                              </div>
+
+                              <hr class="text-muted opacity-25">
+
+                              <h6 class="fw-bold text-primary mb-3">Stat Cards</h6>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Background</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= dashVars.statBg %>" oninput="updatePreview('--dash-stat-bg', this.value)">
+                                      <input type="text" name="--dash-stat-bg" id="val_statBg" class="form-control font-monospace" value="<%= dashVars.statBg %>">
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div class="tab-pane fade" id="tab-modules">
+                              <h6 class="fw-bold text-primary mb-3">Module Grid</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Card Background</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= dashVars.cardBg %>" oninput="updatePreview('--dash-card-bg', this.value)">
+                                      <input type="text" name="--dash-card-bg" id="val_cardBg" class="form-control font-monospace" value="<%= dashVars.cardBg %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Card Border</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= dashVars.cardBorder %>" oninput="updatePreview('--dash-card-border', this.value)">
+                                      <input type="text" name="--dash-card-border" id="val_cardBorder" class="form-control font-monospace" value="<%= dashVars.cardBorder %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Card Radius</span>
+                                      <span id="cRadVal" class="text-primary"><%= dashVars.cardRadius %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="40" step="1" 
+                                         value="<%= parseInt(dashVars.cardRadius) %>"
+                                         oninput="updatePreview('--dash-card-radius', this.value + 'px'); document.getElementById('cRadVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--dash-card-radius" id="val_cardRadius" value="<%= dashVars.cardRadius %>">
+                              </div>
+
+                              <hr class="text-muted opacity-25">
+                              
+                              <h6 class="fw-bold text-primary mb-3">Icons & Accents</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Icon Background</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= dashVars.iconBg %>" oninput="updatePreview('--dash-icon-bg', this.value)">
+                                      <input type="text" name="--dash-icon-bg" id="val_iconBg" class="form-control font-monospace" value="<%= dashVars.iconBg %>">
+                                  </div>
+                              </div>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Icon Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= dashVars.iconColor %>" oninput="updatePreview('--dash-icon-color', this.value)">
+                                      <input type="text" name="--dash-icon-color" id="val_iconColor" class="form-control font-monospace" value="<%= dashVars.iconColor %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Corner Glow (Accent)</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= dashVars.accentColor %>" oninput="updatePreview('--dash-accent-color', this.value)">
+                                      <input type="text" name="--dash-accent-color" id="val_accentColor" class="form-control font-monospace" value="<%= dashVars.accentColor %>">
+                                  </div>
+                              </div>
+
+                          </div>
+
+                      </div>
+
+                  </form>
+              </div>
+          </div>
+      </div>
+
+      <div class="col-lg-8">
+          <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white border-bottom-0 pt-3 fw-bold text-secondary d-flex justify-content-between align-items-center">
+                  <span>Live Preview</span>
+                  <span class="badge bg-light text-muted border">Dashboard Mockup</span>
+              </div>
+              <div class="card-body p-4 bg-light">
+                  
+                  <div class="dash-hero mb-4">
+                      <div class="d-flex align-items-center justify-content-between">
+                          <div>
+                              <h1 class="h3 fw-bold mb-1">Hey <%= user.name || 'User' %> 👋</h1>
+                              <div class="opacity-75 small">Welcome to your workspace.</div>
+                          </div>
+                          <div>
+                              <button class="btn btn-primary btn-filled btn-sm">Manage Sections</button>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="row g-3 mb-4">
+                      <div class="col-md-6">
+                          <div class="dash-stat d-flex align-items-center justify-content-between">
+                              <div>
+                                  <div class="text-muted small">Total Users</div>
+                                  <div class="fs-3 fw-bold text-primary">1,245</div>
+                              </div>
+                              <i class="bi bi-people fs-1 text-primary opacity-25"></i>
+                          </div>
+                      </div>
+                      <div class="col-md-6">
+                          <div class="dash-stat d-flex align-items-center justify-content-between">
+                              <div>
+                                  <div class="text-muted small">System Status</div>
+                                  <div class="fs-3 fw-bold text-success">Healthy</div>
+                              </div>
+                              <i class="bi bi-activity fs-1 text-success opacity-25"></i>
+                          </div>
+                      </div>
+                  </div>
+
+                  <h6 class="fw-bold text-secondary mb-3">Modules</h6>
+                  <div class="row g-3">
+                      
+                      <div class="col-md-6">
+                          <div class="module-card">
+                              <div class="module-accent"></div>
+                              <div class="d-flex align-items-start justify-content-between mb-3">
+                                  <div class="module-icon"><i class="bi bi-gear-fill"></i></div>
+                                  <span class="badge bg-light text-dark border">Admin</span>
+                              </div>
+                              <h5 class="fw-bold mb-1">Settings</h5>
+                              <div class="text-muted small mb-3">System configuration & styles.</div>
+                              <div class="mt-auto">
+                                  <button class="btn btn-primary btn-filled w-100 btn-sm">Open Module</button>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div class="col-md-6">
+                          <div class="module-card">
+                              <div class="module-accent"></div>
+                              <div class="d-flex align-items-start justify-content-between mb-3">
+                                  <div class="module-icon"><i class="bi bi-shield-lock-fill"></i></div>
+                                  <span class="badge bg-light text-dark border">Security</span>
+                              </div>
+                              <h5 class="fw-bold mb-1">Access Control</h5>
+                              <div class="text-muted small mb-3">Manage user permissions.</div>
+                              <div class="mt-auto">
+                                  <button class="btn btn-primary btn-filled w-100 btn-sm">Open Module</button>
+                              </div>
+                          </div>
+                      </div>
+
+                  </div>
+
+              </div>
+          </div>
+      </div>
+
+  </div>
+</div>
+
+<script>
+    function updatePreview(varName, val) {
+        // Sync Inputs
+        const shortName = varName.replace('--dash-', '').replace(/-([a-z])/g, g => g[1].toUpperCase());
+        const inputId = 'val_' + shortName;
+        
+        const textInput = document.getElementById(inputId);
+        if(textInput) textInput.value = val;
+
+        // Apply Globally
+        document.documentElement.style.setProperty(varName, val);
+    }
+
+    document.getElementById('dashForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.querySelector('button[type="submit"]');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        btn.disabled = true;
+
+        try {
+            const fd = new FormData(e.target);
+            const data = Object.fromEntries(fd.entries());
+            const res = await fetch(e.target.action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' }, body: JSON.stringify(data) });
+            const result = await res.json();
+            if (result.status === 'success') {
+                if(typeof showMessageModal === 'function') await showMessageModal({ title: 'Saved', icon: 'success', message: 'Dashboard styles updated.', buttons: [{text:'OK', class:'btn-success'}]});
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            } else {
+                alert('Error: ' + result.message);
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            }
+        } catch (err) {
+            console.error(err); alert('Network error.');
+            btn.disabled = false; btn.innerHTML = originalHtml;
+        }
+    });
+</script>

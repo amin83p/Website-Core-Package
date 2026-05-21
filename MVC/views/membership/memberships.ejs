@@ -1,0 +1,87 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  print,
+  btn_export: false
+}) %>
+
+  <%- include('../partials/tablePages-search', {
+    placeholder: 'Search memberships...',
+    fields: []
+  }) %>
+
+  <div class="table-scroll-wrapper" data-floating-row-actions="true">
+    <table class="table-responsive size-md" id="first-table">
+      <thead>
+        <tr>
+          <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="userId">User <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="orgId">Org Scope <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="effectiveEndDate">Current End <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="nextStartDate">Next Start <span class="sort-icon"></span></th>
+          <th class="draggable" data-column="periods">Periods <span class="sort-icon"></span></th>
+          <th class="text-end pe-4">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (memberships && memberships.length) { %>
+          <% memberships.forEach((row) => { %>
+            <tr>
+              <td><%= row.id || '—' %></td>
+              <td>
+                <div><%= row.userId || '—' %></div>
+                <% if (row.linkedUser) { %>
+                  <div class="text-muted small"><%= row.linkedUser.username || row.linkedUser.email || '' %></div>
+                <% } %>
+              </td>
+              <td><%= row.orgId || 'GLOBAL' %></td>
+              <td>
+                <% const status = row.status || row.summary?.status || 'unknown'; %>
+                <span class="badge <%= status === 'active' ? 'bg-success' : (status === 'expired' ? 'bg-danger' : 'bg-secondary') %>">
+                  <%= status %>
+                </span>
+              </td>
+              <td><%= row.summary?.effectiveEndDate || '—' %></td>
+              <td><%= row.summary?.nextStartDate || '—' %></td>
+              <td><%= Array.isArray(row.periods) ? row.periods.length : 0 %></td>
+              <td class="table-actions text-end pe-4">
+                <div class="row-actions-wrap">
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                    data-row-actions-id="<%= row.id %>"
+                    title="Row actions">
+                    <i class="bi bi-three-dots-vertical"></i>
+                  </button>
+                  <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                    <a href="/memberships/edit/<%= row.id %>" class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-pencil-square me-2"></i>Edit
+                    </a>
+                    <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= row.id %>">
+                      <i class="bi bi-trash me-2"></i>Delete
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        <% } else { %>
+          <tr>
+            <td colspan="8" class="text-center text-muted py-3">No memberships found.</td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+<%- include('../partials/pagination', {
+    pagination: pagination,
+    filters: null,
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>

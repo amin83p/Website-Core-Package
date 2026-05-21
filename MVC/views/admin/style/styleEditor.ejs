@@ -1,0 +1,304 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="page-heading size-md m-0">Visual Theme Editor</h2>
+        <p class="text-muted mb-0">Global variable settings and component navigation.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/dashboard" class="btn btn-outline-secondary btn-sm">Back to Dashboard</a>
+      <button type="submit" form="themeForm" class="btn btn-primary btn-sm btn-filled">
+          <i class="bi bi-save-fill me-1"></i> Save Global Changes
+      </button>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+      <div class="col-md-6 col-lg-3">
+          <a href="/styles/buttons" class="card h-100 border-0 shadow-sm text-decoration-none group-hover-target transition-transform hover-lift">
+              <div class="card-body d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                      <i class="bi bi-hand-index-thumb fs-4"></i>
+                  </div>
+                  <div>
+                      <h6 class="fw-bold text-dark mb-0">Button Studio</h6>
+                      <small class="text-muted">Styles & Radius</small>
+                  </div>
+                  <i class="bi bi-arrow-right ms-auto text-muted opacity-0 group-hover-show"></i>
+              </div>
+          </a>
+      </div>
+      <div class="col-md-6 col-lg-3">
+          <a href="/styles/tables" class="card h-100 border-0 shadow-sm text-decoration-none group-hover-target transition-transform hover-lift">
+              <div class="card-body d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                      <i class="bi bi-table fs-4"></i>
+                  </div>
+                  <div>
+                      <h6 class="fw-bold text-dark mb-0">Table Styler</h6>
+                      <small class="text-muted">Grids & Data</small>
+                  </div>
+                  <i class="bi bi-arrow-right ms-auto text-muted opacity-0 group-hover-show"></i>
+              </div>
+          </a>
+      </div>
+      <div class="col-md-6 col-lg-3">
+          <a href="/styles/header" class="card h-100 border-0 shadow-sm text-decoration-none group-hover-target transition-transform hover-lift">
+              <div class="card-body d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-info-subtle text-info d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                      <i class="bi bi-layout-sidebar-inset-reverse fs-4"></i>
+                  </div>
+                  <div>
+                      <h6 class="fw-bold text-dark mb-0">Header Styler</h6>
+                      <small class="text-muted">Nav & Logo</small>
+                  </div>
+                  <i class="bi bi-arrow-right ms-auto text-muted opacity-0 group-hover-show"></i>
+              </div>
+          </a>
+      </div>
+      <div class="col-md-6 col-lg-3">
+          <a href="/styles/footer" class="card h-100 border-0 shadow-sm text-decoration-none group-hover-target transition-transform hover-lift">
+              <div class="card-body d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-secondary-subtle text-secondary d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                      <i class="bi bi-layout-sidebar-bottom fs-4"></i>
+                  </div>
+                  <div>
+                      <h6 class="fw-bold text-dark mb-0">Footer Styler</h6>
+                      <small class="text-muted">Links & Info</small>
+                  </div>
+                  <i class="bi bi-arrow-right ms-auto text-muted opacity-0 group-hover-show"></i>
+              </div>
+          </a>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <a href="/styles/dashboard" class="card h-100 border-0 shadow-sm text-decoration-none group-hover-target transition-transform hover-lift">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                    <i class="bi bi-grid-1x2-fill fs-4"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-0">Dashboard Styler</h6>
+                    <small class="text-muted">Hero & Cards</small>
+                </div>
+                <i class="bi bi-arrow-right ms-auto text-muted opacity-0 group-hover-show"></i>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="/styles/modals" class="card h-100 border-0 shadow-sm text-decoration-none group-hover-target transition-transform hover-lift">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                    <i class="bi bi-window-stack fs-4"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-0">Modal Styler</h6>
+                    <small class="text-muted">Popups & Blurs</small>
+                </div>
+                <i class="bi bi-arrow-right ms-auto text-muted opacity-0 group-hover-show"></i>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="/styles/search" class="card h-100 border-0 shadow-sm text-decoration-none group-hover-target transition-transform hover-lift">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                    <i class="bi bi-search fs-4"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-0">Search Styler</h6>
+                    <small class="text-muted">Inputs & Pills</small>
+                </div>
+                <i class="bi bi-arrow-right ms-auto text-muted opacity-0 group-hover-show"></i>
+            </div>
+        </a>
+    </div>    
+  </div>
+
+  <form id="themeForm" action="/styles/save" method="POST">
+    <div class="row g-4">
+        
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-light border-0 pt-3 pb-0">
+                    <ul class="nav nav-tabs card-header-tabs" id="themeTabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-colors" type="button">
+                                <i class="bi bi-palette me-2"></i>Global Colors
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-layout" type="button">
+                                <i class="bi bi-aspect-ratio me-2"></i>Spacing & Layout
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-advanced" type="button">
+                                <i class="bi bi-code-slash me-2"></i>Advanced Variables
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="card-body">
+                    <div class="tab-content">
+                        
+                        <div class="tab-pane fade show active" id="tab-colors">
+                            <h6 class="fw-bold text-primary mb-3">Core Color Palette</h6>
+                            <div class="row g-3">
+                                <% (grouped['Colors'] || []).forEach(v => { %>
+                                    <div class="col-md-6 col-xl-4">
+                                        <div class="p-2 border rounded d-flex align-items-center bg-white">
+                                            <input type="color" class="form-control form-control-color me-2 border-0" 
+                                                   value="<%= v.value %>" 
+                                                   oninput="updateVar('<%= v.key %>', this.value)">
+                                            <div class="flex-grow-1 overflow-hidden">
+                                                <div class="small fw-bold text-dark text-truncate"><%= v.key.replace('--color-', '') %></div>
+                                                <input type="text" name="<%= v.key %>" class="form-control form-control-sm border-0 p-0 text-muted font-monospace" 
+                                                       style="font-size: 0.75rem;" value="<%= v.value %>">
+                                            </div>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="tab-layout">
+                            <h6 class="fw-bold text-primary mb-3">Global Dimensions</h6>
+                            <div class="row g-3">
+                                <% (grouped['Spacing & Layout'] || []).forEach(v => { %>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted mb-1"><%= v.key %></label>
+                                        <input type="text" name="<%= v.key %>" class="form-control" value="<%= v.value %>">
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="tab-advanced">
+                            <div class="alert alert-warning border-warning d-flex align-items-center mb-4">
+                                <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+                                <div>
+                                    <strong>Caution:</strong> These are raw CSS variables found in <code>main.css</code>. 
+                                    Changing them may affect various parts of the system.
+                                </div>
+                            </div>
+                            <div class="row g-3">
+                                <% Object.keys(grouped).forEach(cat => { 
+                                     if(['Colors', 'Spacing & Layout'].includes(cat)) return;
+                                     grouped[cat].forEach(v => { %>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted mb-1"><%= v.key %></label>
+                                        <input type="text" name="<%= v.key %>" class="form-control font-monospace" value="<%= v.value %>">
+                                    </div>
+                                <% }) }) %>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="sticky-top" style="top: 20px; z-index: 10;">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+                        <span>Global Preview</span>
+                        <span class="badge bg-white text-dark border">Interactive</span>
+                    </div>
+                    <div class="card-body bg-light text-center" id="livePreviewBox">
+                        
+                        <div class="mb-4">
+                            <label class="form-label small text-muted text-uppercase fw-bold mb-2">Palette Test</label>
+                            <div class="d-flex justify-content-center gap-2">
+                                <button type="button" class="btn btn-primary btn-filled">Primary</button>
+                                <button type="button" class="btn btn-outline-primary btn-filled">Outline</button>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label small text-muted text-uppercase fw-bold mb-2">Alert Colors</label>
+                            <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                <span class="badge bg-success">Success</span>
+                                <span class="badge bg-danger">Danger</span>
+                                <span class="badge bg-warning text-dark">Warning</span>
+                                <span class="badge bg-info">Info</span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 bg-white border rounded shadow-sm text-start">
+                            <h6 class="fw-bold text-primary">Typography & Radius</h6>
+                            <p class="small text-muted mb-2">This card reflects global border-radius and font settings.</p>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar" role="progressbar" style="width: 75%"></div>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="card-footer bg-white text-center">
+                        <button type="button" class="btn btn-link text-muted btn-sm text-decoration-none" onclick="location.reload()">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reset Preview
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+  </form>
+</div>
+
+<style>
+    .hover-lift { transition: transform 0.2s, box-shadow 0.2s; }
+    .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.1)!important; }
+    .group-hover-show { transition: opacity 0.2s; }
+    .group-hover-target:hover .group-hover-show { opacity: 1 !important; }
+</style>
+
+<script>
+    function updateVar(key, val) {
+        // Sync input
+        const input = document.querySelector(`input[name="${key}"]`);
+        if(input && input !== document.activeElement) input.value = val;
+        
+        // Apply to Document Root for live preview
+        document.documentElement.style.setProperty(key, val);
+    }
+
+    document.getElementById('themeForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.querySelector('button[type="submit"]');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        btn.disabled = true;
+
+        try {
+            const fd = new FormData(e.target);
+            const data = Object.fromEntries(fd.entries());
+
+            const res = await fetch(e.target.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await res.json();
+            if (result.status === 'success') {
+                if(typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Theme Saved', icon: 'success', message: 'Global styles updated successfully.', buttons: [{text:'OK', class:'btn-success'}]});
+                }
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            } else {
+                alert('Error: ' + result.message);
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Network error.');
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    });
+</script>

@@ -1,0 +1,234 @@
+﻿<%
+  const r = rate || {};
+  const isEditMode = (typeof isEdit !== 'undefined') ? !!isEdit : !!r.ownerId;
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-cash-stack me-2"></i>Manage Pay Rate Profile</h1>
+    <% if (isEditMode) { %>
+      <span class="badge bg-primary border font-monospace"><%= (r.ownerType || '').toUpperCase() %>: <%= r.ownerId %></span>
+    <% } %>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1100px;">
+    <form id="rateForm" action="<%= isEditMode ? '/school/payrates/edit/' + r.ownerId : '/school/payrates/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+      <input type="hidden" name="ownerId" id="inp_ownerId" value="<%= r.ownerId || '' %>">
+      <input type="hidden" name="ownerType" id="inp_ownerType" value="<%= r.ownerType || '' %>">
+      <input type="hidden" name="compensationProfiles" id="hid_compensationProfiles" value="[]">
+
+      <script type="application/json" id="init_compensationProfiles"><%- JSON.stringify(r.compensationProfiles || []) %></script>
+      <script type="application/json" id="comp_departments"><%- JSON.stringify(departments || []) %></script>
+      <script type="application/json" id="comp_methods"><%- JSON.stringify(compensationMethods || []) %></script>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-7">
+              <label class="form-label fw-bold">Teacher / Staff Person *</label>
+              <div class="input-group">
+                <input type="hidden" name="personId" id="inp_personId" value="<%= r.personId || '' %>" required>
+                <input type="text" id="inp_personName" class="form-control size-md bg-white" value="<%= r.personName || '' %>" placeholder="Select teacher/staff" readonly required>
+                <button type="button" class="btn btn-outline-primary" id="btnPickPerson" <%= isEditMode ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
+              </div>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label fw-bold">Role *</label>
+              <% const pr = String(r.personRole || 'teacher').toLowerCase(); %>
+              <select name="personRole" id="inp_personRole" class="form-select size-md" <%= isEditMode ? 'disabled' : '' %>>
+                <option value="teacher" <%= pr === 'teacher' ? 'selected' : '' %>>Teacher</option>
+                <option value="staff" <%= pr === 'staff' ? 'selected' : '' %>>Staff</option>
+              </select>
+              <% if (isEditMode) { %><input type="hidden" name="personRole" value="<%= pr %>"><% } %>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="fw-bold m-0">Compensation Entries</h6>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddCompensation"><i class="bi bi-plus-lg"></i> Add Entry</button>
+          </div>
+          <div id="compensationProfilesList"></div>
+          <div class="form-text small">Manage all rates for this profile in one place. Department date overlaps are prevented on save.</div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Profile Rates</button>
+        <a href="/school/payrates" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('rateForm');
+  const hidComp = document.getElementById('hid_compensationProfiles');
+  const compList = document.getElementById('compensationProfilesList');
+  const btnAddComp = document.getElementById('btnAddCompensation');
+
+  const departmentOptions = JSON.parse(document.getElementById('comp_departments').textContent || '[]');
+  const compensationMethods = JSON.parse(document.getElementById('comp_methods').textContent || '[]');
+  let compensationProfiles = JSON.parse(document.getElementById('init_compensationProfiles').textContent || '[]');
+
+  function syncHidden() {
+    if (hidComp) hidComp.value = JSON.stringify(compensationProfiles);
+  }
+
+  function toLabel(v) {
+    return String(v || '').split('_').map((x) => x ? x[0].toUpperCase() + x.slice(1) : '').join(' ');
+  }
+
+  function renderCompRows() {
+    if (!compList) return;
+    compList.innerHTML = '';
+    if (!Array.isArray(compensationProfiles)) compensationProfiles = [];
+
+    if (!compensationProfiles.length) {
+      compList.innerHTML = '<div class="text-muted small">No compensation entries yet.</div>';
+      syncHidden();
+      return;
+    }
+
+    compensationProfiles.forEach((row, idx) => {
+      const depOpts = ['<option value="">-- Department --</option>']
+        .concat((departmentOptions || []).map((d) => {
+          const id = String(d?.id || '');
+          const selected = String(row.departmentId || '') === id ? 'selected' : '';
+          const label = `${d?.code || d?.id || ''} - ${d?.name || ''}`.trim();
+          return `<option value="${id}" ${selected}>${label}</option>`;
+        })).join('');
+
+      const methodOpts = (compensationMethods || []).map((m) => {
+        const selected = String(row.paymentMethod || 'hourly') === String(m) ? 'selected' : '';
+        return `<option value="${m}" ${selected}>${toLabel(m)}</option>`;
+      }).join('');
+
+      const wrap = document.createElement('div');
+      wrap.className = 'border rounded p-3 mb-3 bg-white';
+      wrap.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-bold small text-muted">Entry #${idx + 1}</div>
+          <button type="button" class="btn btn-sm btn-outline-danger comp-remove"><i class="bi bi-trash"></i></button>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-3"><label class="form-label fw-bold small">Department *</label><select class="form-select size-md comp-dept">${depOpts}</select></div>
+          <div class="col-md-3"><label class="form-label fw-bold small">Payment Method *</label><select class="form-select size-md comp-method">${methodOpts}</select></div>
+          <div class="col-md-2"><label class="form-label fw-bold small">Hourly Rate</label><input type="number" step="0.01" min="0" class="form-control size-md comp-hourly" value="${row.hourlyRate ?? ''}"></div>
+          <div class="col-md-2"><label class="form-label fw-bold small">Payment Amount</label><input type="number" step="0.01" min="0" class="form-control size-md comp-amount" value="${row.paymentAmount ?? ''}"></div>
+          <div class="col-md-2"><label class="form-label fw-bold small">Contract #</label><input type="text" class="form-control size-md comp-contract" value="${String(row.contractId || '').replace(/"/g, '&quot;')}"></div>
+          <div class="col-md-3"><label class="form-label fw-bold small">Effective From</label><input type="date" class="form-control size-md comp-from" value="${row.effectiveFrom || ''}"></div>
+          <div class="col-md-3"><label class="form-label fw-bold small">Effective To</label><input type="date" class="form-control size-md comp-to" value="${row.effectiveTo || ''}"></div>
+          <div class="col-md-6"><label class="form-label fw-bold small">Notes</label><input type="text" class="form-control size-md comp-notes" value="${String(row.notes || '').replace(/"/g, '&quot;')}"></div>
+        </div>`;
+
+      const setVal = (k, v) => { compensationProfiles[idx][k] = v; syncHidden(); };
+      wrap.querySelector('.comp-dept').addEventListener('change', (e) => setVal('departmentId', e.target.value));
+      wrap.querySelector('.comp-method').addEventListener('change', (e) => setVal('paymentMethod', e.target.value));
+      wrap.querySelector('.comp-hourly').addEventListener('input', (e) => setVal('hourlyRate', e.target.value));
+      wrap.querySelector('.comp-amount').addEventListener('input', (e) => setVal('paymentAmount', e.target.value));
+      wrap.querySelector('.comp-contract').addEventListener('input', (e) => setVal('contractId', e.target.value));
+      wrap.querySelector('.comp-from').addEventListener('change', (e) => setVal('effectiveFrom', e.target.value));
+      wrap.querySelector('.comp-to').addEventListener('change', (e) => setVal('effectiveTo', e.target.value));
+      wrap.querySelector('.comp-notes').addEventListener('input', (e) => setVal('notes', e.target.value));
+      wrap.querySelector('.comp-remove').addEventListener('click', () => {
+        compensationProfiles.splice(idx, 1);
+        renderCompRows();
+      });
+
+      compList.appendChild(wrap);
+    });
+
+    syncHidden();
+  }
+
+  btnAddComp?.addEventListener('click', () => {
+    compensationProfiles.push({
+      id: `CMP_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      departmentId: '',
+      paymentMethod: 'hourly',
+      hourlyRate: '',
+      paymentAmount: '',
+      effectiveFrom: '',
+      effectiveTo: '',
+      contractId: '',
+      notes: ''
+    });
+    renderCompRows();
+  });
+
+  const pBtn = document.getElementById('btnPickPerson');
+  pBtn?.addEventListener('click', () => {
+    GenericPicker.open(GenericPickerPresets.person({
+      title: 'Select Teacher/Staff',
+      apiEndpoint: '/school/payrates/api/eligible-persons',
+      placeholder: 'Search eligible persons...',
+      onSelect: (item) => {
+        document.getElementById('inp_personId').value = item.personId || item.id;
+        document.getElementById('inp_personName').value = item.displayName || item.id;
+        document.getElementById('inp_personRole').value = item.matchedRole || 'teacher';
+        document.getElementById('inp_ownerId').value = item.ownerId || '';
+        document.getElementById('inp_ownerType').value = item.ownerType || '';
+      }
+    }));
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    syncHidden();
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+        body: new URLSearchParams(new FormData(form)).toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+        : { stop: false };
+      if (guarded.stop) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        return;
+      }
+
+      await showMessageModal({
+        title: result.status === 'success' ? 'Success' : 'Error',
+        icon: result.status === 'success' ? 'success' : 'error',
+        message: result.message || 'Operation completed.',
+        buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
+      });
+
+      if (result.status === 'success') {
+        window.location.href = '/school/payrates';
+      } else {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+      }
+    } catch (err) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+      await showMessageModal({
+        title: 'System Error',
+        icon: 'error',
+        message: err.message || 'Unexpected error.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    }
+  });
+
+  renderCompRows();
+});
+</script>

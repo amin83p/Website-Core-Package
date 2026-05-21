@@ -1,0 +1,66 @@
+[
+  {
+    "id": "CNT-34HDLH2",
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T00:07:40.566Z",
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-01-31T08:29:01.693Z"
+    },
+    "contacts": {},
+    "endDate": "2026-08-31",
+    "financials": {
+      "amount": null,
+      "currency": "USD",
+      "billingFrequency": "Monthly"
+    },
+    "notes": "",
+    "orgId": "900000",
+    "renewal": {
+      "autoRenew": false,
+      "renewalPeriodMonths": 12,
+      "renewalNoticeDays": 30
+    },
+    "scope": {
+      "services": [],
+      "notes": ""
+    },
+    "startDate": "2026-01-01",
+    "status": "active",
+    "title": "1",
+    "type": "subscription"
+  },
+  {
+    "id": "CNT-65CP0EV",
+    "attachments": [],
+    "audit": {
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-01-31T08:31:37.818Z",
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-01-31T08:30:25.418Z"
+    },
+    "contacts": {},
+    "endDate": "2026-03-11",
+    "financials": {
+      "amount": null,
+      "currency": "USD",
+      "billingFrequency": "Monthly"
+    },
+    "notes": "",
+    "orgId": "464355",
+    "renewal": {
+      "autoRenew": false,
+      "renewalPeriodMonths": 12,
+      "renewalNoticeDays": 30
+    },
+    "scope": {
+      "services": [],
+      "notes": ""
+    },
+    "startDate": "2026-01-01",
+    "status": "draft",
+    "title": "2",
+    "type": "subscription"
+  }
+]

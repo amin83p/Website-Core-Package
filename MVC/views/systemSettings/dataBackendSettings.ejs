@@ -1,0 +1,435 @@
+<%
+  const backend = runtimeBackend || {};
+  const activeMode = String(backend.mode || 'json').trim().toLowerCase();
+  const runtime = backend.runtime || {};
+  const requestedMode = String(runtime.requestedMode || backend.requested || activeMode).trim().toLowerCase();
+  const source = String(backend.source || 'default');
+  const mongo = backend.mongo || {};
+  const mongoReady = Boolean(mongo.ready);
+  const mongoSource = String(mongo.source || 'none');
+  const envStatus = backend.env || {};
+  const warnings = Array.isArray(backend.warnings) ? backend.warnings : [];
+  const isProduction = Boolean(backend?.production?.active);
+  const fallback = backend.fallback || {};
+  const fallbackActive = Boolean(fallback.active);
+  const strictMode = Boolean(backend?.strict?.enabled);
+  const lastMongoError = runtime.lastMongoError && runtime.lastMongoError.message ? String(runtime.lastMongoError.message) : '';
+  const retryErrorMessage = typeof retryError !== 'undefined' ? String(retryError || '') : '';
+  const actionStateValue = typeof actionStateId !== 'undefined' ? String(actionStateId || '') : '';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0">Data Backend Configuration</h1>
+      <p class="text-muted mb-0 mt-1">Runtime database selection is controlled by environment variables only.</p>
+    </div>
+    <span class="badge <%= isProduction ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-info-subtle text-info-emphasis border border-info-subtle' %>">
+      <%= isProduction ? 'Production Env Locked' : 'Env Driven' %>
+    </span>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <div class="card mb-4 shadow-sm border-0">
+      <div class="card-header bg-white border-0 pb-0">
+        <h5 class="fw-bold mb-1"><i class="bi bi-database-gear text-primary me-2"></i>Runtime Status</h5>
+        <p class="text-muted small mb-0">These values are read from deployment variables. Change them in Railway or your local <code>.env</code>, then restart the app or use retry when Mongo is reachable.</p>
+      </div>
+      <div class="card-body p-4">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6 col-lg-3">
+            <div class="border rounded-3 p-3 h-100 bg-light">
+              <div class="small text-muted text-uppercase fw-bold mb-1">Active Backend</div>
+              <div class="fs-5 fw-bold <%= fallbackActive ? 'text-warning' : (activeMode === 'mongo' ? 'text-success' : '') %>"><%= activeMode.toUpperCase() %></div>
+              <div class="small text-muted mt-1">Requested: <%= requestedMode.toUpperCase() %></div>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="border rounded-3 p-3 h-100 bg-light">
+              <div class="small text-muted text-uppercase fw-bold mb-1">DATA_BACKEND</div>
+              <div class="fs-5 fw-bold <%= envStatus.dataBackendSet ? 'text-success' : 'text-muted' %>">
+                <%= envStatus.dataBackendSet ? 'SET' : 'DEFAULT' %>
+              </div>
+              <div class="small text-muted mt-1">Allowed: <code>json</code> or <code>mongo</code></div>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="border rounded-3 p-3 h-100 bg-light">
+              <div class="small text-muted text-uppercase fw-bold mb-1">Mongo URI</div>
+              <div class="fs-5 fw-bold <%= mongoReady ? 'text-success' : 'text-danger' %>">
+                <%= mongoReady ? 'CONFIGURED' : 'MISSING' %>
+              </div>
+              <div class="small text-muted mt-1">Source: <%= mongoSource.toUpperCase() %></div>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="border rounded-3 p-3 h-100 bg-light">
+              <div class="small text-muted text-uppercase fw-bold mb-1">Strict Mode</div>
+              <div class="fs-5 fw-bold <%= strictMode ? 'text-danger' : 'text-success' %>">
+                <%= strictMode ? 'ON' : 'OFF' %>
+              </div>
+              <div class="small text-muted mt-1"><%= strictMode ? 'Startup fails on Mongo issues' : 'JSON recovery allowed' %></div>
+            </div>
+          </div>
+        </div>
+
+        <% if (fallbackActive || retryErrorMessage) { %>
+          <div class="backend-notice <%= retryErrorMessage ? 'backend-notice-danger' : 'backend-notice-warning' %> mb-3">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3">
+              <div>
+                <div class="fw-bold mb-1">
+                  <i class="bi bi-database-exclamation me-2"></i>
+                  <%= retryErrorMessage ? 'Mongo Retry Failed' : 'JSON Recovery Mode Active' %>
+                </div>
+                <div class="small">
+                  <%= retryErrorMessage || fallback.message || 'Mongo is unavailable, so the app is running from JSON storage.' %>
+                </div>
+                <% if (fallback.reason) { %>
+                  <div class="small mt-1">Reason: <code><%= fallback.reason %></code></div>
+                <% } %>
+                <% if (runtime.lastMongoCheckAt) { %>
+                  <div class="small mt-1">Last checked: <code><%= runtime.lastMongoCheckAt %></code></div>
+                <% } %>
+                <% if (lastMongoError) { %>
+                  <div class="small mt-1 text-muted">Last Mongo error: <%= lastMongoError %></div>
+                <% } %>
+              </div>
+              <form method="POST" action="/systemSettings/data-backend/retry" class="m-0" id="mongoRetryForm">
+                <button type="submit" class="btn btn-warning fw-bold" id="mongoRetryBtn">
+                  <i class="bi bi-arrow-clockwise me-1"></i> Retry Mongo Connection
+                </button>
+              </form>
+            </div>
+          </div>
+        <% } %>
+
+        <% if (warnings.length > 0) { %>
+          <div class="backend-notice backend-notice-danger mb-3">
+            <div class="fw-bold mb-1"><i class="bi bi-shield-exclamation me-2"></i>Configuration Warnings</div>
+            <ul class="mb-0 ps-3">
+              <% warnings.forEach((w) => { %>
+                <li><%= w %></li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+
+        <div class="backend-notice backend-notice-info mb-3">
+          <div class="fw-bold mb-1"><i class="bi bi-info-circle me-2"></i>How to configure this app</div>
+          <div class="small">
+            Local development can omit <code>DATA_BACKEND</code> and will use JSON. Railway/production should set
+            <code>DATA_BACKEND=mongo</code> and <code>MONGODB_URI</code> in environment variables or local <code>.env</code>.
+            Do not save Mongo credentials in System Settings. The legacy <code>MONGO_URI</code> alias is temporarily supported
+            only to avoid breaking older deployments.
+          </div>
+        </div>
+
+        <div class="border rounded-3 p-3 bg-light-subtle">
+          <div class="fw-semibold mb-2">Environment Variables</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Required</th>
+                  <th>Purpose</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>DATA_BACKEND</code></td>
+                  <td>Production: yes</td>
+                  <td>Use <code>json</code> for local JSON mode or <code>mongo</code> for MongoDB.</td>
+                </tr>
+                <tr>
+                  <td><code>MONGODB_URI</code></td>
+                  <td>When backend is Mongo</td>
+                  <td>Canonical Mongo connection string. Keep this in environment variables, not app settings. Remove duplicate <code>MONGO_URI</code> after confirming this works.</td>
+                </tr>
+                <tr>
+                  <td><code>MONGODB_DB</code></td>
+                  <td>No</td>
+                  <td>Optional canonical database name override. If omitted, the app infers it from URI or uses <code>app</code>. Remove duplicate <code>MONGO_DB</code> after confirming this works.</td>
+                </tr>
+                <tr>
+                  <td><code>DATA_BACKEND_STRICT</code></td>
+                  <td>No</td>
+                  <td>Set to <code>true</code> only when you want startup to fail instead of entering JSON recovery mode.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4 shadow-sm border-0">
+      <div class="card-header bg-white border-0 pb-0">
+        <h5 class="fw-bold mb-1"><i class="bi bi-cloud-arrow-up text-danger me-2"></i>Restore Database From Backup</h5>
+        <p class="text-muted small mb-0">
+          Upload a backup created by this app (<code>mongo-backup-*.jsonl.gz</code>) and restore its collections into MongoDB.
+        </p>
+      </div>
+      <div class="card-body p-4">
+        <div class="backend-notice backend-notice-warning mb-3">
+          <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Destructive restore</div>
+          <div class="small">
+            Restore deletes the current documents in each collection included in the backup, then inserts the backup documents.
+            Download a fresh backup before restoring if Mongo is currently reachable.
+          </div>
+        </div>
+
+        <form id="mongoBackupDownloadForm" method="POST" action="/systemSettings/data-migration/backup/mongo" class="d-none">
+          <input type="hidden" name="actionStateId" value="<%= actionStateValue %>">
+        </form>
+
+        <form id="mongoRestoreBackupForm" enctype="multipart/form-data">
+          <div class="row g-3 align-items-end">
+            <div class="col-lg-7">
+              <label for="mongoBackupFile" class="form-label fw-bold">Backup File</label>
+              <input type="file" class="form-control" id="mongoBackupFile" name="backupFile" accept=".gz,.jsonl,.json" <%= mongoReady ? '' : 'disabled' %>>
+              <div class="form-text">Expected format: <code>mongo-backup-YYYYMMDD-HHMMSS.jsonl.gz</code>.</div>
+            </div>
+            <div class="col-lg-5">
+              <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                <button type="button" id="downloadMongoBackupFromBackendBtn" class="btn btn-outline-success" <%= mongoReady ? '' : 'disabled' %>>
+                  <i class="bi bi-download me-1"></i> Download Current Backup
+                </button>
+                <button type="submit" id="restoreMongoBackupBtn" class="btn btn-danger fw-bold" <%= mongoReady ? '' : 'disabled' %>>
+                  <i class="bi bi-cloud-arrow-up me-1"></i> Restore Backup
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <% if (!mongoReady) { %>
+          <div class="small text-danger mt-3">
+            Mongo URI is missing, so restore is disabled. Set <code>MONGODB_URI</code> first.
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+      <a href="/systemSettings" class="btn btn-secondary btn-filled btn-md">Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+
+<style>
+  .backend-notice {
+    padding: 1rem;
+    border-radius: 1rem;
+    border: 1px solid transparent;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+  }
+
+  .backend-notice-info {
+    color: #0f3a6b;
+    border-color: #b6def6;
+    background: linear-gradient(135deg, #eef8ff, #f7fcff);
+  }
+
+  .backend-notice-warning {
+    color: #714c00;
+    border-color: #f3d07b;
+    background: linear-gradient(135deg, #fff8e6, #fffbf0);
+  }
+
+  .backend-notice-danger {
+    color: #842029;
+    border-color: #f1aeb5;
+    background: linear-gradient(135deg, #fff1f2, #fff8f8);
+  }
+</style>
+
+<script>
+(() => {
+  const restoreForm = document.getElementById('mongoRestoreBackupForm');
+  const fileInput = document.getElementById('mongoBackupFile');
+  const restoreBtn = document.getElementById('restoreMongoBackupBtn');
+  const downloadBtn = document.getElementById('downloadMongoBackupFromBackendBtn');
+  const downloadForm = document.getElementById('mongoBackupDownloadForm');
+  const retryForm = document.getElementById('mongoRetryForm');
+  const retryBtn = document.getElementById('mongoRetryBtn');
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  async function showModalMessage(title, message, icon = 'info', buttonClass = 'btn-primary') {
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal({
+        title,
+        icon,
+        message,
+        buttons: [{ text: 'OK', class: buttonClass }]
+      });
+    }
+    return null;
+  }
+
+  function buildRestoreSummary(report) {
+    const rows = Array.isArray(report?.reports) ? report.reports : [];
+    const preview = rows.slice(0, 8).map((row) => (
+      `<tr>
+        <td><code>${escapeHtml(row.collection)}</code></td>
+        <td class="text-end">${Number(row.beforeCount || 0).toLocaleString()}</td>
+        <td class="text-end">${Number(row.inserted || 0).toLocaleString()}</td>
+        <td class="text-end">${Number(row.afterCount || 0).toLocaleString()}</td>
+      </tr>`
+    )).join('');
+    const more = rows.length > 8 ? `<div class="small text-muted mt-2">...and ${rows.length - 8} more collection(s).</div>` : '';
+    return `
+      <div class="mb-2">Restored <b>${Number(report?.totalDocuments || 0).toLocaleString()}</b> document(s)
+      across <b>${Number(report?.totalCollections || 0).toLocaleString()}</b> collection(s).</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Collection</th><th class="text-end">Before</th><th class="text-end">Inserted</th><th class="text-end">After</th></tr></thead>
+          <tbody>${preview}</tbody>
+        </table>
+      </div>
+      ${more}
+    `;
+  }
+
+  if (downloadBtn && downloadForm) {
+    downloadBtn.addEventListener('click', () => downloadForm.submit());
+  }
+
+  if (retryForm && retryBtn) {
+    retryForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const original = retryBtn.innerHTML;
+      try {
+        retryBtn.disabled = true;
+        retryBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Retrying...';
+        if (typeof window.showLoading === 'function') {
+          window.showLoading({
+            title: 'Retrying Mongo Connection',
+            note: 'Checking the configured MongoDB connection...',
+            operation: 'Data backend retry'
+          });
+        }
+
+        const response = await fetch(retryForm.action, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'X-AJAX-Request': 'true'
+          }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.status !== 'success') {
+          throw new Error(payload.message || `Mongo retry failed (${response.status}).`);
+        }
+
+        if (typeof window.hideLoading === 'function') window.hideLoading();
+        const selected = await showModalMessage(
+          'Mongo Connection Restored',
+          escapeHtml(payload.message || 'Mongo connection retry succeeded.'),
+          'success',
+          'btn-success'
+        );
+        if (selected === 'OK' || selected === 'closed' || selected === null) {
+          window.location.reload();
+        }
+      } catch (error) {
+        if (typeof window.hideLoading === 'function') window.hideLoading();
+        await showModalMessage(
+          'Mongo Retry Failed',
+          escapeHtml(error.message || 'Mongo connection retry failed.'),
+          'error',
+          'btn-danger'
+        );
+      } finally {
+        retryBtn.disabled = false;
+        retryBtn.innerHTML = original;
+      }
+    });
+  }
+
+  if (!restoreForm || !restoreBtn || !fileInput) return;
+
+  restoreForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    if (!file) {
+      await showModalMessage('Backup Required', 'Select a Mongo backup file before restoring.', 'warning', 'btn-warning');
+      return;
+    }
+
+    if (typeof window.showMessageModal !== 'function') {
+      return;
+    }
+
+    const selected = await window.showMessageModal({
+      title: 'Confirm Database Restore',
+      icon: 'warning',
+      message: `This will <b>replace Mongo collection data</b> for every collection included in <code>${escapeHtml(file.name)}</code>.<br><br>Download a fresh backup first if you have not already done so.`,
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary btn-md' },
+        { text: 'Download Backup', class: 'btn-outline-success btn-md' },
+        { text: 'Restore Database', class: 'btn-danger btn-md' }
+      ]
+    });
+
+    if (selected === 'Download Backup') {
+      if (downloadForm) downloadForm.submit();
+      return;
+    }
+    if (selected !== 'Restore Database') return;
+
+    try {
+      if (typeof window.requestProtectedAction !== 'function') {
+        throw new Error('Admin verification system is not loaded. Please refresh the page and try again.');
+      }
+      await window.requestProtectedAction();
+
+      const original = restoreBtn.innerHTML;
+      restoreBtn.disabled = true;
+      restoreBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Restoring...';
+
+      if (typeof window.showLoading === 'function') {
+        window.showLoading({
+          title: 'Restoring Mongo Backup',
+          note: 'Uploading backup and rebuilding included collections...',
+          operation: 'Database restore'
+        });
+      }
+
+      const formData = new FormData(restoreForm);
+      const response = await fetch('/systemSettings/data-backend/restore-backup', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: formData
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || `Restore failed (${response.status}).`);
+      }
+
+      if (typeof window.hideLoading === 'function') window.hideLoading();
+      await showModalMessage('Restore Completed', buildRestoreSummary(payload.report), 'success', 'btn-success');
+      fileInput.value = '';
+      restoreBtn.innerHTML = original;
+      restoreBtn.disabled = false;
+    } catch (error) {
+      if (error && error.code === 'ADMIN_VERIFICATION_CANCELLED') return;
+      if (typeof window.hideLoading === 'function') window.hideLoading();
+      await showModalMessage('Restore Failed', escapeHtml(error.message || 'Database restore failed.'), 'error', 'btn-danger');
+      restoreBtn.innerHTML = '<i class="bi bi-cloud-arrow-up me-1"></i> Restore Backup';
+      restoreBtn.disabled = false;
+    }
+  });
+})();
+</script>

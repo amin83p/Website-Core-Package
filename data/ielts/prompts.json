@@ -1,0 +1,161 @@
+[
+  {
+    "id": "legacy_analysis_context",
+    "category": "NO_CATEGORY",
+    "config": {
+      "modelHint": "gemini-2.5-flash",
+      "temperature": 0,
+      "topP": 1,
+      "topK": 1
+    },
+    "content": "IELTS Examiner Analysis. Question: {{question}}. Criteria: {{criteria}}. Essay: \"{{essay_text}}\".",
+    "createdAt": "2026-03-17T03:56:07.153Z",
+    "description": "Analysis context from aiService.buildAnalysisContext",
+    "isActive": true,
+    "isDefault": false,
+    "name": "Legacy Analysis Context",
+    "orgId": "900000",
+    "tags": [],
+    "targetStep": "general",
+    "updatedAt": "2026-03-17T03:56:07.153Z",
+    "variables": [
+      "question",
+      "criteria",
+      "essay_text"
+    ]
+  },
+  {
+    "id": "legacy_assessment_context",
+    "category": "NO_CATEGORY",
+    "config": {
+      "modelHint": "gemini-2.5-flash",
+      "temperature": 0,
+      "topP": 1,
+      "topK": 1
+    },
+    "content": "IELTS Coach Review. Title: {{assessment_title}}.",
+    "createdAt": "2026-03-17T03:56:07.153Z",
+    "description": "Assessment context from aiService.buildAssessmentContext",
+    "isActive": true,
+    "isDefault": false,
+    "name": "Legacy Assessment Context",
+    "orgId": "900000",
+    "tags": [],
+    "targetStep": "general",
+    "updatedAt": "2026-03-17T03:56:07.153Z",
+    "variables": [
+      "assessment_title"
+    ]
+  },
+  {
+    "id": "legacy_sample_context",
+    "category": "NO_CATEGORY",
+    "config": {
+      "modelHint": "gemini-2.5-flash",
+      "temperature": 0,
+      "topP": 1,
+      "topK": 1
+    },
+    "content": "You are an expert IELTS Writing Tutor. Context: Question: \"{{question}}\". Essay: \"{{essay_text}}\"",
+    "createdAt": "2026-03-17T03:56:07.153Z",
+    "description": "Sample context from aiService.buildSampleContext",
+    "isActive": true,
+    "isDefault": false,
+    "name": "Legacy Sample Context",
+    "orgId": "900000",
+    "tags": [],
+    "targetStep": "general",
+    "updatedAt": "2026-03-17T03:56:07.153Z",
+    "variables": [
+      "question",
+      "essay_text"
+    ]
+  },
+  {
+    "id": "step3extract_v0225_sample",
+    "category": "step3extract",
+    "config": {
+      "modelHint": "gemini-2.5-flash",
+      "temperature": 0,
+      "topP": 1,
+      "topK": 1
+    },
+    "content": "You are an IELTS Writing Task 2 examiner assistant.\r\n\r\nGoal: EXTRACT evidence ONLY (sentence indices). Do NOT score bands and do NOT rewrite the essay.\r\n\r\nTASK DEFINITION:\r\n{{task_definition_json}}\r\n\r\nESSAY CONTEXT (Paragraph Roles):\r\n{{paragraph_roles_map}}\r\n\r\nESSAY SENTENCES:\r\n{{essay_sentences_block}}\r\n\r\nSTANCE DECISION RULES (use ONLY the essay text):\r\n- \"agree\": the writer clearly supports one side AND does not present a balanced two-sided position as their main stance.\r\n- \"disagree\": the writer clearly rejects one side / supports the opposite.\r\n- \"partial\": the writer explicitly supports a balanced position, concession, or \"both sides\" as their stance (not just giving an example).\r\n- \"unclear\": no clear position is stated.\r\n\r\nIMPORTANT:\r\n- stanceSentenceIndex MUST point to the ONE sentence that most clearly expresses the stance. If none, set null and stance=\"unclear\".\r\n- contradictionSentenceIndices should include ONLY sentences that contradict the main stance (if any). Otherwise [].\r\n\r\n{{profile_prompt_block}}\r\n\r\nREQUIRED JSON (EXAMPLE SHAPE):\r\n{\r\n  \"position\": {\r\n    \"stance\": \"unclear\",\r\n    \"stanceSentenceIndex\": null,\r\n    \"contradictionSentenceIndices\": []\r\n  },\r\n  \"answersBySubquestion\": {\r\n{{subquestion_keys_template}}\r\n  },\r\n  \"bodySupport\": [],\r\n  \"topicSentenceByParagraph\": [\r\n{{topic_sentence_template}}\r\n  ],\r\n  \"lexicalQuality\": {\r\n    \"range\": \"basic\",\r\n    \"precision\": \"low\",\r\n    \"uncommonSkill\": \"none\"\r\n  },\r\n  \"errorProfiles\": {\r\n    \"grammar\": \"frequent\",\r\n    \"lexical\": \"frequent\",\r\n    \"punctuation\": \"frequent\"\r\n  }\r\n}\r\n\r\nRules:\r\n1) Return JSON only (no markdown, no backticks, no commentary).\r\n2) stance MUST be one of: \"agree\", \"disagree\", \"partial\", \"unclear\".\r\n3) stanceSentenceIndex MUST be [0..{{max_sentence_index}}] or null.\r\n4) All sentence indices MUST be [0..{{max_sentence_index}}].\r\n5) Be conservative: if you are unsure, choose \"unclear\" and use null/[] indices.",
+    "createdAt": "2026-03-17T03:56:07.153Z",
+    "description": "Template sample of current hardcoded Step 3 extraction prompt",
+    "isActive": true,
+    "isDefault": false,
+    "name": "Step 3 Extract Prompt - V0225",
+    "orgId": "900000",
+    "tags": [],
+    "targetStep": "general",
+    "updatedAt": "2026-03-17T03:56:07.153Z",
+    "variables": [
+      "task_definition_json",
+      "paragraph_roles_map",
+      "essay_sentences_block",
+      "profile_prompt_block",
+      "subquestion_keys_template",
+      "topic_sentence_template",
+      "max_sentence_index"
+    ]
+  },
+  {
+    "id": "step4grade_v0225_sample",
+    "category": "step4grade",
+    "config": {
+      "modelHint": "gemini-2.5-flash",
+      "temperature": 0,
+      "topP": 1,
+      "topK": 1
+    },
+    "content": "You are a Senior IELTS Examiner.\r\n\r\nYou MUST return ONLY raw JSON.\r\n\r\nESSAY TASK: \"{{task_prompt}}\"\r\nSTANCE: {{stance}}\r\n\r\nCALCULATED METRICS:\r\n{{analysis_context}}\r\n\r\nESSAY CONTENT:\r\n{{sentence_block}}\r\n\r\nSCORING LOGIC (Examples for {{criterion}}):\r\n{{few_shot_examples}}\r\n\r\n{{profile_prompt_block}}\r\n\r\nINSTRUCTIONS:\r\n1. Answer based on Text AND Metrics.\r\n2. Use ONLY allowed values.\r\n\r\nQUESTIONS:\r\n{{questions_text}}",
+    "createdAt": "2026-03-17T03:56:07.153Z",
+    "description": "Template sample of current hardcoded Step 4 grading batch prompt",
+    "isActive": true,
+    "isDefault": false,
+    "name": "Step 4 Grade Prompt - V0225",
+    "orgId": "900000",
+    "tags": [],
+    "targetStep": "general",
+    "updatedAt": "2026-03-17T03:56:07.153Z",
+    "variables": [
+      "task_prompt",
+      "stance",
+      "analysis_context",
+      "sentence_block",
+      "criterion",
+      "few_shot_examples",
+      "profile_prompt_block",
+      "questions_text"
+    ]
+  },
+  {
+    "id": "step5feedback_v0225_sample",
+    "category": "step5feedback",
+    "config": {
+      "modelHint": "gemini-2.5-flash",
+      "temperature": 0,
+      "topP": 1,
+      "topK": 1
+    },
+    "content": "You are a senior IELTS examiner.\n\nGenerate criterion-structured, evidence-grounded feedback.\n\nCurrent overall band: {{current_band}}\nTarget band: {{target_band}}\n\nRules:\n- Only use evidence references from: {{allowed_refs}}\n- Output evidenceRefs as S# labels only.\n\nEssay context:\n{{essay_text}}\n\nPrioritized weaknesses:\n{{weakness_lines}}\n\nDetected strengths:\n{{strength_lines}}\n\nReturn strict JSON with summary, byCriterion, and improvements.",
+    "createdAt": "2026-03-17T03:56:07.153Z",
+    "description": "Template sample of current hardcoded Step 5 feedback prompt",
+    "isActive": true,
+    "isDefault": false,
+    "name": "Step 5 Feedback Prompt - V0225",
+    "orgId": "900000",
+    "tags": [],
+    "targetStep": "general",
+    "updatedAt": "2026-03-17T03:56:07.153Z",
+    "variables": [
+      "current_band",
+      "target_band",
+      "allowed_refs",
+      "essay_text",
+      "weakness_lines",
+      "strength_lines"
+    ]
+  }
+]

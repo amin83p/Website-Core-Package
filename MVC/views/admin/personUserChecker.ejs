@@ -1,0 +1,210 @@
+<div class="sections-page">
+  
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h2 class="page-heading size-md m-0">Person ID Link Checker</h2>
+    <span class="badge bg-warning text-dark border">Controller Debug Tool</span>
+  </div>
+
+  <div class="dash-hero mb-4 p-4">
+    <div class="row align-items-center">
+      <div class="col-md-1 text-center">
+        <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center mx-auto" 
+             style="width: 64px; height: 64px; font-size: 1.5rem;">
+          🔍
+        </div>
+      </div>
+      <div class="col-md-11">
+        <h3 class="fw-bold mb-1">Testing Access As: <%= user.name || user.username %></h3>
+        <div class="d-flex gap-3 text-muted small">
+          <span><strong>User ID:</strong> <%= user.id %></span>
+          <span>|</span>
+          <span><strong>Access Level:</strong> <span class="badge bg-primary"><%= user.accessLevel %></span></span>
+          <span>|</span>
+          <span><strong>Active Org ID:</strong> <span class="text-dark"><%= user.activeOrgId || 'N/A' %></span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <div class="col-md-5">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary">
+          Test Endpoint: <code>/users/check-person/:personId</code>
+        </div>
+        <div class="card-body">
+           
+          <form id="personCheckForm">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Select Person to Check *</label>
+              
+              <div class="input-group">
+                  <input type="text" id="personNameDisplay" class="form-control bg-white" placeholder="No person selected" readonly>
+                  <input type="hidden" id="personIdInput" name="personId">
+                  
+                  <button type="button" class="btn btn-outline-primary" id="pickPersonBtn">
+                      <i class="bi bi-search"></i> Select
+                  </button>
+              </div>
+              <div class="form-text text-muted x-small mt-1">
+                 Search for a person to retrieve their ID automatically.
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-filled btn-primary w-100" id="submitBtn" disabled>
+              Check Link & Access
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-7">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary">
+          API Response
+        </div>
+        <div class="card-body">
+          <div id="checkResult" style="min-height: 100px;">
+            <div class="text-muted text-center py-4">Submit a Person ID to see the result.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+          <span>Raw API JSON Payload</span>
+          <button class="btn btn-sm btn-outline-light" onclick="copyRawJson()">Copy JSON</button>
+        </div>
+        <div class="card-body bg-light p-0">
+           <pre id="rawPayload" class="m-0 p-3 text-dark" style="max-height: 400px; overflow-y: auto; font-size: 0.85rem;">{}</pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  const form = document.getElementById('personCheckForm');
+  const resultDiv = document.getElementById('checkResult');
+  const rawPayloadPre = document.getElementById('rawPayload');
+  const submitBtn = document.getElementById('submitBtn');
+  
+  // Picker Elements
+  const pickBtn = document.getElementById('pickPersonBtn');
+  const nameDisplay = document.getElementById('personNameDisplay');
+  const idInput = document.getElementById('personIdInput');
+
+  // --- 1. Picker Logic ---
+  if (pickBtn) {
+      pickBtn.addEventListener('click', () => {
+          GenericPicker.open(GenericPickerPresets.person({
+              title: 'Select Person',
+              placeholder: 'Search by name or ID...',
+              context: GenericPickerContexts.system('All Persons', 'bi bi-globe'),
+              onSelect: (item) => {
+                  // Populate fields
+                  idInput.value = item.id;
+                  
+                  // Construct display name safely
+                  const nameStr = item.name ? (item.name.first + ' ' + item.name.last) : (item.username || item.id);
+                  nameDisplay.value = `${nameStr} (${item.id})`;
+                  
+                  // Enable Submit
+                  submitBtn.disabled = false;
+              }
+          }));
+      });
+  }
+
+  // --- 2. Submit Handler ---
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const personId = idInput.value.trim();
+    
+    if (!personId) {
+        alert("Please select a person first.");
+        return;
+    }
+
+    resultDiv.innerHTML = '<div class="text-center text-primary py-3"><span class="spinner-border spinner-border-sm"></span> Checking...</div>';
+    rawPayloadPre.textContent = '...loading...';
+    
+    try {
+      const url = `/users/check-person/${personId}`; 
+      
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      
+      // Update Raw Payload Dump
+      rawPayloadPre.textContent = JSON.stringify(data, null, 2);
+      // Render Result
+      renderResult(data);
+
+    } catch (err) {
+      resultDiv.innerHTML = `<div class="alert alert-danger">Network Error: ${err.message}</div>`;
+      rawPayloadPre.textContent = `{"error": "${err.message}"}`;
+    }
+  });
+
+  // --- 3. Result Renderer ---
+  function renderResult(data) {
+    if (data.status === 'success') {
+      if (data.exists) {
+        resultDiv.innerHTML = `
+          <div class="alert alert-success border-success">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-check-circle-fill me-2 fs-4"></i>
+              <strong class="fs-5">LINK FOUND & ACCESSIBLE</strong>
+            </div>
+            <hr class="my-2">
+            <p class="mb-0 small">
+              <strong>User ID:</strong> <code class="text-primary">${data.user.id}</code><br>
+              <strong>Username/Email:</strong> ${data.user.name}
+            </p>
+          </div>
+        `;
+      } else {
+        resultDiv.innerHTML = `
+          <div class="alert alert-warning border-warning">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-person-x-fill me-2 fs-4"></i>
+              <strong class="fs-5">LINK NOT FOUND OR UNAUTHORIZED</strong>
+            </div>
+            <hr class="my-2">
+            <p class="mb-0 small">No User is linked to Person ID <strong>${idInput.value}</strong>, or you do not have permission to view them.</p>
+          </div>
+        `;
+      }
+    } else {
+       resultDiv.innerHTML = `
+         <div class="alert alert-danger border-danger">
+           <i class="bi bi-exclamation-triangle-fill me-2"></i>
+           <strong>SERVER ERROR:</strong> ${data.message || 'Unknown error.'}
+         </div>
+       `;
+    }
+  }
+  
+  window.copyRawJson = () => {
+    navigator.clipboard.writeText(rawPayloadPre.textContent).then(() => {
+        // Optional: show toast
+        const btn = document.querySelector('button[onclick="copyRawJson()"]');
+        const orig = btn.innerText;
+        btn.innerText = "Copied!";
+        setTimeout(() => btn.innerText = orig, 1500);
+    });
+  };
+});
+</script>

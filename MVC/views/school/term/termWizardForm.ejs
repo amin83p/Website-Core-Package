@@ -1,0 +1,413 @@
+<%- include('./termForm') %>
+
+<style>
+  #termWizardGuide {
+    font-size: 1rem;
+  }
+  #termWizardGuide .small {
+    font-size: 1rem !important;
+  }
+  .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .wizard-step-rail::-webkit-scrollbar {
+    display: none;
+  }
+  #termWizardGuide .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    transition: all 0.2s ease;
+  }
+  #termWizardGuide .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #termWizardGuide .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #termWizardGuide .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #termWizardGuide .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  .term-wizard-controls {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .term-wizard-controls .wizard-step-label {
+    color: #17324d;
+    font-weight: 600;
+  }
+  .term-wizard-controls .btn.btn-sm {
+    font-size: 1rem;
+    padding: 0.45rem 0.85rem;
+  }
+</style>
+
+<script src="/scripts/wizardStepRail.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tabs = document.getElementById('termTabs');
+  const form = document.getElementById('termForm');
+  if (!tabs || !form || typeof bootstrap === 'undefined') return;
+
+  const navButtons = Array.from(tabs.querySelectorAll('button.nav-link[data-bs-target]'));
+  if (!navButtons.length) return;
+
+  function getValue(selector) {
+    return String(form.querySelector(selector)?.value || '').trim();
+  }
+
+  function firstDateError(stepName) {
+    const termStart = getValue('input[name="startDate"]');
+    const termEnd = getValue('input[name="endDate"]');
+    const classesStart = getValue('input[name="classesStartDate"]');
+    const classesEnd = getValue('input[name="classesEndDate"]');
+    const registrationOpen = getValue('input[name="registrationOpenDate"]');
+    const registrationClose = getValue('input[name="registrationCloseDate"]');
+    const withdrawNoPenalty = getValue('input[name="withdrawWithoutPenaltyDeadline"]');
+    const withdrawDeadline = getValue('input[name="withdrawDeadline"]');
+    const finalExamStart = getValue('input[name="finalExamStartDate"]');
+    const finalExamEnd = getValue('input[name="finalExamEndDate"]');
+
+    if (stepName === 'schedule') {
+      if (termStart && termEnd && termEnd < termStart) return 'Term End Date cannot be before Term Start Date.';
+      if (classesStart && classesEnd && classesEnd < classesStart) return 'Classes End Date cannot be before Classes Start Date.';
+      if (classesStart && termStart && classesStart < termStart) return 'Classes Start Date must be on/after Term Start Date.';
+      if (classesStart && termEnd && classesStart > termEnd) return 'Classes Start Date must be within the term period.';
+      if (classesEnd && termStart && classesEnd < termStart) return 'Classes End Date must be within the term period.';
+      if (classesEnd && termEnd && classesEnd > termEnd) return 'Classes End Date must be on/before Term End Date.';
+      return '';
+    }
+
+    if (stepName === 'registration') {
+      if (registrationOpen && registrationClose && registrationClose < registrationOpen) {
+        return 'Registration Close Date cannot be before Registration Open Date.';
+      }
+      if (withdrawNoPenalty && withdrawDeadline && withdrawDeadline < withdrawNoPenalty) {
+        return 'Final Withdraw Deadline cannot be before Withdraw Without Penalty Deadline.';
+      }
+      return '';
+    }
+
+    if (stepName === 'assessment') {
+      if (finalExamStart && finalExamEnd && finalExamEnd < finalExamStart) {
+        return 'Final Exam End Date cannot be before Final Exam Start Date.';
+      }
+      return '';
+    }
+
+    return '';
+  }
+
+  const stepConfig = [
+    {
+      target: '#tab-general',
+      title: 'General Info',
+      helper: [
+        'Define the official term code and term name used across the school system.',
+        'Set the status to control whether the term is planned, active, or archived.',
+        'Keep code and name stable for reporting and registration references.'
+      ],
+      impacts: [
+        'Program term mapping and registration flows reference this term identity.',
+        'Status determines operational visibility across school modules.',
+        'A clean code/name convention improves ledger and statement readability.'
+      ],
+      required: [
+        { selector: 'input[name="code"]', label: 'Term Code' },
+        { selector: 'input[name="name"]', label: 'Term Name' },
+        { selector: 'select[name="status"]', label: 'Status' }
+      ]
+    },
+    {
+      target: '#tab-schedule',
+      title: 'Academic Calendar',
+      helper: [
+        'Set the term period first, then fit class dates and census date within it.',
+        'Keep calendar ranges realistic to avoid scheduling conflicts later.',
+        'Use late registration only when policy explicitly allows it.'
+      ],
+      impacts: [
+        'Class sessions and registrar operations rely on this timeline.',
+        'Date quality here affects enrollment windows and downstream controls.',
+        'Invalid ranges can block save and disrupt registration setup.'
+      ],
+      required: [
+        { selector: 'input[name="startDate"]', label: 'Term Start Date' },
+        { selector: 'input[name="endDate"]', label: 'Term End Date' }
+      ],
+      customCheck: function () {
+        return firstDateError('schedule');
+      }
+    },
+    {
+      target: '#tab-registration',
+      title: 'Registration & Finance',
+      helper: [
+        'Define registration open/close dates for student operations.',
+        'Set add/drop, swap, and withdrawal deadlines according to policy.',
+        'Use payment due date to align with finance posting expectations.'
+      ],
+      impacts: [
+        'Program and term registration workflows use these limits.',
+        'Finance and student services communicate by these dates.',
+        'Misaligned deadlines create exceptions in enrollment handling.'
+      ],
+      required: [],
+      customCheck: function () {
+        return firstDateError('registration');
+      }
+    },
+    {
+      target: '#tab-assessment',
+      title: 'Assessment & Results',
+      helper: [
+        'Set final exam and grade submission windows early.',
+        'Use result release date to coordinate registrar communication.',
+        'Keep assessment milestones realistic and policy-compliant.'
+      ],
+      impacts: [
+        'Assessment timelines affect grading and transcript readiness.',
+        'Late grade submissions can delay reporting and result publication.',
+        'Consistent deadlines support predictable academic operations.'
+      ],
+      required: [],
+      customCheck: function () {
+        return firstDateError('assessment');
+      }
+    },
+    {
+      target: '#tab-notes',
+      title: 'Description & Notes',
+      helper: [
+        'Write a concise public description for operational context.',
+        'Use notes for internal registrar and admin coordination.',
+        'Keep language clear for handover between teams.'
+      ],
+      impacts: [
+        'Descriptions appear in internal listings and selection UIs.',
+        'Notes preserve context for future term maintenance.',
+        'Good notes reduce rework during audits and support cycles.'
+      ],
+      required: []
+    }
+  ];
+
+  const byTarget = new Map(stepConfig.map((step, index) => [step.target, { ...step, index }]));
+
+  const guide = document.createElement('div');
+  guide.id = 'termWizardGuide';
+  guide.className = 'card border-0 shadow-sm mb-3';
+  guide.innerHTML = [
+    '<div class="card-body">',
+      '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">',
+        '<div>',
+          '<div class="fw-bold text-primary">Term Definition Wizard</div>',
+          '<div class="text-muted">Complete the setup step-by-step. Guidance updates as you move through tabs.</div>',
+        '</div>',
+        '<span class="badge bg-light text-dark border" id="termWizardStepBadge">Step 1 of ' + stepConfig.length + '</span>',
+      '</div>',
+      '<div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="termWizardProgressBar"></div></div>',
+      '<div class="wizard-step-rail mb-3" id="termWizardStepPills"></div>',
+      '<div class="row g-3">',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light-subtle">',
+            '<div class="fw-bold mb-2">Active Step Help</div>',
+            '<div id="termWizardStepHelp"></div>',
+          '</div>',
+        '</div>',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light">',
+            '<div class="fw-bold mb-2">How Other Sections Use This Data</div>',
+            '<div id="termWizardStepImpacts"></div>',
+          '</div>',
+        '</div>',
+      '</div>',
+    '</div>'
+  ].join('');
+
+  tabs.parentNode.insertBefore(guide, tabs);
+  tabs.classList.add('d-none');
+
+  const buttonRow = form.querySelector('.button-row');
+  const controls = document.createElement('div');
+  controls.className = 'term-wizard-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3';
+  controls.innerHTML = [
+    '<div class="wizard-step-label" id="termWizardCurrentLabel"></div>',
+    '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="termWizardPrevBtn"><i class="bi bi-arrow-left me-1"></i>Previous</button>',
+      '<button type="button" class="btn btn-primary btn-sm" id="termWizardNextBtn">Next<i class="bi bi-arrow-right ms-1"></i></button>',
+    '</div>'
+  ].join('');
+  if (buttonRow && buttonRow.parentNode) {
+    buttonRow.parentNode.insertBefore(controls, buttonRow);
+  }
+
+  const stepPills = document.getElementById('termWizardStepPills');
+  const stepHelp = document.getElementById('termWizardStepHelp');
+  const stepImpacts = document.getElementById('termWizardStepImpacts');
+  const stepBadge = document.getElementById('termWizardStepBadge');
+  const stepLabel = document.getElementById('termWizardCurrentLabel');
+  const progressBar = document.getElementById('termWizardProgressBar');
+  const btnPrev = document.getElementById('termWizardPrevBtn');
+  const btnNext = document.getElementById('termWizardNextBtn');
+
+  let currentIndex = Math.max(0, navButtons.findIndex((btn) => btn.classList.contains('active')));
+  if (currentIndex < 0) currentIndex = 0;
+
+  function escapeHtml(input) {
+    return String(input || '').replace(/[&<>\"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function renderList(items) {
+    const safe = Array.isArray(items) ? items : [];
+    if (!safe.length) return '<div class="text-muted">No additional notes for this step.</div>';
+    return '<ul class="mb-0 ps-3">' + safe.map(function (line) {
+      return '<li>' + escapeHtml(line) + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function getStepIndexFromTarget(target) {
+    return byTarget.has(target) ? byTarget.get(target).index : 0;
+  }
+
+  function showStep(index) {
+    const bounded = Math.max(0, Math.min(stepConfig.length - 1, Number(index)));
+    const tab = navButtons[bounded];
+    if (!tab) return;
+    bootstrap.Tab.getOrCreateInstance(tab).show();
+  }
+
+  function findMissingRequired(step) {
+    const missing = [];
+    (step.required || []).forEach(function (rule) {
+      const el = form.querySelector(rule.selector);
+      const value = String(el?.value || '').trim();
+      if (!el || !value) missing.push({ label: rule.label, selector: rule.selector });
+    });
+    if (typeof step.customCheck === 'function') {
+      const customError = String(step.customCheck() || '').trim();
+      if (customError) missing.push({ label: customError, selector: '' });
+    }
+    return missing;
+  }
+
+  async function showWarning(message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title: 'Step Incomplete',
+        icon: 'warning',
+        message,
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  function renderWizardUi() {
+    const step = stepConfig[currentIndex];
+    const progress = ((currentIndex + 1) / stepConfig.length) * 100;
+
+    stepBadge.textContent = 'Step ' + (currentIndex + 1) + ' of ' + stepConfig.length;
+    stepLabel.textContent = step.title;
+    progressBar.style.width = progress.toFixed(2) + '%';
+    stepHelp.innerHTML = renderList(step.helper);
+    stepImpacts.innerHTML = renderList(step.impacts);
+
+    stepPills.innerHTML = stepConfig.map(function (item, idx) {
+      const cls = idx === currentIndex ? 'active' : (idx < currentIndex ? 'completed' : '');
+      return '<button type="button" class="wizard-step-pill ' + cls + '" data-step-index="' + idx + '">' + (idx + 1) + '. ' + escapeHtml(item.title) + '</button>';
+    }).join('');
+
+    stepPills.querySelectorAll('[data-step-index]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        showStep(Number(btn.getAttribute('data-step-index')));
+      });
+    });
+
+    if (window.WizardStepRail) window.WizardStepRail.sync(stepPills);
+
+    btnPrev.disabled = currentIndex <= 0;
+    btnNext.innerHTML = currentIndex >= stepConfig.length - 1
+      ? 'Review Save<i class="bi bi-check2-circle ms-1"></i>'
+      : 'Next<i class="bi bi-arrow-right ms-1"></i>';
+  }
+
+  btnPrev?.addEventListener('click', function () {
+    showStep(currentIndex - 1);
+  });
+
+  btnNext?.addEventListener('click', async function () {
+    const step = stepConfig[currentIndex];
+    if (currentIndex < stepConfig.length - 1) {
+      const missing = findMissingRequired(step);
+      if (missing.length) {
+        const message = 'Complete required fields before moving on:<br>' +
+          missing.map(function (item) { return '- ' + escapeHtml(item.label); }).join('<br>');
+        await showWarning(message);
+        const first = missing.find(function (item) { return item.selector; });
+        if (first?.selector) {
+          const el = form.querySelector(first.selector);
+          if (el) {
+            try { el.focus(); } catch (_) {}
+          }
+        }
+        return;
+      }
+      showStep(currentIndex + 1);
+      return;
+    }
+    const saveRow = form.querySelector('.button-row');
+    if (saveRow) saveRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const saveBtn = form.querySelector('button[type="submit"]');
+    if (saveBtn) {
+      saveBtn.classList.add('shadow');
+      setTimeout(function () { saveBtn.classList.remove('shadow'); }, 1200);
+    }
+  });
+
+  navButtons.forEach(function (btn) {
+    btn.addEventListener('shown.bs.tab', function (event) {
+      currentIndex = getStepIndexFromTarget(event.target.getAttribute('data-bs-target'));
+      renderWizardUi();
+    });
+  });
+
+  renderWizardUi();
+});
+</script>
+
+

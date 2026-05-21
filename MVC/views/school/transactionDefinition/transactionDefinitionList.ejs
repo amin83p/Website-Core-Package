@@ -1,0 +1,87 @@
+<%- include('../../partials/tablePages-start', {
+  title, newUrl, newLabel, user, tableName, btn_export: true, print,
+  manageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
+    `<a href="/school/transactionTemplates/new-wizard" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-signpost-split me-1"></i> Template Wizard</a>`
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search transaction templates...',
+  fields: [
+    { name: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'inactive', 'archived'] }
+  ]
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Code / Name</th>
+        <th class="text-center">Entries</th>
+        <th>Total Amount</th>
+        <th class="text-center">Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if(data.length === 0) { %>
+        <tr><td colspan="5" class="text-center py-4 text-muted">No transaction templates found.</td></tr>
+      <% } %>
+      <% data.forEach(item => { %>
+        <% const entries = Array.isArray(item.entries) ? item.entries : []; %>
+        <%
+          const totalsByCurrency = {};
+          entries.forEach(en => {
+            const currency = String(en?.currency || 'CAD').toUpperCase();
+            const amount = Number(en?.amount || 0);
+            if (!Number.isFinite(amount)) return;
+            totalsByCurrency[currency] = (totalsByCurrency[currency] || 0) + amount;
+          });
+          const totalCurrencies = Object.keys(totalsByCurrency);
+        %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-primary"><%= item.code %></div>
+            <div class="small text-dark"><%= item.name %></div>
+            <% if (item.validFrom || item.validTo) { %>
+              <div class="x-small text-muted">Valid: <%= item.validFrom || '?' %> to <%= item.validTo || '?' %></div>
+            <% } %>
+            <div class="x-small text-muted font-monospace"><%= item.id %></div>
+          </td>
+          <td class="text-center fw-bold"><%= entries.length %></td>
+          <td class="fw-bold">
+            <% if (totalCurrencies.length && Object.values(totalsByCurrency).some(amount => Number(amount || 0) > 0)) { %>
+              <% totalCurrencies.forEach((ccy, idx) => { %>
+                <span><%= Number(totalsByCurrency[ccy] || 0).toFixed(2) %> <%= ccy %></span><%= idx < totalCurrencies.length - 1 ? ' + ' : '' %>
+              <% }) %>
+            <% } else if (entries.length) { %>
+              <span class="text-muted">Runtime template</span>
+            <% } else { %>
+              -
+            <% } %>
+          </td>
+          <td class="text-center">
+            <%
+              let badge = 'bg-secondary';
+              if (item.status === 'active') badge = 'bg-success';
+              if (item.status === 'draft') badge = 'bg-warning text-dark';
+              if (item.status === 'inactive') badge = 'bg-secondary';
+              if (item.status === 'archived') badge = 'bg-danger';
+            %>
+            <span class="badge <%= badge %>"><%= (item.status || 'unknown').toUpperCase() %></span>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <a href="/school/transactionTemplates/edit-wizard/<%= item.id %>" class="btn btn-sm btn-outline-info me-1">Wizard</a>
+            <a href="/school/transactionTemplates/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="school/transactionTemplates" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/transactionTemplates' }) %>
+<%- include('../../partials/tablePages-end') %>

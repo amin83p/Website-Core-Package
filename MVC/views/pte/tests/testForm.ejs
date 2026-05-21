@@ -1,0 +1,695 @@
+<%
+  const t = (test && typeof test === 'object') ? test : {};
+  const isEdit = Boolean(t.id);
+  const routeId = String(t.id || '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const options = (formOptions && typeof formOptions === 'object') ? formOptions : {};
+  const skills = Array.isArray(options.skills) ? options.skills : [];
+  const questionTypes = Array.isArray(options.questionTypes) ? options.questionTypes : [];
+  const actionUrl = isEdit
+    ? ('/pte/tests/edit/' + encodeURIComponent(routeId))
+    : '/pte/tests/new';
+  const statusToken = String(t.status || 'draft').trim().toLowerCase();
+  const isEditable = !isEdit || statusToken === 'draft';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-ui-checks-grid me-2"></i><%= title %></h1>
+    <a href="/pte/tests" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1500px;">
+    <% if (isEdit && !isEditable) { %>
+      <div class="alert alert-warning mb-3">
+        <div class="fw-bold mb-1">Immutable Version</div>
+        This test is <span class="text-capitalize"><%= statusToken %></span> and cannot be edited directly. Use <strong>Revise</strong> on the list page to create a new draft.
+      </div>
+    <% } %>
+
+    <form
+      id="pteTestForm"
+      action="<%= actionUrl %>"
+      method="POST"
+    >
+      <input type="hidden" name="actionStateId" id="pteTestActionStateId" value="<%= asid %>">
+      <input type="hidden" name="testPlan" id="pteTestPlanInput" value="">
+      <input type="hidden" name="testId" id="pteTestIdInput" value="<%= routeId %>">
+
+      <script type="application/json" id="pteTestInitial"><%- JSON.stringify(t || {}).replace(/</g, '\\u003c') %></script>
+      <script type="application/json" id="pteTestQuestionTypes"><%- JSON.stringify(questionTypes || []).replace(/</g, '\\u003c') %></script>
+      <script type="application/json" id="pteTestSkills"><%- JSON.stringify(skills || []).replace(/</g, '\\u003c') %></script>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label fw-bold">Test Title *</label>
+              <input type="text" class="form-control size-md" id="pttTitleInput" value="<%= t.title || '' %>" maxlength="260" <%= isEditable ? '' : 'disabled' %>>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">Internal Code</label>
+              <input type="text" class="form-control size-md font-monospace" id="pttCodeInput" value="<%= t.code || '' %>" maxlength="120" <%= isEditable ? '' : 'disabled' %>>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Status</label>
+              <input type="text" class="form-control size-md text-capitalize" value="<%= statusToken %>" disabled>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Revision</label>
+              <input type="text" class="form-control size-md" value="<%= Number(t.revisionNumber || 0) %>" disabled>
+            </div>
+          </div>
+
+          <div class="row g-3 mt-1">
+            <div class="col-md-12">
+              <label class="form-label fw-bold">Description</label>
+              <textarea class="form-control size-md" id="pttDescriptionInput" rows="2" maxlength="5000" <%= isEditable ? '' : 'disabled' %>><%= t.description || '' %></textarea>
+            </div>
+          </div>
+          <div class="row g-3 mt-1">
+            <div class="col-md-12">
+              <label class="form-label fw-bold">Instructions</label>
+              <textarea class="form-control size-md" id="pttInstructionsInput" rows="3" maxlength="10000" <%= isEditable ? '' : 'disabled' %>><%= t.instructions || '' %></textarea>
+            </div>
+          </div>
+          <div class="row g-3 mt-1">
+            <div class="col-md-12">
+              <label class="form-label fw-bold">Tags (comma-separated)</label>
+              <input type="text" class="form-control size-md" id="pttTagsInput" value="<%= Array.isArray(t.tags) ? t.tags.join(', ') : '' %>" <%= isEditable ? '' : 'disabled' %>>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pttValidationBox" class="alert d-none"></div>
+
+      <% ['speaking', 'writing', 'reading', 'listening'].forEach((skill) => { %>
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <h5 class="m-0 text-capitalize"><i class="bi bi-list-check me-2"></i><%= skill %> Questions</h5>
+              <button type="button" class="btn btn-outline-primary btn-sm ptt-btn-add-question" data-skill="<%= skill %>" <%= isEditable ? '' : 'disabled' %>>
+                <i class="bi bi-plus-circle me-1"></i> Add Published Question
+              </button>
+            </div>
+            <div class="small text-muted mb-2">
+              Only published questions can be newly added. Already linked retired questions remain and are marked as retired.
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th style="width: 8%;">#</th>
+                    <th style="width: 34%;">Question</th>
+                    <th style="width: 18%;">Type</th>
+                    <th style="width: 20%;">Question ID</th>
+                    <th style="width: 10%;">Status</th>
+                    <th style="width: 10%;" class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="pttSkillBody_<%= skill %>"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+
+      <div class="button-row mt-4 pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          <button type="button" id="pttBtnValidate" class="btn btn-outline-primary btn-md" <%= isEditable ? '' : 'disabled' %>>
+            <i class="bi bi-check2-square me-1"></i> Validate Draft
+          </button>
+          <% if (isEditable) { %>
+            <button type="submit" id="pttBtnSave" class="btn btn-filled btn-success btn-md fw-bold px-4"><%= isEdit ? 'Update Draft' : 'Save Draft' %></button>
+          <% } %>
+          <a href="/pte/tests" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+        </div>
+        <div class="d-flex align-items-center flex-wrap gap-2 ms-auto">
+          <button type="button" id="pttBtnStudentPreview" class="btn btn-outline-info btn-md">
+            <i class="bi bi-eye me-1"></i> Student Preview
+          </button>
+          <button type="button" id="pttBtnExamPreview" class="btn btn-outline-dark btn-md">
+            <i class="bi bi-arrows-fullscreen me-1"></i> Exam Fullscreen
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<form id="pttExamPreviewForm" action="/pte/tests/preview/exam" method="POST" target="_blank" class="d-none">
+  <input type="hidden" name="actionStateId" id="pttExamPreviewActionState" value="<%= asid %>">
+  <input type="hidden" name="testPlan" id="pttExamPreviewPlan" value="">
+</form>
+
+<div class="modal fade" id="pttStudentPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-display me-2"></i>Student Preview</h5>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <button type="button" class="btn btn-filled btn-primary btn-sm fw-bold px-3 shadow-sm" id="pttBtnRefreshStudentPreview">
+            <i class="bi bi-arrow-repeat me-1"></i> Refresh Preview
+          </button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div id="pttStudentPreviewBody" class="small"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker', { user }) %>
+
+<script>
+(() => {
+  const form = document.getElementById('pteTestForm');
+  if (!form) return;
+
+  const isEditable = <%= isEditable ? 'true' : 'false' %>;
+  const routeId = '<%= routeId %>';
+  const actionStateId = document.getElementById('pteTestActionStateId')?.value || '';
+  const planInput = document.getElementById('pteTestPlanInput');
+  const examPreviewForm = document.getElementById('pttExamPreviewForm');
+  const examPreviewPlan = document.getElementById('pttExamPreviewPlan');
+  const validationBox = document.getElementById('pttValidationBox');
+
+  function parseJsonScript(id, fallback) {
+    try {
+      const node = document.getElementById(id);
+      return JSON.parse((node && node.textContent) || '');
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function cleanText(value) {
+    return String(value || '').replace(/\0/g, '').trim();
+  }
+
+  function parseTags(text) {
+    return String(text || '')
+      .split(',')
+      .map((item) => cleanText(item))
+      .filter(Boolean);
+  }
+
+  const initial = parseJsonScript('pteTestInitial', {});
+  const skillDefs = parseJsonScript('pteTestSkills', []);
+  const questionTypes = parseJsonScript('pteTestQuestionTypes', []);
+  const typeLabelMap = new Map((Array.isArray(questionTypes) ? questionTypes : [])
+    .map((row) => [String(row.value || '').toLowerCase(), row.label || row.value || '']));
+  const skills = (Array.isArray(skillDefs) && skillDefs.length ? skillDefs : [
+    { value: 'speaking', label: 'Speaking' },
+    { value: 'writing', label: 'Writing' },
+    { value: 'reading', label: 'Reading' },
+    { value: 'listening', label: 'Listening' }
+  ]).map((row) => String(row.value || '').toLowerCase()).filter(Boolean);
+
+  const state = {
+    allocations: {}
+  };
+  skills.forEach((skill) => {
+    const rows = Array.isArray(initial?.allocations?.[skill]) ? initial.allocations[skill] : [];
+    state.allocations[skill] = rows.map((row, index) => ({
+      questionVersionId: cleanText(row.questionVersionId || row.id),
+      questionFamilyId: cleanText(row.questionFamilyId || ''),
+      questionCode: cleanText(row.questionCode || ''),
+      questionTitle: cleanText(row.questionTitle || ''),
+      questionType: cleanText(row.questionType || '').toLowerCase(),
+      skill,
+      statusAtSelection: cleanText(row.statusAtSelection || '').toLowerCase(),
+      currentStatus: cleanText(row.currentStatus || '').toLowerCase(),
+      sequenceNo: index + 1
+    })).filter((row) => row.questionVersionId);
+  });
+
+  const FALLBACK_BACKDROP_SELECTOR = '.modal-backdrop.ptt-fallback-backdrop';
+
+  const previewModalEl = document.getElementById('pttStudentPreviewModal');
+  const previewModal = (window.bootstrap && window.bootstrap.Modal && previewModalEl)
+    ? new window.bootstrap.Modal(previewModalEl)
+    : null;
+  const studentPreviewBody = document.getElementById('pttStudentPreviewBody');
+  const btnRefreshStudentPreview = document.getElementById('pttBtnRefreshStudentPreview');
+
+  const titleInput = document.getElementById('pttTitleInput');
+  const codeInput = document.getElementById('pttCodeInput');
+  const descriptionInput = document.getElementById('pttDescriptionInput');
+  const instructionsInput = document.getElementById('pttInstructionsInput');
+  const tagsInput = document.getElementById('pttTagsInput');
+
+  function ensureFallbackModalBackdrop() {
+    const existing = document.querySelector(FALLBACK_BACKDROP_SELECTOR);
+    if (existing) return existing;
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop fade show ptt-fallback-backdrop';
+    document.body.appendChild(backdrop);
+    return backdrop;
+  }
+
+  function removeFallbackModalBackdropIfUnused() {
+    const stillOpenFallback = Array.from(document.querySelectorAll('.modal.ptt-fallback-open'))
+      .some((node) => node.classList.contains('show') && String(node.style.display || '').toLowerCase() !== 'none');
+    if (!stillOpenFallback) {
+      document.querySelectorAll(FALLBACK_BACKDROP_SELECTOR).forEach((node) => node.remove());
+      document.body.classList.remove('modal-open');
+    }
+  }
+
+  function openModalCompat(modalInstance, modalEl) {
+    if (modalInstance && typeof modalInstance.show === 'function') {
+      modalInstance.show();
+      return true;
+    }
+    if (!modalEl) return false;
+    modalEl.classList.add('show', 'ptt-fallback-open');
+    modalEl.style.display = 'block';
+    modalEl.removeAttribute('aria-hidden');
+    ensureFallbackModalBackdrop();
+    document.body.classList.add('modal-open');
+    return true;
+  }
+
+  function closeModalCompat(modalInstance, modalEl) {
+    if (modalInstance && typeof modalInstance.hide === 'function') {
+      modalInstance.hide();
+      return true;
+    }
+    if (!modalEl) return false;
+    modalEl.classList.remove('show', 'ptt-fallback-open');
+    modalEl.style.display = 'none';
+    modalEl.setAttribute('aria-hidden', 'true');
+    removeFallbackModalBackdropIfUnused();
+    return true;
+  }
+
+  function bindModalFallbackDismiss(modalEl, modalInstance) {
+    if (!modalEl) return;
+    modalEl.addEventListener('click', (event) => {
+      const dismissTrigger = event.target.closest('[data-bs-dismiss="modal"]');
+      if (dismissTrigger) {
+        if (!modalInstance) {
+          event.preventDefault();
+          closeModalCompat(modalInstance, modalEl);
+        }
+        return;
+      }
+      if (!modalInstance && event.target === modalEl) {
+        closeModalCompat(modalInstance, modalEl);
+      }
+    });
+  }
+
+  function bindFallbackEscapeClose() {
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (previewModalEl && previewModalEl.classList.contains('ptt-fallback-open')) {
+        closeModalCompat(previewModal, previewModalEl);
+      }
+    });
+  }
+
+  function showValidation(message, variant = 'info') {
+    if (!validationBox) return;
+    validationBox.className = 'alert alert-' + variant;
+    validationBox.classList.remove('d-none');
+    validationBox.innerHTML = message;
+  }
+
+  function hideValidation() {
+    if (!validationBox) return;
+    validationBox.classList.add('d-none');
+    validationBox.innerHTML = '';
+  }
+
+  function getQuestionTypeLabel(type) {
+    const token = cleanText(type).toLowerCase();
+    return typeLabelMap.get(token) || token || '-';
+  }
+
+  function resequenceSkill(skill) {
+    const rows = Array.isArray(state.allocations[skill]) ? state.allocations[skill] : [];
+    rows.forEach((row, index) => {
+      row.sequenceNo = index + 1;
+    });
+  }
+
+  function getStatusBadge(status) {
+    const token = cleanText(status).toLowerCase();
+    if (token === 'retired') return '<span class="badge bg-warning text-dark">Retired</span>';
+    if (token === 'published') return '<span class="badge bg-success">Published</span>';
+    if (token === 'archived') return '<span class="badge bg-secondary">Archived</span>';
+    if (token === 'draft') return '<span class="badge bg-info text-dark">Draft</span>';
+    if (!token) return '<span class="badge bg-light text-dark border">-</span>';
+    return '<span class="badge bg-light text-dark border">' + esc(token) + '</span>';
+  }
+
+  function renderSkillRows(skill) {
+    const body = document.getElementById('pttSkillBody_' + skill);
+    if (!body) return;
+    const rows = Array.isArray(state.allocations[skill]) ? state.allocations[skill] : [];
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No questions allocated.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = rows.map((row, index) => {
+      const statusToken = cleanText(row.currentStatus || row.statusAtSelection).toLowerCase();
+      return ''
+        + '<tr>'
+        + '  <td>' + (index + 1) + '</td>'
+        + '  <td>'
+        + '    <div class="fw-bold text-dark">' + esc(row.questionTitle || '-') + '</div>'
+        + '    <div class="x-small text-muted">Code: <span class="font-monospace">' + esc(row.questionCode || '-') + '</span></div>'
+        + '  </td>'
+        + '  <td><span class="small">' + esc(getQuestionTypeLabel(row.questionType)) + '</span></td>'
+        + '  <td><span class="font-monospace small">' + esc(row.questionVersionId || '-') + '</span></td>'
+        + '  <td>' + getStatusBadge(statusToken) + '</td>'
+        + '  <td class="text-end">'
+        + '    <div class="btn-group btn-group-sm">'
+        + '      <button type="button" class="btn btn-outline-secondary ptt-row-action" data-action="up" data-skill="' + esc(skill) + '" data-index="' + index + '" ' + ((index === 0 || !isEditable) ? 'disabled' : '') + '><i class="bi bi-arrow-up"></i></button>'
+        + '      <button type="button" class="btn btn-outline-secondary ptt-row-action" data-action="down" data-skill="' + esc(skill) + '" data-index="' + index + '" ' + ((index === rows.length - 1 || !isEditable) ? 'disabled' : '') + '><i class="bi bi-arrow-down"></i></button>'
+        + '      <button type="button" class="btn btn-outline-danger ptt-row-action" data-action="remove" data-skill="' + esc(skill) + '" data-index="' + index + '" ' + (!isEditable ? 'disabled' : '') + '><i class="bi bi-trash"></i></button>'
+        + '    </div>'
+        + '  </td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  function renderAllSkills() {
+    skills.forEach((skill) => renderSkillRows(skill));
+  }
+
+  function collectPlan() {
+    const allocations = {};
+    skills.forEach((skill) => {
+      allocations[skill] = (state.allocations[skill] || []).map((row, index) => ({
+        questionVersionId: cleanText(row.questionVersionId),
+        questionFamilyId: cleanText(row.questionFamilyId),
+        questionCode: cleanText(row.questionCode),
+        questionTitle: cleanText(row.questionTitle),
+        questionType: cleanText(row.questionType).toLowerCase(),
+        skill,
+        statusAtSelection: cleanText(row.statusAtSelection || row.currentStatus || '').toLowerCase(),
+        sequenceNo: index + 1
+      }));
+    });
+    return {
+      id: routeId || '',
+      code: cleanText(codeInput?.value),
+      title: cleanText(titleInput?.value),
+      description: cleanText(descriptionInput?.value, 5000),
+      instructions: cleanText(instructionsInput?.value, 10000),
+      tags: parseTags(tagsInput?.value),
+      allocations
+    };
+  }
+
+  function syncPlanInput() {
+    if (!planInput) return;
+    planInput.value = JSON.stringify(collectPlan());
+  }
+
+  function hasQuestion(skill, questionId) {
+    const token = cleanText(questionId);
+    if (!token) return false;
+    return (state.allocations[skill] || []).some((row) => cleanText(row.questionVersionId) === token);
+  }
+
+  function addPickedQuestionsToSkill(skill, pickedItems) {
+    const skillToken = cleanText(skill).toLowerCase();
+    if (!skillToken || !Array.isArray(state.allocations[skillToken])) return;
+    const rows = Array.isArray(pickedItems) ? pickedItems : [pickedItems];
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    rows.forEach((item) => {
+      const questionId = cleanText(item?.id);
+      if (!questionId || hasQuestion(skillToken, questionId)) {
+        skippedCount += 1;
+        return;
+      }
+      state.allocations[skillToken].push({
+        questionVersionId: questionId,
+        questionFamilyId: cleanText(item?.familyId || item?.questionFamilyId),
+        questionCode: cleanText(item?.code || item?.questionCode),
+        questionTitle: cleanText(item?.title || item?.questionTitle),
+        questionType: cleanText(item?.questionType).toLowerCase(),
+        skill: skillToken,
+        statusAtSelection: cleanText(item?.status || item?.statusAtSelection || 'published').toLowerCase() || 'published',
+        currentStatus: cleanText(item?.status || item?.currentStatus || 'published').toLowerCase() || 'published',
+        sequenceNo: state.allocations[skillToken].length + 1
+      });
+      addedCount += 1;
+    });
+
+    if (addedCount > 0) {
+      resequenceSkill(skillToken);
+      renderSkillRows(skillToken);
+      syncPlanInput();
+    }
+
+    if (addedCount > 0 && skippedCount > 0) {
+      showValidation(`Added ${addedCount} question(s). Skipped ${skippedCount} already-added item(s).`, 'warning');
+      return;
+    }
+    if (addedCount === 0 && skippedCount > 0) {
+      showValidation('Selected question(s) are already allocated in this skill.', 'warning');
+      return;
+    }
+    hideValidation();
+  }
+
+  function openPicker(skill) {
+    const skillToken = cleanText(skill).toLowerCase();
+    if (!skillToken) return;
+    if (!window.GenericPicker || typeof window.GenericPicker.open !== 'function') {
+      showValidation('Generic picker is not available on this page.', 'warning');
+      return;
+    }
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization' })
+      : null;
+    const endpointQuery = new URLSearchParams({ skill: skillToken });
+    if (actionStateId) endpointQuery.set('actionStateId', actionStateId);
+    const endpoint = '/pte/tests/picker/published-questions?' + endpointQuery.toString();
+
+    window.GenericPicker.open({
+      title: 'Add Published ' + skillToken.charAt(0).toUpperCase() + skillToken.slice(1) + ' Questions',
+      icon: 'bi-patch-check',
+      apiEndpoint: endpoint,
+      placeholder: 'Search published questions...',
+      multiselect: true,
+      context,
+      renderer: (item) => {
+        const statusToken = cleanText(item?.status).toLowerCase();
+        const statusClass = statusToken === 'published' ? 'bg-success' : 'bg-light text-dark border';
+        return ''
+          + '<div class="d-flex justify-content-between align-items-start gap-2">'
+          + '  <div class="overflow-hidden">'
+          + '    <div class="fw-bold text-dark text-truncate">' + esc(item?.title || '-') + '</div>'
+          + '    <div class="x-small text-muted">Code: <span class="font-monospace">' + esc(item?.code || '-') + '</span></div>'
+          + '    <div class="x-small text-muted font-monospace">' + esc(item?.id || '-') + '</div>'
+          + '  </div>'
+          + '  <div class="text-end flex-shrink-0">'
+          + '    <div><span class="badge ' + statusClass + ' text-capitalize">' + esc(statusToken || 'published') + '</span></div>'
+          + '    <div class="x-small text-muted mt-1">' + esc(getQuestionTypeLabel(item?.questionType)) + '</div>'
+          + '  </div>'
+          + '</div>';
+      },
+      onSelect: (items) => {
+        addPickedQuestionsToSkill(skillToken, items);
+      }
+    });
+  }
+
+  function renderStudentPreview() {
+    if (!studentPreviewBody) return;
+    const plan = collectPlan();
+    let html = '';
+    html += '<div class="mb-3"><div class="fw-bold fs-5">' + esc(plan.title || 'Untitled Test') + '</div>';
+    html += '<div class="text-muted small">Code: <span class="font-monospace">' + esc(plan.code || '-') + '</span></div></div>';
+    skills.forEach((skill) => {
+      const rows = Array.isArray(plan.allocations?.[skill]) ? plan.allocations[skill] : [];
+      html += '<div class="card border-0 shadow-sm mb-3"><div class="card-body">';
+      html += '<div class="fw-bold text-capitalize mb-2">' + esc(skill) + ' (' + rows.length + ')</div>';
+      if (!rows.length) {
+        html += '<div class="small text-muted">No questions allocated.</div>';
+      } else {
+        html += '<ol class="mb-0">';
+        rows.forEach((row) => {
+          const statusToken = cleanText(row.currentStatus || row.statusAtSelection).toLowerCase();
+          const badge = statusToken === 'retired'
+            ? '<span class="badge bg-warning text-dark ms-2">Retired</span>'
+            : '<span class="badge bg-success ms-2">Published</span>';
+          html += '<li class="mb-1">'
+            + esc(row.questionTitle || '-')
+            + ' <span class="text-muted small">(' + esc(getQuestionTypeLabel(row.questionType)) + ')</span>'
+            + badge
+            + '</li>';
+        });
+        html += '</ol>';
+      }
+      html += '</div></div>';
+    });
+    studentPreviewBody.innerHTML = html;
+  }
+
+  async function runValidation() {
+    hideValidation();
+    const plan = collectPlan();
+    if (!plan.title) {
+      showValidation('Test title is required before validation.', 'danger');
+      return;
+    }
+
+    const endpoint = '/pte/tests/validate' + (actionStateId ? ('?actionStateId=' + encodeURIComponent(actionStateId)) : '');
+    const formData = new FormData();
+    formData.set('testPlan', JSON.stringify(plan));
+    formData.set('testId', routeId || '');
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        body: formData,
+        credentials: 'include'
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload || payload.status !== 'success') {
+        throw new Error((payload && payload.message) || ('Request failed with status ' + response.status + '.'));
+      }
+      const result = payload.results || {};
+      const draftErrors = Array.isArray(result.draftErrors) ? result.draftErrors : [];
+      const publishErrors = Array.isArray(result.publishErrors) ? result.publishErrors : [];
+      const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+      const parts = [];
+
+      parts.push('<div><strong>Draft Valid:</strong> ' + (result.isValidDraft ? 'Yes' : 'No') + '</div>');
+      parts.push('<div><strong>Publish Ready:</strong> ' + (result.publishReady ? 'Yes' : 'No') + '</div>');
+      parts.push('<div><strong>Question Count:</strong> ' + Number(result.questionCount || 0) + '</div>');
+
+      if (draftErrors.length) {
+        parts.push('<div class="mt-2"><strong>Draft Errors</strong><ul class="mb-0">' + draftErrors.map((row) => '<li>' + esc(row) + '</li>').join('') + '</ul></div>');
+      }
+      if (publishErrors.length) {
+        parts.push('<div class="mt-2"><strong>Publish Errors</strong><ul class="mb-0">' + publishErrors.map((row) => '<li>' + esc(row) + '</li>').join('') + '</ul></div>');
+      }
+      if (warnings.length) {
+        parts.push('<div class="mt-2"><strong>Warnings</strong><ul class="mb-0">' + warnings.map((row) => '<li>' + esc(row) + '</li>').join('') + '</ul></div>');
+      }
+
+      let variant = 'success';
+      if (!result.isValidDraft || !result.publishReady) variant = 'warning';
+      showValidation(parts.join(''), variant);
+    } catch (error) {
+      showValidation(error.message || 'Validation failed.', 'danger');
+    }
+  }
+
+  form.addEventListener('submit', (event) => {
+    if (!isEditable) {
+      event.preventDefault();
+      return;
+    }
+    const plan = collectPlan();
+    if (!plan.title) {
+      event.preventDefault();
+      showValidation('Test title is required.', 'danger');
+      return;
+    }
+    syncPlanInput();
+  });
+
+  document.addEventListener('click', (event) => {
+    const addBtn = event.target.closest('.ptt-btn-add-question');
+    if (addBtn) {
+      const skill = cleanText(addBtn.getAttribute('data-skill')).toLowerCase();
+      if (!isEditable || !skill) return;
+      openPicker(skill);
+      return;
+    }
+
+    const rowBtn = event.target.closest('.ptt-row-action');
+    if (rowBtn) {
+      if (!isEditable) return;
+      const action = cleanText(rowBtn.getAttribute('data-action')).toLowerCase();
+      const skill = cleanText(rowBtn.getAttribute('data-skill')).toLowerCase();
+      const index = Number.parseInt(String(rowBtn.getAttribute('data-index') || ''), 10);
+      const rows = state.allocations[skill] || [];
+      if (!Number.isFinite(index) || index < 0 || index >= rows.length) return;
+
+      if (action === 'remove') {
+        rows.splice(index, 1);
+      } else if (action === 'up' && index > 0) {
+        const tmp = rows[index - 1];
+        rows[index - 1] = rows[index];
+        rows[index] = tmp;
+      } else if (action === 'down' && index < rows.length - 1) {
+        const tmp = rows[index + 1];
+        rows[index + 1] = rows[index];
+        rows[index] = tmp;
+      }
+      resequenceSkill(skill);
+      renderSkillRows(skill);
+      syncPlanInput();
+      return;
+    }
+
+  });
+
+  const btnValidate = document.getElementById('pttBtnValidate');
+  if (btnValidate) {
+    btnValidate.addEventListener('click', runValidation);
+  }
+
+  const btnStudentPreview = document.getElementById('pttBtnStudentPreview');
+  if (btnStudentPreview) {
+    btnStudentPreview.addEventListener('click', () => {
+      renderStudentPreview();
+      if (!openModalCompat(previewModal, previewModalEl)) {
+        showValidation('Student preview modal is not available in this environment.', 'warning');
+      }
+    });
+  }
+
+  if (btnRefreshStudentPreview) {
+    btnRefreshStudentPreview.addEventListener('click', renderStudentPreview);
+  }
+
+  const btnExamPreview = document.getElementById('pttBtnExamPreview');
+  if (btnExamPreview) {
+    btnExamPreview.addEventListener('click', () => {
+      const plan = collectPlan();
+      if (!plan.title) {
+        showValidation('Test title is required before preview.', 'danger');
+        return;
+      }
+      if (examPreviewPlan) examPreviewPlan.value = JSON.stringify(plan);
+      if (examPreviewForm) examPreviewForm.submit();
+    });
+  }
+
+  bindModalFallbackDismiss(previewModalEl, previewModal);
+  bindFallbackEscapeClose();
+  renderAllSkills();
+  syncPlanInput();
+})();
+</script>

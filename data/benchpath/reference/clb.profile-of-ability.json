@@ -1,0 +1,2689 @@
+{
+  "meta": {
+    "schemaVersion": "1.0.0",
+    "entityType": "clbProfileOfAbility",
+    "layer": "reference",
+    "authority": "official",
+    "isReadMostly": true,
+    "defaultLocale": "en-CA",
+    "generatedAt": "2026-03-21T00:00:00.000Z",
+    "updatedAt": "2026-03-23T03:52:59.923Z"
+  },
+  "itemsById": {
+    "poa:listening:1": {
+      "id": "poa:listening:1",
+      "approvedAt": "2026-03-23T03:52:59.921Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:1",
+      "code": "POA-L-01",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The listener can: Understand a limited number of individual words, simple phrases and short, simple sentences related to immediate personal needs. When the communication is:  Spoken clearly at a slow rate  Strongly supported by visuals or non-verbal communication (pictures, gestures)  Face-to-face with a highly supportive speaker or via digital media (usually one-on- one)  Related to immediate personal needs  Short  In non-demanding contexts Demonstrating these strengths and limitations:  Understands simple phrases, short, simple sentences and a few factual details  Recognizes meaning based on familiar words and phrases and may show some initial understanding of simple sentences and structures  Relies on contextual and other visual clues for comprehension  Needs considerable assistance (such as repetition or paraphrasing, speech modification, explanation, demonstration or translation)  Cannot comprehend on the phone",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:1",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:1:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 32,
+          "pageEnd": 32
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA L 1",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-1",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:1:profile:001",
+          "pages": [
+            32,
+            32
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:listening:1:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 1",
+      "updatedAt": "2026-03-23T03:52:59.921Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:listening:10": {
+      "id": "poa:listening:10",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:10",
+      "code": "POA-L-10",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:10",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:10"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA L 10",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-10",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 10",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:listening:11": {
+      "id": "poa:listening:11",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:11",
+      "code": "POA-L-11",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:11",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:11"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA L 11",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-11",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 11",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:listening:12": {
+      "id": "poa:listening:12",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:12",
+      "code": "POA-L-12",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:12",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:12"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA L 12",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-12",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 12",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:listening:2": {
+      "id": "poa:listening:2",
+      "approvedAt": "2026-03-23T03:52:59.922Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:2",
+      "code": "POA-L-02",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The listener can: Understand key words, formulaic phrases and most short sentences on topics of immediate personal relevance. When the communication is:  Spoken clearly at a slow to normal rate  Often supported by visual or contextual clues  Face-to-face with a supportive speaker or via digital media (usually one-on- one or in small groups)  Related to topics of personal relevance  Relatively short  In non-demanding contexts Demonstrating these strengths and limitations:  Understands the gist and an expanding range of factual details  Recognizes meaning based on familiar phrases and shows a developing understanding of simple sentences and structures  Often relies on contextual clues for comprehension  Needs some assistance (such as repetition and paraphrasing, speech modification, explanation, demonstration or occasional translation)  Comprehension on the phone is very difficult",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:2",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:2:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 34,
+          "pageEnd": 34
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA L 2",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-2",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:2:profile:001",
+          "pages": [
+            34,
+            34
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:listening:2:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 2",
+      "updatedAt": "2026-03-23T03:52:59.922Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:listening:3": {
+      "id": "poa:listening:3",
+      "approvedAt": "2026-03-23T03:52:59.922Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:3",
+      "code": "POA-L-03",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The listener can: Understand, with considerable effort, simple formal and informal communication on topics of personal relevance. When the communication is:  Spoken clearly at a slow to normal rate  Sometimes supported by visual or contextual clues  Face-to-face or via digital media (usually one-on-one or in small groups)  Related to topics of personal relevance  Relatively short  In non-demanding contexts Demonstrating these strengths and limitations:  Understands an expanded range of factual details and some implied meanings  Recognizes meaning based on simple sentences and structures and shows an initial understanding of some complex sentences and structures  Sometimes relies on contextual clues for comprehension  Begins to recognize some common registers and idioms  May need some assistance (such as repetition, paraphrasing, speech modification or explanation)  Comprehension on the phone is difficult",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:3",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:3:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 36,
+          "pageEnd": 36
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA L 3",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-3",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:3:profile:001",
+          "pages": [
+            36,
+            36
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:listening:3:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 3",
+      "updatedAt": "2026-03-23T03:52:59.922Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:listening:4": {
+      "id": "poa:listening:4",
+      "approvedAt": "2026-03-23T03:52:59.922Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:4",
+      "code": "POA-L-04",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The listener can: Understand, with some effort, the gist of moderately complex, concrete formal and informal communication. When the communication is:  Spoken clearly at a slow to normal rate  Face-to-face, on the phone or via digital media (one-on- one or in small groups)  Related to relevant, everyday topics  Moderate in length  In moderately demanding contexts Demonstrating these strengths and limitations:  Understands overall meaning or intent  Identifies main ideas, supporting details and implied meanings  Understands language that is concrete and includes mostly common vocabulary  Recognizes meaning based on a developing understanding of complex sentences and structures  May sometimes rely on contextual clues for comprehension  Recognizes some registers  Understands very common idiomatic language  Sometimes requires repetition  Can comprehend on the phone when context and topic are highly relevant and familiar",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:4",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:4:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 42,
+          "pageEnd": 42
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA L 4",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-4",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:4:profile:001",
+          "pages": [
+            42,
+            42
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:listening:4:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 4",
+      "updatedAt": "2026-03-23T03:52:59.922Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:listening:5": {
+      "id": "poa:listening:5",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:5",
+      "code": "POA-L-05",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:5",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:5"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA L 5",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-5",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 5",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:listening:6": {
+      "id": "poa:listening:6",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:6",
+      "code": "POA-L-06",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:6",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:6"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA L 6",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-6",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 6",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:listening:7": {
+      "id": "poa:listening:7",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:7",
+      "code": "POA-L-07",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:7",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:7"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA L 7",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-7",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 7",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:listening:8": {
+      "id": "poa:listening:8",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:8",
+      "code": "POA-L-08",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:8",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:8"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA L 8",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-8",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 8",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:listening:9": {
+      "id": "poa:listening:9",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:9",
+      "code": "POA-L-09",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:listening:9",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:9"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA L 9",
+      "skillId": "skill:listening",
+      "slug": "poa-listening-9",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Listening - Benchmark 9",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:reading:1": {
+      "id": "poa:reading:1",
+      "approvedAt": "2026-03-23T03:52:59.922Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:1",
+      "code": "POA-R-01",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The reader can: Understand individual words, simple learned phrases and some very short, simple sentences related to immediate needs. When the text is:  Limited to everyday words and phrases  Clear, sparse and very easy to read  Supported by visual clues (e.g., pictures)  Very short  In non-demanding contexts Demonstrating these strengths and limitations:  Finds key words and simple details  May be able to get the gist of short phrases and sentences based on familiar words and phrases  Has limited knowledge of sound-symbol relationships and spelling conventions in English  Has very limited ability to decode unknown words, read connected discourse or guess the meaning of unknown words  Relies on graphics and other visual clues when interpreting meaning  Comprehension is based on very limited knowledge of basic grammar  Relies heavily on a bilingual dictionary due to limited vocabulary",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:1",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:1:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 104,
+          "pageEnd": 104
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA R 1",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-1",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:1:profile:001",
+          "pages": [
+            104,
+            104
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:reading:1:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 1",
+      "updatedAt": "2026-03-23T03:52:59.922Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:reading:10": {
+      "id": "poa:reading:10",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:10",
+      "code": "POA-R-10",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:10",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:10"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA R 10",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-10",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 10",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:reading:11": {
+      "id": "poa:reading:11",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:11",
+      "code": "POA-R-11",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:11",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:11"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA R 11",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-11",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 11",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:reading:12": {
+      "id": "poa:reading:12",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:12",
+      "code": "POA-R-12",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:12",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:12"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA R 12",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-12",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 12",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:reading:2": {
+      "id": "poa:reading:2",
+      "approvedAt": "2026-03-23T03:52:59.922Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:2",
+      "code": "POA-R-02",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The reader can: Understand and get some information from short, simple texts related to familiar, routine everyday topics of personal relevance. When the text is:  Limited to common, factual, concrete vocabulary  Clearly organized and easy to read with simple layout  Sometimes supported by graphics, charts or diagrams  Short  In non-demanding contexts Demonstrating these strengths and limitations:  Understands some simple connected discourse  Gets the gist based on familiar words and phrases  Decodes some unfamiliar words because of an improving awareness of sound-symbol relationships and spelling conventions in English  Has limited ability to guess the meaning of unknown words  May rely on graphics and other visual clues when interpreting meaning  Comprehension is based on limited knowledge of basic grammar  Relies on a bilingual dictionary",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:2",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:2:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 106,
+          "pageEnd": 106
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA R 2",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-2",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:2:profile:001",
+          "pages": [
+            106,
+            106
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:reading:2:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 2",
+      "updatedAt": "2026-03-23T03:52:59.922Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:reading:3": {
+      "id": "poa:reading:3",
+      "approvedAt": "2026-03-23T03:52:59.922Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:3",
+      "code": "POA-R-03",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The reader can: Understand and get most information from short, simple texts related to familiar, routine everyday topics of personal relevance. When the text is:  Limited to common and mostly factual, concrete vocabulary  Clearly organized and easy to read with simple layout  Sometimes supported by graphics, charts or diagrams  Short  In non-demanding contexts Demonstrating these strengths and limitations:  Understands most simple connected discourse  Gets the overall meaning  Identifies purpose, main ideas, some specific details and links between paragraphs  Occasionally guesses the meaning of unknown words and identifies some very common idioms  May rely on graphics and other visual clues when interpreting meaning  May identify some aspects of register and style  Comprehension is based on a developing knowledge of basic grammar and some initial understanding of a limited range of complex sentences and structures  Relies on a bilingual dictionary",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:3",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:3:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 108,
+          "pageEnd": 108
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA R 3",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-3",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:3:profile:001",
+          "pages": [
+            108,
+            108
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:reading:3:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 3",
+      "updatedAt": "2026-03-23T03:52:59.922Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:reading:4": {
+      "id": "poa:reading:4",
+      "approvedAt": "2026-03-23T03:52:59.922Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:4",
+      "code": "POA-R-04",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The reader can: Understand simple and some moderately complex texts in predictable, practical and relevant social, educational and work-related situations. When the text is:  Mostly concrete, factual and descriptive  With mostly common and some abstract or specialized vocabulary and occasional high-frequency idioms  Sometimes supported by visuals  Relatively short  In moderately demanding contexts Demonstrating these strengths and limitations:  Identifies purpose, main ideas, important details and links between paragraphs  Finds some information to make comparisons  Occasionally guesses the meaning of unknown terms, phrases and idioms from the context without a dictionary  Often rereads and needs clarification  Comprehension is based on knowledge of basic grammar and some developing understanding of complex sentences and structures  Identifies some different styles and registers  Uses a bilingual dictionary regularly; begins to use a concise unilingual ESL dictionary",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:4",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:4:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 114,
+          "pageEnd": 114
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA R 4",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-4",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:4:profile:001",
+          "pages": [
+            114,
+            114
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:reading:4:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 4",
+      "updatedAt": "2026-03-23T03:52:59.922Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:reading:5": {
+      "id": "poa:reading:5",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:5",
+      "code": "POA-R-05",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:5",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:5"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA R 5",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-5",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 5",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:reading:6": {
+      "id": "poa:reading:6",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:6",
+      "code": "POA-R-06",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:6",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:6"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA R 6",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-6",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 6",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:reading:7": {
+      "id": "poa:reading:7",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:7",
+      "code": "POA-R-07",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:7",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:7"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA R 7",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-7",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 7",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:reading:8": {
+      "id": "poa:reading:8",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:8",
+      "code": "POA-R-08",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:8",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:8"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA R 8",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-8",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 8",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:reading:9": {
+      "id": "poa:reading:9",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:9",
+      "code": "POA-R-09",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:reading:9",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:9"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA R 9",
+      "skillId": "skill:reading",
+      "slug": "poa-reading-9",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Reading - Benchmark 9",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:speaking:1": {
+      "id": "poa:speaking:1",
+      "approvedAt": "2026-03-23T03:52:59.922Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:1",
+      "code": "POA-S-01",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The speaker can: Communicate basic personal information using short phrases and some sentences, usually in response to questions about personal needs and experiences. When the communication is:  Short and face-to-face  Strongly supported by gestures and visual cues  Informal  With one familiar person at a time  Guided and encouraged by questions and prompts from a highly supportive listener  In non-demanding contexts Demonstrating these strengths and limitations:  Speaks in short phrases and some short sentences, with very little evidence of connected discourse  Fluency is not adequate to sustain simple conversations; speech rate is slow with frequent pauses and hesitations  Vocabulary is limited for basic everyday, routine communication  Little control over basic grammar structures and tenses  Grammar, vocabulary and pronunciation difficulties may significantly impede communication  Relies on gestures",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:1",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:1:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 68,
+          "pageEnd": 68
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA S 1",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-1",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:1:profile:001",
+          "pages": [
+            68,
+            68
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:speaking:1:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 1",
+      "updatedAt": "2026-03-23T03:52:59.922Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:speaking:10": {
+      "id": "poa:speaking:10",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:10",
+      "code": "POA-S-10",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:10",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:10"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA S 10",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-10",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 10",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:speaking:11": {
+      "id": "poa:speaking:11",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:11",
+      "code": "POA-S-11",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:11",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:11"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA S 11",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-11",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 11",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:speaking:12": {
+      "id": "poa:speaking:12",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:12",
+      "code": "POA-S-12",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:12",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:12"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA S 12",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-12",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 12",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:speaking:2": {
+      "id": "poa:speaking:2",
+      "approvedAt": "2026-03-23T03:52:59.923Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:2",
+      "code": "POA-S-02",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The speaker can: Communicate basic information using simple sentences about immediate needs and personal experiences. When the communication is:  Face-to-face or via digital media  Supported by gestures and visual cues  Informal  With one person at a time  Encouraged to a moderate degree by questions and prompts from a supportive listener  In non-demanding contexts Demonstrating these strengths and limitations:  Speaks in short sentences with some evidence of connected discourse  Fluency is just barely adequate for simple conversations; speech rate is slow with pauses and hesitations  Vocabulary is somewhat limited for basic everyday, routine communication  Some control over basic grammar structures and tenses  Grammar, vocabulary and pronunciation difficulties may impede communication  May rely on gestures",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:2",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:2:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 70,
+          "pageEnd": 70
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA S 2",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-2",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:2:profile:001",
+          "pages": [
+            70,
+            70
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:speaking:2:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 2",
+      "updatedAt": "2026-03-23T03:52:59.923Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:speaking:3": {
+      "id": "poa:speaking:3",
+      "approvedAt": "2026-03-23T03:52:59.923Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:3",
+      "code": "POA-S-03",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The speaker can: Communicate information about common everyday activities, experiences, wants and needs. When the communication is:  Face-to-face, very briefly on the phone or via digital media  May be supported by gestures and visual cues  Informal  With one person at a time or in a small supportive group  Encouraged occasionally by questions and prompts from a supportive listener  In non-demanding contexts Demonstrating these strengths and limitations:  Speaks in short sentences and some longer compound sentences, with clear evidence of connected discourse  Fluency is adequate for simple conversations; speech rate is slow to normal with some pauses or hesitations  Vocabulary is adequate for basic everyday, routine communication  Adequate control over basic grammar structures and tenses  Grammar, vocabulary and pronunciation difficulties may impede communication",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:3",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:3:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 72,
+          "pageEnd": 72
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA S 3",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-3",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:3:profile:001",
+          "pages": [
+            72,
+            72
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:speaking:3:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 3",
+      "updatedAt": "2026-03-23T03:52:59.923Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:speaking:4": {
+      "id": "poa:speaking:4",
+      "approvedAt": "2026-03-23T03:52:59.923Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:4",
+      "code": "POA-S-04",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The speaker can: Communicate with some effort in short, routine social situations, and present concrete information about needs and familiar topics of personal relevance. When the communication is:  Face-to-face, on the phone, or via digital media  Informal to somewhat formal  In familiar small groups  In moderately demanding contexts Demonstrating these strengths and limitations:  Clear evidence of connected discourse  Adequately fluent for some moderately demanding contexts; speech rate is slow to normal with some pauses and hesitations  A range of common everyday vocabulary, which may include a limited number of idioms  Some variety of grammatical structures, with good control of simple structures and initial control of some more complex structures.  Grammar, vocabulary and pronunciation difficulties sometimes impede communication  Some awareness of appropriate non-verbal cues and signals",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:4",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:4:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 78,
+          "pageEnd": 78
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA S 4",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-4",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:4:profile:001",
+          "pages": [
+            78,
+            78
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:speaking:4:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 4",
+      "updatedAt": "2026-03-23T03:52:59.923Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:speaking:5": {
+      "id": "poa:speaking:5",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:5",
+      "code": "POA-S-05",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:5",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:5"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA S 5",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-5",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 5",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:speaking:6": {
+      "id": "poa:speaking:6",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:6",
+      "code": "POA-S-06",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:6",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:6"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA S 6",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-6",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 6",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:speaking:7": {
+      "id": "poa:speaking:7",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:7",
+      "code": "POA-S-07",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:7",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:7"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA S 7",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-7",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 7",
+      "updatedAt": "2026-03-23T01:42:56.603Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:speaking:8": {
+      "id": "poa:speaking:8",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:8",
+      "code": "POA-S-08",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:8",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:8"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA S 8",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-8",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 8",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:speaking:9": {
+      "id": "poa:speaking:9",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:9",
+      "code": "POA-S-09",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:speaking:9",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:9"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA S 9",
+      "skillId": "skill:speaking",
+      "slug": "poa-speaking-9",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Speaking - Benchmark 9",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:writing:1": {
+      "id": "poa:writing:1",
+      "approvedAt": "2026-03-23T03:52:59.923Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:1",
+      "code": "POA-W-01",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The writer can: Write basic personal identification information, words, simple phrases, and a few simple sentences about highly familiar information related to immediate needs. When the communication is:  Limited to everyday words and phrases  Intended for a highly supportive and familiar reader  Very short  In non-demanding contexts Demonstrating these strengths and limitations:  Limited knowledge of the language and limited exposure to sound-symbol relationships  Very limited vocabulary  Some initial ability to use simple structures  Some initial awareness of basic spelling, punctuation and capitalization conventions  Difficulty with word order and word forms greatly interferes with comprehensibility  Difficulty communicating simple facts and ideas",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:1",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:1:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 140,
+          "pageEnd": 140
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA W 1",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-1",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:1:profile:001",
+          "pages": [
+            140,
+            140
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:writing:1:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 1",
+      "updatedAt": "2026-03-23T03:52:59.923Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:writing:10": {
+      "id": "poa:writing:10",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:10",
+      "code": "POA-W-10",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:10",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:10"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA W 10",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-10",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 10",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:writing:11": {
+      "id": "poa:writing:11",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:11",
+      "code": "POA-W-11",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:11",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:11"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA W 11",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-11",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 11",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:writing:12": {
+      "id": "poa:writing:12",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:12",
+      "code": "POA-W-12",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:12",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:12"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA W 12",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-12",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 12",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:writing:2": {
+      "id": "poa:writing:2",
+      "approvedAt": "2026-03-23T03:52:59.923Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:2",
+      "code": "POA-W-02",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The writer can: Write simple sentences about familiar information related to personal experiences and everyday situations. When the communication is:  Grammatically and lexically simple  Intended for a supportive and familiar reader  Short  In non-demanding contexts Demonstrating these strengths and limitations:  Developing knowledge of the language and exposure to sound-symbol relationships  Developing range of simple everyday vocabulary  Developing control of simple structures  Developing control of spelling, punctuation and capitalization  Difficulty with word order and word forms interferes with comprehensibility  Some difficulty communicating a simple message",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:2",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:2:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 142,
+          "pageEnd": 142
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA W 2",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-2",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:2:profile:001",
+          "pages": [
+            142,
+            142
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:writing:2:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 2",
+      "updatedAt": "2026-03-23T03:52:59.923Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:writing:3": {
+      "id": "poa:writing:3",
+      "approvedAt": "2026-03-23T03:52:59.923Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:3",
+      "code": "POA-W-03",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The writer can: Write short, simple texts about personal experience and familiar topics or situations related to daily life and experience. When the communication is:  Grammatically and lexically simple  Intended for a familiar reader  Short  In non-demanding contexts Demonstrating these strengths and limitations:  Adequate knowledge of the language for simple tasks  Adequate range of simple everyday vocabulary  Adequate control of simple structures  Conveys personal information in mostly single-clause sentences  May use some coordinated clauses with basic tenses  Adequate control of spelling, punctuation and capitalization  Difficulty with word order and word forms may sometimes interfere with comprehensibility  Able to communicate a simple message",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:3",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:3:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 144,
+          "pageEnd": 144
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA W 3",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-3",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:3:profile:001",
+          "pages": [
+            144,
+            144
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:writing:3:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 3",
+      "updatedAt": "2026-03-23T03:52:59.923Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:writing:4": {
+      "id": "poa:writing:4",
+      "approvedAt": "2026-03-23T03:52:59.923Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:4",
+      "code": "POA-W-04",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "The writer can: Write short, simple to moderately complex descriptions, narrations and communications about familiar, concrete topics related to daily life and experience. When the communication is:  On a familiar and personally relevant topic  Intended for a familiar audience  Relatively short  In moderately demanding contexts Demonstrating these strengths and limitations:  Adequate paragraph structure with a main idea and some supporting details  Adequate use of connective words and phrases  Adequate range of vocabulary for most simple everyday texts  Good control of simple structures  Difficulty with complex structures  Adequate control of spelling, punctuation and format  Some awkward-sounding phrases and word combinations  Able to communicate some moderately complex messages",
+      "domainNotes": "Canonical profile-of-ability text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:4",
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:4:profile:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 150,
+          "pageEnd": 150
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "POA W 4",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-4",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        },
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:4:profile:001",
+          "pages": [
+            150,
+            150
+          ],
+          "note": "Canonical POA source: fragment:clb:2012:writing:4:profile:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "canonical",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 4",
+      "updatedAt": "2026-03-23T03:52:59.923Z",
+      "updatedBy": "system",
+      "version": 4
+    },
+    "poa:writing:5": {
+      "id": "poa:writing:5",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:5",
+      "code": "POA-W-05",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:5",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:5"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA W 5",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-5",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 5",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:writing:6": {
+      "id": "poa:writing:6",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:6",
+      "code": "POA-W-06",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:6",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:6"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA W 6",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-6",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 6",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:writing:7": {
+      "id": "poa:writing:7",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:7",
+      "code": "POA-W-07",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:7",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:7"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA W 7",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-7",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 7",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:writing:8": {
+      "id": "poa:writing:8",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:8",
+      "code": "POA-W-08",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:8",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:8"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA W 8",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-8",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 8",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "poa:writing:9": {
+      "id": "poa:writing:9",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:9",
+      "code": "POA-W-09",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Seed profile record created from benchmark split. Populate canonical descriptors from source fragments.",
+      "domainNotes": "Auto-seeded during data-flow split.",
+      "extensions": {
+        "seededFromBenchmark": "benchmark:writing:9",
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:9"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "POA W 9",
+      "skillId": "skill:writing",
+      "slug": "poa-writing-9",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "profile-of-ability"
+      ],
+      "title": "Profile Of Ability - Writing - Benchmark 9",
+      "updatedAt": "2026-03-23T01:42:56.604Z",
+      "updatedBy": "system",
+      "version": 2
+    }
+  },
+  "allIds": [
+    "poa:listening:1",
+    "poa:listening:10",
+    "poa:listening:11",
+    "poa:listening:12",
+    "poa:listening:2",
+    "poa:listening:3",
+    "poa:listening:4",
+    "poa:listening:5",
+    "poa:listening:6",
+    "poa:listening:7",
+    "poa:listening:8",
+    "poa:listening:9",
+    "poa:reading:1",
+    "poa:reading:10",
+    "poa:reading:11",
+    "poa:reading:12",
+    "poa:reading:2",
+    "poa:reading:3",
+    "poa:reading:4",
+    "poa:reading:5",
+    "poa:reading:6",
+    "poa:reading:7",
+    "poa:reading:8",
+    "poa:reading:9",
+    "poa:speaking:1",
+    "poa:speaking:10",
+    "poa:speaking:11",
+    "poa:speaking:12",
+    "poa:speaking:2",
+    "poa:speaking:3",
+    "poa:speaking:4",
+    "poa:speaking:5",
+    "poa:speaking:6",
+    "poa:speaking:7",
+    "poa:speaking:8",
+    "poa:speaking:9",
+    "poa:writing:1",
+    "poa:writing:10",
+    "poa:writing:11",
+    "poa:writing:12",
+    "poa:writing:2",
+    "poa:writing:3",
+    "poa:writing:4",
+    "poa:writing:5",
+    "poa:writing:6",
+    "poa:writing:7",
+    "poa:writing:8",
+    "poa:writing:9"
+  ],
+  "indexes": {}
+}

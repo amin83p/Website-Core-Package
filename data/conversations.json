@@ -1,0 +1,81 @@
+[
+  {
+    "userIds": [
+      "USR-1774557078536-297",
+      "OTHER-1774557078536-297"
+    ],
+    "participants": [
+      {
+        "userId": "USR-1774557078536-297"
+      },
+      {
+        "userId": "OTHER-1774557078536-297"
+      }
+    ],
+    "messages": [
+      {
+        "id": "4904632",
+        "senderId": "USR-1774557078536-297",
+        "content": "smoke message",
+        "type": "text",
+        "fileUrl": null,
+        "status": "sent",
+        "sentAt": "2026-03-26T20:31:22.629Z"
+      }
+    ],
+    "id": "381489",
+    "lastMessageAt": "2026-03-26T20:31:22.629Z",
+    "updatedAt": "2026-03-26T20:31:22.629Z"
+  },
+  {
+    "userIds": [
+      "441227",
+      "816147"
+    ],
+    "participants": [
+      {
+        "userId": "441227"
+      },
+      {
+        "userId": "816147"
+      }
+    ],
+    "messages": [],
+    "id": "415729",
+    "lastRead": [
+      {
+        "userId": "441227",
+        "at": "2026-05-14T01:43:13.309Z"
+      }
+    ],
+    "updatedAt": "2026-05-14T01:43:13.309Z"
+  },
+  {
+    "userIds": [
+      "USR-1774556750651-330",
+      "OTHER-1774556750651-330"
+    ],
+    "participants": [
+      {
+        "userId": "USR-1774556750651-330"
+      },
+      {
+        "userId": "OTHER-1774556750651-330"
+      }
+    ],
+    "messages": [
+      {
+        "id": "7190257",
+        "senderId": "USR-1774556750651-330",
+        "content": "smoke message",
+        "type": "text",
+        "fileUrl": null,
+        "status": "sent",
+        "sentAt": "2026-03-26T20:25:53.595Z"
+      }
+    ],
+    "id": "779253",
+    "lastMessageAt": "2026-03-26T20:25:53.595Z",
+    "updatedAt": "2026-03-26T20:25:53.595Z"
+  }
+]

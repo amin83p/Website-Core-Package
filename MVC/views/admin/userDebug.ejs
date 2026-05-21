@@ -1,0 +1,188 @@
+<%
+  user = user && typeof user === 'object' ? user : {};
+  const displayName = user.name || user.fullName || user.preferredName || user.username || user.email || user.id || 'Unknown User';
+  const userStatus = user.status || 'unknown';
+  const organizations = Array.isArray(user.organizations) ? user.organizations.filter(Boolean) : [];
+%>
+
+<div class="sections-page">
+    
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <h2 class="page-heading size-md m-0">User Object Debugger</h2>
+      <span class="badge bg-warning text-dark border">Development Mode</span>
+    </div>
+
+    <div class="dash-hero mb-4 p-4">
+      <div class="row align-items-center">
+        <div class="col-md-1 text-center">
+          <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center mx-auto" 
+               style="width: 64px; height: 64px; font-size: 1.5rem;">
+            👤
+          </div>
+        </div>
+        <div class="col-md-11">
+          <h3 class="fw-bold mb-1"><%= displayName %></h3>
+          <div class="d-flex flex-wrap gap-3 text-muted small">
+            <span><strong>ID:</strong> <%= user.id || '-' %></span>
+            <span>|</span>
+            <span><strong>Username:</strong> <%= user.username || '-' %></span>
+            <span>|</span>
+            <span><strong>Access Level:</strong> <span class="badge bg-primary"><%= user.accessLevel || '-' %></span></span>
+            <span>|</span>
+            <span><strong>Status:</strong> <span class="badge <%= userStatus === 'active' ? 'bg-success' : 'bg-secondary' %>"><%= userStatus %></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      
+      <div class="col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-header bg-light border-0 fw-bold text-primary">
+            User Details
+          </div>
+          <div class="card-body">
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item d-flex justify-content-between px-0">
+                <span class="text-muted">Email:</span>
+                <span class="font-monospace"><%= user.email || '-' %></span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between px-0">
+                <span class="text-muted">Email Verified:</span>
+                <span class="badge <%= user.isEmailVerified ? 'bg-success' : 'bg-secondary' %>">
+                  <%= user.isEmailVerified ? 'Yes' : 'No' %>
+                </span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between px-0">
+                <span class="text-muted">Person ID:</span>
+                <span class="font-monospace"><%= user.personId || '-' %></span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between px-0">
+                <span class="text-muted">Primary Org ID:</span>
+                <span class="font-monospace"><%= user.primaryOrgId || '-' %></span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between px-0">
+                <span class="text-muted">Registration Source:</span>
+                <span class="font-monospace"><%= user.registrationSource || '-' %></span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between px-0">
+                <span class="text-muted">Last Login At:</span>
+                <span class="font-monospace"><%= user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'N/A' %></span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-header bg-light border-0 fw-bold text-primary">
+            Audit Log
+          </div>
+          <div class="card-body">
+            <% if (user.audit) { %>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between px-0">
+                  <span class="text-muted">Created By User:</span>
+                  <span class="font-monospace"><%= user.audit.createUser %></span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between px-0">
+                  <span class="text-muted">Created On:</span>
+                  <span class="font-monospace"><%= user.audit.createDateTime ? new Date(user.audit.createDateTime).toLocaleString() : 'N/A' %></span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between px-0">
+                  <span class="text-muted">Last Updated By:</span>
+                  <span class="font-monospace"><%= user.audit.lastUpdateUser %></span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between px-0">
+                  <span class="text-muted">Last Updated On:</span>
+                  <span class="font-monospace"><%= user.audit.lastUpdateDateTime ? new Date(user.audit.lastUpdateDateTime).toLocaleString() : 'N/A' %></span>
+                </li>
+              </ul>
+            <% } else { %>
+              <div class="alert alert-warning m-0">
+                No audit information available.
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-light border-0 fw-bold text-primary">
+            Allowed Organizations (Payload)
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0 align-middle">
+                <thead class="bg-light">
+                  <tr>
+                    <th>Org ID</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Joined At</th>
+                    <th>Access Profiles</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% if (organizations.length > 0) { %>
+                    <% organizations.forEach(org => { %>
+                      <tr class="<%= String(org.orgId) === String(user.activeOrgId) ? 'table-primary' : '' %>">
+                        <td><code><%= org.orgId %></code></td>
+                        <td class="fw-bold">
+                          <%= org.name %> 
+                          <% if (String(org.orgId) === String(user.activeOrgId)) { %>
+                            <span class="badge bg-primary ms-1">Active</span>
+                          <% } %>
+                          <% if (String(org.orgId) === String(user.primaryOrgId)) { %>
+                            <span class="badge bg-info ms-1">Primary</span>
+                          <% } %>
+                        </td>
+                        <td><%= (Array.isArray(org.roles) && org.roles.length ? org.roles.join(', ') : org.role) %></td>
+                        <td>
+                          <span class="badge <%= org.memberStatus === 'active' ?
+                            'bg-success' : 'bg-secondary' %>">
+                            <%= org.memberStatus %>
+                          </span>
+                        </td>
+                        <td class="small text-muted">
+                          <%= org.joinedAt ? new Date(org.joinedAt).toLocaleDateString() : '-' %>
+                        </td>
+                        <td>
+                          <% if (org.accessProfileIds && org.accessProfileIds.length > 0) { %>
+                            <% org.accessProfileIds.forEach(profileId => { %>
+                              <span class="badge bg-dark small me-1"><%= profileId %></span>
+                            <% }); %>
+                          <% } else { %>
+                            <span class="small text-muted">-</span>
+                          <% } %>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  <% } else { %>
+                    <tr><td colspan="6" class="text-center text-muted py-3">No organizations linked.</td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <span>Raw Request Object (req.user)</span>
+            <button class="btn btn-sm btn-outline-light" onclick="navigator.clipboard.writeText(document.getElementById('rawJson').innerText)">Copy JSON</button>
+          </div>
+          <div class="card-body bg-light p-0">
+            <pre id="rawJson" class="m-0 p-3 text-dark" style="max-height: 400px; overflow-y: auto; font-size: 0.85rem;"><%= JSON.stringify(user, null, 2) %></pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>

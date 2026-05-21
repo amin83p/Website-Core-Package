@@ -1,0 +1,179 @@
+<div class="sections-page">
+  
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h2 class="page-heading size-md m-0">Access Policy Diagnostic Tool</h2>
+    <span class="badge bg-info text-dark border">Test Mode</span>
+  </div>
+
+  <!-- 1. USER CONTEXT SUMMARY -->
+  <div class="dash-hero mb-4 p-4">
+    <div class="row align-items-center">
+      <div class="col-md-1 text-center">
+        <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center mx-auto" 
+             style="width: 64px; height: 64px; font-size: 1.5rem;">
+          🛡️
+        </div>
+      </div>
+      <div class="col-md-11">
+        <h3 class="fw-bold mb-1">Simulating Access For: <%= user.name || user.username %></h3>
+        <div class="d-flex gap-3 text-muted small">
+          <span><strong>User ID:</strong> <%= user.id %></span>
+          <span>|</span>
+          <span><strong>Access Level:</strong> <span class="badge bg-primary"><%= user.accessLevel %></span></span>
+          <span>|</span>
+          <span><strong>Policy:</strong> <%= hasPolicy ? 'Active User Policy + Website/Org Guardrails' : 'Profile Access + Website/Org Guardrails' %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <!-- 2. COMBOBOX TESTER -->
+    <div class="col-md-6">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary">
+          Select & Check
+        </div>
+        <div class="card-body">
+          <form id="comboCheckForm">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Section</label>
+              <select class="form-select size-md" name="sectionId" required>
+                <option value="" disabled selected>Choose a Section...</option>
+                <% sections.forEach(sec => { %>
+                  <option value="<%= sec.id %>">[<%= sec.id %>] <%= sec.name %></option>
+                <% }) %>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Operation (Optional)</label>
+              <select class="form-select size-md" name="operationId">
+                <option value="" selected>-- General Section Access --</option>
+                <% operations.forEach(op => { %>
+                  <option value="<%= op.id %>">[<%= op.id %>] <%= op.name %></option>
+                <% }) %>
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-filled btn-primary w-100">Check Permission</button>
+          </form>
+          
+          <div id="comboResult" class="mt-3" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. MANUAL INPUT TESTER -->
+    <div class="col-md-6">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary">
+          Manual ID Entry
+        </div>
+        <div class="card-body">
+          <form id="manualCheckForm">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Section ID / Name</label>
+              <input type="text" class="form-control size-md" name="sectionId" placeholder="e.g. SEC_ACCOUNTING" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Operation ID / Name</label>
+              <input type="text" class="form-control size-md" name="operationId" placeholder="e.g. OP_EXPORT_DATA">
+            </div>
+
+            <button type="submit" class="btn btn-filled btn-secondary w-100">Check Permission</button>
+          </form>
+
+          <div id="manualResult" class="mt-3" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  const handleCheck = async (formId, resultId) => {
+    const form = document.getElementById(formId);
+    const resultDiv = document.getElementById(resultId);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      // UI Loading State
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = '<div class="text-center text-muted"><span class="spinner-border spinner-border-sm"></span> Checking...</div>';
+
+      const formData = new FormData(form);
+      const payload = {
+        sectionId: formData.get('sectionId'),
+        operationId: formData.get('operationId')
+      };
+
+      try {
+        const res = await fetch('/accessPolicies/checker/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        console.log(data.limits);
+        renderResult(resultDiv, data);
+
+      } catch (err) {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+      }
+    });
+  };
+
+function renderResult(container, data) {
+    if (data.status === 'error') {
+       // ... (Error HTML) ...
+    } else {
+       // Success / Allowed
+       const limits = data.limits || {};
+       const scope = data.scopeId || 'Global'; // ✅ Capture Scope
+
+       let limitsHtml = `
+         <ul class="list-group list-group-flush small bg-transparent mt-2">
+           <li class="list-group-item bg-transparent d-flex justify-content-between">
+             <span>Effective Scope:</span> <span class="badge bg-info text-dark">${scope}</span>
+           </li>
+           <li class="list-group-item bg-transparent d-flex justify-content-between">
+             <span>Session Time:</span> <strong>${limits.maxSessionDurationMinutes || 'Unlimited'} min</strong>
+           </li>
+           <li class="list-group-item bg-transparent d-flex justify-content-between">
+             <span>Attempts:</span> <strong>${limits.maxAttemptsPerSession || 'Unlimited'}</strong>
+           </li>
+           <li class="list-group-item bg-transparent d-flex justify-content-between">
+             <span>Fetch Vol:</span> <strong>${limits.maxFetchVolumeKB || 'Unlimited'} KB</strong>
+           </li>
+         </ul>
+       `;
+       
+       container.innerHTML = `
+         <div class="alert alert-success mb-0 border-success">
+           <div class="d-flex align-items-center mb-2">
+             <i class="bi bi-check-circle-fill me-2 fs-4"></i>
+             <strong class="fs-5">ACCESS GRANTED</strong>
+           </div>
+           <div class="small text-muted mb-2">${data.message}</div>
+           <div class="card bg-white border-0 p-2 rounded">
+             <h6 class="fw-bold text-dark border-bottom pb-1">Effective Context</h6>
+             ${limitsHtml}
+           </div>
+         </div>
+       `;
+    }
+  }
+
+  handleCheck('comboCheckForm', 'comboResult');
+  handleCheck('manualCheckForm', 'manualResult');
+  
+});
+</script>

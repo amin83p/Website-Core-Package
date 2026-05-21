@@ -1,0 +1,14 @@
+{
+  "name": "SCHOOL_GRADEBOOK",
+  "type": "class",
+  "value": "bi bi-journal-bookmark-fill",
+  "tags": ["SCHOOL_GRADEBOOK", "778769"],
+  "audit": {
+    "createUser": "ROOT_001",
+    "createDateTime": "2026-03-30T12:00:00.000Z",
+    "lastUpdateUser": "ROOT_001",
+    "lastUpdateDateTime": "2026-03-30T12:00:00.000Z"
+  },
+  "orgId": "SYSTEM",
+  "id": "SYM_SYSTEM_037A"
+}

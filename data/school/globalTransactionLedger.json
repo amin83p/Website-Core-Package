@@ -1,0 +1,1026 @@
+[
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:32:18.872Z",
+    "effectiveDate": "2026-04-01",
+    "transactionType": "charge",
+    "party": {
+      "studentId": "STU52105",
+      "personId": "144922",
+      "programId": "232974",
+      "feeCategory": "Domestic"
+    },
+    "fee": {
+      "category": "Domestic",
+      "code": "MANUAL_PROGRAM_ADJUSTMENT",
+      "label": "Manual Program Registration Adjustment",
+      "frequency": "one_time",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 1563,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "Manual program registration adjustment",
+    "externalReference": "845201",
+    "internalNote": "Manual draft adjustment before approval (845201)",
+    "metadata": {
+      "sourceType": "manual_program_adjustment",
+      "registrationId": "845201",
+      "generatedBy": "ROOT_001",
+      "isManualAdjustment": true,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486530_268",
+      "accountCode": "STU_STU52105",
+      "accountName": "Hossein Norouzi (Student)",
+      "programRegistrationId": "845201"
+    },
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "program_registration_manual_adjustment",
+      "eventId": "SPRMAN-845201-1775061138872-2-982-DR",
+      "idempotencyKey": "SPRMAN|845201|1775061138872-2-982|DR"
+    },
+    "id": "116085"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:32:18.872Z",
+    "effectiveDate": "2026-04-01",
+    "transactionType": "charge",
+    "party": {
+      "studentId": "STU52105",
+      "personId": "144922",
+      "programId": "232974",
+      "feeCategory": "Domestic"
+    },
+    "fee": {
+      "category": "Domestic",
+      "code": "MANUAL_PROGRAM_ADJUSTMENT",
+      "label": "Manual Program Registration Adjustment",
+      "frequency": "one_time",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 250,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "Manual program registration adjustment",
+    "externalReference": "845201",
+    "internalNote": "Manual draft adjustment before approval (845201)",
+    "metadata": {
+      "sourceType": "manual_program_adjustment",
+      "registrationId": "845201",
+      "generatedBy": "ROOT_001",
+      "isManualAdjustment": true,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486530_268",
+      "accountCode": "STU_STU52105",
+      "accountName": "Hossein Norouzi (Student)",
+      "programRegistrationId": "845201"
+    },
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "program_registration_manual_adjustment",
+      "eventId": "SPRMAN-845201-1775061138872-1-5-DR",
+      "idempotencyKey": "SPRMAN|845201|1775061138872-1-5|DR"
+    },
+    "id": "154738"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:30:22.790Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "reversal",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 102,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "Rollback of registration 118605",
+    "externalReference": "",
+    "internalNote": "Class enrollment rollback requested for 118605.",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 2,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4210",
+      "accountCode": "4210",
+      "accountName": "Registration Fees"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "transaction_reversal",
+      "eventId": "CLSENRREV-118605-4",
+      "idempotencyKey": "ROLL-ROLLBACK-118605-935106"
+    },
+    "id": "193911",
+    "balanceEffect": 0,
+    "comments": [],
+    "hold": {
+      "isOnHold": false,
+      "holdReasonCode": "",
+      "holdReasonText": "",
+      "holdPlacedBy": "",
+      "holdPlacedAt": "",
+      "holdUntil": "",
+      "holdReleasedBy": "",
+      "holdReleasedAt": ""
+    },
+    "reversalOfTransactionId": "935106",
+    "audit": {
+      "createDateTime": "2026-04-01T16:30:22.790Z"
+    }
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:30:22.371Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "reversal",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 102,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "Rollback of registration 118605",
+    "externalReference": "",
+    "internalNote": "Class enrollment rollback requested for 118605.",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 2,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486560_570",
+      "accountCode": "STU_STU50124",
+      "accountName": "Javad Amini Foroushani (Student)"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "transaction_reversal",
+      "eventId": "CLSENRREV-118605-3",
+      "idempotencyKey": "ROLL-ROLLBACK-118605-706414"
+    },
+    "id": "261385",
+    "balanceEffect": 0,
+    "comments": [],
+    "hold": {
+      "isOnHold": false,
+      "holdReasonCode": "",
+      "holdReasonText": "",
+      "holdPlacedBy": "",
+      "holdPlacedAt": "",
+      "holdUntil": "",
+      "holdReleasedBy": "",
+      "holdReleasedAt": ""
+    },
+    "reversalOfTransactionId": "706414",
+    "audit": {
+      "createDateTime": "2026-04-01T16:30:22.371Z"
+    }
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:33:50.270Z",
+    "effectiveDate": "2026-04-01",
+    "transactionType": "reversal",
+    "party": {
+      "studentId": "STU52105",
+      "personId": "144922",
+      "programId": "232974",
+      "feeCategory": "Domestic"
+    },
+    "fee": {
+      "category": "Domestic",
+      "code": "MANUAL_PROGRAM_ADJUSTMENT",
+      "label": "Manual Program Registration Adjustment",
+      "frequency": "one_time",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 1563,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "Rollback of program registration 845201",
+    "externalReference": "845201",
+    "internalNote": "Manual rollback from Program Registration details",
+    "metadata": {
+      "sourceType": "manual_program_adjustment",
+      "registrationId": "845201",
+      "generatedBy": "ROOT_001",
+      "isManualAdjustment": true,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4110",
+      "accountCode": "4110",
+      "accountName": "Tuition Revenue - Domestic",
+      "programRegistrationId": "845201"
+    },
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "transaction_reversal",
+      "eventId": "SPRREV-845201-4",
+      "idempotencyKey": "SPR-ROLLBACK-845201-372531"
+    },
+    "id": "293102",
+    "balanceEffect": 0,
+    "comments": [],
+    "hold": {
+      "isOnHold": false,
+      "holdReasonCode": "",
+      "holdReasonText": "",
+      "holdPlacedBy": "",
+      "holdPlacedAt": "",
+      "holdUntil": "",
+      "holdReleasedBy": "",
+      "holdReleasedAt": ""
+    },
+    "reversalOfTransactionId": "372531",
+    "audit": {
+      "createDateTime": "2026-04-01T16:33:50.270Z"
+    }
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:33:48.999Z",
+    "effectiveDate": "2026-04-01",
+    "transactionType": "reversal",
+    "party": {
+      "studentId": "STU52105",
+      "personId": "144922",
+      "programId": "232974",
+      "feeCategory": "Domestic"
+    },
+    "fee": {
+      "category": "Domestic",
+      "code": "MANUAL_PROGRAM_ADJUSTMENT",
+      "label": "Manual Program Registration Adjustment",
+      "frequency": "one_time",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 250,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "Rollback of program registration 845201",
+    "externalReference": "845201",
+    "internalNote": "Manual rollback from Program Registration details",
+    "metadata": {
+      "sourceType": "manual_program_adjustment",
+      "registrationId": "845201",
+      "generatedBy": "ROOT_001",
+      "isManualAdjustment": true,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486530_268",
+      "accountCode": "STU_STU52105",
+      "accountName": "Hossein Norouzi (Student)",
+      "programRegistrationId": "845201"
+    },
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "transaction_reversal",
+      "eventId": "SPRREV-845201-1",
+      "idempotencyKey": "SPR-ROLLBACK-845201-154738"
+    },
+    "id": "356488",
+    "balanceEffect": 0,
+    "comments": [],
+    "hold": {
+      "isOnHold": false,
+      "holdReasonCode": "",
+      "holdReasonText": "",
+      "holdPlacedBy": "",
+      "holdPlacedAt": "",
+      "holdUntil": "",
+      "holdReleasedBy": "",
+      "holdReleasedAt": ""
+    },
+    "reversalOfTransactionId": "154738",
+    "audit": {
+      "createDateTime": "2026-04-01T16:33:48.999Z"
+    }
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T08:01:38.419Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "adjustment",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 102,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "Tuition Fee Sample for LINC Classes - line 2",
+    "externalReference": "",
+    "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 2,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486560_570",
+      "accountCode": "STU_STU50124",
+      "accountName": "Javad Amini Foroushani (Student)"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "class_enrollment_fee",
+      "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_2-2|DR",
+      "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_2-2|DR"
+    },
+    "id": "366515"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:32:18.872Z",
+    "effectiveDate": "2026-04-01",
+    "transactionType": "charge",
+    "party": {
+      "studentId": "STU52105",
+      "personId": "144922",
+      "programId": "232974",
+      "feeCategory": "Domestic"
+    },
+    "fee": {
+      "category": "Domestic",
+      "code": "MANUAL_PROGRAM_ADJUSTMENT",
+      "label": "Manual Program Registration Adjustment",
+      "frequency": "one_time",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 1563,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "Manual program registration adjustment",
+    "externalReference": "845201",
+    "internalNote": "Manual draft adjustment before approval (845201)",
+    "metadata": {
+      "sourceType": "manual_program_adjustment",
+      "registrationId": "845201",
+      "generatedBy": "ROOT_001",
+      "isManualAdjustment": true,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4110",
+      "accountCode": "4110",
+      "accountName": "Tuition Revenue - Domestic",
+      "programRegistrationId": "845201"
+    },
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "program_registration_manual_adjustment",
+      "eventId": "SPRMAN-845201-1775061138872-2-982-CR",
+      "idempotencyKey": "SPRMAN|845201|1775061138872-2-982|CR"
+    },
+    "id": "372531"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:30:21.554Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "reversal",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 4898,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "Rollback of registration 118605",
+    "externalReference": "",
+    "internalNote": "Class enrollment rollback requested for 118605.",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 1,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486560_570",
+      "accountCode": "STU_STU50124",
+      "accountName": "Javad Amini Foroushani (Student)"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "transaction_reversal",
+      "eventId": "CLSENRREV-118605-1",
+      "idempotencyKey": "ROLL-ROLLBACK-118605-987964"
+    },
+    "id": "416654",
+    "balanceEffect": 0,
+    "comments": [],
+    "hold": {
+      "isOnHold": false,
+      "holdReasonCode": "",
+      "holdReasonText": "",
+      "holdPlacedBy": "",
+      "holdPlacedAt": "",
+      "holdUntil": "",
+      "holdReleasedBy": "",
+      "holdReleasedAt": ""
+    },
+    "reversalOfTransactionId": "987964",
+    "audit": {
+      "createDateTime": "2026-04-01T16:30:21.554Z"
+    }
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T08:01:38.418Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "adjustment",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 4898,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "STU50124 146788 232974",
+    "externalReference": "",
+    "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 1,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486560_570",
+      "accountCode": "STU_STU50124",
+      "accountName": "Javad Amini Foroushani (Student)"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "class_enrollment_fee",
+      "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_1-1|DR",
+      "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_1-1|DR"
+    },
+    "id": "428075"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T08:01:38.418Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "adjustment",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 4898,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "STU50124 146788 232974",
+    "externalReference": "",
+    "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 1,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4110",
+      "accountCode": "4110",
+      "accountName": "Tuition Revenue - Domestic"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "class_enrollment_fee",
+      "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_1-1|CR",
+      "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_1-1|CR"
+    },
+    "id": "672512"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T08:01:38.419Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "adjustment",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 102,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "Tuition Fee Sample for LINC Classes - line 2",
+    "externalReference": "",
+    "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 2,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486560_570",
+      "accountCode": "STU_STU50124",
+      "accountName": "Javad Amini Foroushani (Student)"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "class_enrollment_fee",
+      "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_2-2|DR",
+      "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_2-2|DR"
+    },
+    "id": "706414"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:32:18.872Z",
+    "effectiveDate": "2026-04-01",
+    "transactionType": "charge",
+    "party": {
+      "studentId": "STU52105",
+      "personId": "144922",
+      "programId": "232974",
+      "feeCategory": "Domestic"
+    },
+    "fee": {
+      "category": "Domestic",
+      "code": "MANUAL_PROGRAM_ADJUSTMENT",
+      "label": "Manual Program Registration Adjustment",
+      "frequency": "one_time",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 250,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "Manual program registration adjustment",
+    "externalReference": "845201",
+    "internalNote": "Manual draft adjustment before approval (845201)",
+    "metadata": {
+      "sourceType": "manual_program_adjustment",
+      "registrationId": "845201",
+      "generatedBy": "ROOT_001",
+      "isManualAdjustment": true,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4210",
+      "accountCode": "4210",
+      "accountName": "Registration Fees",
+      "programRegistrationId": "845201"
+    },
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "program_registration_manual_adjustment",
+      "eventId": "SPRMAN-845201-1775061138872-1-5-CR",
+      "idempotencyKey": "SPRMAN|845201|1775061138872-1-5|CR"
+    },
+    "id": "786228"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T08:01:38.419Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "adjustment",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 102,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "Tuition Fee Sample for LINC Classes - line 2",
+    "externalReference": "",
+    "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 2,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4210",
+      "accountCode": "4210",
+      "accountName": "Registration Fees"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "class_enrollment_fee",
+      "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_2-2|CR",
+      "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_2-2|CR"
+    },
+    "id": "804682"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T08:01:38.418Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "adjustment",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 4898,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "STU50124 146788 232974",
+    "externalReference": "",
+    "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 1,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4110",
+      "accountCode": "4110",
+      "accountName": "Tuition Revenue - Domestic"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "class_enrollment_fee",
+      "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_1-1|CR",
+      "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_1-1|CR"
+    },
+    "id": "825544"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:33:49.421Z",
+    "effectiveDate": "2026-04-01",
+    "transactionType": "reversal",
+    "party": {
+      "studentId": "STU52105",
+      "personId": "144922",
+      "programId": "232974",
+      "feeCategory": "Domestic"
+    },
+    "fee": {
+      "category": "Domestic",
+      "code": "MANUAL_PROGRAM_ADJUSTMENT",
+      "label": "Manual Program Registration Adjustment",
+      "frequency": "one_time",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 250,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "Rollback of program registration 845201",
+    "externalReference": "845201",
+    "internalNote": "Manual rollback from Program Registration details",
+    "metadata": {
+      "sourceType": "manual_program_adjustment",
+      "registrationId": "845201",
+      "generatedBy": "ROOT_001",
+      "isManualAdjustment": true,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4210",
+      "accountCode": "4210",
+      "accountName": "Registration Fees",
+      "programRegistrationId": "845201"
+    },
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "transaction_reversal",
+      "eventId": "SPRREV-845201-2",
+      "idempotencyKey": "SPR-ROLLBACK-845201-786228"
+    },
+    "id": "902854",
+    "balanceEffect": 0,
+    "comments": [],
+    "hold": {
+      "isOnHold": false,
+      "holdReasonCode": "",
+      "holdReasonText": "",
+      "holdPlacedBy": "",
+      "holdPlacedAt": "",
+      "holdUntil": "",
+      "holdReleasedBy": "",
+      "holdReleasedAt": ""
+    },
+    "reversalOfTransactionId": "786228",
+    "audit": {
+      "createDateTime": "2026-04-01T16:33:49.421Z"
+    }
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:30:21.959Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "reversal",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 4898,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "Rollback of registration 118605",
+    "externalReference": "",
+    "internalNote": "Class enrollment rollback requested for 118605.",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 1,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4110",
+      "accountCode": "4110",
+      "accountName": "Tuition Revenue - Domestic"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "transaction_reversal",
+      "eventId": "CLSENRREV-118605-2",
+      "idempotencyKey": "ROLL-ROLLBACK-118605-825544"
+    },
+    "id": "905261",
+    "balanceEffect": 0,
+    "comments": [],
+    "hold": {
+      "isOnHold": false,
+      "holdReasonCode": "",
+      "holdReasonText": "",
+      "holdPlacedBy": "",
+      "holdPlacedAt": "",
+      "holdUntil": "",
+      "holdReleasedBy": "",
+      "holdReleasedAt": ""
+    },
+    "reversalOfTransactionId": "825544",
+    "audit": {
+      "createDateTime": "2026-04-01T16:30:21.959Z"
+    }
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T08:01:38.419Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "adjustment",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 102,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "Tuition Fee Sample for LINC Classes - line 2",
+    "externalReference": "",
+    "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 2,
+      "ledgerSide": "credit",
+      "accountId": "ACC_4210",
+      "accountCode": "4210",
+      "accountName": "Registration Fees"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "class_enrollment_fee",
+      "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_2-2|CR",
+      "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_2-2|CR"
+    },
+    "id": "935106"
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T16:33:49.849Z",
+    "effectiveDate": "2026-04-01",
+    "transactionType": "reversal",
+    "party": {
+      "studentId": "STU52105",
+      "personId": "144922",
+      "programId": "232974",
+      "feeCategory": "Domestic"
+    },
+    "fee": {
+      "category": "Domestic",
+      "code": "MANUAL_PROGRAM_ADJUSTMENT",
+      "label": "Manual Program Registration Adjustment",
+      "frequency": "one_time",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 1563,
+      "currency": "CAD",
+      "direction": "credit"
+    },
+    "memo": "Rollback of program registration 845201",
+    "externalReference": "845201",
+    "internalNote": "Manual rollback from Program Registration details",
+    "metadata": {
+      "sourceType": "manual_program_adjustment",
+      "registrationId": "845201",
+      "generatedBy": "ROOT_001",
+      "isManualAdjustment": true,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486530_268",
+      "accountCode": "STU_STU52105",
+      "accountName": "Hossein Norouzi (Student)",
+      "programRegistrationId": "845201"
+    },
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "transaction_reversal",
+      "eventId": "SPRREV-845201-3",
+      "idempotencyKey": "SPR-ROLLBACK-845201-116085"
+    },
+    "id": "971737",
+    "balanceEffect": 0,
+    "comments": [],
+    "hold": {
+      "isOnHold": false,
+      "holdReasonCode": "",
+      "holdReasonText": "",
+      "holdPlacedBy": "",
+      "holdPlacedAt": "",
+      "holdUntil": "",
+      "holdReleasedBy": "",
+      "holdReleasedAt": ""
+    },
+    "reversalOfTransactionId": "116085",
+    "audit": {
+      "createDateTime": "2026-04-01T16:33:49.849Z"
+    }
+  },
+  {
+    "orgId": "900000",
+    "status": "posted",
+    "postedAt": "2026-04-01T08:01:38.418Z",
+    "effectiveDate": "2026-01-30",
+    "transactionType": "adjustment",
+    "party": {
+      "studentId": "STU50124",
+      "personId": "146788",
+      "programId": "232974",
+      "feeCategory": "Others"
+    },
+    "fee": {
+      "category": "Others",
+      "code": "TUTION-FEE-SAMPLE",
+      "label": "Tuition Fee Sample for LINC Classes",
+      "frequency": "",
+      "isOptional": false
+    },
+    "amount": {
+      "value": 4898,
+      "currency": "CAD",
+      "direction": "debit"
+    },
+    "memo": "STU50124 146788 232974",
+    "externalReference": "",
+    "internalNote": "Posted from transaction definition Tuition_Fee_Sample",
+    "metadata": {
+      "transactionDefinitionId": "Tuition_Fee_Sample",
+      "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+      "lineIndex": 1,
+      "ledgerSide": "debit",
+      "accountId": "ACC_1772254486560_570",
+      "accountCode": "STU_STU50124",
+      "accountName": "Javad Amini Foroushani (Student)"
+    },
+    "source": {
+      "module": "school_transaction_definition",
+      "eventType": "class_enrollment_fee",
+      "eventId": "CLSENR-609077-STU50124-1775030498418|ENTRY_1-1|DR",
+      "idempotencyKey": "CLSENR|609077|STU50124|2026-01-30|232974|ENTRY_1-1|DR"
+    },
+    "id": "987964"
+  }
+]

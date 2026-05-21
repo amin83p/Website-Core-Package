@@ -1,0 +1,409 @@
+<%
+  const row = article && typeof article === 'object' ? article : {};
+  const meta = row.meta && typeof row.meta === 'object' ? row.meta : {};
+  const content = row.content && typeof row.content === 'object' ? row.content : {};
+  const author = meta.author && typeof meta.author === 'object' ? meta.author : {};
+  const metrics = row.metrics && typeof row.metrics === 'object' ? row.metrics : {};
+  const articleTitle = String(meta.title || 'Untitled News').trim();
+  const articleCategory = String(meta.category || 'General').trim();
+  const authorName = String(author.displayName || 'Editorial Team').trim();
+  const authorInitial = (authorName.charAt(0) || 'E').toUpperCase();
+  const articleSummary = String(content.summary || '').trim();
+  const articleImage = String(content.featuredImage || '').trim();
+  const articleBody = String(content.body || '<p>No article content is available yet.</p>');
+  const articleTags = Array.isArray(meta.tags) ? meta.tags.map((tag) => String(tag || '').trim()).filter(Boolean) : [];
+  const makeDate = (value) => {
+    const d = value ? new Date(value) : null;
+    return d && !Number.isNaN(d.getTime()) ? d : null;
+  };
+  const formatLongDate = (value) => {
+    const d = makeDate(value);
+    return d ? d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Date unavailable';
+  };
+  const formatShortDate = (value) => {
+    const d = makeDate(value);
+    return d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date unavailable';
+  };
+  const normalizeStory = (item) => {
+    const story = item && typeof item === 'object' ? item : {};
+    const storyMeta = story.meta && typeof story.meta === 'object' ? story.meta : {};
+    const storyContent = story.content && typeof story.content === 'object' ? story.content : {};
+    return {
+      hrefToken: String(storyMeta.slug || story.id || '').trim(),
+      title: String(storyMeta.title || 'Untitled News').trim(),
+      category: String(storyMeta.category || 'General').trim(),
+      dateLabel: formatShortDate(storyMeta.publishDate),
+      image: String(storyContent.featuredImage || '').trim(),
+      views: Number(story.metrics && story.metrics.views ? story.metrics.views : 0)
+    };
+  };
+  const latestItems = (Array.isArray(latestNews) ? latestNews : []).map(normalizeStory).filter((story) => story.hrefToken);
+  const relatedItems = (Array.isArray(relatedNews) ? relatedNews : []).map(normalizeStory).filter((story) => story.hrefToken);
+  const readCount = Number(metrics.views || 0);
+%>
+
+<section class="news-public-page news-article-page">
+  <section class="news-article-hero" aria-labelledby="newsArticleTitle">
+    <div class="news-hero-orbit" aria-hidden="true">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+    <div class="news-article-hero-copy">
+      <a href="/news" class="news-back-link"><i class="bi bi-arrow-left"></i>Back to News</a>
+      <div class="news-article-meta-line">
+        <span><%= articleCategory %></span>
+        <small><%= formatLongDate(meta.publishDate) %></small>
+      </div>
+      <h1 id="newsArticleTitle"><%= articleTitle %></h1>
+      <% if (articleSummary) { %>
+        <p><%= articleSummary %></p>
+      <% } %>
+
+      <div class="news-article-author-band">
+        <span class="news-avatar"><%= authorInitial %></span>
+        <div>
+          <strong><%= authorName %></strong>
+          <small><%= readCount ? readCount + ' reads' : 'Contributor' %></small>
+        </div>
+      </div>
+    </div>
+
+    <div class="news-article-hero-media">
+      <% if (articleImage) { %>
+        <img src="<%= articleImage %>" alt="<%= articleTitle %>">
+      <% } else { %>
+        <div class="news-image-fallback"><i class="bi bi-newspaper"></i></div>
+      <% } %>
+    </div>
+  </section>
+
+  <div class="row g-4 g-xl-5 align-items-start" id="articleLayoutRow">
+    <aside class="news-sidebar-col col-lg-3 d-none d-lg-block" id="leftSidebar">
+      <div class="news-sticky-stack">
+        <div class="news-glass-card">
+          <div class="news-widget-title"><i class="bi bi-clock-history"></i>Latest News</div>
+          <% if (latestItems.length) { %>
+            <div class="news-mini-list">
+              <% latestItems.forEach((news) => { %>
+                <a href="/news/article/<%= news.hrefToken %>" class="news-mini-card">
+                  <% if (news.image) { %>
+                    <img src="<%= news.image %>" alt="<%= news.title %>">
+                  <% } else { %>
+                    <span class="news-mini-icon"><i class="bi bi-newspaper"></i></span>
+                  <% } %>
+                  <span>
+                    <strong><%= news.title %></strong>
+                    <small><%= news.dateLabel %></small>
+                  </span>
+                </a>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <p class="news-muted mb-0">No other news available.</p>
+          <% } %>
+        </div>
+      </div>
+    </aside>
+
+    <main class="col-lg-6 col-md-12 transition-all" id="mainColumn">
+      <article class="news-article-card" id="articleContent">
+        <div class="reading-toolbar">
+          <button class="tool-btn" id="btnDecreaseFont" title="Decrease Font"><i class="bi bi-fonts" style="font-size: 0.8rem;"></i></button>
+          <button class="tool-btn" id="btnIncreaseFont" title="Increase Font"><i class="bi bi-fonts" style="font-size: 1.2rem;"></i></button>
+          <div class="vr mx-2 text-muted"></div>
+          <button class="tool-btn" id="btnFocusMode" title="Focus Mode (Hide Sidebars)"><i class="bi bi-arrows-fullscreen"></i></button>
+          <button class="tool-btn" id="btnReaderMode" title="Reader View"><i class="bi bi-book"></i></button>
+          <button class="tool-btn" title="Print" onclick="window.print()"><i class="bi bi-printer"></i></button>
+        </div>
+
+        <div class="article-body" id="articleBodyContent">
+          <%- articleBody %>
+        </div>
+
+        <% if (articleTags.length) { %>
+          <div class="news-article-tags">
+            <h6><i class="bi bi-tags me-1"></i>Topics</h6>
+            <div>
+              <% articleTags.forEach((tag) => { %>
+                <a href="/news?q=<%= tag %>">#<%= tag %></a>
+              <% }) %>
+            </div>
+          </div>
+        <% } %>
+      </article>
+
+      <div class="news-end-card">
+        <i class="bi bi-check2-circle"></i>
+        <span>End of Article</span>
+        <a href="/news">Explore more news</a>
+      </div>
+    </main>
+
+    <aside class="news-sidebar-col col-lg-3 d-none d-lg-block" id="rightSidebar">
+      <div class="news-sticky-stack">
+        <div class="news-glass-card">
+          <div class="news-widget-title"><i class="bi bi-fire"></i>Related Stories</div>
+          <% if (relatedItems.length) { %>
+            <div class="news-mini-list">
+              <% relatedItems.forEach((news) => { %>
+                <a href="/news/article/<%= news.hrefToken %>" class="news-mini-card">
+                  <span class="news-mini-icon"><i class="bi bi-arrow-up-right"></i></span>
+                  <span>
+                    <strong><%= news.title %></strong>
+                    <small><%= news.category %><% if (news.views > 10) { %> - Hot<% } %></small>
+                  </span>
+                </a>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <p class="news-muted mb-0">No related articles found.</p>
+          <% } %>
+        </div>
+
+        <% if (user) { %>
+          <div class="news-glass-card news-admin-card">
+            <div class="news-widget-title"><i class="bi bi-pencil-square"></i>Editor Tools</div>
+            <p>Share a new announcement or manage existing stories.</p>
+            <a href="/news/manage/new" class="btn news-btn-primary w-100">Write Article</a>
+          </div>
+        <% } %>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+html.news-public-root,
+html.news-public-root body.news-public-body {
+  background:
+    radial-gradient(circle at 8% 6%, rgba(29, 95, 184, 0.17), transparent 29%),
+    radial-gradient(circle at 92% 7%, rgba(8, 127, 140, 0.17), transparent 27%),
+    radial-gradient(circle at 9% 54%, rgba(29, 95, 184, 0.08), transparent 25%),
+    radial-gradient(circle at 89% 78%, rgba(8, 127, 140, 0.10), transparent 28%),
+    linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
+  min-height: 100%;
+}
+
+body.news-public-body { background-attachment: fixed; }
+
+main.news-public-main {
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-bottom: clamp(2.5rem, 5vw, 5rem);
+  padding-top: 0;
+  position: relative;
+}
+
+.news-public-page {
+  --news-blue: #1d5fb8;
+  --news-teal: #087f8c;
+  --news-ink: #13222c;
+  --news-muted: #53636f;
+  --news-line: #d7e1e7;
+  --news-surface: rgba(255, 255, 255, 0.82);
+  --news-shadow: 0 26px 70px rgba(19, 34, 44, 0.14);
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  isolation: isolate;
+  padding-top: clamp(1.3rem, 3vw, 2.4rem);
+  position: relative;
+}
+
+.news-public-page::before {
+  background:
+    linear-gradient(115deg, rgba(255,255,255,0.82), rgba(255,255,255,0.24)),
+    radial-gradient(circle at 12% 18%, rgba(29, 95, 184, 0.12), transparent 25%),
+    radial-gradient(circle at 86% 22%, rgba(8, 127, 140, 0.12), transparent 27%);
+  content: "";
+  inset: -2.5rem calc(50% - 50vw) -5rem;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.news-article-hero {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 3rem);
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+  margin-bottom: clamp(2rem, 5vw, 4rem);
+  min-height: 430px;
+  position: relative;
+}
+
+.news-hero-orbit { inset: 0; pointer-events: none; position: absolute; }
+.news-hero-orbit span { border: 1px solid rgba(29,95,184,0.18); border-radius: 999px; position: absolute; }
+.news-hero-orbit span:nth-child(1) { height: 280px; right: 3%; top: 2%; width: 280px; }
+.news-hero-orbit span:nth-child(2) { height: 160px; right: 14%; top: 26%; width: 160px; }
+.news-hero-orbit span:nth-child(3) { background: rgba(8,127,140,0.10); height: 68px; right: 7%; top: 48%; width: 68px; }
+
+.news-article-hero-copy { align-self: center; position: relative; z-index: 1; }
+.news-back-link { align-items: center; color: var(--news-blue); display: inline-flex; font-weight: 800; gap: 0.45rem; margin-bottom: 1rem; text-decoration: none; }
+.news-article-meta-line { align-items: center; display: flex; flex-wrap: wrap; gap: 0.85rem; margin-bottom: 1rem; }
+.news-article-meta-line span {
+  background: rgba(8,127,140,0.12);
+  border-radius: 999px;
+  color: var(--news-teal);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.48rem 0.7rem;
+  text-transform: uppercase;
+}
+.news-article-meta-line small { color: var(--news-muted); font-weight: 700; }
+.news-article-hero h1 { color: var(--news-ink); font-size: clamp(2.55rem, 5.8vw, 5.4rem); font-weight: 800; letter-spacing: -0.07em; line-height: 0.94; margin-bottom: 1rem; }
+.news-article-hero p { color: var(--news-muted); font-size: clamp(1.02rem, 1.7vw, 1.25rem); line-height: 1.72; }
+.news-article-author-band { align-items: center; color: var(--news-muted); display: flex; gap: 0.85rem; margin-top: 1.5rem; }
+.news-article-author-band strong { color: var(--news-ink); display: block; }
+.news-article-author-band small { display: block; }
+.news-avatar { align-items: center; background: linear-gradient(135deg, var(--news-blue), var(--news-teal)); border-radius: 999px; color: #fff; display: inline-flex; font-weight: 800; height: 2.7rem; justify-content: center; width: 2.7rem; }
+
+.news-article-hero-media {
+  align-self: center;
+  backdrop-filter: blur(18px);
+  background: rgba(255,255,255,0.62);
+  border: 1px solid rgba(215,225,231,0.82);
+  border-radius: 36px;
+  box-shadow: var(--news-shadow);
+  min-height: 390px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+.news-article-hero-media img { height: 100%; object-fit: cover; width: 100%; }
+.news-image-fallback { align-items: center; background: radial-gradient(circle at 30% 20%, rgba(29,95,184,0.22), transparent 32%), linear-gradient(135deg, #eaf4fb, #f8fbff); color: rgba(29,95,184,0.35); display: flex; font-size: 4rem; height: 100%; justify-content: center; min-height: 390px; }
+
+.news-sticky-stack { display: grid; gap: 1rem; position: sticky; top: 1.5rem; }
+.news-glass-card,
+.news-article-card,
+.news-end-card {
+  backdrop-filter: blur(18px);
+  background: var(--news-surface);
+  border: 1px solid rgba(215,225,231,0.82);
+  box-shadow: var(--news-shadow);
+}
+.news-glass-card { border-radius: 28px; padding: 1.35rem; }
+.news-widget-title { align-items: center; color: var(--news-teal); display: flex; font-size: 0.78rem; font-weight: 800; gap: 0.45rem; letter-spacing: 0.15em; margin-bottom: 1rem; text-transform: uppercase; }
+.news-mini-list { display: grid; gap: 0.75rem; }
+.news-mini-card { align-items: center; border-radius: 18px; color: inherit; display: grid; gap: 0.75rem; grid-template-columns: 58px minmax(0, 1fr); padding: 0.55rem; text-decoration: none; transition: background 0.18s ease, transform 0.18s ease; }
+.news-mini-card:hover { background: rgba(255,255,255,0.76); transform: translateX(3px); }
+.news-mini-card img,
+.news-mini-icon { border-radius: 16px; height: 58px; object-fit: cover; width: 58px; }
+.news-mini-icon { align-items: center; background: rgba(29,95,184,0.10); color: var(--news-blue); display: flex; justify-content: center; }
+.news-mini-card strong { color: var(--news-ink); display: -webkit-box; font-size: 0.86rem; font-weight: 800; line-height: 1.28; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.news-mini-card small,
+.news-muted { color: var(--news-muted); }
+.news-admin-card p { color: var(--news-muted); }
+.news-btn-primary { background: linear-gradient(135deg, var(--news-blue), var(--news-teal)); border: 0; border-radius: 999px; color: #fff; font-weight: 800; padding: 0.72rem 1.2rem; text-decoration: none; }
+
+.news-article-card { border-radius: 34px; padding: clamp(1.35rem, 3vw, 2.6rem); }
+.reading-toolbar { align-items: center; border-bottom: 1px solid rgba(215,225,231,0.78); display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; margin-bottom: 1.6rem; padding-bottom: 1rem; }
+.tool-btn { align-items: center; background: rgba(255,255,255,0.82); border: 1px solid rgba(215,225,231,0.96); border-radius: 999px; color: var(--news-muted); cursor: pointer; display: flex; height: 38px; justify-content: center; transition: all 0.2s ease; width: 38px; }
+.tool-btn:hover,
+.tool-btn.active { background: linear-gradient(135deg, var(--news-blue), var(--news-teal)); border-color: transparent; color: #fff; }
+.article-body { color: #263642; font-family: 'Manrope', 'Segoe UI', sans-serif; font-size: 1rem; line-height: 1.78; transition: font-size 0.2s ease; }
+.article-body p { margin-bottom: 1.45rem; }
+.article-body h2,
+.article-body h3 { color: var(--news-ink); font-weight: 800; letter-spacing: -0.025em; margin-bottom: 0.9rem; margin-top: 2.2rem; }
+.article-body img { border-radius: 24px; box-shadow: 0 18px 46px rgba(19,34,44,0.14); height: auto; margin: 2rem 0; max-width: 100%; }
+.article-body blockquote { background: rgba(8,127,140,0.08); border-left: 4px solid var(--news-teal); border-radius: 0 20px 20px 0; color: var(--news-ink); font-style: italic; margin: 2rem 0; padding: 1rem 1.35rem; }
+.news-article-tags { border-top: 1px solid rgba(215,225,231,0.78); margin-top: 2.3rem; padding-top: 1.4rem; }
+.news-article-tags h6 { color: var(--news-muted); font-size: 0.76rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.news-article-tags div { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.news-article-tags a { background: rgba(255,255,255,0.78); border: 1px solid rgba(215,225,231,0.9); border-radius: 999px; color: var(--news-muted); font-weight: 700; padding: 0.55rem 0.75rem; text-decoration: none; }
+.news-article-tags a:hover { color: var(--news-blue); }
+.news-end-card { align-items: center; border-radius: 26px; color: var(--news-muted); display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: center; margin-top: 1rem; padding: 1rem; }
+.news-end-card i { color: var(--news-teal); }
+.news-end-card span { color: var(--news-ink); font-weight: 800; }
+.news-end-card a { color: var(--news-blue); font-weight: 800; text-decoration: none; }
+
+.reader-mode-active .news-article-card { background: rgba(244,236,216,0.92); border-color: #e0d6c0; box-shadow: none; }
+.reader-mode-active .article-body { color: #2e231e; font-family: Georgia, 'Times New Roman', serif; }
+.reader-mode-active .article-body h2,
+.reader-mode-active .article-body h3 { color: #2e231e; }
+.reader-mode-active .reading-toolbar { border-color: #e0d6c0; }
+.reader-mode-active .tool-btn { background: #eaddc5; border-color: #d1c4ad; color: #5b4636; }
+.reader-mode-active .tool-btn.active { background: #5b4636; color: #fff; }
+
+@media (max-width: 991.98px) {
+  .news-article-hero { grid-template-columns: 1fr; }
+  .news-article-hero-media { min-height: 320px; }
+  .news-sticky-stack { position: static; }
+}
+@media (max-width: 767.98px) {
+  .news-article-hero h1 { font-size: clamp(2.25rem, 13vw, 3.6rem); }
+  .news-article-card { border-radius: 26px; }
+  .reading-toolbar { justify-content: flex-start; }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const state = {
+        fontSize: 16,
+        isFocus: false,
+        isReader: false
+    };
+
+    const bodyText = document.getElementById('articleBodyContent');
+    const mainCol = document.getElementById('mainColumn');
+    const leftBar = document.getElementById('leftSidebar');
+    const rightBar = document.getElementById('rightSidebar');
+    const btnIncrease = document.getElementById('btnIncreaseFont');
+    const btnDecrease = document.getElementById('btnDecreaseFont');
+    const btnFocus = document.getElementById('btnFocusMode');
+    const btnReader = document.getElementById('btnReaderMode');
+    const layoutRow = document.getElementById('articleLayoutRow');
+    if (!bodyText || !mainCol || !leftBar || !rightBar || !btnIncrease || !btnDecrease || !btnFocus || !btnReader || !layoutRow) return;
+
+    const minFont = 14;
+    const maxFont = 24;
+
+    function updateFont() {
+        bodyText.style.fontSize = `${state.fontSize}px`;
+    }
+
+    btnIncrease.addEventListener('click', () => {
+        if (state.fontSize < maxFont) {
+            state.fontSize += 1;
+            updateFont();
+        }
+    });
+
+    btnDecrease.addEventListener('click', () => {
+        if (state.fontSize > minFont) {
+            state.fontSize -= 1;
+            updateFont();
+        }
+    });
+
+    btnFocus.addEventListener('click', () => {
+        state.isFocus = !state.isFocus;
+        if (state.isFocus) {
+            leftBar.classList.remove('d-lg-block');
+            rightBar.classList.remove('d-lg-block');
+            leftBar.classList.add('d-none');
+            rightBar.classList.add('d-none');
+            mainCol.classList.remove('col-lg-6');
+            mainCol.classList.add('col-lg-8', 'mx-auto');
+            btnFocus.classList.add('active');
+            btnFocus.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
+        } else {
+            leftBar.classList.add('d-none', 'd-lg-block');
+            rightBar.classList.add('d-none', 'd-lg-block');
+            mainCol.classList.add('col-lg-6');
+            mainCol.classList.remove('col-lg-8', 'mx-auto');
+            btnFocus.classList.remove('active');
+            btnFocus.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
+        }
+    });
+
+    btnReader.addEventListener('click', () => {
+        state.isReader = !state.isReader;
+        layoutRow.classList.toggle('reader-mode-active', state.isReader);
+        btnReader.classList.toggle('active', state.isReader);
+    });
+});
+</script>

@@ -1,0 +1,52 @@
+[
+  {
+    "studentId": "STU50124",
+    "programId": "232974",
+    "orgId": "900000",
+    "personId": "146788",
+    "currentTermId": "",
+    "standing": "active",
+    "credits": {
+      "attempted": 0,
+      "earned": 0,
+      "mainEarned": 0,
+      "essentialEarned": 0,
+      "optionalEarned": 0
+    },
+    "results": {
+      "passedSubjects": [
+        "648041"
+      ],
+      "failedSubjects": [],
+      "activeClasses": [
+        "609077"
+      ]
+    },
+    "latestEntryId": "361605",
+    "lastRebuiltAt": "2026-04-07T17:06:22.557Z",
+    "id": "690739"
+  },
+  {
+    "studentId": "STU52105",
+    "programId": "232974",
+    "orgId": "900000",
+    "personId": "144922",
+    "currentTermId": "",
+    "standing": "active",
+    "credits": {
+      "attempted": 0,
+      "earned": 0,
+      "mainEarned": 0,
+      "essentialEarned": 0,
+      "optionalEarned": 0
+    },
+    "results": {
+      "passedSubjects": [],
+      "failedSubjects": [],
+      "activeClasses": []
+    },
+    "latestEntryId": "873821",
+    "lastRebuiltAt": "2026-04-01T16:33:50.733Z",
+    "id": "902561"
+  }
+]

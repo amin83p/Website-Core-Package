@@ -1,0 +1,128 @@
+{
+  "meta": {
+    "schemaVersion": "1.1.0",
+    "entityType": "benchpathReferenceExtractionMap",
+    "generatedAt": "2026-03-23T03:53:11.454Z",
+    "generatedBy": "scripts/benchpath/reference/referenceIntegrityAudit.js",
+    "note": "Auto-regenerated from current BenchPath reference JSON files."
+  },
+  "derivedFrom": {
+    "sourcesFile": "data/benchpath/reference/source.json",
+    "sourceFragmentsFile": "data/benchpath/reference/source-fragments.json",
+    "frameworkFile": "data/benchpath/reference/clb.framework.json",
+    "skillsFile": "data/benchpath/reference/clb.skills.json",
+    "stagesFile": "data/benchpath/reference/clb.stages.json"
+  },
+  "relationshipMap": {
+    "framework": [
+      "skills",
+      "stages",
+      "benchmarks"
+    ],
+    "skill": [
+      "competencyAreas",
+      "benchmarks",
+      "profileOfAbility",
+      "featuresOfCommunication"
+    ],
+    "benchmark": [
+      "competencies",
+      "profileOfAbility",
+      "featuresOfCommunication",
+      "sampleTaskLabels"
+    ],
+    "competency": [
+      "indicators",
+      "featuresOfCommunicationOptional",
+      "sampleTaskLabels"
+    ],
+    "allEntities": [
+      "sourceFragments"
+    ]
+  },
+  "currentState": {
+    "sourceCount": 19,
+    "sourceFragmentCount": 243,
+    "frameworkCount": 1,
+    "skillCount": 4,
+    "stageCount": 3,
+    "competencyAreaCount": 16,
+    "benchmarkCount": 48,
+    "competencyCount": 69,
+    "profileOfAbilityCount": 48,
+    "indicatorCount": 69,
+    "featureOfCommunicationCount": 27,
+    "sampleTaskLabelCount": 69
+  },
+  "targetFiles": [
+    {
+      "entity": "clbCompetencyAreas",
+      "file": "data/benchpath/reference/clb.competency-areas.json",
+      "count": 16,
+      "status": "completed",
+      "note": "Canonical competency areas by skill."
+    },
+    {
+      "entity": "clbBenchmarks",
+      "file": "data/benchpath/reference/clb.benchmarks.json",
+      "count": 48,
+      "status": "completed",
+      "note": "Canonical benchmark records by skill/level."
+    },
+    {
+      "entity": "clbCompetencies",
+      "file": "data/benchpath/reference/clb.competencies.json",
+      "count": 69,
+      "status": "mixed/canonical+seed",
+      "note": "Competency statements and benchmark links."
+    },
+    {
+      "entity": "clbProfileOfAbility",
+      "file": "data/benchpath/reference/clb.profile-of-ability.json",
+      "count": 48,
+      "status": "mixed/canonical+seed",
+      "note": "Profile descriptors per skill+benchmark."
+    },
+    {
+      "entity": "clbIndicators",
+      "file": "data/benchpath/reference/clb.indicators.json",
+      "count": 69,
+      "status": "mixed/canonical+seed",
+      "note": "Competency-linked indicators."
+    },
+    {
+      "entity": "clbFeaturesOfCommunication",
+      "file": "data/benchpath/reference/clb.features-of-communication.json",
+      "count": 27,
+      "status": "mixed/canonical+seed",
+      "note": "Feature descriptors for benchmark/competency context."
+    },
+    {
+      "entity": "clbSampleTaskLabels",
+      "file": "data/benchpath/reference/clb.sample-task-labels.json",
+      "count": 69,
+      "status": "mixed/canonical+seed",
+      "note": "Official sample task labels."
+    }
+  ],
+  "namingDrift": {
+    "detected": true,
+    "issues": [
+      {
+        "code": "naming_drift_source_file",
+        "message": "Reference uses source.json while design docs often refer to sources.json.",
+        "suggestion": "Keep source.json as canonical runtime name or introduce a controlled alias layer; avoid mixed usage in docs and loaders."
+      },
+      {
+        "code": "naming_drift_profile_file",
+        "message": "Reference uses clb.profile-of-ability.json (singular), while plural variants appear in notes/maps.",
+        "suggestion": "Standardize on clb.profile-of-ability.json and profileOfAbility in all maps/loaders."
+      }
+    ]
+  },
+  "auditSnapshot": {
+    "pass": true,
+    "errorCount": 0,
+    "warningCount": 2
+  }
+}

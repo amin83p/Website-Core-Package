@@ -1,0 +1,78 @@
+graph TD
+    %% --- STYLES ---
+    classDef ui fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000;
+    classDef service fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
+    classDef ai fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
+    classDef data fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,stroke-dasharray: 5 5,color:#000;
+    classDef db fill:#e0e0e0,stroke:#616161,stroke-width:2px,shape:cylinder,color:#000;
+
+    %% --- ACTORS ---
+    User((User/Client))
+    DB[(Database)]:::db
+    Gemini{{Google Gemini AI}}:::ai
+
+    %% --- STEP 1: FREEZE ---
+    subgraph Step 1: Input Freeze
+        S1_UI[UI: Select Essay]:::ui -->|POST /step1/freeze| S1_Ctrl[Controller: freezeEssayInput]
+        S1_Ctrl -->|Call| S1_Svc[essayPreprocessingService]:::service
+        S1_Svc -->|Normalize & Segment| S1_Data[essayObject<br/>(Sentences, Counts, 'Clean Text')]:::data
+    end
+
+    %% --- STEP 2: ANALYSIS ---
+    subgraph Step 2: Feature Analysis
+        S2_UI[UI: Run Analysis]:::ui -->|POST /step2/analyze| S2_Ctrl[Controller: analyzeEssayFeatures]
+        S2_Ctrl -->|Input: essayObject| S2_Svc[essayAnalysisService]:::service
+        S2_Svc -->|Compute| S2_Logic[Deterministic Logic<br/>(Connectors, Structure, Repetition)]
+        S2_Logic -->|Output| S2_Data[step2Features<br/>(Roles, Density, Cohesion Maps)]:::data
+    end
+
+    %% --- STEP 3: AI EXTRACTION ---
+    subgraph Step 3: AI Extraction
+        S3_UI[UI: Review & Extract]:::ui -->|POST /step3/extract| S3_Ctrl[Controller: extractEssayEvidence]
+        S3_Ctrl -->|Input: essayObject + Roles| S3_Svc[aiExtractionService]:::service
+        S3_Svc -->|Generate Schema| S3_Schema[Strict JSON Schema]
+        S3_Schema -->|Prompt| Gemini
+        Gemini -->|Extract Evidence| S3_Data[extraction<br/>(Stance, Body Support, Error Profiles)]:::data
+    end
+
+    %% --- STEP 4: GRADING ---
+    subgraph Step 4: Grading Engine
+        S4_UI[UI: Calculate Score]:::ui -->|POST /step4/grade| S4_Ctrl[Controller: calculateGrades]
+        S4_Ctrl -->|Fetch Active Questions| DB
+        S4_Ctrl -->|Input: essayObject + step2Features + extraction| S4_Svc[step3ScoringService]:::service
+        
+        S4_Svc --> S4_Registry{scoringRules.js}:::service
+        S4_Registry -- Rule Exists --> S4_Code[Deterministic Grading]
+        S4_Registry -- No Rule --> S4_Queue[AI Batch Queue]
+        
+        S4_Queue -->|Batch Prompt| Gemini
+        Gemini -->|JSON Answers| S4_Merge[Merge Results]
+        
+        S4_Code --> S4_Merge
+        S4_Merge -->|Aggregation| S4_Calc[Calculate Band Scores<br/>(Weighted 50% Threshold)]
+        S4_Calc -->|Output| S4_Data[gradingResult<br/>(Bands: TR, CC, LR, GRA)]:::data
+    end
+
+    %% --- STEP 5: FEEDBACK ---
+    subgraph Step 5: Feedback
+        S5_UI[UI: Generate Feedback]:::ui -->|POST /step5/feedback| S5_Ctrl[Controller: generateFeedback]
+        S5_Ctrl -->|Input: essayObject + gradingResult| S5_Svc[step5FeedbackService]:::service
+        
+        S5_Svc -->|Filter| S5_Logic[Identify Weaknesses & Strengths]
+        S5_Logic -->|Prompt with Context| Gemini
+        Gemini -->|Generate Advice| S5_Data[feedback<br/>(Summary, Improvements, Next Steps)]:::data
+    end
+
+    %% --- DATA FLOW LINKS ---
+    User --> S1_UI
+    S1_Data --> S2_UI
+    S1_Data --> S3_UI
+    S1_Data --> S4_UI
+    S1_Data --> S5_UI
+
+    S2_Data --> S3_UI
+    S2_Data --> S4_UI
+    
+    S3_Data --> S4_UI
+    
+    S4_Data --> S5_UI

@@ -1,0 +1,143 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0"><%= group ? 'Edit Group' : 'New Subscription Group' %></h1>
+      <% if(group) { %> <span class="badge bg-primary border font-monospace">ID: <%= group.id %></span> <% } %>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="groupForm" action="<%= group ? '/subscriptionGroup/edit/' + group.id : '/subscriptionGroup/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <div class="mb-3">
+        <label class="form-label">Group Name <span class="text-danger">*</span></label>
+        <input type="text" 
+               name="name" 
+               class="form-control size-md" 
+               value="<%= group ? group.name : '' %>" 
+               placeholder="e.g. Monthly Newsletter"
+               required>
+        <div class="form-text">Unique name for this list within your organization.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-control size-md" rows="3" placeholder="Brief description of this subscription list..."><%= group ? group.description : '' %></textarea>
+      </div>
+
+      <div class="row">
+          <div class="col-md-12 mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="activeCheck" name="active" 
+                     <%= (group && group.active) ? 'checked' : (group ? '' : 'checked') %>>
+              <label class="form-check-label" for="activeCheck">Active</label>
+              <div class="form-text x-small text-muted mt-0">
+                  Inactive groups will not be available for new subscriptions.
+              </div>
+            </div>
+          </div>
+      </div>
+
+      <div class="button-row mt-4">
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save</button>
+          <a href="/subscriptionGroup" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction">Cancel</a>
+      </div>
+   </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('groupForm');
+ 
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+          submitBtn.disabled = true;
+          const originalText = submitBtn.innerHTML;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+      }
+
+      const formData = new FormData(form);
+      
+      // Helper to handle switches manually
+      const setSwitch = (id, name) => {
+          const el = form.querySelector('#' + id);
+          if (el) formData.set(name, el.checked ? 'true' : 'false');
+      };
+
+      setSwitch('activeCheck', 'active');
+
+      const data = new URLSearchParams(formData);
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: data.toString()
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          const msg = result.message || 'Group saved successfully.';
+          
+          // 1. SUCCESS: Use Modal -> Fallback to Alert -> Redirect
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Success', icon: 'success', message: msg,
+              buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+            });
+          } else {
+            alert(msg); // Fallback
+          }
+          
+          window.location.href = '/subscriptionGroup';
+
+        } else {
+          // 2. LOGIC ERROR (e.g. Duplicate Name)
+          if (submitBtn) {
+             submitBtn.disabled = false;
+             submitBtn.innerHTML = 'Save'; 
+          }
+
+          const msg = result.message || 'Failed to save.';
+          
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Error', icon: 'error', message: msg,
+              buttons: [{ text: 'OK', class: 'btn-danger btn-md' }]
+            });
+          } else { 
+            alert(msg); [cite_start]// Fallback [cite: 167]
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        
+        // 3. NETWORK ERROR
+        if (submitBtn) {
+             submitBtn.disabled = false;
+             submitBtn.innerHTML = 'Save';
+        }
+
+        const msg = 'Unexpected network error occurred.';
+
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Error', icon: 'error', message: msg,
+            buttons: [{ text: 'OK', class: 'btn-danger btn-md' }]
+          });
+        } else {
+          alert(msg); [cite_start]// Fallback [cite: 170]
+        }
+      }
+    });
+  }
+});
+</script>

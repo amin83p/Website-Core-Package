@@ -1,0 +1,125 @@
+<%
+  const ui = accessUi || {};
+  const canUpdate = ui.canUpdate === true;
+  const canDelete = ui.canDelete === true;
+%>
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  manageBtns: Array.isArray(manageBtns) ? manageBtns : []
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search assignments by id, package, target user, status, or creator...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Assignment</th>
+        <th>Package</th>
+        <th>Target User</th>
+        <th>Status</th>
+        <th>Applied / Removed</th>
+        <th>Creator</th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">No package assignments found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const summary = item.summary || {}; %>
+        <% const creator = item.creator || {}; %>
+        <% const canManage = item.canManage === true; %>
+        <% const canRemove = canDelete && canManage && String(item.status || '').toLowerCase() !== 'removed'; %>
+        <% const hasRowActions = canUpdate || canRemove; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.id || '-' %></div>
+            <div class="x-small text-muted font-monospace">Org: <%= item.orgId || '-' %></div>
+            <div class="x-small text-muted mt-1">
+              Profiles: <%= Number(summary.accessProfileCount || 0) %>,
+              Credits: <%= Number(summary.ledgerEntryCount || 0) %>,
+              Reversals: <%= Number(summary.reversalLedgerEntryCount || 0) %>
+            </div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= item.packageName || item.packageId || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.packageId || '-' %></div>
+            <div class="x-small text-muted mt-1">
+              Eligible roles:
+              <% if (Array.isArray(item.eligibleRoles) && item.eligibleRoles.length) { %>
+                <%= item.eligibleRoles.slice(0, 4).join(', ') %><%= item.eligibleRoles.length > 4 ? ', ...' : '' %>
+              <% } else { %>
+                Unrestricted
+              <% } %>
+            </div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= item.targetUserName || item.targetUserId || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.targetUserId || '-' %></div>
+          </td>
+          <td>
+            <% const statusToken = String(item.status || '').toLowerCase(); %>
+            <span class="badge <%= statusToken === 'active' ? 'text-bg-success' : (statusToken === 'paused' ? 'text-bg-warning' : 'text-bg-secondary') %>"><%= item.status || 'active' %></span>
+            <div class="x-small text-muted mt-1"><%= item.notes ? item.notes.slice(0, 80) : 'No notes' %><%= item.notes && item.notes.length > 80 ? '...' : '' %></div>
+          </td>
+          <td>
+            <div class="small text-dark">Applied: <%= item.appliedAt ? new Date(item.appliedAt).toLocaleString() : '-' %></div>
+            <div class="x-small text-muted">Removed: <%= item.removedAt ? new Date(item.removedAt).toLocaleString() : '-' %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= creator.displayName || (creator.type === 'system' ? 'System' : '-') %></div>
+            <div class="x-small text-muted font-monospace"><%= creator.userId || 'System' %></div>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <% if (hasRowActions) { %>
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= item.id %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                  <% if (canUpdate) { %>
+                    <a href="/activity-quota/package-manager/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-pencil-square me-2"></i>Edit Metadata
+                    </a>
+                  <% } %>
+                  <% if (canRemove) { %>
+                    <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>" data-delete-url="/activity-quota/package-manager/delete/<%= item.id %>">
+                      <i class="bi bi-trash me-2"></i>Remove Assignment
+                    </button>
+                  <% } %>
+                </div>
+              </div>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('../../partials/tablePages-end') %>

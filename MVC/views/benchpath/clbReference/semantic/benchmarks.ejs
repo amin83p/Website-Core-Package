@@ -1,0 +1,60 @@
+<div class="row g-2">
+  <div class="col-md-4 mb-3">
+    <label class="form-label fw-bold">Benchmark Number</label>
+    <input type="number" min="1" max="12" class="form-control" name="benchmarkNumber" value="<%= itemData?.benchmarkNumber ?? '' %>">
+  </div>
+  <div class="col-md-8 mb-3">
+    <label class="form-label fw-bold">Stage Band Label</label>
+    <input class="form-control" name="stageBandLabel" value="<%= itemData?.stageBandLabel || '' %>">
+  </div>
+</div>
+<div class="mb-3">
+  <label class="form-label fw-bold">Summary Statement</label>
+  <textarea class="form-control" name="summaryStatement" rows="3"><%= itemData?.summaryStatement || '' %></textarea>
+</div>
+<div class="mb-3">
+  <label class="form-label fw-bold">Profile Of Ability</label>
+  <select class="form-select" name="profileOfAbilityId" id="profileOfAbilityId">
+    <option value="">Select profile...</option>
+    <% (options.profileOfAbility || []).forEach((row) => { %>
+      <option value="<%= row.id %>" data-framework-id="<%= row.frameworkId || '' %>" data-skill-id="<%= row.skillId || '' %>" data-benchmark-id="<%= row.benchmarkId || '' %>" <%= itemData?.profileOfAbilityId === row.id ? 'selected' : '' %>>
+        <%= row.title || row.id %> (<%= row.id %>)
+      </option>
+    <% }) %>
+  </select>
+</div>
+<div class="row g-3">
+  <div class="col-lg-4">
+    <label class="form-label fw-bold">Competencies</label>
+    <div class="border rounded p-2" style="max-height: 220px; overflow:auto;">
+      <% (options.competencies || []).forEach((row) => { %>
+        <div class="form-check dep-cb-competencies" data-framework-id="<%= row.frameworkId || '' %>" data-skill-id="<%= row.skillId || '' %>" data-benchmark-id="<%= row.benchmarkId || '' %>">
+          <input class="form-check-input" type="checkbox" name="competencyIds" value="<%= row.id %>" id="bm_comp_<%= String(row.id).replace(/[^A-Za-z0-9_-]/g, '_') %>" <%= inSet(selectedCompetencyIds, row.id) ? 'checked' : '' %>>
+          <label class="form-check-label small" for="bm_comp_<%= String(row.id).replace(/[^A-Za-z0-9_-]/g, '_') %>"><%= row.title || row.id %></label>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <label class="form-label fw-bold">Features Of Communication</label>
+    <div class="border rounded p-2" style="max-height: 220px; overflow:auto;">
+      <% (options.featuresOfCommunication || []).forEach((row) => { %>
+        <div class="form-check dep-cb-features" data-framework-id="<%= row.frameworkId || '' %>" data-skill-id="<%= row.skillId || '' %>" data-benchmark-id="<%= row.benchmarkId || '' %>">
+          <input class="form-check-input" type="checkbox" name="featureIds" value="<%= row.id %>" id="bm_feat_<%= String(row.id).replace(/[^A-Za-z0-9_-]/g, '_') %>" <%= inSet(selectedFeatureIds, row.id) ? 'checked' : '' %>>
+          <label class="form-check-label small" for="bm_feat_<%= String(row.id).replace(/[^A-Za-z0-9_-]/g, '_') %>"><%= row.title || row.id %></label>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <label class="form-label fw-bold">Sample Task Labels</label>
+    <div class="border rounded p-2" style="max-height: 220px; overflow:auto;">
+      <% (options.sampleTaskLabels || []).forEach((row) => { %>
+        <div class="form-check dep-cb-sample-task-labels" data-framework-id="<%= row.frameworkId || '' %>" data-skill-id="<%= row.skillId || '' %>" data-benchmark-id="<%= row.benchmarkId || '' %>" data-competency-id="<%= row.competencyId || '' %>">
+          <input class="form-check-input" type="checkbox" name="sampleTaskLabelIds" value="<%= row.id %>" id="bm_task_<%= String(row.id).replace(/[^A-Za-z0-9_-]/g, '_') %>" <%= inSet(selectedSampleTaskLabelIds, row.id) ? 'checked' : '' %>>
+          <label class="form-check-label small" for="bm_task_<%= String(row.id).replace(/[^A-Za-z0-9_-]/g, '_') %>"><%= row.title || row.id %></label>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</div>

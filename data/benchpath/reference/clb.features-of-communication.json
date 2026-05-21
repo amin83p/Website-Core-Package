@@ -1,0 +1,1986 @@
+{
+  "meta": {
+    "schemaVersion": "1.0.0",
+    "entityType": "clbFeaturesOfCommunication",
+    "layer": "reference",
+    "authority": "official",
+    "isReadMostly": true,
+    "defaultLocale": "en-CA",
+    "generatedAt": "2026-03-21T00:00:00.000Z",
+    "updatedAt": "2026-03-23T03:52:59.943Z"
+  },
+  "itemsById": {
+    "foc:listening:1:interacting-with-others:001": {
+      "id": "foc:listening:1:interacting-with-others:001",
+      "approvedAt": "2026-03-23T03:52:59.941Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:1",
+      "code": "FOC-L-01-INTE",
+      "competencyAreaId": "ca:listening:interacting_with_others",
+      "competencyId": "comp:listening:1:interacting_with_others:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Communication is very brief, 2 or 3 turns.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:1:feature:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 32,
+          "pageEnd": 32
+        }
+      },
+      "featureDimension": "Interacting With Others",
+      "featureValue": "[Communication is very brief, 2 or 3 turns.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:1",
+        "ca:listening:interacting_with_others",
+        "comp:listening:1:interacting_with_others:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:listening:1",
+      "scopeCompetencyId": "comp:listening:1:interacting_with_others:001",
+      "scopeSkillId": "skill:listening",
+      "scopeType": "competency",
+      "shortTitle": "FOC L01",
+      "skillId": "skill:listening",
+      "slug": "featureofcommunication-listening-1-interacting-with-others",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:1:feature:interacting_with_others:001",
+          "pages": [
+            32,
+            32
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:listening:1:feature:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Listening CLB 1 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.941Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:listening:2:comprehending-instructions:001": {
+      "id": "foc:listening:2:comprehending-instructions:001",
+      "approvedAt": "2026-03-23T03:52:59.941Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:2",
+      "code": "FOC-L-02-COMP",
+      "competencyAreaId": "ca:listening:comprehending_instructions",
+      "competencyId": "comp:listening:2:comprehending_instructions:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Instructions are about 2 to 4 steps.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:2:feature:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 34,
+          "pageEnd": 34
+        }
+      },
+      "featureDimension": "Comprehending Instructions",
+      "featureValue": "[Instructions are about 2 to 4 steps.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:2",
+        "ca:listening:comprehending_instructions",
+        "comp:listening:2:comprehending_instructions:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:listening:2",
+      "scopeCompetencyId": "comp:listening:2:comprehending_instructions:001",
+      "scopeSkillId": "skill:listening",
+      "scopeType": "competency",
+      "shortTitle": "FOC L02",
+      "skillId": "skill:listening",
+      "slug": "featureofcommunication-listening-2-comprehending-instructions",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:2:feature:comprehending_instructions:001",
+          "pages": [
+            34,
+            34
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:listening:2:feature:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Listening CLB 2 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.941Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:listening:2:interacting-with-others:001": {
+      "id": "foc:listening:2:interacting-with-others:001",
+      "approvedAt": "2026-03-23T03:52:59.941Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:2",
+      "code": "FOC-L-02-INTE",
+      "competencyAreaId": "ca:listening:interacting_with_others",
+      "competencyId": "comp:listening:2:interacting_with_others:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Communication is brief, about 5 turns.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:2:feature:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 34,
+          "pageEnd": 34
+        }
+      },
+      "featureDimension": "Interacting With Others",
+      "featureValue": "[Communication is brief, about 5 turns.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:2",
+        "ca:listening:interacting_with_others",
+        "comp:listening:2:interacting_with_others:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:listening:2",
+      "scopeCompetencyId": "comp:listening:2:interacting_with_others:001",
+      "scopeSkillId": "skill:listening",
+      "scopeType": "competency",
+      "shortTitle": "FOC L02",
+      "skillId": "skill:listening",
+      "slug": "featureofcommunication-listening-2-interacting-with-others",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:2:feature:interacting_with_others:001",
+          "pages": [
+            34,
+            34
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:listening:2:feature:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Listening CLB 2 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:listening:3:comprehending-instructions:001": {
+      "id": "foc:listening:3:comprehending-instructions:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:3",
+      "code": "FOC-L-03-COMP",
+      "competencyAreaId": "ca:listening:comprehending_instructions",
+      "competencyId": "comp:listening:3:comprehending_instructions:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Instructions are about 4 to 5 steps.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:3:feature:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 36,
+          "pageEnd": 36
+        }
+      },
+      "featureDimension": "Comprehending Instructions",
+      "featureValue": "[Instructions are about 4 to 5 steps.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:3",
+        "ca:listening:comprehending_instructions",
+        "comp:listening:3:comprehending_instructions:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:listening:3",
+      "scopeCompetencyId": "comp:listening:3:comprehending_instructions:001",
+      "scopeSkillId": "skill:listening",
+      "scopeType": "competency",
+      "shortTitle": "FOC L03",
+      "skillId": "skill:listening",
+      "slug": "featureofcommunication-listening-3-comprehending-instructions",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:3:feature:comprehending_instructions:001",
+          "pages": [
+            36,
+            36
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:listening:3:feature:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Listening CLB 3 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:listening:3:interacting-with-others:001": {
+      "id": "foc:listening:3:interacting-with-others:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:3",
+      "code": "FOC-L-03-INTE",
+      "competencyAreaId": "ca:listening:interacting_with_others",
+      "competencyId": "comp:listening:3:interacting_with_others:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Communication is about 6 turns.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:3:feature:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 36,
+          "pageEnd": 36
+        }
+      },
+      "featureDimension": "Interacting With Others",
+      "featureValue": "[Communication is about 6 turns.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:3",
+        "ca:listening:interacting_with_others",
+        "comp:listening:3:interacting_with_others:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:listening:3",
+      "scopeCompetencyId": "comp:listening:3:interacting_with_others:001",
+      "scopeSkillId": "skill:listening",
+      "scopeType": "competency",
+      "shortTitle": "FOC L03",
+      "skillId": "skill:listening",
+      "slug": "featureofcommunication-listening-3-interacting-with-others",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:3:feature:interacting_with_others:001",
+          "pages": [
+            36,
+            36
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:listening:3:feature:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Listening CLB 3 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:listening:5:interacting-with-others:001": {
+      "id": "foc:listening:5:interacting-with-others:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:5",
+      "code": "FOC-L-05-01",
+      "competencyAreaId": "ca:listening:interacting_with_others",
+      "competencyId": "comp:listening:5:interacting_with_others:001",
+      "complexityLevel": "to_be_defined",
+      "createdAt": "2026-03-23T01:50:39.752Z",
+      "createdBy": "system",
+      "description": "Starter feature-of-communication scaffold placeholder. Replace with canonical descriptor text from mapped fragments.",
+      "domainNotes": "Seed rule: create one starter feature record per competency seed to avoid empty feature layer.",
+      "extensions": {
+        "requiresCanonicalTextReview": true,
+        "scaffoldRule": "seed_from_competency",
+        "scaffoldSource": "scripts/benchpath/reference/generateReferenceScaffolds.js",
+        "canonicalState": "seeded_with_fragment_support",
+        "seededFromCompetencyId": "comp:listening:5:interacting_with_others:001",
+        "fragmentSupport": {
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "sourceId": "source:clb:support-kit"
+        }
+      },
+      "featureDimension": "to_be_defined",
+      "featureValue": "Starter placeholder (non-canonical)",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "comp:listening:5:interacting_with_others:001",
+        "benchmark:listening:5",
+        "ca:listening:interacting_with_others"
+      ],
+      "reviewStatus": "pending",
+      "scopeBenchmarkId": "benchmark:listening:5",
+      "scopeCompetencyId": "comp:listening:5:interacting_with_others:001",
+      "scopeSkillId": "skill:listening",
+      "scopeType": "competency",
+      "shortTitle": "FOC L05",
+      "skillId": "skill:listening",
+      "slug": "feature-listening-5-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening competency seed at CLB 5."
+        },
+        {
+          "sourceId": "source:clb:support-kit",
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "pages": [
+            23,
+            23
+          ],
+          "note": "Starter scaffold support from fragment:clb-support-kit:task-analysis:001"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "feature-of-communication",
+        "listening",
+        "benchmark-5"
+      ],
+      "title": "Feature Seed - Listening CLB 5 - Listening CLB 5 - Interacting With Others",
+      "updatedAt": "2026-03-23T01:50:39.752Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "foc:reading:3:comprehending-information:001": {
+      "id": "foc:reading:3:comprehending-information:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:3",
+      "code": "FOC-R-03-COMP",
+      "competencyAreaId": "ca:reading:comprehending_information",
+      "competencyId": "comp:reading:3:comprehending_information:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Texts may be supported by simple formatted graphs, tables and diagrams.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:3:feature:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 107,
+          "pageEnd": 107
+        }
+      },
+      "featureDimension": "Comprehending Information",
+      "featureValue": "[Texts may be supported by simple formatted graphs, tables and diagrams.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:3",
+        "ca:reading:comprehending_information",
+        "comp:reading:3:comprehending_information:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:reading:3",
+      "scopeCompetencyId": "comp:reading:3:comprehending_information:001",
+      "scopeSkillId": "skill:reading",
+      "scopeType": "competency",
+      "shortTitle": "FOC R03",
+      "skillId": "skill:reading",
+      "slug": "featureofcommunication-reading-3-comprehending-information",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:3:feature:comprehending_information:001",
+          "pages": [
+            107,
+            107
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:reading:3:feature:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Reading CLB 3 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:reading:4:comprehending-information:001": {
+      "id": "foc:reading:4:comprehending-information:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:4",
+      "code": "FOC-R-04-COMP",
+      "competencyAreaId": "ca:reading:comprehending_information",
+      "competencyId": "comp:reading:4:comprehending_information:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Texts may be supported by graphics, charts, tables, illustrations or diagrams.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:4:feature:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 109,
+          "pageEnd": 109
+        }
+      },
+      "featureDimension": "Comprehending Information",
+      "featureValue": "[Texts may be supported by graphics, charts, tables, illustrations or diagrams.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:4",
+        "ca:reading:comprehending_information",
+        "comp:reading:4:comprehending_information:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:reading:4",
+      "scopeCompetencyId": "comp:reading:4:comprehending_information:001",
+      "scopeSkillId": "skill:reading",
+      "scopeType": "competency",
+      "shortTitle": "FOC R04",
+      "skillId": "skill:reading",
+      "slug": "featureofcommunication-reading-4-comprehending-information",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:4:feature:comprehending_information:001",
+          "pages": [
+            109,
+            109
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:reading:4:feature:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Reading CLB 4 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:reading:6:comprehending-information:001": {
+      "id": "foc:reading:6:comprehending-information:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:6",
+      "code": "FOC-R-06-01",
+      "competencyAreaId": "ca:reading:comprehending_information",
+      "competencyId": "comp:reading:6:comprehending_information:001",
+      "complexityLevel": "to_be_defined",
+      "createdAt": "2026-03-23T01:50:39.753Z",
+      "createdBy": "system",
+      "description": "Starter feature-of-communication scaffold placeholder. Replace with canonical descriptor text from mapped fragments.",
+      "domainNotes": "Seed rule: create one starter feature record per competency seed to avoid empty feature layer.",
+      "extensions": {
+        "requiresCanonicalTextReview": true,
+        "scaffoldRule": "seed_from_competency",
+        "scaffoldSource": "scripts/benchpath/reference/generateReferenceScaffolds.js",
+        "canonicalState": "seeded_with_fragment_support",
+        "seededFromCompetencyId": "comp:reading:6:comprehending_information:001",
+        "fragmentSupport": {
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "sourceId": "source:clb:support-kit"
+        }
+      },
+      "featureDimension": "to_be_defined",
+      "featureValue": "Starter placeholder (non-canonical)",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "comp:reading:6:comprehending_information:001",
+        "benchmark:reading:6",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "pending",
+      "scopeBenchmarkId": "benchmark:reading:6",
+      "scopeCompetencyId": "comp:reading:6:comprehending_information:001",
+      "scopeSkillId": "skill:reading",
+      "scopeType": "competency",
+      "shortTitle": "FOC R06",
+      "skillId": "skill:reading",
+      "slug": "feature-reading-6-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading competency seed at CLB 6."
+        },
+        {
+          "sourceId": "source:clb:support-kit",
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "pages": [
+            23,
+            23
+          ],
+          "note": "Starter scaffold support from fragment:clb-support-kit:task-analysis:001"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "feature-of-communication",
+        "reading",
+        "benchmark-6"
+      ],
+      "title": "Feature Seed - Reading CLB 6 - Reading CLB 6 - Comprehending Information",
+      "updatedAt": "2026-03-23T01:50:39.753Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "foc:speaking:1:giving-instructions:001": {
+      "id": "foc:speaking:1:giving-instructions:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:1",
+      "code": "FOC-S-01-GIVI",
+      "competencyAreaId": "ca:speaking:giving_instructions",
+      "competencyId": "comp:speaking:1:giving_instructions:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Instructions are short phrases or imperative sentences.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:1:feature:giving_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 68,
+          "pageEnd": 68
+        }
+      },
+      "featureDimension": "Giving Instructions",
+      "featureValue": "[Instructions are short phrases or imperative sentences.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:1",
+        "ca:speaking:giving_instructions",
+        "comp:speaking:1:giving_instructions:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:speaking:1",
+      "scopeCompetencyId": "comp:speaking:1:giving_instructions:001",
+      "scopeSkillId": "skill:speaking",
+      "scopeType": "competency",
+      "shortTitle": "FOC S01",
+      "skillId": "skill:speaking",
+      "slug": "featureofcommunication-speaking-1-giving-instructions",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:1:feature:giving_instructions:001",
+          "pages": [
+            68,
+            68
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:speaking:1:feature:giving_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Speaking CLB 1 - Giving Instructions",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:speaking:1:interacting-with-others:001": {
+      "id": "foc:speaking:1:interacting-with-others:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:1",
+      "code": "FOC-S-01-INTE",
+      "competencyAreaId": "ca:speaking:interacting_with_others",
+      "competencyId": "comp:speaking:1:interacting_with_others:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Interlocutors are familiar and supportive.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:1:feature:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 68,
+          "pageEnd": 68
+        }
+      },
+      "featureDimension": "Interacting With Others",
+      "featureValue": "[Interlocutors are familiar and supportive.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:1",
+        "ca:speaking:interacting_with_others",
+        "comp:speaking:1:interacting_with_others:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:speaking:1",
+      "scopeCompetencyId": "comp:speaking:1:interacting_with_others:001",
+      "scopeSkillId": "skill:speaking",
+      "scopeType": "competency",
+      "shortTitle": "FOC S01",
+      "skillId": "skill:speaking",
+      "slug": "featureofcommunication-speaking-1-interacting-with-others",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:1:feature:interacting_with_others:001",
+          "pages": [
+            68,
+            68
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:speaking:1:feature:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Speaking CLB 1 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:speaking:2:giving-instructions:001": {
+      "id": "foc:speaking:2:giving-instructions:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:2",
+      "code": "FOC-S-02-GIVI",
+      "competencyAreaId": "ca:speaking:giving_instructions",
+      "competencyId": "comp:speaking:2:giving_instructions:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Instructions are 2 to 3 steps.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:2:feature:giving_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 70,
+          "pageEnd": 70
+        }
+      },
+      "featureDimension": "Giving Instructions",
+      "featureValue": "[Instructions are 2 to 3 steps.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:2",
+        "ca:speaking:giving_instructions",
+        "comp:speaking:2:giving_instructions:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:speaking:2",
+      "scopeCompetencyId": "comp:speaking:2:giving_instructions:001",
+      "scopeSkillId": "skill:speaking",
+      "scopeType": "competency",
+      "shortTitle": "FOC S02",
+      "skillId": "skill:speaking",
+      "slug": "featureofcommunication-speaking-2-giving-instructions",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:2:feature:giving_instructions:001",
+          "pages": [
+            70,
+            70
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:speaking:2:feature:giving_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Speaking CLB 2 - Giving Instructions",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:speaking:2:interacting-with-others:001": {
+      "id": "foc:speaking:2:interacting-with-others:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:2",
+      "code": "FOC-S-02-INTE",
+      "competencyAreaId": "ca:speaking:interacting_with_others",
+      "competencyId": "comp:speaking:2:interacting_with_others:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Interlocutors are familiar and supportive.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:2:feature:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 70,
+          "pageEnd": 70
+        }
+      },
+      "featureDimension": "Interacting With Others",
+      "featureValue": "[Interlocutors are familiar and supportive.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:2",
+        "ca:speaking:interacting_with_others",
+        "comp:speaking:2:interacting_with_others:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:speaking:2",
+      "scopeCompetencyId": "comp:speaking:2:interacting_with_others:001",
+      "scopeSkillId": "skill:speaking",
+      "scopeType": "competency",
+      "shortTitle": "FOC S02",
+      "skillId": "skill:speaking",
+      "slug": "featureofcommunication-speaking-2-interacting-with-others",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:2:feature:interacting_with_others:001",
+          "pages": [
+            70,
+            70
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:speaking:2:feature:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Speaking CLB 2 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:speaking:2:sharing-information:001": {
+      "id": "foc:speaking:2:sharing-information:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:2",
+      "code": "FOC-S-02-SHAR",
+      "competencyAreaId": "ca:speaking:sharing_information",
+      "competencyId": "comp:speaking:2:sharing_information:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.211Z",
+      "createdBy": "system",
+      "description": "[Descriptions are in response to questions.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:2:feature:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 69,
+          "pageEnd": 69
+        }
+      },
+      "featureDimension": "Sharing Information",
+      "featureValue": "[Descriptions are in response to questions.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:2",
+        "ca:speaking:sharing_information",
+        "comp:speaking:2:sharing_information:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:speaking:2",
+      "scopeCompetencyId": "comp:speaking:2:sharing_information:001",
+      "scopeSkillId": "skill:speaking",
+      "scopeType": "competency",
+      "shortTitle": "FOC S02",
+      "skillId": "skill:speaking",
+      "slug": "featureofcommunication-speaking-2-sharing-information",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:2:feature:sharing_information:001",
+          "pages": [
+            69,
+            69
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:speaking:2:feature:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Speaking CLB 2 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:speaking:3:giving-instructions:001": {
+      "id": "foc:speaking:3:giving-instructions:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:3",
+      "code": "FOC-S-03-GIVI",
+      "competencyAreaId": "ca:speaking:giving_instructions",
+      "competencyId": "comp:speaking:3:giving_instructions:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Instructions are about 4 to 5 steps.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:3:feature:giving_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 72,
+          "pageEnd": 72
+        }
+      },
+      "featureDimension": "Giving Instructions",
+      "featureValue": "[Instructions are about 4 to 5 steps.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:3",
+        "ca:speaking:giving_instructions",
+        "comp:speaking:3:giving_instructions:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:speaking:3",
+      "scopeCompetencyId": "comp:speaking:3:giving_instructions:001",
+      "scopeSkillId": "skill:speaking",
+      "scopeType": "competency",
+      "shortTitle": "FOC S03",
+      "skillId": "skill:speaking",
+      "slug": "featureofcommunication-speaking-3-giving-instructions",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:3:feature:giving_instructions:001",
+          "pages": [
+            72,
+            72
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:speaking:3:feature:giving_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Speaking CLB 3 - Giving Instructions",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:speaking:3:interacting-with-others:001": {
+      "id": "foc:speaking:3:interacting-with-others:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:3",
+      "code": "FOC-S-03-INTE",
+      "competencyAreaId": "ca:speaking:interacting_with_others",
+      "competencyId": "comp:speaking:3:interacting_with_others:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Interlocutors are familiar and supportive.] [Phone interactions are very brief.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:3:feature:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 72,
+          "pageEnd": 72
+        }
+      },
+      "featureDimension": "Interacting With Others",
+      "featureValue": "[Interlocutors are familiar and supportive.] [Phone interactions are very brief.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:3",
+        "ca:speaking:interacting_with_others",
+        "comp:speaking:3:interacting_with_others:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:speaking:3",
+      "scopeCompetencyId": "comp:speaking:3:interacting_with_others:001",
+      "scopeSkillId": "skill:speaking",
+      "scopeType": "competency",
+      "shortTitle": "FOC S03",
+      "skillId": "skill:speaking",
+      "slug": "featureofcommunication-speaking-3-interacting-with-others",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:3:feature:interacting_with_others:001",
+          "pages": [
+            72,
+            72
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:speaking:3:feature:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Speaking CLB 3 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:speaking:4:interacting-with-others:001": {
+      "id": "foc:speaking:4:interacting-with-others:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:4",
+      "code": "FOC-S-04-INTE",
+      "competencyAreaId": "ca:speaking:interacting_with_others",
+      "competencyId": "comp:speaking:4:interacting_with_others:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Limited support from interlocutors.] [Communicating on the phone may be difficult.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:4:feature:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 78,
+          "pageEnd": 78
+        }
+      },
+      "featureDimension": "Interacting With Others",
+      "featureValue": "[Limited support from interlocutors.] [Communicating on the phone may be difficult.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:4",
+        "ca:speaking:interacting_with_others",
+        "comp:speaking:4:interacting_with_others:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:speaking:4",
+      "scopeCompetencyId": "comp:speaking:4:interacting_with_others:001",
+      "scopeSkillId": "skill:speaking",
+      "scopeType": "competency",
+      "shortTitle": "FOC S04",
+      "skillId": "skill:speaking",
+      "slug": "featureofcommunication-speaking-4-interacting-with-others",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:4:feature:interacting_with_others:001",
+          "pages": [
+            78,
+            78
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:speaking:4:feature:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Speaking CLB 4 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:speaking:5:sharing-information:001": {
+      "id": "foc:speaking:5:sharing-information:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:5",
+      "code": "FOC-S-05-01",
+      "competencyAreaId": "ca:speaking:sharing_information",
+      "competencyId": "comp:speaking:5:sharing_information:001",
+      "complexityLevel": "to_be_defined",
+      "createdAt": "2026-03-23T01:50:39.753Z",
+      "createdBy": "system",
+      "description": "Starter feature-of-communication scaffold placeholder. Replace with canonical descriptor text from mapped fragments.",
+      "domainNotes": "Seed rule: create one starter feature record per competency seed to avoid empty feature layer.",
+      "extensions": {
+        "requiresCanonicalTextReview": true,
+        "scaffoldRule": "seed_from_competency",
+        "scaffoldSource": "scripts/benchpath/reference/generateReferenceScaffolds.js",
+        "canonicalState": "seeded_with_fragment_support",
+        "seededFromCompetencyId": "comp:speaking:5:sharing_information:001",
+        "fragmentSupport": {
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "sourceId": "source:clb:support-kit"
+        }
+      },
+      "featureDimension": "to_be_defined",
+      "featureValue": "Starter placeholder (non-canonical)",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "comp:speaking:5:sharing_information:001",
+        "benchmark:speaking:5",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "pending",
+      "scopeBenchmarkId": "benchmark:speaking:5",
+      "scopeCompetencyId": "comp:speaking:5:sharing_information:001",
+      "scopeSkillId": "skill:speaking",
+      "scopeType": "competency",
+      "shortTitle": "FOC S05",
+      "skillId": "skill:speaking",
+      "slug": "feature-speaking-5-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking competency seed at CLB 5."
+        },
+        {
+          "sourceId": "source:clb:support-kit",
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "pages": [
+            23,
+            23
+          ],
+          "note": "Starter scaffold support from fragment:clb-support-kit:task-analysis:001"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "feature-of-communication",
+        "speaking",
+        "benchmark-5"
+      ],
+      "title": "Feature Seed - Speaking CLB 5 - Speaking CLB 5 - Sharing Information",
+      "updatedAt": "2026-03-23T01:50:39.753Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "foc:writing:1:sharing-information:001": {
+      "id": "foc:writing:1:sharing-information:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:1",
+      "code": "FOC-W-01-SHAR",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:1:sharing_information:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Text to complete is about 3 to 5 sentences.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:1:feature:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 139,
+          "pageEnd": 139
+        }
+      },
+      "featureDimension": "Sharing Information",
+      "featureValue": "[Text to complete is about 3 to 5 sentences.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:1",
+        "ca:writing:sharing_information",
+        "comp:writing:1:sharing_information:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:writing:1",
+      "scopeCompetencyId": "comp:writing:1:sharing_information:001",
+      "scopeSkillId": "skill:writing",
+      "scopeType": "competency",
+      "shortTitle": "FOC W01",
+      "skillId": "skill:writing",
+      "slug": "featureofcommunication-writing-1-sharing-information",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:1:feature:sharing_information:001",
+          "pages": [
+            139,
+            139
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:writing:1:feature:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Writing CLB 1 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:writing:2:sharing-information:001": {
+      "id": "foc:writing:2:sharing-information:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:2",
+      "code": "FOC-W-02-SHAR",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:2:sharing_information:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Texts to complete are about 5 to 7 sentences.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:2:feature:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 141,
+          "pageEnd": 141
+        }
+      },
+      "featureDimension": "Sharing Information",
+      "featureValue": "[Texts to complete are about 5 to 7 sentences.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:2",
+        "ca:writing:sharing_information",
+        "comp:writing:2:sharing_information:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:writing:2",
+      "scopeCompetencyId": "comp:writing:2:sharing_information:001",
+      "scopeSkillId": "skill:writing",
+      "scopeType": "competency",
+      "shortTitle": "FOC W02",
+      "skillId": "skill:writing",
+      "slug": "featureofcommunication-writing-2-sharing-information",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:2:feature:sharing_information:001",
+          "pages": [
+            141,
+            141
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:writing:2:feature:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Writing CLB 2 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:writing:3:getting-things-done:001": {
+      "id": "foc:writing:3:getting-things-done:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:3",
+      "code": "FOC-W-03-GETT",
+      "competencyAreaId": "ca:writing:getting_things_done",
+      "competencyId": "comp:writing:3:getting_things_done:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Forms contain about 12 to 15 items, and have clear labels and areas in which to write.] [Messages are about 5 sentences.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:3:feature:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 143,
+          "pageEnd": 143
+        }
+      },
+      "featureDimension": "Getting Things Done",
+      "featureValue": "[Forms contain about 12 to 15 items, and have clear labels and areas in which to write.] [Messages are about 5 sentences.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:3",
+        "ca:writing:getting_things_done",
+        "comp:writing:3:getting_things_done:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:writing:3",
+      "scopeCompetencyId": "comp:writing:3:getting_things_done:001",
+      "scopeSkillId": "skill:writing",
+      "scopeType": "competency",
+      "shortTitle": "FOC W03",
+      "skillId": "skill:writing",
+      "slug": "featureofcommunication-writing-3-getting-things-done",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:3:feature:getting_things_done:001",
+          "pages": [
+            143,
+            143
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:writing:3:feature:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Writing CLB 3 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:writing:3:sharing-information:001": {
+      "id": "foc:writing:3:sharing-information:001",
+      "approvedAt": "2026-03-23T03:52:59.942Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:3",
+      "code": "FOC-W-03-SHAR",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:3:sharing_information:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Writing is up to about 5 sentences.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:3:feature:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 143,
+          "pageEnd": 143
+        }
+      },
+      "featureDimension": "Sharing Information",
+      "featureValue": "[Writing is up to about 5 sentences.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:3",
+        "ca:writing:sharing_information",
+        "comp:writing:3:sharing_information:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:writing:3",
+      "scopeCompetencyId": "comp:writing:3:sharing_information:001",
+      "scopeSkillId": "skill:writing",
+      "scopeType": "competency",
+      "shortTitle": "FOC W03",
+      "skillId": "skill:writing",
+      "slug": "featureofcommunication-writing-3-sharing-information",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:3:feature:sharing_information:001",
+          "pages": [
+            143,
+            143
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:writing:3:feature:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Writing CLB 3 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.942Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:writing:4:getting-things-done:001": {
+      "id": "foc:writing:4:getting-things-done:001",
+      "approvedAt": "2026-03-23T03:52:59.943Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:4",
+      "code": "FOC-W-04-GETT",
+      "competencyAreaId": "ca:writing:getting_things_done",
+      "competencyId": "comp:writing:4:getting_things_done:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Forms contain about 15 to 20 items and have clear labels and areas in which to write.] [Messages are about 7 sentences.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:4:feature:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 145,
+          "pageEnd": 145
+        }
+      },
+      "featureDimension": "Getting Things Done",
+      "featureValue": "[Forms contain about 15 to 20 items and have clear labels and areas in which to write.] [Messages are about 7 sentences.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:4",
+        "ca:writing:getting_things_done",
+        "comp:writing:4:getting_things_done:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:writing:4",
+      "scopeCompetencyId": "comp:writing:4:getting_things_done:001",
+      "scopeSkillId": "skill:writing",
+      "scopeType": "competency",
+      "shortTitle": "FOC W04",
+      "skillId": "skill:writing",
+      "slug": "featureofcommunication-writing-4-getting-things-done",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:4:feature:getting_things_done:001",
+          "pages": [
+            145,
+            145
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:writing:4:feature:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Writing CLB 4 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.943Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:writing:4:reproducing-information:001": {
+      "id": "foc:writing:4:reproducing-information:001",
+      "approvedAt": "2026-03-23T03:52:59.943Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:4",
+      "code": "FOC-W-04-REPR",
+      "competencyAreaId": "ca:writing:reproducing_information",
+      "competencyId": "comp:writing:4:reproducing_information:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Oral discourse is short, with about 5 to 7 details.] [Information is personally relevant; clear layout.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:4:feature:reproducing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 150,
+          "pageEnd": 150
+        }
+      },
+      "featureDimension": "Reproducing Information",
+      "featureValue": "[Oral discourse is short, with about 5 to 7 details.] [Information is personally relevant; clear layout.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:4",
+        "ca:writing:reproducing_information",
+        "comp:writing:4:reproducing_information:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:writing:4",
+      "scopeCompetencyId": "comp:writing:4:reproducing_information:001",
+      "scopeSkillId": "skill:writing",
+      "scopeType": "competency",
+      "shortTitle": "FOC W04",
+      "skillId": "skill:writing",
+      "slug": "featureofcommunication-writing-4-reproducing-information",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:4:feature:reproducing_information:001",
+          "pages": [
+            150,
+            150
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:writing:4:feature:reproducing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Writing CLB 4 - Reproducing Information",
+      "updatedAt": "2026-03-23T03:52:59.943Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:writing:4:sharing-information:001": {
+      "id": "foc:writing:4:sharing-information:001",
+      "approvedAt": "2026-03-23T03:52:59.943Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:4",
+      "code": "FOC-W-04-SHAR",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:4:sharing_information:001",
+      "complexityLevel": "stage_i",
+      "createdAt": "2026-03-23T03:30:34.212Z",
+      "createdBy": "system",
+      "description": "[Writing is about 1 paragraph.]",
+      "domainNotes": "Canonical featureOfCommunication text extracted from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:4:feature:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 145,
+          "pageEnd": 145
+        }
+      },
+      "featureDimension": "Sharing Information",
+      "featureValue": "[Writing is about 1 paragraph.]",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:4",
+        "ca:writing:sharing_information",
+        "comp:writing:4:sharing_information:001"
+      ],
+      "reviewStatus": "reviewed",
+      "scopeBenchmarkId": "benchmark:writing:4",
+      "scopeCompetencyId": "comp:writing:4:sharing_information:001",
+      "scopeSkillId": "skill:writing",
+      "scopeType": "competency",
+      "shortTitle": "FOC W04",
+      "skillId": "skill:writing",
+      "slug": "featureofcommunication-writing-4-sharing-information",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:4:feature:sharing_information:001",
+          "pages": [
+            145,
+            145
+          ],
+          "note": "Canonical featureOfCommunication source: fragment:clb:2012:writing:4:feature:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "featureOfCommunication",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "FeatureOfCommunication - Writing CLB 4 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.943Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "foc:writing:6:getting-things-done:001": {
+      "id": "foc:writing:6:getting-things-done:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:6",
+      "code": "FOC-W-06-01",
+      "competencyAreaId": "ca:writing:getting_things_done",
+      "competencyId": "comp:writing:6:getting_things_done:001",
+      "complexityLevel": "to_be_defined",
+      "createdAt": "2026-03-23T01:50:39.753Z",
+      "createdBy": "system",
+      "description": "Starter feature-of-communication scaffold placeholder. Replace with canonical descriptor text from mapped fragments.",
+      "domainNotes": "Seed rule: create one starter feature record per competency seed to avoid empty feature layer.",
+      "extensions": {
+        "requiresCanonicalTextReview": true,
+        "scaffoldRule": "seed_from_competency",
+        "scaffoldSource": "scripts/benchpath/reference/generateReferenceScaffolds.js",
+        "canonicalState": "seeded_with_fragment_support",
+        "seededFromCompetencyId": "comp:writing:6:getting_things_done:001",
+        "fragmentSupport": {
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "sourceId": "source:clb:support-kit"
+        }
+      },
+      "featureDimension": "to_be_defined",
+      "featureValue": "Starter placeholder (non-canonical)",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "comp:writing:6:getting_things_done:001",
+        "benchmark:writing:6",
+        "ca:writing:getting_things_done"
+      ],
+      "reviewStatus": "pending",
+      "scopeBenchmarkId": "benchmark:writing:6",
+      "scopeCompetencyId": "comp:writing:6:getting_things_done:001",
+      "scopeSkillId": "skill:writing",
+      "scopeType": "competency",
+      "shortTitle": "FOC W06",
+      "skillId": "skill:writing",
+      "slug": "feature-writing-6-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing competency seed at CLB 6."
+        },
+        {
+          "sourceId": "source:clb:support-kit",
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "pages": [
+            23,
+            23
+          ],
+          "note": "Starter scaffold support from fragment:clb-support-kit:task-analysis:001"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "feature-of-communication",
+        "writing",
+        "benchmark-6"
+      ],
+      "title": "Feature Seed - Writing CLB 6 - Writing CLB 6 - Getting Things Done",
+      "updatedAt": "2026-03-23T01:50:39.753Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "foc:writing:8:sharing-information:001": {
+      "id": "foc:writing:8:sharing-information:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:8",
+      "code": "FOC-W-08-01",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:8:sharing_information:001",
+      "complexityLevel": "to_be_defined",
+      "createdAt": "2026-03-23T01:50:39.753Z",
+      "createdBy": "system",
+      "description": "Starter feature-of-communication scaffold placeholder. Replace with canonical descriptor text from mapped fragments.",
+      "domainNotes": "Seed rule: create one starter feature record per competency seed to avoid empty feature layer.",
+      "extensions": {
+        "requiresCanonicalTextReview": true,
+        "scaffoldRule": "seed_from_competency",
+        "scaffoldSource": "scripts/benchpath/reference/generateReferenceScaffolds.js",
+        "canonicalState": "seeded_with_fragment_support",
+        "seededFromCompetencyId": "comp:writing:8:sharing_information:001",
+        "fragmentSupport": {
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "sourceId": "source:clb:support-kit"
+        }
+      },
+      "featureDimension": "to_be_defined",
+      "featureValue": "Starter placeholder (non-canonical)",
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "comp:writing:8:sharing_information:001",
+        "benchmark:writing:8",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "pending",
+      "scopeBenchmarkId": "benchmark:writing:8",
+      "scopeCompetencyId": "comp:writing:8:sharing_information:001",
+      "scopeSkillId": "skill:writing",
+      "scopeType": "competency",
+      "shortTitle": "FOC W08",
+      "skillId": "skill:writing",
+      "slug": "feature-writing-8-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing competency seed at CLB 8."
+        },
+        {
+          "sourceId": "source:clb:support-kit",
+          "fragmentId": "fragment:clb-support-kit:task-analysis:001",
+          "pages": [
+            23,
+            23
+          ],
+          "note": "Starter scaffold support from fragment:clb-support-kit:task-analysis:001"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "seed",
+        "clb",
+        "feature-of-communication",
+        "writing",
+        "benchmark-8"
+      ],
+      "title": "Feature Seed - Writing CLB 8 - Writing CLB 8 - Sharing Information",
+      "updatedAt": "2026-03-23T01:50:39.753Z",
+      "updatedBy": "system",
+      "version": 1
+    }
+  },
+  "allIds": [
+    "foc:listening:1:interacting-with-others:001",
+    "foc:listening:2:comprehending-instructions:001",
+    "foc:listening:2:interacting-with-others:001",
+    "foc:listening:3:comprehending-instructions:001",
+    "foc:listening:3:interacting-with-others:001",
+    "foc:listening:5:interacting-with-others:001",
+    "foc:reading:3:comprehending-information:001",
+    "foc:reading:4:comprehending-information:001",
+    "foc:reading:6:comprehending-information:001",
+    "foc:speaking:1:giving-instructions:001",
+    "foc:speaking:1:interacting-with-others:001",
+    "foc:speaking:2:giving-instructions:001",
+    "foc:speaking:2:interacting-with-others:001",
+    "foc:speaking:2:sharing-information:001",
+    "foc:speaking:3:giving-instructions:001",
+    "foc:speaking:3:interacting-with-others:001",
+    "foc:speaking:4:interacting-with-others:001",
+    "foc:speaking:5:sharing-information:001",
+    "foc:writing:1:sharing-information:001",
+    "foc:writing:2:sharing-information:001",
+    "foc:writing:3:getting-things-done:001",
+    "foc:writing:3:sharing-information:001",
+    "foc:writing:4:getting-things-done:001",
+    "foc:writing:4:reproducing-information:001",
+    "foc:writing:4:sharing-information:001",
+    "foc:writing:6:getting-things-done:001",
+    "foc:writing:8:sharing-information:001"
+  ],
+  "indexes": {}
+}

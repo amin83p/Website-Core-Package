@@ -1,0 +1,15 @@
+<div class="restricted-page">
+  <h1 class="page-heading size-md">Access Restricted</h1>
+  <div class="form-container size-md">
+    <div class="alert alert-warning">
+      <h4>Outside System Working Hours</h4>
+      <p>The system is only available during authorized working time frame:<br><br>
+         Time: <strong><%=reason.startTime%> to <%=reason.endTime%>,</strong>.<br>
+         Days: <strong><%=reason.days%></strong> <br><br>
+         Please try again during authorized hours.</p>
+    </div>
+    <div class="button-row">
+      <a href="/logout" class="btn btn-filled btn-danger btn-md">Logout</a>
+    </div>
+  </div>
+</div>

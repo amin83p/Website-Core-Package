@@ -1,0 +1,1194 @@
+<%
+  const a = (applicant && typeof applicant === 'object') ? applicant : {};
+  const isEdit = Boolean(a.id);
+  const routeId = String(a.id || '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const resolvedListBasePath = (typeof listBasePath === 'string' && listBasePath.trim())
+    ? listBasePath.trim()
+    : '/pte/students';
+  const resolvedFormBasePath = (typeof formBasePath === 'string' && formBasePath.trim())
+    ? formBasePath.trim()
+    : resolvedListBasePath;
+  const resolvedAudience = (typeof audience === 'string' && audience.trim())
+    ? audience.trim().toLowerCase()
+    : 'regular';
+  const isPublicAudience = resolvedAudience === 'public';
+  const personDisplayName = (a.display && a.display.personName) ? a.display.personName : '';
+  const mediaUploadItemId = String((typeof mediaItemId !== 'undefined' && mediaItemId) ? mediaItemId : (routeId || '')).trim();
+  const initCoursesJson = JSON.stringify(Array.isArray(a.courses) ? a.courses : []).replace(/</g, '\\u003c');
+  const initPackagesJson = JSON.stringify(Array.isArray(a.selectedPackages) ? a.selectedPackages : []).replace(/</g, '\\u003c');
+  const initAttachmentsJson = JSON.stringify(Array.isArray(a.attachments) ? a.attachments : []).replace(/</g, '\\u003c');
+  const mediaDefaultFolder = isPublicAudience ? 'PTE/Public_Applicants' : 'PTE/Students';
+%>
+
+<style>
+  #pteStudentForm .form-label {
+    font-weight: 500;
+  }
+  #pteStudentForm .tab-content {
+    padding-top: 0.125rem;
+    padding-bottom: 0.25rem;
+  }
+  #pteStudentForm .tab-pane {
+    padding-top: 0.125rem;
+    padding-bottom: 0.125rem;
+  }
+  #pteStudentForm .tab-pane > .row,
+  #pteStudentForm .tab-pane > .alert,
+  #pteStudentForm .tab-pane > .card,
+  #pteStudentForm .tab-pane > #pte_existingPersonBlock,
+  #pteStudentForm .tab-pane > #pte_newPersonBlock {
+    margin-bottom: 1rem;
+  }
+  #pteStudentForm .tab-pane > :last-child {
+    margin-bottom: 0 !important;
+  }
+</style>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? (isPublicAudience ? 'Edit Public Applicant' : 'Edit Applicant') : 'New Applicant' %></h1>
+    <div class="d-flex flex-column align-items-end gap-1">
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= a.id %></span>
+      <% } %>
+      <a href="<%= resolvedListBasePath %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form
+      id="pteStudentForm"
+      action="<%= (isEdit ? (resolvedFormBasePath + '/edit/' + encodeURIComponent(routeId)) : (resolvedFormBasePath + '/new')) + (asid ? ('?actionStateId=' + encodeURIComponent(asid)) : '') %>"
+      method="POST"
+      enctype="multipart/form-data"
+    >
+      <input type="hidden" name="actionStateId" id="pte_actionStateId" value="<%= asid %>">
+      <input type="hidden" name="coursesJson" id="pte_coursesJson" value="[]">
+      <input type="hidden" name="selectedPackagesJson" id="pte_packagesJson" value="[]">
+      <input type="hidden" name="attachments" id="pte_attachmentsJson" value="[]">
+      <input type="hidden" name="mediaItemId" id="pte_mediaItemId" value="<%= mediaUploadItemId %>">
+
+      <script type="application/json" id="pteInitCourses"><%- initCoursesJson %></script>
+      <script type="application/json" id="pteInitPackages"><%- initPackagesJson %></script>
+      <script type="application/json" id="pteInitAttachments"><%- initAttachmentsJson %></script>
+
+      <ul class="nav nav-tabs mb-4" id="pteStudentTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pte-tab-step1" type="button">Step 1: Applicant / Person</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pte-tab-step2" type="button">Step 2: Courses</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pte-tab-step3" type="button">Step 3: Packages</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pte-tab-step4" type="button">Step 4: Documents</button></li>
+      </ul>
+
+      <div class="tab-content">
+          <div class="tab-pane fade show active" id="pte-tab-step1">
+            <% if (!isEdit) { %>
+              <div class="alert alert-light border shadow-sm mb-4">
+                <div class="fw-bold mb-2"><i class="bi bi-person-plus me-2"></i>Person Source</div>
+                <div class="d-flex flex-wrap gap-4">
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="personMode" id="pte_personModeExisting" value="existing" checked>
+                    <label class="form-check-label" for="pte_personModeExisting">Use Existing Person</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="personMode" id="pte_personModeNew" value="new">
+                    <label class="form-check-label" for="pte_personModeNew">Create New Person</label>
+                  </div>
+                </div>
+              </div>
+            <% } else { %>
+              <input type="hidden" name="personMode" value="existing">
+            <% } %>
+
+            <div id="pte_existingPersonBlock">
+              <div class="row">
+                <div class="col-md-8 mb-3">
+                  <label class="form-label">Select Person *</label>
+                  <div class="input-group">
+                    <input type="hidden" name="personId" id="pte_personId" value="<%= a.personId || '' %>" required>
+                    <input type="text" id="pte_personName" class="form-control size-md bg-white border-primary fw-bold" value="<%= personDisplayName %>" placeholder="Search Person Directory..." readonly required>
+                    <button type="button" class="btn btn-primary" id="pte_btnPickPerson" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
+                  </div>
+                  <div class="form-text small">Applicant links to this person record.</div>
+                </div>
+              </div>
+            </div>
+
+            <% if (!isEdit) { %>
+              <div id="pte_newPersonBlock" class="d-none">
+                <div class="row g-3 mb-3">
+                  <div class="col-md-4">
+                    <label class="form-label">First Name *</label>
+                    <input type="text" name="newPersonFirstName" id="pte_newPersonFirstName" class="form-control size-md" placeholder="First name">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Middle Name</label>
+                    <input type="text" name="newPersonMiddleName" id="pte_newPersonMiddleName" class="form-control size-md" placeholder="Middle name">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Last Name *</label>
+                    <input type="text" name="newPersonLastName" id="pte_newPersonLastName" class="form-control size-md" placeholder="Last name">
+                  </div>
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Preferred Name</label>
+                    <input type="text" name="newPersonPreferredName" id="pte_newPersonPreferredName" class="form-control size-md" placeholder="Preferred name">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Email *</label>
+                    <input type="email" name="newPersonEmail" id="pte_newPersonEmail" class="form-control size-md" placeholder="Email">
+                  </div>
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Phone</label>
+                    <input type="text" name="newPersonPhone" id="pte_newPersonPhone" class="form-control size-md" placeholder="Phone number">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Gender</label>
+                    <select name="newPersonGender" id="pte_newPersonGender" class="form-select size-md">
+                      <option value="">-- Select --</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="nonbinary">Non-binary</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Date of Birth</label>
+                    <input type="date" name="newPersonDateOfBirth" id="pte_newPersonDateOfBirth" class="form-control size-md">
+                  </div>
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-12">
+                    <label class="form-label">Person Notes</label>
+                    <textarea name="newPersonNotes" id="pte_newPersonNotes" class="form-control size-md" rows="2" placeholder="Notes for this person..."></textarea>
+                  </div>
+                </div>
+              </div>
+            <% } %>
+
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Applicant ID</label>
+                <input type="text" name="applicantId" id="pte_applicantId" class="form-control size-md font-monospace" value="<%= a.applicantId || '' %>" placeholder="Auto-generated if blank">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Local / National ID</label>
+                <input type="text" name="localId" id="pte_localId" class="form-control size-md" value="<%= a.localId || '' %>" placeholder="Local ID">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Country of Origin</label>
+                <select name="countryOfOrigin" id="pte_countryOfOrigin" class="form-select size-md">
+                  <option value="">-- Select Country --</option>
+                  <% (countries || []).forEach((country) => { %>
+                    <option value="<%= country %>" <%= String(a.countryOfOrigin || '') === String(country) ? 'selected' : '' %>><%= country %></option>
+                  <% }) %>
+                </select>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-2">
+              <div class="col-md-4">
+                <label class="form-label">Global Academic Status</label>
+                <select name="globalAcademicStatus" id="pte_globalAcademicStatus" class="form-select size-md">
+                  <% (academicStatuses || []).forEach((status) => { %>
+                    <option value="<%= status %>" <%= String(a.globalAcademicStatus || 'Active') === String(status) ? 'selected' : '' %>><%= status %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-8">
+                <label class="form-label">Admissions Notes</label>
+                <textarea name="admissionsNotes" id="pte_admissionsNotes" class="form-control size-md" rows="2" placeholder="Admissions notes..."><%= a.admissionsNotes || '' %></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="pte-tab-step2">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="m-0 fw-bold"><i class="bi bi-book me-2"></i>Courses</h6>
+                  <button type="button" class="btn btn-primary btn-filled btn-sm" id="pte_btnPickCourses">
+                    <i class="bi bi-search me-1"></i> Add Course
+                  </button>
+                </div>
+                <div class="row g-2 mb-3">
+                  <div class="col-md-4">
+                    <input type="text" id="pte_manualCourseId" class="form-control form-control-sm" placeholder="Course ID">
+                  </div>
+                  <div class="col-md-6">
+                    <input type="text" id="pte_manualCourseName" class="form-control form-control-sm" placeholder="Course name">
+                  </div>
+                  <div class="col-md-2 d-grid">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="pte_btnAddManualCourse">Add</button>
+                  </div>
+                </div>
+                <div id="pte_coursesContainer" class="border rounded p-3 bg-light-subtle"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="pte-tab-step3">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="m-0 fw-bold"><i class="bi bi-box-seam me-2"></i>Packages</h6>
+                  <button type="button" class="btn btn-primary btn-filled btn-sm" id="pte_btnPickPackages">
+                    <i class="bi bi-search me-1"></i> Add Package
+                  </button>
+                </div>
+                <div class="alert alert-info py-2 px-3 mb-3">
+                  Package credits are applied when the applicant has a user account. New applicants receive user accounts automatically after save.
+                </div>
+                <div id="pte_packagesContainer" class="border rounded p-3 bg-light-subtle"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="pte-tab-step4">
+            <div class="alert alert-light border shadow-sm">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <h6 class="fw-bold mb-0"><i class="bi bi-paperclip me-2"></i>Attached Documents</h6>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="pteBtnOpenSavedMediaLibrary">
+                  <i class="bi bi-collection-play me-1"></i>Use Saved Media
+                </button>
+              </div>
+              <p class="small text-muted mb-3">
+                Upload scans of Passports, Visas, Transcripts, or Letters here.
+                <span class="fw-bold">Max 5 files.</span> Add a short comment per file to find it faster later.
+              </p>
+
+              <div id="pte_existingAttachmentsWrap" class="mt-2 d-none">
+                <div class="fw-bold mb-2">Existing Attachments</div>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle">
+                    <thead>
+                      <tr>
+                        <th style="width: 30%;">File</th>
+                        <th style="width: 45%;">Comment</th>
+                        <th style="width: 25%;" class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pte_existingAttachmentsBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div
+                id="pte_fileUploadBox"
+                class="p-4 border border-primary border-2 border-dashed rounded text-center bg-light mt-3"
+                style="cursor: pointer;"
+              >
+                <i class="bi bi-cloud-arrow-up fs-2 text-primary mb-2"></i>
+                <p class="mb-1 fw-bold">Click to Browse or Drag files here</p>
+                <p class="small text-muted mb-0" id="pte_fileCountText">No files selected</p>
+              </div>
+
+              <input type="file" id="pte_filesInput" name="files" multiple class="d-none">
+
+              <div id="pte_newFilesWrap" class="mt-3 d-none">
+                <div class="fw-bold mb-2">New Uploads (add a comment per file)</div>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle">
+                    <thead>
+                      <tr>
+                        <th style="width: 35%;">File</th>
+                        <th style="width: 55%;">Comment</th>
+                        <th style="width: 10%;" class="text-end"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="pte_newFilesBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="button" id="pte_btnPrevStep" class="btn btn-outline-primary btn-md" data-no-wait="true">Back</button>
+        <button type="button" id="pte_btnNextStep" class="btn btn-filled btn-primary btn-md fw-bold px-4" data-no-wait="true">Next</button>
+        <button type="submit" id="pte_btnSave" class="btn btn-filled btn-success btn-md fw-bold px-4 d-none">Save Profile</button>
+        <a href="<%= resolvedListBasePath %>" class="btn btn-filled btn-secondary btn-md" id="pte_btnCancel">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+<%- include('../../partials/modal_MediaManager') %>
+<%- include('../../partials/modal_ImageViewer') %>
+<%- include('../../partials/modal_AudioPreview') %>
+
+<script>
+(() => {
+  const form = document.getElementById('pteStudentForm');
+  if (!form) return;
+
+  const isEdit = <%= isEdit ? 'true' : 'false' %>;
+  const routeId = '<%= routeId %>';
+  const actionStateId = document.getElementById('pte_actionStateId')?.value || '';
+  const routeBasePath = '<%= resolvedFormBasePath %>';
+  const listBasePath = '<%= resolvedListBasePath %>';
+  const personModeExisting = document.getElementById('pte_personModeExisting');
+  const personModeNew = document.getElementById('pte_personModeNew');
+  const existingPersonBlock = document.getElementById('pte_existingPersonBlock');
+  const newPersonBlock = document.getElementById('pte_newPersonBlock');
+  const personIdInput = document.getElementById('pte_personId');
+  const personNameInput = document.getElementById('pte_personName');
+  const btnPickPerson = document.getElementById('pte_btnPickPerson');
+
+  const coursesInput = document.getElementById('pte_coursesJson');
+  const packagesInput = document.getElementById('pte_packagesJson');
+  const attachmentsInput = document.getElementById('pte_attachmentsJson');
+
+  const btnPickCourses = document.getElementById('pte_btnPickCourses');
+  const btnAddManualCourse = document.getElementById('pte_btnAddManualCourse');
+  const manualCourseIdInput = document.getElementById('pte_manualCourseId');
+  const manualCourseNameInput = document.getElementById('pte_manualCourseName');
+  const coursesContainer = document.getElementById('pte_coursesContainer');
+
+  const btnPickPackages = document.getElementById('pte_btnPickPackages');
+  const packagesContainer = document.getElementById('pte_packagesContainer');
+
+  const existingAttachmentsWrap = document.getElementById('pte_existingAttachmentsWrap');
+  const existingAttachmentsBody = document.getElementById('pte_existingAttachmentsBody');
+  const uploadBox = document.getElementById('pte_fileUploadBox');
+  const filesInput = document.getElementById('pte_filesInput');
+  const newFilesWrap = document.getElementById('pte_newFilesWrap');
+  const newFilesBody = document.getElementById('pte_newFilesBody');
+  const fileCountText = document.getElementById('pte_fileCountText');
+  const btnOpenSavedMediaLibrary = document.getElementById('pteBtnOpenSavedMediaLibrary');
+  const mediaManagerModalEl = document.getElementById('mediaManagerModal');
+  const mediaManagerModal = (window.bootstrap && window.bootstrap.Modal && mediaManagerModalEl)
+    ? new window.bootstrap.Modal(mediaManagerModalEl)
+    : null;
+  const mediaManagerModalApi = (window.MediaManagerModal && typeof window.MediaManagerModal.open === 'function')
+    ? window.MediaManagerModal
+    : null;
+
+  const btnPrevStep = document.getElementById('pte_btnPrevStep');
+  const btnNextStep = document.getElementById('pte_btnNextStep');
+  const btnSave = document.getElementById('pte_btnSave');
+  const btnCancel = document.getElementById('pte_btnCancel');
+  const MAX_FILES = 5;
+
+  const tabTargets = ['#pte-tab-step1', '#pte-tab-step2', '#pte-tab-step3', '#pte-tab-step4'];
+  let currentStepIndex = 0;
+  let isSubmitting = false;
+  let newFileObjectUrls = [];
+
+  function parseJsonScript(id, fallback) {
+    try {
+      const node = document.getElementById(id);
+      return JSON.parse((node && node.textContent) || '');
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  const initCourses = parseJsonScript('pteInitCourses', []);
+  const initPackages = parseJsonScript('pteInitPackages', []);
+  const initAttachments = parseJsonScript('pteInitAttachments', []);
+
+  const state = {
+    courses: Array.isArray(initCourses) ? initCourses : [],
+    packages: Array.isArray(initPackages) ? initPackages : [],
+    attachments: Array.isArray(initAttachments)
+      ? initAttachments.map((row) => ((row && typeof row === 'object') ? { ...row, __persisted: true } : row)).filter(Boolean)
+      : [],
+    savedMediaLibrary: []
+  };
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function cleanText(value) {
+    return String(value || '').replace(/\0/g, '').trim();
+  }
+
+  function appendActionState(url) {
+    const base = String(url || '').trim();
+    if (!base || !actionStateId) return base;
+    if (/[?&]actionStateId=/.test(base)) return base;
+    return base + (base.includes('?') ? '&' : '?') + 'actionStateId=' + encodeURIComponent(actionStateId);
+  }
+
+  async function showModal(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+      return;
+    }
+    alert(title + ': ' + message);
+  }
+
+  function formatBytes(bytes) {
+    const value = Number(bytes || 0);
+    if (!Number.isFinite(value) || value <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const power = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024)));
+    const size = value / (1024 ** power);
+    return size.toFixed(power === 0 ? 0 : 1) + ' ' + units[power];
+  }
+
+  function clearNewFileObjectUrls() {
+    if (!newFileObjectUrls.length) return;
+    newFileObjectUrls.forEach((url) => {
+      try {
+        window.URL.revokeObjectURL(url);
+      } catch (_) {}
+    });
+    newFileObjectUrls = [];
+  }
+
+  function cacheButtonHtml(button) {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+  }
+
+  function setButtonBusy(button, label) {
+    if (!button) return;
+    cacheButtonHtml(button);
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + esc(label || 'Working...');
+  }
+
+  function restoreButton(button) {
+    if (!button) return;
+    if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+    button.disabled = false;
+  }
+
+  function syncPersonMode() {
+    const useNew = !isEdit && !!(personModeNew && personModeNew.checked);
+    if (existingPersonBlock) existingPersonBlock.classList.toggle('d-none', useNew);
+    if (newPersonBlock) newPersonBlock.classList.toggle('d-none', !useNew);
+  }
+
+  function upsertCourse(item) {
+    const row = (item && typeof item === 'object') ? item : { id: item };
+    const id = cleanText(row.id || row.courseId);
+    const name = cleanText(row.name || row.title);
+    const key = id || name;
+    if (!key) return;
+    if (state.courses.some((course) => (cleanText(course.id) || cleanText(course.name)) === key)) return;
+    state.courses.push({
+      id: id,
+      name: name || id || key
+    });
+  }
+
+  function removeCourse(index) {
+    if (index < 0 || index >= state.courses.length) return;
+    state.courses.splice(index, 1);
+    renderCourses();
+  }
+
+  function upsertPackage(item) {
+    const row = (item && typeof item === 'object') ? item : { id: item };
+    const id = cleanText(row.id || row.packageId);
+    if (!id) return;
+    if (state.packages.some((pkg) => cleanText(pkg.id) === id)) return;
+    state.packages.push({
+      id: id,
+      name: cleanText(row.name) || id
+    });
+  }
+
+  function removePackage(index) {
+    if (index < 0 || index >= state.packages.length) return;
+    state.packages.splice(index, 1);
+    renderPackages();
+  }
+
+  function syncHiddenPayloads() {
+    coursesInput.value = JSON.stringify(state.courses || []);
+    packagesInput.value = JSON.stringify(state.packages || []);
+    attachmentsInput.value = JSON.stringify(
+      (state.attachments || []).map((row) => {
+        const item = row && typeof row === 'object' ? row : {};
+        return {
+          id: cleanText(item.id),
+          originalName: cleanText(item.originalName),
+          filename: cleanText(item.filename),
+          path: cleanText(item.path),
+          url: cleanText(item.url),
+          size: Number(item.size || 0) || 0,
+          uploadDate: cleanText(item.uploadDate),
+          comment: cleanText(item.comment, 500)
+        };
+      })
+    );
+  }
+
+  function renderCourses() {
+    if (!state.courses.length) {
+      coursesContainer.innerHTML = '<div class="text-muted">No courses selected.</div>';
+      syncHiddenPayloads();
+      return;
+    }
+    coursesContainer.innerHTML = state.courses.map((course, index) => {
+      return ''
+        + '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-3 py-2 mb-2">'
+        + '  <div class="overflow-hidden">'
+        + '    <div class="fw-bold text-truncate">' + esc(course.name || course.id || 'Course') + '</div>'
+        + '    <div class="x-small text-muted font-monospace text-truncate">' + esc(course.id || '-') + '</div>'
+        + '  </div>'
+        + '  <button type="button" class="btn btn-outline-danger btn-sm" data-remove-course="' + index + '"><i class="bi bi-x-lg"></i></button>'
+        + '</div>';
+    }).join('');
+    syncHiddenPayloads();
+  }
+
+  function renderPackages() {
+    if (!state.packages.length) {
+      packagesContainer.innerHTML = '<div class="text-muted">No packages selected.</div>';
+      syncHiddenPayloads();
+      return;
+    }
+    packagesContainer.innerHTML = state.packages.map((pkg, index) => {
+      return ''
+        + '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-3 py-2 mb-2">'
+        + '  <div class="overflow-hidden">'
+        + '    <div class="fw-bold text-truncate">' + esc(pkg.name || pkg.id || 'Package') + '</div>'
+        + '    <div class="x-small text-muted font-monospace text-truncate">' + esc(pkg.id || '-') + '</div>'
+        + '  </div>'
+        + '  <button type="button" class="btn btn-outline-danger btn-sm" data-remove-package="' + index + '"><i class="bi bi-x-lg"></i></button>'
+        + '</div>';
+    }).join('');
+    syncHiddenPayloads();
+  }
+
+  function resolveAttachmentPreviewUrl(row = {}) {
+    const directUrl = cleanText(row.url);
+    if (directUrl) return directUrl;
+    const pathToken = cleanText(row.path).replace(/\\/g, '/');
+    if (!pathToken) return '';
+    const uploadsMatch = pathToken.match(/\/uploads\/(.+)$/i);
+    if (uploadsMatch && uploadsMatch[1]) {
+      return '/uploads/' + uploadsMatch[1].replace(/^\/+/, '');
+    }
+    if (/^\/uploads\//i.test(pathToken)) return pathToken;
+    if (/^uploads\//i.test(pathToken)) return '/' + pathToken;
+    return '';
+  }
+
+  function normalizeSavedMediaRow(row, index) {
+    const source = row && typeof row === 'object' ? row : {};
+    const fallbackName = 'Saved file ' + (index + 1);
+    return {
+      id: cleanText(source.id) || ('LIB_' + (index + 1)),
+      originalName: cleanText(source.originalName) || cleanText(source.name) || cleanText(source.filename) || fallbackName,
+      filename: cleanText(source.filename) || cleanText(source.name) || cleanText(source.originalName) || fallbackName,
+      path: cleanText(source.path).replace(/\\/g, '/'),
+      url: cleanText(source.url) || cleanText(source.downloadUrl) || cleanText(source.publicUrl),
+      size: Number(source.size || 0) || 0,
+      uploadDate: cleanText(source.uploadDate) || new Date().toISOString(),
+      comment: cleanText(source.comment, 500),
+      __persisted: false
+    };
+  }
+
+  function mergeSavedMediaLibraryRows(rows = [], options = {}) {
+    const incoming = Array.isArray(rows) ? rows : [];
+    const prepend = options && options.prepend === true;
+    const base = prepend
+      ? incoming.concat(Array.isArray(state.savedMediaLibrary) ? state.savedMediaLibrary : [])
+      : incoming;
+    const out = [];
+    const seen = new Set();
+    base.forEach((raw, index) => {
+      const row = normalizeSavedMediaRow(raw, index);
+      const key = [
+        cleanText(row.id).toLowerCase(),
+        cleanText(row.path).toLowerCase(),
+        cleanText(row.url).toLowerCase(),
+        cleanText(row.filename).toLowerCase(),
+        cleanText(row.originalName).toLowerCase()
+      ].find(Boolean);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push(row);
+    });
+    state.savedMediaLibrary = out;
+    return out;
+  }
+
+  function addSavedMediaAttachment(row) {
+    const attachment = normalizeSavedMediaRow(row, 0);
+    const existing = state.attachments.find((item) => {
+      const samePath = attachment.path && cleanText(item.path) && cleanText(item.path) === attachment.path;
+      const sameUrl = attachment.url && cleanText(item.url) && cleanText(item.url) === attachment.url;
+      const sameFile = attachment.filename && cleanText(item.filename) && cleanText(item.filename) === attachment.filename;
+      return samePath || sameUrl || sameFile;
+    });
+    if (existing) return { row: existing, added: false };
+    state.attachments.push(attachment);
+    renderExistingAttachments();
+    return { row: attachment, added: true };
+  }
+
+  function normalizeFolderToken(value) {
+    const token = cleanText(value).replace(/\\/g, '/');
+    if (!token || token === '/' || token === '.') return '';
+    return token
+      .split('/')
+      .map((part) => cleanText(part))
+      .filter(Boolean)
+      .join('/');
+  }
+
+  async function loadSavedMediaLibrary(options = {}) {
+    const folder = normalizeFolderToken(options && options.folder);
+    const endpointBase = appendActionState(routeBasePath + '/media/library');
+    const endpoint = folder
+      ? (endpointBase + (endpointBase.includes('?') ? '&' : '?') + 'folder=' + encodeURIComponent(folder))
+      : endpointBase;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'X-AJAX-Request': 'true',
+        Accept: 'application/json'
+      },
+      credentials: 'include'
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.status !== 'success') {
+      throw new Error((result && result.message) || ('Unable to load media library (status ' + response.status + ').'));
+    }
+    const rows = Array.isArray(result.results)
+      ? result.results.map((row, index) => normalizeSavedMediaRow(row, index))
+      : [];
+    state.savedMediaLibrary = rows;
+    if (mediaManagerModalApi && typeof mediaManagerModalApi.setRows === 'function') {
+      mediaManagerModalApi.setRows(rows);
+    }
+    const defaultPageSize = Number.parseInt(String(result?.defaults?.pageSize || result?.pageSize || ''), 10);
+    return {
+      rows,
+      message: cleanText(result.message) || ('Loaded ' + rows.length + ' saved media file(s).'),
+      folders: Array.isArray(result.folders) ? result.folders : [],
+      currentFolder: normalizeFolderToken(result.currentFolder || folder),
+      parentFolder: normalizeFolderToken(result.parentFolder),
+      defaultFolder: normalizeFolderToken(result.defaultFolder || '<%= mediaDefaultFolder %>'),
+      defaults: Number.isFinite(defaultPageSize) && !Number.isNaN(defaultPageSize) && defaultPageSize > 0
+        ? { pageSize: defaultPageSize }
+        : null
+    };
+  }
+
+  async function uploadSavedMediaLibraryFiles(files = []) {
+    const inputFiles = Array.isArray(files) ? files.filter(Boolean) : [];
+    if (!inputFiles.length) throw new Error('No files selected for upload.');
+
+    const formData = new FormData();
+    inputFiles.forEach((file) => formData.append('files', file));
+    const endpoint = appendActionState(routeBasePath + '/media/upload');
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'X-AJAX-Request': 'true',
+        Accept: 'application/json'
+      },
+      body: formData,
+      credentials: 'include'
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.status !== 'success') {
+      throw new Error((result && result.message) || ('Upload failed with status ' + response.status + '.'));
+    }
+    const rows = Array.isArray(result.results)
+      ? result.results.map((row, index) => normalizeSavedMediaRow(row, index))
+      : [];
+    mergeSavedMediaLibraryRows(rows, { prepend: true });
+    return {
+      rows,
+      message: cleanText(result.message) || ('Uploaded ' + rows.length + ' file(s).')
+    };
+  }
+
+  async function openSavedMediaManager() {
+    if (!mediaManagerModalApi || typeof mediaManagerModalApi.open !== 'function') {
+      await showModal('Saved Media Library', 'Media manager is not available in this environment.', 'warning');
+      return false;
+    }
+
+    if (typeof mediaManagerModalApi.setModalCompat === 'function') {
+      mediaManagerModalApi.setModalCompat({
+        modalEl: mediaManagerModalEl,
+        modalInstance: mediaManagerModal
+      });
+    }
+
+    if (Array.isArray(state.savedMediaLibrary) && state.savedMediaLibrary.length && typeof mediaManagerModalApi.setRows === 'function') {
+      mediaManagerModalApi.setRows(state.savedMediaLibrary);
+    }
+
+    await mediaManagerModalApi.open({
+      title: 'Saved Media Library',
+      mode: 'attach',
+      mediaKind: 'any',
+      maxSelection: MAX_FILES,
+      defaultView: 'list',
+      defaultFolder: '<%= mediaDefaultFolder %>',
+      forceRefresh: true,
+      onRefresh: async (query = {}) => {
+        return loadSavedMediaLibrary({ folder: query && query.folder });
+      },
+      onUpload: async (files) => {
+        const result = await uploadSavedMediaLibraryFiles(files);
+        return { rows: result.rows, message: result.message };
+      },
+      onApply: async (selectedRows) => {
+        const rows = Array.isArray(selectedRows) ? selectedRows : [];
+        if (!rows.length) throw new Error('Select at least one file.');
+        let addedCount = 0;
+        let duplicateCount = 0;
+        rows.forEach((row) => {
+          const addResult = addSavedMediaAttachment(row);
+          if (addResult && addResult.added) addedCount += 1;
+          else duplicateCount += 1;
+        });
+        if (!addedCount && duplicateCount) {
+          throw new Error('Selected media file(s) are already attached.');
+        }
+      }
+    });
+    return true;
+  }
+
+  function renderExistingAttachments() {
+    if (!state.attachments.length) {
+      existingAttachmentsWrap.classList.add('d-none');
+      existingAttachmentsBody.innerHTML = '';
+      syncHiddenPayloads();
+      return;
+    }
+    existingAttachmentsWrap.classList.remove('d-none');
+
+    existingAttachmentsBody.innerHTML = state.attachments.map((attachment, index) => {
+      const attKey = cleanText(attachment.id) || String(index);
+      const fileLabel = esc(attachment.originalName || attachment.filename || '(file)');
+      const comment = esc(attachment.comment || '');
+      const isPersisted = Boolean(attachment.__persisted);
+      const persistedDownloadUrl = (isPersisted && isEdit && routeId)
+        ? (routeBasePath + '/' + encodeURIComponent(routeId) + '/attachments/' + encodeURIComponent(attKey) + '/download')
+        : '';
+      const previewUrl = resolveAttachmentPreviewUrl(attachment);
+      const downloadUrl = persistedDownloadUrl || previewUrl;
+      const meta = esc(formatBytes(attachment.size));
+      const statusBadge = isPersisted
+        ? '<span class="badge bg-light text-dark border">Saved</span>'
+        : '<span class="badge bg-warning-subtle text-warning-emphasis border">Pending</span>';
+      return ''
+        + '<tr>'
+        + '  <td>'
+        + '    <div class="d-flex align-items-center gap-2">'
+        + '      <div class="fw-bold">' + fileLabel + '</div>'
+        +        statusBadge
+        + '    </div>'
+        + '    <div class="x-small text-muted">' + meta + '</div>'
+        + '  </td>'
+        + '  <td><input type="text" class="form-control form-control-sm" value="' + comment + '" data-existing-comment="' + index + '" placeholder="Comment"></td>'
+        + '  <td class="text-end">'
+        + '    <div class="d-flex justify-content-end gap-2">'
+        +      (downloadUrl ? ('<a href="' + esc(downloadUrl) + '" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>Download</a>') : '')
+        + '      <button type="button" class="btn btn-outline-danger btn-sm" data-delete-attachment-index="' + index + '"><i class="bi bi-trash me-1"></i>Delete</button>'
+        + '    </div>'
+        + '  </td>'
+        + '</tr>';
+    }).join('');
+    syncHiddenPayloads();
+  }
+
+  function renderNewFiles() {
+    const files = Array.from(filesInput.files || []);
+    clearNewFileObjectUrls();
+    if (!files.length) {
+      newFilesWrap.classList.add('d-none');
+      newFilesBody.innerHTML = '';
+      fileCountText.textContent = 'No files selected';
+      if (uploadBox) uploadBox.classList.remove('bg-success', 'bg-opacity-10', 'border-success');
+      return;
+    }
+    newFilesWrap.classList.remove('d-none');
+    fileCountText.innerHTML = '<span class="text-success fw-bold">' + files.length + ' file(s) selected ready for upload.</span>';
+    if (uploadBox) uploadBox.classList.add('bg-success', 'bg-opacity-10', 'border-success');
+
+    newFilesBody.innerHTML = files.map((file, index) => {
+      let downloadUrl = '';
+      try {
+        downloadUrl = window.URL.createObjectURL(file);
+      } catch (_) {
+        downloadUrl = '';
+      }
+      if (downloadUrl) newFileObjectUrls.push(downloadUrl);
+      const downloadAction = downloadUrl
+        ? '<a href="' + esc(downloadUrl) + '" download="' + esc(file.name) + '" class="btn btn-outline-primary btn-sm" title="Download"><i class="bi bi-download"></i></a>'
+        : '';
+      return ''
+        + '<tr>'
+        + '  <td><div class="fw-bold">' + esc(file.name) + '</div><div class="x-small text-muted">' + esc(formatBytes(file.size)) + '</div></td>'
+        + '  <td><input type="text" class="form-control form-control-sm" name="newFileComments" data-new-file-comment="' + index + '" placeholder="Comment for this file"></td>'
+        + '  <td class="text-end"><div class="d-inline-flex gap-1">' + downloadAction + '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-new-file="' + index + '"><i class="bi bi-x-lg"></i></button></div></td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  function getActiveTabTarget() {
+    const active = document.querySelector('#pteStudentTabs .nav-link.active');
+    return active ? String(active.getAttribute('data-bs-target') || '').trim() : tabTargets[0];
+  }
+
+  function showStep(index) {
+    const bounded = Math.max(0, Math.min(tabTargets.length - 1, Number(index) || 0));
+    const target = tabTargets[bounded];
+    const tabButton = document.querySelector('#pteStudentTabs .nav-link[data-bs-target="' + target + '"]');
+    if (!tabButton) return;
+    const tab = window.bootstrap && window.bootstrap.Tab ? new window.bootstrap.Tab(tabButton) : null;
+    if (tab) tab.show();
+    currentStepIndex = bounded;
+    refreshWizardButtons();
+  }
+
+  function refreshWizardButtons() {
+    if (btnPrevStep) btnPrevStep.classList.toggle('d-none', currentStepIndex === 0);
+    if (btnNextStep) btnNextStep.classList.toggle('d-none', currentStepIndex === tabTargets.length - 1);
+    if (btnSave) btnSave.classList.toggle('d-none', currentStepIndex !== tabTargets.length - 1);
+  }
+
+  async function deleteAttachment(attKey) {
+    if (!isEdit || !routeId) return;
+    const url = routeBasePath + '/' + encodeURIComponent(routeId) + '/attachments/' + encodeURIComponent(attKey) + '?actionStateId=' + encodeURIComponent(actionStateId);
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'X-AJAX-Request': 'true',
+        'Accept': 'application/json'
+      },
+      credentials: 'include'
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.status !== 'success') {
+      throw new Error((result && result.message) || ('Delete failed with status ' + response.status + '.'));
+    }
+    state.attachments = Array.isArray(result.attachments)
+      ? result.attachments.map((row) => ((row && typeof row === 'object') ? { ...row, __persisted: true } : row)).filter(Boolean)
+      : [];
+    renderExistingAttachments();
+  }
+
+  async function validateForm() {
+    const useNew = !isEdit && !!(personModeNew && personModeNew.checked);
+    if (useNew) {
+      const firstName = cleanText(document.getElementById('pte_newPersonFirstName')?.value);
+      const lastName = cleanText(document.getElementById('pte_newPersonLastName')?.value);
+      const email = cleanText(document.getElementById('pte_newPersonEmail')?.value);
+      if (!firstName || !lastName || !email) {
+        await showModal('Validation', 'New person requires first name, last name, and email.', 'warning');
+        showStep(0);
+        return false;
+      }
+    } else {
+      const personId = cleanText(personIdInput.value);
+      if (!personId) {
+        await showModal('Validation', 'Please select a person.', 'warning');
+        showStep(0);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function openPersonPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+
+    window.GenericPicker.open(window.GenericPickerPresets.person({
+      title: 'Select Person',
+      icon: 'bi-person-badge',
+      apiEndpoint: routeBasePath + '/picker/persons',
+      searchFields: 'id,displayName,name.first,name.last,name.preferred,contact.email,email',
+      placeholder: 'Search person by name or email...',
+      multiselect: false,
+      context,
+      onSelect: (item) => {
+        personIdInput.value = cleanText(item && item.id);
+        const displayName = cleanText(item?.displayName)
+          || cleanText(item?.name?.first + ' ' + item?.name?.last)
+          || cleanText(item?.name)
+          || cleanText(item?.id);
+        personNameInput.value = displayName;
+        if (personModeExisting) personModeExisting.checked = true;
+        syncPersonMode();
+      }
+    }));
+  }
+
+  function openCoursePicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    window.GenericPicker.open(window.GenericPickerPresets.section({
+      title: 'Select Course',
+      icon: 'bi-book',
+      apiEndpoint: routeBasePath + '/picker/courses',
+      searchFields: 'id,name',
+      placeholder: 'Search existing course references...',
+      multiselect: true,
+      onSelect: (items) => {
+        (Array.isArray(items) ? items : [items]).forEach((item) => upsertCourse(item));
+        renderCourses();
+      }
+    }));
+  }
+
+  function openPackagePicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+
+    window.GenericPicker.open(window.GenericPickerPresets.section({
+      title: 'Select Package',
+      icon: 'bi-box-seam',
+      apiEndpoint: routeBasePath + '/picker/packages',
+      searchFields: 'id,name,description',
+      placeholder: 'Search activity quota packages...',
+      multiselect: true,
+      context,
+      onSelect: (items) => {
+        (Array.isArray(items) ? items : [items]).forEach((item) => upsertPackage(item));
+        renderPackages();
+      }
+    }));
+  }
+
+  function addManualCourse() {
+    const id = cleanText(manualCourseIdInput.value);
+    const name = cleanText(manualCourseNameInput.value);
+    if (!id && !name) return;
+    upsertCourse({ id, name });
+    manualCourseIdInput.value = '';
+    manualCourseNameInput.value = '';
+    renderCourses();
+  }
+
+  coursesContainer.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-remove-course]');
+    if (!removeBtn) return;
+    removeCourse(Number(removeBtn.getAttribute('data-remove-course')));
+  });
+
+  packagesContainer.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-remove-package]');
+    if (!removeBtn) return;
+    removePackage(Number(removeBtn.getAttribute('data-remove-package')));
+  });
+
+  existingAttachmentsBody.addEventListener('input', (event) => {
+    const input = event.target.closest('[data-existing-comment]');
+    if (!input) return;
+    const index = Number(input.getAttribute('data-existing-comment'));
+    if (!Number.isFinite(index) || index < 0 || index >= state.attachments.length) return;
+    state.attachments[index].comment = String(input.value || '');
+    syncHiddenPayloads();
+  });
+
+  existingAttachmentsBody.addEventListener('click', async (event) => {
+    const deleteBtn = event.target.closest('[data-delete-attachment-index]');
+    if (!deleteBtn) return;
+    const index = Number(deleteBtn.getAttribute('data-delete-attachment-index'));
+    if (!Number.isFinite(index) || index < 0 || index >= state.attachments.length) return;
+    const row = state.attachments[index] && typeof state.attachments[index] === 'object'
+      ? state.attachments[index]
+      : null;
+    if (!row) return;
+    const attKey = cleanText(row.id) || String(index);
+    deleteBtn.disabled = true;
+    try {
+      if (isEdit && routeId && row.__persisted) {
+        await deleteAttachment(attKey);
+        await showModal('Deleted', 'Attachment deleted successfully.', 'success');
+      } else {
+        state.attachments.splice(index, 1);
+        renderExistingAttachments();
+      }
+    } catch (error) {
+      deleteBtn.disabled = false;
+      await showModal('Delete Failed', error.message || 'Unable to delete attachment.', 'error');
+    }
+  });
+
+  filesInput.addEventListener('change', () => {
+    const files = Array.from(filesInput.files || []);
+    if (files.length > MAX_FILES) {
+      const dt = new DataTransfer();
+      files.slice(0, MAX_FILES).forEach((file) => dt.items.add(file));
+      filesInput.files = dt.files;
+      showModal('Too many files', 'You can upload up to ' + MAX_FILES + ' files. Extra files were ignored.', 'warning');
+    }
+    renderNewFiles();
+  });
+
+  if (uploadBox) {
+    uploadBox.addEventListener('click', () => filesInput.click());
+    uploadBox.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      uploadBox.classList.add('border-success');
+    });
+    uploadBox.addEventListener('dragleave', () => {
+      uploadBox.classList.remove('border-success');
+    });
+    uploadBox.addEventListener('drop', (event) => {
+      event.preventDefault();
+      uploadBox.classList.remove('border-success');
+      const dt = new DataTransfer();
+      const dropped = Array.from((event.dataTransfer && event.dataTransfer.files) || []);
+      dropped.slice(0, MAX_FILES).forEach((file) => dt.items.add(file));
+      filesInput.files = dt.files;
+      if (dropped.length > MAX_FILES) {
+        showModal('Too many files', 'You can upload up to ' + MAX_FILES + ' files. Extra files were ignored.', 'warning');
+      }
+      renderNewFiles();
+    });
+  }
+
+  newFilesBody.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-remove-new-file]');
+    if (!removeBtn) return;
+    const index = Number(removeBtn.getAttribute('data-remove-new-file'));
+    const files = Array.from(filesInput.files || []);
+    if (!Number.isFinite(index) || index < 0 || index >= files.length) return;
+    const dt = new DataTransfer();
+    files.forEach((file, i) => {
+      if (i !== index) dt.items.add(file);
+    });
+    filesInput.files = dt.files;
+    renderNewFiles();
+  });
+
+  if (btnPickPerson && !btnPickPerson.disabled) btnPickPerson.addEventListener('click', openPersonPicker);
+  if (btnPickCourses) btnPickCourses.addEventListener('click', openCoursePicker);
+  if (btnPickPackages) btnPickPackages.addEventListener('click', openPackagePicker);
+  if (btnOpenSavedMediaLibrary) {
+    btnOpenSavedMediaLibrary.addEventListener('click', async () => {
+      await openSavedMediaManager();
+    });
+  }
+  if (btnAddManualCourse) btnAddManualCourse.addEventListener('click', addManualCourse);
+  if (manualCourseNameInput) {
+    manualCourseNameInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addManualCourse();
+      }
+    });
+  }
+
+  if (personModeExisting) personModeExisting.addEventListener('change', syncPersonMode);
+  if (personModeNew) personModeNew.addEventListener('change', syncPersonMode);
+
+  document.querySelectorAll('#pteStudentTabs .nav-link').forEach((tabButton) => {
+    tabButton.addEventListener('shown.bs.tab', () => {
+      const activeTarget = getActiveTabTarget();
+      currentStepIndex = Math.max(0, tabTargets.indexOf(activeTarget));
+      refreshWizardButtons();
+    });
+  });
+
+  if (btnPrevStep) {
+    btnPrevStep.addEventListener('click', () => showStep(currentStepIndex - 1));
+  }
+  if (btnNextStep) {
+    btnNextStep.addEventListener('click', () => showStep(currentStepIndex + 1));
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+    const valid = await validateForm();
+    if (!valid) return;
+    if (currentStepIndex !== tabTargets.length - 1) {
+      showStep(currentStepIndex + 1);
+      return;
+    }
+
+    syncHiddenPayloads();
+    isSubmitting = true;
+    setButtonBusy(btnSave, 'Saving...');
+    if (btnCancel) btnCancel.disabled = true;
+
+    try {
+      const formData = new FormData(form);
+      const submitUrl = (() => {
+        const token = document.getElementById('pte_actionStateId')?.value || '';
+        if (!token) return form.action;
+        const hasToken = /[?&]actionStateId=/.test(String(form.action || ''));
+        if (hasToken) return form.action;
+        return String(form.action || '') + (String(form.action || '').includes('?') ? '&' : '?') + 'actionStateId=' + encodeURIComponent(token);
+      })();
+      const response = await fetch(submitUrl, {
+        method: 'POST',
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        body: formData,
+        credentials: 'include'
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Request failed with status ' + response.status + '.'));
+      }
+
+      await showModal('Success', result.message || 'Applicant saved successfully.', 'success');
+      window.location.href = listBasePath;
+    } catch (error) {
+      await showModal('Save Failed', error.message || 'Unexpected save error.', 'error');
+      isSubmitting = false;
+      restoreButton(btnSave);
+      restoreButton(btnCancel);
+    }
+  });
+
+  if (btnCancel) {
+    cacheButtonHtml(btnCancel);
+    btnCancel.addEventListener('click', (event) => {
+      if (isSubmitting) {
+        event.preventDefault();
+        return;
+      }
+      setButtonBusy(btnCancel, 'Cancelling...');
+      if (btnSave) btnSave.disabled = true;
+    });
+  }
+
+  cacheButtonHtml(btnSave);
+  syncPersonMode();
+  renderCourses();
+  renderPackages();
+  renderExistingAttachments();
+  renderNewFiles();
+  currentStepIndex = Math.max(0, tabTargets.indexOf(getActiveTabTarget()));
+  refreshWizardButtons();
+  window.addEventListener('beforeunload', clearNewFileObjectUrls);
+})();
+</script>
+

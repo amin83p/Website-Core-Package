@@ -1,0 +1,5313 @@
+[
+  {
+    "userId": "ROOT_001",
+    "tableId": "AI Token Usage",
+    "settings": {
+      "columns": [
+        {
+          "key": "consumedAt",
+          "visible": true,
+          "order": 1,
+          "label": "Consumed At",
+          "defaultLabel": "Consumed At",
+          "width": ""
+        },
+        {
+          "key": "userId",
+          "visible": true,
+          "order": 2,
+          "label": "User",
+          "defaultLabel": "User",
+          "width": ""
+        },
+        {
+          "key": "providerId",
+          "visible": true,
+          "order": 3,
+          "label": "Provider",
+          "defaultLabel": "Provider",
+          "width": ""
+        },
+        {
+          "key": "modelUsed",
+          "visible": true,
+          "order": 4,
+          "label": "Model",
+          "defaultLabel": "Model",
+          "width": ""
+        },
+        {
+          "key": "requestLabel",
+          "visible": true,
+          "order": 5,
+          "label": "Request",
+          "defaultLabel": "Request",
+          "width": ""
+        },
+        {
+          "key": "promptTokenCount",
+          "visible": true,
+          "order": 6,
+          "label": "Prompt",
+          "defaultLabel": "Prompt",
+          "width": ""
+        },
+        {
+          "key": "candidatesTokenCount",
+          "visible": true,
+          "order": 7,
+          "label": "Output",
+          "defaultLabel": "Output",
+          "width": ""
+        },
+        {
+          "key": "totalTokenCount",
+          "visible": true,
+          "order": 8,
+          "label": "Total",
+          "defaultLabel": "Total",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 9,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "billingStatus",
+          "visible": false,
+          "order": 10,
+          "label": "Billing",
+          "defaultLabel": "Billing",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": true,
+          "order": 11,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "IELTS_AITokenUsage",
+    "settings": {
+      "columns": [
+        {
+          "key": "consumedAt",
+          "visible": true,
+          "order": 1,
+          "label": "Consumed At",
+          "defaultLabel": "Consumed At",
+          "width": ""
+        },
+        {
+          "key": "userId",
+          "visible": true,
+          "order": 2,
+          "label": "User",
+          "defaultLabel": "User",
+          "width": ""
+        },
+        {
+          "key": "providerId",
+          "visible": true,
+          "order": 3,
+          "label": "Provider",
+          "defaultLabel": "Provider",
+          "width": ""
+        },
+        {
+          "key": "modelUsed",
+          "visible": true,
+          "order": 4,
+          "label": "Model",
+          "defaultLabel": "Model",
+          "width": ""
+        },
+        {
+          "key": "requestLabel",
+          "visible": true,
+          "order": 5,
+          "label": "Request",
+          "defaultLabel": "Request",
+          "width": ""
+        },
+        {
+          "key": "promptTokenCount",
+          "visible": true,
+          "order": 6,
+          "label": "Prompt",
+          "defaultLabel": "Prompt",
+          "width": ""
+        },
+        {
+          "key": "candidatesTokenCount",
+          "visible": true,
+          "order": 7,
+          "label": "Output",
+          "defaultLabel": "Output",
+          "width": ""
+        },
+        {
+          "key": "totalTokenCount",
+          "visible": true,
+          "order": 8,
+          "label": "Total",
+          "defaultLabel": "Total",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 9,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "billingStatus",
+          "visible": false,
+          "order": 10,
+          "label": "Billing",
+          "defaultLabel": "Billing",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": true,
+          "order": 11,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "Symbol_Management",
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "name",
+          "visible": true,
+          "order": 2,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "orgId",
+          "visible": true,
+          "order": 3,
+          "label": "Scope",
+          "defaultLabel": "Scope",
+          "width": ""
+        },
+        {
+          "key": "type",
+          "visible": true,
+          "order": 4,
+          "label": "Type",
+          "defaultLabel": "Type",
+          "width": ""
+        },
+        {
+          "key": "tags",
+          "visible": false,
+          "order": 5,
+          "label": "Tags",
+          "defaultLabel": "Tags",
+          "width": ""
+        },
+        {
+          "key": "value",
+          "visible": true,
+          "order": 6,
+          "label": "Value / Source",
+          "defaultLabel": "Value / Source",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 7,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "Classes_List",
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Title / ID",
+          "defaultLabel": "Title / ID",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Organization",
+          "defaultLabel": "Organization",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Delivery Dept",
+          "defaultLabel": "Delivery Dept",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Lifecycle",
+          "defaultLabel": "Lifecycle",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Schedule",
+          "defaultLabel": "Schedule",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Curriculum",
+          "defaultLabel": "Curriculum",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "Accesses_Management",
+    "settings": {
+      "columns": [
+        {
+          "key": "name",
+          "visible": true,
+          "order": 1,
+          "label": "Profile Name",
+          "defaultLabel": "Profile Name",
+          "width": ""
+        },
+        {
+          "key": "orgId",
+          "visible": true,
+          "order": 2,
+          "label": "Scope",
+          "defaultLabel": "Scope",
+          "width": ""
+        },
+        {
+          "key": "adminLevel",
+          "visible": true,
+          "order": 3,
+          "label": "Admin Level",
+          "defaultLabel": "Admin Level",
+          "width": ""
+        },
+        {
+          "key": "sections",
+          "visible": false,
+          "order": 4,
+          "label": "Sections",
+          "defaultLabel": "Sections",
+          "width": ""
+        },
+        {
+          "key": "validity",
+          "visible": true,
+          "order": 5,
+          "label": "Validity",
+          "defaultLabel": "Validity",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 6,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 7,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "Report_Assignments",
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Assignment",
+          "defaultLabel": "Assignment",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Class",
+          "defaultLabel": "Class",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Target",
+          "defaultLabel": "Target",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Task Time",
+          "defaultLabel": "Task Time",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Scope",
+          "defaultLabel": "Scope",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": false,
+          "order": 6,
+          "label": "Template",
+          "defaultLabel": "Template",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Teachers",
+          "defaultLabel": "Teachers",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Report Period",
+          "defaultLabel": "Report Period",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "Activity_Quota_Packages",
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Package",
+          "defaultLabel": "Package",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Organization",
+          "defaultLabel": "Organization",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Price / Visibility",
+          "defaultLabel": "Price / Visibility",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Validity",
+          "defaultLabel": "Validity",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": false,
+          "order": 5,
+          "label": "Profiles / Banned Users",
+          "defaultLabel": "Profiles / Banned Users",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": false,
+          "order": 6,
+          "label": "Sections / Operations",
+          "defaultLabel": "Sections / Operations",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Creator",
+          "defaultLabel": "Creator",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Action",
+          "defaultLabel": "Action",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "PTE_Questions_Bank",
+    "settings": {
+      "columns": [
+        {
+          "key": "select",
+          "visible": true,
+          "order": 1,
+          "label": "Select",
+          "defaultLabel": "Select",
+          "width": ""
+        },
+        {
+          "key": "question",
+          "visible": true,
+          "order": 2,
+          "label": "Question",
+          "defaultLabel": "Question",
+          "width": ""
+        },
+        {
+          "key": "testType",
+          "visible": true,
+          "order": 3,
+          "label": "Test Type",
+          "defaultLabel": "Test Type",
+          "width": ""
+        },
+        {
+          "key": "type",
+          "visible": true,
+          "order": 4,
+          "label": "Type",
+          "defaultLabel": "Type",
+          "width": ""
+        },
+        {
+          "key": "familyRevision",
+          "visible": true,
+          "order": 5,
+          "label": "Family / Revision",
+          "defaultLabel": "Family / Revision",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "difficultyTags",
+          "visible": false,
+          "order": 7,
+          "label": "Difficulty / Tags",
+          "defaultLabel": "Difficulty / Tags",
+          "width": ""
+        },
+        {
+          "key": "validationUsage",
+          "visible": true,
+          "order": 8,
+          "label": "Validation / Usage",
+          "defaultLabel": "Validation / Usage",
+          "width": ""
+        },
+        {
+          "key": "creator",
+          "visible": false,
+          "order": 9,
+          "label": "Creator",
+          "defaultLabel": "Creator",
+          "width": ""
+        },
+        {
+          "key": "actions",
+          "visible": true,
+          "order": 10,
+          "label": "Action",
+          "defaultLabel": "Action",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "PTE_Students",
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Applicant",
+          "defaultLabel": "Applicant",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Person",
+          "defaultLabel": "Person",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": false,
+          "order": 3,
+          "label": "User Account",
+          "defaultLabel": "User Account",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Country / ID",
+          "defaultLabel": "Country / ID",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Courses / Packages",
+          "defaultLabel": "Courses / Packages",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Action",
+          "defaultLabel": "Action",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "Activity_Quota_Ledger",
+    "settings": {
+      "columns": [
+        {
+          "key": "select",
+          "visible": true,
+          "order": 1,
+          "label": "Select",
+          "defaultLabel": "Select",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Date / Ledger ID",
+          "defaultLabel": "Date / Ledger ID",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Entry Type",
+          "defaultLabel": "Entry Type",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Target User",
+          "defaultLabel": "Target User",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": false,
+          "order": 5,
+          "label": "Organization",
+          "defaultLabel": "Organization",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Section / Operation",
+          "defaultLabel": "Section / Operation",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Usage",
+          "defaultLabel": "Usage",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Source",
+          "defaultLabel": "Source",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": false,
+          "order": 9,
+          "label": "Creator",
+          "defaultLabel": "Creator",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "ActionState_Logs",
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "Track ID",
+          "defaultLabel": "Track ID",
+          "width": ""
+        },
+        {
+          "key": "userId",
+          "visible": true,
+          "order": 2,
+          "label": "User",
+          "defaultLabel": "User",
+          "width": ""
+        },
+        {
+          "key": "sectionId",
+          "visible": true,
+          "order": 3,
+          "label": "Context",
+          "defaultLabel": "Context",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Origin",
+          "defaultLabel": "Origin",
+          "width": ""
+        },
+        {
+          "key": "targetKey",
+          "visible": true,
+          "order": 5,
+          "label": "Target",
+          "defaultLabel": "Target",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "attemptCount",
+          "visible": true,
+          "order": 7,
+          "label": "Count",
+          "defaultLabel": "Count",
+          "width": ""
+        },
+        {
+          "key": "volumeUsageKB",
+          "visible": true,
+          "order": 8,
+          "label": "Data",
+          "defaultLabel": "Data",
+          "width": ""
+        },
+        {
+          "key": "startedAt",
+          "visible": true,
+          "order": 9,
+          "label": "Started",
+          "defaultLabel": "Started",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "userId": "ROOT_001",
+    "tableId": "Activity_Quota_Rules",
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Rule",
+          "defaultLabel": "Rule",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": false,
+          "order": 2,
+          "label": "Organization",
+          "defaultLabel": "Organization",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Matcher",
+          "defaultLabel": "Matcher",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": false,
+          "order": 4,
+          "label": "Audience",
+          "defaultLabel": "Audience",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Timing / Validity",
+          "defaultLabel": "Timing / Validity",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Formula",
+          "defaultLabel": "Formula",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Creator",
+          "defaultLabel": "Creator",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Action",
+          "defaultLabel": "Action",
+          "width": ""
+        }
+      ]
+    },
+    "auditUser": "ROOT_001"
+  },
+  {
+    "id": "113002",
+    "createDateTime": "2025-11-21T00:49:51.019Z",
+    "createUser": 1,
+    "lastUpdateDateTime": "2025-11-21T00:49:51.019Z",
+    "lastUpdateUser": 1,
+    "settings": {
+      "columns": [
+        {
+          "key": "tableId",
+          "visible": true,
+          "order": 1,
+          "label": "Table ID",
+          "defaultLabel": "Table ID",
+          "width": ""
+        },
+        {
+          "key": "userId",
+          "visible": true,
+          "order": 2,
+          "label": "User ID",
+          "defaultLabel": "User ID",
+          "width": ""
+        },
+        {
+          "key": "createUserId",
+          "visible": false,
+          "order": 3,
+          "label": "Creator",
+          "defaultLabel": "Creator",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 4,
+          "label": "Creation",
+          "defaultLabel": "Creation",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateUserId",
+          "visible": true,
+          "order": 5,
+          "label": "Last Updated By",
+          "defaultLabel": "Last Updated By",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 6,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Table_Settings_Management",
+    "userId": "1"
+  },
+  {
+    "id": "121462",
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-19T18:24:24.532Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-19T18:24:24.532Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "personId",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "fullName",
+          "visible": true,
+          "order": 2,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "preferredName",
+          "visible": false,
+          "order": 3,
+          "label": "Preferred Name",
+          "defaultLabel": "Preferred Name",
+          "width": ""
+        },
+        {
+          "key": "primaryEmail",
+          "visible": true,
+          "order": 4,
+          "label": "Email",
+          "defaultLabel": "Email",
+          "width": ""
+        },
+        {
+          "key": "primaryPhone",
+          "visible": true,
+          "order": 5,
+          "label": "Phone",
+          "defaultLabel": "Phone",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 6,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "organizations",
+          "visible": false,
+          "order": 7,
+          "label": "Organizations",
+          "defaultLabel": "Organizations",
+          "width": ""
+        },
+        {
+          "key": "userId",
+          "visible": true,
+          "order": 8,
+          "label": "User",
+          "defaultLabel": "User",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": true,
+          "order": 9,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 10,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": true,
+          "order": 11,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Persons_Management",
+    "userId": "816147"
+  },
+  {
+    "id": "122120",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-01-24T04:00:40.215Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-01-24T04:01:20.772Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "name",
+          "visible": true,
+          "order": 1,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "description",
+          "visible": false,
+          "order": 2,
+          "label": "Description",
+          "defaultLabel": "Description",
+          "width": ""
+        },
+        {
+          "key": "homeURL",
+          "visible": false,
+          "order": 3,
+          "label": "Home URL",
+          "defaultLabel": "Home URL",
+          "width": ""
+        },
+        {
+          "key": "message",
+          "visible": false,
+          "order": 4,
+          "label": "Dashboard Message",
+          "defaultLabel": "Dashboard Message",
+          "width": ""
+        },
+        {
+          "key": "dashboardDisplay",
+          "visible": false,
+          "order": 5,
+          "label": "Show in Dashboard",
+          "defaultLabel": "Show in Dashboard",
+          "width": ""
+        },
+        {
+          "key": "subsections",
+          "visible": false,
+          "order": 6,
+          "label": "Subsections",
+          "defaultLabel": "Subsections",
+          "width": ""
+        },
+        {
+          "key": "related",
+          "visible": false,
+          "order": 7,
+          "label": "Related Sections",
+          "defaultLabel": "Related Sections",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 8,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "minimumAccessRequirement",
+          "visible": true,
+          "order": 9,
+          "label": "Access Level",
+          "defaultLabel": "Access Level",
+          "width": ""
+        },
+        {
+          "key": "operations",
+          "visible": true,
+          "order": 10,
+          "label": "Operations",
+          "defaultLabel": "Operations",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 11,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": false,
+          "order": 12,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_12",
+          "visible": true,
+          "order": 13,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Section_Management",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "125899",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-23T05:28:32.487Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:28:46.317Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "frameworkId",
+          "visible": false,
+          "order": 3,
+          "label": "Framework",
+          "defaultLabel": "Framework",
+          "width": ""
+        },
+        {
+          "key": "skillId",
+          "visible": true,
+          "order": 4,
+          "label": "Skill",
+          "defaultLabel": "Skill",
+          "width": ""
+        },
+        {
+          "key": "stageId",
+          "visible": true,
+          "order": 5,
+          "label": "Stage",
+          "defaultLabel": "Stage",
+          "width": ""
+        },
+        {
+          "key": "benchmarkNumber",
+          "visible": true,
+          "order": 6,
+          "label": "Benchmark Level",
+          "defaultLabel": "Benchmark Level",
+          "width": ""
+        },
+        {
+          "key": "profileOfAbilityId",
+          "visible": true,
+          "order": 7,
+          "label": "Profile Ref",
+          "defaultLabel": "Profile Ref",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 8,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": true,
+          "order": 9,
+          "label": "Review State",
+          "defaultLabel": "Review State",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": true,
+          "order": 11,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_clbBenchmarks",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "153533",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-12T03:04:21.700Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-12T03:04:21.700Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 2,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "name",
+          "visible": true,
+          "order": 3,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "email",
+          "visible": true,
+          "order": 4,
+          "label": "Email",
+          "defaultLabel": "Email",
+          "width": ""
+        },
+        {
+          "key": "subject",
+          "visible": true,
+          "order": 5,
+          "label": "Subject",
+          "defaultLabel": "Subject",
+          "width": ""
+        },
+        {
+          "key": "type",
+          "visible": true,
+          "order": 6,
+          "label": "Type",
+          "defaultLabel": "Type",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": true,
+          "order": 7,
+          "label": "Received",
+          "defaultLabel": "Received",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Attachments",
+          "defaultLabel": "Attachments",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Contact_Messages",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "193633",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-02T05:43:47.321Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-02T05:43:47.321Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Registration",
+          "defaultLabel": "Registration",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Student",
+          "defaultLabel": "Student",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Program",
+          "defaultLabel": "Program",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Verification",
+          "defaultLabel": "Verification",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Finance",
+          "defaultLabel": "Finance",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Academic",
+          "defaultLabel": "Academic",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Note",
+          "defaultLabel": "Note",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Program_Registrations",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "234621",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-16T21:02:15.996Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-16T21:02:15.996Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "question_key",
+          "visible": true,
+          "order": 1,
+          "label": "Key",
+          "defaultLabel": "Key",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Group/Title",
+          "defaultLabel": "Group/Title",
+          "width": ""
+        },
+        {
+          "key": "band",
+          "visible": true,
+          "order": 3,
+          "label": "Band",
+          "defaultLabel": "Band",
+          "width": ""
+        },
+        {
+          "key": "criterion",
+          "visible": true,
+          "order": 4,
+          "label": "Crit",
+          "defaultLabel": "Crit",
+          "width": ""
+        },
+        {
+          "key": "prompt_group",
+          "visible": true,
+          "order": 5,
+          "label": "Route",
+          "defaultLabel": "Route",
+          "width": ""
+        },
+        {
+          "key": "signal_kind",
+          "visible": true,
+          "order": 6,
+          "label": "Signals",
+          "defaultLabel": "Signals",
+          "width": ""
+        },
+        {
+          "key": "atomic_question",
+          "visible": false,
+          "order": 7,
+          "label": "Question Text",
+          "defaultLabel": "Question Text",
+          "width": ""
+        },
+        {
+          "key": "updatedAt",
+          "visible": true,
+          "order": 8,
+          "label": "Updated",
+          "defaultLabel": "Updated",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Assessment Modules",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "247014",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-23T05:25:31.850Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:25:31.850Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "label",
+          "visible": true,
+          "order": 2,
+          "label": "Label",
+          "defaultLabel": "Label",
+          "width": ""
+        },
+        {
+          "key": "code",
+          "visible": true,
+          "order": 3,
+          "label": "Code",
+          "defaultLabel": "Code",
+          "width": ""
+        },
+        {
+          "key": "frameworkId",
+          "visible": true,
+          "order": 4,
+          "label": "Framework",
+          "defaultLabel": "Framework",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Range",
+          "defaultLabel": "Range",
+          "width": ""
+        },
+        {
+          "key": "displayOrder",
+          "visible": true,
+          "order": 6,
+          "label": "Order",
+          "defaultLabel": "Order",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 7,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": true,
+          "order": 8,
+          "label": "Review",
+          "defaultLabel": "Review",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_CLB_Stages",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "257088",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-23T03:48:27.264Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:34:22.152Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "frameworkId",
+          "visible": false,
+          "order": 3,
+          "label": "Framework",
+          "defaultLabel": "Framework",
+          "width": ""
+        },
+        {
+          "key": "skillId",
+          "visible": false,
+          "order": 4,
+          "label": "Skill",
+          "defaultLabel": "Skill",
+          "width": ""
+        },
+        {
+          "key": "benchmarkId",
+          "visible": true,
+          "order": 5,
+          "label": "Benchmark",
+          "defaultLabel": "Benchmark",
+          "width": ""
+        },
+        {
+          "key": "competencyId",
+          "visible": true,
+          "order": 6,
+          "label": "Competency",
+          "defaultLabel": "Competency",
+          "width": ""
+        },
+        {
+          "key": "indicatorCategory",
+          "visible": true,
+          "order": 7,
+          "label": "Category",
+          "defaultLabel": "Category",
+          "width": ""
+        },
+        {
+          "key": "evidenceType",
+          "visible": false,
+          "order": 8,
+          "label": "Evidence",
+          "defaultLabel": "Evidence",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 9,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": false,
+          "order": 10,
+          "label": "Review State",
+          "defaultLabel": "Review State",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": false,
+          "order": 11,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_11",
+          "visible": true,
+          "order": 12,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_clbIndicators",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "260150",
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-19T18:23:21.976Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-19T18:23:36.546Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "email",
+          "visible": true,
+          "order": 1,
+          "label": "Email",
+          "defaultLabel": "Email",
+          "width": ""
+        },
+        {
+          "key": "personId",
+          "visible": true,
+          "order": 2,
+          "label": "Person",
+          "defaultLabel": "Person",
+          "width": ""
+        },
+        {
+          "key": "accessLevel",
+          "visible": false,
+          "order": 3,
+          "label": "Access Level",
+          "defaultLabel": "Access Level",
+          "width": ""
+        },
+        {
+          "key": "primaryOrgId",
+          "visible": true,
+          "order": 4,
+          "label": "Active Org",
+          "defaultLabel": "Active Org",
+          "width": ""
+        },
+        {
+          "key": "organizations",
+          "visible": false,
+          "order": 5,
+          "label": "Organizations",
+          "defaultLabel": "Organizations",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 7,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "isEmailVerified",
+          "visible": false,
+          "order": 8,
+          "label": "Email Verified",
+          "defaultLabel": "Email Verified",
+          "width": ""
+        },
+        {
+          "key": "lastLoginAt",
+          "visible": true,
+          "order": 9,
+          "label": "Last Login",
+          "defaultLabel": "Last Login",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": true,
+          "order": 10,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 11,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_11",
+          "visible": true,
+          "order": 12,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Users_Management",
+    "userId": "816147"
+  },
+  {
+    "id": "269623",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-24T16:49:27.369Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-25T15:29:48.937Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "name",
+          "visible": true,
+          "order": 1,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "category",
+          "visible": true,
+          "order": 2,
+          "label": "Category",
+          "defaultLabel": "Category",
+          "width": ""
+        },
+        {
+          "key": "description",
+          "visible": false,
+          "order": 3,
+          "label": "Description",
+          "defaultLabel": "Description",
+          "width": ""
+        },
+        {
+          "key": "homeURL",
+          "visible": false,
+          "order": 4,
+          "label": "Home URL",
+          "defaultLabel": "Home URL",
+          "width": ""
+        },
+        {
+          "key": "message",
+          "visible": false,
+          "order": 5,
+          "label": "Dashboard Message",
+          "defaultLabel": "Dashboard Message",
+          "width": ""
+        },
+        {
+          "key": "mainDashboardDisplay",
+          "visible": true,
+          "order": 6,
+          "label": "Main dashboard",
+          "defaultLabel": "Main dashboard",
+          "width": ""
+        },
+        {
+          "key": "dashboardDisplay",
+          "visible": true,
+          "order": 7,
+          "label": "Show in Dashboard",
+          "defaultLabel": "Show in Dashboard",
+          "width": ""
+        },
+        {
+          "key": "subsections",
+          "visible": false,
+          "order": 8,
+          "label": "Subsections",
+          "defaultLabel": "Subsections",
+          "width": ""
+        },
+        {
+          "key": "related",
+          "visible": false,
+          "order": 9,
+          "label": "Related Sections",
+          "defaultLabel": "Related Sections",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 10,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "minimumAccessRequirement",
+          "visible": false,
+          "order": 11,
+          "label": "Access Level",
+          "defaultLabel": "Access Level",
+          "width": ""
+        },
+        {
+          "key": "operations",
+          "visible": false,
+          "order": 12,
+          "label": "Operations",
+          "defaultLabel": "Operations",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 13,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": false,
+          "order": 14,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_14",
+          "visible": true,
+          "order": 15,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Section_Management",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "296178",
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-19T20:15:20.492Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-22T05:29:17.818Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "Track ID",
+          "defaultLabel": "Track ID",
+          "width": ""
+        },
+        {
+          "key": "userId",
+          "visible": true,
+          "order": 2,
+          "label": "User",
+          "defaultLabel": "User",
+          "width": ""
+        },
+        {
+          "key": "sectionId",
+          "visible": true,
+          "order": 3,
+          "label": "Context",
+          "defaultLabel": "Context",
+          "width": ""
+        },
+        {
+          "key": "targetKey",
+          "visible": true,
+          "order": 4,
+          "label": "Target",
+          "defaultLabel": "Target",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 5,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "attemptCount",
+          "visible": true,
+          "order": 6,
+          "label": "Count",
+          "defaultLabel": "Count",
+          "width": ""
+        },
+        {
+          "key": "volumeUsageKB",
+          "visible": true,
+          "order": 7,
+          "label": "Data",
+          "defaultLabel": "Data",
+          "width": ""
+        },
+        {
+          "key": "startedAt",
+          "visible": true,
+          "order": 8,
+          "label": "Started",
+          "defaultLabel": "Started",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "ActionState_Logs",
+    "userId": "816147"
+  },
+  {
+    "id": "313952",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-23T05:34:35.045Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:34:44.486Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "frameworkId",
+          "visible": true,
+          "order": 3,
+          "label": "Framework",
+          "defaultLabel": "Framework",
+          "width": ""
+        },
+        {
+          "key": "skillId",
+          "visible": true,
+          "order": 4,
+          "label": "Skill",
+          "defaultLabel": "Skill",
+          "width": ""
+        },
+        {
+          "key": "benchmarkId",
+          "visible": true,
+          "order": 5,
+          "label": "Benchmark",
+          "defaultLabel": "Benchmark",
+          "width": ""
+        },
+        {
+          "key": "descriptorDimensions",
+          "visible": false,
+          "order": 6,
+          "label": "Descriptor Dimensions",
+          "defaultLabel": "Descriptor Dimensions",
+          "width": ""
+        },
+        {
+          "key": "featureIds",
+          "visible": true,
+          "order": 7,
+          "label": "Feature Count",
+          "defaultLabel": "Feature Count",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 8,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": true,
+          "order": 9,
+          "label": "Review State",
+          "defaultLabel": "Review State",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": true,
+          "order": 11,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_clbProfileOfAbility",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "338498",
+    "audit": {
+      "createUser": "125901",
+      "createDateTime": "2026-01-23T21:42:04.883Z",
+      "lastUpdateUser": "125901",
+      "lastUpdateDateTime": "2026-01-30T03:59:17.576Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "name",
+          "visible": true,
+          "order": 1,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "description",
+          "visible": false,
+          "order": 2,
+          "label": "Description",
+          "defaultLabel": "Description",
+          "width": ""
+        },
+        {
+          "key": "homeURL",
+          "visible": false,
+          "order": 3,
+          "label": "Home URL",
+          "defaultLabel": "Home URL",
+          "width": ""
+        },
+        {
+          "key": "message",
+          "visible": false,
+          "order": 4,
+          "label": "Dashboard Message",
+          "defaultLabel": "Dashboard Message",
+          "width": ""
+        },
+        {
+          "key": "dashboardDisplay",
+          "visible": true,
+          "order": 5,
+          "label": "Show in Dashboard",
+          "defaultLabel": "Show in Dashboard",
+          "width": ""
+        },
+        {
+          "key": "subsections",
+          "visible": false,
+          "order": 6,
+          "label": "Subsections",
+          "defaultLabel": "Subsections",
+          "width": ""
+        },
+        {
+          "key": "related",
+          "visible": false,
+          "order": 7,
+          "label": "Related Sections",
+          "defaultLabel": "Related Sections",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 8,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "minimumAccessRequirement",
+          "visible": true,
+          "order": 9,
+          "label": "Access Level",
+          "defaultLabel": "Access Level",
+          "width": ""
+        },
+        {
+          "key": "operations",
+          "visible": false,
+          "order": 10,
+          "label": "Operations",
+          "defaultLabel": "Operations",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": true,
+          "order": 11,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 12,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_12",
+          "visible": true,
+          "order": 13,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Section_Management",
+    "userId": "125901"
+  },
+  {
+    "id": "355446",
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-22T02:24:01.350Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-22T02:24:01.350Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "name",
+          "visible": true,
+          "order": 1,
+          "label": "File Name",
+          "defaultLabel": "File Name",
+          "width": ""
+        },
+        {
+          "key": "extension",
+          "visible": true,
+          "order": 2,
+          "label": "Type",
+          "defaultLabel": "Type",
+          "width": ""
+        },
+        {
+          "key": "size",
+          "visible": true,
+          "order": 3,
+          "label": "Size",
+          "defaultLabel": "Size",
+          "width": ""
+        },
+        {
+          "key": "modified",
+          "visible": true,
+          "order": 4,
+          "label": "Last Modified",
+          "defaultLabel": "Last Modified",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "File_Manager",
+    "userId": "816147"
+  },
+  {
+    "id": "388682",
+    "createDateTime": "2025-11-24T03:38:35.155Z",
+    "createUser": 1,
+    "lastUpdateDateTime": "2025-11-24T03:39:56.664Z",
+    "lastUpdateUser": 1,
+    "settings": {
+      "columns": [
+        {
+          "key": "displayName",
+          "visible": true,
+          "order": 1,
+          "label": "Display Name",
+          "defaultLabel": "Display Name",
+          "width": ""
+        },
+        {
+          "key": "legalName",
+          "visible": true,
+          "order": 2,
+          "label": "Legal Name",
+          "defaultLabel": "Legal Name",
+          "width": ""
+        },
+        {
+          "key": "type",
+          "visible": true,
+          "order": 3,
+          "label": "Type",
+          "defaultLabel": "Type",
+          "width": ""
+        },
+        {
+          "key": "registrationNo",
+          "visible": false,
+          "order": 4,
+          "label": "Reg. No",
+          "defaultLabel": "Reg. No",
+          "width": ""
+        },
+        {
+          "key": "contactEmail",
+          "visible": true,
+          "order": 5,
+          "label": "Email",
+          "defaultLabel": "Email",
+          "width": ""
+        },
+        {
+          "key": "phone",
+          "visible": true,
+          "order": 6,
+          "label": "Phone",
+          "defaultLabel": "Phone",
+          "width": ""
+        },
+        {
+          "key": "city",
+          "visible": false,
+          "order": 7,
+          "label": "City",
+          "defaultLabel": "City",
+          "width": ""
+        },
+        {
+          "key": "country",
+          "visible": false,
+          "order": 8,
+          "label": "Country",
+          "defaultLabel": "Country",
+          "width": ""
+        },
+        {
+          "key": "primaryDomain",
+          "visible": false,
+          "order": 9,
+          "label": "Domain",
+          "defaultLabel": "Domain",
+          "width": ""
+        },
+        {
+          "key": "autoJoinEnabled",
+          "visible": false,
+          "order": 10,
+          "label": "Auto-Join",
+          "defaultLabel": "Auto-Join",
+          "width": ""
+        },
+        {
+          "key": "ssoEnabled",
+          "visible": false,
+          "order": 11,
+          "label": "SSO",
+          "defaultLabel": "SSO",
+          "width": ""
+        },
+        {
+          "key": "plan",
+          "visible": false,
+          "order": 12,
+          "label": "Plan",
+          "defaultLabel": "Plan",
+          "width": ""
+        },
+        {
+          "key": "billingStatus",
+          "visible": true,
+          "order": 13,
+          "label": "Billing Status",
+          "defaultLabel": "Billing Status",
+          "width": ""
+        },
+        {
+          "key": "seatsLimit",
+          "visible": true,
+          "order": 14,
+          "label": "Seats",
+          "defaultLabel": "Seats",
+          "width": ""
+        },
+        {
+          "key": "contractsCount",
+          "visible": false,
+          "order": 15,
+          "label": "Contracts",
+          "defaultLabel": "Contracts",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 16,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 17,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": false,
+          "order": 18,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_18",
+          "visible": true,
+          "order": 19,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Organizations_Management",
+    "userId": "1"
+  },
+  {
+    "id": "392634",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-01T07:58:44.058Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-02-01T07:58:44.058Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "name",
+          "visible": true,
+          "order": 2,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "orgId",
+          "visible": true,
+          "order": 3,
+          "label": "Scope",
+          "defaultLabel": "Scope",
+          "width": ""
+        },
+        {
+          "key": "type",
+          "visible": true,
+          "order": 4,
+          "label": "Type",
+          "defaultLabel": "Type",
+          "width": ""
+        },
+        {
+          "key": "tags",
+          "visible": true,
+          "order": 5,
+          "label": "Tags",
+          "defaultLabel": "Tags",
+          "width": ""
+        },
+        {
+          "key": "value",
+          "visible": true,
+          "order": 6,
+          "label": "Value / Source",
+          "defaultLabel": "Value / Source",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": false,
+          "order": 7,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Symbol_Management",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "437055",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-01-14T16:24:34.325Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-01-14T16:24:34.325Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "personId",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "fullName",
+          "visible": true,
+          "order": 2,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "preferredName",
+          "visible": false,
+          "order": 3,
+          "label": "Preferred Name",
+          "defaultLabel": "Preferred Name",
+          "width": ""
+        },
+        {
+          "key": "primaryEmail",
+          "visible": true,
+          "order": 4,
+          "label": "Email",
+          "defaultLabel": "Email",
+          "width": ""
+        },
+        {
+          "key": "primaryPhone",
+          "visible": false,
+          "order": 5,
+          "label": "Phone",
+          "defaultLabel": "Phone",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 6,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "organizations",
+          "visible": true,
+          "order": 7,
+          "label": "Organizations",
+          "defaultLabel": "Organizations",
+          "width": ""
+        },
+        {
+          "key": "userId",
+          "visible": true,
+          "order": 8,
+          "label": "User",
+          "defaultLabel": "User",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 9,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 10,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": true,
+          "order": 11,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Persons_Management",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "489335",
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-22T02:32:03.321Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-22T02:32:03.321Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "timestamp",
+          "visible": true,
+          "order": 1,
+          "label": "Time",
+          "defaultLabel": "Time",
+          "width": ""
+        },
+        {
+          "key": "level",
+          "visible": true,
+          "order": 2,
+          "label": "Level",
+          "defaultLabel": "Level",
+          "width": ""
+        },
+        {
+          "key": "section",
+          "visible": true,
+          "order": 3,
+          "label": "Section",
+          "defaultLabel": "Section",
+          "width": ""
+        },
+        {
+          "key": "operation",
+          "visible": true,
+          "order": 4,
+          "label": "Operation",
+          "defaultLabel": "Operation",
+          "width": ""
+        },
+        {
+          "key": "user",
+          "visible": true,
+          "order": 5,
+          "label": "User",
+          "defaultLabel": "User",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "details",
+          "visible": true,
+          "order": 7,
+          "label": "Details",
+          "defaultLabel": "Details",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Activity_Logs",
+    "userId": "816147"
+  },
+  {
+    "id": "504846",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-07T02:49:10.712Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-02-07T02:49:10.712Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "Track ID",
+          "defaultLabel": "Track ID",
+          "width": ""
+        },
+        {
+          "key": "userId",
+          "visible": true,
+          "order": 2,
+          "label": "User",
+          "defaultLabel": "User",
+          "width": ""
+        },
+        {
+          "key": "sectionId",
+          "visible": true,
+          "order": 3,
+          "label": "Context",
+          "defaultLabel": "Context",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Origin",
+          "defaultLabel": "Origin",
+          "width": ""
+        },
+        {
+          "key": "targetKey",
+          "visible": true,
+          "order": 5,
+          "label": "Target",
+          "defaultLabel": "Target",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "attemptCount",
+          "visible": true,
+          "order": 7,
+          "label": "Count",
+          "defaultLabel": "Count",
+          "width": ""
+        },
+        {
+          "key": "volumeUsageKB",
+          "visible": true,
+          "order": 8,
+          "label": "Data",
+          "defaultLabel": "Data",
+          "width": ""
+        },
+        {
+          "key": "startedAt",
+          "visible": true,
+          "order": 9,
+          "label": "Started",
+          "defaultLabel": "Started",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "ActionState_Logs",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "509552",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-13T06:13:16.238Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-13T06:14:03.210Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "name",
+          "visible": true,
+          "order": 2,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "level",
+          "visible": true,
+          "order": 3,
+          "label": "Level",
+          "defaultLabel": "Level",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Mode",
+          "defaultLabel": "Mode",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Runtime Summary",
+          "defaultLabel": "Runtime Summary",
+          "width": ""
+        },
+        {
+          "key": "description",
+          "visible": false,
+          "order": 6,
+          "label": "Description",
+          "defaultLabel": "Description",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 7,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 8,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 9,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Scopes_Management",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "514181",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-23T05:36:14.115Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:36:36.629Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "frameworkId",
+          "visible": false,
+          "order": 3,
+          "label": "Framework",
+          "defaultLabel": "Framework",
+          "width": ""
+        },
+        {
+          "key": "skillId",
+          "visible": true,
+          "order": 4,
+          "label": "Skill",
+          "defaultLabel": "Skill",
+          "width": ""
+        },
+        {
+          "key": "linkedBenchmarkId",
+          "visible": false,
+          "order": 5,
+          "label": "Linked Benchmark",
+          "defaultLabel": "Linked Benchmark",
+          "width": ""
+        },
+        {
+          "key": "linkedCompetencyId",
+          "visible": false,
+          "order": 6,
+          "label": "Linked Competency",
+          "defaultLabel": "Linked Competency",
+          "width": ""
+        },
+        {
+          "key": "contextDomain",
+          "visible": true,
+          "order": 7,
+          "label": "Context",
+          "defaultLabel": "Context",
+          "width": ""
+        },
+        {
+          "key": "taskType",
+          "visible": true,
+          "order": 8,
+          "label": "Task Type",
+          "defaultLabel": "Task Type",
+          "width": ""
+        },
+        {
+          "key": "officialSample",
+          "visible": true,
+          "order": 9,
+          "label": "Official",
+          "defaultLabel": "Official",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 10,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": false,
+          "order": 11,
+          "label": "Review State",
+          "defaultLabel": "Review State",
+          "width": ""
+        },
+        {
+          "key": "col_11",
+          "visible": true,
+          "order": 12,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_12",
+          "visible": true,
+          "order": 13,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_clbSampleTaskLabels",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "550913",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-12T22:21:24.875Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-12T22:21:24.875Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Code / Name",
+          "defaultLabel": "Code / Name",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Type",
+          "defaultLabel": "Type",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Level",
+          "defaultLabel": "Level",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Parent",
+          "defaultLabel": "Parent",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": false,
+          "order": 5,
+          "label": "Role",
+          "defaultLabel": "Role",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Head For",
+          "defaultLabel": "Head For",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Postable",
+          "defaultLabel": "Postable",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "School_Accounts",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "558703",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-26T23:40:45.181Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-02-26T23:40:45.181Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Teacher",
+          "defaultLabel": "Teacher",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Contact",
+          "defaultLabel": "Contact",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Department",
+          "defaultLabel": "Department",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Employment",
+          "defaultLabel": "Employment",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Teachers_Directory",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "576979",
+    "createDateTime": "2025-11-21T00:41:33.656Z",
+    "createUser": 1,
+    "lastUpdateDateTime": "2025-11-21T00:43:21.548Z",
+    "lastUpdateUser": 1,
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "name",
+          "visible": true,
+          "order": 2,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 3,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Operations_Management",
+    "userId": "1"
+  },
+  {
+    "id": "596046",
+    "audit": {
+      "createUser": "646044",
+      "createDateTime": "2026-02-10T06:45:48.545Z",
+      "lastUpdateUser": "646044",
+      "lastUpdateDateTime": "2026-02-10T06:45:48.545Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "email",
+          "visible": true,
+          "order": 1,
+          "label": "Email",
+          "defaultLabel": "Email",
+          "width": ""
+        },
+        {
+          "key": "personId",
+          "visible": true,
+          "order": 2,
+          "label": "Person",
+          "defaultLabel": "Person",
+          "width": ""
+        },
+        {
+          "key": "accessLevel",
+          "visible": true,
+          "order": 3,
+          "label": "Access Level",
+          "defaultLabel": "Access Level",
+          "width": ""
+        },
+        {
+          "key": "primaryOrgId",
+          "visible": true,
+          "order": 4,
+          "label": "Active Org",
+          "defaultLabel": "Active Org",
+          "width": ""
+        },
+        {
+          "key": "organizations",
+          "visible": true,
+          "order": 5,
+          "label": "Organizations",
+          "defaultLabel": "Organizations",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 7,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "isEmailVerified",
+          "visible": false,
+          "order": 8,
+          "label": "Email Verified",
+          "defaultLabel": "Email Verified",
+          "width": ""
+        },
+        {
+          "key": "lastLoginAt",
+          "visible": true,
+          "order": 9,
+          "label": "Last Login",
+          "defaultLabel": "Last Login",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 10,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": false,
+          "order": 11,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_11",
+          "visible": true,
+          "order": 12,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Users_Management",
+    "userId": "646044"
+  },
+  {
+    "id": "644306",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-01-20T05:27:49.314Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-01-20T05:27:49.314Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "policyName",
+          "visible": true,
+          "order": 2,
+          "label": "Policy Name",
+          "defaultLabel": "Policy Name",
+          "width": ""
+        },
+        {
+          "key": "userName",
+          "visible": true,
+          "order": 3,
+          "label": "Assigned User",
+          "defaultLabel": "Assigned User",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 4,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "validity",
+          "visible": true,
+          "order": 5,
+          "label": "Validity Period",
+          "defaultLabel": "Validity Period",
+          "width": ""
+        },
+        {
+          "key": "sections",
+          "visible": true,
+          "order": 6,
+          "label": "Sections Configured",
+          "defaultLabel": "Sections Configured",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 7,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Access_Policy_Management",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "645069",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-01-20T00:35:01.863Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-01-20T00:35:01.863Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "policyName",
+          "visible": true,
+          "order": 2,
+          "label": "Policy Name",
+          "defaultLabel": "Policy Name",
+          "width": ""
+        },
+        {
+          "key": "orgName",
+          "visible": true,
+          "order": 3,
+          "label": "Organization",
+          "defaultLabel": "Organization",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 4,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "bannedUsers",
+          "visible": true,
+          "order": 5,
+          "label": "Banned Users",
+          "defaultLabel": "Banned Users",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 6,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Org_Policy_Management",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "645473",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-21T07:35:34.040Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-02-21T07:35:34.040Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Title / ID",
+          "defaultLabel": "Title / ID",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Organization",
+          "defaultLabel": "Organization",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Schedule",
+          "defaultLabel": "Schedule",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Curriculum",
+          "defaultLabel": "Curriculum",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Classes_List",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "657786",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-09T20:59:09.261Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-02-09T20:59:09.261Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "type",
+          "visible": true,
+          "order": 1,
+          "label": "Type",
+          "defaultLabel": "Type",
+          "width": ""
+        },
+        {
+          "key": "refName",
+          "visible": true,
+          "order": 2,
+          "label": "Reference Name",
+          "defaultLabel": "Reference Name",
+          "width": ""
+        },
+        {
+          "key": "refAddress",
+          "visible": true,
+          "order": 3,
+          "label": "Source / Address",
+          "defaultLabel": "Source / Address",
+          "width": ""
+        },
+        {
+          "key": "question",
+          "visible": true,
+          "order": 4,
+          "label": "Question",
+          "defaultLabel": "Question",
+          "width": ""
+        },
+        {
+          "key": "bandScore",
+          "visible": true,
+          "order": 5,
+          "label": "Band",
+          "defaultLabel": "Band",
+          "width": ""
+        },
+        {
+          "key": "text",
+          "visible": false,
+          "order": 6,
+          "label": "Content Preview",
+          "defaultLabel": "Content Preview",
+          "width": ""
+        },
+        {
+          "key": "attachment",
+          "visible": false,
+          "order": 7,
+          "label": "Attachment",
+          "defaultLabel": "Attachment",
+          "width": ""
+        },
+        {
+          "key": "updatedAt",
+          "visible": false,
+          "order": 8,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Task 2 Samples",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "722018",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-01-21T00:35:57.638Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-01-21T00:35:57.638Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "email",
+          "visible": true,
+          "order": 1,
+          "label": "Email",
+          "defaultLabel": "Email",
+          "width": ""
+        },
+        {
+          "key": "personId",
+          "visible": true,
+          "order": 2,
+          "label": "Person",
+          "defaultLabel": "Person",
+          "width": ""
+        },
+        {
+          "key": "accessLevel",
+          "visible": true,
+          "order": 3,
+          "label": "Access Level",
+          "defaultLabel": "Access Level",
+          "width": ""
+        },
+        {
+          "key": "primaryOrgId",
+          "visible": true,
+          "order": 4,
+          "label": "Active Org",
+          "defaultLabel": "Active Org",
+          "width": ""
+        },
+        {
+          "key": "organizations",
+          "visible": true,
+          "order": 5,
+          "label": "Organizations",
+          "defaultLabel": "Organizations",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 7,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "isEmailVerified",
+          "visible": false,
+          "order": 8,
+          "label": "Email Verified",
+          "defaultLabel": "Email Verified",
+          "width": ""
+        },
+        {
+          "key": "lastLoginAt",
+          "visible": true,
+          "order": 9,
+          "label": "Last Login",
+          "defaultLabel": "Last Login",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 10,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": false,
+          "order": 11,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_11",
+          "visible": true,
+          "order": 12,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Users_Management",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "727044",
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-20T17:53:19.841Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-20T17:53:19.841Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "policyName",
+          "visible": true,
+          "order": 2,
+          "label": "Policy Name",
+          "defaultLabel": "Policy Name",
+          "width": ""
+        },
+        {
+          "key": "orgName",
+          "visible": true,
+          "order": 3,
+          "label": "Organization",
+          "defaultLabel": "Organization",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 4,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "bannedUsers",
+          "visible": true,
+          "order": 5,
+          "label": "Banned Users",
+          "defaultLabel": "Banned Users",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 6,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Org_Policy_Management",
+    "userId": "816147"
+  },
+  {
+    "id": "781722",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-23T05:26:24.075Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:26:24.075Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "code",
+          "visible": true,
+          "order": 3,
+          "label": "Code",
+          "defaultLabel": "Code",
+          "width": ""
+        },
+        {
+          "key": "modality",
+          "visible": true,
+          "order": 4,
+          "label": "Modality",
+          "defaultLabel": "Modality",
+          "width": ""
+        },
+        {
+          "key": "frameworkId",
+          "visible": true,
+          "order": 5,
+          "label": "Framework",
+          "defaultLabel": "Framework",
+          "width": ""
+        },
+        {
+          "key": "benchmarkCount",
+          "visible": true,
+          "order": 6,
+          "label": "Benchmarks",
+          "defaultLabel": "Benchmarks",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 7,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": true,
+          "order": 8,
+          "label": "Review",
+          "defaultLabel": "Review",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_CLB_Skills",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "785108",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-23T23:25:25.427Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-02-23T23:25:25.427Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Student Info",
+          "defaultLabel": "Student Info",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Contact",
+          "defaultLabel": "Contact",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Fee Category",
+          "defaultLabel": "Fee Category",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Students_Directory",
+    "userId": "SYS_ROOT_001"
+  },
+  {
+    "id": "791871",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-21T07:28:32.304Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:26:34.349Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "frameworkId",
+          "visible": true,
+          "order": 3,
+          "label": "Framework",
+          "defaultLabel": "Framework",
+          "width": ""
+        },
+        {
+          "key": "skillId",
+          "visible": true,
+          "order": 4,
+          "label": "Skill",
+          "defaultLabel": "Skill",
+          "width": ""
+        },
+        {
+          "key": "benchmarkId",
+          "visible": false,
+          "order": 5,
+          "label": "Benchmark",
+          "defaultLabel": "Benchmark",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": true,
+          "order": 7,
+          "label": "Review",
+          "defaultLabel": "Review",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_clbCompetencyAreas",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "803612",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-15T18:35:27.001Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-15T18:35:27.001Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "type",
+          "visible": true,
+          "order": 1,
+          "label": "Type",
+          "defaultLabel": "Type",
+          "width": ""
+        },
+        {
+          "key": "refName",
+          "visible": true,
+          "order": 2,
+          "label": "Reference Name",
+          "defaultLabel": "Reference Name",
+          "width": ""
+        },
+        {
+          "key": "refAddress",
+          "visible": false,
+          "order": 3,
+          "label": "Source / Address",
+          "defaultLabel": "Source / Address",
+          "width": ""
+        },
+        {
+          "key": "question",
+          "visible": false,
+          "order": 4,
+          "label": "Question",
+          "defaultLabel": "Question",
+          "width": ""
+        },
+        {
+          "key": "bandScore",
+          "visible": true,
+          "order": 5,
+          "label": "Band",
+          "defaultLabel": "Band",
+          "width": ""
+        },
+        {
+          "key": "text",
+          "visible": true,
+          "order": 6,
+          "label": "Content Preview",
+          "defaultLabel": "Content Preview",
+          "width": ""
+        },
+        {
+          "key": "attachment",
+          "visible": true,
+          "order": 7,
+          "label": "Attachment",
+          "defaultLabel": "Attachment",
+          "width": ""
+        },
+        {
+          "key": "updatedAt",
+          "visible": true,
+          "order": 8,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Task 2 Samples",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "883480",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-02-28T07:47:34.591Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-02-28T07:48:53.041Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "email",
+          "visible": true,
+          "order": 1,
+          "label": "Email",
+          "defaultLabel": "Email",
+          "width": ""
+        },
+        {
+          "key": "personId",
+          "visible": true,
+          "order": 2,
+          "label": "Person",
+          "defaultLabel": "Person",
+          "width": ""
+        },
+        {
+          "key": "accessLevel",
+          "visible": false,
+          "order": 3,
+          "label": "Access Level",
+          "defaultLabel": "Access Level",
+          "width": ""
+        },
+        {
+          "key": "primaryOrgId",
+          "visible": false,
+          "order": 4,
+          "label": "Active Org",
+          "defaultLabel": "Active Org",
+          "width": ""
+        },
+        {
+          "key": "organizations",
+          "visible": true,
+          "order": 5,
+          "label": "Organizations",
+          "defaultLabel": "Organizations",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": false,
+          "order": 7,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "isEmailVerified",
+          "visible": false,
+          "order": 8,
+          "label": "Email Verified",
+          "defaultLabel": "Email Verified",
+          "width": ""
+        },
+        {
+          "key": "lastLoginAt",
+          "visible": true,
+          "order": 9,
+          "label": "Last Login",
+          "defaultLabel": "Last Login",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 10,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 11,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_11",
+          "visible": true,
+          "order": 12,
+          "label": "Actions",
+          "defaultLabel": "Action",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Users_Management",
+    "userId": "ROOT_001",
+    "auditUser": "ROOT_001"
+  },
+  {
+    "id": "906539",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-21T04:26:29.694Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-21T04:26:29.694Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": true,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "sourceType",
+          "visible": true,
+          "order": 3,
+          "label": "Source Type",
+          "defaultLabel": "Source Type",
+          "width": ""
+        },
+        {
+          "key": "authorityLevel",
+          "visible": true,
+          "order": 4,
+          "label": "Authority",
+          "defaultLabel": "Authority",
+          "width": ""
+        },
+        {
+          "key": "language",
+          "visible": false,
+          "order": 5,
+          "label": "Language",
+          "defaultLabel": "Language",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": false,
+          "order": 7,
+          "label": "Review",
+          "defaultLabel": "Review",
+          "width": ""
+        },
+        {
+          "key": "extractionStatus",
+          "visible": false,
+          "order": 8,
+          "label": "Extraction",
+          "defaultLabel": "Extraction",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_Sources",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "909129",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-21T05:29:08.400Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:25:13.372Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "sourceId",
+          "visible": true,
+          "order": 2,
+          "label": "Source",
+          "defaultLabel": "Source",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 3,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "fragmentType",
+          "visible": false,
+          "order": 4,
+          "label": "Fragment Type",
+          "defaultLabel": "Fragment Type",
+          "width": ""
+        },
+        {
+          "key": "semanticRole",
+          "visible": false,
+          "order": 5,
+          "label": "Semantic Role",
+          "defaultLabel": "Semantic Role",
+          "width": ""
+        },
+        {
+          "key": "language",
+          "visible": false,
+          "order": 6,
+          "label": "Language",
+          "defaultLabel": "Language",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 7,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": false,
+          "order": 8,
+          "label": "Review",
+          "defaultLabel": "Review",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": false,
+          "order": 9,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_Source_Fragments",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "911284",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-23T06:39:26.419Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T06:39:37.422Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Skill",
+          "defaultLabel": "Skill",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": false,
+          "order": 4,
+          "label": "Benchmark",
+          "defaultLabel": "Benchmark",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Task Type",
+          "defaultLabel": "Task Type",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "col_6",
+          "visible": true,
+          "order": 7,
+          "label": "Wizard",
+          "defaultLabel": "Wizard",
+          "width": ""
+        },
+        {
+          "key": "col_7",
+          "visible": true,
+          "order": 8,
+          "label": "Validation",
+          "defaultLabel": "Validation",
+          "width": ""
+        },
+        {
+          "key": "col_8",
+          "visible": true,
+          "order": 9,
+          "label": "Updated",
+          "defaultLabel": "Updated",
+          "width": ""
+        },
+        {
+          "key": "col_9",
+          "visible": true,
+          "order": 10,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_Tasks",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "921209",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-23T05:30:23.754Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:31:01.232Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "frameworkId",
+          "visible": false,
+          "order": 3,
+          "label": "Framework",
+          "defaultLabel": "Framework",
+          "width": ""
+        },
+        {
+          "key": "skillId",
+          "visible": true,
+          "order": 4,
+          "label": "Skill",
+          "defaultLabel": "Skill",
+          "width": ""
+        },
+        {
+          "key": "benchmarkId",
+          "visible": true,
+          "order": 5,
+          "label": "Benchmark",
+          "defaultLabel": "Benchmark",
+          "width": ""
+        },
+        {
+          "key": "competencyAreaId",
+          "visible": true,
+          "order": 6,
+          "label": "Competency Area",
+          "defaultLabel": "Competency Area",
+          "width": ""
+        },
+        {
+          "key": "communicativePurpose",
+          "visible": false,
+          "order": 7,
+          "label": "Purpose",
+          "defaultLabel": "Purpose",
+          "width": ""
+        },
+        {
+          "key": "indicatorIds",
+          "visible": false,
+          "order": 8,
+          "label": "Indicator Count",
+          "defaultLabel": "Indicator Count",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 9,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": false,
+          "order": 10,
+          "label": "Review State",
+          "defaultLabel": "Review State",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": true,
+          "order": 11,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_11",
+          "visible": true,
+          "order": 12,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_clbCompetencies",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "929194",
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-24T07:41:20.059Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-24T08:06:14.663Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "name",
+          "visible": true,
+          "order": 1,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": "100"
+        },
+        {
+          "key": "category",
+          "visible": true,
+          "order": 2,
+          "label": "Category",
+          "defaultLabel": "Category",
+          "width": ""
+        },
+        {
+          "key": "description",
+          "visible": false,
+          "order": 3,
+          "label": "Description",
+          "defaultLabel": "Description",
+          "width": ""
+        },
+        {
+          "key": "homeURL",
+          "visible": false,
+          "order": 4,
+          "label": "Home URL",
+          "defaultLabel": "Home URL",
+          "width": ""
+        },
+        {
+          "key": "message",
+          "visible": false,
+          "order": 5,
+          "label": "Dashboard Message",
+          "defaultLabel": "Dashboard Message",
+          "width": ""
+        },
+        {
+          "key": "dashboardDisplay",
+          "visible": false,
+          "order": 6,
+          "label": "Show in Dashboard",
+          "defaultLabel": "Show in Dashboard",
+          "width": ""
+        },
+        {
+          "key": "subsections",
+          "visible": false,
+          "order": 7,
+          "label": "Subsections",
+          "defaultLabel": "Subsections",
+          "width": ""
+        },
+        {
+          "key": "related",
+          "visible": false,
+          "order": 8,
+          "label": "Related Sections",
+          "defaultLabel": "Related Sections",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 9,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "minimumAccessRequirement",
+          "visible": false,
+          "order": 10,
+          "label": "Access Level",
+          "defaultLabel": "Access Level",
+          "width": ""
+        },
+        {
+          "key": "operations",
+          "visible": false,
+          "order": 11,
+          "label": "Operations",
+          "defaultLabel": "Operations",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 12,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 13,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_13",
+          "visible": true,
+          "order": 14,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": "100"
+        }
+      ]
+    },
+    "tableId": "Section_Management",
+    "userId": "816147"
+  },
+  {
+    "id": "940506",
+    "createDateTime": "2025-11-21T04:12:27.313Z",
+    "createUser": 1,
+    "lastUpdateDateTime": "2025-11-21T04:12:27.313Z",
+    "lastUpdateUser": 1,
+    "settings": {
+      "columns": [
+        {
+          "key": "name",
+          "visible": true,
+          "order": 1,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "description",
+          "visible": false,
+          "order": 2,
+          "label": "Description",
+          "defaultLabel": "Description",
+          "width": ""
+        },
+        {
+          "key": "message",
+          "visible": false,
+          "order": 3,
+          "label": "Dashboard Message",
+          "defaultLabel": "Dashboard Message",
+          "width": ""
+        },
+        {
+          "key": "dashboardDisplay",
+          "visible": true,
+          "order": 4,
+          "label": "Show in Dashboard",
+          "defaultLabel": "Show in Dashboard",
+          "width": ""
+        },
+        {
+          "key": "subsections",
+          "visible": false,
+          "order": 5,
+          "label": "Subsections",
+          "defaultLabel": "Subsections",
+          "width": ""
+        },
+        {
+          "key": "related",
+          "visible": false,
+          "order": 6,
+          "label": "Related Sections",
+          "defaultLabel": "Related Sections",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 7,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "minimumAccessRequirement",
+          "visible": true,
+          "order": 8,
+          "label": "Access Level",
+          "defaultLabel": "Access Level",
+          "width": ""
+        },
+        {
+          "key": "operations",
+          "visible": true,
+          "order": 9,
+          "label": "Operations",
+          "defaultLabel": "Operations",
+          "width": ""
+        },
+        {
+          "key": "createUser",
+          "visible": false,
+          "order": 10,
+          "label": "Creator",
+          "defaultLabel": "Creator",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 11,
+          "label": "Creation",
+          "defaultLabel": "Creation",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateUser",
+          "visible": true,
+          "order": 12,
+          "label": "Last Updated By",
+          "defaultLabel": "Last Updated By",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 13,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_13",
+          "visible": true,
+          "order": 14,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Section_Management",
+    "userId": "1"
+  },
+  {
+    "id": "941022",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-23T05:35:11.500Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-23T05:36:00.850Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "id",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "title",
+          "visible": true,
+          "order": 2,
+          "label": "Title",
+          "defaultLabel": "Title",
+          "width": ""
+        },
+        {
+          "key": "frameworkId",
+          "visible": false,
+          "order": 3,
+          "label": "Framework",
+          "defaultLabel": "Framework",
+          "width": ""
+        },
+        {
+          "key": "skillId",
+          "visible": false,
+          "order": 4,
+          "label": "Skill",
+          "defaultLabel": "Skill",
+          "width": ""
+        },
+        {
+          "key": "benchmarkId",
+          "visible": true,
+          "order": 5,
+          "label": "Benchmark",
+          "defaultLabel": "Benchmark",
+          "width": ""
+        },
+        {
+          "key": "scopeType",
+          "visible": false,
+          "order": 6,
+          "label": "Scope",
+          "defaultLabel": "Scope",
+          "width": ""
+        },
+        {
+          "key": "featureDimension",
+          "visible": true,
+          "order": 7,
+          "label": "Dimension",
+          "defaultLabel": "Dimension",
+          "width": ""
+        },
+        {
+          "key": "complexityLevel",
+          "visible": true,
+          "order": 8,
+          "label": "Complexity",
+          "defaultLabel": "Complexity",
+          "width": ""
+        },
+        {
+          "key": "status",
+          "visible": true,
+          "order": 9,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "reviewStatus",
+          "visible": true,
+          "order": 10,
+          "label": "Review State",
+          "defaultLabel": "Review State",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": true,
+          "order": 11,
+          "label": "Flags",
+          "defaultLabel": "Flags",
+          "width": ""
+        },
+        {
+          "key": "col_11",
+          "visible": true,
+          "order": 12,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "BenchPath_clbFeaturesOfCommunication",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "960114",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-11T20:07:49.358Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-11T20:07:49.358Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "personId",
+          "visible": false,
+          "order": 1,
+          "label": "ID",
+          "defaultLabel": "ID",
+          "width": ""
+        },
+        {
+          "key": "fullName",
+          "visible": true,
+          "order": 2,
+          "label": "Name",
+          "defaultLabel": "Name",
+          "width": ""
+        },
+        {
+          "key": "preferredName",
+          "visible": false,
+          "order": 3,
+          "label": "Preferred Name",
+          "defaultLabel": "Preferred Name",
+          "width": ""
+        },
+        {
+          "key": "primaryEmail",
+          "visible": true,
+          "order": 4,
+          "label": "Email",
+          "defaultLabel": "Email",
+          "width": ""
+        },
+        {
+          "key": "primaryPhone",
+          "visible": true,
+          "order": 5,
+          "label": "Phone",
+          "defaultLabel": "Phone",
+          "width": ""
+        },
+        {
+          "key": "active",
+          "visible": true,
+          "order": 6,
+          "label": "Active",
+          "defaultLabel": "Active",
+          "width": ""
+        },
+        {
+          "key": "organizations",
+          "visible": true,
+          "order": 7,
+          "label": "Organizations",
+          "defaultLabel": "Organizations",
+          "width": ""
+        },
+        {
+          "key": "userId",
+          "visible": false,
+          "order": 8,
+          "label": "User",
+          "defaultLabel": "User",
+          "width": ""
+        },
+        {
+          "key": "createDateTime",
+          "visible": false,
+          "order": 9,
+          "label": "Created",
+          "defaultLabel": "Created",
+          "width": ""
+        },
+        {
+          "key": "lastUpdateDateTime",
+          "visible": true,
+          "order": 10,
+          "label": "Last Updated",
+          "defaultLabel": "Last Updated",
+          "width": ""
+        },
+        {
+          "key": "col_10",
+          "visible": true,
+          "order": 11,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Persons_Management",
+    "userId": "ROOT_001"
+  },
+  {
+    "id": "990095",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-24T17:42:22.440Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-02-24T17:42:22.440Z"
+    },
+    "settings": {
+      "columns": [
+        {
+          "key": "col_0",
+          "visible": true,
+          "order": 1,
+          "label": "Title / Code",
+          "defaultLabel": "Title / Code",
+          "width": ""
+        },
+        {
+          "key": "col_1",
+          "visible": true,
+          "order": 2,
+          "label": "Organization",
+          "defaultLabel": "Organization",
+          "width": ""
+        },
+        {
+          "key": "col_2",
+          "visible": true,
+          "order": 3,
+          "label": "Department",
+          "defaultLabel": "Department",
+          "width": ""
+        },
+        {
+          "key": "col_3",
+          "visible": true,
+          "order": 4,
+          "label": "Config",
+          "defaultLabel": "Config",
+          "width": ""
+        },
+        {
+          "key": "col_4",
+          "visible": true,
+          "order": 5,
+          "label": "Status",
+          "defaultLabel": "Status",
+          "width": ""
+        },
+        {
+          "key": "col_5",
+          "visible": true,
+          "order": 6,
+          "label": "Actions",
+          "defaultLabel": "Actions",
+          "width": ""
+        }
+      ]
+    },
+    "tableId": "Subjects_Management",
+    "userId": "SYS_ROOT_001"
+  }
+]

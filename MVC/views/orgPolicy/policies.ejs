@@ -1,0 +1,74 @@
+<%- include('../partials/tablePages-start', {
+  title, 
+  newUrl, 
+  newLabel, 
+  user, 
+  tableName, 
+  btn_export: true, 
+  print
+}) %>
+  <%- include('../partials/tablePages-search', {
+    placeholder: 'Search policies...',
+    fields: []
+  }) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="policyName">Policy Name<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="orgName">Organization<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="active">Status<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="bannedUsers">Banned Users<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated<span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% (data || []).forEach(p => { %>
+        <tr>
+          <td><%= p.id %></td>
+          <td class="fw-bold text-primary"><%= p.policyName %></td>
+          <td><i class="bi bi-building me-1 text-muted"></i> <%= p.orgName %></td>
+          <td>
+              <% if (p.active) { %><span class="badge bg-success">Active</span>
+              <% } else { %><span class="badge bg-secondary">Inactive</span><% } %>
+          </td>
+          <td>
+             <% if(p.bannedUsers && p.bannedUsers.length > 0) { %>
+                <span class="badge bg-danger"><%= p.bannedUsers.length %> User(s)</span>
+             <% } else { %><span class="text-muted small">None</span><% } %>
+          </td>
+          <td><%= p.audit?.lastUpdateDateTime ? new Date(p.audit.lastUpdateDateTime).toLocaleDateString() : '-' %></td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= p.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= p.id %>">
+                <a href="/organizationPolicies/edit/<%= p.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= p.id %>">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>

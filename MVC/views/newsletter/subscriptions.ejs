@@ -1,0 +1,189 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,                 
+  newLabel,
+  user,
+  tableName,
+  print,
+  btn_export: true,
+  optionalBtns: [
+    `
+      <a href="/newsletter/unsubscribe" class="btn btn-secondary btn-filled btn-md me-2">
+        <i class="bi bi-envelope-slash me-1" aria-hidden="true"></i>
+        Public unsubscribe page
+      </a>
+    `
+  ]
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search newsletter emails...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="email">Email <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="groupId">Group <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="active">Active <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="subscribedAt">Subscribed <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated <span class="sort-icon"></span></th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% (data || []).forEach(s => { %>
+        <% const audit = s.audit || {}; %>
+        <% const status = s.status || 'subscribed'; %>
+
+        <tr data-id="<%= s.id %>">
+          <td class="font-monospace"><%= s.id %></td>
+
+          <td>
+            <div class="fw-bold"><%= s.email || '—' %></div>
+            <% if (s.manageCode) { %>
+              <div class="text-muted small font-monospace">Code: <%= s.manageCode %></div>
+            <% } %>
+          </td>
+
+          <td>
+            <% if (s.groupId && typeof groupMap !== 'undefined' && groupMap[s.groupId]) { %>
+                <span class="badge bg-primary-subtle text-primary border shadow-sm"><%= groupMap[s.groupId] %></span>
+                <div class="text-muted small font-monospace">ID: <%= s.groupId %></div>
+            <% } else if (s.groupId) { %>
+                <span class="badge bg-light text-muted border font-monospace"><%= s.groupId %></span>
+            <% } else { %>
+                <span class="text-muted small">—</span>
+            <% } %>
+          </td>
+
+          <td>
+            <% if (status === 'unsubscribed') { %>
+              <span class="badge bg-secondary-subtle text-secondary border shadow-sm">unsubscribed</span>
+            <% } else { %>
+              <span class="badge bg-success-subtle text-success border shadow-sm">subscribed</span>
+            <% } %>
+          </td>
+
+          <td class="text-center">
+            <% if (s.active) { %>
+              <span class="badge bg-success-subtle text-success border shadow-sm">Active</span>
+            <% } else { %>
+              <span class="badge bg-danger-subtle text-danger border shadow-sm">Inactive</span>
+            <% } %>
+
+            <div class="form-check form-switch mt-2 d-flex justify-content-center">
+              <input
+                class="form-check-input active-toggle"
+                type="checkbox"
+                <%= s.active ? 'checked' : '' %>
+                aria-label="Toggle active"
+              />
+            </div>
+          </td>
+
+          <td>
+            <% if (s.subscribedAt) { %>
+              <%= new Date(s.subscribedAt).toLocaleString() %>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+
+          <td>
+            <% if (audit.lastUpdateDateTime) { %>
+              <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+              <% if (audit.lastUpdateUser) { %>
+                <br><span class="text-muted small">by <%= audit.lastUpdateUser %></span>
+              <% } %>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+
+          <td class="table-actions">
+            <a href="unsubscribe/<%= s.email %>" class="btn btn-sm btn-filled btn-edit">Unsubscribe</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= s.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination,
+  filters,
+  baseUrlPath: 'newsletter/admin'
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const table = document.getElementById('first-table');
+    if (!table) return;
+
+    // Quick activate/deactivate toggle
+    table.querySelectorAll('.active-toggle').forEach((toggle) => {
+        toggle.addEventListener('change', async () => {
+            const row = toggle.closest('tr');
+            const id = row ? row.dataset.id : null;
+            if (!id) return;
+
+            const newValue = !!toggle.checked;
+            toggle.disabled = true;
+            try {
+                const res = await fetch(`/newsletter/admin/update/${id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                    body: JSON.stringify({ active: newValue })
+                });
+                const result = await res.json().catch(() => ({}));
+                if (!res.ok || result.status !== 'success') {
+                    throw new Error(result.message || 'Update failed.');
+                }
+
+                const msg = newValue
+                    ? 'Subscription activated successfully.'
+                    : 'Subscription deactivated successfully.';
+
+                if (typeof window.showMessageModal === 'function') {
+                    await window.showMessageModal({
+                    title: 'Newsletter',
+                    icon: 'success',
+                    message: msg,
+                    buttons: [{ text: 'OK', class: 'btn-success' }]
+                    });
+                } else {
+                    alert(msg);
+                }
+
+                window.location.reload();
+            } catch (err) {
+                toggle.checked = !newValue; 
+
+                const msg = err?.message || 'Update failed.';
+
+                if (typeof window.showMessageModal === 'function') {
+                    await window.showMessageModal({
+                    title: 'Newsletter',
+                    icon: 'error',
+                    message: msg,
+                    buttons: [{ text: 'OK', class: 'btn-danger' }]
+                    });
+                } else {
+                    alert(msg);
+                }
+            } finally {
+                toggle.disabled = false;
+            }
+        });
+    });
+  });
+</script>

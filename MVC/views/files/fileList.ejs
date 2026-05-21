@@ -1,0 +1,1899 @@
+<div class="sections-page">
+  <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+  <%
+    const canUseOrgBackups = Boolean(typeof canManageOrgBackups !== 'undefined' && canManageOrgBackups);
+    const orgBackupRows = Array.isArray(typeof orgBackupOrganizations !== 'undefined' ? orgBackupOrganizations : [])
+      ? orgBackupOrganizations
+      : [];
+    const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg|bmp|ico|tiff?)$/i;
+    const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|webm|flac)$/i;
+    const VIDEO_EXT = /\.(mp4|mov|avi|mkv|webm|m4v)$/i;
+
+    function previewUrlFromPath(filePath) {
+      return '/uploads/' + String(filePath || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
+    }
+
+    function getKindByName(fileName) {
+      const token = String(fileName || '').trim().toLowerCase();
+      if (IMAGE_EXT.test(token)) return 'image';
+      if (AUDIO_EXT.test(token)) return 'audio';
+      if (VIDEO_EXT.test(token)) return 'video';
+      return 'file';
+    }
+
+    function getKindIcon(kind, isDir) {
+      if (isDir) return 'bi-folder-fill text-warning';
+      if (kind === 'image') return 'bi-file-earmark-image text-info';
+      if (kind === 'audio') return 'bi-file-earmark-music text-success';
+      if (kind === 'video') return 'bi-file-earmark-play text-danger';
+      return 'bi-file-earmark text-secondary';
+    }
+  %>
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="page-heading size-md m-0">File Manager</h1>
+
+    <div class="d-flex align-items-center gap-2">
+      <% if (canUseOrgBackups) { %>
+        <button class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#orgBackupModal">
+          <i class="bi bi-shield-check me-1"></i> Org / Global Backup
+        </button>
+      <% } %>
+      <% if (!isRoot) { %>
+        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createFolderModal">
+          <i class="bi bi-folder-plus me-1"></i> Create Folder
+        </button>
+        <button class="btn btn-primary btn-filled btn-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
+          <i class="bi bi-cloud-upload me-1"></i> Upload Here
+        </button>
+      <% } %>
+    </div>
+  </div>
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb bg-light p-2 rounded shadow-sm border">
+      <li class="breadcrumb-item">
+        <a href="/files" class="fw-bold"><i class="bi bi-hdd-network me-1"></i> Root</a>
+      </li>
+      <% if (typeof breadcrumbs !== 'undefined') { %>
+      <% breadcrumbs.forEach((b, idx) => { %>
+      <% if (idx === breadcrumbs.length - 1) { %>
+      <li class="breadcrumb-item active" aria-current="page"><%= b.name %></li>
+      <% } else { %>
+      <li class="breadcrumb-item"><a href="/files?path=<%= b.path %>"><%= b.name %></a></li>
+      <% } %>
+      <% }) %>
+      <% } %>
+    </ol>
+  </nav>
+
+  <div class="alert alert-info py-2 px-3 mb-4 small">
+    <strong>Upload destination:</strong> Files are saved to <code>app.uploadsPath</code> from System Settings.
+    Railway uses volume only when that path points to the mounted volume path. Local development writes to local disk.
+  </div>
+
+  <% if (isRoot) { %>
+  <div class="row g-3">
+    <% drives.forEach(drive => { %>
+    <div class="col-md-4 col-sm-6">
+      <a href="/files?path=<%= drive.id %>" class="text-decoration-none text-dark">
+        <div class="card h-100 border-0 shadow-sm text-center p-4 hover-lift">
+          <i class="bi <%= drive.icon %> display-4 text-primary mb-3"></i>
+          <h5 class="fw-bold"><%= drive.name %></h5>
+          <div class="text-muted small"><%= drive.id %></div>
+        </div>
+      </a>
+    </div>
+    <% }) %>
+  </div>
+  <% } else { %>
+  <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+    <div class="small text-muted">
+      Current folder items: <span class="fw-semibold"><%= files.length %></span>
+    </div>
+    <div class="btn-group btn-group-sm" role="group" aria-label="File view modes">
+      <button type="button" class="btn btn-outline-secondary active file-view-btn" data-file-view="detail" title="Detail view">
+        <i class="bi bi-table"></i>
+      </button>
+      <button type="button" class="btn btn-outline-secondary file-view-btn" data-file-view="file" title="File list view">
+        <i class="bi bi-list-ul"></i>
+      </button>
+      <button type="button" class="btn btn-outline-secondary file-view-btn" data-file-view="tile" title="Tile view">
+        <i class="bi bi-grid-3x2-gap"></i>
+      </button>
+      <button type="button" class="btn btn-outline-secondary file-view-btn" data-file-view="thumbs" title="Thumbnail view">
+        <i class="bi bi-grid-3x3-gap"></i>
+      </button>
+    </div>
+  </div>
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <div class="small text-muted">
+        Selected items: <span class="fw-semibold text-dark" id="fileBulkSelectedCount">0</span>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="fileBulkSelectVisibleBtn">
+          <i class="bi bi-check2-square me-1"></i>Select visible
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="fileBulkUnselectVisibleBtn">
+          <i class="bi bi-square me-1"></i>Unselect visible
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="fileBulkClearBtn" disabled>
+          <i class="bi bi-x-circle me-1"></i>Clear
+        </button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="fileBulkCopyBtn" disabled>
+          <i class="bi bi-files me-1"></i>Copy Selected
+        </button>
+        <button type="button" class="btn btn-primary btn-filled btn-sm" id="fileBulkMoveBtn" disabled>
+          <i class="bi bi-arrows-move me-1"></i>Move Selected
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="file-view-pane" data-file-view-pane="detail">
+    <div class="card border-0 shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 40px;" class="text-center"></th>
+              <th style="width: 50px;"></th>
+              <th>Name</th>
+              <th>Size</th>
+              <th>Modified</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (files.length === 0) { %>
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">This folder is empty.</td>
+            </tr>
+            <% } %>
+
+            <% files.forEach((f, idx) => { %>
+            <% const fileUrl = '/files/download/dummy?path=' + encodeURIComponent(f.path); %>
+            <% const previewUrl = previewUrlFromPath(f.path); %>
+            <% const kind = getKindByName(f.name); %>
+            <tr class="<%= f.isDir ? 'bg-light' : '' %> file-entry" data-file-path="<%= f.path %>" data-file-name="<%= f.name %>" data-file-is-dir="<%= f.isDir ? '1' : '0' %>">
+              <td class="text-center">
+                <input type="checkbox" class="form-check-input file-select-check" data-file-path="<%= f.path %>" aria-label="Select <%= f.name %>">
+              </td>
+              <td class="text-center text-secondary">
+                <i class="bi <%= getKindIcon(kind, f.isDir) %> fs-4"></i>
+              </td>
+              <td>
+                <% if (f.isDir) { %>
+                <a href="/files?path=<%= f.path %>" class="fw-bold text-dark text-decoration-none"><%= f.name %></a>
+                <% } else { %>
+                <a href="#"
+                  class="fw-bold text-primary text-decoration-none text-truncate d-block file-preview-trigger"
+                  style="max-width: 320px;"
+                  data-preview-url="<%= previewUrl %>"
+                  data-download-url="<%= fileUrl %>"
+                  data-name="<%= f.name %>"
+                  data-kind="<%= kind %>"
+                  data-index="<%= idx %>">
+                  <%= f.name %>
+                </a>
+                <% } %>
+              </td>
+              <td><%= f.size %></td>
+              <td><%= new Date(f.modified).toLocaleDateString() %></td>
+              <td class="text-end">
+                <% if (!f.isDir) { %>
+                <button class="btn btn-sm btn-outline-secondary border-0 file-preview-trigger"
+                  data-preview-url="<%= previewUrl %>"
+                  data-download-url="<%= fileUrl %>"
+                  data-name="<%= f.name %>"
+                  data-kind="<%= kind %>"
+                  data-index="<%= idx %>"
+                  title="Preview">
+                  <i class="bi bi-eye"></i>
+                </button>
+                <a href="<%= fileUrl %>" class="btn btn-sm btn-outline-secondary border-0" title="Download">
+                  <i class="bi bi-download"></i>
+                </a>
+                <% } %>
+                <button class="btn btn-sm btn-outline-secondary border-0 file-rename-item" data-no-wait="true" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Rename">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary border-0 file-transfer-item" data-no-wait="true" data-operation="copy" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Copy">
+                  <i class="bi bi-files"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary border-0 file-transfer-item" data-no-wait="true" data-operation="move" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Move">
+                  <i class="bi bi-arrows-move"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger border-0 delete-item" data-no-wait="true" data-path="<%= f.path %>" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="file-view-pane d-none" data-file-view-pane="file">
+    <div class="card border-0 shadow-sm">
+      <div class="list-group list-group-flush">
+        <% if (files.length === 0) { %>
+          <div class="list-group-item py-5 text-center text-muted">This folder is empty.</div>
+        <% } %>
+        <% files.forEach((f, idx) => { %>
+          <% const fileUrl = '/files/download/dummy?path=' + encodeURIComponent(f.path); %>
+          <% const previewUrl = previewUrlFromPath(f.path); %>
+          <% const kind = getKindByName(f.name); %>
+          <div class="list-group-item d-flex align-items-center justify-content-between gap-3 file-entry" data-file-path="<%= f.path %>" data-file-name="<%= f.name %>" data-file-is-dir="<%= f.isDir ? '1' : '0' %>">
+            <div class="d-flex align-items-center gap-3 overflow-hidden">
+              <input type="checkbox" class="form-check-input file-select-check flex-shrink-0" data-file-path="<%= f.path %>" aria-label="Select <%= f.name %>">
+              <i class="bi <%= getKindIcon(kind, f.isDir) %> fs-4 flex-shrink-0"></i>
+              <div class="overflow-hidden">
+                <% if (f.isDir) { %>
+                  <a href="/files?path=<%= f.path %>" class="fw-semibold text-dark text-decoration-none text-truncate d-block"><%= f.name %></a>
+                <% } else { %>
+                  <a href="#" class="fw-semibold text-primary text-decoration-none text-truncate d-block file-preview-trigger"
+                    data-preview-url="<%= previewUrl %>"
+                    data-download-url="<%= fileUrl %>"
+                    data-name="<%= f.name %>"
+                    data-kind="<%= kind %>"
+                    data-index="<%= idx %>"><%= f.name %></a>
+                <% } %>
+                <div class="small text-muted">
+                  <%= f.isDir ? 'Folder' : f.size %> - <%= new Date(f.modified).toLocaleString() %>
+                </div>
+              </div>
+            </div>
+            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+              <% if (!f.isDir) { %>
+                <button class="btn btn-sm btn-outline-secondary border-0 file-preview-trigger"
+                  data-preview-url="<%= previewUrl %>"
+                  data-download-url="<%= fileUrl %>"
+                  data-name="<%= f.name %>"
+                  data-kind="<%= kind %>"
+                  data-index="<%= idx %>"
+                  title="Preview"><i class="bi bi-eye"></i></button>
+                <a href="<%= fileUrl %>" class="btn btn-sm btn-outline-secondary border-0" title="Download"><i class="bi bi-download"></i></a>
+              <% } %>
+              <button class="btn btn-sm btn-outline-secondary border-0 file-rename-item" data-no-wait="true" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Rename"><i class="bi bi-pencil-square"></i></button>
+              <button class="btn btn-sm btn-outline-secondary border-0 file-transfer-item" data-no-wait="true" data-operation="copy" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Copy"><i class="bi bi-files"></i></button>
+              <button class="btn btn-sm btn-outline-secondary border-0 file-transfer-item" data-no-wait="true" data-operation="move" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Move"><i class="bi bi-arrows-move"></i></button>
+              <button class="btn btn-sm btn-outline-danger border-0 delete-item" data-no-wait="true" data-path="<%= f.path %>" title="Delete"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+
+  <div class="file-view-pane d-none" data-file-view-pane="tile">
+    <div class="row g-3">
+      <% if (files.length === 0) { %>
+      <div class="col-12">
+        <div class="card border-0 shadow-sm text-center py-5 text-muted">This folder is empty.</div>
+      </div>
+      <% } %>
+      <% files.forEach((f, idx) => { %>
+      <% const fileUrl = '/files/download/dummy?path=' + encodeURIComponent(f.path); %>
+      <% const previewUrl = previewUrlFromPath(f.path); %>
+      <% const kind = getKindByName(f.name); %>
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3 file-entry" data-file-path="<%= f.path %>" data-file-name="<%= f.name %>" data-file-is-dir="<%= f.isDir ? '1' : '0' %>">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex justify-content-end mb-2">
+              <input type="checkbox" class="form-check-input file-select-check" data-file-path="<%= f.path %>" aria-label="Select <%= f.name %>">
+            </div>
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <i class="bi <%= getKindIcon(kind, f.isDir) %> fs-3"></i>
+              <div class="small text-muted"><%= f.isDir ? 'Folder' : kind.toUpperCase() %></div>
+            </div>
+            <% if (f.isDir) { %>
+              <a href="/files?path=<%= f.path %>" class="fw-semibold text-dark text-decoration-none text-truncate"><%= f.name %></a>
+            <% } else { %>
+              <a href="#" class="fw-semibold text-primary text-decoration-none text-truncate file-preview-trigger"
+                data-preview-url="<%= previewUrl %>"
+                data-download-url="<%= fileUrl %>"
+                data-name="<%= f.name %>"
+                data-kind="<%= kind %>"
+                data-index="<%= idx %>"><%= f.name %></a>
+            <% } %>
+            <div class="small text-muted mt-1"><%= f.isDir ? '-' : f.size %></div>
+            <div class="small text-muted mb-3"><%= new Date(f.modified).toLocaleDateString() %></div>
+            <div class="mt-auto d-flex gap-1">
+              <% if (!f.isDir) { %>
+                <button class="btn btn-sm btn-outline-secondary file-preview-trigger"
+                  data-preview-url="<%= previewUrl %>"
+                  data-download-url="<%= fileUrl %>"
+                  data-name="<%= f.name %>"
+                  data-kind="<%= kind %>"
+                  data-index="<%= idx %>"><i class="bi bi-eye"></i></button>
+                <a href="<%= fileUrl %>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-download"></i></a>
+              <% } %>
+              <button class="btn btn-sm btn-outline-secondary file-rename-item" data-no-wait="true" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Rename"><i class="bi bi-pencil-square"></i></button>
+              <button class="btn btn-sm btn-outline-secondary file-transfer-item" data-no-wait="true" data-operation="copy" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Copy"><i class="bi bi-files"></i></button>
+              <button class="btn btn-sm btn-outline-secondary file-transfer-item" data-no-wait="true" data-operation="move" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Move"><i class="bi bi-arrows-move"></i></button>
+              <button class="btn btn-sm btn-outline-danger delete-item" data-no-wait="true" data-path="<%= f.path %>"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <div class="file-view-pane d-none" data-file-view-pane="thumbs">
+    <div class="row g-3">
+      <% if (files.length === 0) { %>
+      <div class="col-12">
+        <div class="card border-0 shadow-sm text-center py-5 text-muted">This folder is empty.</div>
+      </div>
+      <% } %>
+      <% files.forEach((f, idx) => { %>
+      <% const fileUrl = '/files/download/dummy?path=' + encodeURIComponent(f.path); %>
+      <% const previewUrl = previewUrlFromPath(f.path); %>
+      <% const kind = getKindByName(f.name); %>
+      <div class="col-6 col-sm-4 col-md-3 col-xl-2 file-entry" data-file-path="<%= f.path %>" data-file-name="<%= f.name %>" data-file-is-dir="<%= f.isDir ? '1' : '0' %>">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="thumb-frame bg-light">
+            <% if (f.isDir) { %>
+              <a href="/files?path=<%= f.path %>" class="d-flex align-items-center justify-content-center h-100 text-warning text-decoration-none">
+                <i class="bi bi-folder-fill fs-1"></i>
+              </a>
+            <% } else if (kind === 'image') { %>
+              <a href="#" class="d-block h-100 file-preview-trigger"
+                data-preview-url="<%= previewUrl %>"
+                data-download-url="<%= fileUrl %>"
+                data-name="<%= f.name %>"
+                data-kind="<%= kind %>"
+                data-index="<%= idx %>">
+                <img src="<%= previewUrl %>" alt="<%= f.name %>" class="thumb-image">
+              </a>
+            <% } else { %>
+              <button class="btn btn-link text-decoration-none text-secondary w-100 h-100 d-flex align-items-center justify-content-center file-preview-trigger"
+                data-preview-url="<%= previewUrl %>"
+                data-download-url="<%= fileUrl %>"
+                data-name="<%= f.name %>"
+                data-kind="<%= kind %>"
+                data-index="<%= idx %>">
+                <i class="bi <%= kind === 'audio' ? 'bi-file-earmark-music' : (kind === 'video' ? 'bi-file-earmark-play' : 'bi-file-earmark') %> fs-1"></i>
+              </button>
+            <% } %>
+          </div>
+          <div class="card-body p-2">
+            <div class="d-flex justify-content-end mb-1">
+              <input type="checkbox" class="form-check-input file-select-check" data-file-path="<%= f.path %>" aria-label="Select <%= f.name %>">
+            </div>
+            <div class="small text-truncate fw-semibold" title="<%= f.name %>"><%= f.name %></div>
+            <div class="d-flex justify-content-between mt-2">
+              <% if (!f.isDir) { %>
+              <a href="<%= fileUrl %>" class="btn btn-sm btn-outline-secondary border-0"><i class="bi bi-download"></i></a>
+              <% } else { %>
+              <span></span>
+              <% } %>
+              <button class="btn btn-sm btn-outline-secondary border-0 file-rename-item" data-no-wait="true" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Rename"><i class="bi bi-pencil-square"></i></button>
+              <button class="btn btn-sm btn-outline-secondary border-0 file-transfer-item" data-no-wait="true" data-operation="copy" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Copy"><i class="bi bi-files"></i></button>
+              <button class="btn btn-sm btn-outline-secondary border-0 file-transfer-item" data-no-wait="true" data-operation="move" data-path="<%= f.path %>" data-name="<%= f.name %>" title="Move"><i class="bi bi-arrows-move"></i></button>
+              <button class="btn btn-sm btn-outline-danger border-0 delete-item" data-no-wait="true" data-path="<%= f.path %>"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<% if (!isRoot) { %>
+<div class="modal fade" id="createFolderModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form id="createFolderForm" action="/files/create-folder" method="POST">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Folder</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="path" value="<%= currentPath %>">
+          <div class="mb-2">
+            <label class="form-label">Folder Name</label>
+            <input type="text" class="form-control" name="folderName" maxlength="120" required placeholder="New folder name">
+          </div>
+          <div class="form-text">Folder will be created in: <code><%= currentPath %></code></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary btn-filled">Create Folder</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="uploadModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form id="fileUploadForm" action="/files/upload" method="POST" enctype="multipart/form-data">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Upload to Current Folder</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="path" value="<%= currentPath %>">
+          <input type="hidden" name="relativePathsJson" id="relativePathsJsonInput" value="">
+
+          <div class="btn-group w-100 mb-3" role="group">
+            <input type="radio" class="btn-check" name="uploadMode" id="uploadModeFiles" value="files" autocomplete="off" checked>
+            <label class="btn btn-outline-primary" for="uploadModeFiles">Files</label>
+
+            <input type="radio" class="btn-check" name="uploadMode" id="uploadModeFolder" value="folder" autocomplete="off">
+            <label class="btn btn-outline-primary" for="uploadModeFolder">Folder</label>
+          </div>
+
+          <div id="uploadFilesPane">
+            <label class="form-label">Select Files</label>
+            <input type="file" id="uploadFilesInput" name="files" class="form-control" multiple>
+          </div>
+
+          <div id="uploadFolderPane" class="d-none">
+            <label class="form-label">Select Folder</label>
+            <input type="file" id="uploadFolderInput" name="files" class="form-control" webkitdirectory directory multiple>
+            <div class="file-folder-dropzone mt-3" id="folderDropZone">
+              <div class="fw-semibold"><i class="bi bi-folder-symlink me-1"></i> Drag and drop a folder here</div>
+              <div class="small text-muted">This keeps the folder tree and avoids the browser folder-upload confirmation in supported browsers.</div>
+            </div>
+            <div class="form-text">Folder tree will be preserved under this location. The Choose Files button is browser-controlled and may show a native confirmation.</div>
+          </div>
+
+          <div class="mt-3 small text-muted" id="uploadSelectionSummary">No items selected.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary btn-filled">Start Upload</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="fileTransferModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form id="fileTransferForm" method="POST">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="fileTransferTitle">Move Item</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="sourcePath" id="fileTransferSourcePath" value="">
+          <input type="hidden" name="sourcePathsJson" id="fileTransferSourcePathsJson" value="[]">
+          <input type="hidden" name="operation" id="fileTransferOperation" value="move">
+          <div class="mb-3">
+            <label class="form-label">Selected Item(s)</label>
+            <textarea class="form-control" id="fileTransferSourceName" rows="3" readonly></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Destination Folder</label>
+            <div class="input-group">
+              <input type="text" class="form-control" name="destinationPath" id="fileTransferDestinationPath" value="<%= currentPath %>" readonly required>
+              <button type="button" class="btn btn-outline-secondary" id="fileTransferBrowseDestinationBtn">
+                <i class="bi bi-folder2-open me-1"></i>Browse
+              </button>
+            </div>
+            <div class="form-text" id="fileTransferDestinationHint">Choose a destination folder from the browser modal.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-filled" id="fileTransferSubmitBtn">Move Item</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="folderPickerModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-folder2-open me-2"></i>Select Destination Folder</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-12 col-md-5">
+            <label class="form-label small text-muted fw-semibold mb-1">Drive</label>
+            <select class="form-select form-select-sm" id="folderPickerDriveSelect">
+              <% if (Array.isArray(drives)) { %>
+                <% drives.forEach((drive) => { %>
+                  <option value="<%= drive.id %>"><%= drive.name %> (<%= drive.id %>)</option>
+                <% }) %>
+              <% } %>
+            </select>
+          </div>
+          <div class="col-12 col-md-7">
+            <label class="form-label small text-muted fw-semibold mb-1">Current Path</label>
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="folderPickerUpBtn">
+                <i class="bi bi-arrow-up-left me-1"></i>Up
+              </button>
+              <div class="small text-muted text-break" id="folderPickerCurrentPathLabel"><%= currentPath %></div>
+            </div>
+          </div>
+        </div>
+        <div class="list-group" id="folderPickerFolderList"></div>
+        <div class="alert alert-light border mt-3 d-none" id="folderPickerEmptyState">No folders in this location.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-filled" id="folderPickerApplyBtn" disabled>Use This Folder</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="fileRenameModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form id="fileRenameForm" method="POST" action="/files/rename">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Rename Item</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="sourcePath" id="fileRenameSourcePath" value="">
+          <div class="mb-3">
+            <label class="form-label">Selected Item</label>
+            <input type="text" class="form-control" id="fileRenameSourceName" value="" readonly>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">New Name</label>
+            <input type="text" class="form-control" name="newName" id="fileRenameNewName" maxlength="180" required>
+            <div class="form-text">Renaming a file that is already linked from another record can break that stored URL.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-filled" id="fileRenameSubmitBtn">Rename Item</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<% if (canUseOrgBackups) { %>
+<div class="modal fade" id="orgBackupModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-shield-check me-2"></i>Org / Global File Backup</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="backend-notice backend-notice-warning mb-3">
+          <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Files only</div>
+          <div class="small">
+            Download and restore the selected upload folder. Restore replaces all files under
+            <code>/uploads/GLOBAL/</code> or <code>/uploads/ORG_&lt;orgId&gt;/</code> and does not change Mongo or JSON records.
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Organization</label>
+          <select class="form-select" id="orgBackupOrgId" <%= orgBackupRows.length ? '' : 'disabled' %>>
+            <% orgBackupRows.forEach((org) => { %>
+              <option value="<%= org.id %>"><%= org.label %> (<%= org.scope %>)</option>
+            <% }) %>
+          </select>
+          <% if (!orgBackupRows.length) { %>
+            <div class="form-text text-danger">No upload folders are available for backup.</div>
+          <% } else { %>
+            <div class="form-text">Backups cannot be restored into a different organization or system folder.</div>
+          <% } %>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="border rounded-3 p-3 h-100">
+              <h6 class="fw-bold mb-2"><i class="bi bi-cloud-download me-1"></i>Download Backup</h6>
+              <p class="small text-muted">Creates a compressed <code>.tar.gz</code> backup with a manifest and all files for the selected folder.</p>
+              <button type="button" class="btn btn-success btn-filled btn-sm" id="orgBackupDownloadBtn" <%= orgBackupRows.length ? '' : 'disabled' %>>
+                <i class="bi bi-download me-1"></i> Download Backup
+              </button>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="border rounded-3 p-3 h-100">
+              <h6 class="fw-bold mb-2"><i class="bi bi-cloud-upload me-1"></i>Restore Backup</h6>
+              <p class="small text-muted">Upload a backup created by this tool. Existing files for the selected folder will be replaced.</p>
+              <form id="orgBackupRestoreForm" method="POST" action="/files/org-backup/restore" enctype="multipart/form-data">
+                <input type="file" class="form-control form-control-sm mb-2" id="orgBackupFileInput" name="backupFile" accept=".gz,.tgz,.tar.gz,application/gzip">
+                <button type="submit" class="btn btn-danger btn-sm" id="orgBackupRestoreBtn" <%= orgBackupRows.length ? '' : 'disabled' %>>
+                  <i class="bi bi-arrow-counterclockwise me-1"></i> Restore Backup
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<%- include('../partials/modal_ImageViewer') %>
+<%- include('../partials/modal_AudioPreview') %>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const uploadForm = document.getElementById('fileUploadForm');
+    const createFolderForm = document.getElementById('createFolderForm');
+    const filesInput = document.getElementById('uploadFilesInput');
+    const folderInput = document.getElementById('uploadFolderInput');
+    const folderDropZone = document.getElementById('folderDropZone');
+    const summaryEl = document.getElementById('uploadSelectionSummary');
+    const relativePathsInput = document.getElementById('relativePathsJsonInput');
+    const modeFiles = document.getElementById('uploadModeFiles');
+    const modeFolder = document.getElementById('uploadModeFolder');
+    const filesPane = document.getElementById('uploadFilesPane');
+    const folderPane = document.getElementById('uploadFolderPane');
+    const viewButtons = Array.from(document.querySelectorAll('.file-view-btn'));
+    const viewPanes = Array.from(document.querySelectorAll('.file-view-pane'));
+    const previewTriggers = Array.from(document.querySelectorAll('.file-preview-trigger'));
+    const transferModalEl = document.getElementById('fileTransferModal');
+    const transferModal = transferModalEl && window.bootstrap && window.bootstrap.Modal
+      ? new window.bootstrap.Modal(transferModalEl)
+      : null;
+    const transferForm = document.getElementById('fileTransferForm');
+    const transferTitle = document.getElementById('fileTransferTitle');
+    const transferSourcePath = document.getElementById('fileTransferSourcePath');
+    const transferSourcePathsJson = document.getElementById('fileTransferSourcePathsJson');
+    const transferSourceName = document.getElementById('fileTransferSourceName');
+    const transferDestinationPath = document.getElementById('fileTransferDestinationPath');
+    const transferDestinationHint = document.getElementById('fileTransferDestinationHint');
+    const transferOperation = document.getElementById('fileTransferOperation');
+    const transferSubmitBtn = document.getElementById('fileTransferSubmitBtn');
+    const transferBrowseDestinationBtn = document.getElementById('fileTransferBrowseDestinationBtn');
+    const folderPickerModalEl = document.getElementById('folderPickerModal');
+    const folderPickerModal = folderPickerModalEl && window.bootstrap && window.bootstrap.Modal
+      ? new window.bootstrap.Modal(folderPickerModalEl)
+      : null;
+    const folderPickerDriveSelect = document.getElementById('folderPickerDriveSelect');
+    const folderPickerUpBtn = document.getElementById('folderPickerUpBtn');
+    const folderPickerCurrentPathLabel = document.getElementById('folderPickerCurrentPathLabel');
+    const folderPickerFolderList = document.getElementById('folderPickerFolderList');
+    const folderPickerEmptyState = document.getElementById('folderPickerEmptyState');
+    const folderPickerApplyBtn = document.getElementById('folderPickerApplyBtn');
+    const bulkSelectedCountEl = document.getElementById('fileBulkSelectedCount');
+    const bulkCopyBtn = document.getElementById('fileBulkCopyBtn');
+    const bulkMoveBtn = document.getElementById('fileBulkMoveBtn');
+    const bulkClearBtn = document.getElementById('fileBulkClearBtn');
+    const bulkSelectVisibleBtn = document.getElementById('fileBulkSelectVisibleBtn');
+    const bulkUnselectVisibleBtn = document.getElementById('fileBulkUnselectVisibleBtn');
+    const fileSelectionInputs = Array.from(document.querySelectorAll('.file-select-check'));
+    const fileEntryNodes = Array.from(document.querySelectorAll('.file-entry[data-file-path]'));
+    const renameModalEl = document.getElementById('fileRenameModal');
+    const renameModal = renameModalEl && window.bootstrap && window.bootstrap.Modal
+      ? new window.bootstrap.Modal(renameModalEl)
+      : null;
+    const renameForm = document.getElementById('fileRenameForm');
+    const renameSourcePath = document.getElementById('fileRenameSourcePath');
+    const renameSourceName = document.getElementById('fileRenameSourceName');
+    const renameNewName = document.getElementById('fileRenameNewName');
+    const renameSubmitBtn = document.getElementById('fileRenameSubmitBtn');
+    const orgBackupOrgId = document.getElementById('orgBackupOrgId');
+    const orgBackupDownloadBtn = document.getElementById('orgBackupDownloadBtn');
+    const orgBackupRestoreForm = document.getElementById('orgBackupRestoreForm');
+    const orgBackupFileInput = document.getElementById('orgBackupFileInput');
+    const orgBackupRestoreBtn = document.getElementById('orgBackupRestoreBtn');
+
+    const VIEW_STORAGE_KEY = 'fileManager.viewMode';
+    const allowedViews = new Set(['detail', 'file', 'tile', 'thumbs']);
+    const selectedFilePaths = new Set();
+    const folderPickerState = {
+      currentPath: '',
+      parentPath: '',
+      drives: [],
+      folders: []
+    };
+    let droppedFolderFiles = [];
+
+    function ajaxHeaders(extra = {}) {
+      return {
+        'X-AJAX-Request': 'true',
+        'X-Action-State-Id': '',
+        ...(extra || {})
+      };
+    }
+
+    function showFileManagerMessage(options = {}) {
+      if (typeof showMessageModal === 'function') {
+        return showMessageModal(options);
+      }
+      console.warn('[FileManager] Message modal is not available.', options);
+      return Promise.resolve('closed');
+    }
+
+    function escapeHtml(value = '') {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function getBackupScopeLabel(orgId = '') {
+      const token = String(orgId || '').trim();
+      if (token.toUpperCase() === 'GLOBAL' || token.toUpperCase() === 'SYSTEM') return 'GLOBAL';
+      return `ORG_${token.replace(/^ORG[_-]/i, '')}`;
+    }
+
+    function parseDownloadFileName(response, fallbackName = 'org-upload-backup.tar.gz') {
+      const disposition = response.headers.get('content-disposition') || '';
+      const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+      if (utfMatch && utfMatch[1]) return decodeURIComponent(utfMatch[1].trim());
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      return (match && match[1] ? match[1].trim() : fallbackName) || fallbackName;
+    }
+
+    function looksLikeHtmlResponse(value = '') {
+      const token = String(value || '').trim();
+      return /^<!doctype html/i.test(token) || /^<html[\s>]/i.test(token);
+    }
+
+    function summarizeHtmlError(status = 0, fallbackMessage = 'Operation failed.') {
+      if (Number(status) === 404) {
+        return 'Backup route was not found. If you are using Railway proxy mode, deploy the latest gateway changes and restart the app.';
+      }
+      return `The server returned an HTML error page (${status || 'unknown status'}). Please check the server logs.`;
+    }
+
+    async function readErrorPayload(response, fallbackMessage = 'Operation failed.') {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await response.json().catch(() => ({}));
+        return data.message || fallbackMessage;
+      }
+      const text = await response.text().catch(() => '');
+      if (looksLikeHtmlResponse(text)) return summarizeHtmlError(response.status, fallbackMessage);
+      return text ? (text.length > 500 ? `${text.slice(0, 500)}...` : text) : fallbackMessage;
+    }
+
+    function normalizeFilePath(value = '') {
+      return String(value || '').trim().replace(/\\/g, '/');
+    }
+
+    function getVisiblePaneEntries() {
+      const pane = viewPanes.find((item) => !item.classList.contains('d-none'));
+      if (!pane) return [];
+      return Array.from(pane.querySelectorAll('.file-entry[data-file-path]'));
+    }
+
+    function setSelectedPath(pathValue, isSelected) {
+      const normalized = normalizeFilePath(pathValue);
+      if (!normalized) return;
+      if (isSelected) selectedFilePaths.add(normalized);
+      else selectedFilePaths.delete(normalized);
+    }
+
+    function syncFileSelectionUi() {
+      fileSelectionInputs.forEach((input) => {
+        const pathValue = normalizeFilePath(input.dataset.filePath);
+        const checked = pathValue && selectedFilePaths.has(pathValue);
+        input.checked = Boolean(checked);
+      });
+
+      fileEntryNodes.forEach((entry) => {
+        const pathValue = normalizeFilePath(entry.dataset.filePath);
+        const selected = pathValue && selectedFilePaths.has(pathValue);
+        if (entry.tagName === 'TR') {
+          entry.classList.toggle('table-active', Boolean(selected));
+        } else {
+          entry.classList.toggle('file-entry-selected', Boolean(selected));
+        }
+      });
+
+      const selectedCount = selectedFilePaths.size;
+      if (bulkSelectedCountEl) bulkSelectedCountEl.textContent = String(selectedCount);
+      if (bulkCopyBtn) bulkCopyBtn.disabled = selectedCount <= 0;
+      if (bulkMoveBtn) bulkMoveBtn.disabled = selectedCount <= 0;
+      if (bulkClearBtn) bulkClearBtn.disabled = selectedCount <= 0;
+    }
+
+    function getSelectionSummaryLabels(paths = []) {
+      const rows = Array.isArray(paths) ? paths : [];
+      return rows.map((pathValue) => {
+        const token = normalizeFilePath(pathValue);
+        return token.split('/').filter(Boolean).pop() || token;
+      });
+    }
+
+    function openTransferModalForPaths(operation = 'move', sourcePaths = []) {
+      if (!transferForm || !transferModal) return;
+      const normalized = Array.from(new Set((Array.isArray(sourcePaths) ? sourcePaths : [])
+        .map((row) => normalizeFilePath(row))
+        .filter(Boolean)));
+      if (!normalized.length) return;
+
+      const labels = getSelectionSummaryLabels(normalized);
+      const isCopy = operation === 'copy';
+      if (transferOperation) transferOperation.value = isCopy ? 'copy' : 'move';
+      if (transferSourcePath) transferSourcePath.value = normalized.length === 1 ? normalized[0] : '';
+      if (transferSourcePathsJson) transferSourcePathsJson.value = JSON.stringify(normalized);
+      if (transferSourceName) transferSourceName.value = labels.join('\n');
+      if (transferDestinationPath) {
+        const fallbackPath = normalizeFilePath('<%= currentPath %>');
+        transferDestinationPath.value = normalizeFilePath(transferDestinationPath.value) || fallbackPath;
+      }
+      if (transferDestinationHint) {
+        transferDestinationHint.textContent = 'Choose a destination folder from the browser modal.';
+      }
+      if (transferTitle) transferTitle.textContent = isCopy ? 'Copy Selected Items' : 'Move Selected Items';
+      if (transferSubmitBtn) transferSubmitBtn.textContent = isCopy ? 'Copy Selected' : 'Move Selected';
+      transferForm.action = isCopy ? '/files/copy' : '/files/move';
+      transferModal.show();
+    }
+
+    async function fetchFolderLibrary(pathValue = '') {
+      const queryPath = normalizeFilePath(pathValue);
+      const endpoint = queryPath
+        ? `/files/folder-library?path=${encodeURIComponent(queryPath)}`
+        : '/files/folder-library';
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: ajaxHeaders({
+          'Accept': 'application/json'
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || `Unable to load folders (${response.status}).`);
+      }
+      return payload;
+    }
+
+    function renderFolderPicker() {
+      const currentPath = normalizeFilePath(folderPickerState.currentPath);
+      if (folderPickerCurrentPathLabel) {
+        folderPickerCurrentPathLabel.textContent = currentPath || 'Root';
+      }
+      if (folderPickerUpBtn) {
+        folderPickerUpBtn.disabled = !normalizeFilePath(folderPickerState.parentPath);
+      }
+      if (folderPickerApplyBtn) {
+        folderPickerApplyBtn.disabled = !currentPath;
+      }
+
+      if (folderPickerDriveSelect) {
+        const existing = Array.from(folderPickerDriveSelect.options).map((opt) => String(opt.value || ''));
+        (Array.isArray(folderPickerState.drives) ? folderPickerState.drives : []).forEach((drive) => {
+          if (existing.includes(String(drive.id || ''))) return;
+          const option = document.createElement('option');
+          option.value = String(drive.id || '');
+          option.textContent = `${drive.name || drive.id} (${drive.id})`;
+          folderPickerDriveSelect.appendChild(option);
+        });
+        const rootId = currentPath.split('/').filter(Boolean)[0] || '';
+        if (rootId) folderPickerDriveSelect.value = rootId;
+      }
+
+      if (!folderPickerFolderList) return;
+      folderPickerFolderList.innerHTML = '';
+      const folders = Array.isArray(folderPickerState.folders) ? folderPickerState.folders : [];
+      folders.forEach((folder) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+        button.setAttribute('data-folder-picker-open', normalizeFilePath(folder.path));
+        button.innerHTML = `
+          <span class="text-truncate"><i class="bi bi-folder-fill text-warning me-2"></i>${escapeHtml(folder.name || folder.path)}</span>
+          <i class="bi bi-chevron-right text-muted"></i>
+        `;
+        folderPickerFolderList.appendChild(button);
+      });
+      if (folderPickerEmptyState) {
+        folderPickerEmptyState.classList.toggle('d-none', folders.length > 0);
+      }
+    }
+
+    async function loadFolderPicker(pathValue = '', options = {}) {
+      const requestedPath = normalizeFilePath(pathValue);
+      try {
+        if (!options.silent && typeof showLoading === 'function') {
+          showLoading({
+            title: 'Loading folders',
+            note: 'Please wait...',
+            operation: 'Fetching folder list',
+            progress: 55
+          });
+        }
+        const payload = await fetchFolderLibrary(requestedPath);
+        folderPickerState.currentPath = normalizeFilePath(payload.currentPath || requestedPath);
+        folderPickerState.parentPath = normalizeFilePath(payload.parentPath);
+        folderPickerState.drives = Array.isArray(payload.drives) ? payload.drives : [];
+        folderPickerState.folders = Array.isArray(payload.folders) ? payload.folders : [];
+        renderFolderPicker();
+      } finally {
+        if (!options.silent && typeof hideLoading === 'function') hideLoading({ force: true });
+      }
+    }
+
+    function clearDroppedFolderFiles() {
+      droppedFolderFiles = [];
+      if (folderDropZone) folderDropZone.classList.remove('is-ready');
+    }
+
+    function normalizeDroppedPath(pathValue = '', fallbackName = '') {
+      const parts = String(pathValue || fallbackName || '')
+        .replace(/\\/g, '/')
+        .split('/')
+        .map((part) => part.trim())
+        .filter(Boolean);
+      return parts.join('/');
+    }
+
+    function getUploadSelection() {
+      if (modeFolder && modeFolder.checked) {
+        if (droppedFolderFiles.length > 0) {
+          return {
+            files: droppedFolderFiles.map((row) => row.file),
+            relativePaths: droppedFolderFiles.map((row) => normalizeDroppedPath(row.relativePath, row.file?.name)),
+            source: 'drop'
+          };
+        }
+
+        const files = Array.from((folderInput && folderInput.files) || []);
+        return {
+          files,
+          relativePaths: files.map((file) => {
+            const rel = typeof file.webkitRelativePath === 'string' ? file.webkitRelativePath.trim() : '';
+            return normalizeDroppedPath(rel, file.name);
+          }),
+          source: 'picker'
+        };
+      }
+
+      const files = Array.from((filesInput && filesInput.files) || []);
+      return {
+        files,
+        relativePaths: files.map(() => ''),
+        source: 'files'
+      };
+    }
+
+    function readFileEntry(entry) {
+      return new Promise((resolve, reject) => {
+        entry.file(resolve, reject);
+      });
+    }
+
+    function readDirectoryEntries(reader) {
+      const entries = [];
+      return new Promise((resolve, reject) => {
+        const readBatch = () => {
+          reader.readEntries((batch) => {
+            if (!batch.length) {
+              resolve(entries);
+              return;
+            }
+            entries.push(...batch);
+            readBatch();
+          }, reject);
+        };
+        readBatch();
+      });
+    }
+
+    async function collectEntryFiles(entry, parentPath = '') {
+      if (!entry) return [];
+
+      if (entry.isFile) {
+        const file = await readFileEntry(entry);
+        return [{
+          file,
+          relativePath: normalizeDroppedPath([parentPath, file.name].filter(Boolean).join('/'), file.name)
+        }];
+      }
+
+      if (entry.isDirectory) {
+        const nextParent = normalizeDroppedPath([parentPath, entry.name].filter(Boolean).join('/'), entry.name);
+        const reader = entry.createReader();
+        const children = await readDirectoryEntries(reader);
+        const output = [];
+        for (const child of children) {
+          // eslint-disable-next-line no-await-in-loop
+          output.push(...await collectEntryFiles(child, nextParent));
+        }
+        return output;
+      }
+
+      return [];
+    }
+
+    async function collectDroppedUploadFiles(dataTransfer) {
+      const transferItems = Array.from((dataTransfer && dataTransfer.items) || []);
+      const entries = transferItems
+        .map((item) => (typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null))
+        .filter(Boolean);
+
+      if (entries.length > 0) {
+        const output = [];
+        for (const entry of entries) {
+          // eslint-disable-next-line no-await-in-loop
+          output.push(...await collectEntryFiles(entry, ''));
+        }
+        return output;
+      }
+
+      return Array.from((dataTransfer && dataTransfer.files) || []).map((file) => ({
+        file,
+        relativePath: normalizeDroppedPath(file.webkitRelativePath || file.name, file.name)
+      }));
+    }
+
+    const imageGallery = previewTriggers
+      .filter((el) => String(el.dataset.kind || '').trim().toLowerCase() === 'image')
+      .reduce((acc, el) => {
+        const idx = Number.parseInt(String(el.dataset.index || ''), 10);
+        if (!Number.isFinite(idx) || idx < 0) return acc;
+        if (!acc.some((row) => row.index === idx)) {
+          acc.push({
+            index: idx,
+            url: String(el.dataset.previewUrl || '').trim(),
+            name: String(el.dataset.name || 'Image').trim(),
+            mimeType: 'image/*'
+          });
+        }
+        return acc;
+      }, [])
+      .sort((a, b) => a.index - b.index);
+
+    function applyViewMode(requestedView = 'detail') {
+      const selected = allowedViews.has(requestedView) ? requestedView : 'detail';
+      viewButtons.forEach((btn) => {
+        const active = btn.dataset.fileView === selected;
+        btn.classList.toggle('active', active);
+      });
+      viewPanes.forEach((pane) => {
+        pane.classList.toggle('d-none', pane.dataset.fileViewPane !== selected);
+      });
+      try {
+        window.localStorage.setItem(VIEW_STORAGE_KEY, selected);
+      } catch (_) {}
+      syncFileSelectionUi();
+    }
+
+    function openPreview(triggerEl) {
+      if (!triggerEl) return;
+      const kind = String(triggerEl.dataset.kind || 'file').trim().toLowerCase();
+      const previewUrl = String(triggerEl.dataset.previewUrl || '').trim();
+      const downloadUrl = String(triggerEl.dataset.downloadUrl || '').trim();
+      const fileName = String(triggerEl.dataset.name || 'File').trim() || 'File';
+      const itemIndex = Number.parseInt(String(triggerEl.dataset.index || ''), 10);
+      const targetUrl = previewUrl || downloadUrl;
+      if (!targetUrl) return;
+
+      if (kind === 'image' && window.ImageViewer && typeof window.ImageViewer.open === 'function') {
+        const galleryIndex = imageGallery.findIndex((row) => row.index === itemIndex);
+        window.ImageViewer.open(
+          targetUrl,
+          fileName,
+          'image/*',
+          {
+            gallery: imageGallery.map((row) => ({ url: row.url, name: row.name, mimeType: row.mimeType })),
+            index: galleryIndex >= 0 ? galleryIndex : 0
+          }
+        );
+        return;
+      }
+
+      if (kind === 'audio' && window.AudioPreviewModal && typeof window.AudioPreviewModal.open === 'function') {
+        window.AudioPreviewModal.open(targetUrl, fileName, 'audio/*');
+        return;
+      }
+
+      window.open(targetUrl, '_blank', 'noopener');
+    }
+
+    viewButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        applyViewMode(String(btn.dataset.fileView || '').trim());
+      });
+    });
+
+    previewTriggers.forEach((trigger) => {
+      trigger.addEventListener('click', (event) => {
+        event.preventDefault();
+        openPreview(trigger);
+      });
+    });
+
+    fileSelectionInputs.forEach((input) => {
+      input.addEventListener('change', () => {
+        setSelectedPath(input.dataset.filePath, input.checked);
+        syncFileSelectionUi();
+      });
+    });
+
+    bulkSelectVisibleBtn?.addEventListener('click', () => {
+      getVisiblePaneEntries().forEach((entry) => {
+        setSelectedPath(entry.dataset.filePath, true);
+      });
+      syncFileSelectionUi();
+    });
+
+    bulkUnselectVisibleBtn?.addEventListener('click', () => {
+      getVisiblePaneEntries().forEach((entry) => {
+        setSelectedPath(entry.dataset.filePath, false);
+      });
+      syncFileSelectionUi();
+    });
+
+    bulkClearBtn?.addEventListener('click', () => {
+      selectedFilePaths.clear();
+      syncFileSelectionUi();
+    });
+
+    bulkCopyBtn?.addEventListener('click', () => {
+      openTransferModalForPaths('copy', Array.from(selectedFilePaths.values()));
+    });
+
+    bulkMoveBtn?.addEventListener('click', () => {
+      openTransferModalForPaths('move', Array.from(selectedFilePaths.values()));
+    });
+
+    const savedView = (() => {
+      try {
+        return String(window.localStorage.getItem(VIEW_STORAGE_KEY) || '').trim();
+      } catch (_) {
+        return '';
+      }
+    })();
+    applyViewMode(savedView || 'detail');
+    syncFileSelectionUi();
+
+    const updateMode = () => {
+      if (!modeFiles || !modeFolder || !filesPane || !folderPane) return;
+      const folderMode = modeFolder.checked;
+      filesPane.classList.toggle('d-none', folderMode);
+      folderPane.classList.toggle('d-none', !folderMode);
+      if (folderMode) {
+        if (filesInput) filesInput.value = '';
+      } else {
+        clearDroppedFolderFiles();
+        if (folderInput) folderInput.value = '';
+      }
+      updateSelectionSummary();
+    };
+
+    const updateSelectionSummary = () => {
+      if (!summaryEl) return;
+      const selection = getUploadSelection();
+      const selected = selection.files;
+
+      if (!selected.length) {
+        summaryEl.textContent = 'No items selected.';
+        return;
+      }
+
+      const totalBytes = selected.reduce((sum, file) => sum + (Number(file.size) || 0), 0);
+      const totalMB = (totalBytes / (1024 * 1024)).toFixed(2);
+      const sourceText = selection.source === 'drop' ? ' from dropped folder' : '';
+      summaryEl.textContent = `${selected.length} file(s) selected${sourceText}, total ${totalMB} MB.`;
+    };
+
+    if (modeFiles) modeFiles.addEventListener('change', updateMode);
+    if (modeFolder) modeFolder.addEventListener('change', updateMode);
+    if (filesInput) filesInput.addEventListener('change', () => {
+      updateSelectionSummary();
+    });
+    if (folderInput) folderInput.addEventListener('change', () => {
+      clearDroppedFolderFiles();
+      updateSelectionSummary();
+    });
+    if (folderDropZone) {
+      ['dragenter', 'dragover'].forEach((eventName) => {
+        folderDropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          folderDropZone.classList.add('is-dragging');
+        });
+      });
+      ['dragleave', 'drop'].forEach((eventName) => {
+        folderDropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          folderDropZone.classList.remove('is-dragging');
+        });
+      });
+      folderDropZone.addEventListener('drop', async (event) => {
+        try {
+          const files = await collectDroppedUploadFiles(event.dataTransfer);
+          droppedFolderFiles = files.filter((row) => row && row.file);
+          if (folderInput) folderInput.value = '';
+          folderDropZone.classList.toggle('is-ready', droppedFolderFiles.length > 0);
+          updateSelectionSummary();
+          if (!droppedFolderFiles.length) {
+            await showFileManagerMessage({
+              title: 'No Files Found',
+              icon: 'warning',
+              message: 'No files were found in the dropped item. Please drop a folder or files.',
+              buttons: [{ text: 'OK', class: 'btn-warning' }]
+            });
+          }
+        } catch (error) {
+          clearDroppedFolderFiles();
+          updateSelectionSummary();
+          await showFileManagerMessage({
+            title: 'Folder Read Failed',
+            icon: 'error',
+            message: error.message || 'Unable to read the dropped folder.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        }
+      });
+    }
+    updateMode();
+
+    if (orgBackupDownloadBtn && orgBackupOrgId) {
+      orgBackupDownloadBtn.addEventListener('click', async () => {
+        const orgId = orgBackupOrgId.value || '';
+        const scopeLabel = getBackupScopeLabel(orgId);
+        if (!orgId) {
+          await showFileManagerMessage({
+            title: 'Folder Required',
+            icon: 'warning',
+            message: 'Select an upload folder before downloading a backup.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          return;
+        }
+
+        const loadingToken = typeof showLoading === 'function'
+          ? showLoading({ title: 'Preparing backup', note: 'Compressing organization files...', operation: 'Creating archive', progress: 20 })
+          : null;
+        orgBackupDownloadBtn.disabled = true;
+
+        try {
+          const body = new URLSearchParams({ orgId });
+          const response = await fetch('/files/org-backup/download', {
+            method: 'POST',
+            headers: ajaxHeaders({
+              'Accept': 'application/gzip, application/json',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }),
+            body: body.toString()
+          });
+          if (!response.ok) {
+            throw new Error(await readErrorPayload(response, 'Backup download failed.'));
+          }
+          if (typeof updateLoading === 'function') {
+            updateLoading({ operation: 'Starting download', progress: 90 });
+          }
+          const blob = await response.blob();
+          const fileName = parseDownloadFileName(response, `org-upload-backup-${scopeLabel}.tar.gz`);
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          await showFileManagerMessage({
+            title: 'Backup Ready',
+            icon: 'success',
+            message: `Backup download started for <code>${escapeHtml(scopeLabel)}</code>.`,
+            buttons: [{ text: 'OK', class: 'btn-success' }]
+          });
+        } catch (error) {
+          await showFileManagerMessage({
+            title: 'Backup Failed',
+            icon: 'error',
+            message: escapeHtml(error.message || 'Unable to download organization backup.'),
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } finally {
+          orgBackupDownloadBtn.disabled = false;
+          if (typeof hideLoading === 'function') hideLoading(loadingToken || { force: true });
+        }
+      });
+    }
+
+    if (orgBackupRestoreForm && orgBackupOrgId && orgBackupFileInput) {
+      orgBackupRestoreForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const orgId = orgBackupOrgId.value || '';
+        const scopeLabel = getBackupScopeLabel(orgId);
+        const file = orgBackupFileInput.files && orgBackupFileInput.files[0];
+        if (!orgId) {
+          await showFileManagerMessage({
+            title: 'Folder Required',
+            icon: 'warning',
+            message: 'Select an upload folder before restoring a backup.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          return;
+        }
+        if (!file) {
+          await showFileManagerMessage({
+            title: 'Backup Required',
+            icon: 'warning',
+            message: 'Select a compressed organization backup file first.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          return;
+        }
+
+        const selectedLabel = orgBackupOrgId.selectedOptions && orgBackupOrgId.selectedOptions[0]
+          ? orgBackupOrgId.selectedOptions[0].textContent
+          : scopeLabel;
+        const choice = await showFileManagerMessage({
+          title: 'Replace Organization Files?',
+          icon: 'warning',
+          message: `This will permanently replace all current files under <code>${escapeHtml(scopeLabel)}</code> with the contents of <code>${escapeHtml(file.name)}</code>.<br><br>Selected folder: <b>${escapeHtml(selectedLabel)}</b>`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Restore Backup', class: 'btn-danger' }
+          ]
+        });
+        if (choice !== 'Restore Backup') return;
+
+        const loadingToken = typeof showLoading === 'function'
+          ? showLoading({ title: 'Restoring backup', note: 'Validating archive and replacing organization files...', operation: 'Uploading backup', progress: 15 })
+          : null;
+        if (orgBackupRestoreBtn) orgBackupRestoreBtn.disabled = true;
+
+        try {
+          const formData = new FormData();
+          formData.append('orgId', orgId);
+          formData.append('backupFile', file);
+          const response = await fetch('/files/org-backup/restore', {
+            method: 'POST',
+            headers: ajaxHeaders({ 'Accept': 'application/json' }),
+            body: formData
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data.status !== 'success') {
+            throw new Error(data.message || 'Backup restore failed.');
+          }
+          if (typeof updateLoading === 'function') {
+            updateLoading({ operation: 'Refreshing', progress: 95 });
+          }
+          await showFileManagerMessage({
+            title: 'Restore Complete',
+            icon: 'success',
+            message: data.message || 'Organization files restored successfully.',
+            buttons: [{ text: 'OK', class: 'btn-success' }]
+          });
+          window.location.reload();
+        } catch (error) {
+          await showFileManagerMessage({
+            title: 'Restore Failed',
+            icon: 'error',
+            message: escapeHtml(error.message || 'Unable to restore organization backup.'),
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } finally {
+          if (orgBackupRestoreBtn) orgBackupRestoreBtn.disabled = false;
+          if (typeof hideLoading === 'function') hideLoading(loadingToken || { force: true });
+        }
+      });
+    }
+
+    if (createFolderForm) {
+      createFolderForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new URLSearchParams(new FormData(createFolderForm));
+        const submitBtn = createFolderForm.querySelector('button[type="submit"]');
+        const loadingToken = typeof showLoading === 'function'
+          ? showLoading({ title: 'Creating folder', note: 'Please wait...', operation: 'Validating', progress: 10 })
+          : null;
+
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+          if (typeof updateLoading === 'function') {
+            updateLoading({ operation: 'Creating folder', progress: 55 });
+          }
+          const resp = await fetch('/files/create-folder', {
+            method: 'POST',
+            headers: ajaxHeaders({
+              'Accept': 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }),
+            body: formData.toString()
+          });
+          const data = await resp.json();
+          if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.message || 'Failed to create folder.');
+          }
+          if (typeof updateLoading === 'function') {
+            updateLoading({ operation: 'Refreshing', progress: 95 });
+          }
+          await showFileManagerMessage({
+            title: 'Folder Created',
+            icon: 'success',
+            message: data.message || 'Folder created successfully.',
+            buttons: [{ text: 'OK', class: 'btn-success' }]
+          });
+          window.location.reload();
+        } catch (error) {
+          await showFileManagerMessage({
+            title: 'Create Folder Failed',
+            icon: 'error',
+            message: error.message || 'Unable to create folder.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+          if (typeof hideLoading === 'function') hideLoading(loadingToken || { force: true });
+        }
+      });
+    }
+
+    if (uploadForm) {
+      uploadForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const submitBtn = uploadForm.querySelector('button[type="submit"]');
+        const uploadSelection = getUploadSelection();
+        const selectedFiles = uploadSelection.files;
+
+        if (!selectedFiles.length) {
+          await showFileManagerMessage({
+            title: 'No Files Selected',
+            icon: 'warning',
+            message: 'Please choose files or a folder to upload.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          return;
+        }
+
+        const relativePaths = uploadSelection.relativePaths;
+        if (relativePathsInput) {
+          relativePathsInput.value = JSON.stringify(relativePaths);
+        }
+
+        const formData = new FormData();
+        const currentPathInput = uploadForm.querySelector('input[name="path"]');
+        formData.append('path', currentPathInput ? currentPathInput.value : '');
+        formData.append('relativePathsJson', JSON.stringify(relativePaths));
+        selectedFiles.forEach((file) => {
+          formData.append('files', file, file.name);
+        });
+
+        if (submitBtn) submitBtn.disabled = true;
+        const totalCount = selectedFiles.length;
+        const loadingToken = typeof showLoading === 'function'
+          ? showLoading({
+            title: 'Uploading files',
+            note: `Preparing ${totalCount} file(s)...`,
+            operation: `Preparing (0/${totalCount})`,
+            progress: 5
+          })
+          : null;
+
+        try {
+          if (typeof updateLoading === 'function') {
+            updateLoading({
+              operation: `Creating folders (${totalCount} file target(s))`,
+              progress: 15
+            });
+          }
+
+          const result = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/files/upload', true);
+            xhr.setRequestHeader('X-AJAX-Request', 'true');
+
+            xhr.upload.onprogress = (eventProgress) => {
+              if (!eventProgress.lengthComputable || typeof updateLoading !== 'function') return;
+              const ratio = eventProgress.total > 0 ? (eventProgress.loaded / eventProgress.total) : 0;
+              const progress = Math.min(90, Math.max(20, Math.round(ratio * 90)));
+              updateLoading({
+                operation: `Uploading (${totalCount} file(s))`,
+                progress
+              });
+            };
+
+            xhr.onload = () => {
+              let body = {};
+              try {
+                body = JSON.parse(xhr.responseText || '{}');
+              } catch (_) {
+                body = {};
+              }
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(body);
+              } else {
+                const rawText = String(xhr.responseText || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                const detail = rawText && rawText.length < 260 ? ` ${rawText}` : '';
+                reject(new Error(body.message || `Upload failed (${xhr.status || 'network'}).${detail}`));
+              }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during upload.'));
+            xhr.send(formData);
+          });
+
+          if (typeof updateLoading === 'function') {
+            updateLoading({ operation: 'Finalizing', progress: 98 });
+          }
+
+          const uploadedCount = Number(result.uploadedCount || 0);
+          const renamedCount = Number(result.renamedCount || 0);
+          const skippedCount = Number(result.skippedCount || 0);
+          const statusLine = `Uploaded: ${uploadedCount}, Renamed: ${renamedCount}, Skipped: ${skippedCount}`;
+
+          let details = statusLine;
+          if (Array.isArray(result.renamedFiles) && result.renamedFiles.length > 0) {
+            const renamedPreview = result.renamedFiles
+              .slice(0, 8)
+              .map((row) => `${row.from} -> ${row.to}`)
+              .join('<br>');
+            details += `<br><br><strong>Renamed files:</strong><br>${renamedPreview}`;
+            if (result.renamedFiles.length > 8) {
+              details += `<br>...and ${result.renamedFiles.length - 8} more.`;
+            }
+          }
+
+          if (Array.isArray(result.errors) && result.errors.length > 0) {
+            const errorPreview = result.errors
+              .slice(0, 5)
+              .map((row) => `${row.fileName || 'File'}: ${row.message}`)
+              .join('<br>');
+            details += `<br><br><strong>Errors:</strong><br>${errorPreview}`;
+          }
+
+          await showFileManagerMessage({
+            title: result.status === 'partial' ? 'Upload Completed with Warnings' : 'Upload Completed',
+            icon: result.status === 'partial' ? 'warning' : 'success',
+            message: details,
+            buttons: [{ text: 'OK', class: result.status === 'partial' ? 'btn-warning' : 'btn-success' }]
+          });
+
+          window.location.reload();
+        } catch (error) {
+          await showFileManagerMessage({
+            title: 'Upload Failed',
+            icon: 'error',
+            message: error.message || 'Unable to upload files.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+          if (typeof hideLoading === 'function') hideLoading(loadingToken || { force: true });
+        }
+      });
+    }
+
+    transferBrowseDestinationBtn?.addEventListener('click', async () => {
+      const requestedPath = normalizeFilePath(transferDestinationPath?.value || '<%= currentPath %>');
+      try {
+        await loadFolderPicker(requestedPath, { silent: false });
+        folderPickerModal?.show();
+      } catch (error) {
+        await showFileManagerMessage({
+          title: 'Folder Browser Failed',
+          icon: 'error',
+          message: error.message || 'Unable to load destination folders.',
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+      }
+    });
+
+    folderPickerDriveSelect?.addEventListener('change', async () => {
+      const driveId = normalizeFilePath(folderPickerDriveSelect.value);
+      if (!driveId) return;
+      try {
+        await loadFolderPicker(driveId, { silent: true });
+      } catch (error) {
+        await showFileManagerMessage({
+          title: 'Folder Browser Failed',
+          icon: 'error',
+          message: error.message || 'Unable to switch drive.',
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+      }
+    });
+
+    folderPickerUpBtn?.addEventListener('click', async () => {
+      const parentPath = normalizeFilePath(folderPickerState.parentPath);
+      if (!parentPath) return;
+      try {
+        await loadFolderPicker(parentPath, { silent: true });
+      } catch (error) {
+        await showFileManagerMessage({
+          title: 'Folder Browser Failed',
+          icon: 'error',
+          message: error.message || 'Unable to open parent folder.',
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+      }
+    });
+
+    folderPickerFolderList?.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-folder-picker-open]');
+      if (!button) return;
+      const nextPath = normalizeFilePath(button.getAttribute('data-folder-picker-open'));
+      if (!nextPath) return;
+      try {
+        await loadFolderPicker(nextPath, { silent: true });
+      } catch (error) {
+        await showFileManagerMessage({
+          title: 'Folder Browser Failed',
+          icon: 'error',
+          message: error.message || 'Unable to open selected folder.',
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+      }
+    });
+
+    folderPickerApplyBtn?.addEventListener('click', () => {
+      const selectedPath = normalizeFilePath(folderPickerState.currentPath);
+      if (!selectedPath || !transferDestinationPath) return;
+      transferDestinationPath.value = selectedPath;
+      if (transferDestinationHint) {
+        transferDestinationHint.textContent = `Destination selected: ${selectedPath}`;
+      }
+      folderPickerModal?.hide();
+    });
+
+    document.querySelectorAll('.file-transfer-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const operation = String(btn.dataset.operation || 'move').trim().toLowerCase() === 'copy' ? 'copy' : 'move';
+        const sourcePath = String(btn.dataset.path || '').trim();
+        if (!sourcePath) return;
+        openTransferModalForPaths(operation, [sourcePath]);
+      });
+    });
+
+    if (transferForm) {
+      transferForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const operation = String(transferOperation?.value || 'move').trim().toLowerCase() === 'copy' ? 'copy' : 'move';
+        const endpoint = operation === 'copy' ? '/files/copy' : '/files/move';
+        const formData = new URLSearchParams(new FormData(transferForm));
+        const loadingToken = typeof showLoading === 'function'
+          ? showLoading({
+            title: operation === 'copy' ? 'Copying items' : 'Moving items',
+            note: 'Please wait...',
+            operation: operation === 'copy' ? 'Copying items' : 'Moving items',
+            progress: 55
+          })
+          : null;
+
+        if (transferSubmitBtn) transferSubmitBtn.disabled = true;
+
+        try {
+          const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: ajaxHeaders({
+              'Accept': 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }),
+            body: formData.toString()
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || !['success', 'partial'].includes(String(data.status || ''))) {
+            throw new Error(data.message || (operation === 'copy' ? 'Failed to copy items.' : 'Failed to move items.'));
+          }
+          if (typeof updateLoading === 'function') {
+            updateLoading({ operation: 'Refreshing', progress: 95 });
+          }
+          if (transferModal) transferModal.hide();
+          let message = data.message || (operation === 'copy' ? 'Items copied successfully.' : 'Items moved successfully.');
+          if (data.summary && typeof data.summary === 'object') {
+            const requested = Number(data.summary.requested || 0);
+            const succeeded = Number(data.summary.succeeded || 0);
+            const failed = Number(data.summary.failed || 0);
+            message += `<br><br><strong>Summary:</strong> ${succeeded}/${requested} succeeded, ${failed} failed.`;
+          }
+          if (Array.isArray(data.results) && data.results.length > 0 && String(data.status || '') === 'partial') {
+            const failures = data.results
+              .filter((row) => String(row?.status || '') === 'error')
+              .slice(0, 8)
+              .map((row) => `${escapeHtml(String(row.sourcePath || 'Item'))}: ${escapeHtml(String(row.message || 'Error'))}`)
+              .join('<br>');
+            if (failures) {
+              message += `<br><br><strong>Failures:</strong><br>${failures}`;
+            }
+          }
+          await showFileManagerMessage({
+            title: operation === 'copy' ? 'Copy Completed' : 'Move Completed',
+            icon: String(data.status || '') === 'partial' ? 'warning' : 'success',
+            message,
+            buttons: [{ text: 'OK', class: String(data.status || '') === 'partial' ? 'btn-warning' : 'btn-success' }]
+          });
+          selectedFilePaths.clear();
+          syncFileSelectionUi();
+          window.location.reload();
+        } catch (error) {
+          await showFileManagerMessage({
+            title: operation === 'copy' ? 'Copy Failed' : 'Move Failed',
+            icon: 'error',
+            message: error.message || (operation === 'copy' ? 'Unable to copy items.' : 'Unable to move items.'),
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } finally {
+          if (transferSubmitBtn) transferSubmitBtn.disabled = false;
+          if (typeof hideLoading === 'function') hideLoading(loadingToken || { force: true });
+        }
+      });
+    }
+
+    document.querySelectorAll('.file-rename-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sourcePath = String(btn.dataset.path || '').trim();
+        const sourceName = String(btn.dataset.name || sourcePath.split('/').pop() || 'Item').trim();
+        if (!sourcePath || !renameForm) return;
+
+        if (renameSourcePath) renameSourcePath.value = sourcePath;
+        if (renameSourceName) renameSourceName.value = sourceName;
+        if (renameNewName) renameNewName.value = sourceName;
+        if (renameModal) renameModal.show();
+        if (renameNewName) {
+          setTimeout(() => {
+            renameNewName.focus({ preventScroll: true });
+            renameNewName.select();
+          }, 160);
+        }
+      });
+    });
+
+    if (renameForm) {
+      renameForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new URLSearchParams(new FormData(renameForm));
+        const loadingToken = typeof showLoading === 'function'
+          ? showLoading({
+            title: 'Renaming item',
+            note: 'Please wait...',
+            operation: 'Renaming item',
+            progress: 55
+          })
+          : null;
+
+        if (renameSubmitBtn) renameSubmitBtn.disabled = true;
+
+        try {
+          const resp = await fetch('/files/rename', {
+            method: 'POST',
+            headers: ajaxHeaders({
+              'Accept': 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }),
+            body: formData.toString()
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.message || 'Failed to rename item.');
+          }
+          if (typeof updateLoading === 'function') {
+            updateLoading({ operation: 'Refreshing', progress: 95 });
+          }
+          if (renameModal) renameModal.hide();
+          await showFileManagerMessage({
+            title: 'Item Renamed',
+            icon: 'success',
+            message: data.message || 'Item renamed successfully.',
+            buttons: [{ text: 'OK', class: 'btn-success' }]
+          });
+          window.location.reload();
+        } catch (error) {
+          await showFileManagerMessage({
+            title: 'Rename Failed',
+            icon: 'error',
+            message: error.message || 'Unable to rename item.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } finally {
+          if (renameSubmitBtn) renameSubmitBtn.disabled = false;
+          if (typeof hideLoading === 'function') hideLoading(loadingToken || { force: true });
+        }
+      });
+    }
+
+    document.querySelectorAll('.delete-item').forEach((btn) => {
+      btn.addEventListener('click', async (event) => {
+        const targetPath = event.currentTarget.dataset.path;
+        if (!targetPath) return;
+
+        const result = await showFileManagerMessage({
+          title: 'Delete Item',
+          message: 'Are you sure you want to delete this item permanently?<br>This cannot be undone.',
+          icon: 'warning',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary', value: false },
+            { text: 'Delete', class: 'btn-danger', value: true }
+          ]
+        });
+        const confirmed = (result === 'Delete');
+        if (!confirmed) return;
+
+        const loadingToken = typeof showLoading === 'function'
+          ? showLoading({ title: 'Deleting item', note: 'Please wait...', operation: 'Deleting item', progress: 65 })
+          : null;
+
+        try {
+          const resp = await fetch(`/files/delete/dummy?path=${encodeURIComponent(targetPath)}`, {
+            method: 'POST',
+            headers: ajaxHeaders({ 'Accept': 'application/json' })
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.message || 'Failed to delete item.');
+          }
+          if (typeof updateLoading === 'function') {
+            updateLoading({ operation: 'Refreshing', progress: 95 });
+          }
+          window.location.reload();
+        } catch (error) {
+          await showFileManagerMessage({
+            title: 'Delete Failed',
+            message: error.message || 'Unable to delete item.',
+            icon: 'error',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } finally {
+          if (typeof hideLoading === 'function') hideLoading(loadingToken || { force: true });
+        }
+      });
+    });
+  });
+</script>
+
+<style>
+  .hover-lift {
+    transition: transform 0.2s;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-5px);
+    cursor: pointer;
+  }
+
+  .file-view-pane .thumb-frame {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    border-top-left-radius: 0.5rem;
+    border-top-right-radius: 0.5rem;
+  }
+
+  .file-view-pane .thumb-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .file-folder-dropzone {
+    border: 1px dashed rgba(13, 110, 253, 0.45);
+    border-radius: 0.75rem;
+    background: rgba(13, 110, 253, 0.04);
+    padding: 1rem;
+    text-align: center;
+    transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .file-folder-dropzone.is-dragging {
+    border-color: rgba(13, 110, 253, 0.95);
+    background: rgba(13, 110, 253, 0.12);
+    transform: translateY(-1px);
+  }
+
+  .file-folder-dropzone.is-ready {
+    border-color: rgba(25, 135, 84, 0.85);
+    background: rgba(25, 135, 84, 0.08);
+  }
+
+  .file-entry-selected {
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.2) inset;
+  }
+
+  #folderPickerFolderList .list-group-item {
+    cursor: pointer;
+  }
+</style>

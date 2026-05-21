@@ -1,0 +1,80 @@
+[
+  {
+    "id": "SCP_ADMIN",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2025-12-06T07:45:38.292Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2025-12-06T07:45:38.292Z"
+    },
+    "description": "Unrestricted access to all data within the profile's context (Organization-wide or System-wide).",
+    "level": 100,
+    "name": "ADMIN"
+  },
+  {
+    "id": "SCP_DEPT",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2025-12-06T07:49:08.937Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2025-12-06T07:49:08.937Z"
+    },
+    "description": "Restricts access to records within the user's department.",
+    "level": 40,
+    "name": "DEPARTMENT"
+  },
+  {
+    "id": "SCP_DIV",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2025-12-06T07:50:39.139Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2025-12-06T07:50:39.139Z"
+    },
+    "description": "Restricts access to records within the user's division or group.",
+    "level": 30,
+    "name": "DIVISION"
+  },
+  {
+    "id": "SCP_ORG",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2025-12-06T07:46:03.531Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2025-12-06T07:46:41.127Z"
+    },
+    "description": "Access to all records associated with the user's permitted organizations.",
+    "level": 50,
+    "name": "ORGANIZATION"
+  },
+  {
+    "id": "SCP_OWNER",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2025-12-06T07:52:05.611Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2025-12-06T07:52:05.611Z"
+    },
+    "description": "Restricts access to records created by the user (Creator).",
+    "level": 20,
+    "name": "OWNER"
+  },
+  {
+    "id": "SCP_USER",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2025-12-06T07:53:18.939Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2025-12-06T07:53:18.939Z"
+    },
+    "description": "Restricts access to records explicitly assigned to the user (Assignee).",
+    "level": 10,
+    "name": "USER"
+  }
+]

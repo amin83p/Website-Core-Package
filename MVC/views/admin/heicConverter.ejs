@@ -1,0 +1,384 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h2 class="page-heading size-md m-0">HEIC Image Converter</h2>
+    <span class="badge bg-primary text-white border">Tool</span>
+  </div>
+
+  <div class="dash-hero mb-4 p-4">
+    <div class="row align-items-center">
+      <div class="col-md-1 text-center">
+        <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center mx-auto" 
+             style="width: 64px; height: 64px; font-size: 1.5rem;">
+          🖼️
+        </div>
+      </div>
+      <div class="col-md-11">
+        <h3 class="fw-bold mb-1">High-Efficiency Image Converter</h3>
+        <div class="d-flex flex-wrap gap-3 text-muted small">
+          <span><strong>Format:</strong> .HEIC / .HEIF</span>
+          <span>|</span>
+          <span><strong>Output:</strong> Standard JPEG</span>
+          <span>|</span>
+          <span><strong>Method:</strong> <span class="badge bg-success">Server-Side Processing</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <div class="col-12">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary d-flex justify-content-between align-items-center">
+          <span>Select Images</span>
+          <span class="badge bg-secondary" id="fileCountBadge">0 files queued</span>
+        </div>
+        <div class="card-body">
+           
+          <div id="dropZone" class="border-2 border-dashed rounded-3 p-5 text-center bg-white mb-4 position-relative" 
+               style="border-style: dashed; border-color: #dee2e6; cursor: pointer; transition: all 0.2s;">
+              
+              <div class="py-3">
+                <i class="bi bi-cloud-arrow-up text-primary opacity-50 mb-3" style="font-size: 3rem;"></i>
+                <h6 class="fw-bold text-dark">Drag & Drop HEIC files here</h6>
+                <p class="text-muted small mb-0">or click anywhere to browse</p>
+              </div>
+              <input type="file" id="fileInput" multiple accept=".heic,.HEIC,.heif,.HEIF" class="d-none">
+          </div>
+
+          <div id="queueSection" class="mb-3" style="display:none;">
+              <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
+                <h6 class="small fw-bold text-muted m-0">Upload Queue</h6>
+                <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-0" id="clearBtn">
+                   <i class="bi bi-trash"></i> Clear All
+                </button>
+              </div>
+              
+              <div id="queueGrid" class="row g-3">
+                  </div>
+          </div>
+
+          <div class="d-flex justify-content-end pt-2">
+             <button id="convertBtn" class="btn btn-primary btn-filled px-4" disabled>
+               <i class="bi bi-lightning-charge-fill me-2"></i>Upload & Convert
+             </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12" id="resultsSection" style="display: none;">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-dark text-white border-0 fw-bold d-flex justify-content-between align-items-center">
+          <span>Conversion Results</span>
+          <button id="downloadAllBtn" class="btn btn-sm btn-light text-dark fw-bold rounded-pill px-3" disabled>
+            <i class="bi bi-file-earmark-zip-fill me-1"></i> Download All
+          </button>
+        </div>
+        
+        <div class="card-body bg-light">
+          
+          <div id="loadingState" class="text-center py-5 d-none">
+             <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+             <h5 class="fw-bold text-dark">Processing...</h5>
+             <p class="text-muted small">Converting your images on the server.</p>
+          </div>
+
+          <div id="resultsGrid" class="row g-3"></div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<%- include('../partials/modal') %>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Elements
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const convertBtn = document.getElementById('convertBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const fileCountBadge = document.getElementById('fileCountBadge');
+    
+    const queueSection = document.getElementById('queueSection');
+    const queueGrid = document.getElementById('queueGrid');
+    
+    const resultsSection = document.getElementById('resultsSection');
+    const resultsGrid = document.getElementById('resultsGrid');
+    const loadingState = document.getElementById('loadingState');
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+
+    // State
+    let selectedFiles = []; // Array of File objects
+    let convertedBlobs = [];
+
+    // --- 1. Selection & Drag/Drop ---
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    dropZone.addEventListener('dragover', (e) => { 
+        e.preventDefault(); 
+        dropZone.classList.add('bg-light', 'border-primary'); 
+    });
+    
+    dropZone.addEventListener('dragleave', () => { 
+        dropZone.classList.remove('bg-light', 'border-primary'); 
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('bg-light', 'border-primary');
+        handleNewFiles(e.dataTransfer.files);
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+        handleNewFiles(e.target.files);
+        fileInput.value = ''; // Allow re-selecting same file
+    });
+
+    async function handleNewFiles(fileList) {
+        const validFiles = Array.from(fileList).filter(f => 
+            f.name.toLowerCase().endsWith('.heic') || f.name.toLowerCase().endsWith('.heif')
+        );
+
+        if (validFiles.length === 0) {
+            await showMessageModal({
+                title: 'Invalid File',
+                message: 'Please select valid <b>.HEIC</b> or <b>.HEIF</b> files.',
+                icon: 'warning',
+                buttons: [{text: 'OK', class: 'btn-warning'}]
+            });
+            return;
+        }
+
+        // Add to existing array
+        selectedFiles = [...selectedFiles, ...validFiles];
+        renderQueue();
+    }
+
+    // --- 2. Render Queue ---
+    function renderQueue() {
+        queueGrid.innerHTML = '';
+        fileCountBadge.textContent = `${selectedFiles.length} files queued`;
+        
+        if (selectedFiles.length > 0) {
+            queueSection.style.display = 'block';
+            convertBtn.disabled = false;
+        } else {
+            queueSection.style.display = 'none';
+            convertBtn.disabled = true;
+        }
+
+        selectedFiles.forEach((file, index) => {
+            const col = document.createElement('div');
+            col.className = 'col-6 col-md-4 col-lg-2 fade-in';
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+
+            col.innerHTML = `
+                <div class="card h-100 shadow-sm border position-relative">
+                   <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 p-0 d-flex align-items-center justify-content-center shadow-sm" 
+                           style="width: 22px; height: 22px; z-index: 10; border-radius: 50%;"
+                           onclick="removeFile(${index})" title="Remove">
+                       <i class="bi bi-x"></i>
+                   </button>
+
+                   <div class="ratio ratio-4x3 bg-light border-bottom d-flex align-items-center justify-content-center">
+                      <div class="text-muted text-center">
+                          <i class="bi bi-filetype-heic fs-2"></i>
+                      </div>
+                   </div>
+
+                   <div class="card-body p-2">
+                      <div class="small fw-bold text-truncate text-dark" title="${file.name}">${file.name}</div>
+                      <div class="d-flex justify-content-between align-items-center mt-1">
+                         <span class="badge bg-light text-secondary border" style="font-size: 0.65rem;">${sizeMB} MB</span>
+                      </div>
+                   </div>
+                </div>
+            `;
+            queueGrid.appendChild(col);
+        });
+    }
+
+    window.removeFile = (index) => {
+        selectedFiles.splice(index, 1);
+        renderQueue();
+    };
+
+    clearBtn.addEventListener('click', () => {
+        selectedFiles = [];
+        renderQueue();
+        resultsSection.style.display = 'none';
+    });
+
+
+    // --- 3. Upload & Process ---
+    convertBtn.addEventListener('click', async () => {
+        if (selectedFiles.length === 0) return;
+
+        // UI Prep
+        resultsSection.style.display = 'block';
+        resultsGrid.innerHTML = '';
+        loadingState.classList.remove('d-none');
+        convertBtn.disabled = true;
+        
+        // Disable delete buttons
+        document.querySelectorAll('#queueGrid button').forEach(b => b.disabled = true);
+
+        const formData = new FormData();
+        selectedFiles.forEach(file => formData.append('heicFiles', file));
+
+        try {
+            const response = await fetch('/debug/heic-convert', {
+                method: 'POST',
+                body: formData
+            });
+
+            // Handle non-JSON responses gracefully
+            let result;
+            try {
+                result = await response.json();
+            } catch (e) {
+                throw new Error("Server returned an invalid response.");
+            }
+
+            loadingState.classList.add('d-none');
+
+            if (result.status === 'success') {
+                convertedBlobs = []; 
+                
+                result.files.forEach(file => {
+                    if (file.error) {
+                         renderResultCard(file, true);
+                    } else {
+                         const blob = base64ToBlob(file.data, 'image/jpeg');
+                         convertedBlobs.push({ name: file.name, blob: blob });
+                         renderResultCard({ ...file, blobUrl: URL.createObjectURL(blob) }, false);
+                    }
+                });
+
+                // Clear queue on success
+                selectedFiles = [];
+                renderQueue(); 
+                downloadAllBtn.disabled = convertedBlobs.length === 0;
+                
+                // Show success toast/modal
+                await showMessageModal({
+                    title: 'Conversion Complete',
+                    message: `Processed <b>${result.files.length}</b> images successfully.`,
+                    icon: 'success',
+                    buttons: [{ text: 'Great', class: 'btn-success' }]
+                });
+
+            } else {
+                await showMessageModal({
+                    title: 'Conversion Failed',
+                    message: result.message || 'An unknown error occurred on the server.',
+                    icon: 'error',
+                    buttons: [{ text: 'Close', class: 'btn-danger' }]
+                });
+                renderQueue(); // Re-enable controls
+            }
+
+        } catch (err) {
+            console.error(err);
+            loadingState.classList.add('d-none');
+            
+            await showMessageModal({
+                title: 'Network Error',
+                message: 'Failed to connect to the server. Please try again.',
+                icon: 'error',
+                buttons: [{ text: 'OK', class: 'btn-secondary' }]
+            });
+            
+            renderQueue();
+        }
+    });
+
+    // --- 4. Render Results ---
+    function renderResultCard(file, isError) {
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-4 col-lg-3 fade-in';
+        
+        if (isError) {
+            col.innerHTML = `
+                <div class="card h-100 shadow-sm border-danger">
+                   <div class="ratio ratio-1x1 bg-danger bg-opacity-10 d-flex align-items-center justify-content-center">
+                      <i class="bi bi-exclamation-triangle-fill text-danger fs-1"></i>
+                   </div>
+                   <div class="card-body p-2">
+                      <div class="small fw-bold text-truncate text-danger" title="${file.originalName}">${file.originalName}</div>
+                      <div class="mt-1 badge bg-danger">Failed</div>
+                   </div>
+                </div>`;
+        } else {
+            col.innerHTML = `
+                <div class="card h-100 shadow-sm border-success">
+                   <div class="ratio ratio-1x1 bg-light border-bottom position-relative group-hover">
+                      <img src="${file.blobUrl}" class="img-fluid" style="object-fit: contain; width:100%; height:100%;">
+                      <div class="position-absolute top-0 end-0 p-1">
+                        <span class="badge bg-success shadow-sm">JPG</span>
+                      </div>
+                   </div>
+                   <div class="card-body p-2">
+                      <div class="small fw-bold text-truncate text-success" title="${file.name}">${file.name}</div>
+                      <div class="d-flex justify-content-between align-items-center mt-2">
+                         <span class="text-muted x-small">Ready</span>
+                         <button class="btn btn-sm btn-outline-primary py-0" onclick="downloadSingle('${file.name}')">
+                            <i class="bi bi-download"></i>
+                         </button>
+                      </div>
+                   </div>
+                </div>`;
+        }
+        resultsGrid.appendChild(col);
+    }
+
+    window.downloadSingle = (name) => {
+        const item = convertedBlobs.find(b => b.name === name);
+        if (item) saveAs(item.blob, name);
+    };
+
+    function base64ToBlob(base64, mimeType) {
+        const byteCharacters = atob(base64.split(',')[1]);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        return new Blob([byteArray], { type: mimeType });
+    }
+
+    downloadAllBtn.addEventListener('click', async () => {
+        if (convertedBlobs.length === 0) return;
+        const zip = new JSZip();
+        convertedBlobs.forEach(item => zip.file(item.name, item.blob));
+        
+        const originalText = downloadAllBtn.innerHTML;
+        downloadAllBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Zipping...`;
+        downloadAllBtn.disabled = true;
+        
+        try {
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, "converted_images.zip");
+        } finally {
+            downloadAllBtn.innerHTML = originalText;
+            downloadAllBtn.disabled = false;
+        }
+    });
+});
+</script>
+
+<style>
+  .fade-in { animation: fadeIn 0.5s ease-in; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .border-dashed { border-style: dashed !important; }
+</style>

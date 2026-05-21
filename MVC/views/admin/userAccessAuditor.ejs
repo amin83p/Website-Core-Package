@@ -1,0 +1,247 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h2 class="page-heading size-md m-0">User Access Auditor</h2>
+    <span class="badge bg-warning text-dark border">Security Tool</span>
+  </div>
+
+  <div class="dash-hero mb-4 p-4">
+    <div class="row align-items-center">
+      <div class="col-md-1 text-center">
+        <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center mx-auto" 
+             style="width: 64px; height: 64px; font-size: 1.5rem;">
+          📑
+        </div>
+      </div>
+      <div class="col-md-11">
+        <h3 class="fw-bold mb-1">Multi-Org Permission Audit</h3>
+        <p class="text-muted small mb-0">
+          Select a user to generate a full breakdown of their effective permissions across all linked organizations.
+          This report merges multiple profiles to show the final "Union of Authority".
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary">
+          Select Target
+        </div>
+        <div class="card-body">
+          <form id="auditForm">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">User Account</label>
+              <div class="input-group">
+                 <input type="hidden" id="selectedUserId" name="userId">
+                 <input type="text" id="selectedUserName" class="form-control bg-white" placeholder="Select User..." readonly required>
+                 <button type="button" class="btn btn-outline-primary" id="pickUserBtn">
+                    <i class="bi bi-person-badge"></i>
+                 </button>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-filled btn-primary w-100" id="auditBtn" disabled>
+               <i class="bi bi-file-earmark-spreadsheet me-2"></i> Generate Report
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-8">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary d-flex justify-content-between align-items-center">
+          <span>Access Report</span>
+          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('reportContainer').innerHTML=''" title="Clear">
+             <i class="bi bi-eraser"></i>
+          </button>
+        </div>
+        <div class="card-body bg-light p-3 overflow-auto" id="reportContainer" style="max-height: 600px;">
+           <div class="text-center text-muted py-5">
+              <i class="bi bi-search fs-1 opacity-25"></i>
+              <div class="mt-2">Select a user to analyze their permissions.</div>
+           </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // Picker Logic
+    const pickBtn = document.getElementById('pickUserBtn');
+    const idInput = document.getElementById('selectedUserId');
+    const nameInput = document.getElementById('selectedUserName');
+    const auditBtn = document.getElementById('auditBtn');
+
+    pickBtn.addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.user({
+            title: 'Select User to Audit',
+            icon: 'bi-person-lines-fill',
+            context: GenericPickerContexts.allUsers(),
+            onSelect: (item) => {
+                idInput.value = item.id;
+                nameInput.value = `${item.name || item.username} (${item.id})`;
+                auditBtn.disabled = false;
+            }
+        }));
+    });
+
+    // Form Submit
+    const form = document.getElementById('auditForm');
+    const container = document.getElementById('reportContainer');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted">Analyzing Organization Profiles...</div></div>';
+        
+        try {
+            const res = await fetch('/debug/access-audit/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: idInput.value })
+            });
+            const data = await res.json();
+            
+            if(data.status === 'success') {
+                renderReport(data.report);
+            } else {
+                container.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+            }
+        } catch (err) {
+            container.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+        }
+    });
+
+    function renderReport(report) {
+        if (!report || report.length === 0) {
+            container.innerHTML = `<div class="alert alert-warning">No organizations found for this user.</div>`;
+            return;
+        }
+
+        let html = `<div class="accordion" id="auditAccordion">`;
+
+        report.forEach((orgData, idx) => {
+            const isFullAdmin = orgData.effectivePermissions.isFullAdmin;
+            const profileBadge = isFullAdmin 
+                ? `<span class="badge bg-success">FULL ADMIN</span>` 
+                : `<span class="badge bg-info text-dark">${orgData.profileNames.join(', ') || 'No Profile'}</span>`;
+
+            html += `
+              <div class="accordion-item mb-3 border rounded shadow-sm overflow-hidden">
+                <h2 class="accordion-header" id="head${idx}">
+                  <button class="accordion-button ${idx!==0?'collapsed':''}" type="button" data-bs-toggle="collapse" data-bs-target="#col${idx}">
+                    <div class="d-flex w-100 justify-content-between align-items-center me-3">
+                        <div>
+                            <span class="fw-bold text-dark">${orgData.orgName}</span>
+                            <span class="text-muted small ms-2">(#${orgData.orgId})</span>
+                        </div>
+                        <div>${profileBadge}</div>
+                    </div>
+                  </button>
+                </h2>
+                <div id="col${idx}" class="accordion-collapse collapse ${idx===0?'show':''}" data-bs-parent="#auditAccordion">
+                  <div class="accordion-body bg-white">
+                    
+                    <div class="row mb-3 pb-3 border-bottom">
+                       <div class="col-md-3"><strong>Roles:</strong> ${orgData.roleDisplay || orgData.role}</div>
+                       <div class="col-md-3"><strong>Status:</strong> <span class="badge ${orgData.status==='active'?'bg-success':'bg-secondary'}">${orgData.status}</span></div>
+                       <div class="col-md-6 text-muted small"><strong>Profiles Used:</strong> ${orgData.profileIds.join(', ') || 'None'}</div>
+                    </div>
+
+                    ${renderPermissionTable(orgData.effectivePermissions)}
+
+                  </div>
+                </div>
+              </div>
+            `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+    }
+
+    function renderPermissionTable(perms) {
+        if (perms.isFullAdmin) {
+            return `
+                <div class="alert alert-success bg-success-subtle border-success text-center">
+                    <i class="bi bi-shield-check fs-1 d-block mb-2 text-success"></i>
+                    <h5 class="fw-bold text-success">Unrestricted Access</h5>
+                    <p class="mb-0 text-dark">User has <strong>Global Admin</strong> privileges (Profile or Virtual).</p>
+                </div>`;
+        }
+        
+        // ... (Global Ban Check) ...
+
+        if (Object.keys(perms.sections).length === 0) {
+            return `<div class="text-muted fst-italic">No specific permissions found.</div>`;
+        }
+
+        let table = `
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 35%;">Section</th>
+                            <th>Effective Operations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        for (const [secId, secData] of Object.entries(perms.sections)) {
+            let opsHtml = '';
+            
+            // Render Section Name + ID
+            const secDisplay = `
+                <div class="fw-bold text-primary">${secData.sectionName}</div>
+                <div class="x-small text-muted">${secId}</div>
+                ${secData.source === 'policy' ? '<span class="badge bg-info text-dark mt-1" style="font-size:0.6em">POLICY ONLY</span>' : ''}
+            `;
+
+            if (secData.policyStatus === 'BANNED') {
+                opsHtml = `<span class="badge bg-danger w-100 py-2">SECTION BANNED BY POLICY</span>`;
+            } else if (secData.adminAccess) {
+                const label = secData.policyStatus === 'GRANTED' ? 'ALL OPERATIONS (Policy Grant)' : 'ALL OPERATIONS (Admin)';
+                opsHtml = `<span class="badge bg-success w-100 py-2">${label}</span>`;
+            } else {
+                // Render Allowed Ops with Scope
+                if (secData.operations && secData.operations.length > 0) {
+                    opsHtml = secData.operations.map(op => {
+                        const isPolyGrant = secData.policyGrantedOps && secData.policyGrantedOps.includes(op.id);
+                        const style = 'bg-success text-white'; 
+                        const icon = isPolyGrant ? '<i class="bi bi-arrow-up-circle me-1" title="Granted by Policy"></i> ' : '';
+                        
+                        // ✅ NEW: Resolve Scope
+                        const scopeDisplay = op.scopeId ? `<span class="ms-1 opacity-75 border-start ps-1" style="font-size: 0.9em">${op.scopeId}</span>` : '';
+
+                        return `<span class="badge ${style} me-1 mb-1 border border-success-subtle" title="ID: ${op.id}">${icon}${op.name}${scopeDisplay}</span>`;
+                    }).join('');
+                }
+                
+                // ... (Banned Ops Rendering) ...
+
+                if (!opsHtml) opsHtml = `<span class="text-muted small">Read Only / No Ops</span>`;
+            }
+
+            table += `
+                <tr>
+                    <td>${secDisplay}</td>
+                    <td>${opsHtml}</td>
+                </tr>
+            `;
+        }
+
+        table += `</tbody></table></div>`;
+        return table;
+    }
+});
+</script>

@@ -1,0 +1,1234 @@
+[
+  {
+    "orgId": "900000",
+    "deliveryDepartmentId": "DEP_1771788762810",
+    "deliveryDepartmentName": "EAL English as an Additional Language",
+    "title": "EAL-M/I-CLB 5-6",
+    "status": "active",
+    "registrationMode": "rolling",
+    "cycleGroupId": "",
+    "cycleStartDate": "2026-03-01",
+    "cycleEndDate": "2026-04-30",
+    "isClosedForNewEnrollment": false,
+    "previousClassId": "",
+    "nextClassId": "",
+    "cycleNo": 1,
+    "billingMode": "chargeable",
+    "credits": 3,
+    "allowedProgramTerms": [
+      {
+        "programId": "232974",
+        "termId": "",
+        "order": 1,
+        "programCode": "ELA-PROGRAM",
+        "programName": "English as an Additional Language Program",
+        "termCode": "",
+        "termName": "",
+        "notes": ""
+      }
+    ],
+    "statusHistory": [
+      {
+        "status": "active",
+        "date": "2026-03-30T16:53:59.640Z",
+        "updatedBy": "ROOT_001",
+        "reason": "Initial creation"
+      }
+    ],
+    "curriculum": {
+      "subjects": [
+        {
+          "subjectId": "152104",
+          "code": "EAL-CLB5-6",
+          "name": "EAL- CLB 5-6",
+          "allocatedHours": 150,
+          "weight": 100
+        }
+      ],
+      "totalHours": 150
+    },
+    "pricing": {
+      "mode": "auto",
+      "feeRules": [
+        {
+          "feeCategory": "__ALL__",
+          "suggestedAmount": 6230,
+          "amount": 5000,
+          "currency": "CAD",
+          "transactionDefinitionId": "",
+          "transactionDefinitionCode": "",
+          "transactionDefinitionName": "",
+          "notes": "",
+          "active": true,
+          "manualOverride": true
+        }
+      ]
+    },
+    "postingTemplates": [
+      {
+        "feeCategory": "__ALL__",
+        "transactionDefinitionId": "Tuition_Fee_Sample",
+        "transactionDefinitionCode": "TUTION-FEE-SAMPLE",
+        "transactionDefinitionName": "Tuition Fee Sample for LINC Classes",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "schedule": {
+      "current": {},
+      "history": []
+    },
+    "instructors": [
+      {
+        "personId": "560378",
+        "name": "Amir Peivandzani",
+        "role": "Primary",
+        "status": "active"
+      }
+    ],
+    "enrollment": {
+      "maxCapacity": 1,
+      "students": [
+        {
+          "enrollmentId": "118605",
+          "studentId": "STU50124",
+          "personId": "146788",
+          "programRegistrationId": "534551",
+          "programId": "232974",
+          "termId": "",
+          "enrollmentSource": "rolling_enrollment",
+          "feeCategory": "Others",
+          "pricing": {
+            "currency": "CAD",
+            "effectiveDate": "2026-01-30",
+            "suggestedTotal": 0,
+            "finalTotal": 5000,
+            "breakdown": [
+              {
+                "memo": "STU50124 146788 232974",
+                "amount": 4898,
+                "currency": "CAD",
+                "debitAccountId": "ACC_1772254486560_570",
+                "debitAccountCode": "STU_STU50124",
+                "debitAccountName": "Javad Amini Foroushani (Student)",
+                "creditAccountId": "ACC_4110",
+                "creditAccountCode": "4110",
+                "creditAccountName": "Tuition Revenue - Domestic"
+              },
+              {
+                "memo": "Tuition Fee Sample for LINC Classes - line 2",
+                "amount": 102,
+                "currency": "CAD",
+                "debitAccountId": "ACC_1772254486560_570",
+                "debitAccountCode": "STU_STU50124",
+                "debitAccountName": "Javad Amini Foroushani (Student)",
+                "creditAccountId": "ACC_4210",
+                "creditAccountCode": "4210",
+                "creditAccountName": "Registration Fees"
+              }
+            ],
+            "warnings": []
+          },
+          "status": "enrolled",
+          "enrolledAt": "2026-01-30",
+          "withdrawnAt": "2026-04-30",
+          "termRegistrationId": "",
+          "notes": "Rolling enrollment with finance posting for class 609077."
+        }
+      ]
+    },
+    "evaluation": {
+      "passingScore": 60,
+      "weights": {
+        "attendance": 50,
+        "assignments": 50,
+        "midterm": 0,
+        "finalExam": 0
+      }
+    },
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-01T08:04:20.092Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-30T16:53:59.705Z"
+    },
+    "id": "609077",
+    "sessions": [
+      {
+        "sessionId": "SES_17750306503208665",
+        "date": "2026-03-02",
+        "originalDate": "2026-03-02",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503205630",
+        "date": "2026-03-03",
+        "originalDate": "2026-03-03",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503200626",
+        "date": "2026-03-04",
+        "originalDate": "2026-03-04",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503203489",
+        "date": "2026-03-05",
+        "originalDate": "2026-03-05",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503209353",
+        "date": "2026-03-09",
+        "originalDate": "2026-03-09",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503208507",
+        "date": "2026-03-10",
+        "originalDate": "2026-03-10",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [
+          {
+            "personId": "146788",
+            "attendance": "present",
+            "notes": "",
+            "comments": [
+              {
+                "id": "cmt_1775847402594",
+                "authorId": "ROOT_001",
+                "authorName": "Amin",
+                "text": "thrtrtrtrtgrgtrgtrgtrgtrgt",
+                "timestamp": "2026-04-10T18:56:42.594Z",
+                "mentions": [
+                  {
+                    "id": "441227",
+                    "name": "javad"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503202680",
+        "date": "2026-03-11",
+        "originalDate": "2026-03-11",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503209178",
+        "date": "2026-03-12",
+        "originalDate": "2026-03-12",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503204387",
+        "date": "2026-03-16",
+        "originalDate": "2026-03-16",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503207674",
+        "date": "2026-03-17",
+        "originalDate": "2026-03-17",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503201027",
+        "date": "2026-03-18",
+        "originalDate": "2026-03-18",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503200493",
+        "date": "2026-03-19",
+        "originalDate": "2026-03-19",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503206983",
+        "date": "2026-03-23",
+        "originalDate": "2026-03-23",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503202411",
+        "date": "2026-03-24",
+        "originalDate": "2026-03-24",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503206493",
+        "date": "2026-03-25",
+        "originalDate": "2026-03-25",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503205168",
+        "date": "2026-03-26",
+        "originalDate": "2026-03-26",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503200158",
+        "date": "2026-03-30",
+        "originalDate": "2026-03-30",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503201376",
+        "date": "2026-03-31",
+        "originalDate": "2026-03-31",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503205664",
+        "date": "2026-04-01",
+        "originalDate": "2026-04-01",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503202532",
+        "date": "2026-04-02",
+        "originalDate": "2026-04-02",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503204575",
+        "date": "2026-04-06",
+        "originalDate": "2026-04-06",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "completed",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [
+          {
+            "personId": "146788",
+            "attendance": "present",
+            "lateMinutes": 0,
+            "earlyLeaveMinutes": 0,
+            "excuseRef": "",
+            "notes": "",
+            "comments": []
+          }
+        ],
+        "_isSaved": false,
+        "conflictMsg": null,
+        "contentItems": [],
+        "contentOrder": []
+      },
+      {
+        "sessionId": "SES_17750306503202533",
+        "date": "2026-04-07",
+        "originalDate": "2026-04-07",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503204715",
+        "date": "2026-04-08",
+        "originalDate": "2026-04-08",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503209597",
+        "date": "2026-04-09",
+        "originalDate": "2026-04-09",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503205272",
+        "date": "2026-04-13",
+        "originalDate": "2026-04-13",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503207752",
+        "date": "2026-04-14",
+        "originalDate": "2026-04-14",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503207646",
+        "date": "2026-04-15",
+        "originalDate": "2026-04-15",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503204883",
+        "date": "2026-04-16",
+        "originalDate": "2026-04-16",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503203173",
+        "date": "2026-04-20",
+        "originalDate": "2026-04-20",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503200491",
+        "date": "2026-04-21",
+        "originalDate": "2026-04-21",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503203654",
+        "date": "2026-04-22",
+        "originalDate": "2026-04-22",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503204229",
+        "date": "2026-04-23",
+        "originalDate": "2026-04-23",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503203929",
+        "date": "2026-04-27",
+        "originalDate": "2026-04-27",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503209212",
+        "date": "2026-04-28",
+        "originalDate": "2026-04-28",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503200680",
+        "date": "2026-04-29",
+        "originalDate": "2026-04-29",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      },
+      {
+        "sessionId": "SES_17750306503200898",
+        "date": "2026-04-30",
+        "originalDate": "2026-04-30",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3,
+        "room": "",
+        "status": "scheduled",
+        "notes": "",
+        "locked": false,
+        "delivery": {
+          "deliveredBy": "560378",
+          "deliveredByName": "Amir Peivandzani",
+          "substitute": false
+        },
+        "roster": [],
+        "_isSaved": false,
+        "conflictMsg": null
+      }
+    ]
+  },
+  {
+    "id": "CLS-2026-4233G",
+    "allowedProgramTerms": [
+      {
+        "programId": "PRG93679",
+        "termId": "TRM-2026-L8NRM",
+        "order": 1,
+        "programCode": "LINC2026",
+        "programName": "LINC PROGRAM - 2026",
+        "termCode": "WINTER2026",
+        "termName": "Winter 2026",
+        "notes": ""
+      }
+    ],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-28T18:27:55.463Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-13T05:19:27.739Z"
+    },
+    "credits": 3,
+    "curriculum": {
+      "subjects": [
+        {
+          "subjectId": "SUB-LINC-G7QLY",
+          "code": "LINC-3-4",
+          "name": "LINC-PRE-2-3",
+          "allocatedHours": 150,
+          "weight": 100
+        }
+      ],
+      "totalHours": 150
+    },
+    "deliveryDepartmentId": "DEP_1771788678638",
+    "deliveryDepartmentName": "LINC LINC Department",
+    "enrollment": {
+      "maxCapacity": 10,
+      "students": []
+    },
+    "evaluation": {
+      "passingScore": 60,
+      "weights": {
+        "attendance": 10,
+        "assignments": 40,
+        "midterm": 20,
+        "finalExam": 30
+      }
+    },
+    "instructors": [
+      {
+        "personId": "560378",
+        "name": "Don Amir Peynad",
+        "role": "Primary",
+        "status": "active"
+      }
+    ],
+    "orgId": "900000",
+    "postingTemplates": [
+      {
+        "feeCategory": "__ALL__",
+        "transactionDefinitionId": "TRX65023",
+        "transactionDefinitionCode": "GENERAL_APPLICATION_FEE_2026",
+        "transactionDefinitionName": "General Application Fee for 2026",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "pricing": {
+      "mode": "auto",
+      "feeRules": [
+        {
+          "feeCategory": "__ALL__",
+          "suggestedAmount": 3600,
+          "amount": 2200,
+          "currency": "CAD",
+          "transactionDefinitionId": "",
+          "transactionDefinitionCode": "",
+          "transactionDefinitionName": "",
+          "notes": "",
+          "active": true,
+          "manualOverride": true
+        },
+        {
+          "feeCategory": "Domestic",
+          "suggestedAmount": 2200,
+          "amount": 1320,
+          "currency": "CAD",
+          "transactionDefinitionId": "",
+          "transactionDefinitionCode": "",
+          "transactionDefinitionName": "",
+          "notes": "",
+          "active": true,
+          "manualOverride": true
+        }
+      ]
+    },
+    "schedule": {
+      "current": {},
+      "history": []
+    },
+    "status": "active",
+    "statusHistory": [
+      {
+        "status": "active",
+        "date": "2026-03-13T05:19:27.724Z",
+        "updatedBy": "ROOT_001",
+        "reason": "Initial creation"
+      }
+    ],
+    "title": "LINC-M/O-CLB 3-4",
+    "sessions": []
+  },
+  {
+    "id": "CLS-2026-4FKVE",
+    "allowedProgramTerms": [
+      {
+        "programId": "PRG93679",
+        "termId": "TRM-2026-L8NRM",
+        "order": 1,
+        "programCode": "LINC2026",
+        "programName": "LINC PROGRAM - 2026",
+        "termCode": "WINTER2026",
+        "termName": "Winter 2026",
+        "notes": ""
+      }
+    ],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-29T04:57:36.228Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-09T23:39:39.314Z"
+    },
+    "credits": 3,
+    "curriculum": {
+      "subjects": [
+        {
+          "subjectId": "SUB-LINC-9FF0F",
+          "code": "LINC-1-2",
+          "name": "LINC-CLB-1-2",
+          "allocatedHours": 150,
+          "weight": 100
+        }
+      ],
+      "totalHours": 150
+    },
+    "deliveryDepartmentId": "DEP_1771788678638",
+    "deliveryDepartmentName": "LINC LINC Department",
+    "enrollment": {
+      "maxCapacity": 1,
+      "students": []
+    },
+    "evaluation": {
+      "passingScore": 60,
+      "weights": {
+        "attendance": 10,
+        "assignments": 40,
+        "midterm": 20,
+        "finalExam": 30
+      }
+    },
+    "instructors": [
+      {
+        "personId": "560378",
+        "name": "Amir Peivandzani",
+        "role": "Primary",
+        "status": "active"
+      }
+    ],
+    "orgId": "900000",
+    "postingTemplates": [
+      {
+        "feeCategory": "__ALL__",
+        "transactionDefinitionId": "TRX65023",
+        "transactionDefinitionCode": "GENERAL_APPLICATION_FEE_2026",
+        "transactionDefinitionName": "General Application Fee for 2026",
+        "notes": "",
+        "active": true
+      }
+    ],
+    "pricing": {
+      "mode": "auto",
+      "feeRules": [
+        {
+          "feeCategory": "__ALL__",
+          "suggestedAmount": 3600,
+          "amount": 3600,
+          "currency": "CAD",
+          "transactionDefinitionId": "",
+          "transactionDefinitionCode": "",
+          "transactionDefinitionName": "",
+          "notes": "",
+          "active": true,
+          "manualOverride": false
+        },
+        {
+          "feeCategory": "Domestic",
+          "suggestedAmount": 220,
+          "amount": 220,
+          "currency": "CAD",
+          "transactionDefinitionId": "",
+          "transactionDefinitionCode": "",
+          "transactionDefinitionName": "",
+          "notes": "",
+          "active": true,
+          "manualOverride": false
+        }
+      ]
+    },
+    "schedule": {
+      "current": {},
+      "history": []
+    },
+    "status": "active",
+    "statusHistory": [
+      {
+        "status": "active",
+        "date": "2026-03-09T23:39:39.309Z",
+        "updatedBy": "ROOT_001",
+        "reason": "Initial creation"
+      }
+    ],
+    "title": "LINC-M/O-CLB1-2",
+    "sessions": []
+  },
+  {
+    "id": "CLS-2026-UCMSD",
+    "allowedProgramTerms": [
+      {
+        "programId": "PRG93679",
+        "termId": "TRM-2026-L8NRM",
+        "order": 1,
+        "programCode": "LINC2026",
+        "programName": "LINC PROGRAM - 2026",
+        "termCode": "WINTER2026",
+        "termName": "Winter 2026",
+        "notes": ""
+      }
+    ],
+    "audit": {
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-29T17:49:05.776Z",
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-02-28T10:02:30.511Z"
+    },
+    "credits": 3,
+    "curriculum": {
+      "subjects": [
+        {
+          "subjectId": "SUB-EQU-LINC-OIFCI",
+          "code": "LINC-PRE",
+          "name": "LINC-PRE-CLB",
+          "allocatedHours": 150,
+          "weight": 100
+        }
+      ],
+      "totalHours": 150
+    },
+    "deliveryDepartmentId": "DEP_1771788678638",
+    "deliveryDepartmentName": "LINC LINC Department",
+    "enrollment": {
+      "maxCapacity": 1,
+      "students": []
+    },
+    "evaluation": {
+      "passingScore": 60,
+      "weights": {
+        "attendance": 10,
+        "assignments": 40,
+        "midterm": 20,
+        "finalExam": 30
+      }
+    },
+    "instructors": [
+      {
+        "personId": "153279",
+        "name": "Sample Ava Williams Young",
+        "role": "Primary",
+        "status": "active"
+      }
+    ],
+    "orgId": "900000",
+    "postingTemplates": [],
+    "pricing": {
+      "mode": "auto",
+      "feeRules": [
+        {
+          "feeCategory": "__ALL__",
+          "suggestedAmount": 0,
+          "amount": 0,
+          "currency": "CAD",
+          "transactionDefinitionId": "",
+          "transactionDefinitionCode": "",
+          "transactionDefinitionName": "",
+          "notes": "",
+          "active": true,
+          "manualOverride": false
+        }
+      ]
+    },
+    "schedule": {
+      "current": {},
+      "history": []
+    },
+    "status": "active",
+    "statusHistory": [
+      {
+        "status": "completed",
+        "date": "2026-02-28T10:02:30.510Z",
+        "updatedBy": "ROOT_001",
+        "reason": "Initial creation"
+      },
+      {
+        "status": "active",
+        "date": "2026-02-28T10:05:12.364Z",
+        "updatedBy": "ROOT_001",
+        "reason": "Updated via form"
+      }
+    ],
+    "title": "LINC-M/O-PreCLB",
+    "sessions": [],
+    "billingMode": "no_charge"
+  }
+]

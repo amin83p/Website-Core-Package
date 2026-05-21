@@ -1,0 +1,104 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0">Newsletter Configuration</h1>
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Settings</span>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="newsletterSettingsForm" action="/systemSettings/newsletter" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-body p-4">
+            
+            <div class="mb-4">
+                <label class="form-label fw-bold">Default Subscription Group</label>
+                <select name="defaultGroupId" class="form-select size-md">
+                    <option value="">-- No Default Group --</option>
+                    <% groups.forEach(g => { %>
+                        <option value="<%= g.id %>" <%= (settings.newsletter.defaultGroupId === g.id) ? 'selected' : '' %>>
+                            <%= g.name %> (ID: <%= g.id %>)
+                        </option>
+                    <% }) %>
+                </select>
+                <div class="form-text">New subscribers via the public API will be automatically assigned to this group.</div>
+            </div>
+
+            <hr class="text-muted opacity-25 my-4">
+
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <label class="form-check-label fw-bold mb-1" for="doubleOptIn">Require Double Opt-In</label>
+                    <div class="text-muted small">Send a confirmation email before activating subscription.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="doubleOptIn" name="requireDoubleOptIn" value="true"
+                        <%= settings.newsletter.requireDoubleOptIn ? 'checked' : '' %>>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <label class="form-check-label fw-bold mb-1" for="welcomeEmail">Send Welcome Email</label>
+                    <div class="text-muted small">Automatically send a welcome message upon activation.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="welcomeEmail" name="sendWelcomeEmail" value="true"
+                            <%= settings.newsletter.sendWelcomeEmail ? 'checked' : '' %>>
+                </div>
+            </div>
+
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+          <a href="/systemSettings" class="btn btn-secondary btn-filled btn-md">Back to Dashboard</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save Changes</button>
+      </div>
+   </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('newsletterSettingsForm');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+      }
+
+      // Explicitly handle unchecked switches
+      const formData = new FormData(form);
+      if(!document.getElementById('doubleOptIn').checked) formData.set('requireDoubleOptIn', 'false');
+      if(!document.getElementById('welcomeEmail').checked) formData.set('sendWelcomeEmail', 'false');
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+          body: new URLSearchParams(formData).toString()
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({ title: 'Success', icon: 'success', message: result.message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+          }
+          window.location.reload();
+        } else {
+            throw new Error(result.message || 'Failed to save.');
+        }
+      } catch (error) {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = 'Save Changes'; }
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({ title: 'Error', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        } else { alert(error.message); }
+      }
+    });
+  }
+});
+</script>

@@ -1,0 +1,356 @@
+<%
+  const isEdit = Boolean(apiProvider && apiProvider.id);
+  const record = apiProvider || {};
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit PTE API Provider' : 'Create PTE API Provider' %></h1>
+    <div class="d-flex flex-column align-items-end gap-2">
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border">ID: <%= record.id %></span>
+      <% } else { %>
+        <span class="badge bg-success border">New API Provider</span>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromProvider">
+          <i class="bi bi-copy me-1"></i>Copy From Existing
+        </button>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="form-container" style="width: 100%; max-width: 1400px;">
+    <form id="apiProviderForm" action="<%= isEdit ? '/pte/ai-assisst/api-providers/edit/' + record.id : '/pte/ai-assisst/api-providers/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+
+      <div class="row">
+        <div class="col-md-7 mb-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-bold text-primary">
+              <i class="bi bi-key-fill me-2"></i>Provider Configuration
+            </div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Label <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" name="name" value="<%= record.name || '' %>" placeholder="My Gemini Key" required>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Provider <span class="text-danger">*</span></label>
+                <select class="form-select" name="providerId" required>
+                  <option value="">Select provider</option>
+                  <% (providerOptions || []).forEach((row) => { %>
+                    <option value="<%= row.id %>" <%= String(record.providerId || '') === String(row.id) ? 'selected' : '' %>><%= row.label %></option>
+                  <% }) %>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">API Key <%= isEdit ? '' : '<span class="text-danger">*</span>' %></label>
+                <input type="password" class="form-control" name="apiKey" placeholder="<%= isEdit ? 'Leave blank to keep current key' : 'Paste provider API key' %>" <%= isEdit ? '' : 'required' %>>
+                <% if (isEdit && record.apiKeyMasked) { %>
+                  <div class="form-text">Current key: <b><%= record.apiKeyMasked %></b></div>
+                <% } %>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Model (Optional)</label>
+                <input type="text" class="form-control" name="modelId" value="<%= record.modelId || '' %>" placeholder="gemini-2.5-flash">
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Project (Optional)</label>
+                  <input type="text" class="form-control" name="project" value="<%= record.project || '' %>" placeholder="my-gcp-project-id">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Location (Optional)</label>
+                  <input type="text" class="form-control" name="location" value="<%= record.location || '' %>" placeholder="us-central1">
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Notes</label>
+                <textarea class="form-control" name="notes" rows="4" placeholder="Optional notes for this key..."><%= record.notes || '' %></textarea>
+              </div>
+
+              <div class="d-flex flex-wrap align-items-center gap-4 pt-2">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="isDefault" name="isDefault" <%= record.isDefault ? 'checked' : '' %>>
+                  <label class="form-check-label fw-bold small" for="isDefault">Use as default key</label>
+                </div>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="isActive" name="isActive" <%= record.isActive === false ? '' : 'checked' %>>
+                  <label class="form-check-label fw-bold small" for="isActive">Active</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-5 mb-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-bold text-primary">
+              <i class="bi bi-shield-lock me-2"></i>Usage Notes
+            </div>
+            <div class="card-body">
+              <ul class="mb-0 ps-3">
+                <li class="mb-2">Each user manages API keys in their active organization.</li>
+                <li class="mb-2">Keys are stored encrypted at rest.</li>
+                <li class="mb-2">Set one record as default to reduce model selection friction.</li>
+                <li class="mb-2">Keep inactive keys for audit/history if needed.</li>
+                <li class="mb-2">You can rotate keys by editing and pasting a new value.</li>
+                <li class="mb-0">This is the PTE-local AI provider/key management foundation and can be extended to runtime scoring or feedback modules later.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">
+          <i class="bi bi-save me-1"></i> Save
+        </button>
+        <a href="/pte/ai-assisst/api-providers" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal') %>
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+  const isEditMode = <%= isEdit ? 'true' : 'false' %>;
+  const btnCopyFromProvider = document.getElementById('btnCopyFromProvider');
+
+  function getActionStateId() {
+    return document.querySelector('input[name="actionStateId"]')?.value || '';
+  }
+
+  function setFormValue(name, value) {
+    const input = document.querySelector(`[name="${name}"]`);
+    if (!input) return;
+    input.value = String(value ?? '');
+  }
+
+  function setFormChecked(name, checked) {
+    const input = document.querySelector(`[name="${name}"]`);
+    if (!input || input.type !== 'checkbox') return;
+    input.checked = Boolean(checked);
+  }
+
+  function buildCopiedName(sourceName = '') {
+    const base = String(sourceName || '').trim() || 'Copied Provider';
+    const hasCopySuffix = /\(copy\)$/i.test(base);
+    return hasCopySuffix ? base : `${base} (Copy)`;
+  }
+
+  function applyProviderDraftFromSelection(source = {}) {
+    setFormValue('name', buildCopiedName(source.name || source.id || ''));
+    setFormValue('providerId', source.providerId || '');
+    setFormValue('modelId', source.modelId || '');
+    setFormValue('project', source.project || '');
+    setFormValue('location', source.location || '');
+    setFormValue('notes', source.notes || '');
+    setFormValue('apiKey', '');
+    setFormChecked('isActive', source.isActive !== false);
+    // Keep default off for safety on copied drafts.
+    setFormChecked('isDefault', false);
+  }
+
+  async function showInfoModal(title, icon, message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title,
+        icon,
+        message,
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  async function showSaveResultModal({ title, icon, message }) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title,
+        icon,
+        message,
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  const apiProviderForm = document.getElementById('apiProviderForm');
+  const apiProviderSaveBtn = apiProviderForm ? apiProviderForm.querySelector('button[type="submit"]') : null;
+  const apiProviderCancelBtn = document.getElementById('btnCancelAction');
+  const isDefaultInput = document.getElementById('isDefault');
+  const isActiveInput = document.getElementById('isActive');
+  let isSubmitting = false;
+
+  function syncDefaultAvailability() {
+    if (!isDefaultInput || !isActiveInput) return;
+    if (!isActiveInput.checked) {
+      isDefaultInput.checked = false;
+      isDefaultInput.disabled = true;
+    } else {
+      isDefaultInput.disabled = false;
+    }
+  }
+
+  isActiveInput?.addEventListener('change', syncDefaultAvailability);
+  syncDefaultAvailability();
+
+  function cacheButtonHtml(button) {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+  }
+
+  function setButtonBusy(button, label) {
+    if (!button) return;
+    cacheButtonHtml(button);
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + (label || 'Working...');
+    if (button.tagName === 'A') {
+      button.classList.add('disabled');
+      button.setAttribute('aria-disabled', 'true');
+      button.style.pointerEvents = 'none';
+    }
+  }
+
+  function restoreButton(button) {
+    if (!button) return;
+    if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+    button.disabled = false;
+    if (button.tagName === 'A') {
+      button.classList.remove('disabled');
+      button.removeAttribute('aria-disabled');
+      button.style.pointerEvents = '';
+    }
+  }
+
+  cacheButtonHtml(apiProviderSaveBtn);
+  cacheButtonHtml(apiProviderCancelBtn);
+
+  if (apiProviderCancelBtn) {
+    apiProviderCancelBtn.addEventListener('click', (event) => {
+      if (isSubmitting) {
+        event.preventDefault();
+        return;
+      }
+      setButtonBusy(apiProviderCancelBtn, 'Cancelling...');
+      if (apiProviderSaveBtn) apiProviderSaveBtn.disabled = true;
+    });
+  }
+
+  btnCopyFromProvider?.addEventListener('click', async () => {
+    if (isEditMode) return;
+    if (!window.GenericPicker) {
+      await showInfoModal('Picker Unavailable', 'error', 'Generic picker is not available on this page.');
+      return;
+    }
+
+    const basePickerConfig = {
+      title: 'Copy From Existing Provider',
+      icon: 'bi-copy',
+      apiEndpoint: '/pte/ai-assisst/api-providers',
+      placeholder: 'Search API providers...',
+      searchFields: 'id,name,providerId,modelId,project,location,notes'
+    };
+
+    const configFactory = (window.GenericPickerPresets && typeof window.GenericPickerPresets.pteApiProvider === 'function')
+      ? ((overrides = {}) => window.GenericPickerPresets.pteApiProvider({ ...basePickerConfig, ...overrides }))
+      : ((overrides = {}) => (window.GenericPickerPresets?.normalizeConfig
+        ? window.GenericPickerPresets.normalizeConfig({
+            ...basePickerConfig,
+            ...overrides
+          })
+        : {
+            ...basePickerConfig,
+            ...overrides
+          }));
+
+    window.GenericPicker.open(configFactory({
+      context: window.GenericPickerContexts?.activeOrganizationScope
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization API Keys' })
+        : null,
+      multiselect: false,
+      onSelect: async (item) => {
+        const selected = item || {};
+        const selectedId = String(selected.id || '').trim();
+        if (!selectedId) {
+          await showInfoModal('Copy Failed', 'error', 'Selected API provider is invalid.');
+          return;
+        }
+
+        applyProviderDraftFromSelection(selected);
+
+        const apiKeyInput = document.querySelector('[name="apiKey"]');
+        if (apiKeyInput) apiKeyInput.focus();
+
+        await showInfoModal(
+          'Draft Loaded',
+          'success',
+          `Fields were copied from "${selected.name || selectedId}". API key is not copied; please enter it before saving.`
+        );
+      }
+    }));
+  });
+
+  apiProviderForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    isSubmitting = true;
+    const form = e.currentTarget;
+
+    try {
+      setButtonBusy(apiProviderSaveBtn, 'Saving...');
+      if (apiProviderCancelBtn) apiProviderCancelBtn.disabled = true;
+
+      const formData = new FormData(form);
+      const payload = new URLSearchParams();
+      for (const [key, value] of formData.entries()) {
+        payload.append(key, value);
+      }
+
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'x-ajax-request': 'true'
+        },
+        body: payload.toString()
+      });
+
+      let result = null;
+      try {
+        result = await response.json();
+      } catch (_) {
+        result = { status: 'error', message: 'Unexpected response while saving record.' };
+      }
+
+      if (!response.ok || result.status !== 'success') {
+        throw new Error(result.message || 'Failed to save API provider.');
+      }
+
+      await showSaveResultModal({
+        title: 'Saved',
+        icon: 'success',
+        message: result.message || 'API provider saved successfully.'
+      });
+      window.location.href = '/pte/ai-assisst/api-providers';
+    } catch (error) {
+      await showSaveResultModal({
+        title: 'Save Failed',
+        icon: 'error',
+        message: error.message || 'Unable to save API provider.'
+      });
+      isSubmitting = false;
+      restoreButton(apiProviderSaveBtn);
+      restoreButton(apiProviderCancelBtn);
+    }
+  });
+</script>

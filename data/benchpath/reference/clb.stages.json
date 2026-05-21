@@ -1,0 +1,128 @@
+{
+  "meta": {
+    "schemaVersion": "1.0.0",
+    "entityType": "clbStages",
+    "layer": "reference",
+    "authority": "official",
+    "isReadMostly": true,
+    "defaultLocale": "en-CA",
+    "generatedAt": "2026-03-21T00:00:00.000Z",
+    "updatedAt": "2026-03-22T06:14:45.469Z"
+  },
+  "itemsById": {
+    "stage:1": {
+      "id": "stage:1",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkRange": {
+        "minimum": 1,
+        "maximum": 4
+      },
+      "code": "I",
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Initial benchmark range for adult ESL learners.",
+      "descriptor": "basic",
+      "displayOrder": 1,
+      "extensions": {},
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": true,
+      "isSystem": true,
+      "label": "Stage I",
+      "notes": null,
+      "orgId": "SYSTEM",
+      "reviewStatus": "reviewed",
+      "shortLabel": "Stage I",
+      "slug": "stage-1",
+      "sourceRefs": [],
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "stage"
+      ],
+      "updatedAt": "2026-03-22T06:14:45.469Z",
+      "updatedBy": "ROOT_001",
+      "version": 2
+    },
+    "stage:2": {
+      "id": "stage:2",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkRange": {
+        "minimum": 5,
+        "maximum": 8
+      },
+      "code": "II",
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Middle benchmark range for adult ESL learners.",
+      "descriptor": "intermediate",
+      "displayOrder": 2,
+      "extensions": {},
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": true,
+      "isSystem": true,
+      "label": "Stage II",
+      "notes": null,
+      "orgId": "SYSTEM",
+      "reviewStatus": "reviewed",
+      "shortLabel": "Stage II",
+      "slug": "stage-2",
+      "sourceRefs": [],
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "stage"
+      ],
+      "updatedAt": "2026-03-21T00:00:00.000Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "stage:3": {
+      "id": "stage:3",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkRange": {
+        "minimum": 9,
+        "maximum": 12
+      },
+      "code": "III",
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Higher benchmark range for adult ESL learners.",
+      "descriptor": "advanced",
+      "displayOrder": 3,
+      "extensions": {},
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": true,
+      "isSystem": true,
+      "label": "Stage III",
+      "notes": null,
+      "orgId": "SYSTEM",
+      "reviewStatus": "reviewed",
+      "shortLabel": "Stage III",
+      "slug": "stage-3",
+      "sourceRefs": [],
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "stage"
+      ],
+      "updatedAt": "2026-03-21T00:00:00.000Z",
+      "updatedBy": "system",
+      "version": 1
+    }
+  },
+  "allIds": [
+    "stage:1",
+    "stage:2",
+    "stage:3"
+  ],
+  "indexes": {}
+}

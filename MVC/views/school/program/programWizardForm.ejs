@@ -1,0 +1,529 @@
+<%- include('./programForm') %>
+
+<style>
+  #programWizardGuide {
+    font-size: 1rem;
+  }
+  #programWizardGuide .small {
+    font-size: 1rem !important;
+  }
+  .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .wizard-step-rail::-webkit-scrollbar {
+    display: none;
+  }
+  #programWizardGuide .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    transition: all 0.2s ease;
+  }
+  #programWizardGuide .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #programWizardGuide .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #programWizardGuide .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #programWizardGuide .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  #programWizardGuide .wizard-block {
+    border: 1px solid #d6e0ea;
+    border-radius: 0.7rem;
+    padding: 0.85rem 1rem;
+    height: 100%;
+    background: #ffffff;
+  }
+  #programWizardGuide .wizard-block-title {
+    font-weight: 700;
+    color: #17324d;
+    margin-bottom: 0.5rem;
+  }
+  .program-wizard-controls {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .program-wizard-controls .wizard-step-label {
+    color: #17324d;
+    font-weight: 600;
+  }
+  .program-wizard-controls .btn.btn-sm {
+    font-size: 1rem;
+    padding: 0.45rem 0.85rem;
+  }
+</style>
+
+<script src="/scripts/wizardStepRail.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tabs = document.getElementById('programTabs');
+  const form = document.getElementById('programForm');
+  if (!tabs || !form || typeof bootstrap === 'undefined') return;
+
+  const navButtons = Array.from(tabs.querySelectorAll('button.nav-link[data-bs-target]'));
+  if (!navButtons.length) return;
+
+  function parseJsonValue(id, fallback) {
+    try {
+      const raw = document.getElementById(id)?.value;
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function hasDuration() {
+    const y = Number(document.getElementById('inp_durationYears')?.value || 0);
+    const m = Number(document.getElementById('inp_durationMonths')?.value || 0);
+    const d = Number(document.getElementById('inp_durationDays')?.value || 0);
+    return y > 0 || m > 0 || d > 0;
+  }
+
+  function hasTerms() {
+    const terms = parseJsonValue('hid_terms', []);
+    return Array.isArray(terms) && terms.length > 0;
+  }
+
+  function hasSubjects() {
+    const subjects = parseJsonValue('hid_subjects', []);
+    return Array.isArray(subjects) && subjects.length > 0;
+  }
+
+  function hasPostingPolicy() {
+    const rows = parseJsonValue('hid_postingPolicies', []);
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
+  const stepConfig = [
+    {
+      target: '#tab-general',
+      title: 'General Identity',
+      objective: [
+        'Define the official identity of the program (name, code, status, owner).',
+        'Set the accountable person and department that govern this program.',
+        'Capture base notes so operational and finance users have shared context.'
+      ],
+      instructions: [
+        'Use a stable Program Name and Program Code that can appear on documents and filters.',
+        'Pick Program Administrator from the eligible person list in the active organization.',
+        'Pick Department because class posting fallback depends on this organizational owner.',
+        'Use Notes for internal operational constraints (e.g., accreditation or special handling).'
+      ],
+      downstream: [
+        'Program identity appears in registrations, class mapping, and reporting.',
+        'Program Administrator supports operational ownership and escalation workflow.',
+        'Department controls downstream posting fallback when class-level policy is missing.',
+        'Status governs whether future flows should include this program as selectable.'
+      ],
+      quality: [
+        'Program Name is not ambiguous with existing programs.',
+        'Program Code format is consistent with your catalog standards.',
+        'Administrator belongs to same organization context.',
+        'Department selection is intentional and not left from copied data.'
+      ],
+      required: [
+        { selector: 'input[name="name"]', label: 'Program Name' },
+        { selector: '#inp_adminPersonId', label: 'Program Administrator' },
+        { selector: '#inp_programDepartmentId', label: 'Department' }
+      ]
+    },
+    {
+      target: '#tab-rules',
+      title: 'Academic Rules',
+      objective: [
+        'Define academic completion baseline and grading thresholds.',
+        'Configure curriculum credit expectations that validation uses later.',
+        'Set duration to support planning, advisement, and progress checkpoints.'
+      ],
+      instructions: [
+        'Set Duration using years/months/days (at least one value must be greater than zero).',
+        'Set Credits as the total completion credits for this program.',
+        'Set Minimum Passing Score and Minimum Passing Average for final validation.',
+        'Review required Essential/Optional credits so they match curriculum intent.',
+        'Enable Essential->Optional carry only if academic policy explicitly allows it.'
+      ],
+      downstream: [
+        'Program completion logic and graduation checks use these thresholds.',
+        'Curriculum validation compares subject credits against these rule values.',
+        'Registration and advising tools can surface expected duration to users.',
+        'Inconsistent rules cause avoidable exceptions during result processing.'
+      ],
+      quality: [
+        'Duration is realistic and approved by academic policy.',
+        'Credits are aligned with curriculum subject totals.',
+        'Passing score and average are not conflicting with institution standards.',
+        'Credit-rule toggles match published academic handbook behavior.'
+      ],
+      required: [
+        { selector: 'input[name="credits"]', label: 'Credits' },
+        { selector: 'input[name="minimumPassingScore"]', label: 'Minimum Passing Score' },
+        { selector: 'input[name="minimumPassingAverage"]', label: 'Minimum Passing Average' }
+      ],
+      customCheck: function () {
+        return hasDuration() ? '' : 'Duration (Years/Months/Days) must include at least one value greater than zero.';
+      }
+    },
+    {
+      target: '#tab-terms',
+      title: 'Terms',
+      objective: [
+        'Attach academic terms/semesters where this program can run.',
+        'Control sequence and required-term structure for progression.',
+        'Prepare term metadata that class and registration flows can consume.'
+      ],
+      instructions: [
+        'Add each relevant term from the term catalog.',
+        'Order terms to reflect progression (first to last).',
+        'Mark required terms based on official curriculum design.',
+        'Use term detail/rule dialogs if your process needs strict term-level controls.'
+      ],
+      downstream: [
+        'Class definitions reference these program-term mappings.',
+        'Term registration screens depend on this structure to show valid options.',
+        'Program progression analytics rely on order and required flags.',
+        'Missing terms lead to incomplete registration options in downstream pages.'
+      ],
+      quality: [
+        'At least one term exists.',
+        'Term order is intentionally sequenced.',
+        'Required flags match the academic pathway.',
+        'Term snapshots/rules are reviewed if institution requires strict date governance.'
+      ],
+      required: [],
+      customCheck: function () {
+        return hasTerms() ? '' : 'Add at least one program term.';
+      }
+    },
+    {
+      target: '#tab-fees',
+      title: 'Enrollment Fees',
+      objective: [
+        'Define one-time program enrollment charges and their templates.',
+        'Separate category-specific fees from all-category fallback behavior.',
+        'Keep finance configuration explicit at program level.'
+      ],
+      instructions: [
+        'Use All Categories for default pricing when no specific category is intended.',
+        'Select a Transaction Template when accounting behavior must be standardized.',
+        'Add clear Notes so finance users understand why a row exists.',
+        'Validate currency and amount logic before moving to Posting Policies.'
+      ],
+      downstream: [
+        'Program registration posting references these fee rows.',
+        'Template mapping affects debit/credit behavior at transaction creation time.',
+        'Missing or unclear fee rows create manual correction work in accounting.'
+      ],
+      quality: [
+        'No duplicate fee rows for the same category without intent.',
+        'Each critical category has either specific row or All Categories fallback.',
+        'Amounts and currencies are approved for the active academic cycle.',
+        'Template links point to active, valid transaction templates.'
+      ],
+      required: []
+    },
+    {
+      target: '#tab-posting-policy',
+      title: 'Posting Policies',
+      objective: [
+        'Define fallback policy for class posting when class-level policy is absent.',
+        'Ensure predictable finance behavior across term registrations.',
+        'Document policy-by-category in a maintainable way.'
+      ],
+      instructions: [
+        'Add category-specific policy rows where required by accounting rules.',
+        'Keep an All Categories fallback whenever possible to avoid missing mappings.',
+        'Use notes to explain special cases and temporary exceptions.',
+        'Open linked template to validate status and effective period.'
+      ],
+      downstream: [
+        'Policy resolution order is Class -> Program -> Department.',
+        'Program posting policy directly affects student charge posting behavior.',
+        'Missing fallback causes runtime posting gaps and registration blocking.'
+      ],
+      quality: [
+        'Critical categories are covered.',
+        'Fallback exists for uncategorized scenarios.',
+        'Template references are active and auditable.',
+        'Notes explain non-standard policy decisions.'
+      ],
+      required: []
+    },
+    {
+      target: '#tab-curriculum',
+      title: 'Subjects & Prerequisites',
+      objective: [
+        'Build the academic structure of the program through subject mapping.',
+        'Define type, credits, and prerequisites for progression control.',
+        'Establish curriculum data for scheduling and completion analytics.'
+      ],
+      instructions: [
+        'Add subjects from the catalog, then set type (main/essential/optional).',
+        'Verify credit values and sequence order reflect the real curriculum.',
+        'Use prerequisite editor to prevent invalid progression paths.',
+        'Use rule-summary editor where subject-specific academic constraints apply.'
+      ],
+      downstream: [
+        'Class definitions and term planning consume this subject map.',
+        'Progression checks and completion logic rely on prerequisites and credits.',
+        'Program credit-rule validation compares totals against Academic Rules tab.',
+        'Weak curriculum setup causes enrollment and graduation inconsistencies.'
+      ],
+      quality: [
+        'At least one subject exists in the curriculum.',
+        'Main subjects and their credits are complete and accurate.',
+        'Prerequisites do not create impossible circular paths.',
+        'Subject order supports advising and registration clarity.'
+      ],
+      required: [],
+      customCheck: function () {
+        return hasSubjects() ? '' : 'Add at least one subject to the curriculum.';
+      }
+    }
+  ];
+
+  const byTarget = new Map(stepConfig.map(function (step, index) { return [step.target, { step: step, index: index }]; }));
+
+  const guide = document.createElement('div');
+  guide.id = 'programWizardGuide';
+  guide.className = 'card border-0 shadow-sm mb-3';
+  guide.innerHTML = [
+    '<div class="card-body">',
+      '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">',
+        '<div>',
+          '<div class="fw-bold text-primary">Program Definition Wizard</div>',
+          '<div class="text-muted">Follow each step to configure identity, rules, terms, finance, and curriculum with clear downstream behavior.</div>',
+        '</div>',
+        '<div class="d-flex align-items-center gap-2">',
+          '<span class="badge bg-light text-dark border" id="programWizardStepBadge">Step 1 of ' + stepConfig.length + '</span>',
+          '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="programWizardProgressPct">0%</span>',
+        '</div>',
+      '</div>',
+      '<div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="programWizardProgressBar"></div></div>',
+      '<div class="wizard-step-rail mb-3" id="programWizardStepPills"></div>',
+      '<div class="row g-3">',
+        '<div class="col-xl-6">',
+          '<div class="wizard-block">',
+            '<div class="wizard-block-title">Step Objective</div>',
+            '<div id="programWizardObjective"></div>',
+          '</div>',
+        '</div>',
+        '<div class="col-xl-6">',
+          '<div class="wizard-block">',
+            '<div class="wizard-block-title">What To Fill Now</div>',
+            '<div id="programWizardInstructions"></div>',
+          '</div>',
+        '</div>',
+        '<div class="col-xl-6">',
+          '<div class="wizard-block">',
+            '<div class="wizard-block-title">Downstream Impact</div>',
+            '<div id="programWizardImpacts"></div>',
+          '</div>',
+        '</div>',
+        '<div class="col-xl-6">',
+          '<div class="wizard-block">',
+            '<div class="wizard-block-title">Quality Checklist</div>',
+            '<div id="programWizardQuality"></div>',
+          '</div>',
+        '</div>',
+      '</div>',
+      '<div class="small text-muted mt-3" id="programWizardPolicyHint"></div>',
+    '</div>'
+  ].join('');
+
+  tabs.parentNode.insertBefore(guide, tabs);
+  tabs.classList.add('d-none');
+
+  const buttonRow = form.querySelector('.button-row');
+  const controls = document.createElement('div');
+  controls.className = 'program-wizard-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3';
+  controls.innerHTML = [
+    '<div class="wizard-step-label" id="programWizardCurrentLabel"></div>',
+    '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="programWizardPrevBtn"><i class="bi bi-arrow-left me-1"></i>Previous</button>',
+      '<button type="button" class="btn btn-primary btn-sm" id="programWizardNextBtn">Next<i class="bi bi-arrow-right ms-1"></i></button>',
+    '</div>'
+  ].join('');
+  if (buttonRow && buttonRow.parentNode) buttonRow.parentNode.insertBefore(controls, buttonRow);
+
+  const stepPills = document.getElementById('programWizardStepPills');
+  const objectiveEl = document.getElementById('programWizardObjective');
+  const instructionsEl = document.getElementById('programWizardInstructions');
+  const impactsEl = document.getElementById('programWizardImpacts');
+  const qualityEl = document.getElementById('programWizardQuality');
+  const policyHintEl = document.getElementById('programWizardPolicyHint');
+  const stepBadge = document.getElementById('programWizardStepBadge');
+  const progressPct = document.getElementById('programWizardProgressPct');
+  const stepLabel = document.getElementById('programWizardCurrentLabel');
+  const progressBar = document.getElementById('programWizardProgressBar');
+  const btnPrev = document.getElementById('programWizardPrevBtn');
+  const btnNext = document.getElementById('programWizardNextBtn');
+
+  let currentIndex = Math.max(0, navButtons.findIndex(function (btn) { return btn.classList.contains('active'); }));
+  if (currentIndex < 0) currentIndex = 0;
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>\"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function renderList(items) {
+    const safe = Array.isArray(items) ? items : [];
+    if (!safe.length) return '<div class="text-muted">No notes.</div>';
+    return '<ul class="mb-0 ps-3">' + safe.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul>';
+  }
+
+  function getStepIndexFromTarget(target) {
+    return byTarget.has(target) ? byTarget.get(target).index : 0;
+  }
+
+  function showStep(index) {
+    const bounded = Math.max(0, Math.min(stepConfig.length - 1, Number(index)));
+    const tab = navButtons[bounded];
+    if (!tab) return;
+    bootstrap.Tab.getOrCreateInstance(tab).show();
+  }
+
+  function findMissingRequired(step) {
+    const missing = [];
+    (step.required || []).forEach(function (rule) {
+      const el = document.querySelector(rule.selector);
+      const value = String(el?.value || '').trim();
+      if (!el || !value) missing.push({ label: rule.label, selector: rule.selector });
+    });
+    if (typeof step.customCheck === 'function') {
+      const customError = String(step.customCheck() || '').trim();
+      if (customError) missing.push({ label: customError, selector: '' });
+    }
+    return missing;
+  }
+
+  async function showWarning(message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title: 'Step Incomplete',
+        icon: 'warning',
+        message: message,
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  function renderWizardUi() {
+    const step = stepConfig[currentIndex];
+    const progress = ((currentIndex + 1) / stepConfig.length) * 100;
+
+    stepBadge.textContent = 'Step ' + (currentIndex + 1) + ' of ' + stepConfig.length;
+    if (progressPct) progressPct.textContent = Math.round(progress) + '%';
+    stepLabel.textContent = step.title;
+    progressBar.style.width = progress.toFixed(2) + '%';
+    objectiveEl.innerHTML = renderList(step.objective);
+    instructionsEl.innerHTML = renderList(step.instructions);
+    impactsEl.innerHTML = renderList(step.downstream);
+    qualityEl.innerHTML = renderList(step.quality);
+
+    const policyHint = hasPostingPolicy()
+      ? 'Posting Policy rows are currently configured.'
+      : 'No Posting Policy row is configured yet. This is optional, but recommended to avoid fallback gaps.';
+    policyHintEl.textContent = policyHint;
+
+    stepPills.innerHTML = stepConfig.map(function (item, idx) {
+      const cls = idx === currentIndex ? 'active' : (idx < currentIndex ? 'completed' : '');
+      return '<button type="button" class="wizard-step-pill ' + cls + '" data-step-index="' + idx + '">' + (idx + 1) + '. ' + escapeHtml(item.title) + '</button>';
+    }).join('');
+
+    stepPills.querySelectorAll('[data-step-index]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        showStep(Number(btn.getAttribute('data-step-index')));
+      });
+    });
+
+    if (window.WizardStepRail) window.WizardStepRail.sync(stepPills);
+
+    btnPrev.disabled = currentIndex <= 0;
+    btnNext.innerHTML = currentIndex >= stepConfig.length - 1
+      ? 'Review Save<i class="bi bi-check2-circle ms-1"></i>'
+      : 'Next<i class="bi bi-arrow-right ms-1"></i>';
+  }
+
+  btnPrev?.addEventListener('click', function () {
+    showStep(currentIndex - 1);
+  });
+
+  btnNext?.addEventListener('click', async function () {
+    const step = stepConfig[currentIndex];
+    if (currentIndex < stepConfig.length - 1) {
+      const missing = findMissingRequired(step);
+      if (missing.length) {
+        const message = 'Complete required data before moving to the next step:<br>' +
+          missing.map(function (item) { return '- ' + escapeHtml(item.label); }).join('<br>');
+        await showWarning(message);
+        const first = missing.find(function (item) { return item.selector; });
+        if (first?.selector) {
+          const el = document.querySelector(first.selector);
+          if (el) {
+            try { el.focus(); } catch (_) {}
+          }
+        }
+        return;
+      }
+      showStep(currentIndex + 1);
+      return;
+    }
+
+    const saveRow = form.querySelector('.button-row');
+    if (saveRow) saveRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const saveBtn = form.querySelector('button[type="submit"]');
+    if (saveBtn) {
+      saveBtn.classList.add('shadow');
+      setTimeout(function () { saveBtn.classList.remove('shadow'); }, 1200);
+    }
+  });
+
+  navButtons.forEach(function (btn) {
+    btn.addEventListener('shown.bs.tab', function (event) {
+      currentIndex = getStepIndexFromTarget(event.target.getAttribute('data-bs-target'));
+      renderWizardUi();
+    });
+  });
+
+  renderWizardUi();
+});
+</script>
+
+

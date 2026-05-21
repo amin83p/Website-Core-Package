@@ -1,0 +1,202 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  print,
+  btn_export: true,
+  customNewAction: null // Removed custom override to use standard link
+}) %>
+
+  <%- include('../partials/tablePages-search', {
+    placeholder: 'Search Tasks...',
+    fields: []
+  }) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" style="width: 80px;">ID</th>
+        <th class="draggable" style="width: 30%;">Task Details</th>
+        <th class="draggable">Phase</th>
+        <th class="draggable">Status</th>
+        <th class="draggable" style="width: 15%;">Progress</th>
+        <th class="draggable">Team</th>
+        <th class="draggable">Due Date</th>
+        <th class="text-end">Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% (data || []).forEach(task => { %>
+        <tr>
+          <td><span class="text-muted small"><%= task.id.split('_')[1] || task.id %></span></td>
+          
+          <td>
+            <div class="d-flex flex-column">
+                <a href="/tasks/edit/<%= task.id %>" class="fw-bold text-dark text-decoration-none hover-primary">
+                    <%= task.title %>
+                </a>
+                <span class="x-small text-muted">
+                    <i class="bi bi-folder2-open me-1"></i> <%= task.projectName || 'General' %>
+                </span>
+            </div>
+          </td>
+
+          <td><span class="badge bg-light text-secondary border"><%= task.phaseName || 'N/A' %></span></td>
+
+          <td>
+            <% if(task.status === 'done' || task.status === 'completed') { %>
+                <span class="badge bg-success-subtle text-success"><i class="bi bi-check-circle me-1"></i> Done</span>
+            <% } else if(task.status === 'in_progress') { %>
+                <span class="badge bg-primary-subtle text-primary"><i class="bi bi-arrow-repeat me-1"></i> In Progress</span>
+            <% } else if(task.status === 'review') { %>
+                <span class="badge bg-warning-subtle text-warning-emphasis">Review</span>
+            <% } else { %>
+                <span class="badge bg-secondary-subtle text-secondary">To Do</span>
+            <% } %>
+            
+            <% if(task.priority === 'high' || task.priority === 'critical') { %>
+                <i class="bi bi-exclamation-circle-fill text-danger ms-1" title="High Priority"></i>
+            <% } %>
+          </td>
+
+          <td>
+            <div class="d-flex align-items-center">
+                <div class="progress flex-grow-1" style="height: 6px;">
+                    <div class="progress-bar <%= task.progress >= 100 ? 'bg-success' : 'bg-primary' %>" 
+                         role="progressbar" style="width: '<%= task.progress || 0 %>';"></div>
+                </div>
+                <span class="ms-2 x-small text-muted"><%= task.progress || 0 %>%</span>
+            </div>
+          </td>
+
+          <td>
+            <div class="avatar-stack">
+                <% (task.assignees || []).slice(0,3).forEach(a => { %>
+                    <div class="avatar-circle" title="User <%= a.userId %>">
+                        <%= (a.name || 'U').charAt(0).toUpperCase() %>
+                    </div>
+                <% }) %>
+                <% if((task.assignees || []).length > 3) { %>
+                    <div class="avatar-circle more">+<%= task.assignees.length - 3 %></div>
+                <% } %>
+            </div>
+          </td>
+
+          <td>
+             <% if(task.dates && task.dates.due) { 
+                 const due = new Date(task.dates.due);
+                 const isLate = due < new Date() && task.status !== 'done';
+            %>
+                <span class="<%= isLate ? 'text-danger fw-bold' : '' %>">
+                    <%= due.toLocaleDateString() %>
+                </span>
+            <% } else { %>
+                <span class="text-muted">—</span>
+            <% } %>
+          </td>
+
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= task.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= task.id %>">
+                <a href="/tasks/<%= task.id %>" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-gear me-2"></i>Manage
+                </a>
+                <a href="/tasks/edit/<%= task.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" onclick="deleteTask('<%= task.id %>')">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<style>
+    /* Table Specifics */
+    .hover-primary:hover { color: #0d6efd !important; text-decoration: underline !important; }
+    
+    /* Avatar Stack in Table */
+    .avatar-stack { display: flex; align-items: center; }
+    .avatar-circle {
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        background-color: #6c757d; color: #fff;
+        border: 2px solid #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.7rem; font-weight: bold;
+        margin-left: -8px;
+    }
+    .avatar-circle:first-child { margin-left: 0; }
+    .avatar-circle.more { background-color: #e9ecef; color: #6c757d; font-size: 0.6rem; }
+</style>
+
+<script>
+async function deleteTask(id) {
+    let confirmed = false;
+
+    // Use Modal if available, else standard Confirm
+    if (typeof showMessageModal === 'function') {
+        const res = await showMessageModal({
+            title: 'Delete Task?',
+            message: 'Are you sure you want to delete this task? This action cannot be undone.',
+            icon: 'warning',
+            buttons: [
+                { text: 'Cancel', class: 'btn-secondary' },
+                { text: 'Delete', class: 'btn-danger' }
+            ]
+        });
+        if (res === 'Delete') confirmed = true;
+    } else {
+        if (confirm("Are you sure you want to delete this task?")) confirmed = true;
+    }
+
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/tasks/delete/${id}`, { 
+            method: 'GET',
+            headers: { 'X-AJAX-Request': 'true' }
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({ title: 'Deleted', message: 'Task deleted successfully.', icon: 'success', buttons: [{ text: 'OK', class: 'btn-success' }] });
+            }
+            window.location.reload();
+        } else {
+            throw new Error(result.message || 'Failed to delete');
+        }
+    } catch(e) {
+        if (typeof showMessageModal === 'function') {
+            await showMessageModal({ title: 'Error', message: 'Error deleting task: ' + e.message, icon: 'error', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        } else {
+            alert("Error deleting task");
+        }
+    }
+}
+</script>

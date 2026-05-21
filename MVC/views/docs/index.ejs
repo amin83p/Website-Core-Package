@@ -1,0 +1,127 @@
+<%
+  const rows = Array.isArray(files) ? files : [];
+  const groups = Array.isArray(fileGroups) ? fileGroups : [];
+  const warningMessage = String(warning || '').trim();
+%>
+
+<div class="dash-hero mb-4 docs-hero">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+    <div>
+      <h1 class="page-heading size-lg text-start mb-1">
+        Documentation Center
+      </h1>
+      <div class="text-muted">
+        Browse internal docs, handover notes, and guides from the <code>docs</code> folder.
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="/dashboard" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-speedometer2 me-1"></i> Dashboard
+      </a>
+      <a href="/help/center" class="btn btn-outline-secondary btn-md">
+        <i class="bi bi-life-preserver me-1"></i> Help Center
+      </a>
+    </div>
+  </div>
+</div>
+
+<% if (warningMessage) { %>
+  <div class="alert alert-warning border mb-3" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i><%= warningMessage %>
+  </div>
+<% } %>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-uppercase text-muted fw-bold">Total Files</div>
+        <div class="h3 mb-0"><%= rows.length %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-uppercase text-muted fw-bold">Folders</div>
+        <div class="h3 mb-0"><%= groups.length %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-uppercase text-muted fw-bold">Source</div>
+        <div class="fw-bold mb-0 text-truncate" title="<%= docsRootPath %>">
+          <%= docsRootPath %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+    <h5 class="mb-0">All Documents</h5>
+    <span class="badge bg-light text-muted border"><%= rows.length %> items</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-scroll-wrapper mb-0">
+      <table class="table-responsive size-md mb-0">
+        <thead>
+          <tr>
+            <th>Document</th>
+            <th>Folder</th>
+            <th>Type</th>
+            <th>Updated</th>
+            <th>Size</th>
+            <th class="text-end pe-4">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!rows.length) { %>
+            <tr>
+              <td colspan="6" class="text-center py-4 text-muted">
+                No files found in the docs folder.
+              </td>
+            </tr>
+          <% } %>
+
+          <% rows.forEach((row) => { %>
+            <% const pathToken = encodeURIComponent(String(row.relativePath || '')); %>
+            <tr>
+              <td>
+                <div class="fw-bold text-dark"><%= row.name %></div>
+                <div class="x-small text-muted font-monospace"><%= row.relativePath %></div>
+              </td>
+              <td><span class="badge bg-light text-dark border"><%= row.folder %></span></td>
+              <td><span class="text-muted"><%= row.ext || '-' %></span></td>
+              <td><span class="text-muted"><%= row.updatedAtLabel || '-' %></span></td>
+              <td><span class="text-muted"><%= row.sizeLabel || '-' %></span></td>
+              <td class="text-end pe-4">
+                <div class="d-inline-flex align-items-center gap-2">
+                  <% if (row.isTextViewable) { %>
+                    <a href="/docs/view?path=<%= pathToken %>" class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-eye me-1"></i>Open
+                    </a>
+                  <% } else { %>
+                    <span class="badge bg-secondary-subtle text-secondary border">Preview N/A</span>
+                  <% } %>
+                  <a href="/docs/download?path=<%= pathToken %>" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-download me-1"></i>Download
+                  </a>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+.docs-hero {
+  border: 1px solid rgba(13, 110, 253, 0.14);
+}
+</style>

@@ -1,0 +1,12 @@
+{
+  "subjectId": "SUB-LINC-BX89N",
+  "code": "asdfasdfasd",
+  "title": "asdfasdfasdf",
+  "createdOn": "2026-02-27T03:26:55.609Z",
+  "folders": {
+    "sessions": "Contains session-specific materials",
+    "media": "Contains images, videos, and global subject media",
+    "attachments": "Contains general syllabi and reading lists"
+  },
+  "files": []
+}

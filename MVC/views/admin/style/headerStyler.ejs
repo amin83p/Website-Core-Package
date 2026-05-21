@@ -1,0 +1,263 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="page-heading size-md m-0">Header Styler</h2>
+        <p class="text-muted mb-0">Design the navigation bar, logo resizing behavior, and notice banner.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/styles" class="btn btn-outline-secondary btn-sm">Back</a>
+        <button type="submit" form="headerForm" class="btn btn-primary btn-sm btn-filled">
+            <i class="bi bi-save-fill me-1"></i> Save Changes
+        </button>
+    </div>
+  </div>
+
+  <div class="row g-4">
+      
+      <div class="col-lg-4">
+          <div class="card border-0 shadow-lg sticky-top" style="top: 20px;">
+              <div class="card-header bg-dark text-white fw-bold">
+                  Header Configuration
+              </div>
+              <div class="card-body bg-light">
+                  <form id="headerForm" action="/styles/header/save" method="POST">
+                      
+                      <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
+                          <li class="nav-item">
+                              <button class="nav-link active small py-1" data-bs-toggle="pill" data-bs-target="#tab-layout" type="button">Layout</button>
+                          </li>
+                          <li class="nav-item">
+                              <button class="nav-link small py-1" data-bs-toggle="pill" data-bs-target="#tab-colors" type="button">Colors</button>
+                          </li>
+                          <li class="nav-item">
+                              <button class="nav-link small py-1" data-bs-toggle="pill" data-bs-target="#tab-logo" type="button">Logo</button>
+                          </li>
+                      </ul>
+
+                      <div class="tab-content">
+                          
+                          <div class="tab-pane fade show active" id="tab-layout">
+                              <h6 class="fw-bold text-primary mb-3">Dimensions</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Initial Height (Padding)</span>
+                                      <span id="padVal" class="text-primary"><%= headerVars.paddingY %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="5" max="50" step="1" 
+                                         value="<%= parseInt(headerVars.paddingY) %>"
+                                         oninput="updatePreview('--header-padding-y', this.value + 'px'); document.getElementById('padVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--header-padding-y" id="val_paddingY" value="<%= headerVars.paddingY %>">
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Shrunk Height (Padding)</span>
+                                      <span id="padSVal" class="text-primary"><%= headerVars.paddingShrunk %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="30" step="1" 
+                                         value="<%= parseInt(headerVars.paddingShrunk) %>"
+                                         oninput="updatePreview('--header-padding-shrunk', this.value + 'px'); document.getElementById('padSVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--header-padding-shrunk" id="val_paddingShrunk" value="<%= headerVars.paddingShrunk %>">
+                                  <div class="form-text x-small">Applied when user scrolls down.</div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Content Width</label>
+                                  <select class="form-select form-select-sm" name="--header-content-width" onchange="updatePreview('--header-content-width', this.value)">
+                                      <option value="100%" <%= headerVars.contentWidth==='100%'?'selected':'' %>>Full Width (100%)</option>
+                                      <option value="90%" <%= headerVars.contentWidth==='90%'?'selected':'' %>>Wide (90%)</option>
+                                      <option value="80%" <%= headerVars.contentWidth==='80%'?'selected':'' %>>Boxed (80%)</option>
+                                      <option value="1200px" <%= headerVars.contentWidth==='1200px'?'selected':'' %>>Fixed (1200px)</option>
+                                  </select>
+                              </div>
+                          </div>
+
+                          <div class="tab-pane fade" id="tab-colors">
+                              <h6 class="fw-bold text-primary mb-3">Colors & Shadow</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Background Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= headerVars.bg %>" oninput="updatePreview('--header-bg', this.value)">
+                                      <input type="text" name="--header-bg" id="val_bg" class="form-control font-monospace" value="<%= headerVars.bg %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Nav Link Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= headerVars.navColor %>" oninput="updatePreview('--nav-link-color', this.value)">
+                                      <input type="text" name="--nav-link-color" id="val_navColor" class="form-control font-monospace" value="<%= headerVars.navColor %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Nav Hover/Highlight</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= headerVars.navHover %>" oninput="updatePreview('--nav-link-hover', this.value)">
+                                      <input type="text" name="--nav-link-hover" id="val_navHover" class="form-control font-monospace" value="<%= headerVars.navHover %>">
+                                  </div>
+                              </div>
+
+                              <hr class="text-muted opacity-25">
+                              
+                              <h6 class="fw-bold text-primary mb-3">Notice Bar</h6>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Notice Background</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= headerVars.noticeBg %>" oninput="updatePreview('--notice-bg', this.value)">
+                                      <input type="text" name="--notice-bg" id="val_noticeBg" class="form-control font-monospace" value="<%= headerVars.noticeBg %>">
+                                  </div>
+                              </div>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Notice Text</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= headerVars.noticeText %>" oninput="updatePreview('--notice-text', this.value)">
+                                      <input type="text" name="--notice-text" id="val_noticeText" class="form-control font-monospace" value="<%= headerVars.noticeText %>">
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div class="tab-pane fade" id="tab-logo">
+                              <h6 class="fw-bold text-primary mb-3">Logo Scaling</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Initial Height</span>
+                                      <span id="logoVal" class="text-primary"><%= headerVars.logoHeight %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="30" max="100" step="2" 
+                                         value="<%= parseInt(headerVars.logoHeight) %>"
+                                         oninput="updatePreview('--logo-height', this.value + 'px'); document.getElementById('logoVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--logo-height" id="val_logoHeight" value="<%= headerVars.logoHeight %>">
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Shrunk Height</span>
+                                      <span id="logoSVal" class="text-primary"><%= headerVars.logoHeightShrunk %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="20" max="80" step="2" 
+                                         value="<%= parseInt(headerVars.logoHeightShrunk) %>"
+                                         oninput="updatePreview('--logo-height-shrunk', this.value + 'px'); document.getElementById('logoSVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--logo-height-shrunk" id="val_logoHeightShrunk" value="<%= headerVars.logoHeightShrunk %>">
+                              </div>
+                          </div>
+
+                      </div>
+
+                  </form>
+              </div>
+          </div>
+      </div>
+
+      <div class="col-lg-8">
+          <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white border-bottom-0 pt-3 fw-bold text-secondary d-flex justify-content-between align-items-center">
+                  <span>Live Preview</span>
+                  <div class="btn-group btn-group-sm">
+                      <button type="button" class="btn btn-outline-secondary active" id="simTop" onclick="simulateScroll(false)">Top State</button>
+                      <button type="button" class="btn btn-outline-secondary" id="simScroll" onclick="simulateScroll(true)">Scrolled State</button>
+                  </div>
+              </div>
+              <div class="card-body p-0 bg-light d-flex flex-column position-relative overflow-hidden">
+                  
+                  <div class="p-5 text-center flex-grow-1" style="background: repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 10px, #ffffff 10px, #ffffff 20px);">
+                      <div style="height: 120px;"></div> <h1 class="opacity-25 display-4 fw-bold text-muted mt-5">PAGE CONTENT</h1>
+                      <p class="opacity-50">This simulates the page body behind the fixed header.</p>
+                  </div>
+
+                  <div id="previewContainer" style="position: absolute; top: 0; left: 0; right: 0;">
+                      
+                      <div class="notice-bar">
+                          <span class="badge bg-primary me-2">NEW</span>
+                          System Update Available. <a href="#">Learn More</a>
+                      </div>
+
+                      <div id="main-header" style="position: relative;"> 
+                          <div class="header-content">
+                              
+                              <div class="logo-section">
+                                  <div class="logo bg-dark text-white d-flex align-items-center justify-content-center fw-bold rounded" style="width: 120px;">
+                                      LOGO
+                                  </div>
+                                  <div class="tagline">The Tagline Text</div>
+                              </div>
+
+                              <nav class="d-none d-md-flex gap-4 align-items-center">
+                                  <a href="#" class="nav-link fw-bold text-decoration-none">Dashboard</a>
+                                  <a href="#" class="nav-link fw-bold text-decoration-none" style="color: var(--nav-link-hover) !important;">Active</a>
+                                  <a href="#" class="nav-link fw-bold text-decoration-none">Settings</a>
+                                  <div class="d-flex align-items-center gap-2 ms-3">
+                                      <div class="rounded-circle bg-secondary" style="width: 32px; height: 32px;"></div>
+                                  </div>
+                              </nav>
+
+                          </div>
+                      </div>
+
+                  </div>
+
+              </div>
+          </div>
+      </div>
+
+  </div>
+</div>
+
+<script>
+    function updatePreview(varName, val) {
+        // Sync Inputs
+        const shortName = varName.replace('--header-', '').replace('--nav-', 'nav').replace('--logo-', 'logo').replace(/-([a-z])/g, g => g[1].toUpperCase());
+        const inputId = 'val_' + shortName;
+        
+        const textInput = document.getElementById(inputId);
+        if(textInput) textInput.value = val;
+
+        // Apply Globally
+        document.documentElement.style.setProperty(varName, val);
+    }
+
+    function simulateScroll(isScrolled) {
+        const header = document.querySelector('#previewContainer #main-header');
+        const btnTop = document.getElementById('simTop');
+        const btnScroll = document.getElementById('simScroll');
+
+        if(isScrolled) {
+            header.classList.add('shrunk');
+            btnTop.classList.remove('active');
+            btnScroll.classList.add('active');
+        } else {
+            header.classList.remove('shrunk');
+            btnTop.classList.add('active');
+            btnScroll.classList.remove('active');
+        }
+    }
+
+    document.getElementById('headerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.querySelector('button[type="submit"]');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        btn.disabled = true;
+
+        try {
+            const fd = new FormData(e.target);
+            const data = Object.fromEntries(fd.entries());
+            const res = await fetch(e.target.action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' }, body: JSON.stringify(data) });
+            const result = await res.json();
+            if (result.status === 'success') {
+                if(typeof showMessageModal === 'function') await showMessageModal({ title: 'Saved', icon: 'success', message: 'Header styles updated.', buttons: [{text:'OK', class:'btn-success'}]});
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            } else {
+                alert('Error: ' + result.message);
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            }
+        } catch (err) {
+            console.error(err); alert('Network error.');
+            btn.disabled = false; btn.innerHTML = originalHtml;
+        }
+    });
+</script>

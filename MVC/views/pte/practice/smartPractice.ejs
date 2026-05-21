@@ -1,0 +1,455 @@
+<%
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+  const initialRecommendation = (recommendation && typeof recommendation === 'object') ? recommendation : {};
+  const maxCount = Number(maxQuestionCount || 15) || 15;
+  const defaultCount = Number(defaultQuestionCount || 10) || 10;
+  const windowDefault = Number(defaultWindowDays || 90) || 90;
+  const actionToken = typeof actionStateId === 'string' ? actionStateId : '';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3 pte-smart-page-head">
+    <div class="pte-smart-title-wrap">
+      <h1 class="page-heading size-md m-0 pte-smart-page-title"><i class="bi bi-stars me-2"></i>PTE Smart Practice</h1>
+      <div class="text-muted mt-2">Generate a focused practice plan from recent scores, self-rated difficulty, and available question difficulty.</div>
+    </div>
+    <div class="d-flex align-items-center justify-content-end gap-2">
+      <a href="<%= dashboardHref %>" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-speedometer2 me-1"></i> PTE Dashboard
+      </a>
+    </div>
+  </div>
+
+  <script id="pteSmartInitialRecommendationJson" type="application/json"><%- JSON.stringify(initialRecommendation || {}).replace(/</g, '\\u003c') %></script>
+  <input type="hidden" id="pteSmartActionStateId" value="<%= actionToken %>">
+
+  <style>
+    .pte-smart-page-head {
+      width: 100%;
+      margin-left: 0 !important;
+      padding-left: 0 !important;
+      text-align: left !important;
+    }
+    .pte-smart-title-wrap {
+      flex: 1 1 auto;
+      min-width: 280px;
+      margin-left: 0 !important;
+      padding-left: 0 !important;
+      text-align: left !important;
+    }
+    .pte-smart-page-title {
+      margin-left: 0 !important;
+      padding-left: 0 !important;
+      text-align: left !important;
+    }
+    .pte-smart-panel {
+      border: 1px solid #dfe5ee;
+      border-radius: 0.75rem;
+      background: #fff;
+      padding: 1rem;
+    }
+    .pte-smart-plan-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.85rem;
+    }
+    .pte-smart-plan-card {
+      border: 1px solid #dfe5ee;
+      border-radius: 0.7rem;
+      background: #fbfcfe;
+      padding: 0.85rem;
+    }
+    .pte-smart-evidence-list {
+      display: grid;
+      gap: 0.55rem;
+    }
+    .pte-smart-evidence-row {
+      border-bottom: 1px solid #edf1f6;
+      padding-bottom: 0.55rem;
+    }
+    .pte-smart-evidence-row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+    .pte-smart-empty {
+      border: 1px dashed #d5dde8;
+      border-radius: 0.65rem;
+      background: #fbfcfe;
+      color: #6c757d;
+      padding: 1rem;
+    }
+  </style>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-4">
+          <label for="pteSmartPracticeName" class="form-label fw-bold mb-1">Practice Name</label>
+          <input id="pteSmartPracticeName" class="form-control size-md" type="text" maxlength="120" autocomplete="off">
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label for="pteSmartWindowDays" class="form-label fw-bold mb-1">Date Window</label>
+          <select id="pteSmartWindowDays" class="form-select size-md">
+            <option value="30">Last 30 days</option>
+            <option value="60">Last 60 days</option>
+            <option value="90" <%= windowDefault === 90 ? 'selected' : '' %>>Last 90 days</option>
+            <option value="180">Last 180 days</option>
+            <option value="365">Last 365 days</option>
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label for="pteSmartTargetCount" class="form-label fw-bold mb-1">Target Size</label>
+          <select id="pteSmartTargetCount" class="form-select size-md">
+            <% for (let count = 5; count <= maxCount; count += 1) { %>
+              <option value="<%= count %>" <%= count === defaultCount ? 'selected' : '' %>><%= count %> questions</option>
+            <% } %>
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label for="pteSmartPriorityMode" class="form-label fw-bold mb-1">Priority</label>
+          <select id="pteSmartPriorityMode" class="form-select size-md">
+            <option value="balanced_gaps">Balanced gaps</option>
+            <option value="weakest_scores">Weakest scores</option>
+            <option value="hard_ratings">Hard ratings</option>
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="pteSmartIncludeMaintenance" checked>
+            <label class="form-check-label" for="pteSmartIncludeMaintenance">Include maintenance</label>
+          </div>
+        </div>
+      </div>
+      <div class="d-flex align-items-center justify-content-end flex-wrap gap-2 mt-3">
+        <button type="button" class="btn btn-outline-secondary btn-md" id="pteSmartRefreshBtn" data-no-wait="true">
+          <i class="bi bi-arrow-clockwise me-1"></i> Generate Plan
+        </button>
+        <button type="button" class="btn btn-filled btn-primary btn-md" id="pteSmartStartBtn" data-no-wait="true">
+          <i class="bi bi-play-circle me-1"></i> Start Practice
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="pte-smart-panel h-100">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+          <div>
+            <div class="fw-bold">Recommended Plan</div>
+            <div class="small text-muted" id="pteSmartPlanSubtitle">Review the generated plan before starting.</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2" id="pteSmartSummaryBadges"></div>
+        </div>
+        <div id="pteSmartWarnings"></div>
+        <div id="pteSmartPlanGrid" class="pte-smart-plan-grid"></div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="pte-smart-panel h-100">
+        <div class="fw-bold mb-2">Evidence</div>
+        <div class="small text-muted mb-3" id="pteSmartEvidenceSummary">The smart plan uses recent attempt performance and self-rated difficulty.</div>
+        <div id="pteSmartEvidenceList" class="pte-smart-evidence-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const MAX_COUNT = <%= maxCount %>;
+  const refs = {
+    initial: document.getElementById('pteSmartInitialRecommendationJson'),
+    actionState: document.getElementById('pteSmartActionStateId'),
+    practiceName: document.getElementById('pteSmartPracticeName'),
+    windowDays: document.getElementById('pteSmartWindowDays'),
+    targetCount: document.getElementById('pteSmartTargetCount'),
+    priorityMode: document.getElementById('pteSmartPriorityMode'),
+    includeMaintenance: document.getElementById('pteSmartIncludeMaintenance'),
+    refreshBtn: document.getElementById('pteSmartRefreshBtn'),
+    startBtn: document.getElementById('pteSmartStartBtn'),
+    subtitle: document.getElementById('pteSmartPlanSubtitle'),
+    badges: document.getElementById('pteSmartSummaryBadges'),
+    warnings: document.getElementById('pteSmartWarnings'),
+    grid: document.getElementById('pteSmartPlanGrid'),
+    evidenceSummary: document.getElementById('pteSmartEvidenceSummary'),
+    evidenceList: document.getElementById('pteSmartEvidenceList')
+  };
+
+  let actionStateId = String(refs.actionState?.value || '').trim();
+  let currentRecommendation = parseJsonNode(refs.initial, {});
+
+  function parseJsonNode(node, fallback) {
+    try {
+      return JSON.parse((node && node.textContent) || '');
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function clean(value) {
+    return String(value || '').replace(/\0/g, '').trim();
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatQuestionType(value) {
+    return clean(value)
+      .toLowerCase()
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
+  function formatSkill(value) {
+    const token = clean(value).toLowerCase();
+    return token ? token.charAt(0).toUpperCase() + token.slice(1) : '-';
+  }
+
+  function showMessage(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+    }
+    alert(message || title);
+    return Promise.resolve();
+  }
+
+  function setBusy(button, busy, label) {
+    if (!button) return;
+    if (busy) {
+      button.dataset.originalHtml = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + escapeHtml(label || 'Working...');
+      return;
+    }
+    button.disabled = false;
+    if (button.dataset.originalHtml) button.innerHTML = button.dataset.originalHtml;
+  }
+
+  function readOptions() {
+    return {
+      windowDays: clean(refs.windowDays?.value || '90'),
+      targetQuestionCount: clean(refs.targetCount?.value || '10'),
+      priorityMode: clean(refs.priorityMode?.value || 'balanced_gaps'),
+      includeMaintenance: refs.includeMaintenance?.checked ? 'true' : 'false'
+    };
+  }
+
+  function readSkillPlans() {
+    const map = new Map();
+    Array.from(document.querySelectorAll('[data-smart-count-input]')).forEach((input) => {
+      const skill = clean(input.getAttribute('data-skill')).toLowerCase();
+      const questionType = clean(input.getAttribute('data-question-type')).toLowerCase();
+      const count = Math.max(0, Math.min(MAX_COUNT, Number.parseInt(String(input.value || '0'), 10) || 0));
+      if (!skill || !questionType || count <= 0) return;
+      if (!map.has(skill)) map.set(skill, []);
+      map.get(skill).push({ questionType, questionCount: count });
+    });
+    return Array.from(map.entries()).map(([skill, typePlans]) => ({ skill, typePlans }));
+  }
+
+  function selectedPlanCount() {
+    return readSkillPlans().reduce((sum, skillPlan) => (
+      sum + skillPlan.typePlans.reduce((typeSum, typePlan) => typeSum + Number(typePlan.questionCount || 0), 0)
+    ), 0);
+  }
+
+  function renderRecommendation(recommendation) {
+    currentRecommendation = recommendation && typeof recommendation === 'object' ? recommendation : {};
+    const summary = currentRecommendation.summary || {};
+    const skillPlans = Array.isArray(currentRecommendation.skillPlans) ? currentRecommendation.skillPlans : [];
+    const selectedCount = Number(summary.selectedQuestionCount || currentRecommendation.selectedQuestions?.length || 0) || 0;
+
+    if (refs.practiceName && !clean(refs.practiceName.value)) {
+      refs.practiceName.value = clean(summary.recommendedName) || 'Smart Practice';
+    }
+    if (refs.subtitle) refs.subtitle.textContent = clean(summary.headline) || 'Review the generated plan before starting.';
+    if (refs.badges) {
+      refs.badges.innerHTML = ''
+        + '<span class="badge bg-primary-subtle text-primary border border-primary-subtle">' + escapeHtml(selectedCount) + ' question(s)</span>'
+        + '<span class="badge bg-light text-dark border">' + escapeHtml(currentRecommendation.confidence || 'starter') + ' confidence</span>'
+        + '<span class="badge bg-light text-dark border">' + escapeHtml(currentRecommendation.window?.days || '-') + ' days</span>';
+    }
+    if (refs.warnings) {
+      const warnings = Array.isArray(currentRecommendation.warnings) ? currentRecommendation.warnings : [];
+      refs.warnings.innerHTML = warnings.length
+        ? '<div class="alert alert-warning py-2">' + warnings.map(escapeHtml).join('<br>') + '</div>'
+        : '';
+    }
+    if (refs.grid) {
+      if (!skillPlans.length) {
+        refs.grid.innerHTML = '<div class="pte-smart-empty">No smart practice plan could be generated from the current filters.</div>';
+      } else {
+        refs.grid.innerHTML = skillPlans.map((skillPlan) => {
+          const typePlans = Array.isArray(skillPlan.typePlans) ? skillPlan.typePlans : [];
+          return typePlans.map((typePlan) => {
+            const count = Math.max(1, Number(typePlan.questionCount || 1) || 1);
+            const evidence = typePlan.evidence || {};
+            return ''
+              + '<section class="pte-smart-plan-card">'
+              + '  <div class="d-flex align-items-start justify-content-between gap-2 mb-2">'
+              + '    <div>'
+              + '      <div class="fw-bold">' + escapeHtml(formatQuestionType(typePlan.questionType)) + '</div>'
+              + '      <div class="small text-muted">' + escapeHtml(formatSkill(skillPlan.skill)) + ' | Target: ' + escapeHtml(typePlan.targetDifficulty || 'medium') + '</div>'
+              + '    </div>'
+              + '    <input class="form-control form-control-sm" style="max-width: 82px" type="number" min="0" max="' + MAX_COUNT + '" value="' + escapeHtml(count) + '" data-smart-count-input="true" data-skill="' + escapeHtml(skillPlan.skill) + '" data-question-type="' + escapeHtml(typePlan.questionType) + '">'
+              + '  </div>'
+              + '  <div class="small mb-2">' + escapeHtml(typePlan.reason || 'Recommended by Smart Practice.') + '</div>'
+              + '  <div class="d-flex flex-wrap gap-2">'
+              + '    <span class="badge bg-light text-dark border">Need ' + escapeHtml(evidence.needScore ?? '-') + '</span>'
+              + '    <span class="badge bg-light text-dark border">Avg ' + escapeHtml(evidence.averagePercentage ?? '-') + '%</span>'
+              + '    <span class="badge bg-light text-dark border">Hard ' + escapeHtml(evidence.hardRatingCount || 0) + '</span>'
+              + '  </div>'
+              + '</section>';
+          }).join('');
+        }).join('');
+      }
+    }
+    renderEvidence();
+    refreshStartState();
+  }
+
+  function renderEvidence() {
+    const evidence = currentRecommendation.evidence || {};
+    const groups = Array.isArray(evidence.rankedGroups) ? evidence.rankedGroups : [];
+    if (refs.evidenceSummary) {
+      refs.evidenceSummary.textContent = String(evidence.attemptedItemCount || 0)
+        + ' recent attempt item(s), '
+        + String(evidence.scoredItemCount || 0)
+        + ' scored item(s), '
+        + String(evidence.availableQuestionCount || 0)
+        + ' available question(s).';
+    }
+    if (!refs.evidenceList) return;
+    if (!groups.length) {
+      refs.evidenceList.innerHTML = '<div class="pte-smart-empty">No previous evidence yet. Smart Practice will use a balanced starter plan.</div>';
+      return;
+    }
+    refs.evidenceList.innerHTML = groups.slice(0, 6).map((row) => (
+      '<div class="pte-smart-evidence-row">'
+        + '<div class="fw-bold">' + escapeHtml(formatSkill(row.skill)) + ' | ' + escapeHtml(formatQuestionType(row.questionType)) + '</div>'
+        + '<div class="small text-muted">' + escapeHtml(row.reason || '') + '</div>'
+      + '</div>'
+    )).join('');
+  }
+
+  function refreshStartState() {
+    if (!refs.startBtn) return;
+    refs.startBtn.disabled = selectedPlanCount() <= 0;
+  }
+
+  async function requestStartToken() {
+    const response = await fetch('/pte/practice/smart/start/token', {
+      method: 'POST',
+      headers: {
+        'X-AJAX-Request': 'true',
+        Accept: 'application/json'
+      },
+      credentials: 'include'
+    });
+    const result = await response.json().catch(() => null);
+    const token = clean(result?.results?.actionStateId || '');
+    if (!response.ok || !result || result.status !== 'success' || !token) {
+      throw new Error((result && result.message) || 'Unable to prepare secure smart practice start.');
+    }
+    actionStateId = token;
+    if (refs.actionState) refs.actionState.value = token;
+    return token;
+  }
+
+  async function generatePlan() {
+    setBusy(refs.refreshBtn, true, 'Generating...');
+    try {
+      const params = new URLSearchParams(readOptions());
+      const response = await fetch('/pte/practice/smart/recommendation?' + params.toString(), {
+        method: 'GET',
+        headers: {
+          'X-AJAX-Request': 'true',
+          Accept: 'application/json'
+        },
+        credentials: 'include'
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || 'Unable to generate smart practice plan.');
+      }
+      renderRecommendation(result.results || {});
+    } catch (error) {
+      await showMessage('Smart Practice', error.message || 'Unable to generate smart practice plan.', 'error');
+    } finally {
+      setBusy(refs.refreshBtn, false);
+    }
+  }
+
+  async function startPractice() {
+    const practiceName = clean(refs.practiceName?.value || '');
+    if (!practiceName) {
+      await showMessage('Practice Name Required', 'Please enter a practice name before starting.', 'warning');
+      refs.practiceName?.focus();
+      return;
+    }
+    const skillPlans = readSkillPlans();
+    if (!skillPlans.length) {
+      await showMessage('Smart Plan Required', 'Generate or adjust a smart practice plan before starting.', 'warning');
+      return;
+    }
+
+    setBusy(refs.startBtn, true, 'Starting...');
+    try {
+      const token = await requestStartToken();
+      const body = new URLSearchParams();
+      body.set('runtimePlan', JSON.stringify({
+        ...readOptions(),
+        practiceName,
+        skillPlans
+      }));
+      body.set('actionStateId', token);
+      const response = await fetch('/pte/practice/smart/start?actionStateId=' + encodeURIComponent(token), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true',
+          Accept: 'application/json'
+        },
+        credentials: 'include',
+        body: body.toString()
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || 'Unable to start smart practice.');
+      }
+      window.location.href = clean(result?.results?.redirectUrl || '') || '/pte/practice/attempts';
+    } catch (error) {
+      await showMessage('Smart Practice Start Failed', error.message || 'Unable to start smart practice.', 'error');
+      setBusy(refs.startBtn, false);
+    }
+  }
+
+  refs.refreshBtn?.addEventListener('click', generatePlan);
+  refs.startBtn?.addEventListener('click', startPractice);
+  refs.grid?.addEventListener('input', (event) => {
+    if (event.target && event.target.matches('[data-smart-count-input]')) refreshStartState();
+  });
+  refs.targetCount?.addEventListener('change', generatePlan);
+  refs.windowDays?.addEventListener('change', generatePlan);
+  refs.priorityMode?.addEventListener('change', generatePlan);
+  refs.includeMaintenance?.addEventListener('change', generatePlan);
+
+  renderRecommendation(currentRecommendation);
+})();
+</script>

@@ -1,0 +1,292 @@
+[
+  {
+    "orgId": "900000",
+    "studentId": "STU50124",
+    "personId": "146788",
+    "programId": "232974",
+    "registrationDate": "2026-04-01",
+    "status": "registered",
+    "feeCategorySnapshot": "Others",
+    "note": "Approved from Student Program Registration page",
+    "transactionSummary": {
+      "previewCount": 0,
+      "postedCount": 0,
+      "totalAmount": 0,
+      "externalReference": "",
+      "transactionIds": [],
+      "reversalIds": [],
+      "draftTransactionItems": [],
+      "draftPreviewRows": [],
+      "draftSavedAt": "2026-04-01T07:59:18.907Z",
+      "approvedAt": "2026-04-01T07:59:25.447Z",
+      "approvedBy": "ROOT_001"
+    },
+    "academicSummary": {
+      "entryCount": 1,
+      "entryIds": [
+        "997412"
+      ],
+      "voidedEntryIds": []
+    },
+    "id": "534551"
+  },
+  {
+    "orgId": "900000",
+    "studentId": "STU52105",
+    "personId": "144922",
+    "programId": "232974",
+    "registrationDate": "2026-04-01",
+    "status": "rolled_back",
+    "feeCategorySnapshot": "Domestic",
+    "note": "Approved from Program Registration details | Manual rollback from Program Registration details",
+    "transactionSummary": {
+      "previewCount": 2,
+      "postedCount": 4,
+      "totalAmount": 1813,
+      "externalReference": "",
+      "transactionIds": [
+        "154738",
+        "786228",
+        "116085",
+        "372531"
+      ],
+      "reversalIds": [
+        "356488",
+        "902854",
+        "971737",
+        "293102"
+      ],
+      "draftTransactionItems": [
+        {
+          "orgId": "900000",
+          "status": "posted",
+          "postedAt": "2026-04-01T16:32:18.872Z",
+          "effectiveDate": "2026-04-01",
+          "transactionType": "charge",
+          "party": {
+            "studentId": "STU52105",
+            "personId": "144922",
+            "programId": "232974",
+            "feeCategory": "Domestic"
+          },
+          "fee": {
+            "category": "Domestic",
+            "code": "MANUAL_PROGRAM_ADJUSTMENT",
+            "label": "Manual Program Registration Adjustment",
+            "frequency": "one_time",
+            "isOptional": false
+          },
+          "amount": {
+            "value": 250,
+            "currency": "CAD",
+            "direction": "debit"
+          },
+          "memo": "Manual program registration adjustment",
+          "externalReference": "845201",
+          "internalNote": "Manual draft adjustment before approval (845201)",
+          "metadata": {
+            "sourceType": "manual_program_adjustment",
+            "registrationId": "845201",
+            "generatedBy": "ROOT_001",
+            "isManualAdjustment": true,
+            "ledgerSide": "debit",
+            "accountId": "ACC_1772254486530_268",
+            "accountCode": "STU_STU52105",
+            "accountName": "Hossein Norouzi (Student)",
+            "programRegistrationId": "845201"
+          },
+          "source": {
+            "module": "school_program_registration",
+            "eventType": "program_registration_manual_adjustment",
+            "eventId": "SPRMAN-845201-1775061138872-1-5-DR",
+            "idempotencyKey": "SPRMAN|845201|1775061138872-1-5|DR"
+          }
+        },
+        {
+          "orgId": "900000",
+          "status": "posted",
+          "postedAt": "2026-04-01T16:32:18.872Z",
+          "effectiveDate": "2026-04-01",
+          "transactionType": "charge",
+          "party": {
+            "studentId": "STU52105",
+            "personId": "144922",
+            "programId": "232974",
+            "feeCategory": "Domestic"
+          },
+          "fee": {
+            "category": "Domestic",
+            "code": "MANUAL_PROGRAM_ADJUSTMENT",
+            "label": "Manual Program Registration Adjustment",
+            "frequency": "one_time",
+            "isOptional": false
+          },
+          "amount": {
+            "value": 250,
+            "currency": "CAD",
+            "direction": "credit"
+          },
+          "memo": "Manual program registration adjustment",
+          "externalReference": "845201",
+          "internalNote": "Manual draft adjustment before approval (845201)",
+          "metadata": {
+            "sourceType": "manual_program_adjustment",
+            "registrationId": "845201",
+            "generatedBy": "ROOT_001",
+            "isManualAdjustment": true,
+            "ledgerSide": "credit",
+            "accountId": "ACC_4210",
+            "accountCode": "4210",
+            "accountName": "Registration Fees",
+            "programRegistrationId": "845201"
+          },
+          "source": {
+            "module": "school_program_registration",
+            "eventType": "program_registration_manual_adjustment",
+            "eventId": "SPRMAN-845201-1775061138872-1-5-CR",
+            "idempotencyKey": "SPRMAN|845201|1775061138872-1-5|CR"
+          }
+        },
+        {
+          "orgId": "900000",
+          "status": "posted",
+          "postedAt": "2026-04-01T16:32:18.872Z",
+          "effectiveDate": "2026-04-01",
+          "transactionType": "charge",
+          "party": {
+            "studentId": "STU52105",
+            "personId": "144922",
+            "programId": "232974",
+            "feeCategory": "Domestic"
+          },
+          "fee": {
+            "category": "Domestic",
+            "code": "MANUAL_PROGRAM_ADJUSTMENT",
+            "label": "Manual Program Registration Adjustment",
+            "frequency": "one_time",
+            "isOptional": false
+          },
+          "amount": {
+            "value": 1563,
+            "currency": "CAD",
+            "direction": "debit"
+          },
+          "memo": "Manual program registration adjustment",
+          "externalReference": "845201",
+          "internalNote": "Manual draft adjustment before approval (845201)",
+          "metadata": {
+            "sourceType": "manual_program_adjustment",
+            "registrationId": "845201",
+            "generatedBy": "ROOT_001",
+            "isManualAdjustment": true,
+            "ledgerSide": "debit",
+            "accountId": "ACC_1772254486530_268",
+            "accountCode": "STU_STU52105",
+            "accountName": "Hossein Norouzi (Student)",
+            "programRegistrationId": "845201"
+          },
+          "source": {
+            "module": "school_program_registration",
+            "eventType": "program_registration_manual_adjustment",
+            "eventId": "SPRMAN-845201-1775061138872-2-982-DR",
+            "idempotencyKey": "SPRMAN|845201|1775061138872-2-982|DR"
+          }
+        },
+        {
+          "orgId": "900000",
+          "status": "posted",
+          "postedAt": "2026-04-01T16:32:18.872Z",
+          "effectiveDate": "2026-04-01",
+          "transactionType": "charge",
+          "party": {
+            "studentId": "STU52105",
+            "personId": "144922",
+            "programId": "232974",
+            "feeCategory": "Domestic"
+          },
+          "fee": {
+            "category": "Domestic",
+            "code": "MANUAL_PROGRAM_ADJUSTMENT",
+            "label": "Manual Program Registration Adjustment",
+            "frequency": "one_time",
+            "isOptional": false
+          },
+          "amount": {
+            "value": 1563,
+            "currency": "CAD",
+            "direction": "credit"
+          },
+          "memo": "Manual program registration adjustment",
+          "externalReference": "845201",
+          "internalNote": "Manual draft adjustment before approval (845201)",
+          "metadata": {
+            "sourceType": "manual_program_adjustment",
+            "registrationId": "845201",
+            "generatedBy": "ROOT_001",
+            "isManualAdjustment": true,
+            "ledgerSide": "credit",
+            "accountId": "ACC_4110",
+            "accountCode": "4110",
+            "accountName": "Tuition Revenue - Domestic",
+            "programRegistrationId": "845201"
+          },
+          "source": {
+            "module": "school_program_registration",
+            "eventType": "program_registration_manual_adjustment",
+            "eventId": "SPRMAN-845201-1775061138872-2-982-CR",
+            "idempotencyKey": "SPRMAN|845201|1775061138872-2-982|CR"
+          }
+        }
+      ],
+      "draftPreviewRows": [
+        {
+          "rowIndex": 0,
+          "include": true,
+          "memo": "Manual program registration adjustment",
+          "amount": 250,
+          "currency": "CAD",
+          "debitAccount": {
+            "id": "ACC_1772254486530_268",
+            "code": "STU_STU52105",
+            "name": "Hossein Norouzi (Student)"
+          },
+          "creditAccount": {
+            "id": "ACC_4210",
+            "code": "4210",
+            "name": "Registration Fees"
+          }
+        },
+        {
+          "rowIndex": 1,
+          "include": true,
+          "memo": "Manual program registration adjustment",
+          "amount": 1563,
+          "currency": "CAD",
+          "debitAccount": {
+            "id": "ACC_1772254486530_268",
+            "code": "STU_STU52105",
+            "name": "Hossein Norouzi (Student)"
+          },
+          "creditAccount": {
+            "id": "ACC_4110",
+            "code": "4110",
+            "name": "Tuition Revenue - Domestic"
+          }
+        }
+      ],
+      "draftSavedAt": "2026-04-01T07:59:18.775Z",
+      "approvedAt": "2026-04-01T16:32:19.666Z",
+      "approvedBy": "ROOT_001"
+    },
+    "academicSummary": {
+      "entryCount": 1,
+      "entryIds": [
+        "873821"
+      ],
+      "voidedEntryIds": [
+        "873821"
+      ]
+    },
+    "id": "845201"
+  }
+]

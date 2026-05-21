@@ -1,0 +1,18 @@
+<div class="mb-3">
+  <label class="form-label fw-bold">Indicator Text</label>
+  <textarea class="form-control" name="indicatorText" rows="3"><%= itemData?.indicatorText || '' %></textarea>
+</div>
+<div class="row g-2">
+  <div class="col-md-4 mb-3">
+    <label class="form-label fw-bold">Indicator Category</label>
+    <input class="form-control" name="indicatorCategory" value="<%= itemData?.indicatorCategory || '' %>">
+  </div>
+  <div class="col-md-4 mb-3">
+    <label class="form-label fw-bold">Indicator Dimension</label>
+    <input class="form-control" name="indicatorDimension" value="<%= itemData?.indicatorDimension || '' %>">
+  </div>
+  <div class="col-md-4 mb-3">
+    <label class="form-label fw-bold">Evidence Type</label>
+    <input class="form-control" name="evidenceType" value="<%= itemData?.evidenceType || '' %>">
+  </div>
+</div>

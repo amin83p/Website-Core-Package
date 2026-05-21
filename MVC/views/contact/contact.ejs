@@ -1,0 +1,1296 @@
+<%
+  const publicContact = (typeof appContact !== 'undefined' && appContact && typeof appContact === 'object') ? appContact : {};
+  const contactPage = (typeof appContactPage !== 'undefined' && appContactPage && typeof appContactPage === 'object') ? appContactPage : {};
+  const fallbackContactHighlights = [
+    { title: 'Clear Context', body: 'Share goals, files, links, and constraints in one place.' },
+    { title: 'Follow-Up Code', body: 'Track your submitted message later with your private code.' },
+    { title: 'Direct Route', body: 'Use email if your request is urgent or already documented.' }
+  ];
+  const fallbackContactProcessImages = [
+    {
+      imageUrl: '/uploads/GLOBAL/misc/Engineering.jpg',
+      alt: 'Mega dust collector system with high efficiency fan.',
+      caption: 'Mega dust collector system with a high-efficiency fan for lower energy consumption.'
+    },
+    {
+      imageUrl: '/uploads/GLOBAL/misc/Software.jpeg',
+      alt: 'Industrial software interface.',
+      caption: 'Industrial and heavy-duty software packages.'
+    }
+  ];
+  const contactText = (key, fallback = '') => (
+    Object.prototype.hasOwnProperty.call(contactPage, key)
+      ? String(contactPage[key] ?? '')
+      : fallback
+  );
+  const contactHighlights = Array.isArray(contactPage.highlights) ? contactPage.highlights : fallbackContactHighlights;
+  const contactProcessImages = Array.isArray(contactPage.processImages) ? contactPage.processImages : fallbackContactProcessImages;
+  const cleanContactRows = (rows, valueKey, legacyRows = []) => {
+    const source = Array.isArray(rows) ? rows : legacyRows;
+    return source
+      .map((row) => {
+        const item = row && typeof row === 'object' ? row : {};
+        const title = String(item.title || item.label || '').trim();
+        const value = String(item[valueKey] || item.value || '').trim();
+        return value ? { title, value } : null;
+      })
+      .filter(Boolean);
+  };
+  const contactEmails = cleanContactRows(publicContact.emails, 'email', publicContact.email ? [{ title: 'Email', email: publicContact.email }] : []);
+  const contactPhones = cleanContactRows(publicContact.phones, 'number', publicContact.phone ? [{ title: 'Phone', number: publicContact.phone }] : []);
+  const contactFaxes = cleanContactRows(publicContact.faxes, 'number', publicContact.fax ? [{ title: 'Fax', number: publicContact.fax }] : []);
+  const contactAddresses = cleanContactRows(publicContact.addresses, 'address', publicContact.address ? [{ title: 'Address', address: publicContact.address }] : []);
+  const primaryEmail = contactEmails[0]?.value || '';
+  const contactEmailHref = primaryEmail ? `mailto:${encodeURIComponent(primaryEmail)}` : '#';
+  const contactRows = [
+    ...contactEmails.map((row) => ({ label: row.title || 'Email', value: row.value, href: `mailto:${encodeURIComponent(row.value)}` })),
+    ...contactPhones.map((row) => ({ label: row.title || 'Phone', value: row.value, href: row.value ? `tel:${row.value.replace(/[^+\d]/g, '')}` : '' })),
+    ...contactFaxes.map((row) => ({ label: row.title || 'Fax', value: row.value, href: row.value ? `tel:${row.value.replace(/[^+\d]/g, '')}` : '' })),
+    ...contactAddresses.map((row) => ({ label: row.title || 'Address', value: row.value, href: '' }))
+  ].filter((row) => row.value);
+  const getContactRowMeta = (row) => {
+    const label = String(row?.label || '').toLowerCase();
+    const href = String(row?.href || '').toLowerCase();
+    if (href.startsWith('mailto:') || label.includes('email')) {
+      return { icon: 'bi-envelope-paper', tone: 'email', action: contactText('directContactEmailActionLabel', 'Send email') };
+    }
+    if (href.startsWith('tel:') && label.includes('fax')) {
+      return { icon: 'bi-printer', tone: 'fax', action: contactText('directContactFaxActionLabel', 'Call fax number') };
+    }
+    if (href.startsWith('tel:') || label.includes('phone') || label.includes('mobile')) {
+      return { icon: 'bi-telephone-outbound', tone: 'phone', action: contactText('directContactPhoneActionLabel', 'Call now') };
+    }
+    if (label.includes('address') || label.includes('office') || label.includes('location')) {
+      return { icon: 'bi-geo-alt', tone: 'address', action: '' };
+    }
+    return { icon: 'bi-chat-square-text', tone: 'other', action: row?.href ? contactText('directContactDefaultActionLabel', 'Open') : '' };
+  };
+%>
+<section class="pte-public-page contact-page">
+
+  <!-- HERO -->
+  <section class="pte-hero-intro contact-hero-intro" aria-labelledby="contactLandingTitle">
+    <div class="pte-hero-orbit" aria-hidden="true">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+    <div class="pte-hero-copy contact-hero-copy">
+      <div class="pte-eyebrow"><%= contactText('heroEyebrow', 'Contact And Support') %></div>
+      <h1 id="contactLandingTitle"><%= contactText('heroTitle', 'Tell us what you need next.') %></h1>
+      <p>
+        <%= contactText('heroSubtitle', 'Send a message and we will reply with a recommended approach, timeline, and the details needed to move the work forward.') %>
+      </p>
+
+      <div class="pte-hero-actions">
+        <a href="#contact-form" class="btn pte-btn-primary">
+          <i class="bi bi-send me-2"></i>
+          <%= contactText('primaryCtaLabel', 'Go To Form') %>
+        </a>
+        <% if (primaryEmail) { %>
+          <a href="<%= contactEmailHref %>" class="btn pte-btn-secondary">
+            <i class="bi bi-envelope me-2"></i>
+            <%= contactText('emailCtaLabel', 'Email Directly') %>
+          </a>
+        <% } %>
+
+        <button type="button" id="contactTrackBtn" class="btn pte-btn-secondary">
+          <i class="bi bi-search me-2"></i>
+          <%= contactText('followUpCtaLabel', 'Follow Up') %>
+        </button>
+      </div>
+    </div>
+
+    <div class="pte-highlight-row contact-highlight-row" aria-label="Contact process highlights">
+      <% contactHighlights.forEach((item) => { %>
+        <div class="pte-highlight-chip">
+          <strong><%= item.title || '' %></strong>
+          <span><%= item.body || '' %></span>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
+  <!-- CONTENT -->
+  <section class="pte-section contact-workspace" aria-label="Contact form and contact details">
+  <div class="row g-4 mb-4 contact-main-grid">
+    <!-- FORM -->
+    <div class="col-lg-7" id="contact-form">
+      <div class="contact-panel contact-formCard">
+        <div class="pte-section-heading pte-section-heading-left contact-sectionTitle">
+          <span><%= contactText('formEyebrow', 'Message Details') %></span>
+          <h2><%= contactText('formTitle', 'Project / inquiry form') %></h2>
+          <p><%= contactText('formSubtitle', 'Share enough context for a useful first reply.') %></p>
+        </div>
+
+        <!-- Adjust action to your route -->
+        <form id="contactForm" method="POST" action="/contact/api/submit" class="contact-form">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="name">Name</label>
+              <input class="form-control" id="name" name="name" required placeholder="Your name" />
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="email">Email</label>
+              <input class="form-control" id="email" name="email" type="email" required placeholder="name@example.com" />
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="type">Inquiry type</label>
+              <select class="form-select" id="type" name="type" required>
+                <option value="" selected disabled>Select one</option>
+                <option value="engineering">Engineering / simulation</option>
+                <option value="research">Research / academic</option>
+                <option value="software">Software / automation</option>
+                <option value="training">Training / coaching</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="timeline">Timeline</label>
+              <select class="form-select" id="timeline" name="timeline">
+                <option value="asap">ASAP</option>
+                <option value="2-4-weeks">2-4 weeks</option>
+                <option value="1-3-months">1-3 months</option>
+                <option value="flexible" selected>Flexible</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="subject">Subject</label>
+              <input class="form-control" id="subject" name="subject" required placeholder="One line summary" />
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="message">Message</label>
+              <textarea class="form-control contact-message" id="message" name="message" rows="6" required
+                placeholder="What are you trying to achieve? What do you have already? What constraints matter (time, budget, data, stakeholders)?"></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="attachments">Attachments (optional)</label>
+              <input class="form-control"
+                    id="attachments"
+                    name="files"
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.zip" />
+              <div class="text-muted small" style="margin-top:8px;">
+                You can attach multiple files (PDF, images, docs, zip).
+              </div>
+              <div id="attachmentList" class="contact-attachmentList"></div>
+            </div>
+
+            <div class="col-12">
+              <div id="contactStatus" class="contact-status" aria-live="polite"></div>
+            </div>
+            <div class="col-12 d-flex gap-2 justify-content-center justify-content-md-start flex-wrap mt-2">
+              <button id="contactSubmitBtn" type="submit" class="btn pte-btn-primary">
+                <i class="bi bi-send-check me-2"></i>
+                Send Message
+              </button>
+              <a href="/" class="btn pte-btn-secondary">
+                <i class="bi bi-house me-2"></i>
+                Back To Home
+              </a>
+            </div>
+
+            <p class="text-muted small mb-0 contact-hint">
+              <%= contactText('formHint', 'Tip: If you include links, screenshots, or a short description of the decision you need to make, I can respond faster.') %>
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- CONTACT OPTIONS -->
+    <div class="col-lg-5">
+      <div class="row g-4">
+        <% if (contactRows.length) { %>
+          <div class="col-12">
+            <div class="contact-panel contact-tile contact-direct-card contact-direct-title-card text-start">
+              <div class="contact-direct-header">
+                <span class="contact-direct-mark" aria-hidden="true">
+                  <i class="bi bi-person-lines-fill"></i>
+                </span>
+                <div>
+                  <span class="contact-direct-kicker"><%= contactText('directContactKicker', 'Reach Us') %></span>
+                  <h4 class="fw-bold mb-0"><%= contactText('directContactTitle', 'Direct Contact') %></h4>
+                </div>
+              </div>
+              <p class="contact-direct-lead">
+                <%= contactText('directContactLead', 'Choose the route that fits your request best. Email is usually the clearest option for detailed project context.') %>
+              </p>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="contact-panel contact-tile contact-direct-methods-card text-start">
+              <div class="contact-method-heading">
+                <h5><%= contactText('directContactMethodsTitle', 'Contact Options') %></h5>
+                <p><%= contactText('directContactMethodsSubtitle', 'Use the saved contact details below to reach the right inbox, phone line, or location.') %></p>
+              </div>
+              <div class="contact-method-list">
+                <% contactRows.forEach((row) => {
+                  const meta = getContactRowMeta(row);
+                %>
+                  <div class="contact-method-item contact-method-<%= meta.tone %>">
+                    <div class="contact-method-icon" aria-hidden="true">
+                      <i class="bi <%= meta.icon %>"></i>
+                    </div>
+                    <div class="contact-method-body">
+                      <div class="contact-method-label"><%= row.label %></div>
+                      <div class="contact-method-value">
+                        <% if (row.href) { %>
+                          <a href="<%= row.href %>"><%= row.value %></a>
+                        <% } else { %>
+                          <%= row.value %>
+                        <% } %>
+                      </div>
+                    </div>
+                    <% if (row.href && meta.action) { %>
+                      <a class="contact-method-action" href="<%= row.href %>" aria-label="<%= meta.action %>: <%= row.label %>">
+                        <span><%= meta.action %></span>
+                        <i class="bi bi-arrow-up-right"></i>
+                      </a>
+                    <% } %>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        <% } %>
+
+        <div class="col-12">
+          <div class="contact-panel contact-tile text-center">
+            <div class="mb-3 text-primary">
+              <i class="bi bi-eyeglasses" style="font-size: 3rem;"></i>
+            </div>
+            <h4 class="fw-bold"><%= contactText('aboutCardTitle', 'About Me') %></h4>
+            <p class="text-muted small mb-2"><%= contactText('aboutCardBody', 'Best for detailed project context.') %></p>
+            <a class="btn pte-btn-secondary" href="<%= contactPage.aboutCardHref || '/about/' %>">
+              <i class="bi bi-eyeglasses me-2"></i><%= contactText('aboutCardButtonLabel', 'Read About Me') %>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="contact-panel contact-tile contact-experience-panel">
+    <div class="contact-experience-header">
+      <div class="pte-section-heading pte-section-heading-left contact-sectionTitle">
+        <span><%= contactText('processEyebrow', 'Experience') %></span>
+        <h2><i class="bi bi-fan me-2 text-warning"></i><%= contactText('processTitle', 'I Know The Process') %></h2>
+      </div>
+    </div>
+    <div class="contact-experience-grid">
+      <% contactProcessImages.forEach((image) => { %>
+        <figure class="contact-experience-item">
+          <div class="contact-mapFrame">
+            <% if (image.imageUrl) { %>
+              <img class="bio-inlineImage"
+                  src="<%= image.imageUrl %>"
+                  alt="<%= image.alt || image.caption || 'Contact page image' %>"
+                  loading="lazy" />
+            <% } %>
+          </div>
+          <% if (image.caption) { %>
+            <figcaption>
+              <%= image.caption %>
+            </figcaption>
+          <% } %>
+        </figure>
+      <% }) %>
+    </div>
+  </div>
+  </section>
+
+</section>
+<div class="modal fade" id="trackModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-md modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-ticket-detailed me-2 text-primary"></i>
+          Follow up on a message
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <form id="trackForm" class="row g-3">
+          <div class="col-12">
+            <label class="form-label" for="trackCode">Message code</label>
+            <input class="form-control" id="trackCode" placeholder="e.g. CNT1007" required />
+            <div class="form-text">This is the reference code shown after you submit.</div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label" for="trackEmail">Email</label>
+            <input class="form-control" id="trackEmail" type="email" placeholder="The email you used" required />
+          </div>
+
+          <div class="col-12">
+            <div class="form-text">
+              For privacy, the code must match the email you used when submitting the message.
+            </div>
+          </div>
+
+
+          <div class="col-12">
+            <div id="trackResult" class="contact-status" aria-live="polite"></div>
+          </div>
+
+          <div class="col-12 d-flex gap-2 justify-content-end">
+            <button type="submit" class="btn btn-primary btn-filled" id="trackSubmitBtn">Check status</button>
+            <button type="button" class="btn btn-secondary btn-filled" data-bs-dismiss="modal">Close</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  const form = document.getElementById('contactForm');
+  const fileInput = document.getElementById('attachments');
+  const listEl = document.getElementById('attachmentList');
+  const statusEl = document.getElementById('contactStatus');
+  const submitBtn = document.getElementById('contactSubmitBtn');
+
+  if (!form) return;
+
+  // Enable remove-from-selection using DataTransfer
+  let dt = new DataTransfer();
+
+  function formatBytes(bytes){
+    if (!Number.isFinite(bytes)) return '';
+    const units = ['B','KB','MB','GB'];
+    let i = 0, v = bytes;
+    while (v >= 1024 && i < units.length - 1){ v /= 1024; i++; }
+    return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  }
+
+  function setStatus(type, msg){
+    if (!statusEl) return;
+    statusEl.dataset.type = type || '';
+    statusEl.textContent = msg || '';
+  }
+
+  function renderFiles(){
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const files = dt.files;
+    if (!files || files.length === 0) return;
+
+    [...files].forEach((f, idx) => {
+      const row = document.createElement('div');
+      row.className = 'contact-fileRow';
+      row.innerHTML = `
+        <div class="contact-fileMeta">
+          <div class="contact-fileName">${f.name}</div>
+          <div class="contact-fileSize">${formatBytes(f.size)}</div>
+        </div>
+        <button type="button" class="btn btn-danger btn-filled btn-sm contact-fileRemove">Remove</button>
+      `;
+      row.querySelector('.contact-fileRemove').addEventListener('click', () => {
+        const next = new DataTransfer();
+        [...dt.files].forEach((ff, j) => { if (j !== idx) next.items.add(ff); });
+        dt = next;
+        fileInput.files = dt.files;
+        renderFiles();
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  fileInput?.addEventListener('change', () => {
+    // merge newly selected files into dt
+    const incoming = fileInput.files ? [...fileInput.files] : [];
+    incoming.forEach(f => dt.items.add(f));
+    fileInput.files = dt.files;
+    renderFiles();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setStatus('', '');
+
+    const payload = {
+      name: (document.getElementById('name')?.value || '').trim(),
+      email: (document.getElementById('email')?.value || '').trim(),
+      type: (document.getElementById('type')?.value || '').trim(),
+      timeline: (document.getElementById('timeline')?.value || '').trim(),
+      subject: (document.getElementById('subject')?.value || '').trim(),
+      message: (document.getElementById('message')?.value || '').trim(),
+      meta: {
+        page: window.location.pathname,
+        ts: new Date().toISOString()
+      }
+    };
+
+    // quick client-side check
+    if (!payload.name || !payload.email || !payload.subject || !payload.message){
+      setStatus('error', 'Please fill in Name, Email, Subject, and Message.');
+      return;
+    }
+
+    const hasFiles = dt.files && dt.files.length > 0;
+
+    submitBtn?.setAttribute('disabled', 'disabled');
+    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Sending...`;
+
+    try {
+      let res;
+
+      // If attachments exist: send multipart, with JSON inside "payload"
+      if (hasFiles){
+        const fd = new FormData();
+        fd.append('payload', JSON.stringify(payload));
+        [...dt.files].forEach(f => fd.append('files', f)); // must match .array('files', ...)
+        res = await fetch('/contact/api/submit', {
+          method: 'POST',
+          headers: { 'x-ajax-request': '1' },
+          body: fd
+        });
+      } else {
+        // No files: pure JSON
+        res = await fetch('/contact/api/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-ajax-request': '1'
+          },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.status !== 'success'){
+        throw new Error(data.message || 'Unable to submit your message.');
+      }
+      const refId = data?.result?.id;
+      setStatus('success', data.message || 'Message sent successfully.');
+
+      if (refId && typeof window.showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Message received',
+          icon: 'success',
+          size: 'md',
+          message: `
+            <div class="text-center">
+              <div class="text-muted mb-2">Your follow-up code</div>
+              <div class="contact-refCode">${refId}</div>
+              <div class="mt-3 text-danger fw-bold">Save this code.</div>
+              <div class="text-muted small">
+                You will need it to follow up and check status later.
+              </div>
+            </div>
+          `,
+          buttons: [{ text: 'OK', class: 'btn-success' }]
+        });
+      } else if (refId) {
+        alert(`Your follow-up code is: ${refId}\n\nSave it to check status later.`);
+      }
+
+
+      form.reset();
+      dt = new DataTransfer();
+      if (fileInput) fileInput.files = dt.files;
+      renderFiles();
+
+      // Optional: if you have a global modal helper, you can call it here.
+      // if (window.showMessageModal) await showMessageModal({ title: 'Sent', icon: 'success', message: 'Thanks! I will reply soon.' });
+
+    } catch (err){
+      setStatus('error', err.message || 'Submission failed.');
+    } finally {
+      submitBtn?.removeAttribute('disabled');
+      if (submitBtn) submitBtn.innerHTML = originalBtnHtml;
+    }
+  });
+})();
+</script>
+<script>
+  const trackBtn = document.getElementById('contactTrackBtn');
+const trackModalEl = document.getElementById('trackModal');
+const trackForm = document.getElementById('trackForm');
+const trackResult = document.getElementById('trackResult');
+const trackSubmitBtn = document.getElementById('trackSubmitBtn');
+
+function setTrackStatus(type, msg){
+  if (!trackResult) return;
+  trackResult.dataset.type = type || '';
+  trackResult.textContent = msg || '';
+}
+
+let trackModal = null;
+function getTrackModal(){
+  if (trackModal) return trackModal;
+  if (!trackModalEl || !window.bootstrap?.Modal) return null;
+  trackModal = new bootstrap.Modal(trackModalEl);
+  return trackModal;
+}
+
+trackBtn?.addEventListener('click', () => {
+  setTrackStatus('', '');
+  const modal = getTrackModal();
+  if (modal) {
+    modal.show();
+    return;
+  }
+  setTrackStatus('error', 'The tracking window is still loading. Please try again in a moment.');
+});
+
+trackForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setTrackStatus('', '');
+
+  const code = (document.getElementById('trackCode')?.value || '').trim();
+  const email = (document.getElementById('trackEmail')?.value || '').trim();
+
+  if (!code || !email) {
+    setTrackStatus('error', 'Please provide your message code and email.');
+    return;
+  }
+
+  const original = trackSubmitBtn?.innerHTML || '';
+  if (trackSubmitBtn) {
+    trackSubmitBtn.disabled = true;
+    trackSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking...';
+  }
+
+  try {
+    const res = await fetch('/contact/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-ajax-request': '1'
+      },
+      body: JSON.stringify({ code, email })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Lookup failed.');
+
+
+    const received = data.result?.receivedAt ? new Date(data.result.receivedAt).toLocaleString() : '-';
+    const updated = data.result?.lastUpdatedAt ? new Date(data.result.lastUpdatedAt).toLocaleString() : '-';
+    const note = (data.result?.userNote || '').trim();
+
+    setTrackStatus(
+      'success',
+      `Status: ${data.result?.status || '-'} - Received: ${received} - Updated: ${updated}` + (note ? `\nNote: ${note}` : '')
+    );
+
+    // // Example: show status + received date
+    // const received = data.result?.receivedAt ? new Date(data.result.receivedAt).toLocaleString() : '-';
+    // setTrackStatus('success', `Status: ${data.result?.status || '-'} - Received: ${received}`);
+  } catch (err) {
+    setTrackStatus('error', err.message || 'Lookup failed.');
+  } finally {
+    if (trackSubmitBtn) {
+      trackSubmitBtn.disabled = false;
+      trackSubmitBtn.innerHTML = original;
+    }
+  }
+});
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+.contact-page {
+  --contact-primary: #0a66c2;
+  --contact-primary-dark: #094d92;
+  --contact-ink: #17223b;
+  --contact-muted: #5c687d;
+  --contact-border: #dbe3ee;
+  --contact-surface: #ffffff;
+  --contact-soft: #f4f8fc;
+  --pte-ink: #13222c;
+  --pte-muted: #53636f;
+  --pte-line: #d7e1e7;
+  --pte-surface: #ffffff;
+  --pte-soft: #f5f8fa;
+  --pte-teal: #087f8c;
+  --pte-blue: #1d5fb8;
+  --pte-amber: #f0b84e;
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  isolation: isolate;
+  padding-bottom: clamp(2rem, 5vw, 4.5rem);
+  position: relative;
+}
+
+html.pte-public-root,
+html.pte-public-root body.contact-public-body {
+  background:
+    radial-gradient(circle at 8% 5%, rgba(29, 95, 184, 0.16), transparent 28%),
+    radial-gradient(circle at 92% 4%, rgba(8, 127, 140, 0.16), transparent 26%),
+    radial-gradient(circle at 9% 44%, rgba(29, 95, 184, 0.08), transparent 24%),
+    radial-gradient(circle at 91% 72%, rgba(8, 127, 140, 0.1), transparent 28%),
+    linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
+  min-height: 100%;
+}
+
+body.contact-public-body {
+  background-attachment: fixed;
+}
+
+main.contact-public-main {
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-bottom: 0;
+  padding-top: 0;
+  position: relative;
+}
+
+.contact-page::before {
+  background:
+    radial-gradient(circle at 8% 5%, rgba(29, 95, 184, 0.16), transparent 28%),
+    radial-gradient(circle at 92% 4%, rgba(8, 127, 140, 0.16), transparent 26%),
+    radial-gradient(circle at 9% 44%, rgba(29, 95, 184, 0.08), transparent 24%),
+    radial-gradient(circle at 91% 72%, rgba(8, 127, 140, 0.1), transparent 28%),
+    linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
+  bottom: 0;
+  content: "";
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  width: 100vw;
+  z-index: -1;
+}
+
+.contact-page .pte-hero-intro {
+  background: transparent;
+  margin-bottom: 1.15rem;
+  overflow: visible;
+  padding: clamp(1.4rem, 3vw, 2.4rem) 0;
+  position: relative;
+}
+
+.contact-page .pte-hero-orbit {
+  bottom: 0;
+  left: 50%;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  width: 100vw;
+  z-index: 1;
+}
+
+.contact-page .pte-hero-orbit span {
+  border-radius: 999px;
+  position: absolute;
+}
+
+.contact-page .pte-hero-orbit span:nth-child(1) {
+  background: rgba(29, 95, 184, 0.12);
+  height: 210px;
+  right: -74px;
+  top: -78px;
+  width: 210px;
+}
+
+.contact-page .pte-hero-orbit span:nth-child(2) {
+  border: 1px solid rgba(8, 127, 140, 0.2);
+  height: 150px;
+  left: -54px;
+  top: 54%;
+  width: 150px;
+}
+
+.contact-page .pte-hero-orbit span:nth-child(3) {
+  background: radial-gradient(circle, rgba(29, 95, 184, 0.18) 1px, transparent 2px);
+  background-size: 18px 18px;
+  border-radius: 0;
+  height: 120px;
+  right: 18%;
+  top: 20%;
+  width: 150px;
+}
+
+.contact-page .pte-hero-copy {
+  margin-left: 0;
+  margin-right: auto;
+  max-width: none;
+  position: relative;
+  text-align: left;
+  width: 100%;
+  z-index: 2;
+}
+
+.contact-page .pte-eyebrow,
+.contact-page .pte-section-heading span {
+  color: var(--pte-teal);
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 850;
+  line-height: 1;
+  margin-bottom: 0.85rem;
+  text-transform: uppercase;
+}
+
+.contact-page .pte-hero-copy h1 {
+  color: #083253;
+  font-size: clamp(2.25rem, 5.2vw, 5.05rem);
+  font-weight: 920;
+  letter-spacing: -0.055em;
+  line-height: 0.96;
+  margin: 0;
+  max-width: none;
+}
+
+.contact-page .pte-hero-copy p {
+  color: #365568;
+  font-size: clamp(1rem, 1.7vw, 1.28rem);
+  font-weight: 560;
+  line-height: 1.72;
+  margin: 1rem 0 0;
+  max-width: 880px;
+}
+
+.contact-page .pte-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.35rem;
+}
+
+.contact-page .btn {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  font-weight: 760;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.62rem 1rem;
+}
+
+.contact-page .pte-btn-primary {
+  background: var(--pte-amber);
+  border: 1px solid var(--pte-amber);
+  color: #16232c;
+}
+
+.contact-page .pte-btn-primary:hover,
+.contact-page .pte-btn-primary:focus {
+  background: #d99b23;
+  border-color: #d99b23;
+  color: #16232c;
+}
+
+.contact-page .pte-btn-secondary {
+  background: #ffffff;
+  border: 1px solid #c9dce9;
+  color: #163445;
+}
+
+.contact-page .pte-btn-secondary:hover,
+.contact-page .pte-btn-secondary:focus {
+  background: #e9f4fb;
+  border-color: #9cc6df;
+  color: #16232c;
+}
+
+.contact-page .pte-highlight-row {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1.35rem;
+  max-width: none;
+  position: relative;
+  z-index: 2;
+}
+
+.contact-page .pte-highlight-chip {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(202, 219, 232, 0.92);
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(17, 54, 78, 0.07);
+  min-height: 76px;
+  padding: 0.78rem 0.85rem;
+}
+
+.contact-page .pte-highlight-chip strong {
+  color: #0d4fa9;
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 0.24rem;
+}
+
+.contact-page .pte-highlight-chip span {
+  color: #456071;
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.contact-page .pte-section {
+  margin-top: 2rem;
+}
+
+.contact-page .pte-section-heading {
+  margin: 0 auto 1.15rem;
+  max-width: 760px;
+  text-align: center;
+}
+
+.contact-page .pte-section-heading-left {
+  margin-left: 0;
+  text-align: left;
+}
+
+.contact-page .pte-section-heading span {
+  margin-bottom: 0.55rem;
+}
+
+.contact-page .pte-section-heading h2 {
+  color: var(--pte-ink);
+  font-size: 2rem;
+  font-weight: 830;
+  line-height: 1.18;
+  margin: 0;
+}
+
+.contact-page .pte-section-heading p {
+  color: var(--pte-muted);
+  font-size: 1rem;
+  line-height: 1.65;
+  margin: 0.65rem 0 0;
+}
+
+.contact-page .contact-panel {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #dce7f0;
+  border-radius: 18px;
+  box-shadow: 0 22px 70px rgba(18, 48, 70, 0.1);
+  height: 100%;
+  padding: clamp(1.15rem, 2vw, 1.55rem);
+}
+
+.contact-page .contact-main-grid {
+  align-items: flex-start;
+}
+
+.contact-page .contact-hero{
+  border-radius: 24px;
+  border: 1px solid var(--contact-border);
+  background:
+    radial-gradient(circle at 90% 8%, rgba(10, 102, 194, 0.13), transparent 42%),
+    linear-gradient(145deg, #f8fbff 0%, #edf4fb 58%, #e8f1fb 100%);
+  box-shadow: 0 16px 40px rgba(17, 48, 79, 0.08);
+}
+
+.contact-page .contact-lead{
+  color: var(--contact-muted) !important;
+  line-height: 1.65;
+  max-width: 780px;
+}
+
+.contact-page .contact-sectionTitle{
+  text-align: left;
+  margin-bottom: 14px;
+  color: var(--contact-ink);
+}
+
+.contact-page .contact-formCard,
+.contact-page .contact-tile{
+  max-width: 100%;
+  border: 1px solid #dce7f0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 22px 70px rgba(18, 48, 70, 0.1);
+}
+
+.contact-page .contact-formCard {
+  height: auto;
+}
+
+.contact-page .contact-direct-card {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(8, 127, 140, 0.12), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(244, 250, 252, 0.94));
+  overflow: hidden;
+  position: relative;
+}
+
+.contact-page .contact-direct-title-card {
+  min-height: 0;
+  padding: 1rem 1.1rem;
+}
+
+.contact-page .contact-direct-card::after {
+  background: linear-gradient(180deg, rgba(29, 95, 184, 0.2), rgba(8, 127, 140, 0.02));
+  border-radius: 999px;
+  content: "";
+  height: 150px;
+  position: absolute;
+  right: -94px;
+  top: -52px;
+  width: 150px;
+}
+
+.contact-page .contact-direct-header {
+  align-items: center;
+  display: flex;
+  gap: 0.72rem;
+  margin-bottom: 0.42rem;
+  position: relative;
+  z-index: 1;
+}
+
+.contact-page .contact-direct-mark {
+  align-items: center;
+  background: linear-gradient(135deg, #087f8c, #1d5fb8);
+  border-radius: 16px;
+  box-shadow: 0 14px 28px rgba(8, 127, 140, 0.18);
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 1.06rem;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.contact-page .contact-direct-kicker {
+  color: var(--pte-teal);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.22rem;
+  text-transform: uppercase;
+}
+
+.contact-page .contact-direct-lead {
+  color: #51677a;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.contact-page .contact-direct-methods-card {
+  padding-top: 1.05rem;
+}
+
+.contact-page .contact-method-heading {
+  margin-bottom: 0.45rem;
+}
+
+.contact-page .contact-method-heading h5 {
+  color: var(--pte-ink);
+  font-size: 1.02rem;
+  font-weight: 850;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.contact-page .contact-method-heading p {
+  color: #647889;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin: 0.25rem 0 0;
+}
+
+.contact-page .contact-method-list {
+  display: grid;
+  gap: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.contact-page .contact-method-item {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 0.78rem 0;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.contact-page .contact-method-item + .contact-method-item {
+  border-top: 1px solid rgba(176, 202, 218, 0.58);
+}
+
+.contact-page .contact-method-item:hover .contact-method-value,
+.contact-page .contact-method-item:focus-within .contact-method-value {
+  color: #087f8c;
+}
+
+.contact-page .contact-method-icon {
+  align-items: center;
+  background: transparent;
+  border-radius: 0;
+  color: #1d5fb8;
+  display: inline-flex;
+  font-size: 1.2rem;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.contact-page .contact-method-email .contact-method-icon {
+  color: #087f8c;
+}
+
+.contact-page .contact-method-phone .contact-method-icon {
+  color: #b57305;
+}
+
+.contact-page .contact-method-address .contact-method-icon {
+  color: #1d5fb8;
+}
+
+.contact-page .contact-method-label {
+  color: #6a7b89;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.14rem;
+  text-transform: uppercase;
+}
+
+.contact-page .contact-method-value {
+  color: #17364a;
+  font-size: 0.95rem;
+  font-weight: 780;
+  line-height: 1.34;
+  overflow-wrap: anywhere;
+}
+
+.contact-page .contact-method-value a {
+  color: #123e72;
+  text-decoration: none;
+}
+
+.contact-page .contact-method-value a:hover,
+.contact-page .contact-method-value a:focus {
+  color: var(--pte-teal);
+  text-decoration: underline;
+}
+
+.contact-page .contact-method-action {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: #204b6c;
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 800;
+  gap: 0.35rem;
+  justify-content: center;
+  padding: 0;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.contact-page .contact-method-action:hover,
+.contact-page .contact-method-action:focus {
+  color: #087f8c;
+  text-decoration: underline;
+}
+
+.contact-page .contact-form .form-control,
+.contact-page .contact-form .form-select,
+.contact-page #trackForm .form-control{
+  border: 1px solid #d5e1ef;
+  border-radius: 12px;
+  padding: 0.62rem 0.78rem;
+  color: var(--contact-ink);
+  background: #fff;
+}
+
+.contact-page .contact-form .form-control:focus,
+.contact-page .contact-form .form-select:focus,
+.contact-page #trackForm .form-control:focus{
+  border-color: rgba(10, 102, 194, 0.45);
+  box-shadow: 0 0 0 0.2rem rgba(10, 102, 194, 0.16);
+}
+
+.contact-page .contact-form .form-label,
+.contact-page #trackForm .form-label{
+  font-weight: 700;
+  color: #2a4f77;
+  margin-bottom: 0.4rem;
+}
+
+.contact-page .contact-message{
+  min-height: 170px;
+  resize: vertical;
+}
+
+.contact-page .contact-hint{
+  line-height: 1.6;
+  margin-top: 10px;
+  color: var(--contact-muted) !important;
+}
+
+.contact-page .contact-mapFrame{
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--contact-soft);
+  border: 1px solid #d9e4f2;
+}
+
+.contact-page .contact-experience-panel {
+  height: auto;
+  margin-top: 1.2rem;
+  overflow: hidden;
+}
+
+.contact-page .contact-experience-header {
+  max-width: 780px;
+}
+
+.contact-page .contact-experience-panel .contact-sectionTitle {
+  margin-bottom: 1rem;
+}
+
+.contact-page .contact-experience-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.contact-page .contact-experience-item {
+  margin: 0;
+  min-width: 0;
+}
+
+.contact-page .contact-experience-item .contact-mapFrame {
+  box-shadow: 0 14px 34px rgba(18, 48, 70, 0.08);
+}
+
+.contact-page .contact-experience-item figcaption {
+  color: #617386;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.45;
+  margin-top: 0.72rem;
+}
+
+.contact-page .contact-mapFrame iframe{
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.contact-page .contact-status{
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--contact-soft);
+  border: 1px solid rgba(0,0,0,0.06);
+  display: none;
+  color: #31557c;
+}
+
+.contact-page .contact-status[data-type="success"]{
+  display: block;
+  background: rgba(40, 167, 69, 0.10);
+  border-color: rgba(40, 167, 69, 0.20);
+}
+
+.contact-page .contact-status[data-type="error"]{
+  display: block;
+  background: rgba(220, 53, 69, 0.10);
+  border-color: rgba(220, 53, 69, 0.20);
+}
+
+.contact-page .contact-attachmentList{
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.contact-page .contact-fileRow{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #dbe4f1;
+}
+
+.contact-page .contact-fileMeta{
+  min-width: 0;
+}
+
+.contact-page .contact-fileName{
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 520px;
+  color: var(--contact-ink);
+}
+
+.contact-page .contact-fileSize{
+  opacity: 0.75;
+  font-size: 0.85rem;
+  color: var(--contact-muted);
+}
+
+.contact-refCode{
+  display:inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 2px dashed rgba(13,110,253,0.35);
+  background: rgba(0,123,255,0.08);
+  color: #0d6efd;
+}
+
+.bio-inlineImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+@media (max-width: 767.98px){
+  .contact-page .pte-highlight-row{
+    grid-template-columns: 1fr;
+  }
+
+  .contact-page .pte-hero-copy h1{
+    font-size: clamp(2.2rem, 12vw, 3.3rem);
+  }
+
+  .contact-page .contact-method-item {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .contact-page .contact-method-action {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+</style>

@@ -1,0 +1,2359 @@
+{
+  "generatedAt": "2026-04-22T00:23:28.602Z",
+  "mode": "dry_run",
+  "totalRows": 127,
+  "totalActiveRows": 127,
+  "statusCountsBefore": {
+    "COMPLETE_EXPLICIT_CONTRACT": 127,
+    "MISSING_SCORED_ANSWERS": 0,
+    "MISSING_NOT_SCORED_ANSWERS": 0,
+    "MISSING_BOTH": 0,
+    "INVALID_OVERLAP": 0,
+    "INVALID_FOR_ANSWER_TYPE": 0,
+    "AMBIGUOUS_REQUIRES_REVIEW": 0
+  },
+  "statusCountsAfter": {
+    "COMPLETE_EXPLICIT_CONTRACT": 127,
+    "MISSING_SCORED_ANSWERS": 0,
+    "MISSING_NOT_SCORED_ANSWERS": 0,
+    "MISSING_BOTH": 0,
+    "INVALID_OVERLAP": 0,
+    "INVALID_FOR_ANSWER_TYPE": 0,
+    "AMBIGUOUS_REQUIRES_REVIEW": 0
+  },
+  "completeRows": 127,
+  "rowsNeedingPatch": 0,
+  "invalidRows": 0,
+  "ambiguousRows": 0,
+  "byCriterion": {
+    "TR": {
+      "COMPLETE_EXPLICIT_CONTRACT": 43
+    },
+    "CC": {
+      "COMPLETE_EXPLICIT_CONTRACT": 33
+    },
+    "LR": {
+      "COMPLETE_EXPLICIT_CONTRACT": 25
+    },
+    "GRA": {
+      "COMPLETE_EXPLICIT_CONTRACT": 26
+    },
+    "General": {}
+  },
+  "rowsPatchedCount": 0,
+  "rowsPatched": [],
+  "rowsStillRelyingOnFallbackPolarity": [],
+  "rowsRequiringManualReview": [],
+  "malformedAnswerTypeRows": [],
+  "sampleIssues": [],
+  "activeRows": [
+    {
+      "id": "MA_1770787352925_6553",
+      "baseKey": "CC4-1",
+      "question_key": "CC4-1",
+      "criterion": "CC",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787352961_6976",
+      "baseKey": "CC4-2",
+      "question_key": "CC4-2",
+      "criterion": "CC",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787352986_4200",
+      "baseKey": "CC4-3",
+      "question_key": "CC4-3",
+      "criterion": "CC",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353011_3331",
+      "baseKey": "CC4-4",
+      "question_key": "CC4-4",
+      "criterion": "CC",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353035_5146",
+      "baseKey": "CC4-5",
+      "question_key": "CC4-5",
+      "criterion": "CC",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Categorical (absent/confusing/ok)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "ok"
+      ],
+      "notScoredAnswersNormalized": [
+        "absent",
+        "confusing"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353062_284",
+      "baseKey": "GRA4-1",
+      "question_key": "GRA4-1",
+      "criterion": "GRA",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353080_6945",
+      "baseKey": "GRA4-2",
+      "question_key": "GRA4-2",
+      "criterion": "GRA",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean/Count",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353104_7527",
+      "baseKey": "GRA4-3",
+      "question_key": "GRA4-3",
+      "criterion": "GRA",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353128_8045",
+      "baseKey": "GRA4-4",
+      "question_key": "GRA4-4",
+      "criterion": "GRA",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353150_3346",
+      "baseKey": "GRA4-5",
+      "question_key": "GRA4-5",
+      "criterion": "GRA",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353175_4520",
+      "baseKey": "LR4-1",
+      "question_key": "LR4-1",
+      "criterion": "LR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353202_3678",
+      "baseKey": "LR4-2",
+      "question_key": "LR4-2",
+      "criterion": "LR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353222_4348",
+      "baseKey": "LR4-3",
+      "question_key": "LR4-3",
+      "criterion": "LR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353240_7343",
+      "baseKey": "LR4-4",
+      "question_key": "LR4-4",
+      "criterion": "LR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353267_4809",
+      "baseKey": "LR4-5",
+      "question_key": "LR4-5",
+      "criterion": "LR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/some/strain)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "some"
+      ],
+      "notScoredAnswersNormalized": [
+        "strain"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353286_4538",
+      "baseKey": "TR4-1",
+      "question_key": "TR4-1",
+      "criterion": "TR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353302_1330",
+      "baseKey": "TR4-2",
+      "question_key": "TR4-2",
+      "criterion": "TR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Categorical (none/unclear/clear)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "clear"
+      ],
+      "notScoredAnswersNormalized": [
+        "none",
+        "unclear"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353321_7636",
+      "baseKey": "TR4-3",
+      "question_key": "TR4-3",
+      "criterion": "TR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353341_7394",
+      "baseKey": "TR4-4",
+      "question_key": "TR4-4",
+      "criterion": "TR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353360_8218",
+      "baseKey": "TR4-5",
+      "question_key": "TR4-5",
+      "criterion": "TR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353381_4420",
+      "baseKey": "TR4-6",
+      "question_key": "TR4-6",
+      "criterion": "TR",
+      "band": 4,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353403_6022",
+      "baseKey": "CC5-1",
+      "question_key": "CC5-1",
+      "criterion": "CC",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353420_1587",
+      "baseKey": "CC5-2",
+      "question_key": "CC5-2",
+      "criterion": "CC",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353437_8641",
+      "baseKey": "CC5-3",
+      "question_key": "CC5-3",
+      "criterion": "CC",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353456_940",
+      "baseKey": "CC5-4",
+      "question_key": "CC5-4",
+      "criterion": "CC",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353477_791",
+      "baseKey": "CC5-5",
+      "question_key": "CC5-5",
+      "criterion": "CC",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353499_4625",
+      "baseKey": "CC5-6",
+      "question_key": "CC5-6",
+      "criterion": "CC",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353566_2397",
+      "baseKey": "CC5-7",
+      "question_key": "CC5-7",
+      "criterion": "CC",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353593_7508",
+      "baseKey": "CC5-8",
+      "question_key": "CC5-8",
+      "criterion": "CC",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353617_1104",
+      "baseKey": "GRA5-1",
+      "question_key": "GRA5-1",
+      "criterion": "GRA",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353638_4997",
+      "baseKey": "GRA5-2",
+      "question_key": "GRA5-2",
+      "criterion": "GRA",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353659_8857",
+      "baseKey": "GRA5-3",
+      "question_key": "GRA5-3",
+      "criterion": "GRA",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353678_6704",
+      "baseKey": "GRA5-4",
+      "question_key": "GRA5-4",
+      "criterion": "GRA",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353700_4768",
+      "baseKey": "GRA5-5",
+      "question_key": "GRA5-5",
+      "criterion": "GRA",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353715_1829",
+      "baseKey": "GRA5-6",
+      "question_key": "GRA5-6",
+      "criterion": "GRA",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/some)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none"
+      ],
+      "notScoredAnswersNormalized": [
+        "some"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353731_5753",
+      "baseKey": "LR5-1",
+      "question_key": "LR5-1",
+      "criterion": "LR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353763_5073",
+      "baseKey": "LR5-2",
+      "question_key": "LR5-2",
+      "criterion": "LR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353785_7227",
+      "baseKey": "LR5-3",
+      "question_key": "LR5-3",
+      "criterion": "LR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353808_3483",
+      "baseKey": "LR5-4",
+      "question_key": "LR5-4",
+      "criterion": "LR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/some)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none"
+      ],
+      "notScoredAnswersNormalized": [
+        "some"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353830_8211",
+      "baseKey": "TR5-1",
+      "question_key": "TR5-1",
+      "criterion": "TR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353855_1846",
+      "baseKey": "TR5-2",
+      "question_key": "TR5-2",
+      "criterion": "TR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353880_3358",
+      "baseKey": "TR5-3",
+      "question_key": "TR5-3",
+      "criterion": "TR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Categorical (none/yes)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "none"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353909_1187",
+      "baseKey": "TR5-4",
+      "question_key": "TR5-4",
+      "criterion": "TR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353946_3664",
+      "baseKey": "TR5-5",
+      "question_key": "TR5-5",
+      "criterion": "TR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787353974_530",
+      "baseKey": "TR5-6",
+      "question_key": "TR5-6",
+      "criterion": "TR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354003_5172",
+      "baseKey": "TR5-7",
+      "question_key": "TR5-7",
+      "criterion": "TR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354045_6872",
+      "baseKey": "TR5-8",
+      "question_key": "TR5-8",
+      "criterion": "TR",
+      "band": 5,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354084_6958",
+      "baseKey": "CC6-1",
+      "question_key": "CC6-1",
+      "criterion": "CC",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354112_7819",
+      "baseKey": "CC6-2",
+      "question_key": "CC6-2",
+      "criterion": "CC",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354146_9702",
+      "baseKey": "CC6-3",
+      "question_key": "CC6-3",
+      "criterion": "CC",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354170_1594",
+      "baseKey": "CC6-4",
+      "question_key": "CC6-4",
+      "criterion": "CC",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354195_8628",
+      "baseKey": "CC6-5",
+      "question_key": "CC6-5",
+      "criterion": "CC",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354216_2722",
+      "baseKey": "GRA6-1",
+      "question_key": "GRA6-1",
+      "criterion": "GRA",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354239_8209",
+      "baseKey": "GRA6-2",
+      "question_key": "GRA6-2",
+      "criterion": "GRA",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354262_1195",
+      "baseKey": "GRA6-3",
+      "question_key": "GRA6-3",
+      "criterion": "GRA",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Ordinal (rarely/sometimes/often)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "rarely"
+      ],
+      "notScoredAnswersNormalized": [
+        "sometimes",
+        "often"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354292_7779",
+      "baseKey": "LR6-1",
+      "question_key": "LR6-1",
+      "criterion": "LR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354316_6161",
+      "baseKey": "LR6-2",
+      "question_key": "LR6-2",
+      "criterion": "LR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354337_7717",
+      "baseKey": "LR6-3",
+      "question_key": "LR6-3",
+      "criterion": "LR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354352_6970",
+      "baseKey": "LR6-4",
+      "question_key": "LR6-4",
+      "criterion": "LR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/some_non_impeding/impeding)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "some_non_impeding"
+      ],
+      "notScoredAnswersNormalized": [
+        "impeding"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354369_3801",
+      "baseKey": "TR6-1",
+      "question_key": "TR6-1",
+      "criterion": "TR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354388_8796",
+      "baseKey": "TR6-2",
+      "question_key": "TR6-2",
+      "criterion": "TR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354418_2008",
+      "baseKey": "TR6-3",
+      "question_key": "TR6-3",
+      "criterion": "TR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Categorical (none/irrelevant/relevant)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "relevant"
+      ],
+      "notScoredAnswersNormalized": [
+        "none",
+        "irrelevant"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354440_7502",
+      "baseKey": "TR6-4",
+      "question_key": "TR6-4",
+      "criterion": "TR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354463_7326",
+      "baseKey": "TR6-5",
+      "question_key": "TR6-5",
+      "criterion": "TR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354483_9131",
+      "baseKey": "TR6-6",
+      "question_key": "TR6-6",
+      "criterion": "TR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354500_3809",
+      "baseKey": "TR6-7",
+      "question_key": "TR6-7",
+      "criterion": "TR",
+      "band": 6,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354521_6787",
+      "baseKey": "CC7-1",
+      "question_key": "CC7-1",
+      "criterion": "CC",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354555_9289",
+      "baseKey": "CC7-2",
+      "question_key": "CC7-2",
+      "criterion": "CC",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354579_1555",
+      "baseKey": "CC7-3",
+      "question_key": "CC7-3",
+      "criterion": "CC",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354603_4044",
+      "baseKey": "CC7-4",
+      "question_key": "CC7-4",
+      "criterion": "CC",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354624_1182",
+      "baseKey": "GRA7-1",
+      "question_key": "GRA7-1",
+      "criterion": "GRA",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354645_7438",
+      "baseKey": "GRA7-2",
+      "question_key": "GRA7-2",
+      "criterion": "GRA",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354665_1380",
+      "baseKey": "GRA7-3",
+      "question_key": "GRA7-3",
+      "criterion": "GRA",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354686_4371",
+      "baseKey": "GRA7-4",
+      "question_key": "GRA7-4",
+      "criterion": "GRA",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/few/occasional/frequent)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "few",
+        "occasional"
+      ],
+      "notScoredAnswersNormalized": [
+        "frequent"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354705_6809",
+      "baseKey": "LR7-1",
+      "question_key": "LR7-1",
+      "criterion": "LR",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354730_9124",
+      "baseKey": "LR7-2",
+      "question_key": "LR7-2",
+      "criterion": "LR",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354754_7310",
+      "baseKey": "LR7-3",
+      "question_key": "LR7-3",
+      "criterion": "LR",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/rare/occasional/frequent)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "rare",
+        "occasional"
+      ],
+      "notScoredAnswersNormalized": [
+        "frequent"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354778_1975",
+      "baseKey": "TR7-1",
+      "question_key": "TR7-1",
+      "criterion": "TR",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354802_5924",
+      "baseKey": "TR7-2",
+      "question_key": "TR7-2",
+      "criterion": "TR",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354831_6501",
+      "baseKey": "TR7-3",
+      "question_key": "TR7-3",
+      "criterion": "TR",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354856_6780",
+      "baseKey": "TR7-4",
+      "question_key": "TR7-4",
+      "criterion": "TR",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354879_8988",
+      "baseKey": "TR7-5",
+      "question_key": "TR7-5",
+      "criterion": "TR",
+      "band": 7,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354903_2410",
+      "baseKey": "CC8-1",
+      "question_key": "CC8-1",
+      "criterion": "CC",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354934_5000",
+      "baseKey": "CC8-2",
+      "question_key": "CC8-2",
+      "criterion": "CC",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354961_7239",
+      "baseKey": "CC8-3",
+      "question_key": "CC8-3",
+      "criterion": "CC",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787354990_3598",
+      "baseKey": "GRA8-1",
+      "question_key": "GRA8-1",
+      "criterion": "GRA",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355015_4983",
+      "baseKey": "GRA8-2",
+      "question_key": "GRA8-2",
+      "criterion": "GRA",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355048_2907",
+      "baseKey": "GRA8-3",
+      "question_key": "GRA8-3",
+      "criterion": "GRA",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/very_occasional/occasional/frequent)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "very_occasional"
+      ],
+      "notScoredAnswersNormalized": [
+        "occasional",
+        "frequent"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355075_8531",
+      "baseKey": "LR8-1",
+      "question_key": "LR8-1",
+      "criterion": "LR",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355099_8647",
+      "baseKey": "LR8-2",
+      "question_key": "LR8-2",
+      "criterion": "LR",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355122_829",
+      "baseKey": "LR8-3",
+      "question_key": "LR8-3",
+      "criterion": "LR",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/rare/occasional/frequent)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "rare"
+      ],
+      "notScoredAnswersNormalized": [
+        "occasional",
+        "frequent"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355163_2660",
+      "baseKey": "TR8-1",
+      "question_key": "TR8-1",
+      "criterion": "TR",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355189_3107",
+      "baseKey": "TR8-2",
+      "question_key": "TR8-2",
+      "criterion": "TR",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355215_1783",
+      "baseKey": "TR8-3",
+      "question_key": "TR8-3",
+      "criterion": "TR",
+      "band": 8,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355237_8054",
+      "baseKey": "CC9-1",
+      "question_key": "CC9-1",
+      "criterion": "CC",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355262_699",
+      "baseKey": "CC9-2",
+      "question_key": "CC9-2",
+      "criterion": "CC",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355288_6310",
+      "baseKey": "GRA9-1",
+      "question_key": "GRA9-1",
+      "criterion": "GRA",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355317_1336",
+      "baseKey": "GRA9-2",
+      "question_key": "GRA9-2",
+      "criterion": "GRA",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/rare_slips/very_occasional/occasional/frequent)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "rare_slips"
+      ],
+      "notScoredAnswersNormalized": [
+        "very_occasional",
+        "occasional",
+        "frequent"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355343_7193",
+      "baseKey": "LR9-1",
+      "question_key": "LR9-1",
+      "criterion": "LR",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355364_1653",
+      "baseKey": "LR9-2",
+      "question_key": "LR9-2",
+      "criterion": "LR",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/rare_slips/occasional/frequent)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "rare_slips"
+      ],
+      "notScoredAnswersNormalized": [
+        "occasional",
+        "frequent"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355388_2105",
+      "baseKey": "TR9-1",
+      "question_key": "TR9-1",
+      "criterion": "TR",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355413_7580",
+      "baseKey": "TR9-2",
+      "question_key": "TR9-2",
+      "criterion": "TR",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355438_4653",
+      "baseKey": "TR9-3",
+      "question_key": "TR9-3",
+      "criterion": "TR",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1770787355464_4773",
+      "baseKey": "TR9-4",
+      "question_key": "TR9-4",
+      "criterion": "TR",
+      "band": 9,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "yes"
+      ],
+      "notScoredAnswersNormalized": [
+        "no"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000037_3001",
+      "baseKey": "TR3-1",
+      "question_key": "TR3-1",
+      "criterion": "TR",
+      "band": 3,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000074_3002",
+      "baseKey": "TR3-2",
+      "question_key": "TR3-2",
+      "criterion": "TR",
+      "band": 3,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000185_3005",
+      "baseKey": "CC3-2",
+      "question_key": "CC3-2",
+      "criterion": "CC",
+      "band": 3,
+      "scope": "paragraph",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000222_3006",
+      "baseKey": "LR3-1",
+      "question_key": "LR3-1",
+      "criterion": "LR",
+      "band": 3,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000259_3007",
+      "baseKey": "LR3-2",
+      "question_key": "LR3-2",
+      "criterion": "LR",
+      "band": 3,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/some/severe)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "some"
+      ],
+      "notScoredAnswersNormalized": [
+        "severe"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000296_3008",
+      "baseKey": "GRA3-1",
+      "question_key": "GRA3-1",
+      "criterion": "GRA",
+      "band": 3,
+      "scope": "essay",
+      "answer_type": "Ordinal (none/some/distort)",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "none",
+        "some"
+      ],
+      "notScoredAnswersNormalized": [
+        "distort"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000333_3009",
+      "baseKey": "TR2-1",
+      "question_key": "TR2-1",
+      "criterion": "TR",
+      "band": 2,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000370_3010",
+      "baseKey": "TR2-2",
+      "question_key": "TR2-2",
+      "criterion": "TR",
+      "band": 2,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000481_3013",
+      "baseKey": "LR2-1",
+      "question_key": "LR2-1",
+      "criterion": "LR",
+      "band": 2,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000518_3014",
+      "baseKey": "GRA2-1",
+      "question_key": "GRA2-1",
+      "criterion": "GRA",
+      "band": 2,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000555_3015",
+      "baseKey": "TR1-1",
+      "question_key": "TR1-1",
+      "criterion": "TR",
+      "band": 1,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000592_3016",
+      "baseKey": "CC1-1",
+      "question_key": "CC1-1",
+      "criterion": "CC",
+      "band": 1,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000629_3017",
+      "baseKey": "LR1-1",
+      "question_key": "LR1-1",
+      "criterion": "LR",
+      "band": 1,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_1775949000666_3018",
+      "baseKey": "GRA1-1",
+      "question_key": "GRA1-1",
+      "criterion": "GRA",
+      "band": 1,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_CC2_1A_SPLIT",
+      "baseKey": "CC2-1A",
+      "question_key": "CC2-1A",
+      "criterion": "CC",
+      "band": 2,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_CC2_1B_SPLIT",
+      "baseKey": "CC2-1B",
+      "question_key": "CC2-1B",
+      "criterion": "CC",
+      "band": 2,
+      "scope": "paragraph",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_CC3_1A_SPLIT",
+      "baseKey": "CC3-1A",
+      "question_key": "CC3-1A",
+      "criterion": "CC",
+      "band": 3,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_CC3_1B_SPLIT",
+      "baseKey": "CC3-1B",
+      "question_key": "CC3-1B",
+      "criterion": "CC",
+      "band": 3,
+      "scope": "paragraph",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_TR2_3A_SPLIT",
+      "baseKey": "TR2-3A",
+      "question_key": "TR2-3A",
+      "criterion": "TR",
+      "band": 2,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_TR2_3B_SPLIT",
+      "baseKey": "TR2-3B",
+      "question_key": "TR2-3B",
+      "criterion": "TR",
+      "band": 2,
+      "scope": "paragraph",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_TR3_3A_SPLIT",
+      "baseKey": "TR3-3A",
+      "question_key": "TR3-3A",
+      "criterion": "TR",
+      "band": 3,
+      "scope": "essay",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_TR3_3B_SPLIT",
+      "baseKey": "TR3-3B",
+      "question_key": "TR3-3B",
+      "criterion": "TR",
+      "band": 3,
+      "scope": "paragraph",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    },
+    {
+      "id": "MA_TR3_3C_SPLIT",
+      "baseKey": "TR3-3C",
+      "question_key": "TR3-3C",
+      "criterion": "TR",
+      "band": 3,
+      "scope": "paragraph",
+      "answer_type": "Boolean",
+      "statusBefore": "COMPLETE_EXPLICIT_CONTRACT",
+      "statusAfter": "COMPLETE_EXPLICIT_CONTRACT",
+      "scoredAnswersNormalized": [
+        "no"
+      ],
+      "notScoredAnswersNormalized": [
+        "yes"
+      ],
+      "issues": []
+    }
+  ],
+  "dataSource": "file"
+}

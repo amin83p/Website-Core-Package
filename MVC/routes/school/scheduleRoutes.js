@@ -1,0 +1,39 @@
+// MVC/routes/school/scheduleRoutes.js
+const express = require('express');
+const router = express.Router();
+const ctrl = require('../../controllers/school/scheduleController');
+const { requireAuth } = require('../../middleware/authMiddleware');
+const { requireAccess } = require('../../middleware/accessMiddleware');
+const { trackActionState } = require('../../middleware/actionStateMiddleware');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+
+router.use(requireAuth);
+
+router.get('/my',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ),
+  ctrl.showMySchedulePage);
+router.get('/api/my-schedule',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ),
+  ctrl.getMyScheduleData);
+
+router.get(['/','/viewer'],
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  ctrl.showSchedulePage);
+router.get('/api/person-schedule',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  ctrl.getPersonSchedule);
+
+router.get('/global',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  ctrl.showGlobalSchedulePage);
+router.get('/api/global-schedule',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  ctrl.getGlobalSchedule);
+
+module.exports = router;

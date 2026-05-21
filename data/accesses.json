@@ -1,0 +1,311 @@
+[
+  {
+    "name": "PTE_APPLICANT",
+    "orgId": 900000,
+    "description": "",
+    "active": true,
+    "fullAdmin": false,
+    "adminCategories": [],
+    "validity": {
+      "startDate": null,
+      "endDate": null
+    },
+    "sections": [
+      {
+        "sectionId": "910001",
+        "adminAccess": false,
+        "operations": []
+      },
+      {
+        "sectionId": "930108",
+        "adminAccess": false,
+        "operations": []
+      },
+      {
+        "sectionId": "930111",
+        "adminAccess": false,
+        "operations": [
+          {
+            "operationId": "OP1002",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1003",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          }
+        ]
+      },
+      {
+        "sectionId": "930110",
+        "adminAccess": false,
+        "operations": []
+      },
+      {
+        "sectionId": "930104",
+        "adminAccess": false,
+        "operations": []
+      },
+      {
+        "sectionId": "930107",
+        "adminAccess": false,
+        "operations": [
+          {
+            "operationId": "OP1002",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1003",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          }
+        ]
+      },
+      {
+        "sectionId": "930109",
+        "adminAccess": false,
+        "operations": [
+          {
+            "operationId": "OP1001",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": 100,
+            "maxSessionDurationMinutes": 100,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1002",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1003",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1005",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": 100,
+            "maxSessionDurationMinutes": 100,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "935362",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          }
+        ]
+      },
+      {
+        "sectionId": "930120",
+        "adminAccess": false,
+        "operations": [
+          {
+            "operationId": "OP1001",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": 300,
+            "maxSessionDurationMinutes": 300,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1002",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1003",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1005",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": 300,
+            "maxSessionDurationMinutes": 300,
+            "maxFetchUploadVolumeKB": null
+          }
+        ]
+      },
+      {
+        "sectionId": "930121",
+        "adminAccess": false,
+        "operations": [
+          {
+            "operationId": "OP1001",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": 100,
+            "maxSessionDurationMinutes": 100,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1002",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1003",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1005",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": 100,
+            "maxSessionDurationMinutes": 100,
+            "maxFetchUploadVolumeKB": null
+          }
+        ]
+      },
+      {
+        "sectionId": "948948",
+        "adminAccess": false,
+        "operations": []
+      },
+      {
+        "sectionId": "920106",
+        "adminAccess": false,
+        "operations": [
+          {
+            "operationId": "OP1002",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1003",
+            "scopeId": "SCP_OWNER",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          }
+        ]
+      },
+      {
+        "sectionId": "188404",
+        "adminAccess": false,
+        "operations": [
+          {
+            "operationId": "OP1002",
+            "scopeId": "SCP_ORG",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          }
+        ]
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-30T05:17:45.825Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-05-13T19:19:53.856Z"
+    },
+    "id": "191019"
+  },
+  {
+    "name": "SAMPLES",
+    "orgId": null,
+    "description": "",
+    "active": true,
+    "fullAdmin": false,
+    "adminCategories": [],
+    "validity": {
+      "startDate": null,
+      "endDate": null
+    },
+    "sections": [
+      {
+        "sectionId": "100101",
+        "adminAccess": false,
+        "operations": [
+          {
+            "operationId": "OP1002",
+            "scopeId": "SCP_ADMIN",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          },
+          {
+            "operationId": "OP1003",
+            "scopeId": "SCP_ADMIN",
+            "maxAttemptsPerSession": null,
+            "maxSessionDurationMinutes": null,
+            "maxFetchUploadVolumeKB": null
+          }
+        ]
+      }
+    ],
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-05-07T17:41:29.703Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-05-07T17:45:35.258Z"
+    },
+    "id": "401049"
+  },
+  {
+    "id": "ACC555806",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-10T21:04:47.401Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T05:13:23.887Z"
+    },
+    "description": "",
+    "fullAdmin": true,
+    "name": "ADMIN",
+    "orgId": null,
+    "sections": [],
+    "validity": {
+      "startDate": null,
+      "endDate": null
+    },
+    "adminCategories": []
+  },
+  {
+    "id": "ACC568286",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2025-12-10T03:39:14.622Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T05:11:07.878Z"
+    },
+    "description": "",
+    "fullAdmin": true,
+    "name": "ADMIN",
+    "orgId": 900000,
+    "sections": [],
+    "validity": {
+      "startDate": null,
+      "endDate": null
+    },
+    "adminCategories": []
+  }
+]

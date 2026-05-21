@@ -1,0 +1,79 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search groups...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="name">Name <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="description">Description <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="active">Active <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated <span class="sort-icon"></span></th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% (data || []).forEach(group => { %>
+        <tr>
+          <td class="font-monospace"><%= group.id %></td>
+          
+          <td>
+             <span class="fw-bold"><%= group.name %></span>
+          </td>
+
+          <td>
+            <span class="text-muted small text-truncate d-block" style="max-width: 300px;">
+              <%= group.description || '—' %>
+            </span>
+          </td>
+
+          <td class="text-center">
+             <% if (group.active) { %>
+                <span class="badge bg-success-subtle text-success border shadow-sm">Active</span>
+            <% } else { %>
+                <span class="badge bg-secondary-subtle text-secondary border shadow-sm">Inactive</span>
+            <% } %>
+          </td>
+
+          <% const audit = group.audit || {}; %>
+          <td>
+            <% if (audit.lastUpdateDateTime) { %>
+              <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+              <% if (audit.lastUpdateUser) { %>
+                <br><span class="text-muted small">by <%= audit.lastUpdateUser %></span>
+              <% } %>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+
+          <td class="table-actions">
+            <a href="/subscriptionGroup/edit/<%= group.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= group.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: 'subscription-groups'
+}) %>
+
+<%- include('../partials/tablePages-end') %>

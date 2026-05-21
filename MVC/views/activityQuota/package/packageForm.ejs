@@ -1,0 +1,1200 @@
+<%
+  const p = (entry && typeof entry === 'object') ? entry : {};
+  const isEdit = Boolean(p.id);
+  const routeId = String(p.id || '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const options = (formOptions && typeof formOptions === 'object') ? formOptions : {};
+  const defaults = (options.defaults && typeof options.defaults === 'object') ? options.defaults : {};
+  const selectedCategory = String(p.category || defaults.category || '').trim();
+  const categoriesRaw = Array.isArray(options.categories) ? options.categories : [];
+  const categoryMap = new Map();
+  categoriesRaw.forEach((row) => {
+    const value = String((row && (row.value || row.label)) || '').trim();
+    if (!value) return;
+    const label = String((row && row.label) || value).trim() || value;
+    if (!categoryMap.has(value)) categoryMap.set(value, { value, label });
+  });
+  if (selectedCategory && !categoryMap.has(selectedCategory)) {
+    categoryMap.set(selectedCategory, { value: selectedCategory, label: selectedCategory });
+  }
+  const categoryOptions = Array.from(categoryMap.values());
+  const actionUrl = isEdit
+    ? ('/activity-quota/packages/edit/' + encodeURIComponent(routeId))
+    : '/activity-quota/packages/new';
+  const packageSections = Array.isArray(p.sections) ? p.sections : [];
+  const packageSectionCount = packageSections.length;
+  const packageOperationCount = packageSections.reduce((sum, section) => {
+    const ops = Array.isArray(section && section.operations) ? section.operations.length : 0;
+    return sum + ops;
+  }, 0);
+
+  function safeDateValue(value) {
+    const token = String(value || '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(token) ? token : '';
+  }
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= title %></h1>
+    <div class="d-flex flex-column align-items-end gap-1">
+      <% if (isEdit) { %><span class="badge bg-primary border font-monospace">ID: <%= p.id %></span><% } %>
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="aqCopyFromSavedBtn">
+          <i class="bi bi-files me-1"></i> Copy from Saved Package
+        </button>
+        <a href="/activity-quota/packages" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <% if (isEdit) { %>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body py-2">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="badge <%= p.active !== false ? 'bg-success-subtle text-success-emphasis border border-success-subtle' : 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle' %>">
+            <%= p.active !== false ? 'Active' : 'Inactive' %>
+          </span>
+          <span class="badge bg-light text-dark border">Category: <%= selectedCategory || '-' %></span>
+          <span class="badge bg-light text-dark border text-capitalize">Visibility: <%= String(p.visibility || defaults.visibility || 'internal') %></span>
+          <span class="badge bg-info-subtle text-info border border-info-subtle">Sections: <%= Number(packageSectionCount || 0) %></span>
+          <span class="badge bg-light text-dark border">Operations: <%= Number(packageOperationCount || 0) %></span>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="activityQuotaPackageForm" action="<%= actionUrl %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+      <input type="hidden" name="packagePlan" id="aqPackagePlanInput">
+
+      <script type="application/json" id="aqPackageFormOptions"><%- JSON.stringify(options || {}) %></script>
+      <script type="application/json" id="aqPackageInitial"><%- JSON.stringify(p || {}) %></script>
+
+      <ul class="nav nav-tabs mb-4" id="aqPackageTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#aq-tab-general" type="button">General Info</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#aq-tab-validity" type="button">Validity</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#aq-tab-access-profiles" type="button">Access Profiles</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#aq-tab-eligible-roles" type="button">Eligible Roles</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#aq-tab-banned-users" type="button">Banned Users</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#aq-tab-sections" type="button">Sections & Operations</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="aq-tab-general">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <h6 class="fw-bold text-primary m-0 mb-3">Package Details</h6>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Name *</label>
+                  <input type="text" id="aqNameInput" class="form-control size-md" value="<%= p.name || '' %>" required maxlength="200">
+                </div>
+                <div class="col-md-3 mb-3">
+                  <label class="form-label">Price Amount *</label>
+                  <input type="number" id="aqPriceAmountInput" class="form-control size-md" min="0" step="0.000001" value="<%= Number((p.price && p.price.amount) || 0) %>" required>
+                </div>
+                <div class="col-md-3 mb-3">
+                  <label class="form-label">Currency *</label>
+                  <input type="text" id="aqCurrencyInput" class="form-control size-md text-uppercase" maxlength="3" value="<%= String((p.price && p.price.currencyCode) || defaults.currencyCode || 'CAD').toUpperCase() %>" placeholder="CAD" required>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-12 mb-3">
+                  <label class="form-label">Description</label>
+                  <textarea id="aqDescriptionInput" class="form-control size-md" rows="3" maxlength="3000" placeholder="Describe this package..."><%= p.description || '' %></textarea>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Category *</label>
+                  <select id="aqCategorySelect" class="form-select size-md" required>
+                    <option value=""><%= categoryOptions.length ? 'Select Category' : 'No section categories found' %></option>
+                    <% categoryOptions.forEach((row) => { %>
+                      <option value="<%= row.value %>" <%= String(selectedCategory || '').trim() === String(row.value || '').trim() ? 'selected' : '' %>><%= row.label %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Visibility *</label>
+                  <select id="aqVisibilitySelect" class="form-select size-md">
+                    <option value="internal" <%= String((p.visibility || defaults.visibility || 'internal')).toLowerCase() === 'internal' ? 'selected' : '' %>>Internal</option>
+                    <option value="public" <%= String((p.visibility || defaults.visibility || 'internal')).toLowerCase() === 'public' ? 'selected' : '' %>>Public</option>
+                  </select>
+                </div>
+                <div class="col-md-4 mb-3 d-flex align-items-end">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="aqActiveInput" <%= p.active !== false ? 'checked' : '' %>>
+                    <label class="form-check-label" for="aqActiveInput">Active</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="aq-tab-validity">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <h6 class="fw-bold text-primary m-0 mb-3">Validity</h6>
+              <div class="row align-items-end">
+                <div class="col-md-3 mb-3">
+                  <label class="form-label">Validity Mode *</label>
+                  <select id="aqValidityModeSelect" class="form-select size-md">
+                    <option value="duration" <%= String((p.validity && p.validity.mode) || defaults.validityMode || 'duration').toLowerCase() === 'duration' ? 'selected' : '' %>>Duration (Y/M/D)</option>
+                    <option value="date_range" <%= String((p.validity && p.validity.mode) || defaults.validityMode || 'duration').toLowerCase() === 'date_range' ? 'selected' : '' %>>Date Range</option>
+                  </select>
+                </div>
+                <div class="col-md-3 mb-3" id="aqDateStartWrap">
+                  <label class="form-label">Start Date *</label>
+                  <input type="date" id="aqStartDateInput" class="form-control size-md" value="<%= safeDateValue(p.validity && p.validity.startDate) %>">
+                </div>
+                <div class="col-md-3 mb-3" id="aqDateEndWrap">
+                  <label class="form-label">End Date *</label>
+                  <input type="date" id="aqEndDateInput" class="form-control size-md" value="<%= safeDateValue(p.validity && p.validity.endDate) %>">
+                </div>
+                <div class="col-md-1 mb-3 d-none" id="aqYearsWrap">
+                  <label class="form-label">Years</label>
+                  <input type="number" id="aqYearsInput" class="form-control size-md" min="0" step="1" value="<%= Number((p.validity && p.validity.years) || 0) %>">
+                </div>
+                <div class="col-md-1 mb-3 d-none" id="aqMonthsWrap">
+                  <label class="form-label">Months</label>
+                  <input type="number" id="aqMonthsInput" class="form-control size-md" min="0" step="1" value="<%= Number((p.validity && p.validity.months) || 0) %>">
+                </div>
+                <div class="col-md-1 mb-3 d-none" id="aqDaysWrap">
+                  <label class="form-label">Days</label>
+                  <input type="number" id="aqDaysInput" class="form-control size-md" min="0" step="1" value="<%= Number((p.validity && p.validity.days) || 0) %>">
+                </div>
+              </div>
+              <div class="form-text">Validity accepts exactly one mode: Date Range or Duration.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="aq-tab-access-profiles">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-primary m-0">Access Profiles</h6>
+                <button type="button" class="btn btn-primary btn-filled btn-sm" id="aqPickAccessProfilesBtn">
+                  <i class="bi bi-search me-1"></i> Add Access Profiles
+                </button>
+              </div>
+              <div id="aqAccessProfilesContainer" class="border rounded p-3 bg-light-subtle"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="aq-tab-eligible-roles">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-primary m-0">Eligible Roles</h6>
+                <button type="button" class="btn btn-primary btn-filled btn-sm" id="aqPickEligibleRolesBtn">
+                  <i class="bi bi-search me-1"></i> Add Roles
+                </button>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-md-8">
+                  <input type="text" id="aqManualRoleTokenInput" class="form-control form-control-sm" placeholder="Type role token (for example: student)">
+                </div>
+                <div class="col-md-4 d-grid">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="aqAddManualRoleBtn">Add Role Token</button>
+                </div>
+              </div>
+              <div id="aqEligibleRolesContainer" class="border rounded p-3 bg-light-subtle"></div>
+              <div class="form-text mt-2">If no eligible role is selected, the package remains unrestricted by role.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="aq-tab-banned-users">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-primary m-0">Banned Users</h6>
+                <button type="button" class="btn btn-primary btn-filled btn-sm" id="aqPickBannedUsersBtn">
+                  <i class="bi bi-search me-1"></i> Add Banned Users
+                </button>
+              </div>
+              <div id="aqBannedUsersContainer" class="border rounded p-3 bg-light-subtle"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="aq-tab-sections">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-primary m-0">Sections & Operations</h6>
+                <button type="button" class="btn btn-primary btn-filled btn-sm" id="aqPickSectionsBtn">
+                  <i class="bi bi-search me-1"></i> Add Sections
+                </button>
+              </div>
+              <div id="aqSectionsContainer" class="accordion"></div>
+              <div class="form-text">Per section, add operations and define package quota metrics for each operation row.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" id="aqPackageSaveBtn" class="btn btn-filled btn-primary btn-md"><%= isEdit ? 'Update Package' : 'Save Package' %></button>
+        <a href="/activity-quota/packages" class="btn btn-filled btn-secondary btn-md" id="aqPackageCancelBtn" data-return-url="/activity-quota/packages">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('activityQuotaPackageForm');
+  if (!form) return;
+
+  const packagePlanInput = document.getElementById('aqPackagePlanInput');
+  const nameInput = document.getElementById('aqNameInput');
+  const descriptionInput = document.getElementById('aqDescriptionInput');
+  const priceAmountInput = document.getElementById('aqPriceAmountInput');
+  const currencyInput = document.getElementById('aqCurrencyInput');
+  const categorySelect = document.getElementById('aqCategorySelect');
+  const visibilitySelect = document.getElementById('aqVisibilitySelect');
+  const activeInput = document.getElementById('aqActiveInput');
+  const validityModeSelect = document.getElementById('aqValidityModeSelect');
+  const startDateInput = document.getElementById('aqStartDateInput');
+  const endDateInput = document.getElementById('aqEndDateInput');
+  const yearsInput = document.getElementById('aqYearsInput');
+  const monthsInput = document.getElementById('aqMonthsInput');
+  const daysInput = document.getElementById('aqDaysInput');
+  const dateStartWrap = document.getElementById('aqDateStartWrap');
+  const dateEndWrap = document.getElementById('aqDateEndWrap');
+  const yearsWrap = document.getElementById('aqYearsWrap');
+  const monthsWrap = document.getElementById('aqMonthsWrap');
+  const daysWrap = document.getElementById('aqDaysWrap');
+  const copyFromSavedBtn = document.getElementById('aqCopyFromSavedBtn');
+  const pickAccessProfilesBtn = document.getElementById('aqPickAccessProfilesBtn');
+  const accessProfilesContainer = document.getElementById('aqAccessProfilesContainer');
+  const pickEligibleRolesBtn = document.getElementById('aqPickEligibleRolesBtn');
+  const eligibleRolesContainer = document.getElementById('aqEligibleRolesContainer');
+  const manualRoleTokenInput = document.getElementById('aqManualRoleTokenInput');
+  const addManualRoleBtn = document.getElementById('aqAddManualRoleBtn');
+  const pickBannedUsersBtn = document.getElementById('aqPickBannedUsersBtn');
+  const bannedUsersContainer = document.getElementById('aqBannedUsersContainer');
+  const pickSectionsBtn = document.getElementById('aqPickSectionsBtn');
+  const sectionsContainer = document.getElementById('aqSectionsContainer');
+  const saveBtn = document.getElementById('aqPackageSaveBtn');
+  const cancelBtn = document.getElementById('aqPackageCancelBtn');
+  let isSubmitting = false;
+
+  function parseJsonScript(scriptId) {
+    try {
+      const node = document.getElementById(scriptId);
+      return JSON.parse((node && node.textContent) || '{}');
+    } catch (_) {
+      return {};
+    }
+  }
+
+  const options = parseJsonScript('aqPackageFormOptions');
+  const initial = parseJsonScript('aqPackageInitial');
+
+  const state = {
+    accessProfiles: [],
+    eligibleRoles: [],
+    bannedUsers: [],
+    sections: [],
+    expandedSectionId: ''
+  };
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async function showNotice(title, message, icon) {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title: title,
+        message: message,
+        icon: icon || 'warning',
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+    alert(title + ': ' + message);
+  }
+
+  function cacheButtonHtml(button) {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+  }
+
+  function setButtonBusy(button, label) {
+    if (!button) return;
+    cacheButtonHtml(button);
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + escapeHtml(label);
+  }
+
+  function restoreButton(button) {
+    if (!button) return;
+    if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+    button.disabled = false;
+  }
+
+  function restoreActionButtons() {
+    isSubmitting = false;
+    restoreButton(saveBtn);
+    restoreButton(cancelBtn);
+  }
+
+  function numberValue(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) return 0;
+    return Number(numeric.toFixed(6));
+  }
+
+  function integerValue(value) {
+    const numeric = Number.parseInt(String(value || '0'), 10);
+    if (!Number.isFinite(numeric) || Number.isNaN(numeric) || numeric < 0) return 0;
+    return numeric;
+  }
+
+  function normalizeVisibility(value) {
+    return String(value || '').trim().toLowerCase() === 'public' ? 'public' : 'internal';
+  }
+
+  function setCategoryValue(value) {
+    if (!categorySelect) return;
+    const token = String(value || '').trim();
+    if (!token) {
+      categorySelect.value = '';
+      return;
+    }
+    const exists = Array.from(categorySelect.options || []).some((opt) => String(opt.value || '').trim() === token);
+    if (!exists) {
+      const dynamicOption = document.createElement('option');
+      dynamicOption.value = token;
+      dynamicOption.textContent = token;
+      categorySelect.appendChild(dynamicOption);
+    }
+    categorySelect.value = token;
+  }
+
+  function normalizeValidityMode(value) {
+    return String(value || '').trim().toLowerCase() === 'date_range' ? 'date_range' : 'duration';
+  }
+
+  function toggleValidityInputs() {
+    const mode = normalizeValidityMode(validityModeSelect.value);
+    const isDateRange = mode === 'date_range';
+    dateStartWrap.classList.toggle('d-none', !isDateRange);
+    dateEndWrap.classList.toggle('d-none', !isDateRange);
+    yearsWrap.classList.toggle('d-none', isDateRange);
+    monthsWrap.classList.toggle('d-none', isDateRange);
+    daysWrap.classList.toggle('d-none', isDateRange);
+  }
+
+  function upsertAccessProfile(item) {
+    const row = (item && typeof item === 'object') ? item : {};
+    const id = String(row.id || row.accessProfileId || '').trim();
+    if (!id) return;
+    if (state.accessProfiles.some((r) => r.id === id)) return;
+    state.accessProfiles.push({
+      id: id,
+      name: String(row.name || id).trim(),
+      orgId: String(row.orgId || '').trim()
+    });
+  }
+
+  function removeAccessProfile(id) {
+    const target = String(id || '').trim();
+    state.accessProfiles = state.accessProfiles.filter((row) => row.id !== target);
+    renderAccessProfiles();
+  }
+
+  function renderAccessProfiles() {
+    if (!state.accessProfiles.length) {
+      accessProfilesContainer.innerHTML = '<div class="text-muted">No access profiles selected.</div>';
+      return;
+    }
+
+    accessProfilesContainer.innerHTML = state.accessProfiles.map((row) => {
+      return ''
+        + '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-3 py-2 mb-2">'
+        + '  <div class="overflow-hidden">'
+        + '    <div class="fw-bold text-truncate">' + escapeHtml(row.name || row.id) + '</div>'
+        + '    <div class="x-small text-muted font-monospace text-truncate">' + escapeHtml(row.id) + (row.orgId ? (' | Org ' + escapeHtml(row.orgId)) : '') + '</div>'
+        + '  </div>'
+        + '  <button type="button" class="btn btn-outline-danger btn-sm" data-aq-remove-access-profile="' + escapeHtml(row.id) + '">'
+        + '    <i class="bi bi-x-lg"></i>'
+        + '  </button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function normalizeRoleToken(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  function upsertEligibleRole(value) {
+    const token = normalizeRoleToken(
+      (value && typeof value === 'object')
+        ? (value.id || value.role || value.value || value.name || '')
+        : value
+    );
+    if (!token) return;
+    if (!/^[a-z0-9_.:-]+$/.test(token)) return;
+    if (state.eligibleRoles.includes(token)) return;
+    state.eligibleRoles.push(token);
+  }
+
+  function removeEligibleRole(value) {
+    const token = normalizeRoleToken(value);
+    state.eligibleRoles = state.eligibleRoles.filter((role) => normalizeRoleToken(role) !== token);
+    renderEligibleRoles();
+  }
+
+  function renderEligibleRoles() {
+    if (!eligibleRolesContainer) return;
+    if (!state.eligibleRoles.length) {
+      eligibleRolesContainer.innerHTML = '<div class="text-muted small">No eligible roles selected. Package is unrestricted.</div>';
+      return;
+    }
+    eligibleRolesContainer.innerHTML = state.eligibleRoles.map((role) => {
+      const roleEscaped = escapeHtml(role);
+      return '<div class="d-flex align-items-center justify-content-between border rounded px-3 py-2 mb-2 bg-white">'
+        + '  <div>'
+        + '    <div class="fw-bold small">' + roleEscaped + '</div>'
+        + '  </div>'
+        + '  <button type="button" class="btn btn-sm btn-outline-danger" data-aq-remove-eligible-role="' + roleEscaped + '">'
+        + '    <i class="bi bi-x-lg"></i>'
+        + '  </button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function upsertBannedUser(item) {
+    const row = (item && typeof item === 'object') ? item : {};
+    const id = String(row.id || row.userId || '').trim();
+    if (!id) return;
+    if (state.bannedUsers.some((r) => r.id === id)) return;
+    state.bannedUsers.push({
+      id: id,
+      name: String(row.name || id).trim(),
+      username: String(row.username || '').trim(),
+      email: String(row.email || '').trim(),
+      orgId: String(row.orgId || '').trim()
+    });
+  }
+
+  function removeBannedUser(id) {
+    const target = String(id || '').trim();
+    state.bannedUsers = state.bannedUsers.filter((row) => row.id !== target);
+    renderBannedUsers();
+  }
+
+  function renderBannedUsers() {
+    if (!state.bannedUsers.length) {
+      bannedUsersContainer.innerHTML = '<div class="text-muted">No banned users selected.</div>';
+      return;
+    }
+
+    bannedUsersContainer.innerHTML = state.bannedUsers.map((row) => {
+      const subtitleParts = [];
+      if (row.username) subtitleParts.push(row.username);
+      if (row.email) subtitleParts.push(row.email);
+      if (row.orgId) subtitleParts.push('Org ' + row.orgId);
+      const subtitle = subtitleParts.join(' | ');
+      return ''
+        + '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-3 py-2 mb-2">'
+        + '  <div class="overflow-hidden">'
+        + '    <div class="fw-bold text-truncate">' + escapeHtml(row.name || row.id) + '</div>'
+        + '    <div class="x-small text-muted font-monospace text-truncate">' + escapeHtml(row.id) + (subtitle ? ' | ' + escapeHtml(subtitle) : '') + '</div>'
+        + '  </div>'
+        + '  <button type="button" class="btn btn-outline-danger btn-sm" data-aq-remove-banned-user="' + escapeHtml(row.id) + '">'
+        + '    <i class="bi bi-x-lg"></i>'
+        + '  </button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function upsertSection(item, options) {
+    const section = (item && typeof item === 'object') ? item : {};
+    const id = String(section.id || section.sectionId || '').trim();
+    if (!id) return false;
+    const sectionCategory = String(section.category || '').trim();
+    if (state.sections.some((row) => row.id === id)) return false;
+    state.sections.push({
+      id: id,
+      name: String(section.name || id).trim(),
+      operations: []
+    });
+    if (!String((categorySelect && categorySelect.value) || '').trim() && sectionCategory) {
+      setCategoryValue(sectionCategory);
+    }
+    if (!options || options.focus !== false) {
+      state.expandedSectionId = id;
+    }
+    return true;
+  }
+
+  function removeSection(sectionId) {
+    const target = String(sectionId || '').trim();
+    state.sections = state.sections.filter((row) => row.id !== target);
+    if (state.expandedSectionId === target) {
+      state.expandedSectionId = state.sections.length ? state.sections[0].id : '';
+    }
+    renderSections();
+  }
+
+  function upsertOperation(sectionId, item) {
+    const targetSection = state.sections.find((row) => row.id === String(sectionId || '').trim());
+    if (!targetSection) return;
+    const operation = (item && typeof item === 'object') ? item : {};
+    const id = String(operation.id || operation.operationId || '').trim();
+    if (!id) return;
+    if (targetSection.operations.some((row) => row.id === id)) return;
+    targetSection.operations.push({
+      id: id,
+      name: String(operation.name || id).trim(),
+      label: String(operation.label || '').trim(),
+      call: 0,
+      amount: 0,
+      token: 0,
+      volume: 0
+    });
+    state.expandedSectionId = targetSection.id;
+  }
+
+  function removeOperation(sectionId, operationId) {
+    const targetSection = state.sections.find((row) => row.id === String(sectionId || '').trim());
+    if (!targetSection) return;
+    const targetOperationId = String(operationId || '').trim();
+    targetSection.operations = targetSection.operations.filter((row) => row.id !== targetOperationId);
+    state.expandedSectionId = targetSection.id;
+    renderSections();
+  }
+
+  function setOperationMetric(sectionId, operationId, field, value) {
+    const targetSection = state.sections.find((row) => row.id === String(sectionId || '').trim());
+    if (!targetSection) return;
+    const targetOperation = targetSection.operations.find((row) => row.id === String(operationId || '').trim());
+    if (!targetOperation) return;
+    targetOperation[field] = numberValue(value);
+  }
+
+  function setOperationLabel(sectionId, operationId, value) {
+    const targetSection = state.sections.find((row) => row.id === String(sectionId || '').trim());
+    if (!targetSection) return;
+    const targetOperation = targetSection.operations.find((row) => row.id === String(operationId || '').trim());
+    if (!targetOperation) return;
+    targetOperation.label = String(value || '').trim();
+  }
+
+  function renderSections() {
+    if (!state.sections.length) {
+      sectionsContainer.innerHTML = '<div class="text-muted">No sections selected yet.</div>';
+      state.expandedSectionId = '';
+      return;
+    }
+
+    const expandedSectionId = state.sections.some((section) => section.id === state.expandedSectionId)
+      ? state.expandedSectionId
+      : state.sections[0].id;
+    state.expandedSectionId = expandedSectionId;
+
+    sectionsContainer.innerHTML = state.sections.map((section, index) => {
+      const collapseId = 'aqPackageSectionCollapse' + index;
+      const sectionIdEscaped = escapeHtml(section.id);
+      const operationRows = Array.isArray(section.operations) ? section.operations : [];
+      const isExpanded = section.id === expandedSectionId;
+      return ''
+        + '<div class="accordion-item border mb-2">'
+        + '  <h2 class="accordion-header" id="aqPackageSectionHeading' + index + '">'
+        + '    <button class="accordion-button ' + (isExpanded ? '' : 'collapsed') + '" type="button" data-bs-toggle="collapse" data-bs-target="#' + collapseId + '" aria-expanded="' + (isExpanded ? 'true' : 'false') + '">'
+        + '      <div class="d-flex align-items-center justify-content-between w-100 me-2">'
+        + '        <div>'
+        + '          <div class="fw-bold">' + escapeHtml(section.name || section.id) + '</div>'
+        + '          <div class="x-small text-muted font-monospace">' + sectionIdEscaped + '</div>'
+        + '        </div>'
+        + '        <span class="badge bg-light text-dark border">' + operationRows.length + ' operation' + (operationRows.length === 1 ? '' : 's') + '</span>'
+        + '      </div>'
+        + '    </button>'
+        + '  </h2>'
+        + '  <div id="' + collapseId + '" class="accordion-collapse collapse ' + (isExpanded ? 'show' : '') + '">'
+        + '    <div class="accordion-body bg-light-subtle">'
+        + '      <div class="d-flex justify-content-between align-items-center mb-3">'
+        + '        <button type="button" class="btn btn-outline-primary btn-sm" data-aq-add-operations="' + sectionIdEscaped + '">'
+        + '          <i class="bi bi-search me-1"></i> Add Operations'
+        + '        </button>'
+        + '        <button type="button" class="btn btn-outline-danger btn-sm" data-aq-remove-section="' + sectionIdEscaped + '">'
+        + '          <i class="bi bi-trash me-1"></i> Remove Section'
+        + '        </button>'
+        + '      </div>'
+        + '      <div class="table-responsive bg-white border rounded">'
+        + '        <table class="table table-sm align-middle mb-0">'
+        + '          <thead class="table-light">'
+        + '            <tr>'
+        + '              <th>Operation</th>'
+        + '              <th style="width: 220px;">Public Label</th>'
+        + '              <th style="width: 120px;">Call</th>'
+        + '              <th style="width: 120px;">Amount</th>'
+        + '              <th style="width: 120px;">Token</th>'
+        + '              <th style="width: 120px;">Volume</th>'
+        + '              <th style="width: 70px;"></th>'
+        + '            </tr>'
+        + '          </thead>'
+        + '          <tbody>'
+        + (operationRows.length === 0
+          ? '<tr><td colspan="7" class="text-center text-muted py-3">No operations added for this section.</td></tr>'
+          : '')
+        + operationRows.map((operation) => {
+          const operationIdEscaped = escapeHtml(operation.id);
+          const operationLabel = String(operation.label || '').trim();
+          const operationDisplayName = String(operation.name || operation.id || '').trim();
+          const operationTitle = operationLabel || operationDisplayName || String(operation.id || '').trim();
+          const operationSubtitle = operationLabel && operationDisplayName && operationLabel !== operationDisplayName
+            ? (operationIdEscaped + ' | ' + escapeHtml(operationDisplayName))
+            : operationIdEscaped;
+          return ''
+            + '<tr>'
+            + '  <td>'
+            + '    <div class="fw-bold">' + escapeHtml(operationTitle) + '</div>'
+            + '    <div class="x-small text-muted font-monospace">' + operationSubtitle + '</div>'
+            + '  </td>'
+            + '  <td><input type="text" class="form-control form-control-sm" maxlength="180" placeholder="Friendly label for users" data-aq-label="true" data-aq-section-id="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '" value="' + escapeHtml(operationLabel) + '"></td>'
+            + '  <td><input type="number" step="0.000001" min="0" class="form-control form-control-sm" data-aq-metric="call" data-aq-section-id="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '" value="' + Number(operation.call || 0) + '"></td>'
+            + '  <td><input type="number" step="0.000001" min="0" class="form-control form-control-sm" data-aq-metric="amount" data-aq-section-id="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '" value="' + Number(operation.amount || 0) + '"></td>'
+            + '  <td><input type="number" step="0.000001" min="0" class="form-control form-control-sm" data-aq-metric="token" data-aq-section-id="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '" value="' + Number(operation.token || 0) + '"></td>'
+            + '  <td><input type="number" step="0.000001" min="0" class="form-control form-control-sm" data-aq-metric="volume" data-aq-section-id="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '" value="' + Number(operation.volume || 0) + '"></td>'
+            + '  <td class="text-center">'
+            + '    <button type="button" class="btn btn-outline-danger btn-sm" data-aq-remove-operation="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '">'
+            + '      <i class="bi bi-x-lg"></i>'
+            + '    </button>'
+            + '  </td>'
+            + '</tr>';
+        }).join('')
+        + '          </tbody>'
+        + '        </table>'
+        + '      </div>'
+        + '    </div>'
+        + '  </div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function openAccessProfilePicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.accessProfile({
+      title: 'Select Access Profiles',
+      icon: 'bi-shield-lock',
+      apiEndpoint: '/activity-quota/packages/picker/access-profiles',
+      searchFields: 'id,name,description',
+      placeholder: 'Search access profiles...',
+      multiselect: true,
+      context: context,
+      onSelect: (items) => {
+        const list = Array.isArray(items) ? items : [items];
+        list.forEach((item) => upsertAccessProfile(item));
+        renderAccessProfiles();
+      }
+    }));
+  }
+
+  function openEligibleRolesPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    window.GenericPicker.open(window.GenericPickerPresets.normalizeConfig({
+      title: 'Select Eligible Roles',
+      icon: 'bi-person-badge',
+      apiEndpoint: '/activity-quota/packages/picker/roles',
+      searchFields: 'id,name',
+      placeholder: 'Search role tokens...',
+      multiselect: true,
+      onSelect: (items) => {
+        const list = Array.isArray(items) ? items : [items];
+        list.forEach((item) => upsertEligibleRole(item));
+        renderEligibleRoles();
+      }
+    }));
+  }
+
+  function openBannedUsersPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.user({
+      title: 'Select Banned Users',
+      icon: 'bi-people',
+      apiEndpoint: '/activity-quota/packages/picker/users',
+      searchFields: 'id,username,email,name',
+      placeholder: 'Search users by id, username, or email...',
+      multiselect: true,
+      context: context,
+      onSelect: (items) => {
+        const list = Array.isArray(items) ? items : [items];
+        list.forEach((item) => upsertBannedUser(item));
+        renderBannedUsers();
+      }
+    }));
+  }
+
+  function openSectionsPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Visible Section Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.section({
+      title: 'Select Sections',
+      icon: 'bi-collection',
+      apiEndpoint: '/activity-quota/packages/picker/sections',
+      searchFields: 'id,name,description,category',
+      placeholder: 'Search sections...',
+      multiselect: true,
+      context: context,
+      onSelect: (items) => {
+        const list = Array.isArray(items) ? items : [items];
+        let firstNewSectionId = '';
+        list.forEach((item) => {
+          const created = upsertSection(item, { focus: false });
+          if (created && !firstNewSectionId) {
+            firstNewSectionId = String((item && (item.id || item.sectionId)) || '').trim();
+          }
+        });
+        if (firstNewSectionId) {
+          state.expandedSectionId = firstNewSectionId;
+        }
+        renderSections();
+      }
+    }));
+  }
+
+  function openOperationsPicker(sectionId) {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const targetSection = state.sections.find((row) => row.id === String(sectionId || '').trim());
+    if (!targetSection) return;
+
+    window.GenericPicker.open(window.GenericPickerPresets.operation({
+      title: 'Select Operations (' + (targetSection.name || targetSection.id) + ')',
+      icon: 'bi-gear',
+      apiEndpoint: '/activity-quota/packages/picker/operations?sectionId=' + encodeURIComponent(targetSection.id),
+      searchFields: 'id,name,description',
+      placeholder: 'Search operations for this section...',
+      multiselect: true,
+      context: {
+        label: 'Selected Section',
+        value: String(targetSection.name || targetSection.id),
+        icon: 'bi bi-grid'
+      },
+      onSelect: (items) => {
+        const list = Array.isArray(items) ? items : [items];
+        list.forEach((item) => upsertOperation(targetSection.id, item));
+        state.expandedSectionId = targetSection.id;
+        renderSections();
+      }
+    }));
+  }
+
+  async function openCopyPackagePicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    window.GenericPicker.open(window.GenericPickerPresets.section({
+      title: 'Copy from Saved Package',
+      icon: 'bi-box-seam',
+      apiEndpoint: '/activity-quota/packages/picker/packages',
+      searchFields: 'id,name',
+      placeholder: 'Search saved packages...',
+      multiselect: false,
+      onSelect: async (item) => {
+        const id = String((item && item.id) || '').trim();
+        if (!id) return;
+        try {
+          const response = await fetch('/activity-quota/packages/api/template/' + encodeURIComponent(id), {
+            headers: {
+              'X-AJAX-Request': 'true',
+              'Accept': 'application/json'
+            },
+            credentials: 'include'
+          });
+          const data = await response.json();
+          if (!response.ok || !data || data.status !== 'success' || !data.results) {
+            throw new Error((data && data.message) || 'Failed to load package template.');
+          }
+          applyTemplate(data.results, { appendCopySuffix: true });
+          await showNotice('Template Loaded', 'Saved package data was loaded as draft.', 'success');
+        } catch (error) {
+          await showNotice('Copy Failed', error.message || 'Unable to load package template.', 'error');
+        }
+      }
+    }));
+  }
+
+  function applyTemplate(template, options) {
+    const source = (template && typeof template === 'object') ? template : {};
+    const appendCopySuffix = !!(options && options.appendCopySuffix);
+
+    const sourceName = String(source.name || '').trim();
+    if (sourceName) {
+      nameInput.value = appendCopySuffix ? (sourceName + ' (Copy)') : sourceName;
+    }
+    setCategoryValue(source.category || defaults.category || '');
+    descriptionInput.value = String(source.description || '').trim();
+
+    const price = (source.price && typeof source.price === 'object') ? source.price : {};
+    priceAmountInput.value = Number(price.amount || 0);
+    currencyInput.value = String(price.currencyCode || defaults.currencyCode || 'CAD').toUpperCase();
+
+    visibilitySelect.value = normalizeVisibility(source.visibility || defaults.visibility || 'internal');
+    activeInput.checked = source.active !== false;
+
+    const validity = (source.validity && typeof source.validity === 'object') ? source.validity : {};
+    validityModeSelect.value = normalizeValidityMode(validity.mode || defaults.validityMode || 'duration');
+    startDateInput.value = String(validity.startDate || '').trim();
+    endDateInput.value = String(validity.endDate || '').trim();
+    yearsInput.value = integerValue(validity.years || 0);
+    monthsInput.value = integerValue(validity.months || 0);
+    daysInput.value = integerValue(validity.days || 0);
+    toggleValidityInputs();
+
+    state.accessProfiles = [];
+    (Array.isArray(source.accessProfiles) ? source.accessProfiles : []).forEach((row) => upsertAccessProfile(row));
+    renderAccessProfiles();
+
+    state.eligibleRoles = [];
+    (Array.isArray(source.eligibleRoles) ? source.eligibleRoles : []).forEach((role) => upsertEligibleRole(role));
+    renderEligibleRoles();
+
+    state.bannedUsers = [];
+    (Array.isArray(source.bannedUsers) ? source.bannedUsers : []).forEach((row) => upsertBannedUser(row));
+    renderBannedUsers();
+
+    state.sections = [];
+    let firstSectionId = '';
+    (Array.isArray(source.sections) ? source.sections : []).forEach((section) => {
+      const sectionId = String((section && section.id) || '').trim();
+      if (!sectionId) return;
+      const created = upsertSection(section, { focus: false });
+      if ((created || !firstSectionId) && !firstSectionId) firstSectionId = sectionId;
+      const targetSection = state.sections.find((row) => row.id === sectionId);
+      if (!targetSection) return;
+      targetSection.operations = [];
+      (Array.isArray(section.operations) ? section.operations : []).forEach((operation) => {
+        const operationId = String((operation && operation.id) || '').trim();
+        if (!operationId) return;
+        targetSection.operations.push({
+          id: operationId,
+          name: String(operation.name || operationId).trim(),
+          label: String(operation.label || '').trim(),
+          call: numberValue(operation.call),
+          amount: numberValue(operation.amount),
+          token: numberValue(operation.token),
+          volume: numberValue(operation.volume)
+        });
+      });
+    });
+    state.expandedSectionId = firstSectionId || '';
+    renderSections();
+  }
+
+  function hasPositiveMetric(operation) {
+    return ['call', 'amount', 'token', 'volume'].some((field) => Number((operation && operation[field]) || 0) > 0);
+  }
+
+  async function validateBeforeSubmit() {
+    const name = String(nameInput.value || '').trim();
+    if (!name) {
+      await showNotice('Validation', 'Package name is required.', 'warning');
+      return false;
+    }
+
+    const amount = numberValue(priceAmountInput.value);
+    if (amount < 0) {
+      await showNotice('Validation', 'Price amount must be zero or positive.', 'warning');
+      return false;
+    }
+
+    const currencyCode = String(currencyInput.value || '').trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currencyCode)) {
+      await showNotice('Validation', 'Currency must be a 3-letter code (for example CAD).', 'warning');
+      return false;
+    }
+    const category = String((categorySelect && categorySelect.value) || '').trim();
+    if (!category) {
+      await showNotice('Validation', 'Package category is required.', 'warning');
+      return false;
+    }
+
+    const mode = normalizeValidityMode(validityModeSelect.value);
+    if (mode === 'date_range') {
+      const start = String(startDateInput.value || '').trim();
+      const end = String(endDateInput.value || '').trim();
+      if (!start || !end) {
+        await showNotice('Validation', 'Date range mode requires both start and end dates.', 'warning');
+        return false;
+      }
+      if (end < start) {
+        await showNotice('Validation', 'End date must be the same day or after the start date.', 'warning');
+        return false;
+      }
+    } else {
+      const total = integerValue(yearsInput.value) + integerValue(monthsInput.value) + integerValue(daysInput.value);
+      if (total <= 0) {
+        await showNotice('Validation', 'Duration mode requires at least one positive value in years, months, or days.', 'warning');
+        return false;
+      }
+    }
+
+    if (!state.sections.length) {
+      await showNotice('Validation', 'Select at least one section.', 'warning');
+      return false;
+    }
+
+    for (const section of state.sections) {
+      if (!Array.isArray(section.operations) || section.operations.length === 0) {
+        await showNotice('Validation', 'Section "' + (section.name || section.id) + '" must include at least one operation.', 'warning');
+        return false;
+      }
+      for (const operation of section.operations) {
+        if (!hasPositiveMetric(operation)) {
+          await showNotice('Validation', 'Operation "' + (operation.label || operation.name || operation.id) + '" in section "' + (section.name || section.id) + '" must include at least one positive metric.', 'warning');
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  function buildPayload() {
+    const mode = normalizeValidityMode(validityModeSelect.value);
+    const validity = mode === 'date_range'
+      ? {
+        mode: 'date_range',
+        startDate: String(startDateInput.value || '').trim(),
+        endDate: String(endDateInput.value || '').trim(),
+        years: 0,
+        months: 0,
+        days: 0
+      }
+      : {
+        mode: 'duration',
+        startDate: '',
+        endDate: '',
+        years: integerValue(yearsInput.value),
+        months: integerValue(monthsInput.value),
+        days: integerValue(daysInput.value)
+      };
+
+    return {
+      name: String(nameInput.value || '').trim(),
+      category: String((categorySelect && categorySelect.value) || '').trim(),
+      description: String(descriptionInput.value || '').trim(),
+      price: {
+        amount: numberValue(priceAmountInput.value),
+        currencyCode: String(currencyInput.value || defaults.currencyCode || 'CAD').trim().toUpperCase()
+      },
+      active: activeInput.checked,
+      visibility: normalizeVisibility(visibilitySelect.value),
+      validity: validity,
+      accessProfiles: state.accessProfiles.map((row) => ({
+        id: row.id,
+        name: row.name || row.id,
+        orgId: row.orgId || ''
+      })),
+      eligibleRoles: state.eligibleRoles.map((role) => String(role || '').trim().toLowerCase()).filter(Boolean),
+      bannedUsers: state.bannedUsers.map((row) => ({
+        id: row.id,
+        name: row.name || row.id,
+        username: row.username || '',
+        email: row.email || '',
+        orgId: row.orgId || ''
+      })),
+      sections: state.sections.map((section) => ({
+        id: section.id,
+        name: section.name || section.id,
+        operations: (Array.isArray(section.operations) ? section.operations : []).map((operation) => ({
+          id: operation.id,
+          name: operation.name || operation.id,
+          label: String(operation.label || '').trim(),
+          call: numberValue(operation.call),
+          amount: numberValue(operation.amount),
+          token: numberValue(operation.token),
+          volume: numberValue(operation.volume)
+        }))
+      }))
+    };
+  }
+
+  accessProfilesContainer.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-aq-remove-access-profile]');
+    if (!removeBtn) return;
+    removeAccessProfile(removeBtn.getAttribute('data-aq-remove-access-profile'));
+  });
+
+  eligibleRolesContainer.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-aq-remove-eligible-role]');
+    if (!removeBtn) return;
+    removeEligibleRole(removeBtn.getAttribute('data-aq-remove-eligible-role'));
+  });
+
+  bannedUsersContainer.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-aq-remove-banned-user]');
+    if (!removeBtn) return;
+    removeBannedUser(removeBtn.getAttribute('data-aq-remove-banned-user'));
+  });
+
+  sectionsContainer.addEventListener('click', (event) => {
+    const removeSectionBtn = event.target.closest('[data-aq-remove-section]');
+    if (removeSectionBtn) {
+      removeSection(removeSectionBtn.getAttribute('data-aq-remove-section'));
+      return;
+    }
+
+    const addOperationsBtn = event.target.closest('[data-aq-add-operations]');
+    if (addOperationsBtn) {
+      openOperationsPicker(addOperationsBtn.getAttribute('data-aq-add-operations'));
+      return;
+    }
+
+    const removeOperationBtn = event.target.closest('[data-aq-remove-operation]');
+    if (removeOperationBtn) {
+      removeOperation(
+        removeOperationBtn.getAttribute('data-aq-remove-operation'),
+        removeOperationBtn.getAttribute('data-aq-operation-id')
+      );
+    }
+  });
+
+  sectionsContainer.addEventListener('input', (event) => {
+    const labelInput = event.target.closest('[data-aq-label]');
+    if (labelInput) {
+      setOperationLabel(
+        labelInput.getAttribute('data-aq-section-id'),
+        labelInput.getAttribute('data-aq-operation-id'),
+        labelInput.value
+      );
+      return;
+    }
+
+    const input = event.target.closest('[data-aq-metric]');
+    if (!input) return;
+    setOperationMetric(
+      input.getAttribute('data-aq-section-id'),
+      input.getAttribute('data-aq-operation-id'),
+      input.getAttribute('data-aq-metric'),
+      input.value
+    );
+  });
+
+  pickAccessProfilesBtn.addEventListener('click', openAccessProfilePicker);
+  pickEligibleRolesBtn.addEventListener('click', openEligibleRolesPicker);
+  pickBannedUsersBtn.addEventListener('click', openBannedUsersPicker);
+  pickSectionsBtn.addEventListener('click', openSectionsPicker);
+  copyFromSavedBtn.addEventListener('click', openCopyPackagePicker);
+
+  addManualRoleBtn.addEventListener('click', () => {
+    const token = normalizeRoleToken(manualRoleTokenInput.value || '');
+    if (!token) return;
+    upsertEligibleRole(token);
+    manualRoleTokenInput.value = '';
+    renderEligibleRoles();
+  });
+
+  manualRoleTokenInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    addManualRoleBtn.click();
+  });
+
+  validityModeSelect.addEventListener('change', toggleValidityInputs);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+    const valid = await validateBeforeSubmit();
+    if (!valid) {
+      restoreActionButtons();
+      return;
+    }
+    isSubmitting = true;
+    setButtonBusy(saveBtn, 'Saving...');
+    if (cancelBtn) cancelBtn.disabled = true;
+    packagePlanInput.value = JSON.stringify(buildPayload());
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        body: new URLSearchParams(new FormData(form)).toString()
+      });
+
+      let result = null;
+      try {
+        result = await response.json();
+      } catch (_) {
+        result = null;
+      }
+
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Request failed with status ' + response.status + '.'));
+      }
+
+      await showNotice('Success', result.message || 'Package saved successfully.', 'success');
+      window.location.href = '/activity-quota/packages';
+    } catch (error) {
+      await showNotice('Save Failed', error.message || 'Unexpected save error.', 'error');
+      restoreActionButtons();
+    }
+  });
+
+  if (cancelBtn) {
+    cacheButtonHtml(cancelBtn);
+    cancelBtn.addEventListener('click', (event) => {
+      if (isSubmitting) {
+        event.preventDefault();
+        return;
+      }
+      setButtonBusy(cancelBtn, 'Cancelling...');
+      if (saveBtn) saveBtn.disabled = true;
+    });
+  }
+
+  cacheButtonHtml(saveBtn);
+
+  function initializeControlDefaults() {
+    setCategoryValue(initial.category || defaults.category || '');
+    visibilitySelect.value = normalizeVisibility(initial.visibility || defaults.visibility || 'internal');
+    validityModeSelect.value = normalizeValidityMode((initial.validity && initial.validity.mode) || defaults.validityMode || 'duration');
+    currencyInput.value = String((initial.price && initial.price.currencyCode) || defaults.currencyCode || 'CAD').toUpperCase();
+  }
+
+  currencyInput.addEventListener('input', () => {
+    currencyInput.value = String(currencyInput.value || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase();
+  });
+
+  initializeControlDefaults();
+  applyTemplate(initial, { appendCopySuffix: false });
+  toggleValidityInputs();
+});
+</script>

@@ -1,0 +1,2096 @@
+{
+    "MVC/controllers/ielts/ieltsController.js":  [
+                                                     {
+                                                         "key":  "const arrow::hasSuccessfulStep3",
+                                                         "line":  "const hasSuccessfulStep3 = (item = {}) =\u003e ("
+                                                     },
+                                                     {
+                                                         "key":  "const arrow::resolveStep3ModelUsed",
+                                                         "line":  "const resolveStep3ModelUsed = (item = {}) =\u003e {"
+                                                     },
+                                                     {
+                                                         "key":  "function::applySyntheticPrimaryStepTimings",
+                                                         "line":  "function applySyntheticPrimaryStepTimings(session, targetSavedAtMs, nowMs, rng) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::buildRunCancelledMessage",
+                                                         "line":  "function buildRunCancelledMessage(stepLabel) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::buildSyntheticScoringHistoryCopy",
+                                                         "line":  "function buildSyntheticScoringHistoryCopy(sourceSession, options = {}) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::clampNumber",
+                                                         "line":  "function clampNumber(value, min, max) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::cloneAsJson",
+                                                         "line":  "function cloneAsJson(value) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::createSeededRng",
+                                                         "line":  "function createSeededRng(seedInput = \u0027\u0027) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::deriveStepRunProfileFromMeta",
+                                                         "line":  "function deriveStepRunProfileFromMeta(requestMeta = {}, stabilityMeta = null, fallbackRunCount = 1) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::extractScoringCancelToken",
+                                                         "line":  "function extractScoringCancelToken(req) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::extractStepDurationMs",
+                                                         "line":  "function extractStepDurationMs(step = null) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::extractStepRunProfile",
+                                                         "line":  "function extractStepRunProfile(session, stepKey) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::looksLikeTimeKey",
+                                                         "line":  "function looksLikeTimeKey(key = \u0027\u0027) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::normalizeExecutionModeToken",
+                                                         "line":  "function normalizeExecutionModeToken(value) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::parseSyntheticCopyCount",
+                                                         "line":  "function parseSyntheticCopyCount(value, fallback = 1) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::randomInRange",
+                                                         "line":  "function randomInRange(rng, min, max) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::resolveSyntheticSavedAtMs",
+                                                         "line":  "function resolveSyntheticSavedAtMs(sourceSavedAtMs, nowMs, copyIndex, totalCopies, rng) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::shiftTemporalFieldsInPlace",
+                                                         "line":  "function shiftTemporalFieldsInPlace(node, context = {}, parentKey = \u0027\u0027) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::stripStep5Artifacts",
+                                                         "line":  "function stripStep5Artifacts(session) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::toIsoTimestamp",
+                                                         "line":  "function toIsoTimestamp(ms, fallback = null) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::toTimestampMs",
+                                                         "line":  "function toTimestampMs(value) {"
+                                                     }
+                                                 ],
+    "MVC/models/ielts/microAssessmentModel.js":  [
+                                                     {
+                                                         "key":  "function::dedupeScoringAnswerTokens",
+                                                         "line":  "function dedupeScoringAnswerTokens(values) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::parseScoringAnswerList",
+                                                         "line":  "function parseScoringAnswerList(rawValue) {"
+                                                     }
+                                                 ],
+    "MVC/services/ielts/aiExtractionService.js":  [
+                                                      {
+                                                          "key":  "const arrow::addAttempt",
+                                                          "line":  "const addAttempt = (repairStrategy, attemptText) =\u003e {"
+                                                      },
+                                                      {
+                                                          "key":  "const arrow::closesLast",
+                                                          "line":  "const closesLast = (ch === \"}\" \u0026\u0026 last === \"{\") || (ch === \"]\" \u0026\u0026 last === \"[\");"
+                                                      },
+                                                      {
+                                                          "key":  "const arrow::lexicalImpactScore",
+                                                          "line":  "const lexicalImpactScore = (() =\u003e {"
+                                                      },
+                                                      {
+                                                          "key":  "const arrow::push",
+                                                          "line":  "const push = (label, value) =\u003e {"
+                                                      },
+                                                      {
+                                                          "key":  "const arrow::wait",
+                                                          "line":  "const wait = (ms, abortSignal = null) =\u003e new Promise((resolve, reject) =\u003e {"
+                                                      },
+                                                      {
+                                                          "key":  "function::appendMissingClosers",
+                                                          "line":  "function appendMissingClosers(text) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::buildCommaInsertionRepairs",
+                                                          "line":  "function buildCommaInsertionRepairs(text, errorPosition) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::extractJsonCandidates",
+                                                          "line":  "function extractJsonCandidates(rawText) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::extractJsonParseContext",
+                                                          "line":  "function extractJsonParseContext(text, position, radius = 70) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::findNextNonWhitespaceIndex",
+                                                          "line":  "function findNextNonWhitespaceIndex(text, fromIndex) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::findPrevNonWhitespaceIndex",
+                                                          "line":  "function findPrevNonWhitespaceIndex(text, fromIndex) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::getJsonParseErrorPosition",
+                                                          "line":  "function getJsonParseErrorPosition(error) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::harmonizeLanguageSignals",
+                                                          "line":  "function harmonizeLanguageSignals(parsed = {}) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::isAbortLikeError",
+                                                          "line":  "function isAbortLikeError(error) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::isLikelyJsonValueEnd",
+                                                          "line":  "function isLikelyJsonValueEnd(ch) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::isLikelyJsonValueStart",
+                                                          "line":  "function isLikelyJsonValueStart(ch) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::mapErrorProfilesFromRichSignals",
+                                                          "line":  "function mapErrorProfilesFromRichSignals({ grammarControl, lexicalControl }) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::mapGrammarControlFromLegacy",
+                                                          "line":  "function mapGrammarControlFromLegacy(errorProfiles) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::mapLexicalControlFromLegacy",
+                                                          "line":  "function mapLexicalControlFromLegacy(lexicalQuality, errorProfiles) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::mapLexicalQualityFromLexicalControl",
+                                                          "line":  "function mapLexicalQualityFromLexicalControl(lexicalControl) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeGrammarControl",
+                                                          "line":  "function normalizeGrammarControl(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeJsonCandidateText",
+                                                          "line":  "function normalizeJsonCandidateText(text) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeLegacyErrorProfiles",
+                                                          "line":  "function normalizeLegacyErrorProfiles(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeLegacyLexicalQuality",
+                                                          "line":  "function normalizeLegacyLexicalQuality(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeLexicalControl",
+                                                          "line":  "function normalizeLexicalControl(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::onAbort",
+                                                          "line":  "function onAbort() {"
+                                                      },
+                                                      {
+                                                          "key":  "function::pickEnumValue",
+                                                          "line":  "function pickEnumValue(value, allowed, fallback = null) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::removeTrailingCommas",
+                                                          "line":  "function removeTrailingCommas(text) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::safeJsonParse",
+                                                          "line":  "function safeJsonParse(text) {"
+                                                      }
+                                                  ],
+    "MVC/services/ielts/aiService.js":  [
+                                            {
+                                                "key":  "async function::discoverModelsAcrossActiveProviders",
+                                                "line":  "async function discoverModelsAcrossActiveProviders(context = {}) {"
+                                            },
+                                            {
+                                                "key":  "async function::getProviderLabelMap",
+                                                "line":  "async function getProviderLabelMap() {"
+                                            },
+                                            {
+                                                "key":  "function::normalizeDiscoveredModelRows",
+                                                "line":  "function normalizeDiscoveredModelRows(rows = [], {"
+                                            }
+                                        ],
+    "MVC/services/ielts/calibrationEvaluationService.js":  [
+                                                               {
+                                                                   "key":  "const arrow::absError",
+                                                                   "line":  "const absError = (Number.isFinite(predicted) \u0026\u0026 Number.isFinite(reference))"
+                                                               },
+                                                               {
+                                                                   "key":  "const arrow::list",
+                                                                   "line":  "const list = (Array.isArray(records) ? records : []).filter((row) =\u003e row \u0026\u0026 typeof row === \u0027object\u0027);"
+                                                               },
+                                                               {
+                                                                   "key":  "const arrow::validPairs",
+                                                                   "line":  "const validPairs = (Array.isArray(pairs) ? pairs : [])"
+                                                               },
+                                                               {
+                                                                   "key":  "function::aggregateTelemetry",
+                                                                   "line":  "function aggregateTelemetry(records = []) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::bucketBand",
+                                                                   "line":  "function bucketBand(value) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::buildBucketConfusion",
+                                                                   "line":  "function buildBucketConfusion(records = []) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::buildCalibrationReport",
+                                                                   "line":  "function buildCalibrationReport(records = [], options = {}) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::buildCriterionCounter",
+                                                                   "line":  "function buildCriterionCounter() {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::buildEvaluationRecordFromSession",
+                                                                   "line":  "function buildEvaluationRecordFromSession(session = {}) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::buildTopRecurringFailurePatterns",
+                                                                   "line":  "function buildTopRecurringFailurePatterns(records = [], limit = 10) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::collectWeaknessPatternKeys",
+                                                                   "line":  "function collectWeaknessPatternKeys(step4 = {}, step5 = {}) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::computeAgreementMetrics",
+                                                                   "line":  "function computeAgreementMetrics(pairs = []) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::computeCriterionDeltaMetrics",
+                                                                   "line":  "function computeCriterionDeltaMetrics(records = []) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::deriveTelemetryFromStep4",
+                                                                   "line":  "function deriveTelemetryFromStep4(step4 = {}) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::extractReferenceCriteria",
+                                                                   "line":  "function extractReferenceCriteria(session = {}) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::extractReferenceOverall",
+                                                                   "line":  "function extractReferenceOverall(session = {}) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::incrementCriterionCounter",
+                                                                   "line":  "function incrementCriterionCounter(counter, criterion, amount = 1) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::isAiSource",
+                                                                   "line":  "function isAiSource(source) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::isPassingRow",
+                                                                   "line":  "function isPassingRow(row) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::normalizeBandGate",
+                                                                   "line":  "function normalizeBandGate(value) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::normalizeCriterion",
+                                                                   "line":  "function normalizeCriterion(value) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::normalizeScoreValue",
+                                                                   "line":  "function normalizeScoreValue(value) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::toNumberOrNull",
+                                                                   "line":  "function toNumberOrNull(value) {"
+                                                               }
+                                                           ],
+    "MVC/services/ielts/essayAnalysisService.js":  [
+                                                       {
+                                                           "key":  "const arrow::fromRows",
+                                                           "line":  "const fromRows = (Array.isArray(sentenceRows) ? sentenceRows : [])"
+                                                       },
+                                                       {
+                                                           "key":  "const arrow::phraseLike",
+                                                           "line":  "const phraseLike = ("
+                                                       },
+                                                       {
+                                                           "key":  "const arrow::sentenceLike",
+                                                           "line":  "const sentenceLike = ("
+                                                       },
+                                                       {
+                                                           "key":  "function::buildNgramSet",
+                                                           "line":  "function buildNgramSet(tokens, n) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildPromptReuseSegments",
+                                                           "line":  "function buildPromptReuseSegments(promptTokens, essayTokens, minSeed = 4) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::computeTaskEchoSignals",
+                                                           "line":  "function computeTaskEchoSignals(essayObj, taskPrompt) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::countSharedNgrams",
+                                                           "line":  "function countSharedNgrams(tokens, ngramSet, n) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::countTokenOverlap",
+                                                           "line":  "function countTokenOverlap(tokens, tokenSet) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::countVirtualSplitSentences",
+                                                           "line":  "function countVirtualSplitSentences(sentenceRows) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::longestCommonContiguousLength",
+                                                           "line":  "function longestCommonContiguousLength(aTokens, bTokens) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::longestCommonSubsequenceLength",
+                                                           "line":  "function longestCommonSubsequenceLength(aTokens, bTokens) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::normalizeEchoToken",
+                                                           "line":  "function normalizeEchoToken(token) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::splitSentenceLikeUnits",
+                                                           "line":  "function splitSentenceLikeUnits(text, sentenceRows = []) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::toContentWordTokens",
+                                                           "line":  "function toContentWordTokens(tokens, options = {}) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::tokenizeEchoWords",
+                                                           "line":  "function tokenizeEchoWords(text) {"
+                                                       }
+                                                   ],
+    "MVC/services/ielts/essayPreprocessingService.js":  [
+                                                            {
+                                                                "key":  "const arrow::ordered",
+                                                                "line":  "const ordered = (Array.isArray(candidates) ? candidates : [])"
+                                                            },
+                                                            {
+                                                                "key":  "function::buildTrimmedSpan",
+                                                                "line":  "function buildTrimmedSpan(fullText, start, end, meta = {}) {"
+                                                            },
+                                                            {
+                                                                "key":  "function::collectClauseSplitCandidates",
+                                                                "line":  "function collectClauseSplitCandidates(raw) {"
+                                                            },
+                                                            {
+                                                                "key":  "function::collectDiscourseMarkerSplitCandidates",
+                                                                "line":  "function collectDiscourseMarkerSplitCandidates(raw) {"
+                                                            },
+                                                            {
+                                                                "key":  "function::collectLooseClauseSplitCandidates",
+                                                                "line":  "function collectLooseClauseSplitCandidates(raw) {"
+                                                            },
+                                                            {
+                                                                "key":  "function::countWordsSimple",
+                                                                "line":  "function countWordsSimple(text) {"
+                                                            },
+                                                            {
+                                                                "key":  "function::dedupeSplitCandidates",
+                                                                "line":  "function dedupeSplitCandidates(candidates) {"
+                                                            },
+                                                            {
+                                                                "key":  "function::mergeVirtualSplitReason",
+                                                                "line":  "function mergeVirtualSplitReason(meta, reason) {"
+                                                            },
+                                                            {
+                                                                "key":  "function::normalizeMeta",
+                                                                "line":  "function normalizeMeta(meta) {"
+                                                            },
+                                                            {
+                                                                "key":  "function::refineRunOnVirtualBoundarySplits",
+                                                                "line":  "function refineRunOnVirtualBoundarySplits(fullText, spans, opts = {}) {"
+                                                            }
+                                                        ],
+    "MVC/services/ielts/languageEvidenceCalibration.js":  [
+                                                              {
+                                                                  "key":  "const arrow::applyChange",
+                                                                  "line":  "const applyChange = ({ domain, field, to, reason }) =\u003e {"
+                                                              },
+                                                              {
+                                                                  "key":  "function::applyLanguageEvidenceCalibrationGuards",
+                                                                  "line":  "function applyLanguageEvidenceCalibrationGuards({ lexicalControl, grammarControl } = {}) {"
+                                                              },
+                                                              {
+                                                                  "key":  "function::buildStep3LanguageCalibrationGuide",
+                                                                  "line":  "function buildStep3LanguageCalibrationGuide() {"
+                                                              },
+                                                              {
+                                                                  "key":  "function::cloneObject",
+                                                                  "line":  "function cloneObject(value) {"
+                                                              },
+                                                              {
+                                                                  "key":  "function::isOneOf",
+                                                                  "line":  "function isOneOf(value, allowed) {"
+                                                              }
+                                                          ],
+    "MVC/services/ielts/repeatedRunAnalysisService.js":  [
+                                                             {
+                                                                 "key":  "function::extractPromptSourceSummary",
+                                                                 "line":  "function extractPromptSourceSummary(sessions = []) {"
+                                                             }
+                                                         ],
+    "MVC/services/ielts/scoringRules.js":  [
+                                               {
+                                                   "key":  "const arrow::isExplicitStance",
+                                                   "line":  "const isExplicitStance = (stance === \"agree\" || stance === \"disagree\" || stance === \"partial\" || stance === \"mixed\");"
+                                               },
+                                               {
+                                                   "key":  "const arrow::taskEcho",
+                                                   "line":  "const taskEcho = (ctx?.step2?.taskEcho \u0026\u0026 typeof ctx.step2.taskEcho === \"object\")"
+                                               },
+                                               {
+                                                   "key":  "const arrow::usageMap",
+                                                   "line":  "const usageMap = (cohesion?.usageMapExcludingBasic \u0026\u0026 typeof cohesion.usageMapExcludingBasic === \u0027object\u0027)"
+                                               },
+                                               {
+                                                   "key":  "function::bodySupportProfile",
+                                                   "line":  "function bodySupportProfile(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::cohesionAttractsNoAttention",
+                                                   "line":  "function cohesionAttractsNoAttention(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::cohesionQualityProfile",
+                                                   "line":  "function cohesionQualityProfile(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::collapsedParagraphSegmentationLikely",
+                                                   "line":  "function collapsedParagraphSegmentationLikely(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::conclusionSupportIsBand9Safe",
+                                                   "line":  "function conclusionSupportIsBand9Safe(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::countWordsSimple",
+                                                   "line":  "function countWordsSimple(text) {"
+                                               },
+                                               {
+                                                   "key":  "function::currentParagraphSupportSignals",
+                                                   "line":  "function currentParagraphSupportSignals(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::grammarClarityStable",
+                                                   "line":  "function grammarClarityStable(grammarControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::grammarComplexAttempted",
+                                                   "line":  "function grammarComplexAttempted(grammarControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::grammarControlProfile",
+                                                   "line":  "function grammarControlProfile(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::grammarMixedOrWeakControlCount",
+                                                   "line":  "function grammarMixedOrWeakControlCount(grammarControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::grammarRangeLimited",
+                                                   "line":  "function grammarRangeLimited(grammarControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::grammarShowsBand9Control",
+                                                   "line":  "function grammarShowsBand9Control(grammarControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::grammarWeakControlCount",
+                                                   "line":  "function grammarWeakControlCount(grammarControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::highBandSinglePromptEligibility",
+                                                   "line":  "function highBandSinglePromptEligibility(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalBand9Blocked",
+                                                   "line":  "function lexicalBand9Blocked(lexicalControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalClarityPreserved",
+                                                   "line":  "function lexicalClarityPreserved(lexicalControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalControlProfile",
+                                                   "line":  "function lexicalControlProfile(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalErrorBand",
+                                                   "line":  "function lexicalErrorBand(lexicalControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalInstabilitySignalsMidBand",
+                                                   "line":  "function lexicalInstabilitySignalsMidBand(lexicalControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalPrecisionAtLeast",
+                                                   "line":  "function lexicalPrecisionAtLeast(lexicalControl, expected) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalRangeAtLeast",
+                                                   "line":  "function lexicalRangeAtLeast(lexicalControl, expected) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalShowsBand9Control",
+                                                   "line":  "function lexicalShowsBand9Control(lexicalControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalShowsControlledBand6Profile",
+                                                   "line":  "function lexicalShowsControlledBand6Profile(lexicalControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalShowsControlledBand7Profile",
+                                                   "line":  "function lexicalShowsControlledBand7Profile(lexicalControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::lexicalSurfaceErrorsMinorOrSome",
+                                                   "line":  "function lexicalSurfaceErrorsMinorOrSome(lexicalControl) {"
+                                               },
+                                               {
+                                                   "key":  "function::normalizeTaskEchoSeverity",
+                                                   "line":  "function normalizeTaskEchoSeverity(value) {"
+                                               },
+                                               {
+                                                   "key":  "function::paragraphingOnlySupportsBand8",
+                                                   "line":  "function paragraphingOnlySupportsBand8(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::paragraphingShowsBand9Control",
+                                                   "line":  "function paragraphingShowsBand9Control(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::paragraphTopicCoverageProfile",
+                                                   "line":  "function paragraphTopicCoverageProfile(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::repetitionOrMechanicalLinkingBlocksBand9",
+                                                   "line":  "function repetitionOrMechanicalLinkingBlocksBand9(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::taskCoverageProfile",
+                                                   "line":  "function taskCoverageProfile(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::taskEchoProfile",
+                                                   "line":  "function taskEchoProfile(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::taskResponseLengthProfile",
+                                                   "line":  "function taskResponseLengthProfile(ctx) {"
+                                               },
+                                               {
+                                                   "key":  "function::toFiniteNumber",
+                                                   "line":  "function toFiniteNumber(value, fallback = 0) {"
+                                               },
+                                               {
+                                                   "key":  "function::totalSubquestionIdeaCount",
+                                                   "line":  "function totalSubquestionIdeaCount(ctx) {"
+                                               }
+                                           ],
+    "MVC/services/ielts/scoringRunControlService.js":  [
+                                                           {
+                                                               "key":  "function::abortRun",
+                                                               "line":  "function abortRun({ token, userId } = {}) {"
+                                                           },
+                                                           {
+                                                               "key":  "function::cleanupExpiredRuns",
+                                                               "line":  "function cleanupExpiredRuns() {"
+                                                           },
+                                                           {
+                                                               "key":  "function::configureRunSignal",
+                                                               "line":  "function configureRunSignal(signal) {"
+                                                           },
+                                                           {
+                                                               "key":  "function::createAbortError",
+                                                               "line":  "function createAbortError(message = \u0027Operation cancelled by user.\u0027) {"
+                                                           },
+                                                           {
+                                                               "key":  "function::finishRun",
+                                                               "line":  "function finishRun(token) {"
+                                                           },
+                                                           {
+                                                               "key":  "function::isAbortError",
+                                                               "line":  "function isAbortError(error) {"
+                                                           },
+                                                           {
+                                                               "key":  "function::nowMs",
+                                                               "line":  "function nowMs() {"
+                                                           },
+                                                           {
+                                                               "key":  "function::registerRun",
+                                                               "line":  "function registerRun({ token, userId, stepKey } = {}) {"
+                                                           },
+                                                           {
+                                                               "key":  "function::toToken",
+                                                               "line":  "function toToken(value) {"
+                                                           },
+                                                           {
+                                                               "key":  "function::toUserId",
+                                                               "line":  "function toUserId(value) {"
+                                                           }
+                                                       ],
+    "MVC/services/ielts/step3ScoringService.js":  [
+                                                      {
+                                                          "key":  "const arrow::baseStep2",
+                                                          "line":  "const baseStep2 = (step2Features \u0026\u0026 typeof step2Features === \u0027object\u0027) ? step2Features : {};"
+                                                      },
+                                                      {
+                                                          "key":  "const arrow::buildBatchRows",
+                                                          "line":  "const buildBatchRows = ({"
+                                                      },
+                                                      {
+                                                          "key":  "const arrow::lexicalImpactScore",
+                                                          "line":  "const lexicalImpactScore = (() =\u003e {"
+                                                      },
+                                                      {
+                                                          "key":  "function::buildBackoffDelayMs",
+                                                          "line":  "function buildBackoffDelayMs(retryAttempt, retryPolicy) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::buildCriterionCounter",
+                                                          "line":  "function buildCriterionCounter() {"
+                                                      },
+                                                      {
+                                                          "key":  "function::buildFailureClassCounter",
+                                                          "line":  "function buildFailureClassCounter() {"
+                                                      },
+                                                      {
+                                                          "key":  "function::buildLowBandCoverageSummary",
+                                                          "line":  "function buildLowBandCoverageSummary({ results = [], aggregationTrace = {} }) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::buildStep4LanguageEvidenceContext",
+                                                          "line":  "function buildStep4LanguageEvidenceContext(step25 = {}) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::buildStep4RoutePlan",
+                                                          "line":  "function buildStep4RoutePlan({ fixedModelId, providerId, apiProviderId, options = {} }) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::buildStep4Telemetry",
+                                                          "line":  "function buildStep4Telemetry({ assessmentInstances = [], results = [], aggregatedResults = [] }) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::chooseAggregateValueFromContract",
+                                                          "line":  "function chooseAggregateValueFromContract({ semanticOutcome, scoredAnswers, notScoredAnswers, polarity }) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::chooseLegacyAggregateValue",
+                                                          "line":  "function chooseLegacyAggregateValue(semanticOutcome, polarity) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::classifyStep4Failure",
+                                                          "line":  "function classifyStep4Failure(error) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::createAbortError",
+                                                          "line":  "function createAbortError(message = \u0027Step 4 grading was cancelled by user.\u0027) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::evaluateRowPassResult",
+                                                          "line":  "function evaluateRowPassResult(rowLike) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::formatScoringAnswerListForPrompt",
+                                                          "line":  "function formatScoringAnswerListForPrompt(list) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::getSortedBandGates",
+                                                          "line":  "function getSortedBandGates(rows) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::hasTaskEchoSignals",
+                                                          "line":  "function hasTaskEchoSignals(taskEcho) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::incrementCriterionCounter",
+                                                          "line":  "function incrementCriterionCounter(counter, criterion, amount = 1) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::incrementFailureClassCounter",
+                                                          "line":  "function incrementFailureClassCounter(counter, failureClass, amount = 1) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::isAbortLikeError",
+                                                          "line":  "function isAbortLikeError(error) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::isAiSource",
+                                                          "line":  "function isAiSource(source) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::isFaultCheckQuestion",
+                                                          "line":  "function isFaultCheckQuestion(qText, rubricAnchor = \u0027\u0027) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::isLowBandRow",
+                                                          "line":  "function isLowBandRow(row) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::isPassingValue",
+                                                          "line":  "function isPassingValue(valueOrRow, polarity, scoredAnswers, notScoredAnswers) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::isWeakTriggerRow",
+                                                          "line":  "function isWeakTriggerRow(row) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::mapErrorProfilesFromRichSignals",
+                                                          "line":  "function mapErrorProfilesFromRichSignals(grammarControl, lexicalControl) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::mapFallbackReasonToFailureClass",
+                                                          "line":  "function mapFallbackReasonToFailureClass(fallbackReason) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::mapGrammarControlFromLegacy",
+                                                          "line":  "function mapGrammarControlFromLegacy(errorProfiles) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::mapLexicalControlFromLegacy",
+                                                          "line":  "function mapLexicalControlFromLegacy(lexicalQuality, errorProfiles) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::mapLexicalQualityFromLexicalControl",
+                                                          "line":  "function mapLexicalQualityFromLexicalControl(lexicalControl) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeBandGate",
+                                                          "line":  "function normalizeBandGate(value) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeCriterionForCounters",
+                                                          "line":  "function normalizeCriterionForCounters(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeFailureClass",
+                                                          "line":  "function normalizeFailureClass(value) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeGrammarControl",
+                                                          "line":  "function normalizeGrammarControl(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeLegacyErrorProfiles",
+                                                          "line":  "function normalizeLegacyErrorProfiles(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeLegacyLexicalQuality",
+                                                          "line":  "function normalizeLegacyLexicalQuality(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeLexicalControl",
+                                                          "line":  "function normalizeLexicalControl(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeOptionalApiProviderId",
+                                                          "line":  "function normalizeOptionalApiProviderId(value) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeOptionalModelId",
+                                                          "line":  "function normalizeOptionalModelId(value) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeOptionalProviderId",
+                                                          "line":  "function normalizeOptionalProviderId(value) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizePolarityToken",
+                                                          "line":  "function normalizePolarityToken(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeQuestionWeight",
+                                                          "line":  "function normalizeQuestionWeight(value, fallback = 1) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeRouteCandidate",
+                                                          "line":  "function normalizeRouteCandidate(route = {}, fallbackIndex = 0, defaults = {}) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeScoringAnswerList",
+                                                          "line":  "function normalizeScoringAnswerList(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeScoringAnswerToken",
+                                                          "line":  "function normalizeScoringAnswerToken(value) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::normalizeStep3ExtractionEvidence",
+                                                          "line":  "function normalizeStep3ExtractionEvidence(extraction) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::onAbort",
+                                                          "line":  "function onAbort() {"
+                                                      },
+                                                      {
+                                                          "key":  "function::parseDelimitedList",
+                                                          "line":  "function parseDelimitedList(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::parseStep4FallbackRoutes",
+                                                          "line":  "function parseStep4FallbackRoutes(raw) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::pickEnumValue",
+                                                          "line":  "function pickEnumValue(value, allowed, fallback = null) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::resolveAssessmentPolarity",
+                                                          "line":  "function resolveAssessmentPolarity(item, baseKey) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::resolveStep4RetryPolicy",
+                                                          "line":  "function resolveStep4RetryPolicy(options = {}) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::roundMetric",
+                                                          "line":  "function roundMetric(value, digits = 4) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::safeJsonStringify",
+                                                          "line":  "function safeJsonStringify(value) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::sleepMs",
+                                                          "line":  "function sleepMs(ms, abortSignal = null) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::throwIfAborted",
+                                                          "line":  "function throwIfAborted(signal, message = \u0027Step 4 grading was cancelled by user.\u0027) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::toBoundedInt",
+                                                          "line":  "function toBoundedInt(value, fallback, min = 0, max = Number.MAX_SAFE_INTEGER) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::toBoundedNumber",
+                                                          "line":  "function toBoundedNumber(value, fallback, min = 0, max = Number.MAX_SAFE_INTEGER) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::toPromptAnswerLabel",
+                                                          "line":  "function toPromptAnswerLabel(token) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::toSafeErrorSummary",
+                                                          "line":  "function toSafeErrorSummary(error) {"
+                                                      },
+                                                      {
+                                                          "key":  "function::withTaskEchoSignals",
+                                                          "line":  "function withTaskEchoSignals(step2Features, essayObj, taskPrompt) {"
+                                                      }
+                                                  ],
+    "MVC/services/ielts/step5FeedbackService.js":  [
+                                                       {
+                                                           "key":  "function::buildAiPrompt",
+                                                           "line":  "function buildAiPrompt({ currentBand, targetBand, essayObj, weaknesses, strengths, allowedRefsSet, languageEvidenceSnapshot = \u0027\u0027 }) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildLanguageEvidenceSnapshot",
+                                                           "line":  "function buildLanguageEvidenceSnapshot(gradingResult) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::evaluateRowStrength",
+                                                           "line":  "function evaluateRowStrength(row) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::getRowQuestionText",
+                                                           "line":  "function getRowQuestionText(row, fallback = \u0027\u0027) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::isAbortLikeError",
+                                                           "line":  "function isAbortLikeError(error) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::isWeakResult",
+                                                           "line":  "function isWeakResult(row) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::normalizeScoringAnswerList",
+                                                           "line":  "function normalizeScoringAnswerList(raw) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::normalizeScoringAnswerToken",
+                                                           "line":  "function normalizeScoringAnswerToken(value) {"
+                                                       }
+                                                   ],
+    "MVC/services/migration/jsonToMongoMigrationService.js":  [
+                                                                  {
+                                                                      "key":  "async function::clearTargetCollectionItem",
+                                                                      "line":  "async function clearTargetCollectionItem(key) {"
+                                                                  },
+                                                                  {
+                                                                      "key":  "async function::dryRunClearTargetCollectionItem",
+                                                                      "line":  "async function dryRunClearTargetCollectionItem(key) {"
+                                                                  },
+                                                                  {
+                                                                      "key":  "async function::replaceMigrationItem",
+                                                                      "line":  "async function replaceMigrationItem(key) {"
+                                                                  }
+                                                              ],
+    "MVC/views/ielts/compareScoring.ejs":  [
+                                               {
+                                                   "key":  "async function::openAddSessionPicker",
+                                                   "line":  "async function openAddSessionPicker() {"
+                                               },
+                                               {
+                                                   "key":  "async function::rerenderComparisonByIds",
+                                                   "line":  "async function rerenderComparisonByIds(ids) {"
+                                               },
+                                               {
+                                                   "key":  "const arrow::applyFontSizes",
+                                                   "line":  "const applyFontSizes = () =\u003e {"
+                                               },
+                                               {
+                                                   "key":  "const arrow::cleanIds",
+                                                   "line":  "const cleanIds = (ids || []).map((id) =\u003e String(id || \u0027\u0027).trim()).filter(Boolean);"
+                                               },
+                                               {
+                                                   "key":  "const arrow::encoded",
+                                                   "line":  "const encoded = (ids || [])"
+                                               },
+                                               {
+                                                   "key":  "const arrow::ids",
+                                                   "line":  "const ids = (sessions || [])"
+                                               },
+                                               {
+                                                   "key":  "const arrow::step5Feedbacks",
+                                                   "line":  "const step5Feedbacks = (sessions || []).map((s) =\u003e getStep5FeedbackData(s));"
+                                               },
+                                               {
+                                                   "key":  "const arrow::updateLabels",
+                                                   "line":  "const updateLabels = () =\u003e {"
+                                               },
+                                               {
+                                                   "key":  "function::buildComparisonUrlFromIds",
+                                                   "line":  "function buildComparisonUrlFromIds(ids) {"
+                                               },
+                                               {
+                                                   "key":  "function::buildPromptMapsFromSessions",
+                                                   "line":  "function buildPromptMapsFromSessions(sessionRows) {"
+                                               },
+                                               {
+                                                   "key":  "function::escapeHtml",
+                                                   "line":  "function escapeHtml(value) {"
+                                               },
+                                               {
+                                                   "key":  "function::getCriterionSummaryFromFeedback",
+                                                   "line":  "function getCriterionSummaryFromFeedback(rows, criterionKey) {"
+                                               },
+                                               {
+                                                   "key":  "function::getCurrentComparisonType",
+                                                   "line":  "function getCurrentComparisonType() {"
+                                               },
+                                               {
+                                                   "key":  "function::getResultScoringState",
+                                                   "line":  "function getResultScoringState(row) {"
+                                               },
+                                               {
+                                                   "key":  "function::getScoringStateBadgeMeta",
+                                                   "line":  "function getScoringStateBadgeMeta(state) {"
+                                               },
+                                               {
+                                                   "key":  "function::getSessionModelUsed",
+                                                   "line":  "function getSessionModelUsed(session, preferredStep = \u0027step4\u0027) {"
+                                               },
+                                               {
+                                                   "key":  "function::getStep5FeedbackData",
+                                                   "line":  "function getStep5FeedbackData(session) {"
+                                               },
+                                               {
+                                                   "key":  "function::hasScoreImpactStateChange",
+                                                   "line":  "function hasScoreImpactStateChange(states) {"
+                                               },
+                                               {
+                                                   "key":  "function::initComparisonPageRuntime",
+                                                   "line":  "function initComparisonPageRuntime() {"
+                                               },
+                                               {
+                                                   "key":  "function::navigateComparisonByIds",
+                                                   "line":  "function navigateComparisonByIds(ids) {"
+                                               },
+                                               {
+                                                   "key":  "function::navigateComparisonBySessions",
+                                                   "line":  "function navigateComparisonBySessions(sessions) {"
+                                               },
+                                               {
+                                                   "key":  "function::normalizeFeedbackText",
+                                                   "line":  "function normalizeFeedbackText(value) {"
+                                               },
+                                               {
+                                                   "key":  "function::normalizePipelineMode",
+                                                   "line":  "function normalizePipelineMode(raw) {"
+                                               },
+                                               {
+                                                   "key":  "function::normalizePipelineModeLocal",
+                                                   "line":  "function normalizePipelineModeLocal(raw) {"
+                                               },
+                                               {
+                                                   "key":  "function::normalizeScoringAnswerList",
+                                                   "line":  "function normalizeScoringAnswerList(raw) {"
+                                               },
+                                               {
+                                                   "key":  "function::normalizeScoringAnswerToken",
+                                                   "line":  "function normalizeScoringAnswerToken(value) {"
+                                               },
+                                               {
+                                                   "key":  "function::renderSessionPickerRow",
+                                                   "line":  "function renderSessionPickerRow(item) {"
+                                               },
+                                               {
+                                                   "key":  "function::rerenderComparisonBySessions",
+                                                   "line":  "function rerenderComparisonBySessions(sessions) {"
+                                               },
+                                               {
+                                                   "key":  "function::toFeedbackCriterionRows",
+                                                   "line":  "function toFeedbackCriterionRows(raw) {"
+                                               },
+                                               {
+                                                   "key":  "function::toFeedbackImprovements",
+                                                   "line":  "function toFeedbackImprovements(raw) {"
+                                               },
+                                               {
+                                                   "key":  "function::toFeedbackStringList",
+                                                   "line":  "function toFeedbackStringList(raw) {"
+                                               },
+                                               {
+                                                   "key":  "function::truncateForCell",
+                                                   "line":  "function truncateForCell(value, maxLen = 220) {"
+                                               }
+                                           ],
+    "MVC/views/ielts/microAssessmentForm.ejs":  [
+                                                    {
+                                                        "key":  "const arrow::getDerivedOptions",
+                                                        "line":  "const getDerivedOptions = () =\u003e renderAnswerTypeOptionsPreview();"
+                                                    },
+                                                    {
+                                                        "key":  "const arrow::submitToken",
+                                                        "line":  "const submitToken = () =\u003e {"
+                                                    },
+                                                    {
+                                                        "key":  "const arrow::toAnswerText",
+                                                        "line":  "const toAnswerText = (seed) =\u003e {"
+                                                    },
+                                                    {
+                                                        "key":  "function::addTokenToContract",
+                                                        "line":  "function addTokenToContract(kind, rawToken) {"
+                                                    },
+                                                    {
+                                                        "key":  "function::bindTokenInput",
+                                                        "line":  "function bindTokenInput(inputId, addButtonId, kind) {"
+                                                    },
+                                                    {
+                                                        "key":  "function::dedupeAnswerTokens",
+                                                        "line":  "function dedupeAnswerTokens(tokens) {"
+                                                    },
+                                                    {
+                                                        "key":  "function::initScoringContractUI",
+                                                        "line":  "function initScoringContractUI() {"
+                                                    },
+                                                    {
+                                                        "key":  "function::normalizeAnswerToken",
+                                                        "line":  "function normalizeAnswerToken(value) {"
+                                                    },
+                                                    {
+                                                        "key":  "function::parseAnswerTokensFromRaw",
+                                                        "line":  "function parseAnswerTokensFromRaw(raw) {"
+                                                    },
+                                                    {
+                                                        "key":  "function::parseAnswerTypeOptions",
+                                                        "line":  "function parseAnswerTypeOptions(answerTypeRaw) {"
+                                                    },
+                                                    {
+                                                        "key":  "function::removeTokenFromContract",
+                                                        "line":  "function removeTokenFromContract(kind, index) {"
+                                                    },
+                                                    {
+                                                        "key":  "function::renderAnswerTypeOptionsPreview",
+                                                        "line":  "function renderAnswerTypeOptionsPreview() {"
+                                                    },
+                                                    {
+                                                        "key":  "function::renderScoringContract",
+                                                        "line":  "function renderScoringContract() {"
+                                                    },
+                                                    {
+                                                        "key":  "function::renderTokenList",
+                                                        "line":  "function renderTokenList(kind) {"
+                                                    },
+                                                    {
+                                                        "key":  "function::setScoringContract",
+                                                        "line":  "function setScoringContract(scored, notScored) {"
+                                                    },
+                                                    {
+                                                        "key":  "function::syncScoringContractHiddenInputs",
+                                                        "line":  "function syncScoringContractHiddenInputs() {"
+                                                    }
+                                                ],
+    "MVC/views/ielts/scoringHistory.ejs":  [
+                                               {
+                                                   "key":  "async function::confirmCloneSelected",
+                                                   "line":  "async function confirmCloneSelected() {"
+                                               },
+                                               {
+                                                   "key":  "async function::deleteSelectedSessions",
+                                                   "line":  "async function deleteSelectedSessions() {"
+                                               },
+                                               {
+                                                   "key":  "function::getSelectedSessionIds",
+                                                   "line":  "function getSelectedSessionIds() {"
+                                               },
+                                               {
+                                                   "key":  "function::getSelectedSessionNodes",
+                                                   "line":  "function getSelectedSessionNodes() {"
+                                               },
+                                               {
+                                                   "key":  "function::getSingleSelectedSessionId",
+                                                   "line":  "function getSingleSelectedSessionId() {"
+                                               },
+                                               {
+                                                   "key":  "function::openCloneModal",
+                                                   "line":  "function openCloneModal() {"
+                                               }
+                                           ],
+    "MVC/views/ielts/scoringV0326.ejs":  [
+                                             {
+                                                 "key":  "async function::loadStep3FromSavedSession",
+                                                 "line":  "async function loadStep3FromSavedSession(item) {"
+                                             },
+                                             {
+                                                 "key":  "async function::postJsonAndRecord",
+                                                 "line":  "async function postJsonAndRecord(stepKey, url, payload, requestOptions = {}) {"
+                                             },
+                                             {
+                                                 "key":  "async function::postJsonNoRecord",
+                                                 "line":  "async function postJsonNoRecord(url, payload, requestOptions = {}) {"
+                                             },
+                                             {
+                                                 "key":  "const arrow::bands",
+                                                 "line":  "const bands = (rows || [])"
+                                             },
+                                             {
+                                                 "key":  "const arrow::exportBundle",
+                                                 "line":  "const exportBundle = (SESSION_READONLY \u0026\u0026 allowReadOnlyExport)"
+                                             },
+                                             {
+                                                 "key":  "const arrow::fromModels",
+                                                 "line":  "const fromModels = (Array.isArray(TUNING_MODEL_OPTIONS) ? TUNING_MODEL_OPTIONS : []).find((row) =\u003e ("
+                                             },
+                                             {
+                                                 "key":  "const arrow::normalizeScoringAnswerList",
+                                                 "line":  "const normalizeScoringAnswerList = (raw) =\u003e {"
+                                             },
+                                             {
+                                                 "key":  "const arrow::normalizeScoringAnswerToken",
+                                                 "line":  "const normalizeScoringAnswerToken = (value) =\u003e String(value ?? \"\")"
+                                             },
+                                             {
+                                                 "key":  "const arrow::notifyBackend",
+                                                 "line":  "const notifyBackend = () =\u003e {"
+                                             },
+                                             {
+                                                 "key":  "const arrow::recurringFailurePatterns",
+                                                 "line":  "const recurringFailurePatterns = (() =\u003e {"
+                                             },
+                                             {
+                                                 "key":  "const arrow::savedProviders",
+                                                 "line":  "const savedProviders = ("
+                                             },
+                                             {
+                                                 "key":  "const arrow::weakRows",
+                                                 "line":  "const weakRows = (Array.isArray(GLOBALGRADING?.aggregatedResults) ? GLOBALGRADING.aggregatedResults : [])"
+                                             },
+                                             {
+                                                 "key":  "function::beginAbortableStep",
+                                                 "line":  "function beginAbortableStep(stepKey) {"
+                                             },
+                                             {
+                                                 "key":  "function::buildStep3StabilityEntryFromMeta",
+                                                 "line":  "function buildStep3StabilityEntryFromMeta(stabilityMeta, sourceStep3Entry, sourceSessionId) {"
+                                             },
+                                             {
+                                                 "key":  "function::buildStep4Payload",
+                                                 "line":  "function buildStep4Payload({ disableCache = true, cancelToken = \"\" } = {}) {"
+                                             },
+                                             {
+                                                 "key":  "function::clearDownstreamAfterStep3Reuse",
+                                                 "line":  "function clearDownstreamAfterStep3Reuse() {"
+                                             },
+                                             {
+                                                 "key":  "function::createAbortError",
+                                                 "line":  "function createAbortError(message = \"The operation was aborted.\") {"
+                                             },
+                                             {
+                                                 "key":  "function::createRunCancelToken",
+                                                 "line":  "function createRunCancelToken(stepKey) {"
+                                             },
+                                             {
+                                                 "key":  "function::deriveStepExecutionMeta",
+                                                 "line":  "function deriveStepExecutionMeta(requestMeta = {}, stabilityMeta = null, fallbackMode = \"single_run\", fallbackRunCount = 1) {"
+                                             },
+                                             {
+                                                 "key":  "function::detectMinBandFromRows",
+                                                 "line":  "function detectMinBandFromRows(rows) {"
+                                             },
+                                             {
+                                                 "key":  "function::finishAbortableStep",
+                                                 "line":  "function finishAbortableStep(stepKey, controller) {"
+                                             },
+                                             {
+                                                 "key":  "function::formatSavedAtLabel",
+                                                 "line":  "function formatSavedAtLabel(value) {"
+                                             },
+                                             {
+                                                 "key":  "function::getActiveStepCancelToken",
+                                                 "line":  "function getActiveStepCancelToken(stepKey) {"
+                                             },
+                                             {
+                                                 "key":  "function::getAvailableBandGates",
+                                                 "line":  "function getAvailableBandGates(rows) {"
+                                             },
+                                             {
+                                                 "key":  "function::getProviderDefaultCandidate",
+                                                 "line":  "function getProviderDefaultCandidate(providerId) {"
+                                             },
+                                             {
+                                                 "key":  "function::getProviderLabel",
+                                                 "line":  "function getProviderLabel(providerId) {"
+                                             },
+                                             {
+                                                 "key":  "function::getSelectedStep3ProviderId",
+                                                 "line":  "function getSelectedStep3ProviderId() {"
+                                             },
+                                             {
+                                                 "key":  "function::getSelectedStep4ProviderId",
+                                                 "line":  "function getSelectedStep4ProviderId() {"
+                                             },
+                                             {
+                                                 "key":  "function::getSelectedStep5ProviderId",
+                                                 "line":  "function getSelectedStep5ProviderId() {"
+                                             },
+                                             {
+                                                 "key":  "function::getStep3SavedSessionSampleContext",
+                                                 "line":  "function getStep3SavedSessionSampleContext() {"
+                                             },
+                                             {
+                                                 "key":  "function::getStopButtonDefaultHtml",
+                                                 "line":  "function getStopButtonDefaultHtml() {"
+                                             },
+                                             {
+                                                 "key":  "function::getTuningModelsForProvider",
+                                                 "line":  "function getTuningModelsForProvider(providerId) {"
+                                             },
+                                             {
+                                                 "key":  "function::getTuningProviderOptions",
+                                                 "line":  "function getTuningProviderOptions() {"
+                                             },
+                                             {
+                                                 "key":  "function::isAbortError",
+                                                 "line":  "function isAbortError(error) {"
+                                             },
+                                             {
+                                                 "key":  "function::isEvaluableMicroAnswer",
+                                                 "line":  "function isEvaluableMicroAnswer(row) {"
+                                             },
+                                             {
+                                                 "key":  "function::normalizeExecutionModeToken",
+                                                 "line":  "function normalizeExecutionModeToken(value) {"
+                                             },
+                                             {
+                                                 "key":  "function::normalizeGateBandValue",
+                                                 "line":  "function normalizeGateBandValue(value) {"
+                                             },
+                                             {
+                                                 "key":  "function::normalizeProviderToken",
+                                                 "line":  "function normalizeProviderToken(value) {"
+                                             },
+                                             {
+                                                 "key":  "function::normalizeStep3TuningProviderId",
+                                                 "line":  "function normalizeStep3TuningProviderId(providerId) {"
+                                             },
+                                             {
+                                                 "key":  "function::normalizeStep4TuningProviderId",
+                                                 "line":  "function normalizeStep4TuningProviderId(providerId) {"
+                                             },
+                                             {
+                                                 "key":  "function::normalizeStep5TuningProviderId",
+                                                 "line":  "function normalizeStep5TuningProviderId(providerId) {"
+                                             },
+                                             {
+                                                 "key":  "function::onStep3ProviderChange",
+                                                 "line":  "function onStep3ProviderChange(providerId, { preferredModelId = null, persistModel = true } = {}) {"
+                                             },
+                                             {
+                                                 "key":  "function::onStep4ProviderChange",
+                                                 "line":  "function onStep4ProviderChange(providerId, { preferredModelId = null, persistModel = true } = {}) {"
+                                             },
+                                             {
+                                                 "key":  "function::onStep5ProviderChange",
+                                                 "line":  "function onStep5ProviderChange(providerId, { preferredModelId = null, persistModel = true } = {}) {"
+                                             },
+                                             {
+                                                 "key":  "function::openStep3SavedSessionPicker",
+                                                 "line":  "function openStep3SavedSessionPicker() {"
+                                             },
+                                             {
+                                                 "key":  "function::populateModelSelectForProvider",
+                                                 "line":  "function populateModelSelectForProvider(selectId, providerId, selectedModelId = \"\") {"
+                                             },
+                                             {
+                                                 "key":  "function::populateProviderSelect",
+                                                 "line":  "function populateProviderSelect(selectId, selectedProviderId = \"\") {"
+                                             },
+                                             {
+                                                 "key":  "function::resolveBundleSessionId",
+                                                 "line":  "function resolveBundleSessionId(bundle = SESSION_BUNDLE) {"
+                                             },
+                                             {
+                                                 "key":  "function::resolveSessionSampleId",
+                                                 "line":  "function resolveSessionSampleId(session) {"
+                                             },
+                                             {
+                                                 "key":  "function::resolveSessionStep3ModelLabel",
+                                                 "line":  "function resolveSessionStep3ModelLabel(session) {"
+                                             },
+                                             {
+                                                 "key":  "function::saveProgress",
+                                                 "line":  "function saveProgress(options = {}) {"
+                                             },
+                                             {
+                                                 "key":  "function::setStepStopButtonState",
+                                                 "line":  "function setStepStopButtonState(stepKey, { visible = false, stopping = false } = {}) {"
+                                             },
+                                             {
+                                                 "key":  "function::stopRunningStep",
+                                                 "line":  "function stopRunningStep(stepKey) {"
+                                             },
+                                             {
+                                                 "key":  "function::syncBundleSessionId",
+                                                 "line":  "function syncBundleSessionId(bundle = SESSION_BUNDLE, id = null) {"
+                                             },
+                                             {
+                                                 "key":  "function::syncStepExecutionRequestMeta",
+                                                 "line":  "function syncStepExecutionRequestMeta(stepKey, {"
+                                             },
+                                             {
+                                                 "key":  "function::syncStepStopButtons",
+                                                 "line":  "function syncStepStopButtons() {"
+                                             },
+                                             {
+                                                 "key":  "function::toPositiveInt",
+                                                 "line":  "function toPositiveInt(value, fallback = 1) {"
+                                             }
+                                         ],
+    "MVC/views/systemSettings/dataMigrationSettings.ejs":  [
+                                                               {
+                                                                   "key":  "async function::confirmDangerAction",
+                                                                   "line":  "async function confirmDangerAction(config) {"
+                                                               },
+                                                               {
+                                                                   "key":  "async function::ensureAdminVerification",
+                                                                   "line":  "async function ensureAdminVerification() {"
+                                                               },
+                                                               {
+                                                                   "key":  "async function::showActionResultModal",
+                                                                   "line":  "async function showActionResultModal(config, result) {"
+                                                               },
+                                                               {
+                                                                   "key":  "const arrow::pushMetric",
+                                                                   "line":  "const pushMetric = (label, value) =\u003e {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::buildReportSummaryHtml",
+                                                                   "line":  "function buildReportSummaryHtml(report) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::escapeHtml",
+                                                                   "line":  "function escapeHtml(value) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::fmtNumber",
+                                                                   "line":  "function fmtNumber(value) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::renderWarningsList",
+                                                                   "line":  "function renderWarningsList(warnings) {"
+                                                               }
+                                                           ],
+    "scripts/ielts/microAssessmentContractAudit.js":  [
+                                                          {
+                                                              "key":  "const arrow::complementWithinOptions",
+                                                              "line":  "const complementWithinOptions = (list) =\u003e options.filter((token) =\u003e !new Set(list).has(token));"
+                                                          },
+                                                          {
+                                                              "key":  "function::auditMicroAssessmentContracts",
+                                                              "line":  "function auditMicroAssessmentContracts(rows, options = {}) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::buildDisplayHints",
+                                                              "line":  "function buildDisplayHints(row) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::buildStatusCounts",
+                                                              "line":  "function buildStatusCounts(rows, field) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::classifyRowContract",
+                                                              "line":  "function classifyRowContract(row, meta) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::formatDisplayToken",
+                                                              "line":  "function formatDisplayToken(token, meta, displayHints = {}) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::inferBooleanDirection",
+                                                              "line":  "function inferBooleanDirection(row) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::isFaultStylePrompt",
+                                                              "line":  "function isFaultStylePrompt(questionText, rubricAnchor) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::maybePatchRowContract",
+                                                              "line":  "function maybePatchRowContract(row, meta, classification) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::normalizePolarity",
+                                                              "line":  "function normalizePolarity(raw) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::normalizeToken",
+                                                              "line":  "function normalizeToken(value) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::parseAnswerTypeMeta",
+                                                              "line":  "function parseAnswerTypeMeta(answerType) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::parseArgValue",
+                                                              "line":  "function parseArgValue(argv, name, fallback = null) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::parseTokenList",
+                                                              "line":  "function parseTokenList(raw) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::runCli",
+                                                              "line":  "function runCli() {"
+                                                          },
+                                                          {
+                                                              "key":  "function::summarizeByCriterion",
+                                                              "line":  "function summarizeByCriterion(activeRows, field) {"
+                                                          },
+                                                          {
+                                                              "key":  "function::toDisplayList",
+                                                              "line":  "function toDisplayList(tokens, row, meta) {"
+                                                          }
+                                                      ],
+    "test/ielts.explicit-answer-contract.step6e.test.js":  [
+                                                               {
+                                                                   "key":  "async function::runStep3WithStub",
+                                                                   "line":  "async function runStep3WithStub({ microAssessments, answerById }) {"
+                                                               },
+                                                               {
+                                                                   "key":  "const arrow::issues",
+                                                                   "line":  "const issues = (feedback.improvements || []).map((item) =\u003e String(item.issue || \u0027\u0027).toLowerCase());"
+                                                               },
+                                                               {
+                                                                   "key":  "function::baseEssay",
+                                                                   "line":  "function baseEssay() {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::baseExtraction",
+                                                                   "line":  "function baseExtraction() {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::baseStep2",
+                                                                   "line":  "function baseStep2() {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::buildBaselineRow",
+                                                                   "line":  "function buildBaselineRow(criterion) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::createAiStub",
+                                                                   "line":  "function createAiStub(answerById = {}) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::createRestoreStack",
+                                                                   "line":  "function createRestoreStack() {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::extractFunctionSource",
+                                                                   "line":  "function extractFunctionSource(source, functionName) {"
+                                                               },
+                                                               {
+                                                                   "key":  "function::loadClientBandCalculator",
+                                                                   "line":  "function loadClientBandCalculator() {"
+                                                               }
+                                                           ],
+    "test/ielts.high-band-alignment.step6k.test.js":  [
+                                                          {
+                                                              "key":  "function::buildCeilingBand9Context",
+                                                              "line":  "function buildCeilingBand9Context() {"
+                                                          },
+                                                          {
+                                                              "key":  "function::buildCeilingStrongButLimitedContext",
+                                                              "line":  "function buildCeilingStrongButLimitedContext() {"
+                                                          },
+                                                          {
+                                                              "key":  "function::buildEssayFixture",
+                                                              "line":  "function buildEssayFixture() {"
+                                                          },
+                                                          {
+                                                              "key":  "function::buildExtractionFixture",
+                                                              "line":  "function buildExtractionFixture() {"
+                                                          },
+                                                          {
+                                                              "key":  "function::buildStep2Fixture",
+                                                              "line":  "function buildStep2Fixture() {"
+                                                          },
+                                                          {
+                                                              "key":  "function::createRestoreStack",
+                                                              "line":  "function createRestoreStack() {"
+                                                          }
+                                                      ],
+    "test/ielts.low-band-activation.step6.test.js":  [
+                                                         {
+                                                             "key":  "const arrow::hasLowBandCriterion",
+                                                             "line":  "const hasLowBandCriterion = (feedback.improvements || []).some((item) =\u003e"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildLowBandMicroAssessments",
+                                                             "line":  "function buildLowBandMicroAssessments() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildStrongEssay",
+                                                             "line":  "function buildStrongEssay() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildStrongExtraction",
+                                                             "line":  "function buildStrongExtraction() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildStrongStep2",
+                                                             "line":  "function buildStrongStep2() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildWeakEssay",
+                                                             "line":  "function buildWeakEssay() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildWeakExtraction",
+                                                             "line":  "function buildWeakExtraction() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildWeakStep2",
+                                                             "line":  "function buildWeakStep2() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::createAiStub",
+                                                             "line":  "function createAiStub(mode, calls) {"
+                                                         },
+                                                         {
+                                                             "key":  "function::createRestoreStack",
+                                                             "line":  "function createRestoreStack() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::extractFunctionSource",
+                                                             "line":  "function extractFunctionSource(source, functionName) {"
+                                                         },
+                                                         {
+                                                             "key":  "function::loadClientBandCalculator",
+                                                             "line":  "function loadClientBandCalculator() {"
+                                                         }
+                                                     ],
+    "test/ielts.low-band-calibration.step6c.test.js":  [
+                                                           {
+                                                               "key":  "function::buildEssayFixture",
+                                                               "line":  "function buildEssayFixture() {"
+                                                           },
+                                                           {
+                                                               "key":  "function::buildExtractionFixture",
+                                                               "line":  "function buildExtractionFixture() {"
+                                                           },
+                                                           {
+                                                               "key":  "function::buildMicroAssessmentFixture",
+                                                               "line":  "function buildMicroAssessmentFixture() {"
+                                                           },
+                                                           {
+                                                               "key":  "function::buildStep2Fixture",
+                                                               "line":  "function buildStep2Fixture() {"
+                                                           },
+                                                           {
+                                                               "key":  "function::createAiStub",
+                                                               "line":  "function createAiStub() {"
+                                                           },
+                                                           {
+                                                               "key":  "function::createRestoreStack",
+                                                               "line":  "function createRestoreStack() {"
+                                                           }
+                                                       ],
+    "test/ielts.low-band-followup.step6b.test.js":  [
+                                                        {
+                                                            "key":  "const arrow::issues",
+                                                            "line":  "const issues = (feedback.improvements || []).map((x) =\u003e String(x.issue || \u0027\u0027));"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildFollowupEssayAndAnalysis",
+                                                            "line":  "function buildFollowupEssayAndAnalysis() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildMidbandStrongEssay",
+                                                            "line":  "function buildMidbandStrongEssay() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildMidbandStrongExtraction",
+                                                            "line":  "function buildMidbandStrongExtraction() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildMidbandStrongStep2",
+                                                            "line":  "function buildMidbandStrongStep2() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildMidbandWeakEssay",
+                                                            "line":  "function buildMidbandWeakEssay() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildMidbandWeakExtraction",
+                                                            "line":  "function buildMidbandWeakExtraction() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildMidbandWeakStep2",
+                                                            "line":  "function buildMidbandWeakStep2() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildSparseEssay",
+                                                            "line":  "function buildSparseEssay() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildSparseExtraction",
+                                                            "line":  "function buildSparseExtraction() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildSparseStep2",
+                                                            "line":  "function buildSparseStep2() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::createAiStubForFollowup",
+                                                            "line":  "function createAiStubForFollowup(calls) {"
+                                                        },
+                                                        {
+                                                            "key":  "function::createRestoreStack",
+                                                            "line":  "function createRestoreStack() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::extractFunctionSource",
+                                                            "line":  "function extractFunctionSource(source, functionName) {"
+                                                        },
+                                                        {
+                                                            "key":  "function::loadClientBandCalculator",
+                                                            "line":  "function loadClientBandCalculator() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::loadMidbandRows",
+                                                            "line":  "function loadMidbandRows(keys) {"
+                                                        }
+                                                    ],
+    "test/ielts.low-band-polarity-regression.step6d.test.js":  [
+                                                                   {
+                                                                       "key":  "const arrow::gate",
+                                                                       "line":  "const gate = (Array.isArray(trace?.evaluatedGates) ? trace.evaluatedGates : [])"
+                                                                   },
+                                                                   {
+                                                                       "key":  "const arrow::rowCheck",
+                                                                       "line":  "const rowCheck = (Array.isArray(gate?.rowChecks) ? gate.rowChecks : [])"
+                                                                   },
+                                                                   {
+                                                                       "key":  "function::buildEssayFixture",
+                                                                       "line":  "function buildEssayFixture() {"
+                                                                   },
+                                                                   {
+                                                                       "key":  "function::buildExtractionFixture",
+                                                                       "line":  "function buildExtractionFixture({ hasStance = true } = {}) {"
+                                                                   },
+                                                                   {
+                                                                       "key":  "function::buildStep2Fixture",
+                                                                       "line":  "function buildStep2Fixture() {"
+                                                                   },
+                                                                   {
+                                                                       "key":  "function::createAiStub",
+                                                                       "line":  "function createAiStub(answerById = {}) {"
+                                                                   },
+                                                                   {
+                                                                       "key":  "function::createRestoreStack",
+                                                                       "line":  "function createRestoreStack() {"
+                                                                   },
+                                                                   {
+                                                                       "key":  "function::extractFunctionSource",
+                                                                       "line":  "function extractFunctionSource(source, functionName) {"
+                                                                   },
+                                                                   {
+                                                                       "key":  "function::getGateRowPass",
+                                                                       "line":  "function getGateRowPass(gateTrace, criterion, band, baseKey) {"
+                                                                   },
+                                                                   {
+                                                                       "key":  "function::loadClientBandCalculator",
+                                                                       "line":  "function loadClientBandCalculator() {"
+                                                                   }
+                                                               ],
+    "test/ielts.lr-instability.step6m.test.js":  [
+                                                     {
+                                                         "key":  "async function::runLrOnlyScoring",
+                                                         "line":  "async function runLrOnlyScoring(extraction) {"
+                                                     },
+                                                     {
+                                                         "key":  "function::buildBaseExtraction",
+                                                         "line":  "function buildBaseExtraction() {"
+                                                     },
+                                                     {
+                                                         "key":  "function::buildBoundaryLexicalProfileExtraction",
+                                                         "line":  "function buildBoundaryLexicalProfileExtraction() {"
+                                                     },
+                                                     {
+                                                         "key":  "function::buildEssayFixture",
+                                                         "line":  "function buildEssayFixture() {"
+                                                     },
+                                                     {
+                                                         "key":  "function::buildMidBandLexicalProfileExtraction",
+                                                         "line":  "function buildMidBandLexicalProfileExtraction() {"
+                                                     },
+                                                     {
+                                                         "key":  "function::buildStep2Fixture",
+                                                         "line":  "function buildStep2Fixture() {"
+                                                     },
+                                                     {
+                                                         "key":  "function::buildStrongLexicalProfileExtraction",
+                                                         "line":  "function buildStrongLexicalProfileExtraction() {"
+                                                     },
+                                                     {
+                                                         "key":  "function::createRestoreStack",
+                                                         "line":  "function createRestoreStack() {"
+                                                     },
+                                                     {
+                                                         "key":  "function::loadLrBand5To7Rows",
+                                                         "line":  "function loadLrBand5To7Rows() {"
+                                                     }
+                                                 ],
+    "test/ielts.micro-contract-audit.step6g.test.js":  [
+                                                           {
+                                                               "key":  "function::extractFunctionSource",
+                                                               "line":  "function extractFunctionSource(source, functionName) {"
+                                                           },
+                                                           {
+                                                               "key":  "function::loadStep3EvaluateRowPassResult",
+                                                               "line":  "function loadStep3EvaluateRowPassResult() {"
+                                                           },
+                                                           {
+                                                               "key":  "function::loadStep5EvaluateRowStrength",
+                                                               "line":  "function loadStep5EvaluateRowStrength() {"
+                                                           }
+                                                       ],
+    "test/ielts.prompt-echo-stance-regression.step6n.test.js":  [
+                                                                    {
+                                                                        "key":  "function::buildCambridgeLikeEssayText",
+                                                                        "line":  "function buildCambridgeLikeEssayText() {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::buildCambridgeLikeExtraction",
+                                                                        "line":  "function buildCambridgeLikeExtraction() {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::buildRuleCtx",
+                                                                        "line":  "function buildRuleCtx({ essayObj, step2, extraction }) {"
+                                                                    }
+                                                                ],
+    "test/ielts.stability-accuracy.step6r.test.js":  [
+                                                         {
+                                                             "key":  "function::buildCollapsedParagraphCtx",
+                                                             "line":  "function buildCollapsedParagraphCtx() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildModerateGrammarCtx",
+                                                             "line":  "function buildModerateGrammarCtx() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildModerateLexicalCtx",
+                                                             "line":  "function buildModerateLexicalCtx() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildSevereGrammarCtx",
+                                                             "line":  "function buildSevereGrammarCtx() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildSevereLexicalCtx",
+                                                             "line":  "function buildSevereLexicalCtx() {"
+                                                         },
+                                                         {
+                                                             "key":  "function::buildThinLowParagraphCtx",
+                                                             "line":  "function buildThinLowParagraphCtx() {"
+                                                         }
+                                                     ],
+    "test/ielts.step3-calibration.step6l.test.js":  [
+                                                        {
+                                                            "key":  "function::buildBasePayload",
+                                                            "line":  "function buildBasePayload() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildEssayObj",
+                                                            "line":  "function buildEssayObj() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildMidBandPayload",
+                                                            "line":  "function buildMidBandPayload() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildStrongButHarshPayload",
+                                                            "line":  "function buildStrongButHarshPayload() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::createRestoreStack",
+                                                            "line":  "function createRestoreStack() {"
+                                                        }
+                                                    ],
+    "test/ielts.step3-extraction-guard.step6j.test.js":  [
+                                                             {
+                                                                 "key":  "function::buildBaseExtractionPayload",
+                                                                 "line":  "function buildBaseExtractionPayload() {"
+                                                             },
+                                                             {
+                                                                 "key":  "function::buildEssayObj",
+                                                                 "line":  "function buildEssayObj() {"
+                                                             },
+                                                             {
+                                                                 "key":  "function::createRestoreStack",
+                                                                 "line":  "function createRestoreStack() {"
+                                                             },
+                                                             {
+                                                                 "key":  "function::extractFunctionSource",
+                                                                 "line":  "function extractFunctionSource(source, functionName) {"
+                                                             },
+                                                             {
+                                                                 "key":  "function::loadStep3Guard",
+                                                                 "line":  "function loadStep3Guard() {"
+                                                             }
+                                                         ],
+    "test/ielts.step3-language-evidence.step6i.test.js":  [
+                                                              {
+                                                                  "key":  "function::buildEssayFixture",
+                                                                  "line":  "function buildEssayFixture() {"
+                                                              },
+                                                              {
+                                                                  "key":  "function::buildExtractionBase",
+                                                                  "line":  "function buildExtractionBase() {"
+                                                              },
+                                                              {
+                                                                  "key":  "function::buildStep2Fixture",
+                                                                  "line":  "function buildStep2Fixture() {"
+                                                              },
+                                                              {
+                                                                  "key":  "function::createRestoreStack",
+                                                                  "line":  "function createRestoreStack() {"
+                                                              }
+                                                          ],
+    "test/ielts.step4-aggregation-denominator.step6f.test.js":  [
+                                                                    {
+                                                                        "key":  "async function::runStep3WithStub",
+                                                                        "line":  "async function runStep3WithStub({ microAssessments, answerById }) {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::baselineRow",
+                                                                        "line":  "function baselineRow(criterion) {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::buildEssayFixture",
+                                                                        "line":  "function buildEssayFixture() {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::buildExtractionFixture",
+                                                                        "line":  "function buildExtractionFixture() {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::buildStep2Fixture",
+                                                                        "line":  "function buildStep2Fixture() {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::createAiStub",
+                                                                        "line":  "function createAiStub(answerById = {}) {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::createRestoreStack",
+                                                                        "line":  "function createRestoreStack() {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::extractFunctionSource",
+                                                                        "line":  "function extractFunctionSource(source, functionName) {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::getCriterionAggregateTrace",
+                                                                        "line":  "function getCriterionAggregateTrace(result, criterion, baseKey) {"
+                                                                    },
+                                                                    {
+                                                                        "key":  "function::loadClientBandCalculator",
+                                                                        "line":  "function loadClientBandCalculator() {"
+                                                                    }
+                                                                ],
+    "test/ielts.step4-evidence-binding.step6n.test.js":  [
+                                                             {
+                                                                 "key":  "function::buildGrammarControl",
+                                                                 "line":  "function buildGrammarControl(overrides = {}) {"
+                                                             },
+                                                             {
+                                                                 "key":  "function::buildLexicalControl",
+                                                                 "line":  "function buildLexicalControl(overrides = {}) {"
+                                                             }
+                                                         ],
+    "test/ielts.step4-reliability.step6h.test.js":  [
+                                                        {
+                                                            "key":  "async function::runStep3WithStub",
+                                                            "line":  "async function runStep3WithStub({ baseKey, stubFactory, options = {} }) {"
+                                                        },
+                                                        {
+                                                            "key":  "const arrow::failedTrace",
+                                                            "line":  "const failedTrace = (result?.meta?.aiRequestTrace || []).find((entry) =\u003e entry?.status === \u0027failed\u0027);"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildAiJsonResponse",
+                                                            "line":  "function buildAiJsonResponse(ids, value = \u0027Yes\u0027) {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildEssayFixture",
+                                                            "line":  "function buildEssayFixture() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildExtractionFixture",
+                                                            "line":  "function buildExtractionFixture() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildMicroAssessments",
+                                                            "line":  "function buildMicroAssessments(baseKey) {"
+                                                        },
+                                                        {
+                                                            "key":  "function::buildStep2Fixture",
+                                                            "line":  "function buildStep2Fixture() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::createRestoreStack",
+                                                            "line":  "function createRestoreStack() {"
+                                                        },
+                                                        {
+                                                            "key":  "function::extractPromptIds",
+                                                            "line":  "function extractPromptIds(messages) {"
+                                                        }
+                                                    ],
+    "test/ielts.task-echo-robustness.step6p.test.js":  [
+                                                           {
+                                                               "key":  "function::buildContext",
+                                                               "line":  "function buildContext(taskEcho) {"
+                                                           },
+                                                           {
+                                                               "key":  "function::buildDistortedCopyEssay",
+                                                               "line":  "function buildDistortedCopyEssay() {"
+                                                           },
+                                                           {
+                                                               "key":  "function::buildTopicReuseEssay",
+                                                               "line":  "function buildTopicReuseEssay() {"
+                                                           }
+                                                       ],
+    "test/ielts.tr-cc-runprofile.step6q.test.js":  [
+                                                       {
+                                                           "key":  "const arrow::make",
+                                                           "line":  "const make = (baseKey, atomicQuestion) =\u003e ({"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildCcMidBandAssessments",
+                                                           "line":  "function buildCcMidBandAssessments() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildEssayFixture",
+                                                           "line":  "function buildEssayFixture() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildGateCriticalAssessments",
+                                                           "line":  "function buildGateCriticalAssessments() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildGateCriticalEssayFixture",
+                                                           "line":  "function buildGateCriticalEssayFixture() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildGateCriticalExtractionFixture",
+                                                           "line":  "function buildGateCriticalExtractionFixture() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildGateCriticalStep2Fixture",
+                                                           "line":  "function buildGateCriticalStep2Fixture() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildStrongSinglePartCtx",
+                                                           "line":  "function buildStrongSinglePartCtx() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildWeakCcExtractionFixture",
+                                                           "line":  "function buildWeakCcExtractionFixture() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildWeakCcStep2Fixture",
+                                                           "line":  "function buildWeakCcStep2Fixture() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::buildWeakSinglePartCtx",
+                                                           "line":  "function buildWeakSinglePartCtx() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::createRestoreStack",
+                                                           "line":  "function createRestoreStack() {"
+                                                       },
+                                                       {
+                                                           "key":  "function::extractFunctionSource",
+                                                           "line":  "function extractFunctionSource(source, functionName) {"
+                                                       },
+                                                       {
+                                                           "key":  "function::loadControllerRunProfileExtractor",
+                                                           "line":  "function loadControllerRunProfileExtractor() {"
+                                                       }
+                                                   ],
+    "test/ielts.virtual-sentence-recovery.step6o.test.js":  [
+                                                                {
+                                                                    "key":  "function::buildCtx",
+                                                                    "line":  "function buildCtx({ essayObj, step2, extraction }) {"
+                                                                },
+                                                                {
+                                                                    "key":  "function::buildCurrentParagraph",
+                                                                    "line":  "function buildCurrentParagraph({ essayObj, step2, extraction, paragraphIndex }) {"
+                                                                },
+                                                                {
+                                                                    "key":  "function::buildRunOnEssay",
+                                                                    "line":  "function buildRunOnEssay() {"
+                                                                },
+                                                                {
+                                                                    "key":  "function::buildRunOnExtraction",
+                                                                    "line":  "function buildRunOnExtraction() {"
+                                                                }
+                                                            ]
+}

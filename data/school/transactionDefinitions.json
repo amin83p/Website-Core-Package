@@ -1,0 +1,120 @@
+[
+  {
+    "id": "TRX65023",
+    "audit": {
+      "createDateTime": "2026-03-01T22:16:22.304Z",
+      "lastUpdateDateTime": "2026-03-02T19:42:39.879Z"
+    },
+    "code": "GENERAL_APPLICATION_FEE_2026",
+    "description": "",
+    "entries": [
+      {
+        "entryId": "ENTRY_2",
+        "debitRef": "ROLE:student",
+        "creditRef": "ACCOUNT:ACC_4213",
+        "amount": 150,
+        "percentage": 100,
+        "currency": "CAD",
+        "memoTemplate": "Application fee for {{studentId}} - {{amount}} {{currency}}",
+        "notes": ""
+      }
+    ],
+    "metadata": {},
+    "name": "General Application Fee for 2026",
+    "notes": "",
+    "orgId": "900000",
+    "status": "active",
+    "validFrom": "2026-01-01",
+    "validTo": "2026-12-31"
+  },
+  {
+    "id": "TRX68949",
+    "audit": {
+      "createDateTime": "2026-03-01T22:25:13.285Z",
+      "lastUpdateDateTime": "2026-03-02T19:43:49.959Z"
+    },
+    "code": "LINC_ASSESSMENT_2026",
+    "description": "",
+    "entries": [
+      {
+        "entryId": "ENTRY_2",
+        "debitRef": "ROLE:student",
+        "creditRef": "ACCOUNT:ACC_4213",
+        "amount": 230,
+        "percentage": 100,
+        "currency": "CAD",
+        "memoTemplate": "Administrative and Application Fees, Student Id: {{studentId}}, {{amount}} {{currency}}",
+        "notes": ""
+      }
+    ],
+    "metadata": {},
+    "name": "LINC ASSESSMENT 2026",
+    "notes": "",
+    "orgId": "900000",
+    "status": "active",
+    "validFrom": "2026-01-01",
+    "validTo": "2026-12-31"
+  },
+  {
+    "id": "TRX69522",
+    "audit": {
+      "createDateTime": "2026-03-01T22:26:43.916Z",
+      "lastUpdateDateTime": "2026-03-02T19:44:41.351Z"
+    },
+    "code": "LINC_PROGRAM_ENROLLMENT_2026",
+    "description": "",
+    "entries": [
+      {
+        "entryId": "ENTRY_2",
+        "debitRef": "ROLE:student",
+        "creditRef": "ACCOUNT:ACC_4211",
+        "amount": 2254,
+        "percentage": 100,
+        "currency": "CAD",
+        "memoTemplate": "Program Enrollment Fees - LINC - Student Id: {{studentId}}, {{amount}} {{currency}}",
+        "notes": ""
+      }
+    ],
+    "metadata": {},
+    "name": "LINC Enrollment Fee 2026",
+    "notes": "",
+    "orgId": "900000",
+    "status": "active",
+    "validFrom": "2026-01-01",
+    "validTo": "2026-12-31"
+  },
+  {
+    "orgId": "900000",
+    "code": "TUTION-FEE-SAMPLE",
+    "name": "Tuition Fee Sample for LINC Classes",
+    "description": "",
+    "status": "active",
+    "validFrom": "",
+    "validTo": "",
+    "entries": [
+      {
+        "entryId": "ENTRY_1",
+        "debitRef": "ROLE:student",
+        "creditRef": "ACCOUNT:ACC_4110",
+        "amount": 0,
+        "percentage": 100,
+        "currency": "CAD",
+        "memoTemplate": "{{studentId}} {{personId}} {{programId}}",
+        "notes": ""
+      },
+      {
+        "entryId": "ENTRY_2",
+        "debitRef": "ROLE:student",
+        "creditRef": "ACCOUNT:ACC_4210",
+        "amount": 102,
+        "percentage": 0,
+        "currency": "CAD",
+        "memoTemplate": "",
+        "notes": ""
+      }
+    ],
+    "notes": "",
+    "metadata": {},
+    "id": "Tuition_Fee_Sample"
+  }
+]

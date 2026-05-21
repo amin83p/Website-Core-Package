@@ -1,0 +1,508 @@
+[
+  {
+    "orgId": "900000",
+    "name": "English as an Additional Language Program",
+    "code": "ELA-Program",
+    "description": "",
+    "departmentId": "DEP_1771788762810",
+    "departmentCode": "EAL",
+    "departmentName": "English as an Additional Language",
+    "programAdministratorPersonId": "560378",
+    "duration": {
+      "years": 1,
+      "months": 0,
+      "days": 0
+    },
+    "credits": "36",
+    "minimumPassingScore": "70",
+    "minimumPassingAverage": "70",
+    "academicRules": {
+      "requiredMainCredits": 36,
+      "requiredEssentialCredits": 0,
+      "requiredOptionalCredits": 0,
+      "allowEssentialCreditsTowardOptional": true
+    },
+    "feeGroups": {
+      "Domestic": [],
+      "International": [],
+      "Corporate": [],
+      "Scholarship": [],
+      "Government Funded": [],
+      "LINC Alberta": [],
+      "WCB Alberta": [],
+      "Others": [],
+      "__ALL__": []
+    },
+    "postingPolicies": [],
+    "terms": [
+      {
+        "termId": "TRM-2026-F6Y7H",
+        "order": 1,
+        "isRequired": true,
+        "notes": "",
+        "termCode": "SPRING2026",
+        "termName": "Spring 2026",
+        "status": "planned",
+        "termDescription": "",
+        "registrationOpenDate": "",
+        "registrationCloseDate": "",
+        "lateRegistrationDeadline": "",
+        "paymentDueDate": "",
+        "classesStartDate": "",
+        "classesEndDate": "",
+        "addDropDeadline": "",
+        "swapDeadline": "",
+        "withdrawWithoutPenaltyDeadline": "",
+        "withdrawDeadline": "",
+        "censusDate": "",
+        "finalExamStartDate": "",
+        "finalExamEndDate": "",
+        "gradeSubmissionDeadline": "",
+        "termResultReleaseDate": "",
+        "termAcademicRules": {
+          "minimumPassingAverage": null,
+          "minimumPassingScore": null,
+          "totalAllowedCredits": null,
+          "minimumRequiredCredits": null,
+          "allowOverload": false,
+          "mustCompleteRequiredSubjects": true,
+          "notes": ""
+        },
+        "termRegistrationFeeGroups": {
+          "Domestic": [],
+          "International": [],
+          "Corporate": [],
+          "Scholarship": [],
+          "Government Funded": [],
+          "LINC Alberta": [],
+          "WCB Alberta": [],
+          "Others": [],
+          "__ALL__": []
+        }
+      }
+    ],
+    "subjects": [
+      {
+        "subjectId": "SUB-EAL-YCJS2",
+        "order": 1,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [],
+        "notes": ""
+      },
+      {
+        "subjectId": "957950",
+        "order": 2,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "SUB-EAL-YCJS2"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "779977",
+        "order": 3,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "957950"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "345325",
+        "order": 4,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "779977"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "648041",
+        "order": 5,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "345325"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "152104",
+        "order": 6,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "648041"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "441147",
+        "order": 7,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "152104"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "539856",
+        "order": 8,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "441147"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "430030",
+        "order": 9,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "539856"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "333560",
+        "order": 10,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "430030"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "348536",
+        "order": 11,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "333560"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "261174",
+        "order": 12,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 50,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "348536"
+        ],
+        "notes": ""
+      }
+    ],
+    "status": "active",
+    "notes": "",
+    "id": "232974"
+  },
+  {
+    "id": "PRG93679",
+    "academicRules": {
+      "requiredMainCredits": 9,
+      "requiredEssentialCredits": 0,
+      "requiredOptionalCredits": 0,
+      "allowEssentialCreditsTowardOptional": true
+    },
+    "audit": {
+      "createDateTime": "2026-03-01T22:02:49.537Z",
+      "lastUpdateDateTime": "2026-03-02T23:29:25.674Z"
+    },
+    "code": "LINC",
+    "credits": "9",
+    "description": "",
+    "duration": {
+      "years": 1,
+      "months": 0,
+      "days": 0
+    },
+    "feeGroups": {
+      "Domestic": [],
+      "International": [],
+      "Corporate": [],
+      "Scholarship": [],
+      "Government Funded": [],
+      "LINC Alberta": [],
+      "WCB Alberta": [],
+      "Others": [],
+      "__ALL__": []
+    },
+    "minimumPassingAverage": "70",
+    "minimumPassingScore": "70",
+    "name": "LINC PROGRAM",
+    "notes": "",
+    "orgId": "900000",
+    "programAdministratorPersonId": "153279",
+    "status": "active",
+    "subjects": [
+      {
+        "subjectId": "SUB-EQU-LINC-OIFCI",
+        "order": 1,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 70,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [],
+        "notes": ""
+      },
+      {
+        "subjectId": "SUB-LINC-9FF0F",
+        "order": 2,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 70,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "SUB-EQU-LINC-OIFCI"
+        ],
+        "notes": ""
+      },
+      {
+        "subjectId": "SUB-LINC-G7QLY",
+        "order": 3,
+        "isRequired": true,
+        "subjectType": "main",
+        "programCredits": 3,
+        "minPassingScore": 70,
+        "minPassingAverage": null,
+        "mustPass": true,
+        "allowCompensation": false,
+        "prerequisites": [
+          "SUB-LINC-9FF0F"
+        ],
+        "notes": ""
+      }
+    ],
+    "terms": [
+      {
+        "termId": "TRM-2026-L8NRM",
+        "order": 1,
+        "isRequired": true,
+        "notes": "",
+        "termCode": "WINTER2026",
+        "termName": "Winter 2026",
+        "status": "active",
+        "termDescription": "",
+        "registrationOpenDate": "",
+        "registrationCloseDate": "",
+        "lateRegistrationDeadline": "",
+        "paymentDueDate": "",
+        "classesStartDate": "",
+        "classesEndDate": "",
+        "addDropDeadline": "",
+        "swapDeadline": "",
+        "withdrawWithoutPenaltyDeadline": "",
+        "withdrawDeadline": "",
+        "censusDate": "",
+        "finalExamStartDate": "",
+        "finalExamEndDate": "",
+        "gradeSubmissionDeadline": "",
+        "termResultReleaseDate": "",
+        "termAcademicRules": {
+          "minimumPassingAverage": 70,
+          "minimumPassingScore": 70,
+          "totalAllowedCredits": 3,
+          "minimumRequiredCredits": 3,
+          "allowOverload": false,
+          "mustCompleteRequiredSubjects": true,
+          "notes": ""
+        },
+        "termRegistrationFeeGroups": {
+          "Domestic": [],
+          "International": [],
+          "Corporate": [],
+          "Scholarship": [],
+          "Government Funded": [],
+          "LINC Alberta": [],
+          "WCB Alberta": [],
+          "Others": [],
+          "__ALL__": [
+            {
+              "transactionDefinitionId": "TRX65023",
+              "transactionDefinitionCode": "GENERAL_APPLICATION_FEE_2026",
+              "transactionDefinitionName": "General Application Fee for 2026",
+              "code": "GENERAL_APPLICATION_FEE_2026",
+              "label": "General Application Fee for 2026",
+              "amount": 150,
+              "currency": "",
+              "frequency": "one_time",
+              "validFrom": "2026-01-01",
+              "validTo": "2026-12-31",
+              "notes": "",
+              "isOptional": false
+            }
+          ]
+        }
+      },
+      {
+        "termId": "TRM-2026-F6Y7H",
+        "order": 2,
+        "isRequired": true,
+        "notes": "",
+        "termCode": "SPRING2026",
+        "termName": "Spring 2026",
+        "status": "planned",
+        "termDescription": "",
+        "registrationOpenDate": "",
+        "registrationCloseDate": "",
+        "lateRegistrationDeadline": "",
+        "paymentDueDate": "",
+        "classesStartDate": "",
+        "classesEndDate": "",
+        "addDropDeadline": "",
+        "swapDeadline": "",
+        "withdrawWithoutPenaltyDeadline": "",
+        "withdrawDeadline": "",
+        "censusDate": "",
+        "finalExamStartDate": "",
+        "finalExamEndDate": "",
+        "gradeSubmissionDeadline": "",
+        "termResultReleaseDate": "",
+        "termAcademicRules": {
+          "minimumPassingAverage": 70,
+          "minimumPassingScore": 70,
+          "totalAllowedCredits": 3,
+          "minimumRequiredCredits": 3,
+          "allowOverload": false,
+          "mustCompleteRequiredSubjects": true,
+          "notes": ""
+        },
+        "termRegistrationFeeGroups": {
+          "Domestic": [],
+          "International": [],
+          "Corporate": [],
+          "Scholarship": [],
+          "Government Funded": [],
+          "LINC Alberta": [],
+          "WCB Alberta": [],
+          "Others": [],
+          "__ALL__": []
+        }
+      },
+      {
+        "termId": "TRM-2026-CKW5N",
+        "order": 3,
+        "isRequired": true,
+        "notes": "",
+        "termCode": "FALL2026",
+        "termName": "Fall 2026",
+        "status": "planned",
+        "termDescription": "",
+        "registrationOpenDate": "",
+        "registrationCloseDate": "",
+        "lateRegistrationDeadline": "",
+        "paymentDueDate": "",
+        "classesStartDate": "",
+        "classesEndDate": "",
+        "addDropDeadline": "",
+        "swapDeadline": "",
+        "withdrawWithoutPenaltyDeadline": "",
+        "withdrawDeadline": "",
+        "censusDate": "",
+        "finalExamStartDate": "",
+        "finalExamEndDate": "",
+        "gradeSubmissionDeadline": "",
+        "termResultReleaseDate": "",
+        "termAcademicRules": {
+          "minimumPassingAverage": 70,
+          "minimumPassingScore": 70,
+          "totalAllowedCredits": 3,
+          "minimumRequiredCredits": 3,
+          "allowOverload": false,
+          "mustCompleteRequiredSubjects": true,
+          "notes": ""
+        },
+        "termRegistrationFeeGroups": {
+          "Domestic": [],
+          "International": [],
+          "Corporate": [],
+          "Scholarship": [],
+          "Government Funded": [],
+          "LINC Alberta": [],
+          "WCB Alberta": [],
+          "Others": [],
+          "__ALL__": []
+        }
+      }
+    ],
+    "departmentCode": "LINC",
+    "departmentId": "DEP_1771788678638",
+    "departmentName": "LINC Department",
+    "postingPolicies": []
+  }
+]

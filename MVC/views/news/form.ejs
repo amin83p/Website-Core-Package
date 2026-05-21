@@ -1,0 +1,546 @@
+<% 
+  const isEdit = !!(item && item.id);
+  const catList = typeof categories !== 'undefined' ? categories : [];
+  const existingOrgs = (item && item.targetOrgIds) ? item.targetOrgIds : [];
+  const articleAttachments = (item && item.attachments) ? item.attachments : [];
+  const libraryFiles = typeof library_Files !== 'undefined' ? library_Files : [];
+  
+  // Helper to safely get featured image
+  const featuredImg = (item && item.content && item.content.featuredImage) ? item.content.featuredImage : '';
+%>
+
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0">
+      <%= isEdit ? 'Edit Article' : 'Compose Article' %>
+    </h1>
+    <% if (isEdit) { %>
+        <span class="badge bg-secondary border">ID: <%= item.id %></span>
+    <% } %>
+  </div>
+
+  <form id="newsForm" action="<%= isEdit ? '/news/manage/edit/' + item.id : '/news/manage/new' %>" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+    
+    <input type="hidden" name="htmlContent" id="hiddenHtmlContent">
+    <input type="hidden" name="targetOrgIds" id="targetOrgIdsInput">
+    <input type="hidden" name="attachmentRegistry" id="attachmentRegistryInput" value='<%- JSON.stringify(articleAttachments) %>'>
+    
+    <input type="hidden" name="featuredImage" id="featuredImageInput" value="<%= featuredImg %>">
+
+    <script type="application/json" id="initTargetOrgs"><%- JSON.stringify(existingOrgs) %></script>
+    <script type="application/json" id="initLibrary"><%- JSON.stringify(libraryFiles) %></script>
+    <script type="application/json" id="initArticleAttachments"><%- JSON.stringify(articleAttachments) %></script>
+
+    <div class="row g-4">
+        
+        <div class="col-lg-8">
+            <div class="card p-4 border-0 shadow-sm mb-4">
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Headline Title *</label>
+                    <input type="text" name="title" class="form-control size-lg fw-bold" 
+                           value="<%= item ? item.meta.title : '' %>" required placeholder="Enter a catchy headline...">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Summary / Excerpt</label>
+                    <textarea name="summary" class="form-control" rows="2" 
+                              placeholder="Brief description for list views (optional)"><%= item ? item.content.summary : '' %></textarea>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-end mb-2">
+                    <label class="form-label fw-bold mb-0">Article Body</label>
+                    
+                    <button type="button" class="btn btn-sm btn-primary btn-filled" id="btnOpenMediaForEditor" data-bs-toggle="modal" data-bs-target="#mediaManagerModal">
+                        <i class="bi bi-images me-1"></i> Manage & Insert Media
+                    </button>
+                </div>
+
+                <div id="editor-wrapper" class="border rounded">
+                    <div id="editor-container" style="height: 600px; font-size: 16px; border:none;">
+                        <%- item ? item.content.body : '' %>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold py-3">Publishing</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Status</label>
+                        <select name="status" class="form-select">
+                            <option value="draft" <%= (item && item.status==='draft')?'selected':'' %>>Draft</option>
+                            <option value="published" <%= (item && item.status==='published')?'selected':'' %>>Published</option>
+                            <option value="archived" <%= (item && item.status==='archived')?'selected':'' %>>Archived</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Publish Date</label>
+                        <input type="datetime-local" name="publishDate" class="form-control" 
+                               value="<%= (item && item.meta.publishDate) ? new Date(item.meta.publishDate).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16) %>">
+                    </div>
+                    <hr>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-filled">
+                            <i class="bi bi-save me-1"></i> <%= isEdit ? 'Update Article' : 'Save Article' %>
+                        </button>
+                        <a href="/news/manage" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold py-3">Featured Image</div>
+                <div class="card-body text-center">
+                    <div id="featuredImagePreview" class="mb-3 <%= featuredImg ? '' : 'd-none' %>">
+                        <img src="<%= featuredImg %>" class="img-fluid rounded border shadow-sm" style="max-height: 200px; width: 100%; object-fit: cover;">
+                    </div>
+                    
+                    <div id="featuredImagePlaceholder" class="mb-3 p-4 bg-light border rounded border-dashed <%= featuredImg ? 'd-none' : '' %>">
+                        <i class="bi bi-image text-muted fs-1 opacity-50"></i>
+                        <div class="small text-muted mt-2">Optional main photo</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnSetFeaturedImage" data-bs-toggle="modal" data-bs-target="#mediaManagerModal">
+                            <i class="bi bi-card-image me-1"></i> <%= featuredImg ? 'Replace Image' : 'Set Featured Image' %>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm <%= featuredImg ? '' : 'd-none' %>" id="btnRemoveFeaturedImage">
+                            Remove Image
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold py-3">Audience & Scope</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Visibility Level</label>
+                        <div class="form-check">
+                            <input class="form-check-input visibility-radio" type="radio" name="visibility" id="visPublic" value="public" 
+                                   <%= (!item || item.visibility==='public')?'checked':'' %>>
+                            <label class="form-check-label" for="visPublic">Public (Website)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input visibility-radio" type="radio" name="visibility" id="visUsers" value="users" 
+                                   <%= (item && item.visibility==='users')?'checked':'' %>>
+                            <label class="form-check-label" for="visUsers">All Logged-in Users</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input visibility-radio" type="radio" name="visibility" id="visOrg" value="org" 
+                                   <%= (item && item.visibility==='org')?'checked':'' %>>
+                            <label class="form-check-label" for="visOrg">Specific Organizations</label>
+                        </div>
+                    </div>
+                    <div id="targetOrgContainer" class="d-none">
+                        <label class="form-label small fw-bold text-primary">Target Organizations</label>
+                        <div class="border rounded bg-light p-2 mb-2" style="max-height: 150px; overflow-y: auto;">
+                            <div id="selectedOrgsList" class="d-flex flex-wrap gap-2">
+                                <span class="text-muted small fst-italic p-1" id="noOrgsMsg">No organizations selected.</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="btnAddOrg">
+                            <i class="bi bi-plus-lg me-1"></i> Add Organization
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold py-3">Categorization</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Category</label>
+                        <select name="category" class="form-select">
+                            <% catList.forEach(cat => { %>
+                                <option value="<%= cat.name %>" <%= (item && item.meta.category === cat.name) ? 'selected' : '' %>>
+                                    <%= cat.name %>
+                                </option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Tags</label>
+                        <input type="text" name="tags" class="form-control" placeholder="comma, separated" 
+                               value="<%= (item && item.meta.tags) ? item.meta.tags.join(', ') : '' %>">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal fade" id="mediaManagerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content" style="height: 90vh;">
+      <div class="modal-header border-bottom-0 pb-0">
+          <ul class="nav nav-tabs border-bottom-0" id="mediaTabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active fw-bold" id="tab-library" data-bs-toggle="tab" data-bs-target="#panel-library" type="button">
+                    <i class="bi bi-images me-2"></i>Library
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link fw-bold" id="tab-upload" data-bs-toggle="tab" data-bs-target="#panel-upload" type="button">
+                    <i class="bi bi-cloud-upload me-2"></i>Upload
+                </button>
+            </li>
+          </ul>
+          <button type="button" class="btn-close mb-2 me-2" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light">
+          <div class="tab-content h-100">
+              <div class="tab-pane fade show active h-100" id="panel-library">
+                  <div class="row g-3" id="mediaGrid"></div>
+                  <div id="emptyLibraryMsg" class="d-none flex-column align-items-center justify-content-center h-100 text-muted">
+                      <i class="bi bi-images fs-1 opacity-25 mb-3"></i>
+                      <p>Library is empty.</p>
+                      <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('tab-upload').click()">Go to Upload Tab</button>
+                  </div>
+              </div>
+              <div class="tab-pane fade h-100" id="panel-upload">
+                  <div class="d-flex flex-column align-items-center justify-content-center h-100 p-5 border rounded-3 bg-white border-dashed">
+                      <div id="uploadSpinner" class="d-none text-center">
+                          <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+                          <h5 class="mt-3">Uploading...</h5>
+                      </div>
+                      <div id="uploadZone" class="text-center">
+                          <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 4rem;"></i>
+                          <h4 class="fw-bold mt-3">Upload Files</h4>
+                          <p class="text-muted mb-4">Files will be added to the organization's library.</p>
+                          <input type="file" id="ajaxFileInput" class="d-none" multiple accept="image/*,video/*,application/pdf">
+                          <button class="btn btn-primary btn-lg px-5" onclick="document.getElementById('ajaxFileInput').click()">Select Files</button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <div class="me-auto text-muted small" id="selectionStatus">Select an item to insert</div>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="btnInsertMedia" disabled>
+            <i class="bi bi-plus-lg me-1"></i> Insert Selected
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // --- 1. GLOBAL STATE & INIT ---
+    const grid = document.getElementById('mediaGrid');
+    const emptyMsg = document.getElementById('emptyLibraryMsg');
+    const attachmentRegistryInput = document.getElementById('attachmentRegistryInput');
+    
+    let libraryFiles = JSON.parse(document.getElementById('initLibrary').textContent || '[]');
+    let articleAttachments = JSON.parse(document.getElementById('initArticleAttachments').textContent || '[]');
+    let selectedMedia = null;
+    
+    // ✅ NEW: Modal Context (To distinguish between Editor Insert vs Featured Image Set)
+    let modalContext = 'editor'; 
+
+    var quill = new Quill('#editor-container', {
+        theme: 'snow',
+        placeholder: 'Write your story...',
+        modules: { toolbar: [ 
+            [{ 'header': [1, 2, 3, false] }], 
+            ['bold', 'italic', 'underline', 'strike', 'blockquote'], 
+            [{ 'color': [] }, { 'background': [] }], 
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }], 
+            [{ 'align': [] }], 
+            ['link', 'image', 'video'], ['clean'] 
+        ]}
+    });
+
+    // --- 2. RENDER LIBRARY ---
+    function renderLibrary() {
+        grid.innerHTML = '';
+        if (libraryFiles.length === 0) {
+            emptyMsg.classList.remove('d-none');
+            emptyMsg.classList.add('d-flex');
+            return;
+        }
+        emptyMsg.classList.add('d-none');
+        emptyMsg.classList.remove('d-flex');
+
+        libraryFiles.forEach(file => {
+            const isLinked = articleAttachments.some(a => a.url === file.url);
+            const col = document.createElement('div');
+            col.className = 'col-md-3 col-sm-4 col-6 media-col';
+            col.innerHTML = `
+                <div class="card h-100 border shadow-sm media-item-card" 
+                     data-url="${file.url}" data-type="${file.type}" data-name="${file.name}">
+                    <div class="ratio ratio-1x1 bg-secondary position-relative">
+                        ${file.type === 'image' 
+                            ? `<img src="${file.url}" class="object-fit-cover">` 
+                            : `<div class="d-flex align-items-center justify-content-center text-white h-100 w-100"><i class="bi bi-file-earmark-play fs-1"></i></div>`
+                        }
+                        ${isLinked ? `<div class="position-absolute bottom-0 start-0 m-1"><span class="badge bg-success small" style="font-size:0.6rem">Attached</span></div>` : ''}
+                        <div class="selected-overlay position-absolute top-0 start-0 w-100 h-100 bg-primary bg-opacity-50 d-none align-items-center justify-content-center">
+                            <i class="bi bi-check-circle-fill text-white fs-1"></i>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 p-0 d-flex align-items-center justify-content-center btn-delete-media" 
+                                style="width:24px; height:24px; z-index:10;" title="Permanently Delete" data-url="${file.url}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-2 bg-white">
+                        <div class="small text-truncate fw-bold">${file.name}</div>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(col);
+        });
+        attachmentRegistryInput.value = JSON.stringify(articleAttachments);
+    }
+    renderLibrary();
+
+// --- 3. UPLOAD LOGIC ---
+    const fileInput = document.getElementById('ajaxFileInput');
+    const spinner = document.getElementById('uploadSpinner');
+    const zone = document.getElementById('uploadZone');
+
+    fileInput.addEventListener('change', async () => {
+        if (fileInput.files.length === 0) return;
+        zone.classList.add('d-none');
+        spinner.classList.remove('d-none');
+
+        const formData = new FormData();
+        // ✅ REMOVED: formData.append('targetOrgId', 'GLOBAL'); 
+        // ✅ REMOVED: formData.append('category', 'news'); 
+        // The route /news/api/upload already knows it goes to 'news' folder
+
+        Array.from(fileInput.files).forEach(f => formData.append('files', f));
+
+        try {
+            // ✅ UPDATED: Point to the specific News API route
+            const resp = await fetch('/news/api/upload', {
+                method: 'POST',
+                headers: { 'X-AJAX-Request': 'true' },
+                body: formData
+            });
+            const data = await resp.json();
+            
+            if (data.status === 'success') {
+                data.files.forEach(f => {
+                    // Prepend to library so it shows up first
+                    libraryFiles.unshift({ url: f.url, type: f.type, name: f.name });
+                    // Also add to registry so it persists on save
+                    articleAttachments.push({ url: f.url, type: f.type, name: f.name });
+                });
+                renderLibrary();
+                document.getElementById('tab-library').click();
+            } else {
+                alert('Upload failed: ' + data.message);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Network error.');
+        } finally {
+            spinner.classList.add('d-none');
+            zone.classList.remove('d-none');
+            fileInput.value = '';
+        }
+    });
+    // --- 4. CLICK HANDLERS (Select / Delete) ---
+    grid.addEventListener('click', async (e) => {
+        const delBtn = e.target.closest('.btn-delete-media');
+        if (delBtn) {
+            e.stopPropagation();
+            if (typeof showMessageModal === 'function') {
+                const confirmed = await showMessageModal({
+                    title: 'Delete File', message: 'Permanently delete this file?', icon: 'warning',
+                    buttons: [{ text: 'Cancel', class: 'btn-secondary', value: false }, { text: 'Delete', class: 'btn-danger', value: true }]
+                });
+                if (!confirmed) return;
+            } else {
+                if (!confirm('Permanently delete this file?')) return;
+            }
+            
+            const urlToDelete = delBtn.dataset.url;
+            let relativePath = urlToDelete.replace('/uploads/', '');
+            if(relativePath.startsWith('/')) relativePath = relativePath.substring(1);
+
+            try {
+                const resp = await fetch(`/files/delete/dummy?path=${encodeURIComponent(relativePath)}`, { method: 'POST', headers: {'X-AJAX-Request': 'true'} });
+                const res = await resp.json();
+                if(res.status === 'success') {
+                    libraryFiles = libraryFiles.filter(a => a.url !== urlToDelete);
+                    articleAttachments = articleAttachments.filter(a => a.url !== urlToDelete);
+                    renderLibrary();
+                } else {
+                    alert(res.message);
+                }
+            } catch(e) { alert('Error deleting file'); }
+            return;
+        }
+
+        const card = e.target.closest('.media-item-card');
+        if (card) {
+            document.querySelectorAll('.media-item-card').forEach(c => {
+                c.classList.remove('border-primary', 'border-2');
+                c.querySelector('.selected-overlay').classList.add('d-none');
+                c.querySelector('.selected-overlay').classList.remove('d-flex');
+            });
+            card.classList.add('border-primary', 'border-2');
+            card.querySelector('.selected-overlay').classList.remove('d-none');
+            card.querySelector('.selected-overlay').classList.add('d-flex');
+
+            selectedMedia = { url: card.dataset.url, type: card.dataset.type, name: card.dataset.name };
+            document.getElementById('selectionStatus').innerHTML = `Selected: <strong>${selectedMedia.name}</strong>`;
+            document.getElementById('btnInsertMedia').disabled = false;
+        }
+    });
+
+    // --- 5. INSERT / SET FEATURED LOGIC ---
+    
+    // Set Context: Editor
+    document.getElementById('btnOpenMediaForEditor').addEventListener('click', () => {
+        modalContext = 'editor';
+        document.getElementById('btnInsertMedia').innerHTML = '<i class="bi bi-plus-lg me-1"></i> Insert Selected';
+    });
+
+    // Set Context: Featured Image
+    document.getElementById('btnSetFeaturedImage').addEventListener('click', () => {
+        modalContext = 'featured';
+        document.getElementById('btnInsertMedia').innerHTML = '<i class="bi bi-check-lg me-1"></i> Set as Featured';
+    });
+
+    // Main Action Button
+    document.getElementById('btnInsertMedia').addEventListener('click', () => {
+        if (!selectedMedia) return;
+
+        if (modalContext === 'featured') {
+            // ✅ Handle Featured Image Logic
+            if (selectedMedia.type !== 'image') {
+                alert('Please select an image file for the featured image.');
+                return;
+            }
+            // Update UI & Input
+            document.getElementById('featuredImageInput').value = selectedMedia.url;
+            const preview = document.getElementById('featuredImagePreview');
+            preview.querySelector('img').src = selectedMedia.url;
+            preview.classList.remove('d-none');
+            document.getElementById('featuredImagePlaceholder').classList.add('d-none');
+            
+            // Toggle Buttons
+            document.getElementById('btnSetFeaturedImage').innerHTML = '<i class="bi bi-card-image me-1"></i> Replace Image';
+            document.getElementById('btnRemoveFeaturedImage').classList.remove('d-none');
+
+        } else {
+            // ✅ Handle Editor Insert Logic
+            if (!articleAttachments.some(a => a.url === selectedMedia.url)) {
+                articleAttachments.push(selectedMedia);
+                renderLibrary();
+            }
+            const range = quill.getSelection(true);
+            if (selectedMedia.type === 'image') {
+                quill.insertEmbed(range.index, 'image', selectedMedia.url);
+            } else {
+                 quill.insertText(range.index, ` ${selectedMedia.name} `, 'link', selectedMedia.url);
+            }
+        }
+        
+        bootstrap.Modal.getInstance(document.getElementById('mediaManagerModal')).hide();
+    });
+
+    // Remove Featured Image Logic
+    document.getElementById('btnRemoveFeaturedImage').addEventListener('click', () => {
+        document.getElementById('featuredImageInput').value = '';
+        document.getElementById('featuredImagePreview').classList.add('d-none');
+        document.getElementById('featuredImagePlaceholder').classList.remove('d-none');
+        document.getElementById('btnSetFeaturedImage').innerHTML = '<i class="bi bi-card-image me-1"></i> Set Featured Image';
+        document.getElementById('btnRemoveFeaturedImage').classList.add('d-none');
+    });
+
+    // --- 6. FORM SUBMIT ---
+    document.getElementById('newsForm').addEventListener('submit', () => {
+        document.getElementById('hiddenHtmlContent').value = document.querySelector('.ql-editor').innerHTML;
+    });
+
+    // --- 7. ORG PICKER & VISIBILITY ---
+    const targetOrgsInput = document.getElementById('targetOrgIdsInput');
+    const selectedOrgsList = document.getElementById('selectedOrgsList');
+    const noOrgsMsg = document.getElementById('noOrgsMsg');
+    
+    let targetOrgIds = JSON.parse(document.getElementById('initTargetOrgs').textContent || '[]');
+
+    function renderOrgs() {
+        targetOrgIds = [...new Set(targetOrgIds)].filter(Boolean);
+        selectedOrgsList.innerHTML = '';
+        if (targetOrgIds.length === 0) {
+            selectedOrgsList.appendChild(noOrgsMsg);
+            targetOrgsInput.value = '[]';
+            return;
+        }
+
+        targetOrgIds.forEach(id => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-primary d-flex align-items-center gap-2';
+            badge.innerHTML = `<span>Org #${id}</span><i class="bi bi-x-circle-fill cursor-pointer remove-org-btn" data-id="${id}"></i>`;
+            selectedOrgsList.appendChild(badge);
+        });
+
+        targetOrgsInput.value = JSON.stringify(targetOrgIds);
+
+        document.querySelectorAll('.remove-org-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const removeId = e.target.dataset.id;
+                targetOrgIds = targetOrgIds.filter(oid => String(oid) !== String(removeId));
+                renderOrgs();
+            });
+        });
+    }
+
+    const btnAddOrg = document.getElementById('btnAddOrg');
+    if (btnAddOrg) {
+        btnAddOrg.addEventListener('click', () => {
+            GenericPicker.open(GenericPickerPresets.organization({
+                title: 'Target Organization',
+                placeholder: 'Search...',
+                onSelect: (item) => {
+                    if (!targetOrgIds.includes(String(item.id))) {
+                        targetOrgIds.push(String(item.id));
+                        renderOrgs();
+                    }
+                }
+            }));
+        });
+    }
+    renderOrgs();
+
+    const orgContainer = document.getElementById('targetOrgContainer');
+    const radios = document.querySelectorAll('.visibility-radio');
+    function toggleOrgSelect() {
+        const selected = document.querySelector('.visibility-radio:checked');
+        if (selected && selected.value === 'org') {
+            orgContainer.classList.remove('d-none');
+        } else {
+            orgContainer.classList.add('d-none');
+        }
+    }
+    radios.forEach(r => r.addEventListener('change', toggleOrgSelect));
+    toggleOrgSelect();
+});
+</script>
+
+<style>
+.cursor-pointer { cursor: pointer; }
+.media-item-card { cursor: pointer; transition: transform 0.1s; }
+.media-item-card:hover { transform: scale(1.02); }
+.border-dashed { border-style: dashed !important; }
+</style>

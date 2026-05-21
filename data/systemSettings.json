@@ -1,0 +1,256 @@
+{
+  "newsletter": {
+    "defaultGroupId": "GRP1001",
+    "requireDoubleOptIn": false,
+    "sendWelcomeEmail": false
+  },
+  "organization": {
+    "allowFreeRegistration": true,
+    "defaultTrialDays": 14,
+    "freeOrgId": 900000,
+    "freeOrgName": "Free User",
+    "pteJoinOrgId": 900000
+  },
+  "access": {
+    "highAccessMin": 8,
+    "highAccessMax": 10,
+    "selfAccessLevel": 1,
+    "immuneSuperAdmins": [
+      "admin@localhost.com",
+      "root@system.local",
+      "apaknejad@equilibrium.ab.ca"
+    ]
+  },
+  "app": {
+    "defaultPageSize": 50,
+    "searchDefaultKeyword": "aaa",
+    "uploadsPath": "/app/uploads",
+    "uploadFolders": {
+      "core.fileManager": "misc",
+      "core.tasks": "tasks/{taskId}",
+      "core.symbols": "symbols",
+      "core.news": "news",
+      "core.chat": "chat/{conversationId}",
+      "core.contacts": "contacts",
+      "core.ielts": "ielts",
+      "school.students": "students/{personId}",
+      "school.reportTemplates": "reports",
+      "school.examMedia": "school-exams/{templateId}/{questionId}",
+      "school.classWorkspace": "school/classes/{classId}",
+      "school.subjectWorkspace": "school/subjects/{subjectId}",
+      "pte.questionBank": "PTE/Question_Bank",
+      "pte.students": "PTE/Students",
+      "pte.studentItem": "PTE/Students/{itemId}",
+      "pte.publicApplicants": "PTE/Public_Applicants",
+      "pte.publicApplicantItem": "PTE/Public_Applicants/{itemId}",
+      "pte.practiceAttempt": "PTE/Practice_By_Skills/{userId}/{practiceName}/{sessionId}/{itemId}",
+      "pte.smartPracticeAttempt": "PTE/Smart_Practice/{userId}/{practiceName}/{sessionId}/{itemId}",
+      "pte.mockExamAttempt": "PTE/Mock_Exams/{userId}/{testName}/{sessionId}/{itemId}",
+      "generated.heic": "heic-converter/{jobDate}/{jobId}",
+      "generated.importReports": "importReports",
+      "generated.benchpathReports": "benchpath/reports"
+    },
+    "schoolCanonicalEnrollmentRead": false,
+    "schoolCanonicalEnrollmentWrite": false,
+    "schoolIntentionalConflictMode": false,
+    "schoolReadModelsEnabled": false,
+    "brand": {
+      "appName": "Amin Pakenjad",
+      "appShortName": "Amin Pakenjad",
+      "tagline": "Learn, work, and thrive in new Education",
+      "logoUrl": "/uploads/GLOBAL/logo/PaknejadLogo/Logo1.png",
+      "iconSvgUrl": "/uploads/GLOBAL/logo/PaknejadLogo/Logo.svg",
+      "appleTouchIconUrl": "/uploads/GLOBAL/logo/PaknejadLogo/Logo1.png",
+      "themeColor": "#ffffff",
+      "ownerDisplayName": "Amin Paknejad",
+      "footerAboutTitle": "About Amin Paknejad",
+      "footerAboutText": "<b>Amin Paknejad</b>, PhD, is a Calgary-based engineer, software developer, and instructor. His work focuses on CFD, scientific computing, and building practical tools that make research and engineering workflows faster and more reliable.",
+      "footerLogoAlt": "Amin Paknejad",
+      "footerShowNewsletter": true,
+      "instagramUrl": "https://www.instagram.com/amin83/",
+      "facebookUrl": "",
+      "linkedinUrl": "https://www.linkedin.com/in/amin-paknejad/",
+      "youtubeUrl": ""
+    },
+    "contact": {
+      "email": "paknejad@live.com",
+      "collegeEmail": "",
+      "phone": "+1 (437) 602 8720",
+      "address": "Calgary, Alberta",
+      "faxes": [],
+      "emails": [
+        {
+          "title": "General Inquiries",
+          "email": "paknejad@live.com"
+        },
+        {
+          "title": "School",
+          "email": "apaknejad@equilibrium.ab.ca"
+        },
+        {
+          "title": "College",
+          "email": "amin.paknejad@robertsoncollege.ca"
+        },
+        {
+          "title": "University",
+          "email": "apaknejad@ucalgary.ca"
+        }
+      ],
+      "phones": [
+        {
+          "title": "Phone",
+          "number": "+1 (437) 602 8720"
+        }
+      ],
+      "addresses": [
+        {
+          "title": "Address",
+          "address": "Calgary, Alberta"
+        }
+      ],
+      "fax": ""
+    },
+    "contactPage": {
+      "heroEyebrow": "Contact And Support",
+      "heroTitle": "Tell us what you need next.",
+      "heroSubtitle": "Send a message and we will reply with a recommended approach, timeline, and the details needed to move the work forward.",
+      "primaryCtaLabel": "Go To Form",
+      "emailCtaLabel": "Email Directly",
+      "followUpCtaLabel": "Follow Up",
+      "highlights": [
+        {
+          "title": "Clear Context",
+          "body": "Share goals, files, links, and constraints in one place."
+        },
+        {
+          "title": "Follow-Up Code",
+          "body": "Track your submitted message later with your private code."
+        },
+        {
+          "title": "Direct Route",
+          "body": "Use email if your request is urgent or already documented."
+        }
+      ],
+      "formEyebrow": "Message Details",
+      "formTitle": "Project / inquiry form",
+      "formSubtitle": "Share enough context for a useful first reply.",
+      "formHint": "Tip: If you include links, screenshots, or a short description of the decision you need to make, I can respond faster.",
+      "directContactKicker": "Reach Us",
+      "directContactTitle": "Direct Contact",
+      "directContactLead": "Choose the route that fits your request best. Email is usually the clearest option for detailed project context.",
+      "directContactMethodsTitle": "Contact Options",
+      "directContactMethodsSubtitle": "Use the saved contact details below to reach the right inbox, phone line, or location.",
+      "directContactEmailActionLabel": "Send email",
+      "directContactPhoneActionLabel": "Call now",
+      "directContactFaxActionLabel": "Call fax number",
+      "directContactDefaultActionLabel": "Open",
+      "aboutCardTitle": "About Me",
+      "aboutCardBody": "Best for detailed project context.",
+      "aboutCardButtonLabel": "Read About Me",
+      "aboutCardHref": "/about/",
+      "processEyebrow": "Experience",
+      "processTitle": "I Know The Process",
+      "processImages": [
+        {
+          "imageUrl": "/uploads/GLOBAL/misc/Engineering.jpg",
+          "alt": "Mega dust collector system with high efficiency fan.",
+          "caption": "Mega dust collector system with a high-efficiency fan for lower energy consumption."
+        },
+        {
+          "imageUrl": "/uploads/GLOBAL/misc/Software.jpeg",
+          "alt": "Industrial software interface.",
+          "caption": "Industrial and heavy-duty software packages."
+        }
+      ]
+    },
+    "publicMenu": {
+      "defaultHomePath": "/",
+      "items": [
+        {
+          "id": "home",
+          "label": "Home",
+          "href": "/",
+          "icon": "bi-house",
+          "visibility": "all",
+          "target": "_self",
+          "active": true,
+          "children": []
+        },
+        {
+          "id": "what-i-offer",
+          "label": "Projects",
+          "href": "/whatIOffer",
+          "icon": "bi-stars",
+          "visibility": "all",
+          "target": "_self",
+          "active": true,
+          "children": []
+        },
+        {
+          "id": "news",
+          "label": "News",
+          "href": "/news",
+          "icon": "bi-newspaper",
+          "visibility": "all",
+          "target": "_self",
+          "active": true,
+          "children": []
+        },
+        {
+          "id": "pte-test",
+          "label": "PTE Test",
+          "href": "/pte",
+          "icon": "bi-mortarboard",
+          "visibility": "all",
+          "target": "_self",
+          "active": true,
+          "children": []
+        },
+        {
+          "id": "biography",
+          "label": "Biography",
+          "href": "/biography",
+          "icon": "bi-person-badge",
+          "visibility": "all",
+          "target": "_self",
+          "active": true,
+          "children": []
+        },
+        {
+          "id": "contact",
+          "label": "Contact",
+          "href": "/contact",
+          "icon": "bi-envelope",
+          "visibility": "all",
+          "target": "_self",
+          "active": true,
+          "children": []
+        },
+        {
+          "id": "about",
+          "label": "About",
+          "href": "/about",
+          "icon": "bi-info-circle",
+          "visibility": "all",
+          "target": "_self",
+          "active": true,
+          "children": []
+        },
+        {
+          "id": "sign-in",
+          "label": "Sign In",
+          "href": "/login",
+          "icon": "bi-box-arrow-in-right",
+          "visibility": "guest",
+          "target": "_self",
+          "active": true,
+          "children": []
+        }
+      ]
+    }
+  },
+  "audit": {
+    "lastUpdateUser": "ROOT_001",
+    "lastUpdateDateTime": "2026-05-20T04:03:34.597Z"
+  }
+}

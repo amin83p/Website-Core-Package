@@ -1,0 +1,351 @@
+<%
+    const localStateId = (typeof actionStateId !== 'undefined') ? actionStateId : '';
+    const localTaskId = (typeof task !== 'undefined' && task.id) ? task.id : '';
+%>
+
+<div class="modal fade" id="taskCommentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 95vw; width: fit-content;">
+    
+    <div class="modal-content resizable-modal-content" style="width: 800px; min-width: 400px; min-height: 600px; display: flex; flex-direction: column;">
+      
+      <div class="modal-header bg-white border-bottom py-2 px-3 align-items-center" style="cursor: move;">
+        <h5 class="modal-title fw-bold text-dark fs-6"><i class="bi bi-chat-square-text text-primary me-2"></i>Comments</h5>
+        
+        <div class="ms-auto d-flex gap-2">
+            <div class="input-group input-group-sm" style="width: 200px;">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control border-start-0 bg-light" placeholder="Search..." onkeyup="TaskCommentModule.filter(this.value)">
+            </div>
+            
+            <div class="btn-group btn-group-sm">
+                <input type="radio" class="btn-check" name="sortComm" id="sortNew" autocomplete="off" checked onchange="TaskCommentModule.sort('desc')">
+                <label class="btn btn-outline-light text-secondary border" for="sortNew" title="Newest First"><i class="bi bi-sort-down"></i></label>
+                
+                <input type="radio" class="btn-check" name="sortComm" id="sortOld" autocomplete="off" onchange="TaskCommentModule.sort('asc')">
+                <label class="btn btn-outline-light text-secondary border" for="sortOld" title="Oldest First"><i class="bi bi-sort-up"></i></label>
+            </div>
+        </div>
+        
+        <button type="button" class="btn-close ms-2 small" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body p-0 position-relative" style="background-color: #f8f9fa;">
+          <div id="fullCommentList" class="p-3 d-flex flex-column gap-3 overflow-auto custom-scrollbar" 
+               style="height: 100%; background-image: radial-gradient(#e9ecef 1px, transparent 1px); background-size: 15px 15px;">
+          </div>
+      </div>
+
+      <div id="commentContextArea" class="bg-white border-top px-3 py-2 d-none"></div>
+
+      <div class="modal-footer bg-white p-2 border-top-0">
+          <form id="fullCommentForm" class="w-100 d-flex gap-2 align-items-end">
+              <input type="hidden" name="actionStateId" value="<%= localStateId %>">
+              <input type="hidden" name="taskId" value="<%= localTaskId %>">
+              <input type="hidden" name="parentId" id="replyParentId">
+              
+              <div class="position-relative">
+                  <button type="button" class="btn btn-light text-secondary rounded-circle border hover-bg-gray" onclick="document.getElementById('fullCommFile').click()" title="Attach File">
+                      <i class="bi bi-paperclip"></i>
+                  </button>
+                  <input type="file" id="fullCommFile" name="file" class="d-none" onchange="TaskCommentModule.handleFileSelect(this)">
+              </div>
+
+              <div class="flex-grow-1 position-relative">
+                  <textarea name="comment" id="fullCommInput" class="form-control bg-light border-0 shadow-none" rows="1" placeholder="Write a comment..." required style="resize:none; min-height: 40px; max-height: 120px; border-radius: 20px; padding-left: 15px; padding-right: 40px;"></textarea>
+              </div>
+              
+              <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px; transition: transform 0.1s;">
+                  <i class="bi bi-send-fill" style="margin-left: 2px;"></i>
+              </button>
+          </form>
+      </div>
+
+      <div class="modal-resize-grip">
+          <svg viewBox="0 0 10 10" width="100%" height="100%" fill="#adb5bd"><path d="M10 10 L10 2 L2 10 Z" /></svg>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+    /* Styling for nested comments */
+    .nested-thread {
+        margin-left: 20px; /* Indentation */
+        padding-left: 10px;
+        border-left: 2px solid #e9ecef; /* Cascade line */
+        margin-top: 10px;
+    }
+    
+    .comment-bubble { background: #fff; border: 1px solid #eef0f3; border-radius: 12px; padding: 10px 15px; position: relative; font-size: 0.95rem; box-shadow: 0 1px 2px rgba(0,0,0,0.03); transition: box-shadow 0.2s; z-index: 1; }
+    .comment-bubble:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .hover-actions { opacity: 0; transition: opacity 0.2s; min-height: 20px; }
+    .comment-row:hover .hover-actions { opacity: 1; }
+    .preview-chip { display: inline-flex; align-items: center; background: #fff; border: 1px solid #dee2e6; border-radius: 16px; padding: 4px 10px; font-size: 0.85rem; max-width: 100%; }
+    .preview-chip img { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; margin-right: 8px; }
+    .reply-context-bar { border-left: 3px solid #0d6efd; background: #f8f9fa; padding: 8px 12px; border-radius: 0 4px 4px 0; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+</style>
+
+<script>
+const TaskCommentModule = (() => {
+    let localComments = []; 
+    let currentFilter = '';
+    let currentSort = 'desc';
+    let pendingFile = null; 
+    let replyingTo = null; 
+
+    function init() {
+        if(typeof serverComments !== 'undefined') localComments = [...serverComments];
+        const tx = document.getElementById('fullCommInput');
+        if(tx) {
+            tx.addEventListener("input", function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + "px";
+            }, false);
+        }
+    }
+
+    function render() {
+        const list = document.getElementById('fullCommentList');
+        if(!list) return;
+        list.innerHTML = '';
+
+        const threadMap = {};
+        const roots = [];
+        const validIds = new Set(localComments.map(c => c.id));
+        
+        let sorted = [...localComments].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        // 1. Build Thread Map
+        sorted.forEach(c => {
+            if (currentFilter) {
+                const match = (c.details && c.details.toLowerCase().includes(currentFilter.toLowerCase())) || 
+                              (c.userName && c.userName.toLowerCase().includes(currentFilter.toLowerCase()));
+                if(!match) return;
+            }
+            if (c.parentId && validIds.has(c.parentId)) {
+                if (!threadMap[c.parentId]) threadMap[c.parentId] = [];
+                threadMap[c.parentId].push(c);
+            } else {
+                roots.push(c);
+            }
+        });
+
+        // 2. Sort Roots
+        roots.sort((a, b) => {
+            const da = new Date(a.timestamp), db = new Date(b.timestamp);
+            return currentSort === 'asc' ? da - db : db - da;
+        });
+
+        if (roots.length === 0) {
+            list.innerHTML = `
+            <div class="text-center text-muted p-5 fst-italic opacity-50 d-flex flex-column align-items-center justify-content-center h-100">
+                <div class="bg-white p-3 rounded-circle shadow-sm mb-3"><i class="bi bi-chat-square-quote fs-1 text-secondary"></i></div>
+                <span>No comments yet.<br>Be the first to share your thoughts!</span>
+            </div>`;
+            return;
+        }
+
+        // 3. Recursive Render Function
+        function renderTree(comment) {
+            let html = createCommentHTML(comment);
+            
+            // Check for children
+            if (threadMap[comment.id]) {
+                const children = threadMap[comment.id];
+                let childrenHtml = '';
+                children.forEach(child => {
+                    childrenHtml += renderTree(child); // Recurse
+                });
+                
+                if (childrenHtml) {
+                    html += `<div class="nested-thread">${childrenHtml}</div>`;
+                }
+            }
+            return html;
+        }
+
+        // 4. Execute Render
+        roots.forEach(root => {
+            list.insertAdjacentHTML('beforeend', `<div class="mb-3">${renderTree(root)}</div>`);
+        });
+        
+        renderContextArea();
+    }
+
+    function createCommentHTML(c) {
+        const isMine = (typeof currentUserId !== 'undefined' && String(c.userId) === String(currentUserId));
+        const dateStr = new Date(c.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        
+        let fileHtml = '';
+        if (c.file) {
+            const isImage = c.file.mimetype && c.file.mimetype.startsWith('image');
+            if (isImage) {
+                fileHtml = `
+                <div class="mt-2">
+                    <div class="d-inline-block position-relative rounded overflow-hidden border bg-light cursor-pointer" 
+                         onclick="ImageViewer.open('${c.file.url}', '${c.file.filename}', '${c.file.mimetype}'); event.stopPropagation();"
+                         title="View Image">
+                        <img src="${c.file.url}" alt="${c.file.filename}" style="max-height: 150px; max-width: 100%; object-fit: cover; display: block;">
+                    </div>
+                </div>`;
+            } else {
+                const icon = 'bi-file-earmark-arrow-down-fill';
+                fileHtml = `
+                <div class="mt-2 pt-2 border-top">
+                    <a href="javascript:void(0)" 
+                       class="d-flex align-items-center text-decoration-none bg-light border rounded p-2 hover-bg-white transition-all" 
+                       onclick="ImageViewer.open('${c.file.url}', '${c.file.filename}', '${c.file.mimetype}'); event.stopPropagation()">
+                        <div class="rounded bg-white p-1 border me-2 d-flex align-items-center justify-content-center" style="width:32px;height:32px;">
+                            <i class="bi ${icon} text-primary"></i>
+                        </div>
+                        <div class="overflow-hidden">
+                            <div class="small fw-bold text-dark text-truncate" style="max-width: 180px;">${c.file.filename}</div>
+                            <div class="x-small text-muted">Click to open</div>
+                        </div>
+                    </a>
+                </div>`;
+            }
+        }
+
+        let actionsHtml = `
+            <button class="btn btn-xs btn-link text-secondary p-0 me-3 text-decoration-none" onclick="TaskCommentModule.initReply('${c.id}', '${c.userName}')" title="Reply">
+                <i class="bi bi-reply-fill"></i> Reply
+            </button>
+        `;
+        // ✅ FIX: Delete button logic standardized
+        if (isMine) {
+            actionsHtml += `
+            <button class="btn btn-xs btn-link text-danger p-0 opacity-75 hover-100 text-decoration-none" onclick="deleteComment('${c.id}'); event.stopPropagation();" title="Delete">
+                <i class="bi bi-trash-fill"></i>
+            </button>`;
+        }
+
+        const avatarSize = 36;
+        
+        return `
+            <div class="comment-row d-flex gap-2 position-relative group mb-2">
+                <div class="avatar-sm rounded-circle bg-white text-secondary fw-bold flex-shrink-0 d-flex align-items-center justify-content-center border shadow-sm" style="width: ${avatarSize}px; height: ${avatarSize}px; z-index: 1;">
+                    ${(c.userName||'U').charAt(0).toUpperCase()}
+                </div>
+                <div class="flex-grow-1" style="min-width: 0;">
+                    <div class="d-flex justify-content-between align-items-baseline mb-1 px-1">
+                        <span class="fw-bold text-dark small">${c.userName}</span> 
+                        <span class="text-muted x-small">${dateStr}</span>
+                    </div>
+                    
+                    <div class="comment-bubble hover-highlight" 
+                         onclick="TaskCommentModule.readComment('${c.id}')">
+                        <div class="text-dark text-pre-wrap">${c.details}</div>
+                        ${fileHtml}
+                    </div>
+                    
+                    <div class="d-flex mt-1 px-2 hover-actions">
+                        ${actionsHtml}
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function renderContextArea() {
+        const area = document.getElementById('commentContextArea');
+        let html = '';
+        let hasContent = false;
+
+        if (replyingTo) {
+            hasContent = true;
+            html += `
+            <div class="reply-context-bar">
+                <div>
+                    <span class="text-muted x-small text-uppercase fw-bold me-2">Replying to</span>
+                    <span class="fw-bold text-dark small">${replyingTo.name}</span>
+                </div>
+                <button type="button" class="btn-close small" aria-label="Cancel Reply" onclick="TaskCommentModule.cancelReply()"></button>
+            </div>`;
+        }
+
+        if (pendingFile) {
+            hasContent = true;
+            const isImage = pendingFile.type.startsWith('image/');
+            let previewContent = isImage ? `<img src="${URL.createObjectURL(pendingFile)}" alt="preview">` : `<i class="bi bi-file-earmark-text text-primary me-2"></i>`;
+            html += `
+            <div class="preview-chip mt-1">
+                ${previewContent}
+                <span class="text-truncate fw-bold text-dark me-2" style="max-width: 200px;">${pendingFile.name}</span>
+                <i class="bi bi-x-circle-fill text-secondary cursor-pointer hover-danger" onclick="TaskCommentModule.clearFile()"></i>
+            </div>`;
+        }
+
+        area.innerHTML = html;
+        if (hasContent) area.classList.remove('d-none'); else area.classList.add('d-none');
+    }
+
+    function handleFileSelect(input) { if(input.files && input.files.length > 0) { pendingFile = input.files[0]; renderContextArea(); } }
+    function clearFile() { pendingFile = null; document.getElementById('fullCommFile').value = ''; renderContextArea(); }
+    function initReply(parentId, userName) { replyingTo = { id: parentId, name: userName }; document.getElementById('replyParentId').value = parentId; renderContextArea(); document.getElementById('fullCommInput').focus(); }
+    function cancelReply() { replyingTo = null; document.getElementById('replyParentId').value = ''; renderContextArea(); }
+    function readComment(id) { const comment = localComments.find(c => c.id === id); if (comment && typeof openReader === 'function') { openReader(`Comment by ${comment.userName}`, comment.details); } }
+
+    return {
+        init,
+        open: () => { init(); render(); new bootstrap.Modal(document.getElementById('taskCommentModal')).show(); },
+        filter: (val) => { currentFilter = val; render(); },
+        sort: (dir) => { currentSort = dir; render(); },
+        handleFileSelect, clearFile, initReply, cancelReply, readComment,
+        addLocal: (entry) => {
+            localComments.push(entry);
+            if(typeof serverComments !== 'undefined') serverComments.push(entry); 
+            document.getElementById('fullCommInput').value = ''; document.getElementById('fullCommInput').style.height = 'auto'; 
+            clearFile(); cancelReply(); 
+            currentSort = 'desc'; 
+            if(document.getElementById('sortNew')) document.getElementById('sortNew').checked = true;
+            render();
+        },
+        removeLocal: (id) => {
+            // Filter local array
+            localComments = localComments.filter(c => c.id !== id);
+            if(typeof serverComments !== 'undefined') { 
+                const idx = serverComments.findIndex(c => c.id === id); 
+                if(idx > -1) serverComments.splice(idx, 1); 
+            }
+            render();
+        }
+    };
+})();
+
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('fullCommentForm');
+    if(form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            const btn = this.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            const actionId = this.querySelector('input[name="actionStateId"]').value;
+            try {
+                const url = `/tasks/comment/add?actionStateId=${encodeURIComponent(actionId)}`;
+                const res = await fetch(url, { method:'POST', headers:{'X-AJAX-Request':'true'}, body:fd });
+                const d = await res.json();
+                if (d.status === 'success') { TaskCommentModule.addLocal(d.entry); } 
+                else { if(typeof showMsg === 'function') await showMsg('Error', d.message, 'error'); else alert(d.message); }
+            } catch(err) { if(typeof showMsg === 'function') await showMsg('Error', 'Failed to post.', 'error'); } 
+            finally { btn.disabled = false; }
+        });
+    }
+});
+
+const originalDeleteComment = window.deleteComment;
+window.deleteComment = async function(id) {
+    if(!await confirmMsg("Delete Comment?", "Are you sure?")) return;
+    const taskId = '<%= localTaskId %>';
+    const actionId = '<%= localStateId %>';
+    try {
+        const res = await fetch('/tasks/comment/delete', { method: 'POST', headers: {'Content-Type':'application/json', 'X-AJAX-Request':'true'}, body: JSON.stringify({ taskId: taskId, commentId: id, actionStateId: actionId }) });
+        const d = await res.json();
+        if(d.status === 'success') { TaskCommentModule.removeLocal(id); } 
+        else { if(typeof showMsg === 'function') await showMsg('Error', d.message, 'error'); }
+    } catch(e) { if(typeof showMsg === 'function') await showMsg('Error', 'Delete failed.', 'error'); }
+};
+
+window.openFullCommentsModal = function() { TaskCommentModule.open(); };
+</script>

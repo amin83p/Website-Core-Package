@@ -1,0 +1,415 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-clipboard-data me-2"></i><%= title %></h1>
+    <div class="d-flex gap-2">
+      <a href="/school/transactions" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+      <form method="GET" action="/school/transactions/statement" id="statementFilterForm">
+        <div class="row">
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Effective From</label>
+            <input type="date" name="effectiveFrom" class="form-control size-md" value="<%= filters?.effectiveFrom || '' %>">
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Effective To</label>
+            <input type="date" name="effectiveTo" class="form-control size-md" value="<%= filters?.effectiveTo || '' %>">
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Posted From (DateTime)</label>
+            <input type="datetime-local" name="postedFrom" class="form-control size-md" value="<%= filters?.postedFrom || '' %>">
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Posted To (DateTime)</label>
+            <input type="datetime-local" name="postedTo" class="form-control size-md" value="<%= filters?.postedTo || '' %>">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-2 mb-3">
+            <label class="form-label fw-bold">Direction</label>
+            <select name="direction" class="form-select size-md">
+              <option value="">All</option>
+              <% (txDirections || []).forEach((dir) => { %>
+                <option value="<%= dir %>" <%= (filters?.direction || '') === dir ? 'selected' : '' %>><%= dir %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-2 mb-3">
+            <label class="form-label fw-bold">Currency</label>
+            <input type="text" name="currency" class="form-control size-md font-monospace" maxlength="3" value="<%= filters?.currency || '' %>" placeholder="CAD">
+          </div>
+          <div class="col-md-2 mb-3">
+            <label class="form-label fw-bold">Min Amount</label>
+            <input type="number" name="amountMin" class="form-control size-md" step="0.01" value="<%= filters?.amountMin ?? '' %>">
+          </div>
+          <div class="col-md-2 mb-3">
+            <label class="form-label fw-bold">Max Amount</label>
+            <input type="number" name="amountMax" class="form-control size-md" step="0.01" value="<%= filters?.amountMax ?? '' %>">
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label fw-bold">Search</label>
+            <input type="text" name="search" class="form-control size-md" value="<%= filters?.search || '' %>" placeholder="Memo, journal no, account code, event id...">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label class="form-label fw-bold">Statuses</label>
+            <select name="statuses" class="form-select size-md" multiple size="4">
+              <% (txStatuses || []).forEach((st) => { %>
+                <option value="<%= st %>" <%= (filters?.statuses || []).includes(st) ? 'selected' : '' %>><%= st %></option>
+              <% }) %>
+            </select>
+            <div class="form-text small">Use Ctrl/Cmd for multi-select.</div>
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label fw-bold">Transaction Types</label>
+            <select name="transactionTypes" class="form-select size-md" multiple size="4">
+              <% (txTypes || []).forEach((tp) => { %>
+                <option value="<%= tp %>" <%= (filters?.transactionTypes || []).includes(tp) ? 'selected' : '' %>><%= tp %></option>
+              <% }) %>
+            </select>
+            <div class="form-text small">Use Ctrl/Cmd for multi-select.</div>
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label fw-bold">Accounts</label>
+            <div class="d-flex gap-2 mb-2">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickAccount"><i class="bi bi-search me-1"></i>Add Account</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnClearAccounts">Clear</button>
+              <div class="form-check d-flex align-items-center ms-auto">
+                <input class="form-check-input" type="checkbox" value="1" id="chkAllAccounts" name="allAccounts" <%= filters?.allAccounts ? 'checked' : '' %>>
+                <label class="form-check-label fw-bold ms-2" for="chkAllAccounts">All Accounts</label>
+              </div>
+            </div>
+            <div id="selectedAccountsBox" class="border rounded p-2 bg-light-subtle small"></div>
+            <div class="form-text small">Select one or more accounts to run the statement.</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <div class="form-check mt-2">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="chkIncludeReversals"
+                name="includeReversals"
+                value="1"
+                <%= filters?.includeReversals ? 'checked' : '' %>
+              >
+              <label class="form-check-label fw-bold" for="chkIncludeReversals">Include Rollback/Reversal History</label>
+            </div>
+            <div class="form-text small">When enabled, original posted rows and their reversal rows are both visible in statement results.</div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+          <a href="/school/transactions/statement" class="btn btn-outline-secondary btn-md">Reset</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Transactions</div>
+          <div class="fs-4 fw-bold"><%= summary?.transactionCount || 0 %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Accounts</div>
+          <div class="fs-4 fw-bold"><%= summary?.accountCount || 0 %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Debit</div>
+          <div class="fs-6 fw-bold text-success"><%= Number(summary?.totalDebit || 0).toFixed(2) %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Credit</div>
+          <div class="fs-6 fw-bold text-danger"><%= Number(summary?.totalCredit || 0).toFixed(2) %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Net Movement</div>
+          <div class="fs-6 fw-bold"><%= Number(summary?.netMovement || 0).toFixed(2) %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+      <div class="d-flex align-items-center justify-content-between gap-2">
+        <h5 class="m-0 fw-bold">Account Summary</h5>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          data-bs-toggle="collapse"
+          data-bs-target="#accountSummaryCollapse"
+          aria-expanded="true"
+          aria-controls="accountSummaryCollapse"
+        >
+          <i class="bi bi-chevron-down me-1"></i><span class="js-collapse-label">Collapse</span>
+        </button>
+      </div>
+    </div>
+    <div id="accountSummaryCollapse" class="collapse show">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="ps-3">Account</th>
+              <th>Normal</th>
+              <th>Opening</th>
+              <th>Period Debit</th>
+              <th>Period Credit</th>
+              <th class="pe-3">Closing</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!hasSelectedAccounts) { %>
+              <tr><td colspan="6" class="text-center text-muted py-3">Select one or more accounts to view the statement.</td></tr>
+            <% } else if (!byAccountSummary || byAccountSummary.length === 0) { %>
+              <tr><td colspan="6" class="text-center text-muted py-3">No account summary rows found.</td></tr>
+            <% } %>
+            <% (byAccountSummary || []).forEach((row) => { %>
+              <tr>
+                <td class="ps-3">
+                  <div class="fw-bold"><%= row.code %> - <%= row.name %></div>
+                  <div class="x-small text-muted font-monospace"><%= row.accountId %></div>
+                </td>
+                <td><%= String(row.normalBalance || '').toUpperCase() %></td>
+                <td class="fw-bold"><%= Number(row.opening || 0).toFixed(2) %></td>
+                <td class="text-success fw-bold"><%= Number(row.periodDebit || 0).toFixed(2) %></td>
+                <td class="text-danger fw-bold"><%= Number(row.periodCredit || 0).toFixed(2) %></td>
+                <td class="pe-3 fw-bold"><%= Number(row.closing || 0).toFixed(2) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3">
+      <div class="d-flex align-items-center justify-content-between gap-2">
+        <h5 class="m-0 fw-bold">Statement Rows</h5>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          data-bs-toggle="collapse"
+          data-bs-target="#statementRowsCollapse"
+          aria-expanded="true"
+          aria-controls="statementRowsCollapse"
+        >
+          <i class="bi bi-chevron-down me-1"></i><span class="js-collapse-label">Collapse</span>
+        </button>
+      </div>
+    </div>
+    <div id="statementRowsCollapse" class="collapse show">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="ps-3">Effective</th>
+              <th>Posted At</th>
+              <th>Account</th>
+              <th>Direction</th>
+              <th>Amount</th>
+              <th>Running Balance</th>
+              <th>Reference</th>
+              <th class="pe-3">Memo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!hasSelectedAccounts) { %>
+              <tr><td colspan="8" class="text-center text-muted py-3">Select one or more accounts to view statement rows.</td></tr>
+            <% } else if (!rows || rows.length === 0) { %>
+              <tr><td colspan="8" class="text-center text-muted py-3">No rows matched your filters.</td></tr>
+            <% } %>
+            <% (rows || []).forEach((row) => { %>
+              <tr>
+                <td class="ps-3"><%= row.effectiveDate || '-' %></td>
+                <td><%= row.postedAt || '-' %></td>
+                <td>
+                  <div class="fw-bold"><%= row.__accountCode || '-' %> - <%= row.__accountName || '-' %></div>
+                  <div class="x-small text-muted font-monospace"><%= row.__accountId || '-' %></div>
+                </td>
+                <td>
+                  <% const direction = String(row?.amount?.direction || '').toLowerCase(); %>
+                  <% if (direction === 'debit') { %>
+                    <span class="badge bg-success">DEBIT</span>
+                  <% } else { %>
+                    <span class="badge bg-danger">CREDIT</span>
+                  <% } %>
+                </td>
+                <td class="fw-bold"><%= Number(row?.amount?.value || 0).toFixed(2) %> <%= row?.amount?.currency || '' %></td>
+                <td class="fw-bold"><%= Number(row.__runningBalance || 0).toFixed(2) %></td>
+                <td>
+                  <div class="small"><%= row.externalReference || '-' %></div>
+                  <div class="x-small text-muted font-monospace"><%= row.source?.eventId || row.id || '-' %></div>
+                </td>
+                <td class="pe-3"><span class="small text-muted"><%= row.memo || '-' %></span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const selectedAccounts = <%- JSON.stringify(selectedAccounts || []) %>;
+  const form = document.getElementById('statementFilterForm');
+  const chkAll = document.getElementById('chkAllAccounts');
+
+  function initCollapseToggle(collapseId) {
+    const el = document.getElementById(collapseId);
+    if (!el) return;
+    const btn = document.querySelector('[data-bs-target="#' + collapseId + '"]');
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    const label = btn.querySelector('.js-collapse-label');
+    function sync(isShown) {
+      if (icon) {
+        icon.classList.toggle('bi-chevron-down', !!isShown);
+        icon.classList.toggle('bi-chevron-right', !isShown);
+      }
+      if (label) label.textContent = isShown ? 'Collapse' : 'Expand';
+      btn.setAttribute('aria-expanded', isShown ? 'true' : 'false');
+    }
+    sync(el.classList.contains('show'));
+    el.addEventListener('shown.bs.collapse', function () { sync(true); });
+    el.addEventListener('hidden.bs.collapse', function () { sync(false); });
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function renderSelectedAccounts() {
+    const box = document.getElementById('selectedAccountsBox');
+    if (!box) return;
+    const allAccounts = !!chkAll?.checked;
+    if (allAccounts) {
+      box.innerHTML = '<div class="fw-bold">All accounts selected.</div><div class="text-muted">Account picker is disabled while "All Accounts" is checked.</div>';
+      return;
+    }
+    if (!selectedAccounts.length) {
+      box.innerHTML = '<div class="text-muted">No accounts selected.</div>';
+      return;
+    }
+    box.innerHTML = selectedAccounts.map(function (item, index) {
+      return '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-2 py-1 mb-2">' +
+        '<div class="text-break">' +
+          '<div class="fw-bold">' + escapeHtml(item.label || item.id) + '</div>' +
+          '<div class="x-small text-muted font-monospace">' + escapeHtml(item.id || '') + '</div>' +
+        '</div>' +
+        '<div class="d-flex align-items-center gap-2">' +
+          '<input type="hidden" name="accountIds" value="' + escapeHtml(item.id || '') + '">' +
+          '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-account="' + index + '"><i class="bi bi-x-lg"></i></button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    box.querySelectorAll('button[data-remove-account]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const idx = Number(btn.getAttribute('data-remove-account'));
+        if (Number.isNaN(idx) || idx < 0 || idx >= selectedAccounts.length) return;
+        selectedAccounts.splice(idx, 1);
+        renderSelectedAccounts();
+      });
+    });
+  }
+
+  function setAccountUiEnabled(enabled) {
+    const pickBtn = document.getElementById('btnPickAccount');
+    const clearBtn = document.getElementById('btnClearAccounts');
+    if (pickBtn) pickBtn.disabled = !enabled;
+    if (clearBtn) clearBtn.disabled = !enabled;
+  }
+
+  function addUniqueAccount(item) {
+    const id = String(item?.id || '').trim();
+    if (!id) return;
+    if (selectedAccounts.some(function (row) { return String(row.id || '') === id; })) return;
+    selectedAccounts.push({
+      id: id,
+      label: String(item.label || id)
+    });
+    renderSelectedAccounts();
+  }
+
+  document.getElementById('btnPickAccount')?.addEventListener('click', function () {
+    if (chkAll?.checked) return;
+    GenericPicker.open(GenericPickerPresets.account({
+      title: 'Select Account(s)',
+      multiselect: true,
+      onSelect: function (items) {
+        const list = Array.isArray(items) ? items : [items];
+        list.forEach(function (item) {
+          addUniqueAccount({
+            id: item.id,
+            label: [String(item.code || item.id || ''), String(item.name || '')].filter(Boolean).join(' - ') + ' (' + String(item.id || '') + ')'
+          });
+        });
+      }
+    }));
+  });
+
+  document.getElementById('btnClearAccounts')?.addEventListener('click', function () {
+    if (chkAll?.checked) return;
+    selectedAccounts.length = 0;
+    renderSelectedAccounts();
+  });
+
+  chkAll?.addEventListener('change', function () {
+    const enabled = !chkAll.checked;
+    setAccountUiEnabled(enabled);
+    if (chkAll.checked) {
+      selectedAccounts.length = 0;
+    }
+    renderSelectedAccounts();
+  });
+
+  form?.addEventListener('submit', function () {
+    renderSelectedAccounts();
+  });
+
+  initCollapseToggle('accountSummaryCollapse');
+  initCollapseToggle('statementRowsCollapse');
+  setAccountUiEnabled(!(chkAll?.checked));
+  renderSelectedAccounts();
+})();
+</script>

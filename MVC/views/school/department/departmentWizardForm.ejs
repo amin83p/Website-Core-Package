@@ -1,0 +1,334 @@
+<%- include('./departmentForm') %>
+
+<style>
+  #departmentWizardGuide {
+    font-size: 1rem;
+  }
+  #departmentWizardGuide .small {
+    font-size: 1rem !important;
+  }
+  .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .wizard-step-rail::-webkit-scrollbar {
+    display: none;
+  }
+  #departmentWizardGuide .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    transition: all 0.2s ease;
+  }
+  #departmentWizardGuide .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #departmentWizardGuide .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #departmentWizardGuide .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #departmentWizardGuide .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  .department-wizard-controls {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .department-wizard-controls .wizard-step-label {
+    color: #17324d;
+    font-weight: 600;
+  }
+  .department-wizard-controls .btn.btn-sm {
+    font-size: 1rem;
+    padding: 0.45rem 0.85rem;
+  }
+</style>
+
+<script src="/scripts/wizardStepRail.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tabs = document.getElementById('departmentTabs');
+  const form = document.getElementById('deptForm');
+  if (!tabs || !form || typeof bootstrap === 'undefined') return;
+
+  const navButtons = Array.from(tabs.querySelectorAll('button.nav-link[data-bs-target]'));
+  if (!navButtons.length) return;
+
+  function parseJson(id, fallback) {
+    try {
+      const raw = document.getElementById(id)?.value;
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  const stepConfig = [
+    {
+      target: '#tab-general',
+      title: 'General Info',
+      helper: [
+        'Define department code, name, status, and description.',
+        'Use a stable code format for finance, reporting, and references.',
+        'Keep status aligned with operational readiness.'
+      ],
+      impacts: [
+        'Department identity is referenced by programs, classes, and staffing modules.',
+        'Inactive departments are typically hidden from operational pickers.',
+        'Clear descriptions help governance and audit reviews.'
+      ],
+      required: [
+        { selector: 'input[name="code"]', label: 'Department Code' },
+        { selector: 'input[name="name"]', label: 'Department Name' }
+      ]
+    },
+    {
+      target: '#tab-posting-policy',
+      title: 'Posting Policies',
+      helper: [
+        'Define fallback transaction templates by fee category.',
+        'Keep an All Categories policy for safer default behavior.',
+        'Add notes for exceptions and temporary finance rules.'
+      ],
+      impacts: [
+        'Program and class registration finance can fall back to these policies.',
+        'Missing policies increase manual accounting corrections.',
+        'Consistent mappings improve downstream posting reliability.'
+      ],
+      required: [],
+      customCheck: function () {
+        const rows = parseJson('hid_postingPolicies', []);
+        if (!Array.isArray(rows)) return '';
+        for (const row of rows) {
+          if (!String(row?.transactionDefinitionId || '').trim()) {
+            return 'Each Posting Policy row must include a Transaction Template.';
+          }
+        }
+        return '';
+      }
+    }
+  ];
+
+  const byTarget = new Map(stepConfig.map((step, index) => [step.target, { ...step, index }]));
+
+  const guide = document.createElement('div');
+  guide.id = 'departmentWizardGuide';
+  guide.className = 'card border-0 shadow-sm mb-3';
+  guide.innerHTML = [
+    '<div class="card-body">',
+      '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">',
+        '<div>',
+          '<div class="fw-bold text-primary">Department Setup Wizard</div>',
+          '<div class="text-muted">Complete setup in order to keep governance and posting defaults consistent.</div>',
+        '</div>',
+        '<div class="d-flex align-items-center gap-2">',
+          '<span class="badge bg-light text-dark border" id="departmentWizardStepBadge">Step 1 of ' + stepConfig.length + '</span>',
+          '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="departmentWizardProgressPct">0%</span>',
+        '</div>',
+      '</div>',
+      '<div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="departmentWizardProgressBar"></div></div>',
+      '<div class="wizard-step-rail mb-3" id="departmentWizardStepPills"></div>',
+      '<div class="row g-3">',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light-subtle">',
+            '<div class="fw-bold mb-2">Active Step Help</div>',
+            '<div id="departmentWizardStepHelp"></div>',
+          '</div>',
+        '</div>',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light">',
+            '<div class="fw-bold mb-2">How Other Sections Use This Data</div>',
+            '<div id="departmentWizardStepImpacts"></div>',
+          '</div>',
+        '</div>',
+      '</div>',
+    '</div>'
+  ].join('');
+
+  tabs.parentNode.insertBefore(guide, tabs);
+  tabs.classList.add('d-none');
+
+  const buttonRow = form.querySelector('.button-row');
+  const controls = document.createElement('div');
+  controls.className = 'department-wizard-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3';
+  controls.innerHTML = [
+    '<div class="wizard-step-label" id="departmentWizardCurrentLabel"></div>',
+    '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="departmentWizardPrevBtn"><i class="bi bi-arrow-left me-1"></i>Previous</button>',
+      '<button type="button" class="btn btn-primary btn-sm" id="departmentWizardNextBtn">Next<i class="bi bi-arrow-right ms-1"></i></button>',
+    '</div>'
+  ].join('');
+  if (buttonRow && buttonRow.parentNode) {
+    buttonRow.parentNode.insertBefore(controls, buttonRow);
+  }
+
+  const stepPills = document.getElementById('departmentWizardStepPills');
+  const stepHelp = document.getElementById('departmentWizardStepHelp');
+  const stepImpacts = document.getElementById('departmentWizardStepImpacts');
+  const stepBadge = document.getElementById('departmentWizardStepBadge');
+  const progressPct = document.getElementById('departmentWizardProgressPct');
+  const stepLabel = document.getElementById('departmentWizardCurrentLabel');
+  const progressBar = document.getElementById('departmentWizardProgressBar');
+  const btnPrev = document.getElementById('departmentWizardPrevBtn');
+  const btnNext = document.getElementById('departmentWizardNextBtn');
+
+  let currentIndex = Math.max(0, navButtons.findIndex((btn) => btn.classList.contains('active')));
+  if (currentIndex < 0) currentIndex = 0;
+
+  function escapeHtml(input) {
+    return String(input || '').replace(/[&<>\"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function renderList(items) {
+    const safe = Array.isArray(items) ? items : [];
+    if (!safe.length) return '<div class="text-muted">No additional notes for this step.</div>';
+    return '<ul class="mb-0 ps-3">' + safe.map(function (line) {
+      return '<li>' + escapeHtml(line) + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function getStepIndexFromTarget(target) {
+    return byTarget.has(target) ? byTarget.get(target).index : 0;
+  }
+
+  function showStep(index) {
+    const bounded = Math.max(0, Math.min(stepConfig.length - 1, Number(index)));
+    const tab = navButtons[bounded];
+    if (!tab) return;
+    bootstrap.Tab.getOrCreateInstance(tab).show();
+  }
+
+  function findMissingRequired(step) {
+    const missing = [];
+    (step.required || []).forEach(function (rule) {
+      const el = form.querySelector(rule.selector);
+      const value = String(el?.value || '').trim();
+      if (!el || !value) missing.push({ label: rule.label, selector: rule.selector });
+    });
+    if (typeof step.customCheck === 'function') {
+      const customError = String(step.customCheck() || '').trim();
+      if (customError) missing.push({ label: customError, selector: '' });
+    }
+    return missing;
+  }
+
+  async function showWarning(message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title: 'Step Incomplete',
+        icon: 'warning',
+        message,
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  function renderWizardUi() {
+    const step = stepConfig[currentIndex];
+    const progress = ((currentIndex + 1) / stepConfig.length) * 100;
+
+    stepBadge.textContent = 'Step ' + (currentIndex + 1) + ' of ' + stepConfig.length;
+    if (progressPct) progressPct.textContent = Math.round(progress) + '%';
+    stepLabel.textContent = step.title;
+    progressBar.style.width = progress.toFixed(2) + '%';
+    stepHelp.innerHTML = renderList(step.helper);
+    stepImpacts.innerHTML = renderList(step.impacts);
+
+    stepPills.innerHTML = stepConfig.map(function (item, idx) {
+      const cls = idx === currentIndex ? 'active' : (idx < currentIndex ? 'completed' : '');
+      return '<button type="button" class="wizard-step-pill ' + cls + '" data-step-index="' + idx + '">' + (idx + 1) + '. ' + escapeHtml(item.title) + '</button>';
+    }).join('');
+
+    stepPills.querySelectorAll('[data-step-index]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        showStep(Number(btn.getAttribute('data-step-index')));
+      });
+    });
+
+    if (window.WizardStepRail) window.WizardStepRail.sync(stepPills);
+
+    btnPrev.disabled = currentIndex <= 0;
+    btnNext.innerHTML = currentIndex >= stepConfig.length - 1
+      ? 'Review Save<i class="bi bi-check2-circle ms-1"></i>'
+      : 'Next<i class="bi bi-arrow-right ms-1"></i>';
+  }
+
+  btnPrev?.addEventListener('click', function () {
+    showStep(currentIndex - 1);
+  });
+
+  btnNext?.addEventListener('click', async function () {
+    const step = stepConfig[currentIndex];
+    if (currentIndex < stepConfig.length - 1) {
+      const missing = findMissingRequired(step);
+      if (missing.length) {
+        const message = 'Complete required fields before moving on:<br>' +
+          missing.map(function (item) { return '- ' + escapeHtml(item.label); }).join('<br>');
+        await showWarning(message);
+        const first = missing.find(function (item) { return item.selector; });
+        if (first?.selector) {
+          const el = form.querySelector(first.selector);
+          if (el) {
+            try { el.focus(); } catch (_) {}
+          }
+        }
+        return;
+      }
+      showStep(currentIndex + 1);
+      return;
+    }
+    const saveRow = form.querySelector('.button-row');
+    if (saveRow) saveRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const saveBtn = form.querySelector('button[type="submit"]');
+    if (saveBtn) {
+      saveBtn.classList.add('shadow');
+      setTimeout(function () { saveBtn.classList.remove('shadow'); }, 1200);
+    }
+  });
+
+  navButtons.forEach(function (btn) {
+    btn.addEventListener('shown.bs.tab', function (event) {
+      currentIndex = getStepIndexFromTarget(event.target.getAttribute('data-bs-target'));
+      renderWizardUi();
+    });
+  });
+
+  renderWizardUi();
+});
+</script>
+
+

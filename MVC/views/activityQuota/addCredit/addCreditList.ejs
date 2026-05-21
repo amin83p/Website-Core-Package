@@ -1,0 +1,126 @@
+<%
+  const ui = accessUi || {};
+  const canUpdate = ui.canUpdate === true;
+  const canDelete = ui.canDelete === true;
+  const hasRowActions = canUpdate || canDelete;
+%>
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  manageBtns: Array.isArray(manageBtns) ? manageBtns : []
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search credits by id, user, creator, section, or source...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Date / Ledger ID</th>
+        <th>Target User</th>
+        <th>Organization</th>
+        <th>Section / Operation</th>
+        <th>Credit Values</th>
+        <th>Creator</th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">No credit entries found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const creator = item.creator || {}; %>
+        <% const source = item.source || {}; %>
+        <% const display = item.display || {}; %>
+        <% const groupInfo = item.group || null; %>
+        <% const editHref = groupInfo && groupInfo.id ? ('/activity-quota/add-credit/groups/edit/' + groupInfo.id) : ('/activity-quota/add-credit/edit/' + item.id); %>
+        <% const deleteUrl = groupInfo && groupInfo.id ? ('/activity-quota/add-credit/groups/delete/' + groupInfo.id) : ('/activity-quota/add-credit/delete/' + item.id); %>
+        <% const actionMenuId = item.id; %>
+        <% const deleteTargetId = groupInfo && groupInfo.id ? groupInfo.id : item.id; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.dateTime ? new Date(item.dateTime).toLocaleString() : '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
+            <% if (groupInfo && groupInfo.id) { %>
+              <div class="x-small mt-1">
+                <a href="/activity-quota/add-credit/groups/edit/<%= groupInfo.id %>" class="badge text-bg-info text-decoration-none">
+                  Group <%= groupInfo.id %>
+                </a>
+              </div>
+            <% } %>
+          </td>
+          <td>
+            <div class="fw-bold text-dark"><%= display.userName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.userId || '-' %></div>
+            <div class="x-small text-muted"><%= source.eventType || 'manual_credit' %></div>
+          </td>
+          <td>
+            <div class="small text-dark font-monospace"><%= item.orgId || '-' %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= display.sectionName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.section || '-' %></div>
+            <div class="small fw-bold text-dark mt-1"><%= display.operationName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.operation || '-' %></div>
+          </td>
+          <td>
+            <div class="small text-dark">Call: <span class="fw-bold"><%= Number(item.call || 0) %></span></div>
+            <div class="x-small text-muted">Amount: <%= Number(item.amount || 0) %></div>
+            <div class="x-small text-muted">Token: <%= Number(item.token || 0) %></div>
+            <div class="x-small text-muted">Volume: <%= Number(item.volume || 0) %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= creator.displayName || (creator.type === 'system' ? 'System' : '-') %></div>
+            <div class="x-small text-muted font-monospace"><%= creator.userId || 'System' %></div>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <% if (hasRowActions) { %>
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= actionMenuId %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= actionMenuId %>">
+                  <% if (canUpdate) { %>
+                    <a href="<%= editHref %>" class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-pencil-square me-2"></i><%= groupInfo && groupInfo.id ? 'Edit Group' : 'Edit' %>
+                    </a>
+                  <% } %>
+                  <% if (canDelete) { %>
+                    <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= deleteTargetId %>" data-delete-url="<%= deleteUrl %>">
+                      <i class="bi bi-trash me-2"></i><%= groupInfo && groupInfo.id ? 'Delete Group' : 'Delete' %>
+                    </button>
+                  <% } %>
+                </div>
+              </div>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('../../partials/tablePages-end') %>

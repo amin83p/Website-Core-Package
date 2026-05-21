@@ -1,0 +1,4452 @@
+{
+  "meta": {
+    "schemaVersion": "1.0.0",
+    "entityType": "clbCompetencies",
+    "layer": "reference",
+    "authority": "official",
+    "isReadMostly": true,
+    "defaultLocale": "en-CA",
+    "generatedAt": "2026-03-21T00:00:00.000Z",
+    "updatedAt": "2026-03-23T03:52:59.926Z"
+  },
+  "itemsById": {
+    "comp:listening:1:comprehending_information:001": {
+      "id": "comp:listening:1:comprehending_information:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:1",
+      "code": "COMP-L-01-COMP",
+      "competencyAreaId": "ca:listening:comprehending_information",
+      "competencyId": "comp:listening:1:comprehending_information:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand very simple information about highly familiar, concrete topics.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:1:competency:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 31,
+          "pageEnd": 31
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:1",
+        "ca:listening:comprehending_information",
+        "poa:listening:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L01 Comprehending",
+      "skillId": "skill:listening",
+      "slug": "listening-1-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:1:competency:comprehending_information:001",
+          "pages": [
+            31,
+            31
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:1:competency:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 1 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:1:comprehending_instructions:001": {
+      "id": "comp:listening:1:comprehending_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:1",
+      "code": "COMP-L-01-COMP",
+      "competencyAreaId": "ca:listening:comprehending_instructions",
+      "competencyId": "comp:listening:1:comprehending_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short, simple, common instructions, commands, requests and directions related to immediate personal needs. [Instructions/commands are simple imperative sentences.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:1:competency:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 32,
+          "pageEnd": 32
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:1",
+        "ca:listening:comprehending_instructions",
+        "poa:listening:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L01 Comprehending",
+      "skillId": "skill:listening",
+      "slug": "listening-1-comprehending-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:1:competency:comprehending_instructions:001",
+          "pages": [
+            32,
+            32
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:1:competency:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 1 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:1:getting_things_done:001": {
+      "id": "comp:listening:1:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:1",
+      "code": "COMP-L-01-GETT",
+      "competencyAreaId": "ca:listening:getting_things_done",
+      "competencyId": "comp:listening:1:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand expressions used to attract attention and to request assistance in situations of immediate personal need.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:1:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 31,
+          "pageEnd": 31
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:1",
+        "ca:listening:getting_things_done",
+        "poa:listening:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L01 Getting Things",
+      "skillId": "skill:listening",
+      "slug": "listening-1-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:1:competency:getting_things_done:001",
+          "pages": [
+            31,
+            31
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:1:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 1 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:1:interacting_with_others:001": {
+      "id": "comp:listening:1:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:1",
+      "code": "COMP-L-01-INTE",
+      "competencyAreaId": "ca:listening:interacting_with_others",
+      "competencyId": "comp:listening:1:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand greetings, introductions, requests, goodwill expressions and an expanding range of basic courtesy formulas.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:1:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 32,
+          "pageEnd": 32
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:1",
+        "ca:listening:interacting_with_others",
+        "poa:listening:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L01 Interacting Wi",
+      "skillId": "skill:listening",
+      "slug": "listening-1-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:1:competency:interacting_with_others:001",
+          "pages": [
+            32,
+            32
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:1:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 1 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:2:comprehending_information:001": {
+      "id": "comp:listening:2:comprehending_information:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:2",
+      "code": "COMP-L-02-COMP",
+      "competencyAreaId": "ca:listening:comprehending_information",
+      "competencyId": "comp:listening:2:comprehending_information:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand simple information about familiar, concrete topics.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:2:competency:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 33,
+          "pageEnd": 33
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:2",
+        "ca:listening:comprehending_information",
+        "poa:listening:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L02 Comprehending",
+      "skillId": "skill:listening",
+      "slug": "listening-2-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:2:competency:comprehending_information:001",
+          "pages": [
+            33,
+            33
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:2:competency:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 2 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:2:comprehending_instructions:001": {
+      "id": "comp:listening:2:comprehending_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:2",
+      "code": "COMP-L-02-COMP",
+      "competencyAreaId": "ca:listening:comprehending_instructions",
+      "competencyId": "comp:listening:2:comprehending_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand instructions and directions related to familiar, everyday situations of immediate personal relevance.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:2:competency:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 34,
+          "pageEnd": 34
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:2",
+        "ca:listening:comprehending_instructions",
+        "poa:listening:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L02 Comprehending",
+      "skillId": "skill:listening",
+      "slug": "listening-2-comprehending-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:2:competency:comprehending_instructions:001",
+          "pages": [
+            34,
+            34
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:2:competency:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 2 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:2:getting_things_done:001": {
+      "id": "comp:listening:2:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:2",
+      "code": "COMP-L-02-GETT",
+      "competencyAreaId": "ca:listening:getting_things_done",
+      "competencyId": "comp:listening:2:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand expressions used to make and respond to requests and warnings in situations of immediate personal need.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:2:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 33,
+          "pageEnd": 33
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:2",
+        "ca:listening:getting_things_done",
+        "poa:listening:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L02 Getting Things",
+      "skillId": "skill:listening",
+      "slug": "listening-2-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:2:competency:getting_things_done:001",
+          "pages": [
+            33,
+            33
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:2:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 2 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:2:interacting_with_others:001": {
+      "id": "comp:listening:2:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:2",
+      "code": "COMP-L-02-INTE",
+      "competencyAreaId": "ca:listening:interacting_with_others",
+      "competencyId": "comp:listening:2:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand simple social exchanges, including styles of greetings, introductions and leave-taking.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:2:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 34,
+          "pageEnd": 34
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:2",
+        "ca:listening:interacting_with_others",
+        "poa:listening:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L02 Interacting Wi",
+      "skillId": "skill:listening",
+      "slug": "listening-2-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:2:competency:interacting_with_others:001",
+          "pages": [
+            34,
+            34
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:2:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 2 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:3:comprehending_information:001": {
+      "id": "comp:listening:3:comprehending_information:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:3",
+      "code": "COMP-L-03-COMP",
+      "competencyAreaId": "ca:listening:comprehending_information",
+      "competencyId": "comp:listening:3:comprehending_information:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short, simple, descriptive communication about a person, object, situation, scene, personal experience or daily routine.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:3:competency:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 35,
+          "pageEnd": 35
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:3",
+        "ca:listening:comprehending_information",
+        "poa:listening:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L03 Comprehending",
+      "skillId": "skill:listening",
+      "slug": "listening-3-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:3:competency:comprehending_information:001",
+          "pages": [
+            35,
+            35
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:3:competency:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 3 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:3:comprehending_instructions:001": {
+      "id": "comp:listening:3:comprehending_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:3",
+      "code": "COMP-L-03-COMP",
+      "competencyAreaId": "ca:listening:comprehending_instructions",
+      "competencyId": "comp:listening:3:comprehending_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand common, sequentially presented instructions and directions related to familiar, everyday situations of personal relevance.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:3:competency:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 36,
+          "pageEnd": 36
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:3",
+        "ca:listening:comprehending_instructions",
+        "poa:listening:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L03 Comprehending",
+      "skillId": "skill:listening",
+      "slug": "listening-3-comprehending-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:3:competency:comprehending_instructions:001",
+          "pages": [
+            36,
+            36
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:3:competency:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 3 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:3:getting_things_done:001": {
+      "id": "comp:listening:3:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:3",
+      "code": "COMP-L-03-GETT",
+      "competencyAreaId": "ca:listening:getting_things_done",
+      "competencyId": "comp:listening:3:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand expressions used in familiar everyday situations (such as requests, permission and warnings).",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:3:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 35,
+          "pageEnd": 35
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:3",
+        "ca:listening:getting_things_done",
+        "poa:listening:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L03 Getting Things",
+      "skillId": "skill:listening",
+      "slug": "listening-3-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:3:competency:getting_things_done:001",
+          "pages": [
+            35,
+            35
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:3:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 3 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:3:interacting_with_others:001": {
+      "id": "comp:listening:3:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:3",
+      "code": "COMP-L-03-INTE",
+      "competencyAreaId": "ca:listening:interacting_with_others",
+      "competencyId": "comp:listening:3:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short social exchanges containing introductions, casual small talk and leave-taking.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:3:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 36,
+          "pageEnd": 36
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:3",
+        "ca:listening:interacting_with_others",
+        "poa:listening:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L03 Interacting Wi",
+      "skillId": "skill:listening",
+      "slug": "listening-3-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:3:competency:interacting_with_others:001",
+          "pages": [
+            36,
+            36
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:3:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 3 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:4:comprehending_information:001": {
+      "id": "comp:listening:4:comprehending_information:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:4",
+      "code": "COMP-L-04-COMP",
+      "competencyAreaId": "ca:listening:comprehending_information",
+      "competencyId": "comp:listening:4:comprehending_information:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short descriptive or narrative communication on topics of personal relevance.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:4:competency:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 37,
+          "pageEnd": 37
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:4",
+        "ca:listening:comprehending_information",
+        "poa:listening:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L04 Comprehending",
+      "skillId": "skill:listening",
+      "slug": "listening-4-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:4:competency:comprehending_information:001",
+          "pages": [
+            37,
+            37
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:4:competency:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 4 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:4:comprehending_instructions:001": {
+      "id": "comp:listening:4:comprehending_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:4",
+      "code": "COMP-L-04-COMP",
+      "competencyAreaId": "ca:listening:comprehending_instructions",
+      "competencyId": "comp:listening:4:comprehending_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand simple to moderately complex directions and instructions for generally familiar and relevant procedures. [Instructions are about 7 to 8 steps, with up to 10 details (fewer on the phone).]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:4:competency:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 42,
+          "pageEnd": 42
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:4",
+        "ca:listening:comprehending_instructions",
+        "poa:listening:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L04 Comprehending",
+      "skillId": "skill:listening",
+      "slug": "listening-4-comprehending-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:4:competency:comprehending_instructions:001",
+          "pages": [
+            42,
+            42
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:4:competency:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 4 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:4:getting_things_done:001": {
+      "id": "comp:listening:4:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:4",
+      "code": "COMP-L-04-GETT",
+      "competencyAreaId": "ca:listening:getting_things_done",
+      "competencyId": "comp:listening:4:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short communication intended to influence or persuade others in familiar, everyday situations.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:4:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 37,
+          "pageEnd": 37
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:4",
+        "ca:listening:getting_things_done",
+        "poa:listening:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L04 Getting Things",
+      "skillId": "skill:listening",
+      "slug": "listening-4-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:4:competency:getting_things_done:001",
+          "pages": [
+            37,
+            37
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:4:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 4 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:4:interacting_with_others:001": {
+      "id": "comp:listening:4:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:listening:4",
+      "code": "COMP-L-04-INTE",
+      "competencyAreaId": "ca:listening:interacting_with_others",
+      "competencyId": "comp:listening:4:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand the gist and some details in moderately complex common and predictable social exchanges (that may express interests, likes, dislikes, preferences, offers, invitations and compliments).",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:listening:4:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 42,
+          "pageEnd": 42
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:4",
+        "ca:listening:interacting_with_others",
+        "poa:listening:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L04 Interacting Wi",
+      "skillId": "skill:listening",
+      "slug": "listening-4-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:listening:4:competency:interacting_with_others:001",
+          "pages": [
+            42,
+            42
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:listening:4:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Listening CLB 4 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:listening:5:interacting_with_others:001": {
+      "id": "comp:listening:5:interacting_with_others:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:listening:5",
+      "code": "COMP-L-05-01",
+      "competencyAreaId": "ca:listening:interacting_with_others",
+      "competencyId": "comp:listening:5:interacting_with_others:001",
+      "createdAt": "2026-03-21T20:15:00.000Z",
+      "createdBy": "system",
+      "description": "Can follow and respond to moderately complex spoken interaction in routine social/service contexts with familiar support.",
+      "domainNotes": "Starter seed competency. Replace with exact canonical CLB wording during source-fragment extraction.",
+      "extensions": {
+        "seededFrom": "manual_starter",
+        "requiresCanonicalTextReview": true,
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:listening:5",
+        "ca:listening:interacting_with_others",
+        "poa:listening:5"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "L5 Interacting 01",
+      "skillId": "skill:listening",
+      "slug": "listening-5-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening competency seed at CLB 5."
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "listening",
+        "stage-2"
+      ],
+      "title": "Listening CLB 5 - Interacting With Others",
+      "updatedAt": "2026-03-23T01:42:56.601Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:1:comprehending_information:001": {
+      "id": "comp:reading:1:comprehending_information:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:1",
+      "code": "COMP-R-01-COMP",
+      "competencyAreaId": "ca:reading:comprehending_information",
+      "competencyId": "comp:reading:1:comprehending_information:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Recognize names, numbers and some basic details in very simple, short texts related to everyday situations and immediate needs.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:1:competency:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 103,
+          "pageEnd": 103
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:1",
+        "ca:reading:comprehending_information",
+        "poa:reading:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R01 Comprehending",
+      "skillId": "skill:reading",
+      "slug": "reading-1-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:1:competency:comprehending_information:001",
+          "pages": [
+            103,
+            103
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:1:competency:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 1 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:1:comprehending_instructions:001": {
+      "id": "comp:reading:1:comprehending_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:1",
+      "code": "COMP-R-01-COMP",
+      "competencyAreaId": "ca:reading:comprehending_instructions",
+      "competencyId": "comp:reading:1:comprehending_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short, simple, clearly sequenced instructions for common, familiar everyday situations. [Instructions are up to about 4 steps, in point or bullet form, and may be accompanied by illustrations.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:1:competency:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 104,
+          "pageEnd": 104
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:1",
+        "ca:reading:comprehending_instructions",
+        "poa:reading:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R01 Comprehending",
+      "skillId": "skill:reading",
+      "slug": "reading-1-comprehending-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:1:competency:comprehending_instructions:001",
+          "pages": [
+            104,
+            104
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:1:competency:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 1 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:1:getting_things_done:001": {
+      "id": "comp:reading:1:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:1",
+      "code": "COMP-R-01-GETT",
+      "competencyAreaId": "ca:reading:getting_things_done",
+      "competencyId": "comp:reading:1:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Get information from very short, simple, common formatted texts (such as simple sections of forms, maps, diagrams, sales receipts, or common universal traffic signs and civic symbols).",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:1:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 103,
+          "pageEnd": 103
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:1",
+        "ca:reading:getting_things_done",
+        "poa:reading:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R01 Getting Things",
+      "skillId": "skill:reading",
+      "slug": "reading-1-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:1:competency:getting_things_done:001",
+          "pages": [
+            103,
+            103
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:1:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 1 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:1:interacting_with_others:001": {
+      "id": "comp:reading:1:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:1",
+      "code": "COMP-R-01-INTE",
+      "competencyAreaId": "ca:reading:interacting_with_others",
+      "competencyId": "comp:reading:1:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short greetings and other goodwill messages. [Texts are up to a few short, simple sentences and related to routine social interactions.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:1:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 104,
+          "pageEnd": 104
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:1",
+        "ca:reading:interacting_with_others",
+        "poa:reading:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R01 Interacting Wi",
+      "skillId": "skill:reading",
+      "slug": "reading-1-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:1:competency:interacting_with_others:001",
+          "pages": [
+            104,
+            104
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:1:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 1 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:2:comprehending_information:001": {
+      "id": "comp:reading:2:comprehending_information:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:2",
+      "code": "COMP-R-02-COMP",
+      "competencyAreaId": "ca:reading:comprehending_information",
+      "competencyId": "comp:reading:2:comprehending_information:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand the purpose and some basic details in very simple, short texts related to everyday, familiar, personally relevant situations and topics.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:2:competency:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 105,
+          "pageEnd": 105
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:2",
+        "ca:reading:comprehending_information",
+        "poa:reading:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R02 Comprehending",
+      "skillId": "skill:reading",
+      "slug": "reading-2-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:2:competency:comprehending_information:001",
+          "pages": [
+            105,
+            105
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:2:competency:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 2 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:2:comprehending_instructions:001": {
+      "id": "comp:reading:2:comprehending_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:2",
+      "code": "COMP-R-02-COMP",
+      "competencyAreaId": "ca:reading:comprehending_instructions",
+      "competencyId": "comp:reading:2:comprehending_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short, simple, clearly sequenced instructions for familiar everyday situations. [Instructions are up to about 5 steps, in point form or prose, and are often accompanied by illustrations.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:2:competency:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 106,
+          "pageEnd": 106
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:2",
+        "ca:reading:comprehending_instructions",
+        "poa:reading:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R02 Comprehending",
+      "skillId": "skill:reading",
+      "slug": "reading-2-comprehending-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:2:competency:comprehending_instructions:001",
+          "pages": [
+            106,
+            106
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:2:competency:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 2 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:2:getting_things_done:001": {
+      "id": "comp:reading:2:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:2",
+      "code": "COMP-R-02-GETT",
+      "competencyAreaId": "ca:reading:getting_things_done",
+      "competencyId": "comp:reading:2:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Get information from simple formatted texts (such as simple forms, maps, diagrams, signs, labels, tables and schedules). Get basic information from short, simple business or service notices.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:2:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 105,
+          "pageEnd": 105
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:2",
+        "ca:reading:getting_things_done",
+        "poa:reading:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R02 Getting Things",
+      "skillId": "skill:reading",
+      "slug": "reading-2-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:2:competency:getting_things_done:001",
+          "pages": [
+            105,
+            105
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:2:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 2 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:2:interacting_with_others:001": {
+      "id": "comp:reading:2:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:2",
+      "code": "COMP-R-02-INTE",
+      "competencyAreaId": "ca:reading:interacting_with_others",
+      "competencyId": "comp:reading:2:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short, personal social messages (such as invitations, thanks, apologies, quick updates and arrangements) within predictable contexts of daily experience.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:2:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 106,
+          "pageEnd": 106
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:2",
+        "ca:reading:interacting_with_others",
+        "poa:reading:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R02 Interacting Wi",
+      "skillId": "skill:reading",
+      "slug": "reading-2-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:2:competency:interacting_with_others:001",
+          "pages": [
+            106,
+            106
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:2:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 2 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:3:comprehending_information:001": {
+      "id": "comp:reading:3:comprehending_information:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:3",
+      "code": "COMP-R-03-COMP",
+      "competencyAreaId": "ca:reading:comprehending_information",
+      "competencyId": "comp:reading:3:comprehending_information:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand the purpose, main idea, key information and some details in simple, short texts related to everyday familiar and personally relevant situations and topics. Access simple standard reference texts (such as print or online bilingual dictionaries and encyclopedias).",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:3:competency:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 107,
+          "pageEnd": 107
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:3",
+        "ca:reading:comprehending_information",
+        "poa:reading:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R03 Comprehending",
+      "skillId": "skill:reading",
+      "slug": "reading-3-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:3:competency:comprehending_information:001",
+          "pages": [
+            107,
+            107
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:3:competency:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 3 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:3:comprehending_instructions:001": {
+      "id": "comp:reading:3:comprehending_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:3",
+      "code": "COMP-R-03-COMP",
+      "competencyAreaId": "ca:reading:comprehending_instructions",
+      "competencyId": "comp:reading:3:comprehending_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand short, simple, clearly sequenced instructions and instructional texts for familiar everyday situations. [Instructions are up to about 6 steps in point form or as a short, continuous text that may include a visual to support comprehension.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:3:competency:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 108,
+          "pageEnd": 108
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:3",
+        "ca:reading:comprehending_instructions",
+        "poa:reading:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R03 Comprehending",
+      "skillId": "skill:reading",
+      "slug": "reading-3-comprehending-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:3:competency:comprehending_instructions:001",
+          "pages": [
+            108,
+            108
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:3:competency:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 3 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:3:getting_things_done:001": {
+      "id": "comp:reading:3:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:3",
+      "code": "COMP-R-03-GETT",
+      "competencyAreaId": "ca:reading:getting_things_done",
+      "competencyId": "comp:reading:3:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Get information from simple formatted texts (such as forms, tables, charts, schedules and directories). Get information from short business or service texts (such as brochures, notices, form letters and flyers).",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:3:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 107,
+          "pageEnd": 107
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:3",
+        "ca:reading:getting_things_done",
+        "poa:reading:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R03 Getting Things",
+      "skillId": "skill:reading",
+      "slug": "reading-3-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:3:competency:getting_things_done:001",
+          "pages": [
+            107,
+            107
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:3:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 3 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:3:interacting_with_others:001": {
+      "id": "comp:reading:3:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:3",
+      "code": "COMP-R-03-INTE",
+      "competencyAreaId": "ca:reading:interacting_with_others",
+      "competencyId": "comp:reading:3:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand simple personal social messages (such as invitations, thanks, apologies, quick updates and arrangements) within predictable contexts of daily experience.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:3:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 108,
+          "pageEnd": 108
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:3",
+        "ca:reading:interacting_with_others",
+        "poa:reading:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R03 Interacting Wi",
+      "skillId": "skill:reading",
+      "slug": "reading-3-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:3:competency:interacting_with_others:001",
+          "pages": [
+            108,
+            108
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:3:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 3 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:4:comprehending_information:001": {
+      "id": "comp:reading:4:comprehending_information:001",
+      "approvedAt": "2026-03-23T03:30:34.205Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:4",
+      "code": "COMP-R-04-COMP",
+      "competencyAreaId": "ca:reading:comprehending_information",
+      "competencyId": "comp:reading:4:comprehending_information:001",
+      "createdAt": "2026-03-23T03:30:34.205Z",
+      "createdBy": "system",
+      "description": "Understand the purpose, main idea, key information and specific details in simple, short texts related to everyday familiar and personally relevant situations and topics. Access simple standard reference texts (such as dictionaries and encyclopedias).",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:4:competency:comprehending_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 109,
+          "pageEnd": 109
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:4",
+        "ca:reading:comprehending_information",
+        "poa:reading:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R04 Comprehending",
+      "skillId": "skill:reading",
+      "slug": "reading-4-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:4:competency:comprehending_information:001",
+          "pages": [
+            109,
+            109
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:4:competency:comprehending_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 4 - Comprehending Information",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:4:comprehending_instructions:001": {
+      "id": "comp:reading:4:comprehending_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:4",
+      "code": "COMP-R-04-COMP",
+      "competencyAreaId": "ca:reading:comprehending_instructions",
+      "competencyId": "comp:reading:4:comprehending_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Understand simple to moderately complex, step-by-step instructions and instructional texts for multistep procedures related to everyday situations. [Instructions are about 7 to 10 steps, presented in point form or in a text of about 2 or 3 paragraphs with some visual clues to support comprehension.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:4:competency:comprehending_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 114,
+          "pageEnd": 114
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:4",
+        "ca:reading:comprehending_instructions",
+        "poa:reading:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R04 Comprehending",
+      "skillId": "skill:reading",
+      "slug": "reading-4-comprehending-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:4:competency:comprehending_instructions:001",
+          "pages": [
+            114,
+            114
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:4:competency:comprehending_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 4 - Comprehending Instructions",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:4:getting_things_done:001": {
+      "id": "comp:reading:4:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:4",
+      "code": "COMP-R-04-GETT",
+      "competencyAreaId": "ca:reading:getting_things_done",
+      "competencyId": "comp:reading:4:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Get information from simple formatted texts (such as forms, tables, schedules and directories). Get information from short business or service texts (such as brochures, notices, form letters and flyers).",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:4:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 109,
+          "pageEnd": 109
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:4",
+        "ca:reading:getting_things_done",
+        "poa:reading:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R04 Getting Things",
+      "skillId": "skill:reading",
+      "slug": "reading-4-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:4:competency:getting_things_done:001",
+          "pages": [
+            109,
+            109
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:4:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 4 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:4:interacting_with_others:001": {
+      "id": "comp:reading:4:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:reading:4",
+      "code": "COMP-R-04-INTE",
+      "competencyAreaId": "ca:reading:interacting_with_others",
+      "competencyId": "comp:reading:4:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Understand simple to moderately complex personal and public social messages (such as those conveying compliments, invitations, likes, dislikes and preferences) related to a familiar context.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:reading:4:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 114,
+          "pageEnd": 114
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:4",
+        "ca:reading:interacting_with_others",
+        "poa:reading:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R04 Interacting Wi",
+      "skillId": "skill:reading",
+      "slug": "reading-4-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:reading:4:competency:interacting_with_others:001",
+          "pages": [
+            114,
+            114
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:reading:4:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Reading CLB 4 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.925Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:reading:6:comprehending_information:001": {
+      "id": "comp:reading:6:comprehending_information:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:reading:6",
+      "code": "COMP-R-06-01",
+      "competencyAreaId": "ca:reading:comprehending_information",
+      "competencyId": "comp:reading:6:comprehending_information:001",
+      "createdAt": "2026-03-21T20:15:00.000Z",
+      "createdBy": "system",
+      "description": "Can read and extract key details and main ideas from moderately complex informational texts in familiar contexts.",
+      "domainNotes": "Starter seed competency. Replace with exact canonical CLB wording during source-fragment extraction.",
+      "extensions": {
+        "seededFrom": "manual_starter",
+        "requiresCanonicalTextReview": true,
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:reading:6",
+        "ca:reading:comprehending_information",
+        "poa:reading:6"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "R6 Info 01",
+      "skillId": "skill:reading",
+      "slug": "reading-6-comprehending-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading competency seed at CLB 6."
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "reading",
+        "stage-2"
+      ],
+      "title": "Reading CLB 6 - Comprehending Information",
+      "updatedAt": "2026-03-23T01:42:56.602Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:1:getting_things_done:001": {
+      "id": "comp:speaking:1:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:1",
+      "code": "COMP-S-01-GETT",
+      "competencyAreaId": "ca:speaking:getting_things_done",
+      "competencyId": "comp:speaking:1:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Make and respond to simple requests related to immediate personal needs (such as asking for assistance, or for the time, a price or an amount).",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:1:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 67,
+          "pageEnd": 67
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:1",
+        "ca:speaking:getting_things_done",
+        "poa:speaking:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S01 Getting Things",
+      "skillId": "skill:speaking",
+      "slug": "speaking-1-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:1:competency:getting_things_done:001",
+          "pages": [
+            67,
+            67
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:1:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 1 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:1:giving_instructions:001": {
+      "id": "comp:speaking:1:giving_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:1",
+      "code": "COMP-S-01-GIVI",
+      "competencyAreaId": "ca:speaking:giving_instructions",
+      "competencyId": "comp:speaking:1:giving_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Give short, simple, common, routine instructions to a familiar person.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:1:competency:giving_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 68,
+          "pageEnd": 68
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:1",
+        "ca:speaking:giving_instructions",
+        "poa:speaking:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S01 Giving Instruc",
+      "skillId": "skill:speaking",
+      "slug": "speaking-1-giving-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:1:competency:giving_instructions:001",
+          "pages": [
+            68,
+            68
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:1:competency:giving_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 1 - Giving Instructions",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:1:interacting_with_others:001": {
+      "id": "comp:speaking:1:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:1",
+      "code": "COMP-S-01-INTE",
+      "competencyAreaId": "ca:speaking:interacting_with_others",
+      "competencyId": "comp:speaking:1:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Use and respond to courtesy formulas and greetings.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:1:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 68,
+          "pageEnd": 68
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:1",
+        "ca:speaking:interacting_with_others",
+        "poa:speaking:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S01 Interacting Wi",
+      "skillId": "skill:speaking",
+      "slug": "speaking-1-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:1:competency:interacting_with_others:001",
+          "pages": [
+            68,
+            68
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:1:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 1 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:1:sharing_information:001": {
+      "id": "comp:speaking:1:sharing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:1",
+      "code": "COMP-S-01-SHAR",
+      "competencyAreaId": "ca:speaking:sharing_information",
+      "competencyId": "comp:speaking:1:sharing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Give basic personal information in response to direct questions from a supportive listener. Ask for basic personal information.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:1:competency:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 67,
+          "pageEnd": 67
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:1",
+        "ca:speaking:sharing_information",
+        "poa:speaking:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S01 Sharing Inform",
+      "skillId": "skill:speaking",
+      "slug": "speaking-1-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:1:competency:sharing_information:001",
+          "pages": [
+            67,
+            67
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:1:competency:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 1 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:2:getting_things_done:001": {
+      "id": "comp:speaking:2:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:2",
+      "code": "COMP-S-02-GETT",
+      "competencyAreaId": "ca:speaking:getting_things_done",
+      "competencyId": "comp:speaking:2:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Make and respond to simple requests related to common everyday activities. Give very simple warnings and cautions.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:2:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 69,
+          "pageEnd": 69
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:2",
+        "ca:speaking:getting_things_done",
+        "poa:speaking:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S02 Getting Things",
+      "skillId": "skill:speaking",
+      "slug": "speaking-2-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:2:competency:getting_things_done:001",
+          "pages": [
+            69,
+            69
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:2:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 2 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:2:giving_instructions:001": {
+      "id": "comp:speaking:2:giving_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:2",
+      "code": "COMP-S-02-GIVI",
+      "competencyAreaId": "ca:speaking:giving_instructions",
+      "competencyId": "comp:speaking:2:giving_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Give simple, common, routine instructions and directions to a familiar person.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:2:competency:giving_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 70,
+          "pageEnd": 70
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:2",
+        "ca:speaking:giving_instructions",
+        "poa:speaking:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S02 Giving Instruc",
+      "skillId": "skill:speaking",
+      "slug": "speaking-2-giving-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:2:competency:giving_instructions:001",
+          "pages": [
+            70,
+            70
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:2:competency:giving_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 2 - Giving Instructions",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:2:interacting_with_others:001": {
+      "id": "comp:speaking:2:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:2",
+      "code": "COMP-S-02-INTE",
+      "competencyAreaId": "ca:speaking:interacting_with_others",
+      "competencyId": "comp:speaking:2:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Use a range of courtesy formulas and greetings in very short, casual, face-to-face interactions.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:2:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 70,
+          "pageEnd": 70
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:2",
+        "ca:speaking:interacting_with_others",
+        "poa:speaking:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S02 Interacting Wi",
+      "skillId": "skill:speaking",
+      "slug": "speaking-2-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:2:competency:interacting_with_others:001",
+          "pages": [
+            70,
+            70
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:2:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 2 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:2:sharing_information:001": {
+      "id": "comp:speaking:2:sharing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:2",
+      "code": "COMP-S-02-SHAR",
+      "competencyAreaId": "ca:speaking:sharing_information",
+      "competencyId": "comp:speaking:2:sharing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Give expanded basic personal information to a supportive listener. Ask for basic personal information. Give basic descriptions of concrete, familiar objects in a few short words or phrases.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:2:competency:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 69,
+          "pageEnd": 69
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:2",
+        "ca:speaking:sharing_information",
+        "poa:speaking:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S02 Sharing Inform",
+      "skillId": "skill:speaking",
+      "slug": "speaking-2-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:2:competency:sharing_information:001",
+          "pages": [
+            69,
+            69
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:2:competency:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 2 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:3:getting_things_done:001": {
+      "id": "comp:speaking:3:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:3",
+      "code": "COMP-S-03-GETT",
+      "competencyAreaId": "ca:speaking:getting_things_done",
+      "competencyId": "comp:speaking:3:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Make and respond to an expanding range of simple requests related to everyday activities. Give an expanding range of simple warnings, apologies and cautions.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:3:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 71,
+          "pageEnd": 71
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:3",
+        "ca:speaking:getting_things_done",
+        "poa:speaking:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S03 Getting Things",
+      "skillId": "skill:speaking",
+      "slug": "speaking-3-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:3:competency:getting_things_done:001",
+          "pages": [
+            71,
+            71
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:3:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 3 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:3:giving_instructions:001": {
+      "id": "comp:speaking:3:giving_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:3",
+      "code": "COMP-S-03-GIVI",
+      "competencyAreaId": "ca:speaking:giving_instructions",
+      "competencyId": "comp:speaking:3:giving_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Give a set of simple, common, routine instructions and directions to a familiar person.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:3:competency:giving_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 72,
+          "pageEnd": 72
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:3",
+        "ca:speaking:giving_instructions",
+        "poa:speaking:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S03 Giving Instruc",
+      "skillId": "skill:speaking",
+      "slug": "speaking-3-giving-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:3:competency:giving_instructions:001",
+          "pages": [
+            72,
+            72
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:3:competency:giving_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 3 - Giving Instructions",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:3:interacting_with_others:001": {
+      "id": "comp:speaking:3:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:3",
+      "code": "COMP-S-03-INTE",
+      "competencyAreaId": "ca:speaking:interacting_with_others",
+      "competencyId": "comp:speaking:3:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Use a range of courtesy formulas and some casual small talk in short, one-on-one or small group interactions. Participate in very short, simple phone calls.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:3:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 72,
+          "pageEnd": 72
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:3",
+        "ca:speaking:interacting_with_others",
+        "poa:speaking:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S03 Interacting Wi",
+      "skillId": "skill:speaking",
+      "slug": "speaking-3-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:3:competency:interacting_with_others:001",
+          "pages": [
+            72,
+            72
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:3:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 3 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:3:sharing_information:001": {
+      "id": "comp:speaking:3:sharing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:3",
+      "code": "COMP-S-03-SHAR",
+      "competencyAreaId": "ca:speaking:sharing_information",
+      "competencyId": "comp:speaking:3:sharing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Ask for and give information about immediate needs and some feelings related to common everyday activities. Give simple descriptions of concrete objects, people or experiences in a few short sentences. [Descriptions are an attempt at taking a longer turn within an interaction with one person at a time.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:3:competency:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 71,
+          "pageEnd": 71
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:3",
+        "ca:speaking:sharing_information",
+        "poa:speaking:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S03 Sharing Inform",
+      "skillId": "skill:speaking",
+      "slug": "speaking-3-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:3:competency:sharing_information:001",
+          "pages": [
+            71,
+            71
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:3:competency:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 3 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:4:getting_things_done:001": {
+      "id": "comp:speaking:4:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:4",
+      "code": "COMP-S-04-GETT",
+      "competencyAreaId": "ca:speaking:getting_things_done",
+      "competencyId": "comp:speaking:4:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Make and respond to a range of requests and offers (such as getting assistance, and asking for, offering, accepting or rejecting goods or services.)",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:4:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 73,
+          "pageEnd": 73
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:4",
+        "ca:speaking:getting_things_done",
+        "poa:speaking:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S04 Getting Things",
+      "skillId": "skill:speaking",
+      "slug": "speaking-4-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:4:competency:getting_things_done:001",
+          "pages": [
+            73,
+            73
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:4:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 4 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:4:giving_instructions:001": {
+      "id": "comp:speaking:4:giving_instructions:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:4",
+      "code": "COMP-S-04-GIVI",
+      "competencyAreaId": "ca:speaking:giving_instructions",
+      "competencyId": "comp:speaking:4:giving_instructions:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Give instructions and directions for everyday activities and processes.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:4:competency:giving_instructions:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 78,
+          "pageEnd": 78
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:4",
+        "ca:speaking:giving_instructions",
+        "poa:speaking:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S04 Giving Instruc",
+      "skillId": "skill:speaking",
+      "slug": "speaking-4-giving-instructions-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:4:competency:giving_instructions:001",
+          "pages": [
+            78,
+            78
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:4:competency:giving_instructions:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 4 - Giving Instructions",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:4:interacting_with_others:001": {
+      "id": "comp:speaking:4:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:4",
+      "code": "COMP-S-04-INTE",
+      "competencyAreaId": "ca:speaking:interacting_with_others",
+      "competencyId": "comp:speaking:4:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Participate in basic social conversations for some everyday purposes (such as expressing feelings; making, accepting or declining invitations; and engaging in small talk). Participate in very short phone calls.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:4:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 78,
+          "pageEnd": 78
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:4",
+        "ca:speaking:interacting_with_others",
+        "poa:speaking:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S04 Interacting Wi",
+      "skillId": "skill:speaking",
+      "slug": "speaking-4-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:4:competency:interacting_with_others:001",
+          "pages": [
+            78,
+            78
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:4:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 4 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:4:sharing_information:001": {
+      "id": "comp:speaking:4:sharing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:speaking:4",
+      "code": "COMP-S-04-SHAR",
+      "competencyAreaId": "ca:speaking:sharing_information",
+      "competencyId": "comp:speaking:4:sharing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Ask for and give information about needs and feelings related to common everyday activities. Give brief descriptions of personal experiences, situations or simple processes, such as getting goods or services. [Descriptions are an attempt at taking a longer turn within an interaction with one person or a familiar supportive group.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:speaking:4:competency:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 73,
+          "pageEnd": 73
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:4",
+        "ca:speaking:sharing_information",
+        "poa:speaking:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S04 Sharing Inform",
+      "skillId": "skill:speaking",
+      "slug": "speaking-4-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:speaking:4:competency:sharing_information:001",
+          "pages": [
+            73,
+            73
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:speaking:4:competency:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Speaking CLB 4 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:speaking:5:sharing_information:001": {
+      "id": "comp:speaking:5:sharing_information:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:speaking:5",
+      "code": "COMP-S-05-01",
+      "competencyAreaId": "ca:speaking:sharing_information",
+      "competencyId": "comp:speaking:5:sharing_information:001",
+      "createdAt": "2026-03-21T20:15:00.000Z",
+      "createdBy": "system",
+      "description": "Can provide connected spoken information and short explanations on familiar topics for practical communication purposes.",
+      "domainNotes": "Starter seed competency. Replace with exact canonical CLB wording during source-fragment extraction.",
+      "extensions": {
+        "seededFrom": "manual_starter",
+        "requiresCanonicalTextReview": true,
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:speaking:5",
+        "ca:speaking:sharing_information",
+        "poa:speaking:5"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "S5 Sharing 01",
+      "skillId": "skill:speaking",
+      "slug": "speaking-5-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking competency seed at CLB 5."
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "speaking",
+        "stage-2"
+      ],
+      "title": "Speaking CLB 5 - Sharing Information",
+      "updatedAt": "2026-03-23T01:42:56.602Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:1:getting_things_done:001": {
+      "id": "comp:writing:1:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:1",
+      "code": "COMP-W-01-GETT",
+      "competencyAreaId": "ca:writing:getting_things_done",
+      "competencyId": "comp:writing:1:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Complete very short, simple or simplified forms that require only basic personal identification information. [Forms contain up to about 5 personal identification items and have clear labels and areas in which to write.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:1:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 139,
+          "pageEnd": 139
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:1",
+        "ca:writing:getting_things_done",
+        "poa:writing:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W01 Getting Things",
+      "skillId": "skill:writing",
+      "slug": "writing-1-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:1:competency:getting_things_done:001",
+          "pages": [
+            139,
+            139
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:1:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 1 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:1:interacting_with_others:001": {
+      "id": "comp:writing:1:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:1",
+      "code": "COMP-W-01-INTE",
+      "competencyAreaId": "ca:writing:interacting_with_others",
+      "competencyId": "comp:writing:1:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Convey an expanding range of goodwill messages (such as thanks, apologies, congratulations, get well wishes, goodbyes, and sympathy) by means of standard cards or guided notes. [Messages are a few words or short phrases, addressed to a familiar person and related to personally relevant situations.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:1:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 140,
+          "pageEnd": 140
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:1",
+        "ca:writing:interacting_with_others",
+        "poa:writing:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W01 Interacting Wi",
+      "skillId": "skill:writing",
+      "slug": "writing-1-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:1:competency:interacting_with_others:001",
+          "pages": [
+            140,
+            140
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:1:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 1 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:1:reproducing_information:001": {
+      "id": "comp:writing:1:reproducing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:1",
+      "code": "COMP-W-01-REPR",
+      "competencyAreaId": "ca:writing:reproducing_information",
+      "competencyId": "comp:writing:1:reproducing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Copy a range of information, from simple lists or very short passages, for personal use or to complete short tasks. [Texts to copy are 3 to 5 sentences, have clear layout, and basic everyday information; lists have about 10 to 15 items.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:1:competency:reproducing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 140,
+          "pageEnd": 140
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:1",
+        "ca:writing:reproducing_information",
+        "poa:writing:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W01 Reproducing In",
+      "skillId": "skill:writing",
+      "slug": "writing-1-reproducing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:1:competency:reproducing_information:001",
+          "pages": [
+            140,
+            140
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:1:competency:reproducing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 1 - Reproducing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:1:sharing_information:001": {
+      "id": "comp:writing:1:sharing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:1",
+      "code": "COMP-W-01-SHAR",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:1:sharing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Write a few words to complete a short, guided text or answer simple questions to describe a personal situation.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:1:competency:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 139,
+          "pageEnd": 139
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:1",
+        "ca:writing:sharing_information",
+        "poa:writing:1"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W01 Sharing Inform",
+      "skillId": "skill:writing",
+      "slug": "writing-1-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:1:competency:sharing_information:001",
+          "pages": [
+            139,
+            139
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:1:competency:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 1 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:2:getting_things_done:001": {
+      "id": "comp:writing:2:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:2",
+      "code": "COMP-W-02-GETT",
+      "competencyAreaId": "ca:writing:getting_things_done",
+      "competencyId": "comp:writing:2:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Complete short, simple or simplified forms that require only basic personal identification or familiar information. [Forms contain up to about 10 personal identification items, and have clear labels and areas in which to write.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:2:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 141,
+          "pageEnd": 141
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:2",
+        "ca:writing:getting_things_done",
+        "poa:writing:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W02 Getting Things",
+      "skillId": "skill:writing",
+      "slug": "writing-2-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:2:competency:getting_things_done:001",
+          "pages": [
+            141,
+            141
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:2:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 2 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:2:interacting_with_others:001": {
+      "id": "comp:writing:2:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:2",
+      "code": "COMP-W-02-INTE",
+      "competencyAreaId": "ca:writing:interacting_with_others",
+      "competencyId": "comp:writing:2:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Convey short, personal and informal social messages on topics related to familiar everyday situations (such as invitations, thanks, updates, cancellations and apologies). [Messages are a few short sentences addressed to a familiar person and related to personally relevant situations.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:2:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 142,
+          "pageEnd": 142
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:2",
+        "ca:writing:interacting_with_others",
+        "poa:writing:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W02 Interacting Wi",
+      "skillId": "skill:writing",
+      "slug": "writing-2-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:2:competency:interacting_with_others:001",
+          "pages": [
+            142,
+            142
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:2:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 2 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:2:reproducing_information:001": {
+      "id": "comp:writing:2:reproducing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:2",
+      "code": "COMP-W-02-REPR",
+      "competencyAreaId": "ca:writing:reproducing_information",
+      "competencyId": "comp:writing:2:reproducing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Copy or record a range of information from short texts for personal use. [Texts to copy are up to about 1 paragraph and have a clear layout; can include passages, directories, schedules, instructions, and dictionaries.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:2:competency:reproducing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 142,
+          "pageEnd": 142
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:2",
+        "ca:writing:reproducing_information",
+        "poa:writing:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W02 Reproducing In",
+      "skillId": "skill:writing",
+      "slug": "writing-2-reproducing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:2:competency:reproducing_information:001",
+          "pages": [
+            142,
+            142
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:2:competency:reproducing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 2 - Reproducing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:2:sharing_information:001": {
+      "id": "comp:writing:2:sharing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:2",
+      "code": "COMP-W-02-SHAR",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:2:sharing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Write a few words to complete a short, guided text or answer simple questions to describe a personal situation.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:2:competency:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 141,
+          "pageEnd": 141
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:2",
+        "ca:writing:sharing_information",
+        "poa:writing:2"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W02 Sharing Inform",
+      "skillId": "skill:writing",
+      "slug": "writing-2-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:2:competency:sharing_information:001",
+          "pages": [
+            141,
+            141
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:2:competency:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 2 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:3:getting_things_done:001": {
+      "id": "comp:writing:3:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:3",
+      "code": "COMP-W-03-GETT",
+      "competencyAreaId": "ca:writing:getting_things_done",
+      "competencyId": "comp:writing:3:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Complete short, simple forms that require basic personal or familiar information and some responses to simple questions. Write short, simple business or service messages.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:3:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 143,
+          "pageEnd": 143
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:3",
+        "ca:writing:getting_things_done",
+        "poa:writing:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W03 Getting Things",
+      "skillId": "skill:writing",
+      "slug": "writing-3-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:3:competency:getting_things_done:001",
+          "pages": [
+            143,
+            143
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:3:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 3 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:3:interacting_with_others:001": {
+      "id": "comp:writing:3:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:3",
+      "code": "COMP-W-03-INTE",
+      "competencyAreaId": "ca:writing:interacting_with_others",
+      "competencyId": "comp:writing:3:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Convey short, personal, informal social messages on topics related to familiar everyday situations (such as invitations, thanks, updates, cancellations and apologies). [Message is a few sentences or a short paragraph addressed to a familiar person and related to a personally relevant situation.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:3:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 144,
+          "pageEnd": 144
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:3",
+        "ca:writing:interacting_with_others",
+        "poa:writing:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W03 Interacting Wi",
+      "skillId": "skill:writing",
+      "slug": "writing-3-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:3:competency:interacting_with_others:001",
+          "pages": [
+            144,
+            144
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:3:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 3 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:3:reproducing_information:001": {
+      "id": "comp:writing:3:reproducing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:3",
+      "code": "COMP-W-03-REPR",
+      "competencyAreaId": "ca:writing:reproducing_information",
+      "competencyId": "comp:writing:3:reproducing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Copy or record an expanded range of information from short texts for personal use. [Texts to copy are up to about 2 paragraphs and have a clear layout; can include passages, directories, schedules, instructions, directions, dictionaries and manuals; and may come from more than one source.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:3:competency:reproducing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 144,
+          "pageEnd": 144
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:3",
+        "ca:writing:reproducing_information",
+        "poa:writing:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W03 Reproducing In",
+      "skillId": "skill:writing",
+      "slug": "writing-3-reproducing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:3:competency:reproducing_information:001",
+          "pages": [
+            144,
+            144
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:3:competency:reproducing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 3 - Reproducing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:3:sharing_information:001": {
+      "id": "comp:writing:3:sharing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:3",
+      "code": "COMP-W-03-SHAR",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:3:sharing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Write a few sentences to describe a familiar person, object, place, situation or event.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:3:competency:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 143,
+          "pageEnd": 143
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:3",
+        "ca:writing:sharing_information",
+        "poa:writing:3"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W03 Sharing Inform",
+      "skillId": "skill:writing",
+      "slug": "writing-3-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:3:competency:sharing_information:001",
+          "pages": [
+            143,
+            143
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:3:competency:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 3 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:4:getting_things_done:001": {
+      "id": "comp:writing:4:getting_things_done:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:4",
+      "code": "COMP-W-04-GETT",
+      "competencyAreaId": "ca:writing:getting_things_done",
+      "competencyId": "comp:writing:4:getting_things_done:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Complete simple forms that require basic personal or familiar information and some responses to simple questions. Write simple business or service messages.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:4:competency:getting_things_done:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 145,
+          "pageEnd": 145
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:4",
+        "ca:writing:getting_things_done",
+        "poa:writing:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W04 Getting Things",
+      "skillId": "skill:writing",
+      "slug": "writing-4-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:4:competency:getting_things_done:001",
+          "pages": [
+            145,
+            145
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:4:competency:getting_things_done:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 4 - Getting Things Done",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:4:interacting_with_others:001": {
+      "id": "comp:writing:4:interacting_with_others:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:4",
+      "code": "COMP-W-04-INTE",
+      "competencyAreaId": "ca:writing:interacting_with_others",
+      "competencyId": "comp:writing:4:interacting_with_others:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Convey personal messages in short, formal and informal correspondence for a range of everyday social purposes (such as expressing or responding to invitations and feelings, or providing quick updates). [Message is about 1 paragraph related to everyday experience.]",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:4:competency:interacting_with_others:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 150,
+          "pageEnd": 150
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:4",
+        "ca:writing:interacting_with_others",
+        "poa:writing:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W04 Interacting Wi",
+      "skillId": "skill:writing",
+      "slug": "writing-4-interacting-with-others-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:4:competency:interacting_with_others:001",
+          "pages": [
+            150,
+            150
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:4:competency:interacting_with_others:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 4 - Interacting With Others",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:4:reproducing_information:001": {
+      "id": "comp:writing:4:reproducing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:4",
+      "code": "COMP-W-04-REPR",
+      "competencyAreaId": "ca:writing:reproducing_information",
+      "competencyId": "comp:writing:4:reproducing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Reduce short, factual, oral discourse (such as live or recorded phone messages or pre-recorded public information lines) to notes or messages. Reduce a page of information to a list of important details.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:4:competency:reproducing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 150,
+          "pageEnd": 150
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:4",
+        "ca:writing:reproducing_information",
+        "poa:writing:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W04 Reproducing In",
+      "skillId": "skill:writing",
+      "slug": "writing-4-reproducing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:4:competency:reproducing_information:001",
+          "pages": [
+            150,
+            150
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:4:competency:reproducing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 4 - Reproducing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:4:sharing_information:001": {
+      "id": "comp:writing:4:sharing_information:001",
+      "approvedAt": "2026-03-23T03:30:34.206Z",
+      "approvedBy": "system",
+      "benchmarkId": "benchmark:writing:4",
+      "code": "COMP-W-04-SHAR",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:4:sharing_information:001",
+      "createdAt": "2026-03-23T03:30:34.206Z",
+      "createdBy": "system",
+      "description": "Write a short paragraph to describe a familiar situation, event, personal experience or future plan.",
+      "domainNotes": "Canonical competency text backfilled from CLB 2012 benchmark-page fragment.",
+      "extensions": {
+        "canonicalState": "canonical_fragment_backed",
+        "requiresCanonicalTextReview": false,
+        "canonicalProvenance": {
+          "source": "sourceFragments",
+          "fragmentId": "fragment:clb:2012:writing:4:competency:sharing_information:001",
+          "sourceId": "source:clb:2012",
+          "pageStart": 145,
+          "pageEnd": 145
+        }
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:4",
+        "ca:writing:sharing_information",
+        "poa:writing:4"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W04 Sharing Inform",
+      "skillId": "skill:writing",
+      "slug": "writing-4-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": "fragment:clb:2012:writing:4:competency:sharing_information:001",
+          "pages": [
+            145,
+            145
+          ],
+          "note": "Canonical competency source: fragment:clb:2012:writing:4:competency:sharing_information:001"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "reviewed",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-1",
+        "canonical"
+      ],
+      "title": "Writing CLB 4 - Sharing Information",
+      "updatedAt": "2026-03-23T03:52:59.926Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:6:getting_things_done:001": {
+      "id": "comp:writing:6:getting_things_done:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:6",
+      "code": "COMP-W-06-01",
+      "competencyAreaId": "ca:writing:getting_things_done",
+      "competencyId": "comp:writing:6:getting_things_done:001",
+      "createdAt": "2026-03-21T20:15:00.000Z",
+      "createdBy": "system",
+      "description": "Can produce practical written texts and requests with adequate detail and organization to complete routine tasks.",
+      "domainNotes": "Starter seed competency. Replace with exact canonical CLB wording during source-fragment extraction.",
+      "extensions": {
+        "seededFrom": "manual_starter",
+        "requiresCanonicalTextReview": true,
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:6",
+        "ca:writing:getting_things_done",
+        "poa:writing:6"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "W6 Tasks 01",
+      "skillId": "skill:writing",
+      "slug": "writing-6-getting-things-done-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing competency seed at CLB 6."
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-2"
+      ],
+      "title": "Writing CLB 6 - Getting Things Done",
+      "updatedAt": "2026-03-23T01:42:56.602Z",
+      "updatedBy": "system",
+      "version": 2
+    },
+    "comp:writing:8:sharing_information:001": {
+      "id": "comp:writing:8:sharing_information:001",
+      "approvedAt": null,
+      "approvedBy": null,
+      "benchmarkId": "benchmark:writing:8",
+      "code": "COMP-W-08-01",
+      "competencyAreaId": "ca:writing:sharing_information",
+      "competencyId": "comp:writing:8:sharing_information:001",
+      "createdAt": "2026-03-21T20:15:00.000Z",
+      "createdBy": "system",
+      "description": "Can write extended informational messages and explanations with clearer cohesion for audience and purpose.",
+      "domainNotes": "Starter seed competency. Replace with exact canonical CLB wording during source-fragment extraction.",
+      "extensions": {
+        "seededFrom": "manual_starter",
+        "requiresCanonicalTextReview": true,
+        "canonicalState": "seeded"
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "benchmark:writing:8",
+        "ca:writing:sharing_information",
+        "poa:writing:8"
+      ],
+      "reviewStatus": "pending",
+      "shortTitle": "W8 Sharing 01",
+      "skillId": "skill:writing",
+      "slug": "writing-8-sharing-information-001",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing competency seed at CLB 8."
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "draft",
+      "tags": [
+        "official",
+        "clb",
+        "competency",
+        "writing",
+        "stage-2"
+      ],
+      "title": "Writing CLB 8 - Sharing Information",
+      "updatedAt": "2026-03-23T01:42:56.602Z",
+      "updatedBy": "system",
+      "version": 2
+    }
+  },
+  "allIds": [
+    "comp:listening:1:comprehending_information:001",
+    "comp:listening:1:comprehending_instructions:001",
+    "comp:listening:1:getting_things_done:001",
+    "comp:listening:1:interacting_with_others:001",
+    "comp:listening:2:comprehending_information:001",
+    "comp:listening:2:comprehending_instructions:001",
+    "comp:listening:2:getting_things_done:001",
+    "comp:listening:2:interacting_with_others:001",
+    "comp:listening:3:comprehending_information:001",
+    "comp:listening:3:comprehending_instructions:001",
+    "comp:listening:3:getting_things_done:001",
+    "comp:listening:3:interacting_with_others:001",
+    "comp:listening:4:comprehending_information:001",
+    "comp:listening:4:comprehending_instructions:001",
+    "comp:listening:4:getting_things_done:001",
+    "comp:listening:4:interacting_with_others:001",
+    "comp:listening:5:interacting_with_others:001",
+    "comp:reading:1:comprehending_information:001",
+    "comp:reading:1:comprehending_instructions:001",
+    "comp:reading:1:getting_things_done:001",
+    "comp:reading:1:interacting_with_others:001",
+    "comp:reading:2:comprehending_information:001",
+    "comp:reading:2:comprehending_instructions:001",
+    "comp:reading:2:getting_things_done:001",
+    "comp:reading:2:interacting_with_others:001",
+    "comp:reading:3:comprehending_information:001",
+    "comp:reading:3:comprehending_instructions:001",
+    "comp:reading:3:getting_things_done:001",
+    "comp:reading:3:interacting_with_others:001",
+    "comp:reading:4:comprehending_information:001",
+    "comp:reading:4:comprehending_instructions:001",
+    "comp:reading:4:getting_things_done:001",
+    "comp:reading:4:interacting_with_others:001",
+    "comp:reading:6:comprehending_information:001",
+    "comp:speaking:1:getting_things_done:001",
+    "comp:speaking:1:giving_instructions:001",
+    "comp:speaking:1:interacting_with_others:001",
+    "comp:speaking:1:sharing_information:001",
+    "comp:speaking:2:getting_things_done:001",
+    "comp:speaking:2:giving_instructions:001",
+    "comp:speaking:2:interacting_with_others:001",
+    "comp:speaking:2:sharing_information:001",
+    "comp:speaking:3:getting_things_done:001",
+    "comp:speaking:3:giving_instructions:001",
+    "comp:speaking:3:interacting_with_others:001",
+    "comp:speaking:3:sharing_information:001",
+    "comp:speaking:4:getting_things_done:001",
+    "comp:speaking:4:giving_instructions:001",
+    "comp:speaking:4:interacting_with_others:001",
+    "comp:speaking:4:sharing_information:001",
+    "comp:speaking:5:sharing_information:001",
+    "comp:writing:1:getting_things_done:001",
+    "comp:writing:1:interacting_with_others:001",
+    "comp:writing:1:reproducing_information:001",
+    "comp:writing:1:sharing_information:001",
+    "comp:writing:2:getting_things_done:001",
+    "comp:writing:2:interacting_with_others:001",
+    "comp:writing:2:reproducing_information:001",
+    "comp:writing:2:sharing_information:001",
+    "comp:writing:3:getting_things_done:001",
+    "comp:writing:3:interacting_with_others:001",
+    "comp:writing:3:reproducing_information:001",
+    "comp:writing:3:sharing_information:001",
+    "comp:writing:4:getting_things_done:001",
+    "comp:writing:4:interacting_with_others:001",
+    "comp:writing:4:reproducing_information:001",
+    "comp:writing:4:sharing_information:001",
+    "comp:writing:6:getting_things_done:001",
+    "comp:writing:8:sharing_information:001"
+  ],
+  "indexes": {}
+}

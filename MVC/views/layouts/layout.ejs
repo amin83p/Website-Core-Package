@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<%
+  const layoutBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
+  const layoutAppName = layoutBrand.appName || 'Amin Paknejad';
+  const layoutShortName = layoutBrand.appShortName || layoutAppName || 'Website';
+  const layoutThemeColor = layoutBrand.themeColor || '#ffffff';
+  const layoutIconSvgUrl = layoutBrand.iconSvgUrl || '/uploads/GLOBAL/logo/icon.svg';
+  const layoutLogoUrl = layoutBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
+  const layoutAppleIconUrl = layoutBrand.appleTouchIconUrl || layoutLogoUrl;
+  const layoutHtmlClass = (typeof htmlClass !== 'undefined' && htmlClass) ? String(htmlClass).trim() : '';
+  const layoutBodyClass = (typeof bodyClass !== 'undefined' && bodyClass) ? String(bodyClass).trim() : '';
+  const layoutMainClass = (typeof mainClass !== 'undefined' && mainClass) ? String(mainClass).trim() : 'container my-4';
+%>
+<html lang="en"<% if (layoutHtmlClass) { %> class="<%= layoutHtmlClass %>"<% } %>>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= title || layoutAppName %></title>
+  <meta name="theme-color" content="<%= layoutThemeColor %>" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="<%= layoutShortName %>" />
+
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('app_header_compact') === '1') {
+          document.documentElement.classList.add('header-pref-compact');
+        }
+      } catch (_) {}
+    })();
+  </script>
+
+  <link rel="icon" type="image/svg+xml" href="<%= layoutIconSvgUrl %>">
+  <link rel="icon" type="image/png" href="<%= layoutLogoUrl %>">
+  <link rel="shortcut icon" type="image/png" href="<%= layoutLogoUrl %>">
+  <link rel="apple-touch-icon" sizes="180x180" href="<%= layoutAppleIconUrl %>">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles/main.css">
+  <style>
+    :root {
+      --app-brand-logo-url: url(<%- JSON.stringify(layoutLogoUrl) %>);
+    }
+  </style>
+
+  <% if (typeof pageCss !== 'undefined' && pageCss) { %>
+    <link rel="stylesheet" href="/styles/<%= pageCss %>">
+  <% } %>
+
+  <% if (typeof includeModal !== 'undefined' && includeModal) { %>
+    <link rel="stylesheet" href="/styles/modal.css">
+  <% } %>
+
+  <% if (typeof tableName !== 'undefined' && tableName) { %>
+    <link rel="stylesheet" href="/styles/pagination.css">
+  <% } %>
+
+</head>
+<body<% if (layoutBodyClass) { %> class="<%= layoutBodyClass %>"<% } %>>
+  <% if (typeof user !== 'undefined') { %>
+      <%- include('../partials/header', { user }) %>
+  <% } else { %>
+      <%- include('../partials/header') %>
+  <% } %>
+
+  <% if (typeof backendRecoveryActive !== 'undefined' && backendRecoveryActive && typeof backendRecoveryCanView !== 'undefined' && backendRecoveryCanView) { %>
+    <%- include('../partials/backendRecoveryBanner') %>
+  <% } %>
+
+  <main class="<%= layoutMainClass %>">
+    <%- body %>
+  </main>
+
+  <%- include('../partials/footer') %>
+
+  <% if (typeof includeModal !== 'undefined' && includeModal !== null && includeModal) { %>
+    <%- include('../partials/modal') %>
+  <% } %>
+  
+  <% if (typeof includeModal_Table !== 'undefined' && includeModal_Table !== null && includeModal_Table) { %>
+    <%- include('../partials/modal-table') %>
+  <% } %>
+  <% if (typeof includeModal_FileImport !== 'undefined' && includeModal_FileImport!== null && includeModal_FileImport) { %>
+    <%- include('../partials/modal_FileImport') %>
+  <% } %>
+  <%- include('../partials/modal_FileExport') %>
+
+  <%- include('../partials/adminVerificationModal') %>
+  <%- include('../partials/quickMenu') %>
+  <%- include('../partials/startMenu') %>
+  <%- include('../partials/loadingModal') %>
+  <% if (typeof user !== 'undefined' && user && typeof chatAccess !== 'undefined' && chatAccess && (chatAccess.canRead || chatAccess.canReadAll)) { %>
+    <%- include('../partials/chatModal') %>
+  <% } %>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/scripts/main.js"></script>
+
+  <% if (typeof includeModal !== 'undefined' && includeModal) { %>
+    <script src="/scripts/modal.js"></script>
+  <% } %>
+  <% if (typeof includeModal_Table !== 'undefined' && includeModal_Table) { %>
+    <script src="/scripts/modal-table.js"></script>
+  <% } %>
+
+  <% if (typeof print !== 'undefined' && print) { %>
+    <script src="/scripts/print.js"></script>
+  <% } %>
+  
+  <% if (typeof includeModal_FileImport !== 'undefined' && includeModal_FileImport!== null && includeModal_FileImport) { %>
+    <script src="/scripts/modal_FileImport.js"></script>
+  <% } %>
+  <script src="/scripts/modal_FileExport.js"></script>
+
+  <% if (typeof pageScript !== 'undefined' && pageScript) { %>
+    <script src="/scripts/<%= pageScript %>"></script>
+  <% } %>
+</body>
+</html>

@@ -1,0 +1,555 @@
+<%
+  const row = membershipItem || {};
+  const isEditMode = !!row.id;
+  const periodRows = Array.isArray(row.periods)
+    ? row.periods
+    : (Array.isArray(row.summary?.periods) ? row.summary.periods : []);
+  const periodsJson = JSON.stringify(periodRows);
+  const allUsers = typeof users !== 'undefined' ? users : [];
+  const sourceTypeOptions = Array.isArray(membershipPeriodSourceTypeOptions) && membershipPeriodSourceTypeOptions.length
+    ? membershipPeriodSourceTypeOptions
+    : [
+      { value: 'manual', label: 'Manual' },
+      { value: 'payment', label: 'Payment' },
+      { value: 'trial', label: 'Trial' },
+      { value: 'admin_grant', label: 'Admin Grant' },
+      { value: 'activity_quota_package', label: 'Activity Quota Package' }
+    ];
+  const sourceTypeOptionsJson = JSON.stringify(sourceTypeOptions);
+  const selectedUser = allUsers.find((u) => String(u.id) === String(row.userId || '')) || null;
+  const selectedUserLabel = selectedUser
+    ? `${selectedUser.id} - ${selectedUser.username || selectedUser.email || 'User'}`
+    : '';
+%>
+
+<div class="sections-page">
+  <%- include('../partials/formPage_PageTitle', {
+    isEditMode,
+    name: 'Membership',
+    id: row?.id || 0
+  }) %>
+
+  <div class="form-container wide" style="width: 100%; max-width: 1200px;">
+    <form id="membershipForm" action="<%= isEditMode ? '/memberships/edit/' + row.id : '/memberships/new' %>" method="POST" novalidate>
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      <input type="hidden" name="periodsJson" id="periodsJsonInput" value="">
+      <input type="hidden" name="userId" id="selectedUserId" value="<%= row.userId || '' %>">
+
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label">User *</label>
+          <div class="input-group">
+            <input type="text" id="selectedUserLabel" class="form-control size-md bg-white fw-bold" readonly placeholder="Select user..." value="<%= selectedUserLabel %>">
+            <button type="button" class="btn btn-outline-primary" id="openUserPickerBtn">
+              <i class="bi bi-search"></i> Select
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="clearUserBtn" title="Clear">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Organization Scope</label>
+          <select name="orgId" id="selectedOrgId" class="form-select size-md">
+            <option value="">All User Organizations (Default)</option>
+            <option value="GLOBAL">Global (All User Organizations)</option>
+          </select>
+          <div class="form-text">If not selected or Global is chosen, membership applies to all organizations for this user.</div>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="activeCheck" name="active" <%= row.active !== false ? 'checked' : '' %>>
+            <label class="form-check-label" for="activeCheck">Enabled</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span class="fw-bold">Membership Periods</span>
+          <button type="button" id="addPeriodBtn" class="btn btn-sm btn-outline-primary">Add Period</button>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table align-middle" id="periodTable">
+              <thead>
+                <tr>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Organization</th>
+                  <th>Source Type</th>
+                  <th>Source Ref</th>
+                  <th>Note</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="periodTableBody"></tbody>
+            </table>
+          </div>
+          <div class="small text-muted">
+            All period rows are preserved for payment/history auditing. Validity checks use a merged effective window at runtime.
+          </div>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Payment Provider (optional)</label>
+          <input type="text" name="paymentProvider" class="form-control size-md" value="<%= row.source?.paymentProvider || '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Payment Reference (optional)</label>
+          <input type="text" name="paymentReference" class="form-control size-md" value="<%= row.source?.paymentReference || '' %>">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-control size-md" rows="3"><%= row.notes || '' %></textarea>
+      </div>
+
+      <% if (isEditMode && row.summary) { %>
+        <div class="alert alert-secondary">
+          Status: <b><%= row.summary.status || row.status || 'unknown' %></b> |
+          Effective Start: <b><%= row.summary.effectiveStartDate || '—' %></b> |
+          Effective End: <b><%= row.summary.effectiveEndDate || '—' %></b>
+        </div>
+      <% } %>
+
+      <div class="button-row mt-4">
+        <button type="button" class="btn btn-filled btn-primary btn-md" id="saveMembershipBtn">Save Membership</button>
+        <a href="/memberships" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/memberships">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script id="initialPeriodsJson" type="application/json"><%- periodsJson %></script>
+<script id="membershipUsersJson" type="application/json"><%- typeof usersJson === 'string' ? usersJson : '[]' %></script>
+<script id="membershipPeriodSourceTypesJson" type="application/json"><%- sourceTypeOptionsJson %></script>
+<script>
+  function initMembershipFormPage() {
+    const periodBody = document.getElementById('periodTableBody');
+    const addBtn = document.getElementById('addPeriodBtn');
+    const form = document.getElementById('membershipForm');
+    if (!form || !periodBody || !addBtn) return;
+    const hidden = document.getElementById('periodsJsonInput');
+
+    function parseJsonScript(id, fallbackValue) {
+      const el = document.getElementById(id);
+      if (!el) return fallbackValue;
+      try {
+        const raw = String(el.textContent || '').trim();
+        if (!raw) return fallbackValue;
+        return JSON.parse(raw);
+      } catch (_) {
+        return fallbackValue;
+      }
+    }
+
+    const initial = parseJsonScript('initialPeriodsJson', []);
+    const allUsers = parseJsonScript('membershipUsersJson', []);
+    const sourceTypeOptionsRaw = parseJsonScript('membershipPeriodSourceTypesJson', []);
+    const selectedUserIdInput = document.getElementById('selectedUserId');
+    const selectedUserLabel = document.getElementById('selectedUserLabel');
+    const selectedOrgId = document.getElementById('selectedOrgId');
+    const openUserPickerBtn = document.getElementById('openUserPickerBtn');
+    const clearUserBtn = document.getElementById('clearUserBtn');
+    const initialOrgValue = '<%= row.orgId || "" %>';
+    const saveBtn = document.getElementById('saveMembershipBtn');
+    const cancelBtn = document.getElementById('btnCancelAction');
+    const GLOBAL_SCOPE_TOKEN = 'GLOBAL';
+    const DEFAULT_SOURCE_TYPE_VALUE = 'manual';
+    const sourceTypeOptions = Array.isArray(sourceTypeOptionsRaw) && sourceTypeOptionsRaw.length
+      ? sourceTypeOptionsRaw
+      : [{ value: 'manual', label: 'Manual' }];
+    const sourceTypeAliasMap = new Map([
+      ['package', 'activity_quota_package']
+    ]);
+    const sourceTypeValueSet = new Set(
+      sourceTypeOptions
+        .map((item) => String(item?.value || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function normalizeSourceTypeToken(value) {
+      const token = String(value || '').trim().toLowerCase();
+      const canonical = sourceTypeAliasMap.get(token) || token;
+      if (sourceTypeValueSet.has(canonical)) return canonical;
+      return sourceTypeValueSet.has(DEFAULT_SOURCE_TYPE_VALUE) ? DEFAULT_SOURCE_TYPE_VALUE : '';
+    }
+
+    function buildSourceTypeOptionsMarkup(selectedValue) {
+      const normalizedSelected = normalizeSourceTypeToken(selectedValue || DEFAULT_SOURCE_TYPE_VALUE);
+      return sourceTypeOptions.map((item) => {
+        const value = String(item?.value || '').trim().toLowerCase();
+        if (!value) return '';
+        const label = String(item?.label || value).trim() || value;
+        const selected = value === normalizedSelected ? ' selected' : '';
+        return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(label)}</option>`;
+      }).join('');
+    }
+
+    function normalizeOrgToken(value) {
+      const token = String(value || '').trim();
+      if (!token) return '';
+      if (token.toUpperCase() === GLOBAL_SCOPE_TOKEN) return '';
+      return token;
+    }
+
+    function getSelectedMembershipOrgId() {
+      return normalizeOrgToken(selectedOrgId?.value || '');
+    }
+
+    function getSelectedUser() {
+      const id = String(selectedUserIdInput?.value || '').trim();
+      return allUsers.find((u) => String(u?.id || '') === id) || null;
+    }
+
+    function getOrgOptionsForUser(user) {
+      const rows = [];
+      const seen = new Set();
+      const userOrgs = Array.isArray(user?.organizations) ? user.organizations : [];
+      userOrgs.forEach((org) => {
+        const orgId = String(org?.orgId || '').trim();
+        if (!orgId || seen.has(orgId)) return;
+        seen.add(orgId);
+        rows.push({
+          id: orgId,
+          name: resolveOrgName(org) || `Org #${orgId}`
+        });
+      });
+      return rows;
+    }
+
+    function renderPeriodOrgSelect(selectEl, selectedValue = '', options = {}) {
+      if (!selectEl) return;
+      const user = getSelectedUser();
+      const membershipOrgId = getSelectedMembershipOrgId();
+      const orgRows = getOrgOptionsForUser(user);
+      const currentValue = normalizeOrgToken(selectedValue);
+      const shouldLock = !!membershipOrgId;
+
+      if (shouldLock) {
+        const orgName = (orgRows.find((row) => row.id === membershipOrgId) || {}).name || `Org #${membershipOrgId}`;
+        selectEl.innerHTML = `<option value="${membershipOrgId}">${orgName} (#${membershipOrgId})</option>`;
+        selectEl.value = membershipOrgId;
+        selectEl.disabled = true;
+        return;
+      }
+
+      const optionRows = ['<option value="">All User Organizations</option>'];
+      orgRows.forEach((row) => {
+        optionRows.push(`<option value="${row.id}">${row.name} (#${row.id})</option>`);
+      });
+      selectEl.innerHTML = optionRows.join('');
+      selectEl.disabled = false;
+      selectEl.value = currentValue && orgRows.some((row) => row.id === currentValue) ? currentValue : '';
+    }
+
+    function buildRow(period = {}) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="date" class="form-control size-md p-start" value="${String(period.startDate || '').slice(0, 10)}"></td>
+        <td><input type="date" class="form-control size-md p-end" value="${String(period.endDate || '').slice(0, 10)}"></td>
+        <td><select class="form-select size-md p-org"></select></td>
+        <td>
+          <select class="form-select size-md p-source-type">${buildSourceTypeOptionsMarkup(period.sourceType)}</select>
+        </td>
+        <td><input type="text" class="form-control size-md p-source-ref" value="${period.sourceRef || ''}"></td>
+        <td><input type="text" class="form-control size-md p-note" value="${period.note || ''}"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger p-remove">Remove</button></td>
+      `;
+      tr.querySelector('.p-source-type').value = normalizeSourceTypeToken(period.sourceType || DEFAULT_SOURCE_TYPE_VALUE);
+      renderPeriodOrgSelect(tr.querySelector('.p-org'), period.orgId || '');
+      tr.querySelector('.p-remove').addEventListener('click', () => tr.remove());
+      return tr;
+    }
+
+    function serializeRows() {
+      if (!String(selectedUserIdInput?.value || '').trim()) {
+        throw new Error('User required');
+      }
+      const rows = [...periodBody.querySelectorAll('tr')].map((tr) => ({
+        startDate: tr.querySelector('.p-start')?.value || '',
+        endDate: tr.querySelector('.p-end')?.value || '',
+        orgId: tr.querySelector('.p-org')?.value || '',
+        sourceType: normalizeSourceTypeToken(tr.querySelector('.p-source-type')?.value || DEFAULT_SOURCE_TYPE_VALUE),
+        sourceRef: tr.querySelector('.p-source-ref')?.value || '',
+        note: tr.querySelector('.p-note')?.value || ''
+      }));
+      hidden.value = JSON.stringify(rows);
+    }
+
+    async function showMembershipModal({ title, message, icon = 'info' }) {
+      if (typeof window.showMessageModal === 'function') {
+        await window.showMessageModal({
+          title,
+          message,
+          icon,
+          buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+        });
+        return;
+      }
+      // Fallback kept minimal if modal script is unavailable unexpectedly.
+      console.warn(`${title}: ${message}`);
+    }
+
+    function setSaveWaiting(isWaiting, label = 'Save Membership') {
+      if (!saveBtn) return;
+      if (isWaiting) {
+        if (!saveBtn.dataset.originalHtml) saveBtn.dataset.originalHtml = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${label}`;
+      } else {
+        saveBtn.disabled = false;
+        if (saveBtn.dataset.originalHtml) saveBtn.innerHTML = saveBtn.dataset.originalHtml;
+      }
+    }
+
+    function setWaitingState(el, waitText) {
+      if (!el || el.dataset.waitingStateApplied === '1') return;
+      const text = String(waitText || 'Please wait...').trim() || 'Please wait...';
+      el.dataset.waitingStateApplied = '1';
+      const width = el.getBoundingClientRect ? Math.ceil(el.getBoundingClientRect().width) : 0;
+      if (width > 0 && !el.style.minWidth) el.style.minWidth = `${width}px`;
+      el.classList.add('disabled');
+
+      if (el.tagName === 'BUTTON') {
+        el.dataset.waitingOriginalHtml = el.innerHTML;
+        el.disabled = true;
+        el.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${text}`;
+        return;
+      }
+      if (el.tagName === 'A') {
+        el.dataset.waitingOriginalHtml = el.innerHTML;
+        el.setAttribute('aria-disabled', 'true');
+        el.style.pointerEvents = 'none';
+        el.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${text}`;
+      }
+    }
+
+    async function submitMembershipViaAjax() {
+      try {
+        serializeRows();
+      } catch (error) {
+        await showMembershipModal({
+          title: 'Validation Error',
+          icon: 'warning',
+          message: error?.message === 'User required' ? 'Please select a user before saving.' : (error?.message || 'Invalid form input.')
+        });
+        return;
+      }
+
+      try {
+        setSaveWaiting(true, 'Saving...');
+        const payload = new URLSearchParams(new FormData(form));
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-AJAX-Request': 'true',
+            'x-ajax-request': 'true',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: payload.toString()
+        });
+
+        const result = await response.json().catch(() => ({ status: 'error', message: 'Unexpected server response.' }));
+        if (!response.ok || result?.status !== 'success') {
+          await showMembershipModal({
+            title: 'Save Failed',
+            icon: 'error',
+            message: result?.message || 'Unable to save membership.'
+          });
+          return;
+        }
+
+        await showMembershipModal({
+          title: 'Saved',
+          icon: 'success',
+          message: result?.message || 'Membership saved successfully.'
+        });
+        window.location.href = '/memberships';
+      } catch (error) {
+        await showMembershipModal({
+          title: 'Network Error',
+          icon: 'error',
+          message: error?.message || 'Unable to reach server while saving.'
+        });
+      } finally {
+        setSaveWaiting(false);
+      }
+    }
+
+    function getUserLabel(user) {
+      if (!user) return '';
+      return `${user.id} - ${user.username || user.email || 'User'}`;
+    }
+
+    function resolveOrgName(org) {
+      return org?.name || org?.orgName || org?.organizationName || (org?.orgId ? `Org #${org.orgId}` : '');
+    }
+
+    function buildUserPickerContext() {
+      const contexts = window.GenericPickerContexts || {};
+      const selectedOrgValue = String(selectedOrgId?.value || '').trim();
+      const selectedUserId = String(selectedUserIdInput?.value || '').trim();
+      const selectedUser = allUsers.find((u) => String(u?.id || '') === selectedUserId) || null;
+
+      if (selectedOrgValue.toUpperCase() === 'GLOBAL') {
+        return {
+          label: 'Access Scope',
+          value: 'Global Access',
+          icon: 'bi-globe fs-4'
+        };
+      }
+
+      if (selectedOrgValue) {
+        const userOrgs = Array.isArray(selectedUser?.organizations) ? selectedUser.organizations : [];
+        const matchedOrg = userOrgs.find((org) => String(org?.orgId || '') === selectedOrgValue) || null;
+        const orgName = resolveOrgName(matchedOrg || { orgId: selectedOrgValue });
+        return {
+          label: 'Active Organization',
+          value: { id: selectedOrgValue, name: orgName },
+          icon: 'bi-building fs-4'
+        };
+      }
+
+      if (typeof contexts.activeOrganizationScope === 'function') {
+        return contexts.activeOrganizationScope({
+          label: 'Active Organization',
+          icon: 'bi-building fs-4'
+        });
+      }
+
+      return {
+        label: 'Access Scope',
+        value: 'Active Organization',
+        icon: 'bi-building fs-4'
+      };
+    }
+
+    function renderOrgOptions(user, preferredOrgId = '') {
+      selectedOrgId.innerHTML = '';
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = 'All User Organizations (Default)';
+      selectedOrgId.appendChild(defaultOpt);
+
+      const globalOpt = document.createElement('option');
+      globalOpt.value = GLOBAL_SCOPE_TOKEN;
+      globalOpt.textContent = 'Global (All User Organizations)';
+      selectedOrgId.appendChild(globalOpt);
+
+      const userOrgs = Array.isArray(user?.organizations) ? user.organizations : [];
+      userOrgs.forEach((org) => {
+        const opt = document.createElement('option');
+        opt.value = String(org.orgId || '').trim();
+        opt.textContent = `${resolveOrgName(org)} (#${org.orgId})`;
+        selectedOrgId.appendChild(opt);
+      });
+
+      const desired = String(preferredOrgId || '').trim();
+      if (desired) {
+        const exists = [...selectedOrgId.options].some((opt) => String(opt.value) === desired);
+        selectedOrgId.value = exists ? desired : '';
+      } else {
+        selectedOrgId.value = '';
+      }
+
+      refreshPeriodOrgControls();
+    }
+
+    function refreshPeriodOrgControls() {
+      const rows = [...periodBody.querySelectorAll('tr')];
+      rows.forEach((tr) => {
+        const orgSelect = tr.querySelector('.p-org');
+        if (!orgSelect) return;
+        const preferred = orgSelect.value || '';
+        renderPeriodOrgSelect(orgSelect, preferred);
+      });
+    }
+
+    function selectUser(user, preferredOrgId = '') {
+      selectedUserIdInput.value = String(user?.id || '').trim();
+      selectedUserLabel.value = getUserLabel(user);
+      renderOrgOptions(user, preferredOrgId);
+    }
+
+    addBtn.addEventListener('click', () => {
+      periodBody.appendChild(buildRow());
+    });
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      await submitMembershipViaAjax();
+    });
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async (event) => {
+        event.preventDefault();
+        await submitMembershipViaAjax();
+      });
+    }
+
+    if (openUserPickerBtn) {
+      openUserPickerBtn.addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.user({
+          title: 'Select User',
+          placeholder: 'Search users...',
+          context: buildUserPickerContext(),
+          onSelect: async (item) => {
+            const picked = allUsers.find((u) => String(u.id) === String(item?.id || '')) || item;
+            selectUser(picked, '');
+          }
+        }));
+      });
+    }
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        setWaitingState(cancelBtn, 'Cancelling...');
+      }, true);
+    }
+
+    if (clearUserBtn) {
+      clearUserBtn.addEventListener('click', () => {
+        selectedUserIdInput.value = '';
+        selectedUserLabel.value = '';
+        renderOrgOptions(null, '');
+      });
+    }
+
+    if (selectedOrgId) {
+      selectedOrgId.addEventListener('change', () => {
+        refreshPeriodOrgControls();
+      });
+    }
+
+    if (Array.isArray(initial) && initial.length) {
+      initial.forEach((period) => periodBody.appendChild(buildRow(period)));
+    } else {
+      periodBody.appendChild(buildRow());
+    }
+
+    const currentUser = allUsers.find((u) => String(u.id) === String(selectedUserIdInput?.value || '')) || null;
+    renderOrgOptions(currentUser, initialOrgValue);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMembershipFormPage);
+  } else {
+    initMembershipFormPage();
+  }
+</script>
+<%- include('../partials/modal_GenericPicker') %>

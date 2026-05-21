@@ -1,0 +1,116 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  print,
+  btn_export: true
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search scopes...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="name">Name <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="level">Level <span class="sort-icon"></span></th>
+        <th>Mode</th>
+        <th>Runtime Summary</th>
+        <th class="draggable" data-column="description">Description <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="active">Active <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="createDateTime">Created <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% scopes.forEach((s) => { %>
+        <% const audit = s.audit || {}; %>
+        <tr>
+          <td><%= s.id %></td>
+          <td class="fw-bold"><%= s.name %></td>
+          <td>
+            <span class="badge bg-light text-dark border shadow-sm">
+              <%= s.level !== undefined ? s.level : 0 %>
+            </span>
+          </td>
+          <td>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+              <%= s.definition?.mode || '-' %>
+            </span>
+          </td>
+          <td>
+            <span class="small text-muted d-block" style="max-width: 320px;">
+              <%= s.definitionSummary || 'No runtime summary.' %>
+            </span>
+          </td>
+          <td>
+            <span class="text-muted small text-truncate d-block" style="max-width: 250px;">
+              <%= s.description || '-' %>
+            </span>
+          </td>
+          <td>
+            <% if (s.active) { %>
+              <span class="badge bg-success">Active</span>
+            <% } else { %>
+              <span class="badge bg-secondary">Inactive</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (audit.createDateTime) { %>
+              <%= new Date(audit.createDateTime).toLocaleString() %>
+              <% if (audit.createUser) { %>
+                <br><span class="text-muted small">by User <%= audit.createUser %></span>
+              <% } %>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (audit.lastUpdateDateTime) { %>
+              <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+              <% if (audit.lastUpdateUser) { %>
+                <br><span class="text-muted small">by User <%= audit.lastUpdateUser %></span>
+              <% } %>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= s.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= s.id %>">
+                <a href="/scopes/edit/<%= s.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= s.id %>">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>

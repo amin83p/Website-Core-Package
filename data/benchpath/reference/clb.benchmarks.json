@@ -1,0 +1,2609 @@
+{
+  "meta": {
+    "schemaVersion": "1.0.0",
+    "entityType": "clbBenchmarks",
+    "layer": "reference",
+    "authority": "official",
+    "isReadMostly": true,
+    "defaultLocale": "en-CA",
+    "generatedAt": "2026-03-21T00:00:00.000Z",
+    "updatedAt": "2026-03-22T05:38:49.351Z"
+  },
+  "itemsById": {
+    "benchmark:listening:1": {
+      "id": "benchmark:listening:1",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:1",
+      "code": "BM-L-01",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 1.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 1
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 1",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-1",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-1"
+      ],
+      "title": "Listening Benchmark 1",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:10": {
+      "id": "benchmark:listening:10",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:10",
+      "code": "BM-L-10",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 10.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 10
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 10",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-10",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-10"
+      ],
+      "title": "Listening Benchmark 10",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:11": {
+      "id": "benchmark:listening:11",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:11",
+      "code": "BM-L-11",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 11.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 11
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 11",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-11",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-11"
+      ],
+      "title": "Listening Benchmark 11",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:12": {
+      "id": "benchmark:listening:12",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:12",
+      "code": "BM-L-12",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 12.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 12
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 12",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-12",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-12"
+      ],
+      "title": "Listening Benchmark 12",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:2": {
+      "id": "benchmark:listening:2",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:2",
+      "code": "BM-L-02",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 2.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 2
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 2",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-2",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-2"
+      ],
+      "title": "Listening Benchmark 2",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:3": {
+      "id": "benchmark:listening:3",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:3",
+      "code": "BM-L-03",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 3.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 3
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 3",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-3",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-3"
+      ],
+      "title": "Listening Benchmark 3",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:4": {
+      "id": "benchmark:listening:4",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:4",
+      "code": "BM-L-04",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 4.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 4
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 4",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-4",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-4"
+      ],
+      "title": "Listening Benchmark 4",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:5": {
+      "id": "benchmark:listening:5",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:5",
+      "code": "BM-L-05",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 5.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 5
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 5",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-5",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-5"
+      ],
+      "title": "Listening Benchmark 5",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:6": {
+      "id": "benchmark:listening:6",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:6",
+      "code": "BM-L-06",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 6.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 6
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 6",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-6",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-6"
+      ],
+      "title": "Listening Benchmark 6",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:7": {
+      "id": "benchmark:listening:7",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:7",
+      "code": "BM-L-07",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 7.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 7
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 7",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-7",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-7"
+      ],
+      "title": "Listening Benchmark 7",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:8": {
+      "id": "benchmark:listening:8",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:8",
+      "code": "BM-L-08",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 8.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 8
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 8",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-8",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-8"
+      ],
+      "title": "Listening Benchmark 8",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:listening:9": {
+      "id": "benchmark:listening:9",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:listening:9",
+      "code": "BM-L-09",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Listening, level 9.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 9
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:listening:interacting_with_others",
+        "ca:listening:comprehending_instructions",
+        "ca:listening:getting_things_done",
+        "ca:listening:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "L 9",
+      "skillId": "skill:listening",
+      "slug": "listening-benchmark-9",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Listening skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "listening",
+        "level-9"
+      ],
+      "title": "Listening Benchmark 9",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:1": {
+      "id": "benchmark:reading:1",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:1",
+      "code": "BM-R-01",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 1.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 1
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 1",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-1",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-1"
+      ],
+      "title": "Reading Benchmark 1",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:10": {
+      "id": "benchmark:reading:10",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:10",
+      "code": "BM-R-10",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 10.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 10
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 10",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-10",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-10"
+      ],
+      "title": "Reading Benchmark 10",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:11": {
+      "id": "benchmark:reading:11",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:11",
+      "code": "BM-R-11",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 11.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 11
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 11",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-11",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-11"
+      ],
+      "title": "Reading Benchmark 11",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:12": {
+      "id": "benchmark:reading:12",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:12",
+      "code": "BM-R-12",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 12.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 12
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 12",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-12",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-12"
+      ],
+      "title": "Reading Benchmark 12",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:2": {
+      "id": "benchmark:reading:2",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:2",
+      "code": "BM-R-02",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 2.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 2
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 2",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-2",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-2"
+      ],
+      "title": "Reading Benchmark 2",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:3": {
+      "id": "benchmark:reading:3",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:3",
+      "code": "BM-R-03",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 3.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 3
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 3",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-3",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-3"
+      ],
+      "title": "Reading Benchmark 3",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:4": {
+      "id": "benchmark:reading:4",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:4",
+      "code": "BM-R-04",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 4.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 4
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 4",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-4",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-4"
+      ],
+      "title": "Reading Benchmark 4",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:5": {
+      "id": "benchmark:reading:5",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:5",
+      "code": "BM-R-05",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 5.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 5
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 5",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-5",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-5"
+      ],
+      "title": "Reading Benchmark 5",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:6": {
+      "id": "benchmark:reading:6",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:6",
+      "code": "BM-R-06",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 6.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 6
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 6",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-6",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-6"
+      ],
+      "title": "Reading Benchmark 6",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:7": {
+      "id": "benchmark:reading:7",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:7",
+      "code": "BM-R-07",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 7.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 7
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 7",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-7",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-7"
+      ],
+      "title": "Reading Benchmark 7",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:8": {
+      "id": "benchmark:reading:8",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:8",
+      "code": "BM-R-08",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 8.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 8
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 8",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-8",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-8"
+      ],
+      "title": "Reading Benchmark 8",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:reading:9": {
+      "id": "benchmark:reading:9",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:reading:9",
+      "code": "BM-R-09",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Reading, level 9.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 9
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:reading:interacting_with_others",
+        "ca:reading:comprehending_instructions",
+        "ca:reading:getting_things_done",
+        "ca:reading:comprehending_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "R 9",
+      "skillId": "skill:reading",
+      "slug": "reading-benchmark-9",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Reading skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "reading",
+        "level-9"
+      ],
+      "title": "Reading Benchmark 9",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:1": {
+      "id": "benchmark:speaking:1",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:1",
+      "code": "BM-S-01",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 1.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 1
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 1",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-1",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-1"
+      ],
+      "title": "Speaking Benchmark 1",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:10": {
+      "id": "benchmark:speaking:10",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:10",
+      "code": "BM-S-10",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 10.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 10
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 10",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-10",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-10"
+      ],
+      "title": "Speaking Benchmark 10",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:11": {
+      "id": "benchmark:speaking:11",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:11",
+      "code": "BM-S-11",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 11.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 11
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 11",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-11",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-11"
+      ],
+      "title": "Speaking Benchmark 11",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:12": {
+      "id": "benchmark:speaking:12",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:12",
+      "code": "BM-S-12",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 12.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 12
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 12",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-12",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-12"
+      ],
+      "title": "Speaking Benchmark 12",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:2": {
+      "id": "benchmark:speaking:2",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:2",
+      "code": "BM-S-02",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 2.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 2
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 2",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-2",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-2"
+      ],
+      "title": "Speaking Benchmark 2",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:3": {
+      "id": "benchmark:speaking:3",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:3",
+      "code": "BM-S-03",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 3.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 3
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 3",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-3",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-3"
+      ],
+      "title": "Speaking Benchmark 3",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:4": {
+      "id": "benchmark:speaking:4",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:4",
+      "code": "BM-S-04",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 4.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 4
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 4",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-4",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-4"
+      ],
+      "title": "Speaking Benchmark 4",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:5": {
+      "id": "benchmark:speaking:5",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:5",
+      "code": "BM-S-05",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 5.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 5
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 5",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-5",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-5"
+      ],
+      "title": "Speaking Benchmark 5",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:6": {
+      "id": "benchmark:speaking:6",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:6",
+      "code": "BM-S-06",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 6.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 6
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 6",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-6",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-6"
+      ],
+      "title": "Speaking Benchmark 6",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:7": {
+      "id": "benchmark:speaking:7",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:7",
+      "code": "BM-S-07",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 7.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 7
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 7",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-7",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-7"
+      ],
+      "title": "Speaking Benchmark 7",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:8": {
+      "id": "benchmark:speaking:8",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:8",
+      "code": "BM-S-08",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 8.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 8
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 8",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-8",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-8"
+      ],
+      "title": "Speaking Benchmark 8",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:speaking:9": {
+      "id": "benchmark:speaking:9",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:speaking:9",
+      "code": "BM-S-09",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Speaking, level 9.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 9
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:speaking:interacting_with_others",
+        "ca:speaking:giving_instructions",
+        "ca:speaking:getting_things_done",
+        "ca:speaking:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "S 9",
+      "skillId": "skill:speaking",
+      "slug": "speaking-benchmark-9",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Speaking skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "speaking",
+        "level-9"
+      ],
+      "title": "Speaking Benchmark 9",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:1": {
+      "id": "benchmark:writing:1",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:1",
+      "code": "BM-W-01",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 1.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 1
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 1",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-1",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-1"
+      ],
+      "title": "Writing Benchmark 1",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:10": {
+      "id": "benchmark:writing:10",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:10",
+      "code": "BM-W-10",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 10.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 10
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 10",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-10",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-10"
+      ],
+      "title": "Writing Benchmark 10",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:11": {
+      "id": "benchmark:writing:11",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:11",
+      "code": "BM-W-11",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 11.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 11
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 11",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-11",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-11"
+      ],
+      "title": "Writing Benchmark 11",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:12": {
+      "id": "benchmark:writing:12",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:12",
+      "code": "BM-W-12",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 12.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 12
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 12",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-12",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-12"
+      ],
+      "title": "Writing Benchmark 12",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:2": {
+      "id": "benchmark:writing:2",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:2",
+      "code": "BM-W-02",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 2.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 2
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 2",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-2",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-2"
+      ],
+      "title": "Writing Benchmark 2",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:3": {
+      "id": "benchmark:writing:3",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:3",
+      "code": "BM-W-03",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 3.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 3
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 3",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-3",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-3"
+      ],
+      "title": "Writing Benchmark 3",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:4": {
+      "id": "benchmark:writing:4",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:4",
+      "code": "BM-W-04",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 4.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 4
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 4",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-4",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:1",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-4"
+      ],
+      "title": "Writing Benchmark 4",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:5": {
+      "id": "benchmark:writing:5",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:5",
+      "code": "BM-W-05",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 5.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 5
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 5",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-5",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-5"
+      ],
+      "title": "Writing Benchmark 5",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:6": {
+      "id": "benchmark:writing:6",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:6",
+      "code": "BM-W-06",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 6.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 6
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 6",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-6",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-6"
+      ],
+      "title": "Writing Benchmark 6",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:7": {
+      "id": "benchmark:writing:7",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:7",
+      "code": "BM-W-07",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 7.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 7
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 7",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-7",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-7"
+      ],
+      "title": "Writing Benchmark 7",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:8": {
+      "id": "benchmark:writing:8",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:8",
+      "code": "BM-W-08",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 8.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 8
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 8",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-8",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:2",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-8"
+      ],
+      "title": "Writing Benchmark 8",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    },
+    "benchmark:writing:9": {
+      "id": "benchmark:writing:9",
+      "approvedAt": "2026-03-21T00:00:00.000Z",
+      "approvedBy": "admin",
+      "benchmarkId": "benchmark:writing:9",
+      "code": "BM-W-09",
+      "competencyAreaId": null,
+      "competencyId": null,
+      "createdAt": "2026-03-21T00:00:00.000Z",
+      "createdBy": "system",
+      "description": "Canonical benchmark reference for Writing, level 9.",
+      "domainNotes": null,
+      "extensions": {
+        "level": 9
+      },
+      "frameworkId": "framework:clb",
+      "isActive": true,
+      "isLocked": false,
+      "isSystem": true,
+      "notes": null,
+      "orgId": "SYSTEM",
+      "relatedIds": [
+        "ca:writing:interacting_with_others",
+        "ca:writing:reproducing_information",
+        "ca:writing:getting_things_done",
+        "ca:writing:sharing_information"
+      ],
+      "reviewStatus": "reviewed",
+      "shortTitle": "W 9",
+      "skillId": "skill:writing",
+      "slug": "writing-benchmark-9",
+      "sourceRefs": [
+        {
+          "sourceId": "source:clb:2012",
+          "fragmentId": null,
+          "pages": null,
+          "note": "Writing skill definition and organization"
+        }
+      ],
+      "stageId": "stage:3",
+      "status": "approved",
+      "tags": [
+        "official",
+        "clb",
+        "benchmark",
+        "writing",
+        "level-9"
+      ],
+      "title": "Writing Benchmark 9",
+      "updatedAt": "2026-03-21T06:31:50.4751631Z",
+      "updatedBy": "system",
+      "version": 1
+    }
+  },
+  "allIds": [
+    "benchmark:listening:1",
+    "benchmark:listening:10",
+    "benchmark:listening:11",
+    "benchmark:listening:12",
+    "benchmark:listening:2",
+    "benchmark:listening:3",
+    "benchmark:listening:4",
+    "benchmark:listening:5",
+    "benchmark:listening:6",
+    "benchmark:listening:7",
+    "benchmark:listening:8",
+    "benchmark:listening:9",
+    "benchmark:reading:1",
+    "benchmark:reading:10",
+    "benchmark:reading:11",
+    "benchmark:reading:12",
+    "benchmark:reading:2",
+    "benchmark:reading:3",
+    "benchmark:reading:4",
+    "benchmark:reading:5",
+    "benchmark:reading:6",
+    "benchmark:reading:7",
+    "benchmark:reading:8",
+    "benchmark:reading:9",
+    "benchmark:speaking:1",
+    "benchmark:speaking:10",
+    "benchmark:speaking:11",
+    "benchmark:speaking:12",
+    "benchmark:speaking:2",
+    "benchmark:speaking:3",
+    "benchmark:speaking:4",
+    "benchmark:speaking:5",
+    "benchmark:speaking:6",
+    "benchmark:speaking:7",
+    "benchmark:speaking:8",
+    "benchmark:speaking:9",
+    "benchmark:writing:1",
+    "benchmark:writing:10",
+    "benchmark:writing:11",
+    "benchmark:writing:12",
+    "benchmark:writing:2",
+    "benchmark:writing:3",
+    "benchmark:writing:4",
+    "benchmark:writing:5",
+    "benchmark:writing:6",
+    "benchmark:writing:7",
+    "benchmark:writing:8",
+    "benchmark:writing:9"
+  ],
+  "indexes": {}
+}

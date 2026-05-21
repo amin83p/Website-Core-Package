@@ -1,0 +1,114 @@
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  headerManageBtns: [
+    `<a href="/school/exams" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-house me-1"></i> Exam Home</a>`
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search templates...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Template</th>
+        <th>Status</th>
+        <th>Visibility</th>
+        <th>Owner</th>
+        <th>Department</th>
+        <th>Subjects</th>
+        <th>Parent</th>
+        <th>Depth</th>
+        <th>Latest Revision</th>
+        <th>Duration</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr><td colspan="11" class="text-center py-4 text-muted">No exam templates found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= row.title || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= row.id %></div>
+            <div class="x-small text-muted"><%= row.description || '' %></div>
+          </td>
+          <td>
+            <% const st = String(row.status || '').toLowerCase(); %>
+            <span class="badge <%= st === 'active' ? 'bg-success' : (st === 'draft' ? 'bg-warning text-dark' : 'bg-secondary') %>"><%= st || '-' %></span>
+          </td>
+          <td>
+            <% const visibility = String(row.visibility || 'private').toLowerCase(); %>
+            <span class="badge <%= visibility === 'public' ? 'bg-success' : 'bg-secondary' %>"><%= visibility %></span>
+          </td>
+          <td>
+            <span class="font-monospace x-small"><%= row.ownerUserId || '-' %></span>
+          </td>
+          <td>
+            <div class="small fw-semibold"><%= row.departmentName || '-' %></div>
+            <div class="x-small text-muted"><%= row.departmentCode || '-' %></div>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border"><%= Number(row.subjectCount || 0) %></span>
+          </td>
+          <td>
+            <% if (row.parentTemplateId) { %>
+              <span class="font-monospace x-small"><%= row.parentTemplateId %></span>
+            <% } else { %>
+              <span class="badge bg-light text-dark border">Original</span>
+            <% } %>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border"><%= Number(row.revisionDepth || 0) %></span>
+          </td>
+          <td><span class="badge bg-light text-dark border">R<%= Number(row.latestRevisionNo || 0) %></span></td>
+          <td><%= Number(row.settings?.defaultDurationMinutes || 60) %> min</td>
+          <td class="table-actions pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Template Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <a class="btn btn-outline-secondary btn-sm" href="/school/exams/templates/<%= row.id %>"><i class="bi bi-box-arrow-up-right me-2"></i>Open</a>
+                <% if (!row.isImmutableTemplate) { %>
+                  <a class="btn btn-outline-secondary btn-sm" href="/school/exams/templates/edit/<%= row.id %>"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                  <a class="btn btn-outline-primary btn-sm" href="/school/exams/templates/edit/<%= row.id %>#tab-questions"><i class="bi bi-ui-checks-grid me-2"></i>Question Builder</a>
+                <% } else { %>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-lock me-2"></i>Edit (Locked)</button>
+                <% } %>
+                <a class="btn btn-outline-secondary btn-sm" href="/school/exams/templates/<%= row.id %>#lineage-history"><i class="bi bi-clock-history me-2"></i>History</a>
+                <% if (row.publishedRevisionId) { %>
+                  <form method="POST" action="/school/exams/templates/<%= row.id %>/revisions/create-copy" class="m-0">
+                    <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+                    <button type="submit" class="btn btn-outline-success btn-sm"><i class="bi bi-files me-2"></i>Create Revision</button>
+                  </form>
+                <% } else { %>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="Publish this template before creating a revision."><i class="bi bi-files me-2"></i>Create Revision</button>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="<%= newUrl %>" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
+<%- include('../../partials/tablePages-end') %>

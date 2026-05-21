@@ -1,0 +1,612 @@
+<div class="sections-page">
+  <div class="three-run-header-wrap mb-4">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+      <div>
+        <h2 class="page-heading size-md m-0">Step 3 Tuning Comparison</h2>
+        <div class="text-muted small mt-1">Cross-session variation analysis focused on Step 3 extraction signals.</div>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <a href="<%= ieltsSectionDashboardHref %>" class="ielts-navigator-dashboard btn btn-secondary btn-filled text-white btn-sm d-inline-flex align-items-center gap-1">
+          <i class="bi bi-speedometer2"></i>
+          <span>IELTS Dashboard</span>
+        </a>
+        <a href="/ielts/scoring/dashboard" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1">
+          <i class="bi bi-graph-up-arrow"></i>
+          <span>Scoring Dashboard</span>
+        </a>
+      </div>
+    </div>
+    <div class="three-run-action-row d-flex gap-2 flex-wrap mt-3">
+      <a href="/ielts/scoring/history?type=step3_tuning" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Step 3 History
+      </a>
+      <% if (typeof compareIdsQuery !== 'undefined' && compareIdsQuery) { %>
+      <a href="/ielts/scoring/compare?ids=<%- compareIdsQuery %>" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-columns-gap me-1"></i> Session Comparison
+      </a>
+      <% } %>
+      <a href="/ielts/scoring/tuning/step3" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-sliders me-1"></i> Open Step 3 Tuning
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-xl-3 col-md-6"><div class="metric-tile"><div class="metric-label">Selected Results</div><div id="kpiSessions" class="metric-value">-</div></div></div>
+    <div class="col-xl-3 col-md-6"><div class="metric-tile"><div class="metric-label">Signal Universe</div><div id="kpiSignals" class="metric-value">-</div></div></div>
+    <div class="col-xl-3 col-md-6"><div class="metric-tile"><div class="metric-label">Avg Unstable</div><div id="kpiUnstable" class="metric-value">-</div></div></div>
+    <div class="col-xl-3 col-md-6"><div class="metric-tile"><div class="metric-label">Avg Agreement</div><div id="kpiAgreement" class="metric-value">-</div></div></div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-xl-4">
+      <div class="card border-0 shadow-sm h-100 panel-card">
+        <div class="card-header bg-white fw-bold small">Selected Results</div>
+        <div class="card-body p-0">
+          <div class="table-responsive" style="max-height: 620px;">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>Result</th>
+                  <th class="text-center">Unstable</th>
+                  <th class="text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="resultRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-8">
+      <div class="card border-0 shadow-sm h-100 panel-card">
+        <div class="card-header bg-white fw-bold small">Result Summary (Click a Result)</div>
+        <div class="card-body" id="resultSummaryPanel">
+          <div class="text-muted small">Select a result from the left list.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm panel-card">
+        <div class="card-header bg-white fw-bold small">Selected Bar Details</div>
+        <div class="card-body" id="barSignalDetailsPanel">
+          <div class="text-muted small">Click a bar in the chart above to view signal-level details across selected results.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm h-100 panel-card">
+        <div class="card-header bg-white fw-bold small">Variated Signals: Occurrence Rate Across Selected Results</div>
+        <div class="card-body">
+          <div class="chart-shell">
+            <canvas id="signalOccurrenceChart" height="320"></canvas>
+          </div>
+          <div id="signalChartLegend" class="small mt-2 text-muted"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-xl-6">
+      <div class="card border-0 shadow-sm panel-card h-100">
+        <div class="card-header bg-white fw-bold small">Most Fluctuating Signals</div>
+        <div class="card-body p-0">
+          <ul id="mostFluctuatingList" class="list-group list-group-flush small"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-6">
+      <div class="card border-0 shadow-sm panel-card h-100">
+        <div class="card-header bg-white fw-bold small">Most Consistent Signals</div>
+        <div class="card-body p-0">
+          <ul id="mostConsistentList" class="list-group list-group-flush small"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3 panel-card">
+    <div class="card-header bg-white fw-bold small">Per Result: Step 3 Non-Consistent Signals</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Result</th>
+              <th class="text-center">Run Count</th>
+              <th class="text-center">Unstable</th>
+              <th>Signal Keys</th>
+            </tr>
+          </thead>
+          <tbody id="perResultUnstableRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm panel-card">
+    <div class="card-header bg-white fw-bold small">Cross-Sample Signal Matrix (Consensus Value + Outcome Per Result)</div>
+    <div class="card-body p-0">
+      <div class="table-responsive" style="max-height: 68vh;">
+        <table class="table table-sm table-bordered mb-0 align-middle">
+          <thead id="signalMatrixHead" class="table-light sticky-top"></thead>
+          <tbody id="signalMatrixRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="step3CompareRecords"><%- JSON.stringify(records || []) %></script>
+<script type="application/json" id="step3CompareAnalysis"><%- JSON.stringify(analysis || {}) %></script>
+<script>
+(function () {
+  const records = (() => {
+    try { return JSON.parse(document.getElementById('step3CompareRecords')?.textContent || '[]'); } catch (_) { return []; }
+  })();
+  const analysis = (() => {
+    try { return JSON.parse(document.getElementById('step3CompareAnalysis')?.textContent || '{}'); } catch (_) { return {}; }
+  })();
+  const esc = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const toPct = (v) => Number.isFinite(Number(v)) ? `${(Number(v) * 100).toFixed(1)}%` : '-';
+  const shortId = (id) => { const s = String(id || '').trim(); return s.length > 14 ? `${s.slice(0, 7)}...${s.slice(-4)}` : s || '-'; };
+  const fmtDate = (value) => {
+    if (!value) return '-';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return '-';
+    return `${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  };
+
+  const active = { index: records.length ? 0 : null };
+  const CHART_COLORS = ['#0d6efd', '#198754', '#fd7e14', '#6f42c1', '#20c997', '#dc3545', '#0dcaf0', '#ffc107', '#6610f2', '#6c757d'];
+  let chartBarHitAreas = [];
+
+  function renderKpis() {
+    document.getElementById('kpiSessions').textContent = String(analysis?.sessionCount ?? records.length ?? 0);
+    document.getElementById('kpiSignals').textContent = String(analysis?.signalCount ?? 0);
+    document.getElementById('kpiUnstable').textContent = String(analysis?.avgUnstable ?? 0);
+    document.getElementById('kpiAgreement').textContent = toPct(analysis?.avgAgreement);
+  }
+
+  function renderResultList() {
+    const rows = records.map((record, idx) => {
+      const activeClass = idx === active.index ? 'table-primary' : '';
+      return `
+        <tr class="result-row ${activeClass}" data-index="${idx}">
+          <td>
+            <div class="fw-bold">${esc(record?.sampleName || 'Untitled')}</div>
+            <div class="small text-muted">${esc(fmtDate(record?.savedAt))}</div>
+            <div class="small text-muted font-monospace">${esc(shortId(record?.id))}</div>
+          </td>
+          <td class="text-center"><span class="badge bg-warning text-dark">${esc(record?.unstableCount ?? 0)}</span></td>
+          <td class="text-center">
+            <div class="d-inline-flex flex-column gap-1 action-btn-group">
+              <a href="${esc(record?.loadUrl || '#')}" class="btn btn-outline-primary btn-sm action-btn">Load</a>
+              <button type="button" class="btn btn-outline-secondary btn-sm btn-view-prompt action-btn" data-index="${idx}">Prompt + Model</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    document.getElementById('resultRows').innerHTML = rows || `<tr><td colspan="3" class="text-muted text-center py-3">No records selected.</td></tr>`;
+  }
+
+  function unstableRowsHtml(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) return `<tr><td colspan="4" class="text-muted text-center py-2">No unstable signals.</td></tr>`;
+    return list.map((row) => {
+      const runValues = Array.isArray(row?.runValues)
+        ? row.runValues.map((v, i) => `<span class="badge bg-light text-dark border me-1">R${i + 1}: ${esc(v)}</span>`).join('')
+        : '-';
+      return `<tr><td class="font-monospace">${esc(row?.key || '-')}</td><td>${esc(row?.criterion || '-')}</td><td>${runValues}</td><td class="fw-bold">${esc(row?.consensusValue || '-')}</td></tr>`;
+    }).join('');
+  }
+
+  function getSignalRow(record, key) {
+    const signalKey = String(key || '').trim();
+    if (!signalKey) return null;
+    const allRows = Array.isArray(record?.allSignals) ? record.allSignals : [];
+    const exact = allRows.find((row) => String(row?.key || '').trim() === signalKey);
+    if (exact) return exact;
+    const unstable = Array.isArray(record?.topUnstable) ? record.topUnstable : [];
+    return unstable.find((row) => String(row?.key || '').trim() === signalKey) || null;
+  }
+
+  function renderResultSummary() {
+    const panel = document.getElementById('resultSummaryPanel');
+    if (active.index == null || !records[active.index]) {
+      panel.innerHTML = `<div class="text-muted small">Select a result from the left list.</div>`;
+      return;
+    }
+    const r = records[active.index];
+    const unstableKeys = (Array.isArray(r?.topUnstable) ? r.topUnstable : []).map((x) => String(x?.key || '').trim()).filter(Boolean);
+    panel.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+          <div class="fw-bold">${esc(r?.sampleName || 'Untitled')}</div>
+          <div class="small text-muted">${esc(fmtDate(r?.savedAt))}</div>
+          <div class="small text-muted font-monospace">${esc(r?.id || '-')}</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <span class="badge bg-light text-dark border">Runs: ${esc(r?.runCount ?? '-')}</span>
+          <span class="badge bg-light text-dark border">Agreement: ${esc(toPct(r?.meanAgreement))}</span>
+          <span class="badge bg-light text-dark border">Flip: ${esc(toPct(r?.flipRate))}</span>
+          <span class="badge ${r?.gatePassed === true ? 'bg-success' : (r?.gatePassed === false ? 'bg-warning text-dark' : 'bg-light text-dark border')}">${r?.gatePassed === true ? 'PASS' : (r?.gatePassed === false ? 'REVIEW' : '-')}</span>
+        </div>
+      </div>
+      <div class="small mb-2"><span class="fw-bold">Unstable signal count:</span> ${esc(r?.unstableCount ?? 0)} / ${esc(r?.totalSignals ?? 0)}</div>
+      <div class="small mb-3">${unstableKeys.length ? unstableKeys.slice(0, 40).map((k) => `<span class="badge bg-light text-dark border me-1 mb-1">${esc(k)}</span>`).join('') : '<span class="text-muted">No unstable signals detected.</span>'}</div>
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white fw-bold small">Unstable Signal Details</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light"><tr><th>Signal</th><th>Criterion</th><th>Run Values</th><th>Consensus</th></tr></thead>
+              <tbody>${unstableRowsHtml(r?.topUnstable)}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderBarSignalDetails(signalKey) {
+    const panel = document.getElementById('barSignalDetailsPanel');
+    if (!panel) return;
+    const key = String(signalKey || '').trim();
+    if (!key) {
+      panel.innerHTML = `<div class="text-muted small">Click a bar in the chart above to view signal-level details across selected results.</div>`;
+      return;
+    }
+
+    const rows = records.map((record) => {
+      const hit = getSignalRow(record, key);
+      const runValues = Array.isArray(hit?.runValues)
+        ? hit.runValues.map((v, i) => `<span class="badge bg-light text-dark border me-1">R${i + 1}: ${esc(v)}</span>`).join('')
+        : '<span class="text-muted">-</span>';
+      const status = hit?.changed === true
+        ? `<span class="badge bg-danger">Variated</span>`
+        : `<span class="badge bg-success">Stable</span>`;
+      return `
+        <tr>
+          <td>
+            <div class="fw-bold">${esc(record?.sampleName || 'Untitled')}</div>
+            <div class="small text-muted font-monospace">${esc(shortId(record?.id))}</div>
+          </td>
+          <td class="text-center">${status}</td>
+          <td>${runValues}</td>
+          <td class="fw-bold">${esc(hit?.consensusValue || '-')}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const occurrence = records.reduce((sum, record) => {
+      const row = getSignalRow(record, key);
+      return sum + (row?.changed === true ? 1 : 0);
+    }, 0);
+    const rate = records.length ? `${((occurrence / records.length) * 100).toFixed(1)}%` : '-';
+
+    panel.innerHTML = `
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+          <div class="fw-bold">Signal: <span class="font-monospace">${esc(key)}</span></div>
+          <div class="small text-muted">Occurrence: <span class="fw-bold">${esc(occurrence)}</span> / ${esc(records.length)} results (${esc(rate)})</div>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Result</th>
+              <th class="text-center">Status</th>
+              <th>Run Values</th>
+              <th>Consensus</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function renderPerResultTable() {
+    const rows = records.map((record) => {
+      const unstable = Array.isArray(record?.topUnstable) ? record.topUnstable : [];
+      const keys = unstable.length
+        ? unstable.slice(0, 24).map((row) => `<span class="badge bg-light text-dark border me-1 mb-1">${esc(row?.key || '-')}</span>`).join('')
+        : `<span class="text-muted">No unstable signals</span>`;
+      return `<tr><td><div class="fw-bold">${esc(record?.sampleName || 'Untitled')}</div><div class="small text-muted font-monospace">${esc(shortId(record?.id))}</div></td><td class="text-center fw-bold">${esc(record?.runCount ?? 1)}</td><td class="text-center fw-bold">${esc(record?.unstableCount ?? 0)}</td><td>${keys}</td></tr>`;
+    }).join('');
+    document.getElementById('perResultUnstableRows').innerHTML = rows || `<tr><td colspan="4" class="text-muted text-center py-3">No data.</td></tr>`;
+  }
+
+  const VALUE_COLOR_PALETTE = [
+    'rgba(13, 110, 253, 0.2)', 'rgba(25, 135, 84, 0.2)', 'rgba(253, 126, 20, 0.2)', 'rgba(111, 66, 193, 0.2)',
+    'rgba(214, 51, 132, 0.2)', 'rgba(32, 201, 151, 0.2)', 'rgba(102, 126, 234, 0.2)', 'rgba(253, 151, 31, 0.2)'
+  ];
+  function getValueColorMap(values) {
+    const normalized = (values || []).map((v) => String(v ?? '').trim().toLowerCase() || '___empty___');
+    const unique = [...new Set(normalized)];
+    const map = {};
+    unique.forEach((u, i) => { map[u] = VALUE_COLOR_PALETTE[i % VALUE_COLOR_PALETTE.length]; });
+    return map;
+  }
+  function buildRemoveColumnUrl(excludeIndex) {
+    const remaining = records.map((r, i) => (i === excludeIndex ? null : r?.id)).filter(Boolean);
+    if (remaining.length < 1) return null;
+    const base = window.location.pathname || '/ielts/scoring/tuning/step3/compare';
+    return `${base}?ids=${remaining.join(',')}`;
+  }
+
+  function renderSignalMatrix() {
+    const matrix = Array.isArray(analysis?.matrixRows) ? analysis.matrixRows : [];
+    const head = document.getElementById('signalMatrixHead');
+    const body = document.getElementById('signalMatrixRows');
+    const sessionHead = records.map((r, idx) => {
+      const removeUrl = buildRemoveColumnUrl(idx);
+      const removeBtn = removeUrl && records.length > 2
+        ? `<a href="${esc(removeUrl)}" class="btn btn-outline-danger btn-sm py-0 px-1 ms-1" title="Remove this sample from comparison"><i class="bi bi-x-lg"></i></a>`
+        : '';
+      return `<th class="text-center"><span>${esc(shortId(r?.id))}</span>${removeBtn}</th>`;
+    }).join('');
+    head.innerHTML = `<tr><th>Signal Key</th><th>Criterion</th><th class="text-center">Variated Results</th><th class="text-center">Cross-Sample Value Diff</th>${sessionHead}</tr>`;
+    const rows = matrix.map((row) => {
+      const outcomes = Array.isArray(row?.perSessionOutcome) ? row.perSessionOutcome : [];
+      const values = Array.isArray(row?.perSessionConsensus) ? row.perSessionConsensus : [];
+      const runValues = Array.isArray(row?.perSessionRunValues) ? row.perSessionRunValues : [];
+      const valueColorMap = getValueColorMap(values);
+      const cells = records.map((_, idx) => {
+        const status = String(outcomes[idx] || 'No data');
+        const consensus = String(values[idx] || '').trim();
+        const normKey = (consensus || '').toLowerCase() || '___empty___';
+        const bgColor = valueColorMap[normKey] || '';
+        const style = bgColor ? ` style="background-color: ${bgColor};"` : '';
+        const detail = String(runValues[idx] || '').trim();
+        const badge = status === 'Variated'
+          ? '<span class="badge bg-danger">Variated</span>'
+          : '<span class="badge bg-success">Stable</span>';
+        const cls = status === 'Variated' ? 'table-danger' : '';
+        const title = detail ? ` title="${esc(detail)}"` : '';
+        const valueText = consensus || '-';
+        return `<td class="${cls}"${style}${title}><div class="small fw-bold">${esc(valueText)}</div><div class="small">${badge}</div></td>`;
+      }).join('');
+      const diffBadge = row?.interSampleDifferent === true
+        ? '<span class="badge bg-warning text-dark">Different</span>'
+        : '<span class="badge bg-success">Same</span>';
+      return `<tr><td class="font-monospace">${esc(row?.key || '-')}</td><td>${esc(row?.criterion || '-')}</td><td class="text-center fw-bold">${esc(row?.totalOccurrences ?? 0)}</td><td class="text-center">${diffBadge}</td>${cells}</tr>`;
+    }).join('');
+    body.innerHTML = rows || `<tr><td colspan="${4 + records.length}" class="text-muted text-center py-3">No matrix data available.</td></tr>`;
+  }
+
+  function renderRankLists() {
+    const most = Array.isArray(analysis?.mostFluctuating) ? analysis.mostFluctuating : [];
+    const least = Array.isArray(analysis?.mostConsistent) ? analysis.mostConsistent : [];
+    const mostHtml = most.slice(0, 12).map((item) => `<li class="list-group-item d-flex justify-content-between align-items-center"><span class="font-monospace">${esc(item?.key || '-')}</span><span class="badge bg-danger">${esc(item?.totalOccurrences ?? 0)}</span></li>`).join('') || `<li class="list-group-item text-muted">No data</li>`;
+    const leastHtml = least.slice(0, 12).map((item) => `<li class="list-group-item d-flex justify-content-between align-items-center"><span class="font-monospace">${esc(item?.key || '-')}</span><span class="badge bg-success">${esc(item?.totalOccurrences ?? 0)}</span></li>`).join('') || `<li class="list-group-item text-muted">No data</li>`;
+    document.getElementById('mostFluctuatingList').innerHTML = mostHtml;
+    document.getElementById('mostConsistentList').innerHTML = leastHtml;
+  }
+
+  function renderOccurrenceChart() {
+    const canvas = document.getElementById('signalOccurrenceChart');
+    const legendEl = document.getElementById('signalChartLegend');
+    if (!canvas) return;
+    chartBarHitAreas = [];
+
+    const sessionCount = Math.max(1, Number(analysis?.sessionCount || records.length || 1));
+    const source = Array.isArray(analysis?.mostFluctuating) ? analysis.mostFluctuating : [];
+    const rows = source
+      .map((item) => {
+        const occurrence = Number(item?.totalOccurrences || 0);
+        const occurrenceRate = occurrence / sessionCount;
+        return {
+          key: String(item?.key || '-'),
+          criterion: String(item?.criterion || 'GENERAL').trim().toUpperCase(),
+          occurrence,
+          occurrenceRate
+        };
+      })
+      .filter((item) => item.occurrence > 0)
+      .sort((a, b) => b.occurrenceRate - a.occurrenceRate || b.occurrence - a.occurrence)
+      .slice(0, 20);
+
+    const dpr = Math.max(1, Number(window.devicePixelRatio || 1));
+    const containerWidth = Math.floor(canvas.parentElement?.clientWidth || canvas.clientWidth || 980);
+    const barWidth = 24;
+    const barGap = 12;
+    const leftPad = 48;
+    const rightPad = 14;
+    const topPad = 14;
+    const bottomPad = 88;
+    const plotWidth = rows.length > 0 ? (rows.length * (barWidth + barGap) - barGap) : 180;
+    const cssWidth = Math.max(containerWidth, leftPad + rightPad + plotWidth);
+    const cssHeight = 320;
+
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${cssHeight}px`;
+    canvas.width = Math.floor(cssWidth * dpr);
+    canvas.height = Math.floor(cssHeight * dpr);
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+    const chartWidth = Math.max(120, cssWidth - leftPad - rightPad);
+    const chartHeight = Math.max(120, cssHeight - topPad - bottomPad);
+
+    if (!rows.length) {
+      ctx.fillStyle = '#6c757d';
+      ctx.font = '13px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No variated signals found in selected results.', cssWidth / 2, cssHeight / 2);
+      if (legendEl) legendEl.innerHTML = `<span class="text-muted">Occurrence rate = occurrences / selected results.</span>`;
+      return;
+    }
+
+    ctx.strokeStyle = '#dee2e6';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(leftPad, topPad);
+    ctx.lineTo(leftPad, topPad + chartHeight);
+    ctx.lineTo(cssWidth - rightPad, topPad + chartHeight);
+    ctx.stroke();
+
+    const tickCount = 5;
+    for (let i = 0; i < tickCount; i += 1) {
+      const v = i / (tickCount - 1); // 0..1
+      const y = topPad + chartHeight - (chartHeight * v);
+      ctx.strokeStyle = '#f1f3f5';
+      ctx.beginPath();
+      ctx.moveTo(leftPad, y);
+      ctx.lineTo(cssWidth - rightPad, y);
+      ctx.stroke();
+
+      ctx.fillStyle = '#6c757d';
+      ctx.font = '11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${Math.round(v * 100)}%`, leftPad - 8, y + 4);
+    }
+
+    const stepX = rows.length > 0 ? Math.min(barWidth + barGap, chartWidth / rows.length) : barWidth;
+    ctx.font = '11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+    rows.forEach((row, i) => {
+      const x = leftPad + (i * stepX);
+      const barHeight = Math.max(1, row.occurrenceRate * chartHeight);
+      const y = topPad + chartHeight - barHeight;
+      const label = row.key.length > 16 ? `${row.key.slice(0, 13)}...` : row.key;
+
+      const color = CHART_COLORS[i % CHART_COLORS.length];
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, barWidth, barHeight);
+      chartBarHitAreas.push({ x, y, width: barWidth, height: barHeight, row });
+
+      ctx.fillStyle = '#212529';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${(row.occurrenceRate * 100).toFixed(0)}%`, x + (barWidth / 2), y - 4);
+
+      ctx.save();
+      ctx.translate(x + (barWidth / 2), topPad + chartHeight + 14);
+      ctx.rotate(-Math.PI / 4);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#343a40';
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+    });
+
+    if (legendEl) {
+      legendEl.innerHTML = `Bar colors are varied for readability. Click a bar to view signal details. Occurrence rate = (number of selected results where signal varied) / ${sessionCount}.`;
+    }
+  }
+
+  document.getElementById('resultRows')?.addEventListener('click', (event) => {
+    const promptBtn = event.target.closest('.btn-view-prompt');
+    if (promptBtn) {
+      const idx = Number(promptBtn.getAttribute('data-index'));
+      if (Number.isInteger(idx) && records[idx]) {
+        openPromptModelModal(records[idx]);
+      }
+      return;
+    }
+    const row = event.target.closest('tr.result-row');
+    if (!row) return;
+    const idx = Number(row.dataset.index);
+    if (!Number.isInteger(idx)) return;
+    active.index = idx;
+    renderResultList();
+    renderResultSummary();
+  });
+
+  document.getElementById('signalOccurrenceChart')?.addEventListener('click', (event) => {
+    const canvas = event.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const hit = chartBarHitAreas.find((bar) =>
+      x >= bar.x && x <= (bar.x + bar.width) && y >= bar.y && y <= (bar.y + bar.height)
+    );
+    if (hit?.row?.key) {
+      renderBarSignalDetails(hit.row.key);
+    }
+  });
+
+  function openPromptModelModal(record) {
+    const titleEl = document.getElementById('promptModelModalTitle');
+    const modelEl = document.getElementById('promptModelModel');
+    const promptEl = document.getElementById('promptModelPrompt');
+    if (!titleEl || !modelEl || !promptEl) return;
+
+    titleEl.textContent = `Prompt + Model | ${record?.sampleName || 'Result'}`;
+    modelEl.textContent = String(record?.modelUsed || record?.selectedModelId || 'Unknown');
+    promptEl.textContent = String(record?.promptUsed || '').trim() || 'Prompt content not available in this saved result.';
+
+    const modalEl = document.getElementById('promptModelModal');
+    if (modalEl && window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  renderKpis();
+  renderResultList();
+  renderResultSummary();
+  renderPerResultTable();
+  renderSignalMatrix();
+  renderRankLists();
+  renderOccurrenceChart();
+  renderBarSignalDetails('');
+
+  let chartResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(chartResizeTimer);
+    chartResizeTimer = setTimeout(() => {
+      renderOccurrenceChart();
+    }, 120);
+  });
+})();
+</script>
+
+<div class="modal fade" id="promptModelModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="promptModelModalTitle">Prompt + Model</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <span class="fw-bold">Model Used:</span>
+          <span id="promptModelModel" class="badge bg-light text-dark border ms-1">-</span>
+        </div>
+        <div class="small text-muted mb-2">Prompt text captured for this result:</div>
+        <pre id="promptModelPrompt" class="bg-light border rounded p-3 mb-0" style="white-space: pre-wrap; max-height: 58vh; overflow:auto;"></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .three-run-header-wrap { border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 12px; background: #fff; padding: 14px 16px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04); }
+  .three-run-action-row { border-top: 1px dashed rgba(0, 0, 0, 0.12); padding-top: 12px; }
+  .metric-tile { border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 10px; background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%); padding: 12px; height: 100%; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04); }
+  .metric-label { font-size: 0.75rem; font-weight: 700; color: #6c757d; text-transform: uppercase; letter-spacing: 0.03em; }
+  .metric-value { margin: 6px 0 0; font-size: 1.55rem; font-weight: 700; color: #212529; }
+  .panel-card .card-header { border-bottom: 1px solid rgba(0, 0, 0, 0.08); letter-spacing: 0.01em; }
+  .panel-card .table thead th { position: sticky; top: 0; z-index: 3; background: #f8f9fa; white-space: nowrap; }
+  #resultRows tr.result-row { cursor: pointer; transition: background-color 0.14s ease-in-out; }
+  #resultRows tr.result-row:hover { background: #f5f9ff; }
+  #resultRows tr.result-row.table-primary { --bs-table-bg: #e9f3ff; --bs-table-striped-bg: #e9f3ff; --bs-table-active-bg: #e9f3ff; --bs-table-hover-bg: #e9f3ff; }
+  .action-btn-group { min-width: 126px; }
+  .action-btn { width: 100%; }
+  #signalMatrixRows td.font-monospace, #perResultUnstableRows .font-monospace { font-size: 0.78rem; }
+  .chart-shell { border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 10px; background: linear-gradient(180deg, #fff 0%, #f8f9fa 100%); padding: 6px; overflow-x: auto; overflow-y: hidden; }
+  #signalOccurrenceChart { display: block; width: 100%; min-height: 320px; }
+</style>

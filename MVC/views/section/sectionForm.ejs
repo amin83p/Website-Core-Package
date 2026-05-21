@@ -1,0 +1,778 @@
+<%
+  // Extract data for cleaner template usage
+  const isEdit = !!(section && section.id);
+  const allSections = (typeof sections !== 'undefined' && Array.isArray(sections)) ? sections : [];
+  // Enrichment: Map IDs to Names for existing operations
+  const currentOps = (section && section.operations) ?
+    section.operations.map(op => {
+      const def = (typeof operations !== 'undefined') ? operations.find(o => o.id === op.id) : null;
+      return {
+          ...op,
+          name: def ? def.name : (op.name || op.id)
+      };
+  }) : [];
+  // Enrich subsection/related refs with names for display (stored as { id } only)
+  const currentSubs = (section && section.subsections) ? section.subsections.map(ref => {
+    const id = ref.id || ref;
+    const full = allSections.find(s => String(s.id) === String(id));
+    return full ? { id: full.id, name: full.name } : { id };
+  }) : [];
+  const currentRelated = (section && section.related) ? section.related.map(ref => {
+    const id = ref.id || ref;
+    const full = allSections.find(s => String(s.id) === String(id));
+    return full ? { id: full.id, name: full.name } : { id };
+  }) : [];
+%>
+
+<div class="sections-page">
+  
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0">
+      <%= isEdit ? 'Edit Section' : 'Create New Section' %>
+    </h1>
+    <div class="d-flex flex-column align-items-end gap-1">
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border">ID: <%= section.id %></span>
+      <% } else { %>
+        <span class="badge bg-success border">New Definition</span>
+      <% } %>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromSection">
+        <i class="bi bi-copy me-1"></i> Copy From Section
+      </button>
+    </div>
+  </div>
+
+  <div class="form-container" style="width: 100%; max-width: 100%;">
+    <form id="sectionForm" action="<%= isEdit ? '/sections/edit/' + section.id  : '/sections/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <input type="hidden" id="currentSectionId" value="<%= section ? section.id : '' %>">
+      
+      <input type="hidden" name="selectedOperations" id="selectedOperations">
+      <input type="hidden" name="subsections" id="subsectionsInput">
+      <input type="hidden" name="related" id="relatedInput">
+
+      <script type="application/json" id="initOperations"><%- JSON.stringify(currentOps) %></script>
+      <script type="application/json" id="initSubsections"><%- JSON.stringify(currentSubs) %></script>
+      <script type="application/json" id="initRelated"><%- JSON.stringify(currentRelated) %></script>
+
+      <ul class="nav nav-tabs mb-4" id="sectionTabs" role="tablist">
+        <li class="nav-item">
+          <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button">General Settings</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="structure-tab" data-bs-toggle="tab" data-bs-target="#structure" type="button">Structure & Links</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="operations-tab" data-bs-toggle="tab" data-bs-target="#operations" type="button">Operations</button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        
+        <div class="tab-pane fade show active" id="general">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Name *</label>
+                            <input type="text" name="name" class="form-control size-md name-input" value="<%= section ? section.name : '' %>" required>
+                            <small class="form-text text-muted">Use uppercase letters and underscores (e.g., USER_MANAGEMENT).</small>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Category *</label>
+                            <select name="category" id="categorySelect" class="form-select size-md" required>
+                                <% 
+                                   const cats = (typeof sectionCategories !== 'undefined' && Array.isArray(sectionCategories) && sectionCategories.length)
+                                     ? sectionCategories
+                                     : ['GENERAL', 'ORGANIZATION', 'SYSTEM', 'SECURITY', 'DATA', 'LOGGING', 'IELTS', 'SCHOOL', 'CREDIT_LOANS', 'BENCHPATH'];
+                                   const currentCat = section ? (section.category || 'GENERAL') : 'GENERAL';
+                                %>
+                                <% cats.forEach(cat => { %>
+                                    <option value="<%= cat %>" <%= currentCat === cat ? 'selected' : '' %>><%= cat %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description *</label>
+                        <textarea name="description" class="form-control size-md" rows="3" required><%= section ? section.description : '' %></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Home URL</label>
+                        <input type="text" name="homeURL" class="form-control size-md" placeholder="/path or https://example.com" value="<%= section ? (section.homeURL || '') : '' %>">
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body">
+                            <h6 class="fw-bold text-primary mb-3">Visibility & Status</h6>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="activeCheck" name="active" <%= section && section.active ? 'checked' : '' %>>
+                                <label class="form-check-label" for="activeCheck">Active (Enabled)</label>
+                            </div>
+                            <div class="form-check form-switch mb-2 d-flex align-items-center flex-wrap gap-1">
+                                <input class="form-check-input" type="checkbox" id="mainDashboardDisplayCheck" name="mainDashboardDisplay" <%= section && section.mainDashboardDisplay === true ? 'checked' : '' %>>
+                                <label class="form-check-label mb-0" for="mainDashboardDisplayCheck">Show on main dashboard</label>
+                                <button type="button" class="btn btn-link p-0 section-field-help text-info align-baseline lh-1" tabindex="0"
+                                    data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left" data-bs-html="true"
+                                    data-bs-title="Show on main dashboard"
+                                    data-bs-content="When enabled, this section appears as a <strong>card on the home dashboard</strong>. Use it for top-level hubs that open a sub-dashboard (typically no Home URL and with subsections). Single-link sections are usually left off so the home page stays tidy. Sections can still appear in the Quick Menu if &quot;Show in Dashboard&quot; is on."
+                                    aria-label="Help: show on main dashboard"><i class="bi bi-info-circle"></i></button>
+                            </div>
+                            <div class="form-check form-switch mb-3 d-flex align-items-center flex-wrap gap-1">
+                                <input class="form-check-input" type="checkbox" id="dashboardDisplayCheck" name="dashboardDisplay" <%= !section || section.dashboardDisplay !== false ? 'checked' : '' %>>
+                                <label class="form-check-label mb-0" for="dashboardDisplayCheck">Show in Dashboard</label>
+                                <button type="button" class="btn btn-link p-0 section-field-help text-info align-baseline lh-1" tabindex="0"
+                                    data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left" data-bs-html="true"
+                                    data-bs-title="Show in Dashboard"
+                                    data-bs-content="When enabled, this section can appear in the <strong>Quick Menu</strong>, <strong>section sub-dashboards</strong>, and other discovery lists (together with your access rights). Inactive sections never appear anywhere. The <strong>home page</strong> tiles only use &quot;Show on main dashboard&quot;."
+                                    aria-label="Help: show in dashboard"><i class="bi bi-info-circle"></i></button>
+                            </div>
+
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="trackStateCheck" name="trackState" <%= (!section || section.trackState !== false) ? 'checked' : '' %>>
+                                <label class="form-check-label" for="trackStateCheck">Enable Audit Tracking</label>
+                                <div class="form-text x-small">If disabled, actions here won't generate Action States.</div>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold">Min. Access Level</label>
+                                <input type="number" name="minimumAccessRequirement" class="form-control size-sm" value="<%= section ? section.minimumAccessRequirement : '5' %>" min="1" max="10" required>
+                            </div>
+
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="navigatorSectionCheck" name="navigatorSection" <%= section && section.navigatorSection ? 'checked' : '' %>>
+                                <label class="form-check-label" for="navigatorSectionCheck">Navigator Section</label>
+                            </div>
+                            <div id="navigatorSectionWarning" class="alert alert-warning small py-2 px-3 mb-2 d-none" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                <strong>Outcomes of enabling Navigator Section:</strong> This section will only serve navigation (pages, icons, subsections). Audit Tracking will be turned OFF and the Operations tab will be disabled. This cannot be undone without unchecking Navigator Section.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Dashboard Message</label>
+                    <textarea name="message" class="form-control size-sm" rows="2" placeholder="Custom message to display on the dashboard card..."><%= section ? section.message : '' %></textarea>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label text-danger">Inactive Message</label>
+                    <textarea name="inactiveMessage" class="form-control size-sm" rows="2" placeholder="Message shown to users when access is attempted but section is inactive..."><%= section ? section.inactiveMessage : '' %></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="structure">
+            <div class="row">
+                <div class="col-md-6 border-end">
+                    <h6 class="fw-bold text-info mb-2">Subsections (Children)</h6>
+                    <div class="input-group mb-2">
+                        <button type="button" id="addSubsectionBtn" class="btn btn-outline-info btn-sm w-100 border-dashed">
+                            <i class="bi bi-plus-circle me-1"></i> Add Subsection
+                        </button>
+                    </div>
+                    
+                    <div class="list-group list-group-flush overflow-auto border rounded bg-white" id="subsectionsList" style="max-height: 400px; min-height: 100px;">
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <h6 class="fw-bold text-secondary mb-2">Related Sections (Links)</h6>
+                    <div class="input-group mb-2">
+                        <button type="button" id="addRelatedBtn" class="btn btn-outline-secondary btn-sm w-100 border-dashed">
+                            <i class="bi bi-link-45deg me-1"></i> Add Related Section
+                        </button>
+                    </div>
+
+                    <div class="list-group list-group-flush overflow-auto border rounded bg-white" id="relatedList" style="max-height: 400px; min-height: 100px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="operations">
+            
+            <div class="d-flex justify-content-between align-items-center mb-3 bg-light p-2 rounded">
+                <div class="d-flex gap-2">
+                    <button type="button" id="addOperationBtn" class="btn btn-primary btn-sm btn-filled">
+                        <i class="bi bi-plus-lg me-1"></i> Add Operation
+                    </button>
+                    <button type="button" id="addAllOperationsBtn" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-collection me-1"></i> Add All Available
+                    </button>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <input type="file" id="operationImportInput" accept=".json,.csv" style="display: none;" />
+                    <button type="button" id="importOperationsBtn" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-upload me-1"></i> Import
+                    </button>
+                    <button type="button" id="exportOperationsTemplateBtn" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-download me-1"></i> Template
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 500px;">
+                <table class="table table-hover table-bordered align-middle mb-0 operations-table" id="operationsTable">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th>Operation Name / ID</th>
+                            <th style="width: 120px;">Attempts</th>
+                            <th style="width: 120px;">Time (m)</th>
+                            <th style="width: 80px;" class="text-center">Active</th>
+                            <th style="width: 60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+            <div class="form-text mt-2"><i class="bi bi-info-circle me-1"></i> Setting <b>Attempts</b> or <b>Time</b> to 0 means unlimited.</div>
+        </div>
+
+    </div> <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md" id="btnSaveAction" data-wait-text="Saving...">Save Section</button>
+        <a href="/sections" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/sections"> Cancel </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  document.querySelectorAll('.section-field-help[data-bs-toggle="popover"]').forEach((el) => {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Popover) {
+      new bootstrap.Popover(el);
+    }
+  });
+  
+  // --- 1. STATE INITIALIZATION ---
+  function readJson(id, fallback) {
+    try { return JSON.parse(document.getElementById(id).textContent || ''); } catch { return fallback; }
+  }
+
+  const currentSectionId = document.getElementById('currentSectionId').value;
+  const initOps = readJson('initOperations', []);
+  const initSubs = readJson('initSubsections', []);
+  const initRelated = readJson('initRelated', []);
+
+  // Elements
+  const form = document.getElementById('sectionForm');
+  const nameInput = document.querySelector('.name-input');
+  
+  const subsectionsList = document.getElementById('subsectionsList');
+  const subsectionsInput = document.getElementById('subsectionsInput');
+  
+  const relatedList = document.getElementById('relatedList');
+  const relatedInput = document.getElementById('relatedInput');
+  const operationsTableBody = document.getElementById('operationsTable').querySelector('tbody');
+  const selectedOperationsInput = document.getElementById('selectedOperations');
+  
+  // Buttons
+  const importBtn = document.getElementById('importOperationsBtn');
+  const importInput = document.getElementById('operationImportInput');
+  const exportTemplateBtn = document.getElementById('exportOperationsTemplateBtn');
+  const addOperationBtn = document.getElementById('addOperationBtn');
+  const addAllOperationsBtn = document.getElementById('addAllOperationsBtn');
+  const btnSaveAction = document.getElementById('btnSaveAction');
+  const btnCancelAction = document.getElementById('btnCancelAction');
+  let isSubmitting = false;
+  
+  // --- INITIAL RENDER ---
+  initSubs.forEach(item => addSectionToList(item, subsectionsList));
+  initRelated.forEach(item => addSectionToList(item, relatedList));
+  initOps.forEach(item => addOperationToTable(item));
+
+  // --- NAVIGATOR SECTION: Freeze logic ---
+  const navigatorCheck = document.getElementById('navigatorSectionCheck');
+  const trackStateCheck = document.getElementById('trackStateCheck');
+  const categorySelect = document.getElementById('categorySelect');
+  const operationsTabBtn = document.getElementById('operations-tab');
+  const navigatorWarning = document.getElementById('navigatorSectionWarning');
+  const operationsPane = document.getElementById('operations');
+
+  function applyNavigatorSectionState(isNavigator) {
+    if (isNavigator) {
+      if (navigatorWarning) navigatorWarning.classList.remove('d-none');
+      if (trackStateCheck) { trackStateCheck.checked = false; trackStateCheck.disabled = true; }
+      if (operationsTabBtn) {
+        operationsTabBtn.classList.add('disabled');
+        operationsTabBtn.setAttribute('tabindex', '-1');
+        operationsTabBtn.setAttribute('aria-disabled', 'true');
+        operationsTabBtn.style.pointerEvents = 'none';
+      }
+      if (operationsPane) operationsPane.querySelectorAll('button, input').forEach(el => { el.disabled = true; el.style.pointerEvents = 'none'; });
+    } else {
+      if (navigatorWarning) navigatorWarning.classList.add('d-none');
+      if (trackStateCheck) { trackStateCheck.disabled = false; }
+      if (operationsTabBtn) {
+        operationsTabBtn.classList.remove('disabled');
+        operationsTabBtn.removeAttribute('tabindex');
+        operationsTabBtn.removeAttribute('aria-disabled');
+        operationsTabBtn.style.pointerEvents = '';
+      }
+      if (operationsPane) operationsPane.querySelectorAll('button, input').forEach(el => { el.disabled = false; el.style.pointerEvents = ''; });
+    }
+  }
+
+  if (navigatorCheck) {
+    navigatorCheck.addEventListener('change', () => {
+      applyNavigatorSectionState(navigatorCheck.checked);
+      if (navigatorCheck.checked && operationsPane && operationsPane.classList.contains('show')) {
+        document.getElementById('general-tab')?.click();
+      }
+    });
+    if (navigatorCheck.checked) applyNavigatorSectionState(true);
+  }
+
+  // --- COPY FROM SECTION ---
+  function applySectionTemplate(tpl) {
+    if (!tpl || typeof tpl !== 'object') return;
+    const f = form;
+    const set = (sel, val) => { const el = f.querySelector(sel); if (el) el.value = String(val ?? '').trim(); };
+    const setCheck = (sel, checked) => { const el = f.querySelector(sel); if (el) el.checked = !!checked; };
+
+    set('input[name="name"]', tpl.name);
+    const catEl = f.querySelector('#categorySelect');
+    if (catEl && tpl.category) catEl.value = tpl.category;
+    set('textarea[name="description"]', tpl.description);
+    set('input[name="homeURL"]', tpl.homeURL);
+    set('textarea[name="message"]', tpl.message);
+    set('textarea[name="inactiveMessage"]', tpl.inactiveMessage);
+    set('input[name="minimumAccessRequirement"]', tpl.minimumAccessRequirement ?? 5);
+    setCheck('#activeCheck', tpl.active !== false);
+    setCheck('#mainDashboardDisplayCheck', tpl.mainDashboardDisplay === true);
+    setCheck('#dashboardDisplayCheck', tpl.dashboardDisplay === true);
+    setCheck('#trackStateCheck', tpl.trackState !== false);
+    setCheck('#navigatorSectionCheck', tpl.navigatorSection === true);
+
+    subsectionsList.innerHTML = '';
+    relatedList.innerHTML = '';
+    (tpl.subsections || []).forEach(ref => addSectionToList({ id: ref.id || ref, name: ref.name }, subsectionsList));
+    (tpl.related || []).forEach(ref => addSectionToList({ id: ref.id || ref, name: ref.name }, relatedList));
+
+    operationsTableBody.querySelectorAll('tr').forEach(r => r.remove());
+    (tpl.operations || []).forEach(op => addOperationToTable(op));
+
+    if (navigatorCheck) applyNavigatorSectionState(!!tpl.navigatorSection);
+    document.getElementById('general-tab')?.click();
+  }
+
+  const btnCopyFromSection = document.getElementById('btnCopyFromSection');
+  if (btnCopyFromSection) {
+    btnCopyFromSection.addEventListener('click', () => {
+      GenericPicker.open(GenericPickerPresets.section({
+        title: 'Copy From Section',
+        icon: 'bi-copy',
+        context: GenericPickerContexts.allSections(),
+        placeholder: 'Search sections to copy...',
+        onSelect: async (item) => {
+          const sourceId = String(item?.id || '').trim();
+          if (!sourceId) return;
+          if (currentSectionId && sourceId === String(currentSectionId)) {
+            if (typeof showMessageModal === 'function') {
+              await showMessageModal({
+                title: 'Invalid Selection',
+                icon: 'warning',
+                message: 'Select a different section to copy from.',
+                buttons: [{ text: 'OK', class: 'btn-warning' }]
+              });
+            } else { alert('Select a different section to copy from.'); }
+            return;
+          }
+          try {
+            const response = await fetch(`/sections/api/template/${encodeURIComponent(sourceId)}`, {
+              headers: { 'X-AJAX-Request': 'true' }
+            });
+            const result = await response.json();
+            if (!response.ok || result?.status === 'error') {
+              throw new Error(result?.message || 'Failed to load section template.');
+            }
+            applySectionTemplate(result.template || {});
+            if (typeof showMessageModal === 'function') {
+              await showMessageModal({
+                title: 'Template Applied',
+                icon: 'success',
+                message: 'Section fields were copied. Review and edit values before saving.',
+                buttons: [{ text: 'OK', class: 'btn-success' }]
+              });
+            } else { alert('Section fields were copied. Review and edit before saving.'); }
+          } catch (error) {
+            if (typeof showMessageModal === 'function') {
+              await showMessageModal({
+                title: 'Copy Failed',
+                icon: 'error',
+                message: error.message || 'Failed to copy section data.',
+                buttons: [{ text: 'OK', class: 'btn-danger' }]
+              });
+            } else { alert(error.message || 'Failed to copy section data.'); }
+          }
+        }
+      }));
+    });
+  }
+  
+  // --- 2. LIST HELPERS (Structure Tab) ---
+  
+  function addSectionToList(item, listElement) {
+    const id = item.id || item;
+    const name = item.name || id;
+
+    if (currentSectionId && String(id) === String(currentSectionId)) return;
+    let exists = false;
+    listElement.querySelectorAll('.list-group-item').forEach(li => { if(li.dataset.id === id) exists = true; });
+    if (exists) return;
+
+    const div = document.createElement('div');
+    div.className = "list-group-item d-flex justify-content-between align-items-center";
+    div.dataset.id = id;
+    const isSubsectionList = listElement === subsectionsList;
+    if (isSubsectionList) {
+      div.setAttribute('draggable', 'true');
+      div.classList.add('draggable-subsection');
+    }
+    const dragHandleHtml = isSubsectionList
+      ? '<span class="text-muted me-2 drag-handle" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></span>'
+      : '';
+    div.innerHTML = `
+        <span>${dragHandleHtml}<strong>${name}</strong> <span class="text-muted small ms-1 font-monospace">(${id})</span></span>
+        <div class="d-flex align-items-center">
+          <button type="button" class="btn btn-sm btn-light border text-danger remove-item"><i class="bi bi-x-lg"></i></button>
+        </div>
+    `;
+    listElement.appendChild(div);
+  }
+
+  function initSubsectionDragAndDrop() {
+    let draggingRow = null;
+
+    subsectionsList.addEventListener('dragstart', (e) => {
+      const row = e.target.closest('.list-group-item.draggable-subsection');
+      if (!row) return;
+      draggingRow = row;
+      row.classList.add('dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', row.dataset.id || '');
+      }
+    });
+
+    subsectionsList.addEventListener('dragend', () => {
+      if (draggingRow) {
+        draggingRow.classList.remove('dragging');
+      }
+      draggingRow = null;
+      subsectionsList.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+    });
+
+    subsectionsList.addEventListener('dragover', (e) => {
+      if (!draggingRow) return;
+      e.preventDefault();
+
+      const target = e.target.closest('.list-group-item.draggable-subsection');
+      if (!target || target === draggingRow) return;
+
+      subsectionsList.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+      target.classList.add('drag-over');
+
+      const rect = target.getBoundingClientRect();
+      const insertAfter = (e.clientY - rect.top) > (rect.height / 2);
+      if (insertAfter) {
+        target.parentNode.insertBefore(draggingRow, target.nextSibling);
+      } else {
+        target.parentNode.insertBefore(draggingRow, target);
+      }
+    });
+
+    subsectionsList.addEventListener('drop', (e) => {
+      e.preventDefault();
+      subsectionsList.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+    });
+  }
+
+  [subsectionsList, relatedList].forEach(el => {
+      el.addEventListener('click', e => {
+        const row = e.target.closest('.list-group-item');
+        if (e.target.closest('.remove-item')) {
+            row?.remove();
+        }
+      });
+  });
+  initSubsectionDragAndDrop();
+
+  if(nameInput) {
+      nameInput.addEventListener('input', () => {
+        let value = nameInput.value.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z_]/g, '');
+        nameInput.value = value;
+      });
+  }
+
+  // --- 3. OPERATIONS LOGIC ---
+
+  function addOperationToTable(op) {
+    if (operationsTableBody.querySelector(`tr[data-id="${op.id}"]`)) return;
+    const row = document.createElement('tr');
+    row.dataset.id = op.id;
+    
+    // Use the name if available, otherwise ID
+    const displayName = op.name || op.id;
+    const attempts = op.sessionAttempts !== undefined ? op.sessionAttempts : 5;
+    const time = op.sessionTime !== undefined ? op.sessionTime : 15;
+    const active = op.active !== undefined ? op.active : true;
+
+    row.innerHTML = `
+      <td>
+         <div class="fw-bold text-primary">${displayName}</div>
+         <div class="x-small text-muted font-monospace">${op.id}</div>
+      </td>
+      <td><input type="number" class="form-control form-control-sm operation-attempts" value="${attempts}" min="0"></td>
+      <td><input type="number" class="form-control form-control-sm operation-time" value="${time}" min="0"></td>
+      <td class="text-center">
+         <input type="checkbox" class="form-check-input operation-active" ${active ? 'checked' : ''}>
+      </td>
+      <td class="text-center">
+        <button type="button" class="btn btn-sm btn-light border text-danger remove-operation"><i class="bi bi-trash-fill"></i></button>
+      </td>
+    `;
+    operationsTableBody.appendChild(row);
+  }
+
+  operationsTableBody.addEventListener('click', e => {
+    if (e.target.closest('.remove-operation')) {
+        e.target.closest('tr').remove();
+    }
+  });
+
+  // --- PICKERS (multiselect with search) ---
+  function addSectionsToList(items, listElement) {
+      const arr = Array.isArray(items) ? items : [items];
+      arr.forEach(item => addSectionToList(item, listElement));
+  }
+
+  if (document.getElementById('addSubsectionBtn')) {
+      document.getElementById('addSubsectionBtn').addEventListener('click', () => {
+          GenericPicker.open(GenericPickerPresets.section({
+              title: 'Add Subsections',
+              icon: 'bi-diagram-3',
+              context: GenericPickerContexts.allSections(),
+              multiselect: true,
+              placeholder: 'Search sections, select multiple, then Add Selected...',
+              onSelect: (items) => addSectionsToList(items, subsectionsList)
+          }));
+      });
+  }
+
+  if (document.getElementById('addRelatedBtn')) {
+      document.getElementById('addRelatedBtn').addEventListener('click', () => {
+          GenericPicker.open(GenericPickerPresets.section({
+              title: 'Add Related Sections',
+              icon: 'bi-link-45deg',
+              context: GenericPickerContexts.allSections(),
+              multiselect: true,
+              placeholder: 'Search sections, select multiple, then Add Selected...',
+              onSelect: (items) => addSectionsToList(items, relatedList)
+          }));
+      });
+  }
+
+  if (addOperationBtn) {
+    addOperationBtn.addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.operation({
+            title: 'Add Operation',
+            context: GenericPickerContexts.allOperations(),
+            onSelect: (item) => addOperationToTable(item)
+        }));
+    });
+  }
+
+  // --- ADD ALL OPERATIONS ---
+  if (addAllOperationsBtn) {
+      addAllOperationsBtn.addEventListener('click', async () => {
+          const btnContent = addAllOperationsBtn.innerHTML;
+          addAllOperationsBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading...';
+          addAllOperationsBtn.disabled = true;
+
+          try {
+              const res = await fetch('/operations', { headers: { 'X-AJAX-Request': 'true' } });
+              if (!res.ok) throw new Error("Failed");
+              const data = await res.json();
+              const allOps = data.results || data.data || [];
+              let addedCount = 0;
+
+              allOps.forEach(op => {
+                  if (!operationsTableBody.querySelector(`tr[data-id="${op.id}"]`)) {
+                      addOperationToTable(op);
+                      addedCount++;
+                  }
+              });
+
+              if (typeof showMessageModal === 'function') {
+                  showMessageModal({ title: 'Success', icon: 'success', message: `Added ${addedCount} operations.`, buttons: [{text:'OK', class:'btn-success'}]});
+              } else { alert(`Added ${addedCount} operations.`); }
+
+          } catch (err) {
+              console.error(err);
+              alert("Error fetching operations.");
+          } finally {
+              addAllOperationsBtn.innerHTML = btnContent;
+              addAllOperationsBtn.disabled = false;
+          }
+      });
+  }
+
+  // --- IMPORT / EXPORT ---
+  if (exportTemplateBtn) {
+      exportTemplateBtn.addEventListener('click', () => {
+          const rows = [];
+          operationsTableBody.querySelectorAll('tr').forEach(row => {
+            const id = row.dataset.id;
+            const name = row.querySelector('.fw-bold')?.textContent.trim() || id;
+            const attempts = row.querySelector('.operation-attempts').value;
+            const time = row.querySelector('.operation-time').value;
+            const active = row.querySelector('.operation-active').checked;
+            rows.push([id, name, attempts, time, active]);
+          });
+          
+          const header = ['ID', 'Name', 'Attempts', 'Time', 'Active'];
+          const csvContent = [header.join(','), ...rows.map(r => r.join(','))].join('\n');
+          const blob = new Blob([csvContent], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'operations.csv'; a.click();
+          URL.revokeObjectURL(url);
+      });
+  }
+
+  if (importBtn && importInput) {
+      importBtn.addEventListener('click', () => importInput.click());
+      importInput.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (event) => {
+              try {
+                  const lines = event.target.result.split(/\r\n|\n/);
+                  for (let i = 1; i < lines.length; i++) {
+                      if (!lines[i].trim()) continue;
+                      const [id, name, att, time, active] = lines[i].split(',').map(s => s.trim().replace(/['"]+/g, ''));
+                      if (id) {
+                          addOperationToTable({
+                              id, name,
+                              sessionAttempts: parseInt(att)||5,
+                              sessionTime: parseInt(time)||15,
+                              active: active.toLowerCase() !== 'false'
+                          });
+                      }
+                  }
+                  if(typeof showMessageModal === 'function') {
+                      showMessageModal({ title: 'Import Complete', icon: 'success', message: 'Operations loaded.', buttons: [{text:'OK', class:'btn-success'}]});
+                  } else { alert('Import complete.'); }
+              } catch (err) { alert('Failed to parse file.');
+              }
+              importInput.value = '';
+          };
+          reader.readAsText(file);
+      });
+  }
+
+  // --- SUBMIT HANDLER ---
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    isSubmitting = true;
+
+    const submitter = e.submitter || btnSaveAction || form.querySelector('button[type="submit"], input[type="submit"]');
+    if (window.appWaiting && submitter) {
+      window.appWaiting.set(submitter, 'Saving...');
+    } else if (submitter) {
+      submitter.disabled = true;
+    }
+    if (btnCancelAction) btnCancelAction.classList.add('disabled');
+  
+    // 1. Serialize Operations
+    const ops = [];
+    operationsTableBody.querySelectorAll('tr').forEach(row => {
+      ops.push({
+        id: row.dataset.id,
+        sessionAttempts: parseInt(row.querySelector('.operation-attempts').value) || 0,
+        sessionTime: parseInt(row.querySelector('.operation-time').value) || 0,
+        active: row.querySelector('.operation-active').checked
+      });
+    });
+    selectedOperationsInput.value = JSON.stringify(ops);
+
+    // 2. Serialize Subsections
+    const subs = [];
+    subsectionsList.querySelectorAll('.list-group-item').forEach(li => subs.push({ id: li.dataset.id }));
+    subsectionsInput.value = JSON.stringify(subs);
+
+    // 3. Serialize Related
+    const rels = [];
+    relatedList.querySelectorAll('.list-group-item').forEach(li => rels.push({ id: li.dataset.id }));
+    relatedInput.value = JSON.stringify(rels);
+
+    // 4. Form Data
+    const formData = new FormData(form);
+    formData.set('active', document.getElementById('activeCheck').checked ? 'true' : 'false');
+    formData.set('mainDashboardDisplay', document.getElementById('mainDashboardDisplayCheck').checked ? 'true' : 'false');
+    formData.set('dashboardDisplay', document.getElementById('dashboardDisplayCheck').checked ? 'true' : 'false');
+    formData.set('trackState', document.getElementById('trackStateCheck').checked ? 'true' : 'false');
+    formData.set('navigatorSection', document.getElementById('navigatorSectionCheck').checked ? 'true' : 'false');
+    
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+        body: new URLSearchParams(formData).toString()
+      });
+      const result = await response.json();
+  
+      if (result.status === 'success') {
+        if(typeof showMessageModal === 'function') {
+            await showMessageModal({ title: 'Success', icon: 'success', message: result.message || 'Saved.', buttons: [{ text: 'OK', class: 'btn-success' }] });
+        }
+        window.location.href = '/sections';
+      } else {
+        if (window.appWaiting && submitter) window.appWaiting.clear(submitter);
+        if (btnCancelAction) btnCancelAction.classList.remove('disabled');
+        isSubmitting = false;
+        if(typeof showMessageModal === 'function') {
+            await showMessageModal({ title: 'Error', icon: 'error', message: result.message || 'Failed.', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        } else { alert(result.message); }
+      }
+    } catch (error) {
+      if (window.appWaiting && submitter) window.appWaiting.clear(submitter);
+      if (btnCancelAction) btnCancelAction.classList.remove('disabled');
+      isSubmitting = false;
+      console.error(error);
+      alert('Unexpected error occurred.');
+    }
+  });
+});
+</script>
+
+<style>
+    .section-field-help { text-decoration: none !important; }
+    .section-field-help:focus { box-shadow: none; outline: 2px solid rgba(13, 110, 253, 0.35); outline-offset: 2px; border-radius: 2px; }
+    .border-dashed { border-style: dashed !important; border-width: 2px !important; }
+    .nav-tabs .nav-link { color: #495057; font-weight: 500; }
+    .nav-tabs .nav-link.active { font-weight: bold; color: #0d6efd; border-top: 3px solid #0d6efd; }
+    .list-group-item { transition: background 0.2s; }
+    .list-group-item:hover { background-color: #f8f9fa; }
+    .draggable-subsection { cursor: move; user-select: none; }
+    .draggable-subsection .drag-handle { cursor: grab; }
+    .draggable-subsection.dragging { opacity: 0.65; }
+    .draggable-subsection.drag-over { border-top: 2px solid #0d6efd; }
+</style>

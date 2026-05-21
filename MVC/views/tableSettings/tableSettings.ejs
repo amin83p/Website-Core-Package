@@ -1,0 +1,98 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print
+}) %>
+
+  <%- include('../partials/tablePages-search', {
+    placeholder: 'Search operations...',
+    fields: []
+  }) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th data-column="tableId" class="draggable">Table ID <span class="sort-icon"></span></th>
+        <th data-column="userId" class="draggable">User ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="createDateTime">Created<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated<span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (data && data.length > 0) { %>
+        <% data.forEach(item => { %>
+          <%
+            const audit = item.audit || {};
+            const createDateTime = audit.createDateTime || item.createDateTime;
+            const lastUpdateDateTime = audit.lastUpdateDateTime || item.lastUpdateDateTime;
+            const createUser = audit.createUser || item.createUser;
+            const lastUpdateUser = audit.lastUpdateUser || item.lastUpdateUser;
+          %>
+          <tr>
+            <td><%= item.tableId %></td>
+            <td><%= item.userId %></td>
+            <td>
+              <% if (createDateTime) { %>
+                <%= new Date(createDateTime).toLocaleString() %>
+                <% if (createUser) { %>
+                  <br><span class="text-muted small">by <%= createUser %></span>
+                <% } %>
+              <% } else { %>
+                —
+              <% } %>
+            </td>
+            <td>
+              <% if (lastUpdateDateTime) { %>
+                <%= new Date(lastUpdateDateTime).toLocaleString() %>
+                <% if (lastUpdateUser) { %>
+                  <br><span class="text-muted small">by <%= lastUpdateUser %></span>
+                <% } %>
+              <% } else { %>
+                —
+              <% } %>
+            </td>
+              <td class="table-actions text-end pe-4">
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= item.userId %>_<%= item.tableId %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= item.userId %>_<%= item.tableId %>">
+                  <a href="/<%=newUrl%>/edit/<%= item.userId %>/<%= item.tableId %>" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil-square me-2"></i>Edit
+                  </a>
+                  <button class="btn btn-outline-danger btn-sm delete-btn"
+                          data-user="<%= item.userId %>"
+                          data-id="<%= item.tableId %>">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </button>
+                </div>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      <% } else { %>
+         <tr>
+          <td colspan="5" class="text-center text-muted py-3">No records found.</td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>

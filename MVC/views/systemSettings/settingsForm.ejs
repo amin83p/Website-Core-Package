@@ -1,0 +1,140 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0">System Configuration</h1>
+      <span class="badge bg-secondary border shadow-sm">Global Settings</span>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="settingsForm" action="/systemSettings/update" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white py-3">
+            <h5 class="fw-bold text-primary m-0"><i class="bi bi-newspaper me-2"></i>Newsletter Constants</h5>
+        </div>
+        <div class="card-body">
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold">Default Subscription Group</label>
+                <select name="newsletter_defaultGroupId" class="form-select size-md">
+                    <option value="">-- Select Default Group --</option>
+                    <% groups.forEach(g => { %>
+                        <option value="<%= g.id %>" <%= (settings.newsletter.defaultGroupId === g.id) ? 'selected' : '' %>>
+                            <%= g.name %> (ID: <%= g.id %>)
+                        </option>
+                    <% }) %>
+                </select>
+                <div class="form-text">New subscribers via the public API will be assigned to this group automatically.</div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="doubleOptIn" name="newsletter_requireDoubleOptIn" value="true"
+                            <%= settings.newsletter.requireDoubleOptIn ? 'checked' : '' %>>
+                        <label class="form-check-label" for="doubleOptIn">Require Double Opt-In</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                     <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="welcomeEmail" name="newsletter_sendWelcomeEmail" value="true"
+                             <%= settings.newsletter.sendWelcomeEmail ? 'checked' : '' %>>
+                        <label class="form-check-label" for="welcomeEmail">Send Welcome Email</label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white py-3">
+            <h5 class="fw-bold text-dark m-0"><i class="bi bi-building me-2"></i>Organization Defaults</h5>
+        </div>
+        <div class="card-body">
+             <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Default Trial Period (Days)</label>
+                    <input type="number" name="org_defaultTrialDays" class="form-control" value="<%= settings.organization.defaultTrialDays %>">
+                </div>
+                <div class="col-md-6 mb-3 d-flex align-items-center">
+                    <div class="form-check form-switch mt-4">
+                        <input class="form-check-input" type="checkbox" id="freeReg" name="org_allowFreeRegistration" value="true"
+                            <%= settings.organization.allowFreeRegistration ? 'checked' : '' %>>
+                        <label class="form-check-label" for="freeReg">Allow Free Registration</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4">
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save Configuration</button>
+      </div>
+   </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('settingsForm');
+ 
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+      }
+
+      const formData = new FormData(form);
+      const data = new URLSearchParams(formData);
+
+      // Manual switch handling not strictly needed if value="true" is set in HTML, 
+      // but good for safety if checkboxes are unchecked (they won't send anything).
+      // The controller handles "undefined" as false.
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: data.toString()
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Success', icon: 'success', message: result.message,
+              buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+            });
+          }
+          // Optional: Reload to see changes or stay
+           window.location.reload();
+        } else {
+            throw new Error(result.message || 'Failed to save.');
+        }
+      } catch (error) {
+        if (submitBtn) {
+             submitBtn.disabled = false;
+             submitBtn.innerHTML = 'Save Configuration';
+        }
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Error', icon: 'error', message: error.message || 'Error occurred.',
+            buttons: [{ text: 'OK', class: 'btn-danger btn-md' }]
+          });
+        } else {
+            alert(error.message);
+        }
+      }
+    });
+  }
+});
+</script>

@@ -1,0 +1,65 @@
+[
+  {
+    "email": "newsletter.1774556750651-330@example.com",
+    "status": "subscribed",
+    "id": "104520"
+  },
+  {
+    "email": "newsletter.1774557078536-297@example.com",
+    "status": "subscribed",
+    "id": "508280"
+  },
+  {
+    "id": "NWS1004",
+    "active": false,
+    "audit": {
+      "createDateTime": "2026-02-17T05:31:19.806Z",
+      "lastUpdateDateTime": "2026-02-17T07:06:57.355Z"
+    },
+    "email": "anahita.mohammadi.1992@gmail.com",
+    "groupId": "GRP1001",
+    "manageCode": "NWC-0E3CCA",
+    "meta": {
+      "page": "/newsletter/unsubscribe/anahita.mohammadi.1992@gmail.com",
+      "ts": "2026-02-17T07:06:57.355Z"
+    },
+    "note": "",
+    "status": "unsubscribed",
+    "subscribedAt": "2026-02-17T05:31:19.806Z",
+    "unsubscribedAt": "2026-02-17T07:06:57.355Z"
+  },
+  {
+    "id": "NWS1005",
+    "active": false,
+    "audit": {
+      "createDateTime": "2026-02-17T07:06:33.350Z",
+      "lastUpdateDateTime": "2026-02-17T07:07:03.617Z",
+      "createUser": "SYS_ROOT_001"
+    },
+    "email": "elahe.ghorbanchian89@gmail.com",
+    "groupId": "GRP1001",
+    "manageCode": "NWC-D48302",
+    "meta": {},
+    "subscribedAt": "2026-02-17T07:06:33.350Z",
+    "unsubscribedAt": null
+  },
+  {
+    "id": "NWS1006",
+    "active": true,
+    "audit": {
+      "createDateTime": "2026-03-18T15:22:38.943Z",
+      "lastUpdateDateTime": "2026-03-18T15:22:38.943Z"
+    },
+    "email": "aminpeivandzani@gmail.com",
+    "groupId": "GRP1001",
+    "manageCode": "NWC-2E61E2",
+    "meta": {
+      "page": "/",
+      "ts": "2026-03-18T15:22:38.943Z"
+    },
+    "note": "",
+    "status": "subscribed",
+    "subscribedAt": "2026-03-18T15:22:38.943Z",
+    "unsubscribedAt": null
+  }
+]

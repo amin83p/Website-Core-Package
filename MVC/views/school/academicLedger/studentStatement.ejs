@@ -1,0 +1,104 @@
+<%
+  const studentName = person ? `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim() : (student?.id || '');
+%>
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-mortarboard-fill me-2"></i><%= title %></h1>
+      <div class="text-muted small mt-1"><%= studentName || student?.id %> | Student ID: <%= student?.id %> | Active Org: <%= activeOrgId %></div>
+    </div>
+    <a href="/school/academic-ledger" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Ledger</a>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <% if (!(snapshots || []).length) { %>
+      <div class="col-12">
+        <div class="alert alert-light border mb-0">No academic snapshot has been built for this student/program yet.</div>
+      </div>
+    <% } %>
+    <% (snapshots || []).forEach(function(snapshot) { %>
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div class="fw-bold">Program: <%= snapshot.programId %></div>
+              <span class="badge bg-info-subtle text-info"><%= snapshot.standing || 'pending' %></span>
+            </div>
+            <div class="small text-muted mb-3">Current Term: <%= snapshot.currentTermId || '-' %></div>
+            <div class="row g-2 small">
+              <div class="col-6">Attempted Credits: <strong><%= snapshot.credits?.attempted ?? 0 %></strong></div>
+              <div class="col-6">Earned Credits: <strong><%= snapshot.credits?.earned ?? 0 %></strong></div>
+              <div class="col-6">Main Earned: <strong><%= snapshot.credits?.mainEarned ?? 0 %></strong></div>
+              <div class="col-6">Essential Earned: <strong><%= snapshot.credits?.essentialEarned ?? 0 %></strong></div>
+              <div class="col-6">Optional Earned: <strong><%= snapshot.credits?.optionalEarned ?? 0 %></strong></div>
+              <div class="col-6">Last Rebuilt: <strong><%= snapshot.lastRebuiltAt || '-' %></strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="fw-bold">Academic Events</div>
+        <form method="GET" class="d-flex gap-2 align-items-center">
+          <label class="small text-muted">Program</label>
+          <select name="programId" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">All Programs</option>
+            <% (programs || []).forEach(function(program) { %>
+              <option value="<%= program.id %>" <%= selectedProgramId === String(program.id) ? 'selected' : '' %>><%= program.code || program.id %> - <%= program.name || '' %></option>
+            <% }) %>
+          </select>
+        </form>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Program / Term</th>
+              <th>Class / Subject</th>
+              <th>Quantities</th>
+              <th>Academic Result</th>
+              <th>Memo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!entries || !entries.length) { %>
+              <tr><td colspan="7" class="text-center text-muted py-4">No academic events found for this student.</td></tr>
+            <% } %>
+            <% (entries || []).forEach(function(entry) { %>
+              <tr>
+                <td><%= entry.effectiveDate || '-' %></td>
+                <td><span class="badge bg-primary-subtle text-primary"><%= entry.entryType %></span></td>
+                <td>
+                  <div><%= entry.programId || '-' %></div>
+                  <div class="small text-muted"><%= entry.termId || '-' %></div>
+                </td>
+                <td>
+                  <div><%= entry.classId || '-' %></div>
+                  <div class="small text-muted"><%= entry.subjectId || '-' %></div>
+                </td>
+                <td class="small">
+                  <div>Score: <%= entry.quantities?.score ?? '-' %></div>
+                  <div>Attempted: <%= entry.quantities?.creditsAttempted ?? '-' %></div>
+                  <div>Earned: <%= entry.quantities?.creditsEarned ?? '-' %></div>
+                </td>
+                <td class="small">
+                  <div>Result: <%= entry.academic?.result || '-' %></div>
+                  <div>Standing: <%= entry.academic?.standing || '-' %></div>
+                  <div>Type: <%= entry.academic?.subjectType || '-' %></div>
+                </td>
+                <td><%= entry.memo || '-' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

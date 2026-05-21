@@ -1,0 +1,1087 @@
+<%
+  const u = userItem || {};
+  const isEditMode = !!u.id;
+  // Person Data
+  var pData = (typeof person !== 'undefined' ? person : null) || { id: u.personId || '', name: 'N/A' };
+  
+  // Org Data
+  const userOrgs = u.organizations || [];
+  const personOrgs = pData.organizations || [];
+  // Access Defs for lookup
+  const accessDefs = typeof accessDefinitions !== 'undefined' ? accessDefinitions : [];
+  const scopeDefs = typeof scopeDefinitions !== 'undefined' ? scopeDefinitions : [];
+  
+  // 1. Resolve Active Organization Name
+  let activeOrgName = 'System / Global';
+  if (user && user.activeOrgId && user.allowedOrgs) {
+    const orgObj = user.allowedOrgs.find(o => String(o.orgId) === String(user.activeOrgId));
+    if (orgObj) {
+      activeOrgName = orgObj.name || ('Org #' + orgObj.orgId);
+    }
+  }
+
+  // Helper to find profile name
+  const getProfileName = (id) => {
+      const found = accessDefs.find(a => String(a.id) === String(id));
+      return found ? found.name : id;
+  };
+%>
+
+<div class="sections-page">
+    <%- include('../partials/formPage_PageTitle', {
+      isEditMode: isEditMode,
+      name: 'User',
+      id: u?.id || 0
+    }) %>
+
+  <div class="form-container wide" style="width: 100%; max-width: 1200px;">
+    <form id="userForm" action="<%= isEditMode ? '/users/edit/' + u.id : '/users/new' %>" method="POST" novalidate>
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      <input type="hidden" id="organizationsHidden" name="organizations">
+      
+      <script type="application/json" id="initUserOrgs"><%- JSON.stringify(userOrgs) %></script>
+      <script type="application/json" id="initPersonOrgs"><%- JSON.stringify(personOrgs) %></script>
+      <script type="application/json" id="initAccessDefs"><%- JSON.stringify(accessDefs) %></script>
+      <script type="application/json" id="initScopeDefs"><%- JSON.stringify(scopeDefs) %></script>
+      <script type="application/json" id="initAllowedOrgs"><%- JSON.stringify((user && user.allowedOrgs) ? user.allowedOrgs : []) %></script>
+
+      <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-account" type="button">Account</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-person-orgs" type="button">Person & Organizations</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-status" type="button">Status</button>
+        </li>
+        <% if (isEditMode) { %>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-audit" type="button">Audit</button>
+        </li>
+        <% } %>
+      </ul>
+
+      <div class="tab-content">
+
+        <div class="tab-pane fade show active" id="tab-account">
+          <div class="row mb-3">
+            <div class="col-md-8">
+              <label class="form-label">Email *</label>
+              <input type="email" name="email" class="form-control size-md" value="<%= u.email ||'' %>" required>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <p class="text-muted p-2 border rounded w-100 small mb-0 bg-light">
+                      <i class="bi bi-info-circle me-1"></i> Login email can differ from contact emails.
+                </p>
+            </div>
+          </div>          
+          <div class="mb-3">
+            <label class="form-label">Username (optional)</label>
+            <input type="text" name="username" class="form-control size-md" value="<%= u.username || '' %>">
+          </div>
+          <div class="mb-3">
+              <label class="form-label"><%= isEditMode ? 'New Password (Optional)' : 'Password (Optional)' %></label>
+              <input type="text" name="passwordHash" class="form-control size-md" autocomplete="new-password"
+                     placeholder="<%= isEditMode ? 'Leave empty to keep current password' : 'Leave empty to auto-generate' %>">
+          </div>
+
+          <% if (typeof isSystemAdmin !== 'undefined' && isSystemAdmin) { %>
+            <hr class="my-4">
+            <div class="card bg-light border-warning mb-3 shadow-sm">
+                <div class="card-body">
+                    <label class="form-label fw-bold text-dark d-flex align-items-center">
+                        <i class="bi bi-shield-lock-fill text-warning me-2"></i> System-Wide Access (Optional)
+                    </label>
+                    <div class="input-group">
+                        <input type="hidden" name="systemAccessProfileId" id="sysProfileId" value="<%= u.systemAccessProfileId || '' %>">
+                        <input type="text" id="sysProfileName" class="form-control bg-white text-primary fw-bold" readonly 
+                               value="<%= u.systemAccessProfileId ? getProfileName(u.systemAccessProfileId) : 'None (Standard User)' %>">
+                        
+                        <button type="button" class="btn btn-outline-primary" id="btnPickSysProfile" title="Select Global Profile"><i class="bi bi-search"></i> Select</button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnClearSysProfile" title="Clear Access"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                    <div class="form-text small mt-2">
+                        <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+                        <b>High Privilege Action:</b> Assigning a profile here grants this user access to <b>ALL Organizations</b> in the system using these permissions.
+                        Only <b>Global</b> profiles (not bound to an org) can be selected.
+                    </div>
+                </div>
+            </div>
+          <% } %>
+
+        </div>
+
+        <div class="tab-pane fade" id="tab-person-orgs">
+          <div class="mb-3">
+            <label class="form-label">Linked Person *</label>
+            
+            <div class="input-group" style="max-width: 600px;">
+                <input type="hidden" name="personId" id="selectedPersonId" value="<%= u.personId || '' %>">
+                
+                <% 
+                   let initialPersonName = pData.name + (u.personId ? ` (${u.personId})` : '');
+                %>
+                <input type="text" id="selectedPersonName" class="form-control bg-white fw-bold" 
+                       placeholder="No person selected" value="<%= initialPersonName %>" readonly>
+                
+                <button type="button" class="btn btn-outline-primary" id="openPersonPickerBtn" <%= isEditMode ? 'disabled' : '' %>>
+                   <i class="bi bi-search"></i> Select
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="clearPersonBtn" title="Reset" <%= isEditMode ? 'disabled' : '' %>>
+                  <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <% if (isEditMode) { %>
+                <div class="form-text text-muted">Person link cannot be changed after creation.</div>
+            <% } %>
+          </div>
+
+          <div class="card border-0 bg-light shadow-sm mb-3">
+            <div class="card-body">
+              <div class="fw-bold text-primary mb-1"><i class="bi bi-diagram-3 me-2"></i>Current Person Role Composition</div>
+              <div class="small text-muted mb-3">This summarizes the selected person's roles across organizations. Access profiles below are separate from these business roles.</div>
+              <div id="personRoleSummary"></div>
+            </div>
+          </div>
+
+          <hr>
+
+          <div class="d-flex justify-content-between align-items-center mb-3">
+             <label class="form-label mb-0 fw-bold text-primary">Organization Access</label>
+             <button type="button" id="refreshOrgsBtn" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Config
+             </button>
+          </div>
+          
+          <div class="table-responsive border rounded mb-3">
+            <table class="table table-hover align-middle mb-0" id="orgConfigTable">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 250px;">Organization</th>
+                        <th style="width: 170px;">Roles / Status</th>
+                        <th>Access Profiles</th>
+                        <th style="width: 180px;" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="orgConfigBody">
+                    <tr><td colspan="4" class="text-center py-4 text-muted">No person selected.</td></tr>
+                </tbody>
+            </table>
+          </div>
+
+          <div class="mb-3 mt-4">
+            <label class="form-label small fw-bold text-muted">Default Dashboard Context</label>
+            <select name="primaryOrgId" id="primaryOrgSelect" class="form-select size-md">
+               <option value="">Auto / First Organization</option>
+            </select>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-status">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Status</label>
+              <% const status = u.status || 'pending'; %>
+              <select name="status" class="form-select size-md">
+                <option value="pending" <%= status==='pending'?'selected':'' %>>Pending</option>
+                <option value="active" <%= status==='active'?'selected':'' %>>Active</option>
+                <option value="suspended" <%= status==='suspended'?'selected':'' %>>Suspended</option>
+                <option value="deleted" <%= status==='deleted'?'selected':'' %>>Deleted</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Registration Source</label>
+              <% const reg = u.registrationSource || 'admin_create'; %>
+              <select name="registrationSource" class="form-select size-md">
+                <option value="self" <%= reg==='self'?'selected':'' %>>Self</option>
+                <option value="org_invite" <%= reg==='org_invite'?'selected':'' %>>Org Invite</option>
+                <option value="admin_create" <%= reg==='admin_create'?'selected':'' %>>Admin Create</option>
+                <option value="org_admin_create" <%= reg==='org_admin_create'?'selected':'' %>>Org Admin Create</option>
+              </select>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label class="form-label">System Access Level</label>
+              <input type="number" name="accessLevel" class="form-control size-md" min="1" max="10" value="<%= u.accessLevel ?? 1 %>" required>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="activeCheck" name="active" <%= u.active ? 'checked' : '' %>>
+                <label class="form-check-label" for="activeCheck">Active</label>
+              </div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="emailVerifiedCheck" name="isEmailVerified" <%= u.isEmailVerified ? 'checked' : '' %>>
+                <label class="form-check-label" for="emailVerifiedCheck">Email Verified</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <% if (isEditMode) { const audit = u.audit || {}; %>
+        <div class="tab-pane fade" id="tab-audit">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Created By</label>
+              <input type="text" class="form-control size-md" disabled value="<%= audit.createUser ?? '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Created At</label>
+              <input type="text" class="form-control size-md" disabled value="<%= audit.createDateTime ? new Date(audit.createDateTime).toLocaleString() : '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Last Updated By</label>
+              <input type="text" class="form-control size-md" disabled value="<%= audit.lastUpdateUser ?? '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Last Updated At</label>
+              <input type="text" class="form-control size-md" disabled value="<%= audit.lastUpdateDateTime ? new Date(audit.lastUpdateDateTime).toLocaleString() : '' %>">
+            </div>
+          </div>
+        </div>
+        <% } %>
+
+      </div>
+
+      <div class="button-row mt-4">
+        <button type="submit" class="btn btn-filled btn-primary btn-md" id="btnSaveAction">Save User</button>
+        <a href="/users" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/users"> Cancel </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<div class="modal fade" id="mergedAccessPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-1">Merged Access Preview</h5>
+          <div class="small text-muted" id="mergedAccessPreviewMeta"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="mergedAccessPreviewBody"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  // --- DATA INIT ---
+  const userOrgs = JSON.parse(document.getElementById('initUserOrgs').textContent || '[]');
+  let personOrgs = JSON.parse(document.getElementById('initPersonOrgs').textContent || '[]'); 
+  const accessDefs = JSON.parse(document.getElementById('initAccessDefs').textContent || '[]');
+  const scopeDefs = JSON.parse(document.getElementById('initScopeDefs').textContent || '[]');
+  const allowedOrgs = JSON.parse(document.getElementById('initAllowedOrgs').textContent || '[]');
+  
+  // Map to full object
+  const accessMap = new Map(accessDefs.map(a => [a.id, a]));
+  const scopeMap = new Map(scopeDefs.map(s => [String(s.id || ''), s]));
+  const scopeLevelMap = new Map(scopeDefs.map(s => [String(s.id || ''), Number(s.level) || 0]));
+  // State
+  let currentOrgsState = []; 
+  const form = document.getElementById('userForm');
+  const saveActionBtn = document.getElementById('btnSaveAction');
+  const cancelActionBtn = document.getElementById('btnCancelAction');
+  let isFormBusy = false;
+
+  function cacheButtonHtml(btn) {
+      if (!btn) return;
+      if (!btn.dataset.defaultHtml) btn.dataset.defaultHtml = btn.innerHTML;
+  }
+
+  function setButtonBusy(btn, label) {
+      if (!btn) return;
+      cacheButtonHtml(btn);
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>${label}`;
+      if (btn.tagName === 'A') {
+          btn.classList.add('disabled');
+          btn.setAttribute('aria-disabled', 'true');
+          btn.style.pointerEvents = 'none';
+      }
+  }
+
+  function restoreButton(btn) {
+      if (!btn) return;
+      if (btn.dataset.defaultHtml) btn.innerHTML = btn.dataset.defaultHtml;
+      btn.disabled = false;
+      if (btn.tagName === 'A') {
+          btn.classList.remove('disabled');
+          btn.removeAttribute('aria-disabled');
+          btn.style.pointerEvents = '';
+      }
+  }
+
+  function restoreFormActionButtons() {
+      isFormBusy = false;
+      restoreButton(saveActionBtn);
+      restoreButton(cancelActionBtn);
+  }
+
+  cacheButtonHtml(saveActionBtn);
+  cacheButtonHtml(cancelActionBtn);
+  if (cancelActionBtn) {
+      cancelActionBtn.addEventListener('click', (event) => {
+          if (isFormBusy) {
+              event.preventDefault();
+              return;
+          }
+          isFormBusy = true;
+          setButtonBusy(cancelActionBtn, 'Cancelling...');
+          if (saveActionBtn) saveActionBtn.disabled = true;
+      });
+  }
+
+  // --- SYSTEM PROFILE LOGIC (New) ---
+  const btnPickSysProfile = document.getElementById('btnPickSysProfile');
+  const btnClearSysProfile = document.getElementById('btnClearSysProfile');
+  
+  if (btnPickSysProfile) {
+      btnPickSysProfile.addEventListener('click', () => {
+          GenericPicker.open(GenericPickerPresets.accessProfile({
+              title: 'Select System Access Profile',
+              placeholder: 'Search global profiles...',
+              context: GenericPickerContexts.globalSystemProfiles(),
+              onSelect: async (item) => {
+                  // ✅ CHECK: Must be a GLOBAL profile (orgId is null/false)
+                  if (item.orgId) {
+                      await showMessageModal({
+                        title: 'Invalid Selection',
+                        message: `The profile <b>${item.name}</b> belongs to Organization #${item.orgId}.<br><br>System-Wide Access requires a <b>Global</b> profile (not bound to any organization).`,
+                        icon: 'warning',
+                        buttons: [{ text: 'OK', class: 'btn-warning' }]
+                      });
+                      return;
+                  }
+                  
+                  document.getElementById('sysProfileId').value = item.id;
+                  document.getElementById('sysProfileName').value = item.name;
+              }
+          }));
+      });
+
+      btnClearSysProfile.addEventListener('click', () => {
+          document.getElementById('sysProfileId').value = '';
+          document.getElementById('sysProfileName').value = 'None (Standard User)';
+      });
+  }
+
+  // --- MERGE LOGIC ---
+  function resolveOrgName(orgLike) {
+      const orgId = orgLike?.orgId || orgLike?.id || '';
+      const directName = String(orgLike?.name || orgLike?.orgName || '').trim();
+      const genericOrgLabel = `org ${String(orgId).trim()}`.toLowerCase();
+      const genericOrgHashLabel = `org #${String(orgId).trim()}`.toLowerCase();
+      if (directName && directName.toLowerCase() !== genericOrgLabel && directName.toLowerCase() !== genericOrgHashLabel) {
+          return directName;
+      }
+      const allowedOrg = allowedOrgs.find((org) => String(org.orgId) === String(orgId));
+      return allowedOrg?.name || directName || ('Org ' + orgId);
+  }
+
+  function normalizeIdListClient(values) {
+      const rows = Array.isArray(values) ? values : [values];
+      const out = [];
+      const seen = new Set();
+      rows.forEach((value) => {
+          const id = String(value || '').trim();
+          if (!id || seen.has(id)) return;
+          seen.add(id);
+          out.push(id);
+      });
+      return out;
+  }
+
+  function normalizeManagedProfilesClient(values) {
+      const rows = Array.isArray(values) ? values : [];
+      const out = [];
+      const seen = new Set();
+      rows.forEach((row) => {
+          if (!row || typeof row !== 'object') return;
+          const profileId = String(row.profileId || row.id || row.accessProfileId || '').trim();
+          if (!profileId) return;
+          const sourceType = String(row.sourceType || row.type || row.originType || 'external').trim().toLowerCase() || 'external';
+          const sourceRefId = String(row.sourceRefId || row.sourceId || row.originId || '').trim();
+          const sourceLabel = String(row.sourceLabel || row.label || row.originLabel || '').trim();
+          const key = `${profileId}::${sourceType}::${sourceRefId}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          out.push({
+              profileId,
+              sourceType,
+              sourceRefId,
+              sourceLabel,
+              locked: true
+          });
+      });
+      return out;
+  }
+
+  function getManagedProfileIdsClient(org) {
+      const entries = normalizeManagedProfilesClient(org?.managedAccessProfiles || []);
+      return normalizeIdListClient(entries.map((entry) => entry.profileId));
+  }
+
+  function getDirectProfileIdsClient(org) {
+      if (Array.isArray(org?.directAccessProfileIds)) {
+          return normalizeIdListClient(org.directAccessProfileIds);
+      }
+      return normalizeIdListClient(org?.accessProfileIds || []);
+  }
+
+  function syncOrgEffectiveProfileIds(org) {
+      const directIds = getDirectProfileIdsClient(org);
+      const managedEntries = normalizeManagedProfilesClient(org?.managedAccessProfiles || []);
+      const managedIds = normalizeIdListClient(managedEntries.map((entry) => entry.profileId));
+      org.directAccessProfileIds = directIds;
+      org.managedAccessProfiles = managedEntries;
+      org.accessProfileIds = normalizeIdListClient([...directIds, ...managedIds]);
+      return org;
+  }
+
+  function mergeOrgData() {
+      currentOrgsState = personOrgs.map(pOrg => {
+          const existingConfig = userOrgs.find(u => Number(u.orgId) === Number(pOrg.orgId));
+          const managedAccessProfiles = normalizeManagedProfilesClient(existingConfig ? (existingConfig.managedAccessProfiles || []) : []);
+          const managedProfileSet = new Set(managedAccessProfiles.map((entry) => String(entry.profileId || '').trim()).filter(Boolean));
+          const configuredDirect = Array.isArray(existingConfig?.directAccessProfileIds)
+            ? existingConfig.directAccessProfileIds
+            : (existingConfig ? (existingConfig.accessProfileIds || []) : []);
+          const directAccessProfileIds = normalizeIdListClient(configuredDirect).filter((id) => !managedProfileSet.has(String(id)));
+          const rawRoles = Array.isArray(pOrg.roles) ? pOrg.roles : (pOrg.role ? [pOrg.role] : []);
+          const roles = rawRoles
+            .map(r => String(r || '').trim().toLowerCase())
+            .filter(Boolean)
+            .filter((r, idx, arr) => arr.indexOf(r) === idx);
+          if (!roles.length) roles.push('member');
+          return syncOrgEffectiveProfileIds({
+              orgId: pOrg.orgId,
+              name: resolveOrgName(pOrg),
+              roles,
+              role: roles[0],
+              memberStatus: pOrg.memberStatus || 'active',
+              directAccessProfileIds,
+              managedAccessProfiles
+          });
+      });
+      renderPersonRoleSummary();
+      renderOrgTable();
+  }
+
+  function renderMergedAccessPreview(org) {
+      const profileIds = getDirectProfileIdsClient(org);
+      const sourceProfiles = profileIds.map((id) => accessMap.get(id)).filter(Boolean);
+      const missingProfileIds = profileIds.filter((id) => !accessMap.get(id));
+      const merged = mergeAccessProfilesForPreview(sourceProfiles);
+
+      if (!merged || !mergedAccessPreviewModalEl || !mergedAccessPreviewBody || !mergedAccessPreviewMeta) return;
+
+      const sourceProfileHtml = sourceProfiles.map((profile) => {
+          const sectionCount = Array.isArray(profile.sections) ? profile.sections.length : 0;
+          return `
+            <div class="border rounded p-2 bg-white">
+              <div class="fw-bold text-dark">${escapeHtml(profile.name || profile.id)}</div>
+              <div class="small text-muted">${escapeHtml(profile.id || '')}</div>
+              <div class="small text-secondary mt-1">${sectionCount} sections</div>
+            </div>
+          `;
+      }).join('');
+
+      const categoryHtml = (merged.adminCategories || []).length
+        ? merged.adminCategories.map((category) => `<span class="badge bg-light text-dark border me-1 mb-1">${escapeHtml(category)}</span>`).join('')
+        : '<span class="text-muted small">None</span>';
+
+      const sectionHtml = (merged.sections || []).length
+        ? merged.sections.map((section) => {
+            const operations = Array.isArray(section.operations) ? section.operations : [];
+            const operationsHtml = section.adminAccess === true
+              ? '<div class="small text-success fw-bold">Section-level admin access. All operation-level restrictions are ignored.</div>'
+              : (operations.length
+                ? `<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light"><tr><th>Operation</th><th>Status</th><th>Scope</th><th>Attempts</th><th>Session</th><th>Fetch</th></tr></thead><tbody>${operations.map((operation) => `
+                    <tr>
+                      <td><div class="fw-bold">${escapeHtml(operation.operationName || operation.operationId || '')}</div><div class="small text-muted">${escapeHtml(operation.operationId || '')}</div></td>
+                      <td>${escapeHtml(operation.accessType || 'custom')}</td>
+                      <td>${escapeHtml(formatScopeName(operation.scopeId || ''))}</td>
+                      <td>${escapeHtml(formatLimit(operation.executionLimits?.maxAttemptsPerSession))}</td>
+                      <td>${escapeHtml(formatLimit(operation.timeLimits?.maxSessionDurationMinutes, ' min'))}</td>
+                      <td>${escapeHtml(formatLimit(operation.throughputLimits?.maxFetchVolumeKB, ' KB'))}</td>
+                    </tr>
+                  `).join('')}</tbody></table></div>`
+                : '<div class="small text-muted">No operation overrides in merged result.</div>');
+
+            return `
+              <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                    <div>
+                      <div class="fw-bold text-dark">${escapeHtml(section.sectionName || section.sectionId || '')}</div>
+                      <div class="small text-muted">${escapeHtml(section.sectionId || '')}</div>
+                    </div>
+                    <div class="text-end">
+                      <span class="badge ${section.adminAccess === true ? 'bg-success' : 'bg-secondary'}">${section.adminAccess === true ? 'Admin Access' : (section.accessType || 'custom')}</span>
+                    </div>
+                  </div>
+                  <div class="row g-2 small mb-3">
+                    <div class="col-md-4"><span class="text-muted">Attempts:</span> ${escapeHtml(formatLimit(section.executionLimits?.maxAttemptsPerSession))}</div>
+                    <div class="col-md-4"><span class="text-muted">Session:</span> ${escapeHtml(formatLimit(section.timeLimits?.maxSessionDurationMinutes, ' min'))}</div>
+                    <div class="col-md-4"><span class="text-muted">Fetch:</span> ${escapeHtml(formatLimit(section.throughputLimits?.maxFetchVolumeKB, ' KB'))}</div>
+                  </div>
+                  ${operationsHtml}
+                </div>
+              </div>
+            `;
+        }).join('')
+        : '<div class="text-muted">No sections exist in the merged result.</div>';
+
+      const missingHtml = missingProfileIds.length
+        ? `<div class="alert alert-warning py-2 small mb-3">These assigned profiles could not be loaded and were excluded from the preview: ${missingProfileIds.map((id) => escapeHtml(id)).join(', ')}</div>`
+        : '';
+
+      mergedAccessPreviewMeta.innerHTML = `${escapeHtml(org.name)} (#${escapeHtml(org.orgId)}) • ${sourceProfiles.length} profiles merged`;
+      mergedAccessPreviewBody.innerHTML = `
+        ${missingHtml}
+        <div class="row g-3 mb-3">
+          <div class="col-lg-4">
+            <div class="card border-0 bg-light h-100">
+              <div class="card-body">
+                <div class="fw-bold mb-2">Source Profiles</div>
+                <div class="d-grid gap-2">${sourceProfileHtml || '<div class="text-muted small">No valid profiles selected.</div>'}</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-8">
+            <div class="card border-0 bg-light h-100">
+              <div class="card-body">
+                <div class="fw-bold mb-2">Effective Result</div>
+                <div class="row g-2 small mb-3">
+                  <div class="col-md-4"><span class="text-muted">Full Admin:</span> ${merged.fullAdmin ? 'Yes' : 'No'}</div>
+                  <div class="col-md-4"><span class="text-muted">Sections:</span> ${(merged.sections || []).length}</div>
+                  <div class="col-md-4"><span class="text-muted">Merged Profile Id:</span> ${escapeHtml(merged.id || '-')}</div>
+                </div>
+                <div class="small text-muted mb-1">Admin Categories</div>
+                <div>${categoryHtml}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="fw-bold mb-2">Section and Operation Result</div>
+          ${sectionHtml}
+        </div>
+      `;
+
+      bootstrap.Modal.getOrCreateInstance(mergedAccessPreviewModalEl).show();
+  }
+
+  // --- RENDER UI ---
+  const orgTableBody = document.getElementById('orgConfigBody');
+  const primarySelect = document.getElementById('primaryOrgSelect');
+  const orgsHiddenInput = document.getElementById('organizationsHidden');
+  const personRoleSummary = document.getElementById('personRoleSummary');
+  const mergedAccessPreviewModalEl = document.getElementById('mergedAccessPreviewModal');
+  const mergedAccessPreviewMeta = document.getElementById('mergedAccessPreviewMeta');
+  const mergedAccessPreviewBody = document.getElementById('mergedAccessPreviewBody');
+
+  function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+  }
+
+  function cloneDeep(value) {
+      if (value === null || value === undefined) return {};
+      return JSON.parse(JSON.stringify(value));
+  }
+
+  function mergePermissionLimitValue(current, incoming) {
+      if (incoming === undefined) return current;
+      if (incoming === null) return null;
+      if (current === undefined) return incoming;
+      if (current === null) return null;
+      return Math.max(Number(current) || 0, Number(incoming) || 0);
+  }
+
+  function mergeAccessConfig(baseConfig, nextConfig) {
+      const merged = { ...cloneDeep(baseConfig), ...cloneDeep(nextConfig) };
+      merged.executionLimits = { ...(baseConfig?.executionLimits || {}), ...(nextConfig?.executionLimits || {}) };
+      merged.timeLimits = { ...(baseConfig?.timeLimits || {}), ...(nextConfig?.timeLimits || {}) };
+      merged.throughputLimits = { ...(baseConfig?.throughputLimits || {}), ...(nextConfig?.throughputLimits || {}) };
+
+      merged.executionLimits.maxAttemptsPerSession = mergePermissionLimitValue(
+          baseConfig?.executionLimits?.maxAttemptsPerSession,
+          nextConfig?.executionLimits?.maxAttemptsPerSession
+      );
+      merged.timeLimits.maxSessionDurationMinutes = mergePermissionLimitValue(
+          baseConfig?.timeLimits?.maxSessionDurationMinutes,
+          nextConfig?.timeLimits?.maxSessionDurationMinutes
+      );
+      merged.throughputLimits.maxFetchVolumeKB = mergePermissionLimitValue(
+          baseConfig?.throughputLimits?.maxFetchVolumeKB,
+          nextConfig?.throughputLimits?.maxFetchVolumeKB
+      );
+
+      if (nextConfig?.accessType === 'full_access' || baseConfig?.accessType === 'full_access') merged.accessType = 'full_access';
+      if (nextConfig?.adminAccess === true || baseConfig?.adminAccess === true) merged.adminAccess = true;
+
+      return merged;
+  }
+
+  function mergeAccessProfilesForPreview(profiles) {
+      const list = Array.isArray(profiles) ? profiles.filter((p) => p && p.active !== false) : [];
+      if (!list.length) return null;
+      if (list.length === 1) return cloneDeep(list[0]);
+
+      const mergedSections = new Map();
+      const mergedCategorySet = new Set();
+
+      for (const profile of list) {
+          const categories = Array.isArray(profile?.adminCategories) ? profile.adminCategories : [];
+          categories.forEach((category) => {
+              const clean = String(category || '').trim();
+              if (clean) mergedCategorySet.add(clean);
+          });
+
+          const sections = Array.isArray(profile?.sections) ? profile.sections : [];
+          for (const section of sections) {
+              const sectionId = String(section?.sectionId || '').trim();
+              if (!sectionId) continue;
+
+              if (!mergedSections.has(sectionId)) {
+                  mergedSections.set(sectionId, { ...cloneDeep(section), sectionId, operations: [] });
+              } else {
+                  const currentSection = mergedSections.get(sectionId);
+                  mergedSections.set(sectionId, {
+                      ...mergeAccessConfig(currentSection, section),
+                      sectionId,
+                      operations: Array.isArray(currentSection.operations) ? currentSection.operations : []
+                  });
+              }
+
+              const targetSection = mergedSections.get(sectionId);
+              if (section?.adminAccess === true || targetSection?.adminAccess === true) {
+                  targetSection.adminAccess = true;
+                  targetSection.operations = [];
+                  continue;
+              }
+
+              const opMap = new Map(
+                  (Array.isArray(targetSection.operations) ? targetSection.operations : [])
+                    .map((op) => [String(op.operationId || ''), op])
+              );
+              const incomingOps = Array.isArray(section?.operations) ? section.operations : [];
+              for (const operation of incomingOps) {
+                  const operationId = String(operation?.operationId || '').trim();
+                  if (!operationId) continue;
+
+                  const currentOp = opMap.get(operationId);
+                  if (!currentOp) {
+                      opMap.set(operationId, { ...cloneDeep(operation), operationId });
+                      continue;
+                  }
+
+                  const currentScope = Number(scopeLevelMap.get(String(currentOp.scopeId || '')) || 0);
+                  const nextScope = Number(scopeLevelMap.get(String(operation.scopeId || '')) || 0);
+                  const preferred = nextScope > currentScope ? operation : currentOp;
+                  const mergedOp = mergeAccessConfig(currentOp, operation);
+                  mergedOp.operationId = operationId;
+                  mergedOp.scopeId = String(preferred?.scopeId || currentOp.scopeId || operation.scopeId || '');
+                  opMap.set(operationId, mergedOp);
+              }
+              targetSection.operations = Array.from(opMap.values());
+          }
+      }
+
+      return {
+          id: `MERGED_${list.map((p) => String(p.id || '')).filter(Boolean).join('_')}`,
+          name: list.map((p) => p.name).filter(Boolean).join(' + ') || 'Merged Access Profile',
+          description: `Merged from ${list.length} local access profiles.`,
+          active: true,
+          fullAdmin: list.some((p) => p?.fullAdmin === true),
+          adminCategories: Array.from(mergedCategorySet).filter(Boolean),
+          sections: Array.from(mergedSections.values())
+      };
+  }
+
+  function formatScopeName(scopeId) {
+      if (!scopeId) return 'Default';
+      const scope = scopeMap.get(String(scopeId));
+      return scope ? `${scope.name} (${scope.id})` : scopeId;
+  }
+
+  function formatLimit(value, suffix = '') {
+      if (value === null) return 'Unlimited';
+      if (value === undefined || value === '') return 'Default';
+      return `${value}${suffix}`;
+  }
+
+  function renderPersonRoleSummary() {
+      if (!personRoleSummary) return;
+      if (!Array.isArray(personOrgs) || !personOrgs.length) {
+          personRoleSummary.innerHTML = '<div class="text-muted small">No linked person is selected, or the person has no organization memberships yet.</div>';
+          return;
+      }
+
+      const roleSet = new Set();
+      const orgCards = personOrgs.map((org) => {
+          const roles = Array.isArray(org.roles) && org.roles.length ? org.roles : [org.role || 'member'];
+          const normalizedRoles = roles
+            .map((role) => String(role || '').trim().toLowerCase())
+            .filter(Boolean)
+            .filter((role, idx, arr) => arr.indexOf(role) === idx);
+          const safeRoles = normalizedRoles.length ? normalizedRoles : ['member'];
+          safeRoles.forEach((role) => roleSet.add(role));
+          const badges = safeRoles.map((role) => `<span class="badge bg-light text-dark border me-1 mb-1">${role}</span>`).join('');
+          return `
+            <div class="border rounded p-2 bg-white">
+              <div class="fw-bold text-dark">${resolveOrgName(org)}</div>
+              <div class="small text-muted mb-1">Organization ID: ${org.orgId || '-'}</div>
+              <div>${badges}</div>
+            </div>
+          `;
+      }).join('');
+
+      const aggregate = Array.from(roleSet).map((role) => `<span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1 mb-1">${role}</span>`).join('');
+      personRoleSummary.innerHTML = `
+        <div class="mb-3">
+          <div class="small text-muted mb-1">All current roles</div>
+          <div>${aggregate}</div>
+        </div>
+        <div class="d-grid gap-2">${orgCards}</div>
+      `;
+  }
+
+  function renderOrgTable() {
+      orgTableBody.innerHTML = '';
+      
+      const currentPrimary = primarySelect.value;
+      primarySelect.innerHTML = '<option value="">Auto / First Organization</option>';
+      
+      if (currentOrgsState.length === 0) {
+          orgTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-5 text-muted bg-light">No organizations found for this person.</td></tr>';
+          return;
+      }
+
+      currentOrgsState.forEach((org, idx) => {
+          const roleBadges = (Array.isArray(org.roles) && org.roles.length ? org.roles : [org.role || 'member'])
+            .map(r => `<span class="badge bg-light text-dark border me-1">${r}</span>`)
+            .join('');
+          // Update Select
+          const opt = document.createElement('option');
+          opt.value = org.orgId;
+          opt.textContent = `${org.name} (#${org.orgId})`;
+          primarySelect.appendChild(opt);
+
+          // Render Row
+          const tr = document.createElement('tr');
+          
+          let profilesHtml = '<span class="text-muted small fst-italic">No access assigned.</span>';
+          const directProfileIds = getDirectProfileIdsClient(org);
+          const managedEntries = normalizeManagedProfilesClient(org?.managedAccessProfiles || []);
+          const hasDirectProfile = directProfileIds.length > 0;
+          const hasManagedProfile = managedEntries.length > 0;
+          const hasMergedPreview = directProfileIds.length > 1;
+          
+          if (hasDirectProfile || hasManagedProfile) {
+             const directHtml = hasDirectProfile
+               ? `<div class="d-flex flex-column gap-2">${directProfileIds.map((pid) => {
+                   const profile = accessMap.get(pid);
+                   if (profile) {
+                       const isGlobal = !profile.orgId;
+                       const sectionCount = (profile.sections || []).length;
+                       const shortDesc = profile.description ? (profile.description.substring(0, 60) + (profile.description.length > 60 ? '...' : '')) : 'No description';
+                       return `
+                          <div class="d-flex align-items-center p-2 border rounded bg-white shadow-sm position-relative" style="max-width: 420px;">
+                              <div class="me-3 text-primary">
+                                  <i class="bi bi-shield-lock-fill fs-3"></i>
+                              </div>
+                              <div class="flex-grow-1" style="line-height: 1.2;">
+                                  <div class="fw-bold text-dark d-flex align-items-center">
+                                      ${profile.name}
+                                      ${isGlobal
+                                         ? '<span class="badge bg-secondary ms-2" style="font-size:0.6rem;">GLOBAL</span>'
+                                         : '<span class="badge bg-info text-dark ms-2" style="font-size:0.6rem;">ORG SPECIFIC</span>'}
+                                  </div>
+                                  <div class="text-muted x-small mt-1" title="${profile.description || ''}">${shortDesc}</div>
+                                  <div class="x-small text-secondary mt-1">
+                                      <i class="bi bi-layers-half me-1"></i>${sectionCount} Sections configured
+                                  </div>
+                              </div>
+                              <button type="button" class="btn btn-link text-danger position-absolute top-0 end-0 p-1 remove-profile" data-org-idx="${idx}" data-profile-id="${pid}" title="Remove Access">
+                                  <i class="bi bi-x-circle-fill"></i>
+                              </button>
+                          </div>
+                       `;
+                   }
+                   return `<span class="badge bg-danger">Unknown Profile (${pid}) <i class="bi bi-x cursor-pointer ms-1 remove-profile" data-org-idx="${idx}" data-profile-id="${pid}"></i></span>`;
+               }).join('')}</div>`
+               : '<span class="text-muted small fst-italic">No direct profiles.</span>';
+
+             const managedHtml = hasManagedProfile
+               ? `<div class="mt-3">
+                    <div class="small text-muted fw-bold mb-1">Externally Managed (Locked)</div>
+                    <div class="d-flex flex-column gap-2">${managedEntries.map((entry) => {
+                      const pid = String(entry.profileId || '').trim();
+                      const profile = accessMap.get(pid);
+                      const title = profile ? profile.name : pid;
+                      const sourceLabel = String(entry.sourceLabel || entry.sourceRefId || entry.sourceType || 'External').trim();
+                      return `
+                        <div class="d-flex align-items-center p-2 border rounded bg-light">
+                          <div class="me-3 text-secondary">
+                            <i class="bi bi-lock-fill fs-5"></i>
+                          </div>
+                          <div class="flex-grow-1" style="line-height: 1.2;">
+                            <div class="fw-bold text-dark">${escapeHtml(title)}</div>
+                            <div class="x-small text-muted">${escapeHtml(pid)}</div>
+                            <div class="x-small text-secondary mt-1">Source: ${escapeHtml(sourceLabel)}</div>
+                          </div>
+                          <span class="badge bg-secondary">LOCKED</span>
+                        </div>
+                      `;
+                    }).join('')}</div>
+                  </div>`
+               : '';
+
+             profilesHtml = `${directHtml}${managedHtml}`;
+          }
+
+          tr.innerHTML = `
+             <td>
+                <div class="fw-bold text-dark">${org.name}</div>
+                <div class="text-muted x-small">ID: ${org.orgId}</div>
+             </td>
+             <td>
+                <div class="small">${roleBadges}</div>
+                <span class="badge bg-light text-secondary border">${org.memberStatus}</span>
+             </td>
+             <td>${profilesHtml}</td>
+             <td class="text-end">
+                ${hasMergedPreview ? `<button type="button" class="btn btn-sm btn-outline-info me-2 view-merged-btn" data-org-idx="${idx}"><i class="bi bi-diagram-3"></i> Merge</button>` : ''}
+                <button type="button" class="btn btn-sm btn-outline-primary btn-filled add-profile-btn" data-org-idx="${idx}">
+                    <i class="bi bi-plus-lg"></i> ${hasDirectProfile ? 'Add Another' : 'Add'}
+                </button>
+             </td>
+           `;
+          orgTableBody.appendChild(tr);
+      });
+      
+      if (currentOrgsState.some(o => String(o.orgId) === String(currentPrimary))) {
+          primarySelect.value = currentPrimary;
+      }
+      orgsHiddenInput.value = JSON.stringify(currentOrgsState);
+  }
+
+  // --- LISTENERS ---
+  
+  // 1. Remove Profile
+  orgTableBody.addEventListener('click', (e) => {
+      const mergeBtn = e.target.closest('.view-merged-btn');
+      if (mergeBtn) {
+          const orgIdx = parseInt(mergeBtn.dataset.orgIdx, 10);
+          renderMergedAccessPreview(currentOrgsState[orgIdx]);
+          return;
+      }
+
+      if (e.target.closest('.remove-profile')) {
+          const btn = e.target.closest('.remove-profile');
+          const orgIdx = parseInt(btn.dataset.orgIdx);
+          const profileId = String(btn.dataset.profileId || '').trim();
+          const existingIds = getDirectProfileIdsClient(currentOrgsState[orgIdx]);
+          currentOrgsState[orgIdx].directAccessProfileIds = existingIds.filter((id) => String(id) !== profileId);
+          syncOrgEffectiveProfileIds(currentOrgsState[orgIdx]);
+          renderOrgTable();
+      }
+  });
+
+  // 2. Add Profile (Org Level)
+  orgTableBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('.add-profile-btn');
+      if (btn) {
+          const orgIdx = parseInt(btn.dataset.orgIdx);
+          const targetOrg = currentOrgsState[orgIdx];
+
+          GenericPicker.open(GenericPickerPresets.accessProfile({
+              title: `Assign Access to ${targetOrg.name}`,
+              context: GenericPickerContexts.orgScope(targetOrg, { label: 'Target Organization' }),
+              onSelect: async (item) => {
+                  // Check Org Match
+                  if (!item.orgId) {
+                      await showMessageModal({
+                        title: 'Organization Mismatch',
+                        message: `Cannot assign this profile. <br><br>The profile <b>${item.name}</b> is a <b>Global</b> profile and does not belong to <b>${targetOrg.name}</b>.<br>Please select a profile created for Organization ID <b>${targetOrg.orgId}</b>.`,
+                        icon: 'warning',
+                        buttons: [{ text: 'OK', class: 'btn-warning' }]
+                      });
+                      return;
+                  } else if (String(item.orgId) !== String(targetOrg.orgId)) {
+                      await showMessageModal({
+                        title: 'Organization Mismatch',
+                        message: `Cannot assign this profile. <br><br>The profile <b>${item.name}</b> belongs to Organization ID <b>${item.orgId}</b>.<br>Please select a profile belonging to <b>${targetOrg.name}</b> (Organization ID <b>${targetOrg.orgId}</b>).`,
+                        icon: 'warning',
+                        buttons: [{ text: 'OK', class: 'btn-warning' }]
+                      });
+                      return;
+                  }
+
+                  const currentIds = getDirectProfileIdsClient(targetOrg).slice();
+                  const managedIds = new Set(getManagedProfileIdsClient(targetOrg));
+                  if (managedIds.has(String(item.id))) {
+                      await showMessageModal({
+                        title: 'Locked by External Source',
+                        message: `The profile <b>${item.name}</b> is managed by another module and cannot be edited from the Users form.`,
+                        icon: 'warning',
+                        buttons: [{ text: 'OK', class: 'btn-warning' }]
+                      });
+                      return;
+                  }
+                  if (currentIds.some((id) => String(id) === String(item.id))) {
+                      await showMessageModal({
+                        title: 'Already Assigned',
+                        message: `The profile <b>${item.name}</b> is already assigned to <b>${targetOrg.name}</b>.`,
+                        icon: 'info',
+                        buttons: [{ text: 'OK', class: 'btn-primary' }]
+                      });
+                      return;
+                  }
+
+                  currentIds.push(item.id);
+                  targetOrg.directAccessProfileIds = currentIds;
+                  syncOrgEffectiveProfileIds(targetOrg);
+                  renderOrgTable();
+              }
+          }));
+      }
+  });
+
+  // 3. Person Picker
+  const personPickerBtn = document.getElementById('openPersonPickerBtn');
+  const personIdInput = document.getElementById('selectedPersonId');
+  const personNameInput = document.getElementById('selectedPersonName');
+  const clearPersonBtn = document.getElementById('clearPersonBtn');
+
+  if (personPickerBtn) {
+      personPickerBtn.addEventListener('click', () => {
+          GenericPicker.open(GenericPickerPresets.person({
+              title: 'Select Person',
+              placeholder: 'Search for person...',
+              context: GenericPickerContexts.activeOrganizationScope(),
+              onSelect: async (item) => {
+                  try {
+                      const resp = await fetch(`/users/check-person/${item.id}`);
+                      const data = await resp.json();
+                      
+                      if (data.status === 'success' && data.exists) {
+                          await showMessageModal({
+                             title: 'User Already Assigned', 
+                             message: `User (ID: ${item.id}) already has a linked User Account.<br>One person cannot have multiple user accounts.`, 
+                             icon: 'warning', 
+                             buttons: [{ text: 'OK', class: 'btn-warning' }] 
+                          });
+                          return;
+                      }
+                      
+                      personIdInput.value = item.id;
+                      personNameInput.value = `${item.name.first} ${item.name.last} (${item.id})`;
+
+                      if (item.organizations) {
+                          personOrgs = item.organizations;
+                          mergeOrgData();
+                      } else {
+                          personOrgs = [];
+                          mergeOrgData();
+                      }
+
+                  } catch(e) { console.error(e); }
+              }
+          }));
+      });
+      
+      clearPersonBtn.addEventListener('click', () => {
+          personIdInput.value = "";
+          personNameInput.value = "";
+          personOrgs = [];
+          mergeOrgData();
+      });
+  }
+
+  mergeOrgData();
+  
+  document.getElementById('refreshOrgsBtn').addEventListener('click', () => {
+      mergeOrgData();
+  });
+
+  // Submit Logic
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      if (!form.checkValidity()) {
+        e.preventDefault();
+        e.stopPropagation();
+        const firstInvalid = form.querySelector(':invalid');
+        if (firstInvalid) {
+            const tabPane = firstInvalid.closest('.tab-pane');
+            if (tabPane) {
+                const tabButton = document.querySelector(`button[data-bs-target="#${tabPane.id}"]`);
+                if (tabButton) bootstrap.Tab.getOrCreateInstance(tabButton).show();
+            }
+            setTimeout(() => { firstInvalid.focus(); firstInvalid.reportValidity(); }, 200);
+        }
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+      if (isFormBusy) return;
+      isFormBusy = true;
+      setButtonBusy(saveActionBtn, 'Saving...');
+      if (cancelActionBtn) cancelActionBtn.disabled = true;
+      
+      orgsHiddenInput.value = JSON.stringify(currentOrgsState);
+      const formData = new FormData(form);
+      if (document.getElementById('activeCheck')) formData.set('active', document.getElementById('activeCheck').checked ? 'true' : 'false');
+      if (document.getElementById('emailVerifiedCheck')) formData.set('isEmailVerified', document.getElementById('emailVerifiedCheck').checked ? 'true' : 'false');
+
+      let submitSucceeded = false;
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+          body: new URLSearchParams(formData).toString()
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          await showMessageModal({ title: 'Success', icon: 'success', message: result.message, buttons: [{ text: 'OK', class: 'btn-success' }] });
+          submitSucceeded = true;
+          window.location.href = '/users';
+        } else {
+          await showMessageModal({ title: 'Error', icon: 'error', message: result.message, buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        }
+      } catch (error) {
+        console.error(error);
+        await showMessageModal({ title: 'Error', icon: 'error', message: 'Unexpected error occurred.', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+      } finally {
+        if (!submitSucceeded) restoreFormActionButtons();
+      }
+    });
+  }
+});
+</script>
+<style>
+    .cursor-pointer { cursor: pointer; }
+</style>
+

@@ -1,0 +1,93 @@
+<%- include('../partials/tablePages-start', {
+  title: 'Organization Contracts',
+  newUrl: 'contracts', 
+  newLabel: 'New Contract',
+  user,
+  tableName: 'Contracts_List',
+  btn_export: true,
+  print: true
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search contracts...',
+  fields: [
+      { name: 'status', label: 'Status', type: 'select', options: ['active','draft','expired','cancelled'] },
+      { name: 'type', label: 'Type', type: 'text' }
+  ]
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="main-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Title / ID</th>
+        <th>Organization</th>
+        <th>Type</th>
+        <th>Validity Period</th>
+        <th class="text-center">Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if(data.length === 0) { %>
+         <tr><td colspan="6" class="text-center py-4 text-muted">No contracts found.</td></tr>
+      <% } %>
+      
+      <% data.forEach(item => { %>
+        <tr>
+          <td class="ps-4">
+             <div class="fw-bold text-dark"><%= item.title %></div>
+             <div class="x-small text-muted font-monospace"><%= item.id %></div>
+          </td>
+          
+          <td>
+             <div class="d-flex align-items-center gap-2">
+                 <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center text-primary" style="width:32px;height:32px;">
+                    <i class="bi bi-building"></i>
+                 </div>
+                 <div class="fw-bold text-dark small"><%= item.orgName %></div>
+             </div>
+          </td>
+
+          <td><span class="badge bg-light text-secondary border"><%= item.type %></span></td>
+
+          <td>
+             <div class="small">
+                <% if(item.startDate) { %>
+                    <%= item.startDate %> <i class="bi bi-arrow-right mx-1 text-muted"></i> <%= item.endDate || 'No Expiry' %>
+                <% } else { %>
+                    <span class="text-muted fst-italic">Not scheduled</span>
+                <% } %>
+             </div>
+          </td>
+
+          <td class="text-center">
+             <% 
+               let badge = 'bg-secondary';
+               if(item.status === 'active') badge = 'bg-success';
+               if(item.status === 'draft') badge = 'bg-warning text-dark';
+               if(item.status === 'expired') badge = 'bg-danger';
+             %>
+             <span class="badge <%= badge %>"><%= (item.status || 'unknown').toUpperCase() %></span>
+          </td>
+
+          <td class="table-actions">
+             <a href="/contracts/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+             <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          
+            </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="contracts" hidden></span>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: 'contracts' 
+}) %>
+
+<%- include('../partials/tablePages-end') %>

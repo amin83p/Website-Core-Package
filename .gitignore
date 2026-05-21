@@ -1,0 +1,5 @@
+node_modules/
+/uploads/
+/data/pte/*.report.json
+/data/pte/*migration*.json
+.env

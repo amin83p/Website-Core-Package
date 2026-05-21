@@ -1,0 +1,22 @@
+[
+  {
+    "userId": "1",
+    "allowedHours": {
+      "startTime": "00:00",
+      "endTime": "23:59",
+      "maxDailyHours": 8,
+      "maxWeeklyHours": 40,
+      "allowedDays": [0, 1, 2, 3, 4, 5, 6, 7]
+    }
+  },
+  {
+    "userId": "6",
+    "allowedHours": {
+      "startTime": "14:00",
+      "endTime": "15:00",
+      "maxDailyHours": 6,
+      "maxWeeklyHours": 30,
+      "allowedDays": [1, 2, 3]
+    }
+  }
+]

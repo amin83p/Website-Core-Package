@@ -1,0 +1,734 @@
+<style>
+    .att-cell { text-align: center; vertical-align: middle; min-width: 80px; position: relative; cursor: pointer; transition: background-color 0.2s; }
+    .att-cell:hover { background-color: #f1f3f5; }
+    
+    .status-present { color: #198754; font-weight: bold; }
+    .status-late { color: #ffc107; font-weight: bold; }
+    .status-excused { color: #0dcaf0; font-weight: bold; }
+    .status-absent { color: #dc3545; font-weight: bold; }
+    .status-na { color: #adb5bd; }
+    
+    .matrix-wrapper { max-height: 600px; overflow: auto; border: 1px solid #dee2e6; border-radius: 6px; }
+    .matrix-table th { position: sticky; top: 0; background-color: #f8f9fa; z-index: 2; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); }
+    /* Sticky rollup + student name columns */
+    .matrix-table th.matrix-sticky-rollup,
+    .matrix-table td.matrix-sticky-rollup {
+      position: sticky;
+      left: 0;
+      z-index: 3;
+      border-right: 1px solid #dee2e6;
+      background-color: #f8f9fa;
+      width: 96px;
+      min-width: 96px;
+      max-width: 96px;
+      vertical-align: middle;
+    }
+    .matrix-table td.matrix-sticky-rollup { background-color: #fff; z-index: 2; }
+    .matrix-table th.matrix-sticky-name,
+    .matrix-table td.matrix-sticky-name {
+      position: sticky;
+      left: 96px;
+      z-index: 3;
+      border-right: 2px solid #dee2e6;
+      background-color: #f8f9fa;
+      box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06);
+    }
+    .matrix-table td.matrix-sticky-name {
+      background-color: #fff;
+      z-index: 2;
+      font-weight: bold;
+    }
+
+    /* Comment Thread CSS */
+    .comment-thread { max-height: 300px; overflow-y: auto; background: #f8f9fa; border-radius: 6px; padding: 10px; }
+    .comment-bubble { background: #fff; border: 1px solid #e9ecef; border-radius: 8px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .comment-author { font-weight: bold; font-size: 0.8rem; color: #495057; }
+    .comment-time { font-size: 0.7rem; color: #adb5bd; float: right; }
+    .mention-badge { background-color: #e7f1ff; color: #0d6efd; font-size: 0.75rem; padding: 2px 6px; border-radius: 12px; font-weight: bold; border: 1px solid #b6d4fe; }
+</style>
+
+<div class="sections-page">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-grid-3x3 me-2"></i> Attendance Matrix</h1>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
+            <% if (typeof canManageAttendanceMatrixPolicy !== 'undefined' && canManageAttendanceMatrixPolicy) { %>
+            <a href="/school/attendances/settings" class="btn btn-outline-primary btn-md mb-2">
+                <i class="bi bi-sliders me-1"></i> Matrix thresholds
+            </a>
+            <% } %>
+            <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2">
+                <i class="bi bi-speedometer2 me-1"></i> Dashboard
+            </a>
+        </div>
+    </div>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body bg-light rounded">
+            <div class="row align-items-end g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Select Class</label>
+                    <div class="input-group">
+                        <input type="hidden" id="filter_classId">
+                        <input type="text" id="filter_className" class="form-control bg-white" placeholder="Search Class..." readonly>
+                        <button type="button" class="btn btn-outline-primary" id="btn_openClassPicker"><i class="bi bi-search"></i></button>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Start Date</label>
+                    <input type="date" id="filter_startDate" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">End Date</label>
+                    <input type="date" id="filter_endDate" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <button type="button" id="btn_loadData" class="btn btn-primary w-100 fw-bold">Load Matrix</button>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="today">Today</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="twoWeeks">Two Weeks</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="thisWeek">This Week</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="prevWeek">Prev Week</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="thisMonth">This Month</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="prevMonth">Prev Month</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="allTime">Whole Class Date (All Time)</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm d-none" id="resultsContainer">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+            <h5 class="m-0 fw-bold text-primary" id="lbl_displayClassName">Class Name</h5>
+            <div class="small text-muted text-md-end">
+                <span class="me-3"><i class="bi bi-check-circle-fill text-success"></i> Present</span>
+                <span class="me-3"><i class="bi bi-clock-fill text-warning"></i> Late</span>
+                <span class="me-3"><i class="bi bi-envelope-paper-fill text-info"></i> Excused</span>
+                <span class="me-3"><i class="bi bi-x-circle-fill text-danger"></i> Absent</span>
+                <span class="me-3"><i class="bi bi-percent text-secondary"></i> Rollup % = time-based credit (see column header)</span>
+                <span><i class="bi bi-chat-dots-fill text-primary"></i> Notes Exist</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="matrix-wrapper">
+                <table class="table table-hover mb-0 matrix-table" id="attendanceTable">
+                    <thead><tr id="matrixHeaders"></tr></thead>
+                    <tbody id="matrixBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cellDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-person-badge me-2"></i> Attendance Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                
+                <input type="hidden" id="modal_classId">
+                <input type="hidden" id="modal_sessionId">
+                <input type="hidden" id="modal_personId">
+
+                <div class="mb-3 pb-3 border-bottom">
+                    <h5 class="fw-bold mb-1" id="det_studentName">Student Name</h5>
+                    <div class="text-muted small" id="det_date">Date</div>
+                    <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_lock_notice">This session is locked. Attendance cannot be changed unless an administrator unlocks it or overrides the lock.</p>
+                </div>
+
+                <fieldset id="fieldset_cell_attendance" class="border-0 p-0 m-0 mb-4">
+                    <legend class="fw-bold small text-secondary mb-2">Attendance</legend>
+                    <div class="btn-group btn-group-sm flex-wrap mb-3" role="group" aria-label="Attendance status">
+                        <input type="radio" class="btn-check" name="modal_cell_attendance" id="modal_att_present" value="present">
+                        <label class="btn btn-outline-success" for="modal_att_present" title="Present"><i class="bi bi-check-lg me-1"></i>Present</label>
+                        <input type="radio" class="btn-check" name="modal_cell_attendance" id="modal_att_late" value="late">
+                        <label class="btn btn-outline-warning text-dark" for="modal_att_late" title="Late"><i class="bi bi-clock-history me-1"></i>Late</label>
+                        <input type="radio" class="btn-check" name="modal_cell_attendance" id="modal_att_excused" value="excused">
+                        <label class="btn btn-outline-info text-dark" for="modal_att_excused" title="Excused"><i class="bi bi-envelope-paper me-1"></i>Excused</label>
+                        <input type="radio" class="btn-check" name="modal_cell_attendance" id="modal_att_absent" value="absent">
+                        <label class="btn btn-outline-danger" for="modal_att_absent" title="Absent"><i class="bi bi-x-lg me-1"></i>Absent</label>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small mb-0">Late arrival (mins)</label>
+                            <input type="number" class="form-control form-control-sm" id="inp_cellLateMins" placeholder="0" min="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small mb-0">Left early (mins)</label>
+                            <input type="number" class="form-control form-control-sm" id="inp_cellLeaveMins" placeholder="0" min="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small mb-0">Excuse / file link</label>
+                            <input type="text" class="form-control form-control-sm" id="inp_cellExcuseRef" placeholder="URL">
+                        </div>
+                    </div>
+
+                    <div class="mb-3 d-none" id="det_sessionLevelNote_wrap">
+                        <label class="fw-bold small text-secondary">Session note (whole class)</label>
+                        <div class="p-2 rounded bg-light border small text-muted" id="det_sessionLevelNote"></div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="fw-bold small text-secondary" for="inp_rosterStudentNote">Student note (on roster)</label>
+                        <textarea class="form-control form-control-sm" id="inp_rosterStudentNote" rows="2" placeholder="Optional note for this student on this session"></textarea>
+                    </div>
+                </fieldset>
+
+                <div class="mb-3">
+                    <label class="fw-bold text-primary"><i class="bi bi-chat-text me-1"></i> Admin Discussion</label>
+                    <div class="comment-thread mb-3" id="det_commentsThread">
+                        </div>
+
+                    <div class="border rounded p-2 bg-white">
+                        <div class="d-flex flex-wrap gap-1 mb-2" id="pendingMentionsArea"></div>
+                        <textarea class="form-control border-0 bg-transparent p-0 mb-2" id="inp_newComment" rows="2" placeholder="Write a note..."></textarea>
+                        <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                            <button class="btn btn-sm btn-outline-secondary" id="btn_mentionUser"><i class="bi bi-at"></i> Tag User</button>
+                            <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment">Save Note</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <% if (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) { %>
+                <button type="button" class="btn btn-primary fw-bold" id="btn_saveAttendance">Save attendance</button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+// Store the loaded matrix globally so we can access it on clicks
+window.currentMatrixData = null;
+let currentMentions = [];
+let detailsModalInstance = null;
+
+window.ATTENDANCE_PAGE_INITIAL = <%- JSON.stringify({
+    classId: typeof initialClassId !== 'undefined' ? initialClassId : '',
+    className: typeof initialClassName !== 'undefined' ? initialClassName : '',
+    startDate: typeof initialStartDate !== 'undefined' ? initialStartDate : '',
+    endDate: typeof initialEndDate !== 'undefined' ? initialEndDate : '',
+    studentId: typeof initialStudentId !== 'undefined' ? initialStudentId : '',
+    sessionId: typeof initialSessionId !== 'undefined' ? initialSessionId : '',
+    range: typeof initialRange !== 'undefined' ? initialRange : ''
+}) %>;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+    window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
+    window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
+
+    if (typeof bootstrap !== 'undefined') {
+        detailsModalInstance = new bootstrap.Modal(document.getElementById('cellDetailsModal'));
+    }
+
+    // --- 1. Date Range Logic (local calendar dates for YYYY-MM-DD inputs) ---
+    const toYmd = (d) => {
+        if (!d) return '';
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+    const setDateRange = (start, end) => {
+        document.getElementById('filter_startDate').value = start ? toYmd(start) : '';
+        document.getElementById('filter_endDate').value = end ? toYmd(end) : '';
+    };
+    const startOfLocalDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    document.querySelectorAll('.btn-range').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const range = e.currentTarget.getAttribute('data-range');
+            const today = new Date();
+            let start;
+            let end;
+
+            if (range === 'today') {
+                start = startOfLocalDay(today);
+                end = new Date(start);
+            } else if (range === 'twoWeeks') {
+                const day = today.getDay() || 7;
+                start = startOfLocalDay(today);
+                start.setDate(today.getDate() - (day - 1));
+                end = new Date(start);
+                end.setDate(start.getDate() + 13);
+            } else if (range === 'thisWeek') {
+                const day = today.getDay() || 7;
+                start = startOfLocalDay(today);
+                start.setDate(today.getDate() - (day - 1));
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+            } else if (range === 'prevWeek') {
+                const day = today.getDay() || 7;
+                start = startOfLocalDay(today);
+                start.setDate(today.getDate() - (day - 1) - 7);
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+            } else if (range === 'thisMonth') {
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            } else if (range === 'prevMonth') {
+                start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                end = new Date(today.getFullYear(), today.getMonth(), 0);
+            } else if (range === 'allTime') {
+                setDateRange(null, null);
+                if (document.getElementById('filter_classId').value) document.getElementById('btn_loadData').click();
+                return;
+            } else {
+                return;
+            }
+
+            setDateRange(start, end);
+            if (document.getElementById('filter_classId').value) document.getElementById('btn_loadData').click();
+        });
+    });
+
+    // --- 2. Pickers ---
+    const btnPicker = document.getElementById('btn_openClassPicker');
+    if (btnPicker) {
+        btnPicker.addEventListener('click', () => {
+            GenericPicker.open(GenericPickerPresets.class({
+                title: 'Select Class',
+                icon: 'bi-book',
+                onSelect: (item) => {
+                    document.getElementById('filter_classId').value = item.id;
+                    document.getElementById('filter_className').value = item.title || item.id;
+                    document.getElementById('btn_loadData').click();
+                }
+            }));
+        });
+    }
+
+    document.getElementById('btn_mentionUser').addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.user({
+            title: 'Tag User',
+            icon: 'bi-at',
+            apiEndpoint: '/chat/users/search',
+            placeholder: 'Search for a user...',
+            onSelect: (item) => {
+                const name = item.name || item.email || item.id;
+                if (item.id && item.id !== 'undefined' && !currentMentions.find(m => m.id === item.id)) {
+                    currentMentions.push({ id: item.id, name: name });
+                    renderMentions();
+                } else if (!item.id || item.id === 'undefined') {
+                    alert("Error: Could not retrieve a valid Person ID.");
+                }
+            }
+        }));
+    });
+
+    function renderMentions() {
+        const area = document.getElementById('pendingMentionsArea');
+        area.innerHTML = '';
+        currentMentions.forEach(m => {
+            area.innerHTML += `<span class="mention-badge shadow-sm">@${m.name} <i class="bi bi-x-circle ms-1" style="cursor:pointer;" onclick="removeMention('${m.id}')"></i></span>`;
+        });
+    }
+    
+    window.removeMention = (id) => {
+        currentMentions = currentMentions.filter(m => m.id !== id);
+        renderMentions();
+    };
+
+    // --- 3. Render Engine ---
+    document.getElementById('btn_loadData').addEventListener('click', async () => {
+        const classId = document.getElementById('filter_classId').value;
+        const startDate = document.getElementById('filter_startDate').value;
+        const endDate = document.getElementById('filter_endDate').value;
+
+        if (!classId) return; 
+
+        const btn = document.getElementById('btn_loadData');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        btn.disabled = true;
+
+        try {
+            const url = `/school/attendances/api/data?classId=${classId}&startDate=${startDate}&endDate=${endDate}`;
+            const res = await fetch(url, { cache: 'no-store', headers: { 'X-AJAX-Request': 'true' } });
+            const result = await res.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(result, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
+                : { stop: false };
+            if (guarded.stop) return;
+            
+            if (result.status !== 'success') throw new Error(result.message);
+            
+            window.currentMatrixData = result;
+            document.getElementById('resultsContainer').classList.remove('d-none');
+            
+            document.getElementById('filter_className').value = result.className || 'Loaded Class';
+            document.getElementById('lbl_displayClassName').innerText = result.className || 'Class Attendance';
+
+            const headers = document.getElementById('matrixHeaders');
+            const tbody = document.getElementById('matrixBody');
+            headers.innerHTML = ''; tbody.innerHTML = '';
+
+            const ap = result.attendancePolicy || {};
+            const policyTitle = [
+              `Scheduled ${ap.scheduledMinutes ?? 180} min/session`,
+              `late ≥ ${ap.disqualifyLateMinutes ?? 30} min → 0%`,
+              `early leave ≥ ${ap.disqualifyEarlyLeaveMinutes ?? 30} min → 0%`,
+              ap.disqualifyCombinedMissedMinutes != null
+                ? `combined late+leave ≥ ${ap.disqualifyCombinedMissedMinutes} min → 0%`
+                : null
+            ].filter(Boolean).join(' · ');
+
+            let headerHtml = `
+              <th class="matrix-sticky-rollup text-center small px-2 py-2" title="${policyTitle.replace(/"/g, '&quot;')}">
+                <div class="fw-bold text-secondary">Rollup</div>
+                <div class="text-muted" style="font-size: 0.68rem; line-height: 1.2;">P / A / %</div>
+              </th>
+              <th style="min-width: 220px;" class="ps-3 matrix-sticky-name">Student Name</th>`;
+            if (result.sessions.length === 0) {
+                headerHtml += `<th>Status</th>`;
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-5 text-muted">No active sessions found in this date range.</td></tr>`;
+                headers.innerHTML = headerHtml;
+                return;
+            }
+
+            result.sessions.forEach(s => {
+                const d = new Date(s.date + 'T00:00:00');
+                const shortDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                // UPDATED: Added clickable styling and onclick event to open Session Manager
+                headerHtml += `<th class="att-cell text-primary small fw-bold text-decoration-underline" style="cursor:pointer;" title="Click to open Session Manager" onclick="confirmOpenSession('${classId}', '${s.id}')">${shortDate}</th>`;
+            });
+            headers.innerHTML = headerHtml;
+
+            if (result.matrix.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${result.sessions.length + 2}" class="text-center py-5 text-muted">No students found.</td></tr>`;
+                return;
+            }
+
+            result.matrix.forEach(stu => {
+                const s = stu.summary || {};
+                const p = Number(s.totalPresentSessions) || 0;
+                const a = Number(s.totalAbsentSessions) || 0;
+                const pct = s.performancePercent;
+                const pctStr = pct == null ? '—' : `${pct}%`;
+                const dq = Number(s.disqualifiedSessionCount) || 0;
+                const rollupTitle = [
+                  `Present (marked): ${p}`,
+                  `Absent: ${a}`,
+                  `Efficiency: ${pctStr}`,
+                  dq ? `Disqualified sessions (late/leave cutoffs): ${dq}` : null
+                ].filter(Boolean).join(' · ');
+
+                let rowHtml = `
+                  <td class="matrix-sticky-rollup px-2 py-2 text-center small" title="${rollupTitle.replace(/"/g, '&quot;')}">
+                    <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span></div>
+                    <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${pctStr}</div>
+                  </td>
+                  <td class="ps-3 matrix-sticky-name">${stu.name}</td>`;
+                
+                stu.records.forEach(rec => {
+                    let icon = '<i class="bi bi-dash status-na"></i>';
+                    let tooltip = 'No Record';
+
+                    if (rec.status === 'present') { icon = '<i class="bi bi-check-circle-fill status-present"></i>'; tooltip = 'Present'; }
+                    else if (rec.status === 'late') { icon = `<i class="bi bi-clock-fill status-late"></i>`; tooltip = `Late`; }
+                    else if (rec.status === 'excused') { icon = '<i class="bi bi-envelope-paper-fill status-excused"></i>'; tooltip = 'Excused'; }
+                    else if (rec.status === 'absent') { icon = '<i class="bi bi-x-circle-fill status-absent"></i>'; tooltip = 'Absent'; }
+
+                    // UPDATED: Badge now strictly checks the comments array (ignores general teacherNotes)
+                    const hasComments = (rec.comments && rec.comments.length > 0);
+                    const noteBadge = hasComments ? `<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>` : '';
+
+                    rowHtml += `
+                        <td class="att-cell" title="${tooltip} (Click for Details)" onclick="openInteractiveModal('${stu.personId}', '${rec.sessionId}')">
+                            ${icon}
+                            ${noteBadge}
+                        </td>
+                    `;
+                });
+                tbody.innerHTML += `<tr>${rowHtml}</tr>`;
+            });
+
+            // Auto-open logic
+            const currentUrlParams = new URLSearchParams(window.location.search);
+            const targetStudentId = currentUrlParams.get('studentId');
+            const targetSessionId = currentUrlParams.get('sessionId');
+
+            if (targetStudentId && targetSessionId) {
+                setTimeout(() => {
+                    openInteractiveModal(targetStudentId, targetSessionId);
+                    const cleanUrl = new URL(`${window.location.origin}/school/attendances`);
+                    cleanUrl.searchParams.set('classId', classId);
+                    if (startDate) cleanUrl.searchParams.set('startDate', startDate);
+                    if (endDate) cleanUrl.searchParams.set('endDate', endDate);
+                    window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search);
+                }, 200);
+            }
+
+        } catch (error) {
+            console.error(error);
+            if (typeof showMessageModal === 'function') {
+                showMessageModal({ title: 'Error', icon: 'error', message: error.message, buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+            } else { alert(error.message); }
+        } finally {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    });
+
+    // --- 4. Interactive Note Saving Logic ---
+    document.getElementById('btn_saveComment').addEventListener('click', async () => {
+        const classId = document.getElementById('modal_classId').value;
+        const sessionId = document.getElementById('modal_sessionId').value;
+        const personId = document.getElementById('modal_personId').value;
+        const text = document.getElementById('inp_newComment').value;
+
+        if (!text.trim()) return;
+
+        const btn = document.getElementById('btn_saveComment');
+        const origBtn = btn.innerHTML;
+        btn.innerHTML = 'Saving...'; btn.disabled = true;
+
+        try {
+            const payload = {
+                classId: classId,
+                sessionId: sessionId,
+                studentPersonId: personId,
+                text: text,
+                mentions: currentMentions,
+                actionStateId
+            };
+
+            const res = await fetch('/school/attendances/api/comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(result, { busyTitle: 'Save Comment In Progress', replayTitle: 'Comment Already Saved' })
+                : { stop: false };
+            if (guarded.stop) return;
+
+            if (result.status !== 'success') throw new Error(result.message);
+
+            document.getElementById('inp_newComment').value = '';
+            currentMentions = [];
+            renderMentions();
+            
+            document.getElementById('btn_loadData').click();
+
+            const thread = document.getElementById('det_commentsThread');
+            let mentionHtml = '';
+            result.comment.mentions.forEach(m => mentionHtml += `<span class="mention-badge me-1">@${m.name}</span>`);
+            thread.innerHTML += `
+                <div class="comment-bubble">
+                    <span class="comment-time">${new Date(result.comment.timestamp).toLocaleString()}</span>
+                    <div class="comment-author">${result.comment.authorName}</div>
+                    <div class="mt-1">${mentionHtml} ${result.comment.text}</div>
+                </div>
+            `;
+            thread.scrollTop = thread.scrollHeight;
+
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            btn.innerHTML = origBtn; btn.disabled = false;
+        }
+    });
+
+    const btnSaveAttendance = document.getElementById('btn_saveAttendance');
+    if (btnSaveAttendance) {
+        btnSaveAttendance.addEventListener('click', async () => {
+            const classId = document.getElementById('modal_classId').value;
+            const sessionId = document.getElementById('modal_sessionId').value;
+            const personId = document.getElementById('modal_personId').value;
+            const attendance = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value;
+            if (!attendance) {
+                if (typeof showMessageModal === 'function') {
+                    showMessageModal({ title: 'Attendance', icon: 'warning', message: 'Select a status (Present, Late, Excused, or Absent).', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+                } else { alert('Select an attendance status.'); }
+                return;
+            }
+
+            const btn = btnSaveAttendance;
+            const origBtn = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            btn.disabled = true;
+
+            try {
+                const payload = {
+                    classId,
+                    sessionId,
+                    studentPersonId: personId,
+                    attendance,
+                    lateMinutes: document.getElementById('inp_cellLateMins').value,
+                    earlyLeaveMinutes: document.getElementById('inp_cellLeaveMins').value,
+                    excuseRef: document.getElementById('inp_cellExcuseRef').value,
+                    notes: document.getElementById('inp_rosterStudentNote').value,
+                    actionStateId
+                };
+                const res = await fetch('/school/attendances/api/update-roster-cell', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                const guarded = typeof window.applyGuardedApiResult === 'function'
+                    ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Completed' })
+                    : { stop: false };
+                if (guarded.stop) return;
+                if (result.status !== 'success') throw new Error(result.message);
+
+                if (detailsModalInstance) detailsModalInstance.hide();
+                document.getElementById('btn_loadData').click();
+            } catch (err) {
+                if (typeof showMessageModal === 'function') {
+                    showMessageModal({ title: 'Error', icon: 'error', message: err.message, buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+                } else { alert(err.message); }
+            } finally {
+                btn.innerHTML = origBtn;
+                btn.disabled = false;
+            }
+        });
+    }
+
+    // --- 5. Query / server initial state: class, date range, deep link ---
+    const init = window.ATTENDANCE_PAGE_INITIAL || {};
+    const urlParams = new URLSearchParams(window.location.search);
+    const qClassId = (urlParams.get('classId') || init.classId || '').trim();
+    const qClassName = (urlParams.get('className') || init.className || '').trim();
+    let qStart = (urlParams.get('startDate') || init.startDate || '').trim();
+    let qEnd = (urlParams.get('endDate') || init.endDate || '').trim();
+    const qStudentId = (urlParams.get('studentId') || init.studentId || '').trim();
+    const qSessionId = (urlParams.get('sessionId') || init.sessionId || '').trim();
+    const qRange = (urlParams.get('range') || init.range || '').trim().toLowerCase();
+    const wantsAllTimeRange = qRange === 'alltime' || qRange === 'all_time';
+
+    if (qStart && !qEnd) qEnd = qStart;
+
+    if (qClassId) {
+        document.getElementById('filter_classId').value = qClassId;
+        document.getElementById('filter_className').value = qClassName || 'Loading Class Data...';
+    }
+    if (qStart) document.getElementById('filter_startDate').value = qStart;
+    if (qEnd) document.getElementById('filter_endDate').value = qEnd;
+
+    if (!qClassId) {
+        document.querySelector('.btn-range[data-range="thisWeek"]').click();
+    } else if (qStart && qEnd) {
+        document.getElementById('btn_loadData').click();
+    } else if (wantsAllTimeRange) {
+        document.querySelector('.btn-range[data-range="allTime"]').click();
+    } else if (qStudentId && qSessionId && !qStart) {
+        document.querySelector('.btn-range[data-range="allTime"]').click();
+    } else {
+        document.querySelector('.btn-range[data-range="thisWeek"]').click();
+    }
+});
+
+// --- NEW: Global Function to handle Header Clicks ---
+window.confirmOpenSession = async function(classId, sessionId) {
+    if (typeof showMessageModal === 'function') {
+        const res = await showMessageModal({
+            title: 'Open Session Manager',
+            icon: 'question',
+            message: 'Do you want to open the Session Manager for this specific date in a new tab?',
+            buttons: [
+                { text: 'Cancel', class: 'btn-secondary', value: false },
+                { text: 'Open Session', class: 'btn-primary', value: true }
+            ]
+        });
+        if (res === true || (res && res.value === true) || res === 'Open Session') {
+            window.open(`/school/classes/${classId}/sessions/${sessionId}`, '_blank');
+        }
+    } else {
+        if (confirm("Do you want to open the Session Manager for this date in a new tab?")) {
+            window.open(`/school/classes/${classId}/sessions/${sessionId}`, '_blank');
+        }
+    }
+};
+
+// Global Function to handle Cell Clicks
+window.openInteractiveModal = function(studentPersonId, sessionId) {
+    if (!window.currentMatrixData) return;
+    const matrix = window.currentMatrixData.matrix;
+    const student = matrix.find(s => s.personId === studentPersonId);
+    if (!student) return;
+    const record = student.records.find(r => r.sessionId === sessionId);
+    if (!record) return;
+
+    document.getElementById('modal_classId').value = window.currentMatrixData.classId;
+    document.getElementById('modal_sessionId').value = sessionId;
+    document.getElementById('modal_personId').value = studentPersonId;
+    document.getElementById('det_studentName').innerText = student.name;
+    document.getElementById('det_date').innerText = `Session Date: ${record.date}`;
+
+    const allowed = ['present', 'late', 'excused', 'absent'];
+    const effStatus = allowed.includes(record.status) ? record.status : 'present';
+    document.querySelectorAll('input[name="modal_cell_attendance"]').forEach((el) => {
+        el.checked = el.value === effStatus;
+    });
+    document.getElementById('inp_cellLateMins').value = record.lateMinutes != null && record.lateMinutes !== '' ? record.lateMinutes : '';
+    document.getElementById('inp_cellLeaveMins').value = record.earlyLeaveMinutes != null && record.earlyLeaveMinutes !== '' ? record.earlyLeaveMinutes : '';
+    document.getElementById('inp_cellExcuseRef').value = record.excuseRef || '';
+    document.getElementById('inp_rosterStudentNote').value = record.rosterStudentNotes != null ? record.rosterStudentNotes : '';
+
+    const sessionNote = record.sessionLevelNote || '';
+    const snWrap = document.getElementById('det_sessionLevelNote_wrap');
+    if (sessionNote) {
+        snWrap.classList.remove('d-none');
+        document.getElementById('det_sessionLevelNote').textContent = sessionNote;
+    } else {
+        snWrap.classList.add('d-none');
+    }
+
+    const locked = record.sessionLocked === true;
+    const canEdit = window.CAN_EDIT_ATTENDANCE_ROSTER === true;
+    const canOverride = window.CAN_OVERRIDE_SESSION_LOCK === true;
+    const allowEdit = canEdit && (!locked || canOverride);
+    const fs = document.getElementById('fieldset_cell_attendance');
+    if (fs) fs.disabled = !allowEdit;
+    const lockNotice = document.getElementById('cell_modal_lock_notice');
+    if (locked && !canOverride && canEdit) lockNotice.classList.remove('d-none');
+    else lockNotice.classList.add('d-none');
+    const saveAttBtn = document.getElementById('btn_saveAttendance');
+    if (saveAttBtn) {
+        saveAttBtn.disabled = !allowEdit;
+    }
+
+    const thread = document.getElementById('det_commentsThread');
+    thread.innerHTML = '';
+    if (record.comments && record.comments.length > 0) {
+        record.comments.forEach(c => {
+            let mentionHtml = '';
+            (c.mentions || []).forEach(m => mentionHtml += `<span class="mention-badge me-1">@${m.name}</span>`);
+            
+            thread.innerHTML += `
+                <div class="comment-bubble">
+                    <span class="comment-time">${new Date(c.timestamp).toLocaleString()}</span>
+                    <div class="comment-author">${c.authorName}</div>
+                    <div class="mt-1">${mentionHtml} ${c.text}</div>
+                </div>
+            `;
+        });
+    } else {
+        thread.innerHTML = '<div class="text-muted small text-center py-2">No administrative notes yet. Be the first to comment.</div>';
+    }
+
+    document.getElementById('inp_newComment').value = '';
+    currentMentions = [];
+    document.getElementById('pendingMentionsArea').innerHTML = '';
+
+    if (detailsModalInstance) detailsModalInstance.show();
+};
+</script>

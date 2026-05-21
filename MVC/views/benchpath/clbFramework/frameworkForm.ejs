@@ -1,0 +1,367 @@
+<%
+  const isEdit = !!(frameworkData && frameworkData.id);
+  const formAction = isEdit ? `/benchpath/clb-framework/edit/${frameworkData.id}` : '/benchpath/clb-framework/new';
+  const selectedPurpose = Array.isArray(frameworkData?.purpose) ? frameworkData.purpose : [];
+  const selectedNotIntended = Array.isArray(frameworkData?.notIntendedAs) ? frameworkData.notIntendedAs : [];
+  const selectedFeatures = Array.isArray(frameworkData?.frameworkFeatures) ? frameworkData.frameworkFeatures : [];
+  const supported = frameworkData?.supportedBenchmarks || { minimum: 1, maximum: 12, totalCount: 12 };
+  const defaultSkillIds = ['skill:listening', 'skill:speaking', 'skill:reading', 'skill:writing'];
+  const skillIds = Array.isArray(frameworkData?.skillIds) && frameworkData.skillIds.length ? frameworkData.skillIds : defaultSkillIds;
+  const defaultStageIds = [];
+  const stageIds = Array.isArray(frameworkData?.stageIds) && frameworkData.stageIds.length ? frameworkData.stageIds : defaultStageIds;
+  const sourceRefs = Array.isArray(frameworkData?.sourceRefs) ? frameworkData.sourceRefs : [];
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit CLB Framework' : 'Create CLB Framework' %></h1>
+    <div class="d-flex align-items-center gap-2">
+      <% if (isEdit) { %><span class="badge bg-primary border">ID: <%= frameworkData.id %></span><% } else { %><span class="badge bg-success border">New Item</span><% } %>
+    </div>
+  </div>
+
+  <div class="form-container" style="width: 100%; max-width: 1400px;">
+    <form id="frameworkForm" method="POST" action="<%= formAction %>">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      <input type="hidden" name="supportedBenchmarks" id="supportedBenchmarksInput">
+      <input type="hidden" name="sourceRefs" id="sourceRefsInput">
+
+      <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#core-pane" type="button">Core</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#structure-pane" type="button">Structure</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#refs-pane" type="button">Source Refs</button></li>
+      </ul>
+
+      <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
+        <div class="tab-pane fade show active" id="core-pane">
+          <div class="row g-2">
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">ID *</label><input class="form-control" name="id" value="<%= frameworkData?.id || '' %>" <%= isEdit ? 'readonly' : '' %> required></div>
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">Slug *</label><input class="form-control" name="slug" value="<%= frameworkData?.slug || '' %>" required></div>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-4 mb-3"><label class="form-label fw-bold">Code *</label><input class="form-control" name="code" value="<%= frameworkData?.code || '' %>" required></div>
+            <div class="col-md-4 mb-3"><label class="form-label fw-bold">Edition *</label><input class="form-control" name="edition" value="<%= frameworkData?.edition || '' %>" required></div>
+            <div class="col-md-4 mb-3"><label class="form-label fw-bold">Language *</label><select class="form-select" name="language" required><option value="">Select...</option><% languageOptions.forEach((opt)=>{ %><option value="<%= opt %>" <%= frameworkData?.language===opt?'selected':'' %>><%= opt %></option><% }) %></select></div>
+          </div>
+          <div class="mb-3"><label class="form-label fw-bold">Title *</label><input class="form-control" name="title" value="<%= frameworkData?.title || '' %>" required></div>
+          <div class="mb-3"><label class="form-label fw-bold">Version Label *</label><input class="form-control" name="versionLabel" value="<%= frameworkData?.versionLabel || '' %>" required></div>
+          <div class="row g-2">
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">Framework Type *</label><select class="form-select" name="frameworkType" required><option value="">Select...</option><% frameworkTypeOptions.forEach((opt)=>{ %><option value="<%= opt %>" <%= frameworkData?.frameworkType===opt?'selected':'' %>><%= opt %></option><% }) %></select></div>
+            <div class="col-md-6 mb-3"><label class="form-label">Publisher</label><input class="form-control" name="publisher" value="<%= frameworkData?.publisher || '' %>"></div>
+          </div>
+          <div class="mb-3"><label class="form-label">Authors (comma separated)</label><input class="form-control" name="authors" value="<%= Array.isArray(frameworkData?.authors)?frameworkData.authors.join(', '):'' %>"></div>
+          <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"><%= frameworkData?.description || '' %></textarea></div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Purpose *</label>
+            <div class="row g-2 border rounded p-2"><% purposeOptions.forEach((opt)=>{ %><div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="purpose_<%= opt %>" name="purpose" value="<%= opt %>" <%= selectedPurpose.includes(opt)?'checked':'' %>><label class="form-check-label small" for="purpose_<%= opt %>"><%= opt %></label></div></div><% }) %></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Not Intended As *</label>
+            <div class="row g-2 border rounded p-2"><% notIntendedOptions.forEach((opt)=>{ %><div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="nia_<%= opt %>" name="notIntendedAs" value="<%= opt %>" <%= selectedNotIntended.includes(opt)?'checked':'' %>><label class="form-check-label small" for="nia_<%= opt %>"><%= opt %></label></div></div><% }) %></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Framework Features *</label>
+            <div class="row g-2 border rounded p-2"><% frameworkFeatureOptions.forEach((opt)=>{ %><div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="ff_<%= opt %>" name="frameworkFeatures" value="<%= opt %>" <%= selectedFeatures.includes(opt)?'checked':'' %>><label class="form-check-label small" for="ff_<%= opt %>"><%= opt %></label></div></div><% }) %></div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="structure-pane">
+          <div class="row g-2">
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">Status *</label><select class="form-select" name="status" required><option value="">Select...</option><% statusOptions.forEach((opt)=>{ %><option value="<%= opt %>" <%= frameworkData?.status===opt?'selected':'' %>><%= opt %></option><% }) %></select></div>
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">Review Status *</label><select class="form-select" name="reviewStatus" required><option value="">Select...</option><% reviewStatusOptions.forEach((opt)=>{ %><option value="<%= opt %>" <%= frameworkData?.reviewStatus===opt?'selected':'' %>><%= opt %></option><% }) %></select></div>
+          </div>
+
+          <label class="form-label fw-bold">Supported Benchmarks *</label>
+          <div class="row g-2 mb-3">
+            <div class="col-md-4"><input type="number" min="1" class="form-control" id="sbMin" value="<%= supported.minimum %>" placeholder="Minimum" required></div>
+            <div class="col-md-4"><input type="number" min="1" class="form-control" id="sbMax" value="<%= supported.maximum %>" placeholder="Maximum" required></div>
+            <div class="col-md-4"><input type="number" min="1" class="form-control" id="sbTotal" value="<%= supported.totalCount %>" placeholder="Total Count" required></div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Skill IDs *</label>
+            <div id="skillIdRows" class="vstack gap-2">
+              <% skillIds.forEach((sid) => { %>
+                <div class="input-group skill-id-row">
+                  <input class="form-control bg-light skill-id-input" name="skillIds" value="<%= sid %>" readonly required>
+                  <button type="button" class="btn btn-outline-danger remove-skill-id">Remove</button>
+                </div>
+              <% }) %>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="pickSkillIdBtn"><i class="bi bi-plus-circle me-1"></i>Pick Skill</button>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Stage IDs *</label>
+            <div id="stageIdRows" class="vstack gap-2">
+              <% stageIds.forEach((sid) => { %>
+                <div class="input-group stage-id-row">
+                  <input class="form-control bg-light stage-id-input" name="stageIds" value="<%= sid %>" readonly required>
+                  <button type="button" class="btn btn-outline-danger remove-stage-id">Remove</button>
+                </div>
+              <% }) %>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="pickStageIdBtn"><i class="bi bi-plus-circle me-1"></i>Pick Stage</button>
+          </div>
+
+          <div class="mb-3"><label class="form-label fw-bold">Global Notes * (one per line)</label><textarea class="form-control" name="globalNotes" rows="4" required><%= Array.isArray(frameworkData?.globalNotes)?frameworkData.globalNotes.join('\n'):'' %></textarea></div>
+          <div class="mb-3"><label class="form-label">Tags (comma separated)</label><input class="form-control" name="tags" value="<%= Array.isArray(frameworkData?.tags)?frameworkData.tags.join(', '):'' %>"></div>
+
+          <div class="d-flex gap-4">
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="isActive" name="isActive" value="true" <%= frameworkData ? (frameworkData.isActive?'checked':'') : 'checked' %>><label class="form-check-label fw-bold" for="isActive">isActive</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="isSystem" name="isSystem" value="true" <%= frameworkData?.isSystem?'checked':'' %>><label class="form-check-label fw-bold" for="isSystem">isSystem</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="isLocked" name="isLocked" value="true" <%= frameworkData?.isLocked?'checked':'' %>><label class="form-check-label fw-bold" for="isLocked">isLocked</label></div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="refs-pane">
+          <label class="form-label fw-bold">Source References</label>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0" id="refsTable">
+              <thead class="table-light">
+                <tr><th>Source</th><th>Fragment</th><th>Page Start</th><th>Page End</th><th>Note</th><th></th></tr>
+              </thead>
+              <tbody>
+                <% (sourceRefs.length ? sourceRefs : [{}]).forEach((ref) => { %>
+                  <tr class="ref-row">
+                    <td>
+                      <select class="form-select form-select-sm ref-source-id">
+                        <option value="">Select source...</option>
+                        <% (sources || []).forEach((src) => { %>
+                          <option value="<%= src.id %>" <%= ref.sourceId === src.id ? 'selected' : '' %>><%= src.title %> (<%= src.id %>)</option>
+                        <% }) %>
+                      </select>
+                    </td>
+                    <td>
+                      <select class="form-select form-select-sm ref-fragment-id">
+                        <option value="">No fragment</option>
+                        <% (fragments || []).forEach((frg) => { %>
+                          <option value="<%= frg.id %>" <%= ref.fragmentId === frg.id ? 'selected' : '' %>><%= frg.title || frg.id %> (<%= frg.id %>)</option>
+                        <% }) %>
+                      </select>
+                    </td>
+                    <td><input type="number" min="1" class="form-control form-control-sm ref-page-start" value="<%= Array.isArray(ref.pages) ? (ref.pages[0] || '') : '' %>"></td>
+                    <td><input type="number" min="1" class="form-control form-control-sm ref-page-end" value="<%= Array.isArray(ref.pages) ? (ref.pages[1] || '') : '' %>"></td>
+                    <td><input class="form-control form-control-sm ref-note" value="<%= ref.note || '' %>"></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger remove-ref">Remove</button></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="addRefBtn">Add Source Ref</button>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-save me-1"></i> Save</button>
+        <a href="/benchpath/clb-framework" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/benchpath/clb-framework">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+  (function () {
+    const form = document.getElementById('frameworkForm');
+    const skillRows = document.getElementById('skillIdRows');
+    const stageRows = document.getElementById('stageIdRows');
+    const refsTable = document.getElementById('refsTable').querySelector('tbody');
+
+    const addSkillRow = (val = '') => {
+      const normalized = String(val || '').trim();
+      if (!normalized) return;
+      const exists = Array.from(skillRows.querySelectorAll('input[name="skillIds"]'))
+        .some((input) => String(input.value || '').trim() === normalized);
+      if (exists) return;
+      const row = document.createElement('div');
+      row.className = 'input-group skill-id-row';
+      row.innerHTML = `<input class="form-control bg-light skill-id-input" name="skillIds" readonly required><button type="button" class="btn btn-outline-danger remove-skill-id">Remove</button>`;
+      row.querySelector('input').value = normalized;
+      skillRows.appendChild(row);
+    };
+
+    const addStageIdRow = (val = '') => {
+      const normalized = String(val || '').trim();
+      if (!normalized) return;
+      const exists = Array.from(stageRows.querySelectorAll('input[name="stageIds"]'))
+        .some((input) => String(input.value || '').trim() === normalized);
+      if (exists) return;
+      const row = document.createElement('div');
+      row.className = 'input-group stage-id-row';
+      row.innerHTML = `<input class="form-control bg-light stage-id-input" name="stageIds" readonly required><button type="button" class="btn btn-outline-danger remove-stage-id">Remove</button>`;
+      row.querySelector('input').value = normalized;
+      stageRows.appendChild(row);
+    };
+
+    const openPicker = (config) => {
+      if (!window.GenericPicker || typeof window.GenericPicker.open !== 'function') {
+        if (typeof window.showMessageModal === 'function') {
+          window.showMessageModal({
+            title: 'Picker Not Available',
+            icon: 'error',
+            message: 'Skill picker is not available on this page.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        }
+        return;
+      }
+      const normalizedConfig = (typeof window.GenericPickerPresets?.normalizeConfig === 'function')
+        ? window.GenericPickerPresets.normalizeConfig(config)
+        : config;
+      window.GenericPicker.open(normalizedConfig);
+    };
+
+    const addRefRow = () => {
+      const tr = document.createElement('tr');
+      tr.className = 'ref-row';
+      tr.innerHTML = `
+        <td>
+          <select class="form-select form-select-sm ref-source-id">
+            <option value="">Select source...</option>
+            <% (sources || []).forEach((src) => { %><option value="<%= src.id %>"><%= src.title %> (<%= src.id %>)</option><% }) %>
+          </select>
+        </td>
+        <td>
+          <select class="form-select form-select-sm ref-fragment-id">
+            <option value="">No fragment</option>
+            <% (fragments || []).forEach((frg) => { %><option value="<%= frg.id %>"><%= frg.title || frg.id %> (<%= frg.id %>)</option><% }) %>
+          </select>
+        </td>
+        <td><input type="number" min="1" class="form-control form-control-sm ref-page-start"></td>
+        <td><input type="number" min="1" class="form-control form-control-sm ref-page-end"></td>
+        <td><input class="form-control form-control-sm ref-note"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-ref">Remove</button></td>
+      `;
+      refsTable.appendChild(tr);
+    };
+
+    document.getElementById('pickSkillIdBtn').addEventListener('click', () => {
+      openPicker((typeof window.GenericPickerPresets?.clbSkill === 'function')
+        ? window.GenericPickerPresets.clbSkill({
+            onSelect: (item) => addSkillRow(item?.id || '')
+          })
+        : {
+            title: 'Select Skill',
+            icon: 'bi-list-check',
+            apiEndpoint: '/benchpath/clb-skills',
+            placeholder: 'Search skills...',
+            onSelect: (item) => addSkillRow(item?.id || '')
+          });
+    });
+    document.getElementById('pickStageIdBtn').addEventListener('click', () => {
+      openPicker((typeof window.GenericPickerPresets?.clbStage === 'function')
+        ? window.GenericPickerPresets.clbStage({
+            onSelect: (item) => addStageIdRow(item?.id || '')
+          })
+        : {
+            title: 'Select Stage',
+            icon: 'bi-signpost-split-fill',
+            apiEndpoint: '/benchpath/clb-stages',
+            placeholder: 'Search stages...',
+            onSelect: (item) => addStageIdRow(item?.id || '')
+          });
+    });
+    document.getElementById('addRefBtn').addEventListener('click', addRefRow);
+
+    form.addEventListener('click', (e) => {
+      if (e.target.classList.contains('remove-skill-id')) e.target.closest('.skill-id-row').remove();
+      if (e.target.classList.contains('remove-stage-id')) e.target.closest('.stage-id-row').remove();
+      if (e.target.classList.contains('remove-ref')) e.target.closest('.ref-row').remove();
+    });
+
+    let isSubmitting = false;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (isSubmitting) return;
+
+      const stageIds = Array.from(stageRows.querySelectorAll('input[name="stageIds"]'))
+        .map((input) => String(input.value || '').trim())
+        .filter(Boolean);
+
+      const refs = [];
+      refsTable.querySelectorAll('.ref-row').forEach((row) => {
+        const sourceId = row.querySelector('.ref-source-id').value.trim();
+        if (!sourceId) return;
+        const pageStart = parseInt(row.querySelector('.ref-page-start').value || '', 10);
+        const pageEnd = parseInt(row.querySelector('.ref-page-end').value || '', 10);
+        const pages = Number.isFinite(pageStart) && Number.isFinite(pageEnd) ? [pageStart, pageEnd] : null;
+        refs.push({
+          sourceId,
+          fragmentId: row.querySelector('.ref-fragment-id').value.trim() || null,
+          pages,
+          note: row.querySelector('.ref-note').value.trim() || null
+        });
+      });
+
+      const min = parseInt(document.getElementById('sbMin').value || '', 10);
+      const max = parseInt(document.getElementById('sbMax').value || '', 10);
+      const totalCount = parseInt(document.getElementById('sbTotal').value || '', 10);
+
+      document.getElementById('supportedBenchmarksInput').value = JSON.stringify({ minimum: min, maximum: max, totalCount });
+      document.getElementById('sourceRefsInput').value = JSON.stringify(refs);
+
+      if (!stageIds.length) {
+        const firstTab = document.querySelector('[data-bs-target="#structure-pane"]');
+        if (firstTab) firstTab.click();
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Validation Error',
+            icon: 'warning',
+            message: 'At least one stage ID is required before saving.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        }
+        return;
+      }
+
+      isSubmitting = true;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const payload = new URLSearchParams(new FormData(form));
+        const response = await fetch(form.action, {
+          method: (form.method || 'POST').toUpperCase(),
+          headers: {
+            'x-ajax-request': '1',
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+          },
+          body: payload
+        });
+        const result = await response.json().catch(() => ({ status: 'error', message: `Server returned HTTP ${response.status}.` }));
+        const isSuccess = response.ok && result?.status === 'success';
+
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: isSuccess ? 'Saved' : 'Save Failed',
+            icon: isSuccess ? 'success' : 'error',
+            message: result?.message || (isSuccess ? 'Saved successfully.' : 'Unable to save.'),
+            buttons: [{ text: 'OK', class: isSuccess ? 'btn-success' : 'btn-danger' }]
+          });
+        }
+
+        if (isSuccess) {
+          window.location.href = '/benchpath/clb-framework';
+        }
+      } catch (error) {
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Save Failed',
+            icon: 'error',
+            message: error?.message || 'Unexpected network error.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        }
+      } finally {
+        isSubmitting = false;
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  })();
+</script>

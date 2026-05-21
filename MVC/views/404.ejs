@@ -1,0 +1,91 @@
+<!-- MVC/views/404.ejs -->
+<div class="container py-5">
+
+  <!-- Hero-style banner -->
+  <div class="dash-hero mb-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+      <h1 class="page-heading size-lg mb-1">Page Not Found</h1>
+      <div class="text-muted" style="font-size:1.05rem;">
+        We searched everywhere but couldn't find that page.
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="/dashboard" class="btn btn-primary btn-filled btn-md">
+        <i class="bi bi-house-door me-1"></i> Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4 align-items-stretch">
+    <!-- Big 404 Visual -->
+    <div class="col-lg-5">
+      <div class="module-card h-100 d-flex flex-column justify-content-center text-center p-5">
+        <div class="module-accent"></div>
+        
+        <div class="display-1 fw-bold text-primary mb-2" style="opacity: 0.2; letter-spacing: -5px;">404</div>
+        <div class="h5 text-muted">Path not found</div>
+        
+        <!-- Show the bad path for clarity -->
+        <div class="mt-3 p-2 bg-light rounded border font-monospace text-danger small text-break">
+            <%= typeof url !== 'undefined' ? url : title %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Helpful Links -->
+    <div class="col-lg-7">
+      <div class="module-card h-100">
+        <div class="module-accent"></div>
+
+        <h4 class="fw-bold mb-3">Where to next?</h4>
+        
+        <% if (user) { %>
+            <div class="row g-3">
+                <div class="col-md-6">
+                  <a href="/sections" class="text-decoration-none">
+                    <div class="p-3 border rounded bg-white shadow-sm hover-lift">
+                        <div class="fw-bold text-dark mb-1"><i class="bi bi-layers text-primary me-2"></i> Sections</div>
+                        <div class="small text-muted">Manage app modules</div>
+                    </div>
+                  </a>
+                </div>
+                <div class="col-md-6">
+                  <a href="/users" class="text-decoration-none">
+                    <div class="p-3 border rounded bg-white shadow-sm hover-lift">
+                        <div class="fw-bold text-dark mb-1"><i class="bi bi-people text-success me-2"></i> Users</div>
+                        <div class="small text-muted">Manage accounts</div>
+                    </div>
+                  </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="/operations" class="text-decoration-none">
+                      <div class="p-3 border rounded bg-white shadow-sm hover-lift">
+                          <div class="fw-bold text-dark mb-1"><i class="bi bi-gear text-secondary me-2"></i> Operations</div>
+                          <div class="small text-muted">System definitions</div>
+                      </div>
+                    </a>
+                  </div>
+                  <div class="col-md-6">
+                    <a href="/dashboard" class="text-decoration-none">
+                      <div class="p-3 border rounded bg-white shadow-sm hover-lift">
+                          <div class="fw-bold text-dark mb-1"><i class="bi bi-speedometer2 text-warning me-2"></i> Dashboard</div>
+                          <div class="small text-muted">Go back home</div>
+                      </div>
+                    </a>
+                  </div>
+            </div>
+        <% } else { %>
+            <div class="alert alert-light border">
+                Please <a href="/login" class="fw-bold">Sign In</a> to access the system.
+            </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+    .hover-lift { transition: transform 0.2s ease; }
+    .hover-lift:hover { transform: translateY(-3px); border-color: var(--color-primary) !important; }
+</style>

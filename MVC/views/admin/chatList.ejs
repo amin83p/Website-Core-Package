@@ -1,0 +1,307 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl, 
+  newLabel: null, 
+  user,
+  tableName: 'System Conversations',
+  print,
+  btn_export: true
+}) %>
+
+<%- include('../partials/tablePages-search', {
+    placeholder: 'Search conversations...',
+    fields: []
+  }) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="chat-table">
+    <thead>
+      <tr>
+        <th class="draggable">ID<span class="sort-icon"></span></th>
+        <th class="draggable">Participants<span class="sort-icon"></span></th>
+        <th class="draggable">Started<span class="sort-icon"></span></th>
+        <th class="draggable">Last Active<span class="sort-icon"></span></th>
+        <th class="draggable">Last Message<span class="sort-icon"></span></th>
+        <th class="draggable">Total Size<span class="sort-icon"></span></th>
+        <th class="draggable">Msgs<span class="sort-icon"></span></th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% (data || []).forEach(conv => { %>
+        <tr>
+          <td>
+            <span class="text-muted small"><%= conv.id %></span>
+          </td>
+          
+          <td>
+            <i class="bi bi-people-fill text-secondary me-1"></i>
+            <span class="fw-bold text-dark"><%= conv.participants %></span>
+          </td>
+
+          <td>
+            <%= new Date(conv.startDate).toLocaleDateString() %>
+            <div class="text-muted x-small"><%= new Date(conv.startDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) %></div>
+          </td>
+
+          <td>
+            <%= new Date(conv.updatedAt).toLocaleDateString() %>
+            <div class="text-muted x-small"><%= new Date(conv.updatedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) %></div>
+          </td>
+
+          <td>
+            <div class="text-truncate" style="max-width: 200px;" title="<%= conv.lastMsg %>">
+                <%= conv.lastMsg %>
+            </div>
+          </td>
+
+          <td>
+            <span class="badge bg-light text-dark border"><%= conv.sizeStr %></span>
+          </td>
+
+          <td>
+            <span class="badge bg-secondary rounded-pill"><%= conv.msgCount %></span>
+          </td>
+
+          <td class="table-actions">
+            <button class="btn btn-sm btn-filled btn-edit" onclick="adminViewChat('<%= conv.id %>', '<%= conv.participants %>')">
+                View
+            </button>
+            
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" onclick="adminDeleteChat('<%= conv.id %>')">
+                Delete
+            </button>
+          </td>
+        </tr>
+      <% }) %>
+
+      <% if (!data || data.length === 0) { %>
+        <tr>
+            <td colspan="8" class="text-center py-4 text-muted">No conversations found.</td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/tablePages-end') %>
+
+<div class="modal fade" id="adminChatViewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <div>
+            <h5 class="modal-title fw-bold" id="adminChatTitle">Conversation History</h5>
+            <small class="text-muted" id="adminChatSubtitle">ID: ...</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light" id="adminChatContainer" style="min-height: 400px;">
+          </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+    /* Admin View Specific Styles */
+    .admin-msg-row {
+        margin-bottom: 15px;
+        border-left: 3px solid #dee2e6;
+        padding-left: 15px;
+        background: #fff;
+        padding: 10px;
+        border-radius: 0 8px 8px 0;
+    }
+    .admin-msg-meta {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-bottom: 5px;
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #f1f1f1;
+        padding-bottom: 5px;
+    }
+    .admin-sender-id {
+        font-weight: bold;
+        color: #0d6efd;
+        font-family: monospace;
+    }
+    .admin-msg-content img {
+        max-width: 300px;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
+    .admin-file-link {
+        display: inline-flex;
+        align-items: center;
+        background: #f8f9fa;
+        padding: 8px 12px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #333;
+    }
+    .admin-file-link:hover {
+        background: #e9ecef;
+    }
+</style>
+
+<script>
+// ✅ NEW: View Chat Logic
+async function adminViewChat(convId, participants) {
+    const modalEl = document.getElementById('adminChatViewModal');
+    const titleEl = document.getElementById('adminChatTitle');
+    const subTitleEl = document.getElementById('adminChatSubtitle');
+    const container = document.getElementById('adminChatContainer');
+
+    // 1. Setup Modal
+    titleEl.innerText = participants || 'Conversation';
+    subTitleEl.innerText = 'ID: ' + convId;
+    container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted">Loading history...</div></div>';
+    
+    const bsModal = new bootstrap.Modal(modalEl);
+    bsModal.show();
+
+    // 2. Fetch Data
+    try {
+        const resp = await fetch(`/chat/messages/${convId}`);
+        const res = await resp.json();
+
+        if (res.status === 'success') {
+            container.innerHTML = '';
+            
+            if (!res.data || res.data.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted mt-5">No messages found in this history.</div>';
+                return;
+            }
+
+            // 3. Render Messages (Log Style)
+            res.data.forEach(msg => {
+                const timeStr = new Date(msg.timestamp).toLocaleString();
+                
+                // Content Handling
+                let contentHtml = msg.content;
+                if(msg.type === 'image') {
+                    // Ensure URL is encoded properly
+                    const safeUrl = encodeURI(msg.fileUrl).replace(/%25/g, '%'); 
+                    contentHtml = `
+                        <div class="mt-1">
+                            <a href="${safeUrl}" target="_blank">
+                                <img src="${safeUrl}" alt="Attachment">
+                            </a>
+                            <div class="small text-muted mt-1"><i class="bi bi-image"></i> Image Attachment</div>
+                        </div>`;
+                } else if (msg.type === 'file') {
+                    contentHtml = `
+                        <div class="mt-1">
+                            <a href="${msg.fileUrl}" target="_blank" class="admin-file-link">
+                                <i class="bi bi-file-earmark-arrow-down fs-5 me-2 text-primary"></i> 
+                                <div>
+                                    <div class="fw-bold">File Attachment</div>
+                                    <div class="x-small text-muted">Click to download</div>
+                                </div>
+                            </a>
+                        </div>`;
+                }
+
+                const html = `
+                <div class="admin-msg-row">
+                    <div class="admin-msg-meta">
+                        <span class="admin-sender-id"><i class="bi bi-person-badge"></i> ${msg.senderId}</span>
+                        <span>${timeStr}</span>
+                    </div>
+                    <div class="admin-msg-content text-dark">
+                        ${contentHtml}
+                    </div>
+                    <div class="mt-1">
+                        <span class="badge bg-light text-secondary border">Status: ${msg.status || 'sent'}</span>
+                    </div>
+                </div>`;
+                
+                container.insertAdjacentHTML('beforeend', html);
+            });
+            
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+
+        } else {
+            container.innerHTML = `<div class="alert alert-danger">Failed to load messages: ${res.message}</div>`;
+        }
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = `<div class="alert alert-danger">Error connecting to server.</div>`;
+    }
+}
+
+async function adminDeleteChat(convId) {
+    let isConfirmed = false;
+    // 1. CONFIRMATION STEP
+    if (typeof window.showMessageModal === 'function') {
+        // Use Custom Modal
+        const result = await window.showMessageModal({
+            title: 'Delete Conversation',
+            icon: 'warning',
+            message: '<strong>⚠️ ADMIN ACTION</strong><br><br>Are you sure you want to delete this? This will permanently delete the conversation history and <strong>ALL attached files</strong> for all participants.',
+            buttons: [
+                { text: 'Cancel', class: 'btn-secondary' },
+                { text: 'Delete', class: 'btn-danger' }
+            ]
+        });
+        if (result === 'Delete') isConfirmed = true;
+    } else {
+        // Fallback to browser alert
+        isConfirmed = confirm("⚠️ ADMIN ACTION: Are you sure?\n\nThis will permanently delete the conversation history and ALL attached files for all participants.");
+    }
+
+    if (!isConfirmed) return;
+
+    // 2. EXECUTE DELETION
+    try {
+        const resp = await fetch(`/chat/delete/${convId}`, { method: 'DELETE' });
+        const res = await resp.json();
+
+        if (res.status === 'success') {
+            // SUCCESS NOTIFICATION
+            if (typeof window.showMessageModal === 'function') {
+                await window.showMessageModal({
+                    title: 'Success',
+                    icon: 'success',
+                    message: 'Conversation and files deleted successfully.',
+                    buttons: [{ text: 'OK', class: 'btn-success' }]
+                });
+            } else {
+                alert("Conversation deleted successfully.");
+            }
+            window.location.reload();
+        } else {
+            // ERROR NOTIFICATION
+            const errMsg = "Failed: " + res.message;
+            if (typeof window.showMessageModal === 'function') {
+                await window.showMessageModal({
+                    title: 'Error',
+                    icon: 'error',
+                    message: errMsg
+                });
+            } else {
+                alert(errMsg);
+            }
+        }
+    } catch (e) {
+        console.error(e);
+        const errMsg = "Error connecting to server.";
+        if (typeof window.showMessageModal === 'function') {
+            await window.showMessageModal({
+                title: 'Connection Error',
+                icon: 'error',
+                message: errMsg
+            });
+        } else {
+            alert(errMsg);
+        }
+    }
+}
+</script>

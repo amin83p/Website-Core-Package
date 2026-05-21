@@ -1,0 +1,279 @@
+{
+  "info": {
+    "_postman_id": "a4b8fd0e-7b3b-4b0a-9d41-e995b9d35f1d",
+    "name": "PTE Attempt Runtime Ledger Flow",
+    "description": "PTE runtime attempt flow (start -> item start/save/submit -> score/feedback -> session submit -> analytics). Includes Action State token bootstrap requests required by trackActionState middleware.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const runId = pm.collectionVariables.get('runId') || String(Date.now());",
+          "pm.collectionVariables.set('runId', runId);",
+          "const reqName = String(pm.info.requestName || 'request').toLowerCase().replace(/[^a-z0-9]+/g, '-');",
+          "pm.variables.set('idempotencyKey', `pm-${reqName}-${runId}-${Date.now()}`);"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "testVersionId", "value": "", "type": "string" },
+    { "key": "questionVersionId", "value": "", "type": "string" },
+    { "key": "personId", "value": "", "type": "string" },
+    { "key": "applicantId", "value": "", "type": "string" },
+    { "key": "sessionId", "value": "", "type": "string" },
+    { "key": "itemId", "value": "", "type": "string" },
+    { "key": "actionStateGlobal", "value": "", "type": "string" },
+    { "key": "actionStateSession", "value": "", "type": "string" },
+    { "key": "analyticsFrom", "value": "", "type": "string" },
+    { "key": "analyticsTo", "value": "", "type": "string" },
+    { "key": "runId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "00 Bootstrap Action Token (GLOBAL_SCOPE)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Accept", "value": "text/html" }
+        ],
+        "url": "{{baseUrl}}/pte/tests"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const html = pm.response.text();",
+              "const match = html.match(/id=\\\"actionStateIdRef\\\"[^>]*data-id=\\\"([^\\\"]+)\\\"/i);",
+              "pm.test('Action State token found', function () {",
+              "  pm.expect(match, 'No actionStateIdRef token in HTML response.').to.not.equal(null);",
+              "});",
+              "if (match && match[1]) {",
+              "  pm.collectionVariables.set('actionStateGlobal', match[1]);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Start Runtime Session (test_run)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionStateId\": \"{{actionStateGlobal}}\",\n  \"attemptType\": \"test_run\",\n  \"testVersionId\": \"{{testVersionId}}\",\n  \"personId\": \"{{personId}}\",\n  \"applicantId\": \"{{applicantId}}\",\n  \"source\": {\n    \"module\": \"postman_runtime\",\n    \"eventType\": \"attempt_started\",\n    \"eventId\": \"PM-START-{{$timestamp}}\",\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/pte/tests/runtime/start"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Start attempt success', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "  pm.expect(json.status).to.eql('success');",
+              "});",
+              "const sessionId = json?.results?.session?.id || '';",
+              "pm.test('sessionId returned', function () {",
+              "  pm.expect(sessionId, 'Missing sessionId').to.be.a('string').and.not.empty;",
+              "});",
+              "pm.collectionVariables.set('sessionId', sessionId);",
+              "const items = Array.isArray(json?.results?.items) ? json.results.items : [];",
+              "if (items.length > 0) {",
+              "  pm.collectionVariables.set('itemId', String(items[0].id || ''));",
+              "  if (items[0].questionVersionId) pm.collectionVariables.set('questionVersionId', String(items[0].questionVersionId));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Bootstrap Action Token (SESSION_SCOPE)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Accept", "value": "text/html" }
+        ],
+        "url": "{{baseUrl}}/pte/tests?id={{sessionId}}"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const html = pm.response.text();",
+              "const match = html.match(/id=\\\"actionStateIdRef\\\"[^>]*data-id=\\\"([^\\\"]+)\\\"/i);",
+              "pm.test('Session-scoped Action State token found', function () {",
+              "  pm.expect(match, 'No session-scoped actionStateId token found.').to.not.equal(null);",
+              "});",
+              "if (match && match[1]) {",
+              "  pm.collectionVariables.set('actionStateSession', match[1]);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Runtime Item Start",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionStateId\": \"{{actionStateSession}}\",\n  \"source\": {\n    \"module\": \"postman_runtime\",\n    \"eventType\": \"question_started\",\n    \"eventId\": \"PM-QSTART-{{$timestamp}}\",\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/pte/tests/runtime/{{sessionId}}/items/{{itemId}}/start"
+      },
+      "response": []
+    },
+    {
+      "name": "04 Runtime Item Save",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionStateId\": \"{{actionStateSession}}\",\n  \"responseSummary\": {\n    \"kind\": \"text\",\n    \"payloadBytes\": 256,\n    \"textLength\": 120,\n    \"wordCount\": 22,\n    \"optionCount\": 0,\n    \"blankCount\": 0,\n    \"pairCount\": 0,\n    \"audioDurationSeconds\": 0\n  },\n  \"artifacts\": [\n    {\n      \"clientArtifactId\": \"client-art-{{$timestamp}}\",\n      \"artifactType\": \"text\",\n      \"name\": \"draft-response.txt\",\n      \"mimeType\": \"text/plain\",\n      \"sizeBytes\": 120,\n      \"referenceId\": \"draft-v1\",\n      \"summary\": { \"note\": \"draft save\" },\n      \"metadata\": { \"source\": \"postman\" }\n    }\n  ],\n  \"source\": {\n    \"module\": \"postman_runtime\",\n    \"eventType\": \"response_saved\",\n    \"eventId\": \"PM-QSAVE-{{$timestamp}}\",\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/pte/tests/runtime/{{sessionId}}/items/{{itemId}}/save"
+      },
+      "response": []
+    },
+    {
+      "name": "05 Runtime Item Submit",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionStateId\": \"{{actionStateSession}}\",\n  \"autoSubmit\": false,\n  \"responseSummary\": {\n    \"kind\": \"text\",\n    \"payloadBytes\": 512,\n    \"textLength\": 260,\n    \"wordCount\": 48\n  },\n  \"timeSpentSeconds\": 75,\n  \"source\": {\n    \"module\": \"postman_runtime\",\n    \"eventType\": \"question_submitted\",\n    \"eventId\": \"PM-QSUB-{{$timestamp}}\",\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/pte/tests/runtime/{{sessionId}}/items/{{itemId}}/submit"
+      },
+      "response": []
+    },
+    {
+      "name": "06 Runtime Item Score",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionStateId\": \"{{actionStateSession}}\",\n  \"scoreRaw\": 3,\n  \"scoreFinal\": 3,\n  \"maxScore\": 5,\n  \"isCorrect\": false,\n  \"traitScores\": {\n    \"content\": 1,\n    \"pronunciation\": 1,\n    \"fluency\": 1\n  },\n  \"source\": {\n    \"module\": \"postman_runtime\",\n    \"eventType\": \"score_recorded\",\n    \"eventId\": \"PM-QSCORE-{{$timestamp}}\",\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/pte/tests/runtime/{{sessionId}}/items/{{itemId}}/score"
+      },
+      "response": []
+    },
+    {
+      "name": "07 Runtime Item Feedback",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionStateId\": \"{{actionStateSession}}\",\n  \"feedback\": \"Focus on response structure and pacing. Review two sample answers and retry this question type.\",\n  \"feedbackProvidedAt\": \"{{$isoTimestamp}}\",\n  \"source\": {\n    \"module\": \"postman_runtime\",\n    \"eventType\": \"feedback_added\",\n    \"eventId\": \"PM-QFDBK-{{$timestamp}}\",\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/pte/tests/runtime/{{sessionId}}/items/{{itemId}}/feedback"
+      },
+      "response": []
+    },
+    {
+      "name": "08 Runtime Session Submit",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionStateId\": \"{{actionStateSession}}\",\n  \"autoSubmitRemaining\": true,\n  \"source\": {\n    \"module\": \"postman_runtime\",\n    \"eventType\": \"attempt_submitted\",\n    \"eventId\": \"PM-ASESSION-SUB-{{$timestamp}}\",\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  },\n  \"finishSource\": {\n    \"module\": \"postman_runtime\",\n    \"eventType\": \"attempt_finished\",\n    \"eventId\": \"PM-ASESSION-FIN-{{$timestamp}}\",\n    \"idempotencyKey\": \"{{idempotencyKey}}-finish\"\n  }\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/pte/tests/runtime/{{sessionId}}/submit"
+      },
+      "response": []
+    },
+    {
+      "name": "09 Runtime Session Detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/pte/tests/runtime/sessions/{{sessionId}}?includeEvents=true&eventLimit=200"
+      },
+      "response": []
+    },
+    {
+      "name": "10 Runtime Analytics (Me)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-AJAX-Request", "value": "true" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/pte/tests/runtime/analytics/me?from={{analyticsFrom}}&to={{analyticsTo}}"
+      },
+      "response": []
+    }
+  ]
+}

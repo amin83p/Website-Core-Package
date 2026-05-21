@@ -1,0 +1,610 @@
+<%
+  const backend = runtimeBackend || {};
+  const activeMode = String(backend.mode || 'json').trim().toLowerCase();
+  const mongo = backend.mongo || {};
+  const mongoReady = Boolean(mongo.ready);
+  const mongoSource = String(mongo.source || 'none');
+  const rows = Array.isArray(migrationRows) ? migrationRows : [];
+  const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
+  const coverageModel = coverage || { catalogItems: rows.length, coveredCount: 0, ignoredCount: 0, unmappedCount: 0, ignored: [], unmapped: [] };
+%>
+
+<div class="sections-page migration-redesign-page">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h1 class="page-heading size-md text-start m-0">Data Migration</h1>
+      <p class="text-muted mb-0 mt-1">JSON/Mongo migration tools with lazy counts and Mongo backup export.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">JSON <-> MONGO</span>
+      <a href="/systemSettings" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-speedometer2 me-1"></i>Settings Home
+      </a>
+    </div>
+  </div>
+
+  <% if (!mongoReady) { %>
+    <div class="alert alert-danger py-2 px-3 mb-3">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      Mongo URI is not configured. Set <code>MONGODB_URI</code> in deployment variables, then restart the app.
+    </div>
+  <% } %>
+
+  <% if (loadWarning) { %>
+    <div class="alert alert-warning py-2 px-3 mb-3">
+      <i class="bi bi-info-circle me-2"></i><%= loadWarning %>
+    </div>
+  <% } %>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg col-md-4">
+      <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-primary">
+        <div class="text-muted small text-uppercase fw-bold">Runtime Mode</div>
+        <div class="fs-5 fw-bold text-dark"><%= activeMode.toUpperCase() %></div>
+      </div>
+    </div>
+    <div class="col-lg col-md-4">
+      <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-info">
+        <div class="text-muted small text-uppercase fw-bold">Mongo URI Source</div>
+        <div class="fs-5 fw-bold text-dark"><%= mongoSource.toUpperCase() %></div>
+      </div>
+    </div>
+    <div class="col-lg col-md-4">
+      <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-success">
+        <div class="text-muted small text-uppercase fw-bold">Catalog Items</div>
+        <div class="fs-5 fw-bold text-dark" id="catalogCountCard"><%= Number(coverageModel.catalogItems || rows.length || 0) %></div>
+      </div>
+    </div>
+    <div class="col-lg col-md-4">
+      <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-secondary">
+        <div class="text-muted small text-uppercase fw-bold">Covered Files</div>
+        <div class="fs-5 fw-bold text-dark" id="coveredCountCard"><%= Number(coverageModel.coveredCount || 0) %></div>
+      </div>
+    </div>
+    <div class="col-lg col-md-4">
+      <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-warning">
+        <div class="text-muted small text-uppercase fw-bold">Ignored Generated</div>
+        <div class="fs-5 fw-bold text-dark" id="ignoredCountCard"><%= Number(coverageModel.ignoredCount || 0) %></div>
+      </div>
+    </div>
+    <div class="col-lg col-md-4">
+      <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-danger">
+        <div class="text-muted small text-uppercase fw-bold">Needs Review</div>
+        <div class="fs-5 fw-bold text-dark" id="unmappedCountCard"><%= Number(coverageModel.unmappedCount || 0) %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-3">
+      <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-3">
+        <div>
+          <div class="fw-bold">Migration Catalog</div>
+          <div class="small text-muted">Counts are loaded lazily for the current page to keep this screen fast.</div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <button class="btn btn-outline-secondary btn-sm" type="button" id="refreshCatalogBtn">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" id="loadCountsBtn" <%= mongoReady ? '' : '' %>>
+            <i class="bi bi-calculator me-1"></i>Load Counts
+          </button>
+          <button class="btn btn-success btn-sm btn-filled" type="button" id="backupMongoBtn" <%= mongoReady ? '' : 'disabled' %>>
+            <i class="bi bi-download me-1"></i>Download Mongo Backup
+          </button>
+        </div>
+      </div>
+
+      <form id="mongoBackupForm" method="POST" action="/systemSettings/data-migration/backup/mongo" class="d-none">
+        <input type="hidden" name="actionStateId" value="<%= actionStateValue %>">
+      </form>
+
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label small fw-bold">Search</label>
+          <input type="search" class="form-control form-control-sm" id="migrationSearchInput" placeholder="Section, source, collection...">
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label small fw-bold">Domain</label>
+          <select class="form-select form-select-sm" id="migrationDomainFilter">
+            <option value="">All domains</option>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label small fw-bold">Source Type</label>
+          <select class="form-select form-select-sm" id="migrationSourceTypeFilter">
+            <option value="">All source types</option>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label small fw-bold">Status</label>
+          <select class="form-select form-select-sm" id="migrationStatusFilter">
+            <option value="">All rows</option>
+            <option value="required">Required</option>
+            <option value="optional">Optional</option>
+          </select>
+        </div>
+        <div class="col-lg-1 col-md-3">
+          <label class="form-label small fw-bold">Size</label>
+          <select class="form-select form-select-sm" id="migrationPageSize">
+            <option value="10">10</option>
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-9 d-flex gap-2 justify-content-lg-end">
+          <button class="btn btn-primary btn-sm btn-filled w-100" type="button" id="applyMigrationFiltersBtn">
+            <i class="bi bi-funnel me-1"></i>Apply
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" type="button" id="clearMigrationFiltersBtn">Clear</button>
+        </div>
+      </div>
+
+      <div class="border rounded-3 p-2 bg-light-subtle mb-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+        <div class="small text-muted"><span id="selectedCountLabel">0</span> selected</div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-primary btn-sm btn-filled" type="button" id="bulkTransferBtn" disabled>
+            <i class="bi bi-database-add me-1"></i>Transfer Selected In
+          </button>
+          <button class="btn btn-outline-primary btn-sm" type="button" id="bulkExportBtn" disabled>
+            <i class="bi bi-file-earmark-arrow-down me-1"></i>Export Selected Out
+          </button>
+        </div>
+      </div>
+
+      <div class="table-scroll-wrapper" data-floating-row-actions="true">
+        <table class="table-responsive size-md" id="dataMigrationTable">
+          <thead>
+            <tr>
+              <th style="width: 42px;"><input type="checkbox" id="selectAllMigrationRows"></th>
+              <th>Domain</th>
+              <th>Section</th>
+              <th>Source JSON</th>
+              <th>Mongo Collection</th>
+              <th class="text-end">Source</th>
+              <th class="text-end">Valid</th>
+              <th class="text-end">Mongo</th>
+              <th>Warnings</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="dataMigrationTableBody">
+            <tr><td colspan="10" class="text-center text-muted py-4">Loading migration catalog...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mt-3">
+        <div class="small text-muted" id="migrationPaginationLabel">Loading...</div>
+        <div class="btn-group btn-group-sm" role="group">
+          <button class="btn btn-outline-secondary" type="button" id="migrationPrevPageBtn">Previous</button>
+          <button class="btn btn-outline-secondary" type="button" id="migrationNextPageBtn">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between gap-2 flex-wrap">
+      <span>Catalog Coverage</span>
+      <span class="text-muted fw-normal">Generated reports are ignored by default.</span>
+    </div>
+    <div class="card-body p-3" id="coverageAuditPanel">
+      <div class="small text-muted">Loading coverage audit...</div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mt-3">
+    <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between gap-2">
+      <span>Migration Output</span>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="clearMigrationOutputBtn">Clear</button>
+    </div>
+    <div class="card-body">
+      <pre id="migrationOutput" class="small bg-dark text-success p-3 rounded mb-0" style="max-height: 340px; overflow:auto;">Ready.</pre>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 mt-3">
+    <a href="/systemSettings/data-backend" class="btn btn-secondary btn-filled btn-md">Go To Data Backend</a>
+    <a href="/systemSettings" class="btn btn-secondary btn-md">Back To Dashboard</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  const actionStateId = "<%= actionStateValue %>";
+  const mongoReady = <%= mongoReady ? 'true' : 'false' %>;
+  const outputEl = document.getElementById('migrationOutput');
+  const tableBody = document.getElementById('dataMigrationTableBody');
+  const coveragePanel = document.getElementById('coverageAuditPanel');
+  const paginationLabel = document.getElementById('migrationPaginationLabel');
+  const selectedCountLabel = document.getElementById('selectedCountLabel');
+  const selectedKeys = new Set();
+
+  const state = {
+    page: 1,
+    pageSize: 25,
+    rows: [],
+    pagination: null,
+    domainsLoaded: false
+  };
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(String(value ?? ''));
+    return String(value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }
+
+  function setOutput(title, payload) {
+    const stamp = new Date().toISOString();
+    outputEl.textContent = `[${stamp}] ${title}\n${JSON.stringify(payload, null, 2)}`;
+  }
+
+  function getFilters() {
+    return {
+      q: document.getElementById('migrationSearchInput').value.trim(),
+      domain: document.getElementById('migrationDomainFilter').value,
+      sourceType: document.getElementById('migrationSourceTypeFilter').value,
+      status: document.getElementById('migrationStatusFilter').value,
+      page: state.page,
+      pageSize: document.getElementById('migrationPageSize').value || state.pageSize
+    };
+  }
+
+  function fillSelect(selectId, rows, label) {
+    const select = document.getElementById(selectId);
+    const current = select.value;
+    select.innerHTML = `<option value="">${escapeHtml(label)}</option>`;
+    rows.forEach((item) => {
+      const option = document.createElement('option');
+      option.value = item;
+      option.textContent = item;
+      select.appendChild(option);
+    });
+    select.value = current;
+  }
+
+  function updateCards(coverage) {
+    if (!coverage) return;
+    document.getElementById('catalogCountCard').textContent = String(coverage.catalogItems || 0);
+    document.getElementById('coveredCountCard').textContent = String(coverage.coveredCount || 0);
+    document.getElementById('ignoredCountCard').textContent = String(coverage.ignoredCount || 0);
+    document.getElementById('unmappedCountCard').textContent = String(coverage.unmappedCount || 0);
+  }
+
+  function renderCoverage(coverage) {
+    updateCards(coverage);
+    const unmapped = Array.isArray(coverage?.unmapped) ? coverage.unmapped : [];
+    const ignored = Array.isArray(coverage?.ignored) ? coverage.ignored : [];
+    const unmappedHtml = unmapped.length
+      ? `<ul class="small mb-0 ps-3">${unmapped.slice(0, 20).map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join('')}</ul>${unmapped.length > 20 ? `<div class="small text-muted mt-1">And ${unmapped.length - 20} more...</div>` : ''}`
+      : '<div class="small text-success">No unmapped operational files detected.</div>';
+    const ignoredHtml = ignored.length
+      ? `<ul class="small mb-0 ps-3">${ignored.slice(0, 12).map((item) => `<li><code>${escapeHtml(item.path)}</code> <span class="text-muted">${escapeHtml(item.reason)}</span></li>`).join('')}</ul>${ignored.length > 12 ? `<div class="small text-muted mt-1">And ${ignored.length - 12} more ignored generated files...</div>` : ''}`
+      : '<div class="small text-muted">No ignored generated files detected.</div>';
+    coveragePanel.innerHTML = `
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="fw-semibold mb-2">Needs Review</div>
+            ${unmappedHtml}
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="fw-semibold mb-2">Ignored Generated / Derived Files</div>
+            ${ignoredHtml}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function updateSelectionUi() {
+    selectedCountLabel.textContent = String(selectedKeys.size);
+    document.getElementById('bulkTransferBtn').disabled = selectedKeys.size === 0 || !mongoReady;
+    document.getElementById('bulkExportBtn').disabled = selectedKeys.size === 0 || !mongoReady;
+    const allVisibleSelected = state.rows.length > 0 && state.rows.every((row) => selectedKeys.has(row.key));
+    document.getElementById('selectAllMigrationRows').checked = allVisibleSelected;
+  }
+
+  function renderRows(rows) {
+    state.rows = Array.isArray(rows) ? rows : [];
+    if (!state.rows.length) {
+      tableBody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No migration rows match the current filters.</td></tr>';
+      updateSelectionUi();
+      return;
+    }
+
+    tableBody.innerHTML = state.rows.map((row) => {
+      const checked = selectedKeys.has(row.key) ? 'checked' : '';
+      const optionalLabel = row.optional ? '<div class="small text-muted">Optional</div>' : '';
+      return `
+        <tr data-key="${escapeHtml(row.key)}">
+          <td><input type="checkbox" class="migration-row-check" data-key="${escapeHtml(row.key)}" ${checked}></td>
+          <td><span class="badge bg-light text-dark border">${escapeHtml(row.domain)}</span></td>
+          <td><div class="fw-semibold">${escapeHtml(row.section)}</div>${optionalLabel}</td>
+          <td><div class="font-monospace small">${escapeHtml(row.sourcePath || row.source)}</div><div class="small text-muted">${escapeHtml(row.sourceType || 'json_file')}</div></td>
+          <td><code>${escapeHtml(row.collection)}</code></td>
+          <td class="text-end"><span class="badge bg-light text-dark border" data-count-field="sourceCount">-</span></td>
+          <td class="text-end"><span class="badge bg-light text-dark border" data-count-field="validSourceCount">-</span></td>
+          <td class="text-end"><span class="badge bg-light text-dark border" data-count-field="targetCount">-</span></td>
+          <td class="small" data-count-field="warnings">${escapeHtml(row.notes || '')}</td>
+          <td class="text-end">
+            <div class="d-flex gap-1 justify-content-end flex-wrap">
+              <select class="form-select form-select-sm migration-action-select" data-key="${escapeHtml(row.key)}" ${mongoReady ? '' : 'disabled'} style="width: 150px;">
+                <option value="">Action...</option>
+                <option value="dryRun">Dry Run In</option>
+                <option value="transfer">Transfer In</option>
+                <option value="dryRunClearTarget">Dry Run Clear</option>
+                <option value="clearTarget">Delete Target</option>
+                <option value="replaceTransfer">Replace In</option>
+                <option value="dryRunReverse">Dry Run Out</option>
+                <option value="transferReverse">Export Out</option>
+              </select>
+              <button type="button" class="btn btn-outline-primary btn-sm migration-run-action" data-key="${escapeHtml(row.key)}" ${mongoReady ? '' : 'disabled'}>Run</button>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+    updateSelectionUi();
+  }
+
+  function updateRowCounts(counts) {
+    (Array.isArray(counts) ? counts : []).forEach((item) => {
+      const row = tableBody.querySelector(`tr[data-key="${cssEscape(item.key)}"]`);
+      if (!row) return;
+      const set = (field, value) => {
+        const el = row.querySelector(`[data-count-field="${field}"]`);
+        if (el) el.textContent = value == null ? '-' : String(value);
+      };
+      set('sourceCount', item.sourceCount);
+      set('validSourceCount', item.validSourceCount);
+      set('targetCount', item.targetCount);
+      const warnings = [];
+      if (Array.isArray(item.sourceWarnings)) warnings.push(...item.sourceWarnings);
+      if (Number(item.skippedInvalid || 0) > 0) warnings.push(`Skipped invalid: ${item.skippedInvalid}`);
+      if (Number(item.skippedMissingId || 0) > 0) warnings.push(`Skipped missing id: ${item.skippedMissingId}`);
+      const warningEl = row.querySelector('[data-count-field="warnings"]');
+      if (warningEl && warnings.length) warningEl.innerHTML = `<span class="text-warning">${escapeHtml(warnings[0])}</span>`;
+    });
+  }
+
+  async function fetchJson(url, options = {}) {
+    const response = await fetch(url, options);
+    const text = await response.text();
+    let result = {};
+    try { result = text ? JSON.parse(text) : {}; } catch (_) { result = { status: 'error', message: text || 'Invalid JSON response.' }; }
+    if (!response.ok || result.status === 'error') throw new Error(result.message || `Request failed (${response.status}).`);
+    return result;
+  }
+
+  async function loadItems() {
+    tableBody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading migration catalog...</td></tr>';
+    const params = new URLSearchParams(getFilters());
+    const result = await fetchJson(`/systemSettings/data-migration/items?${params.toString()}`, {
+      headers: { 'Accept': 'application/json', 'X-AJAX-Request': 'true' }
+    });
+    if (!state.domainsLoaded) {
+      fillSelect('migrationDomainFilter', result.domains || [], 'All domains');
+      fillSelect('migrationSourceTypeFilter', result.sourceTypes || [], 'All source types');
+      state.domainsLoaded = true;
+    }
+    state.pagination = result.pagination;
+    renderRows(result.rows || []);
+    renderCoverage(result.coverage || {});
+    renderPagination();
+    await loadCountsForVisibleRows();
+  }
+
+  function renderPagination() {
+    const p = state.pagination || {};
+    paginationLabel.textContent = p.totalItems == null
+      ? 'No pagination data.'
+      : `Showing ${p.startItem || 0}-${p.endItem || 0} of ${p.totalItems || 0}`;
+    document.getElementById('migrationPrevPageBtn').disabled = !p.currentPage || p.currentPage <= 1;
+    document.getElementById('migrationNextPageBtn').disabled = !p.currentPage || p.currentPage >= p.totalPages;
+  }
+
+  async function loadCountsForVisibleRows() {
+    const keys = state.rows.map((row) => row.key).filter(Boolean);
+    if (!keys.length) return;
+    const result = await fetchJson('/systemSettings/data-migration/counts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-AJAX-Request': 'true' },
+      body: JSON.stringify({ keys, actionStateId })
+    });
+    updateRowCounts(result.counts || []);
+  }
+
+  async function postAction(url, body) {
+    return fetchJson(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-AJAX-Request': 'true' },
+      body: new URLSearchParams({ ...body, actionStateId }).toString()
+    });
+  }
+
+  function submitBackupDownload() {
+    document.getElementById('mongoBackupForm').submit();
+  }
+
+  async function confirmDangerAction(config) {
+    const message = `${config.confirmMessage}<br><br><span class="text-muted">Recommended: download a Mongo backup before continuing.</span>`;
+    if (typeof showMessageModal === 'function') {
+      const selected = await showMessageModal({
+        title: config.confirmTitle,
+        icon: 'warning',
+        message,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Download Backup', class: 'btn-outline-success btn-md' },
+          { text: config.confirmText, class: 'btn-danger btn-md' }
+        ]
+      });
+      if (selected === 'Download Backup') {
+        submitBackupDownload();
+        return false;
+      }
+      return selected === config.confirmText;
+    }
+    throw new Error('Message modal is not loaded. Please refresh the page before running destructive migration actions.');
+  }
+
+  async function ensureAdminVerification() {
+    if (typeof window.requestProtectedAction !== 'function') {
+      throw new Error('Admin verification system is not loaded. Please refresh the page and try again.');
+    }
+    await window.requestProtectedAction();
+  }
+
+  async function runItemAction(action, key, button = null) {
+    const actionMap = {
+      dryRun: { url: '/systemSettings/data-migration/dry-run', label: 'Dry Run In', isDryRun: true },
+      transfer: { url: '/systemSettings/data-migration/transfer', label: 'Transfer In' },
+      dryRunClearTarget: { url: '/systemSettings/data-migration/dry-run-clear-target', label: 'Dry Run Clear', isDryRun: true },
+      clearTarget: {
+        url: '/systemSettings/data-migration/clear-target',
+        label: 'Delete Target',
+        requiresAdmin: true,
+        confirmTitle: 'Confirm Target Deletion',
+        confirmMessage: 'This action will <b>permanently delete all records</b> from this target Mongo collection.',
+        confirmText: 'Delete'
+      },
+      replaceTransfer: {
+        url: '/systemSettings/data-migration/replace-transfer',
+        label: 'Replace In',
+        requiresAdmin: true,
+        confirmTitle: 'Confirm Replace In',
+        confirmMessage: 'This action will <b>delete all records</b> from this target Mongo collection, then copy data from JSON.',
+        confirmText: 'Replace'
+      },
+      dryRunReverse: { url: '/systemSettings/data-migration/dry-run-reverse', label: 'Dry Run Out', isDryRun: true },
+      transferReverse: { url: '/systemSettings/data-migration/transfer-reverse', label: 'Export Out' }
+    };
+    const config = actionMap[action];
+    if (!config) throw new Error('Unknown migration action.');
+
+    if (config.requiresAdmin) {
+      const confirmed = await confirmDangerAction(config);
+      if (!confirmed) return null;
+      await ensureAdminVerification();
+    }
+
+    const original = button ? button.innerHTML : '';
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    }
+    try {
+      const result = await postAction(config.url, { key });
+      setOutput(`${config.label}: ${key}`, result.report || result);
+      await loadCountsForVisibleRows();
+      return result;
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = original;
+      }
+    }
+  }
+
+  async function runBulk(action) {
+    const keys = [...selectedKeys];
+    if (!keys.length) return;
+    const label = action === 'transfer' ? 'Transfer Selected In' : 'Export Selected Out';
+    const reports = [];
+    setOutput(label, { status: 'started', total: keys.length });
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i];
+      setOutput(label, { status: 'running', current: i + 1, total: keys.length, key, reports });
+      // eslint-disable-next-line no-await-in-loop
+      const result = await runItemAction(action, key);
+      if (result) reports.push(result.report || result);
+    }
+    setOutput(label, { status: 'completed', total: keys.length, reports });
+    await loadCountsForVisibleRows();
+  }
+
+  document.getElementById('refreshCatalogBtn').addEventListener('click', () => loadItems().catch(showError));
+  document.getElementById('loadCountsBtn').addEventListener('click', () => loadCountsForVisibleRows().catch(showError));
+  document.getElementById('backupMongoBtn').addEventListener('click', submitBackupDownload);
+  document.getElementById('applyMigrationFiltersBtn').addEventListener('click', () => { state.page = 1; loadItems().catch(showError); });
+  document.getElementById('clearMigrationFiltersBtn').addEventListener('click', () => {
+    document.getElementById('migrationSearchInput').value = '';
+    document.getElementById('migrationDomainFilter').value = '';
+    document.getElementById('migrationSourceTypeFilter').value = '';
+    document.getElementById('migrationStatusFilter').value = '';
+    state.page = 1;
+    loadItems().catch(showError);
+  });
+  document.getElementById('migrationPrevPageBtn').addEventListener('click', () => { state.page = Math.max(1, state.page - 1); loadItems().catch(showError); });
+  document.getElementById('migrationNextPageBtn').addEventListener('click', () => { state.page += 1; loadItems().catch(showError); });
+  document.getElementById('clearMigrationOutputBtn').addEventListener('click', () => { outputEl.textContent = 'Ready.'; });
+  document.getElementById('bulkTransferBtn').addEventListener('click', () => runBulk('transfer').catch(showError));
+  document.getElementById('bulkExportBtn').addEventListener('click', () => runBulk('transferReverse').catch(showError));
+
+  document.getElementById('selectAllMigrationRows').addEventListener('change', (event) => {
+    state.rows.forEach((row) => {
+      if (event.target.checked) selectedKeys.add(row.key);
+      else selectedKeys.delete(row.key);
+    });
+    renderRows(state.rows);
+  });
+
+  tableBody.addEventListener('change', (event) => {
+    if (!event.target.matches('.migration-row-check')) return;
+    const key = event.target.getAttribute('data-key');
+    if (!key) return;
+    if (event.target.checked) selectedKeys.add(key);
+    else selectedKeys.delete(key);
+    updateSelectionUi();
+  });
+
+  tableBody.addEventListener('click', async (event) => {
+    const btn = event.target.closest('.migration-run-action');
+    if (!btn) return;
+    const key = btn.getAttribute('data-key');
+    const select = tableBody.querySelector(`.migration-action-select[data-key="${cssEscape(key)}"]`);
+    const action = select ? select.value : '';
+    if (!action) {
+      await showInfo('Choose Action', 'Please choose a migration action first.');
+      return;
+    }
+    try {
+      await runItemAction(action, key, btn);
+      if (select) select.value = '';
+    } catch (error) {
+      await showError(error);
+    }
+  });
+
+  async function showInfo(title, message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({ title, icon: 'info', message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+    }
+  }
+
+  async function showError(error) {
+    setOutput('Error', { message: error.message || String(error) });
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title: 'Migration Error',
+        icon: 'error',
+        message: escapeHtml(error.message || 'Migration request failed.'),
+        buttons: [{ text: 'Close', class: 'btn-danger' }]
+      });
+    }
+  }
+
+  loadItems().catch(showError);
+})();
+</script>

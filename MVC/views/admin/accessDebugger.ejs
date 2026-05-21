@@ -1,0 +1,295 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h2 class="page-heading size-md m-0">Access Control Simulator</h2>
+    <span class="badge bg-warning text-dark border">Security Tool</span>
+  </div>
+
+  <div class="dash-hero mb-4 p-4">
+    <div class="row align-items-center">
+      <div class="col-md-1 text-center">
+        <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center mx-auto" 
+             style="width: 64px; height: 64px; font-size: 1.5rem;">
+          🛡️
+        </div>
+      </div>
+      <div class="col-md-11">
+        <h3 class="fw-bold mb-1">Access Logic Verifier</h3>
+        <p class="text-muted small mb-0">
+          Simulate authorization requests by selecting a User, an Organization Context, and a specific Operation.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <div class="col-md-5">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary">
+          Configure Request
+        </div>
+        <div class="card-body">
+           
+          <form id="accessDebugForm">
+            
+            <div class="mb-3">
+              <label class="form-label small fw-bold">1. Target User</label>
+              <div class="input-group">
+                 <input type="hidden" id="selectedUserId" name="userId" value="<%= user.id %>">
+                 <input type="text" id="selectedUserName" class="form-control bg-white" value="<%= user.username || user.email %>" readonly>
+                 <button type="button" class="btn btn-outline-primary" id="pickUserBtn">
+                    <i class="bi bi-person"></i>
+                 </button>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">2. Organization Context</label>
+              <div class="input-group">
+                 <input type="hidden" id="selectedOrgId" name="orgId" value="<%= user.activeOrgId || '' %>">
+                 <input type="text" id="selectedOrgName" class="form-control bg-white" value="<%= user.activeOrgId ? 'Org #'+user.activeOrgId : 'System / None' %>" readonly>
+                 <button type="button" class="btn btn-outline-primary" id="pickOrgBtn">
+                    <i class="bi bi-building"></i>
+                 </button>
+              </div>
+              <div class="form-text text-muted x-small" id="orgHelpText">
+                 Select the organization environment to simulate.
+              </div>
+            </div>
+
+            <hr>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">3. Target Section</label>
+              <div class="input-group">
+                 <input type="text" id="sectionId" name="sectionId" class="form-control bg-white" placeholder="Select Section..." required readonly>
+                 <button type="button" class="btn btn-outline-secondary" id="pickSectionBtn">
+                    <i class="bi bi-collection"></i>
+                 </button>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">4. Target Operation</label>
+              <div class="input-group">
+                 <input type="text" id="operationId" name="operationId" class="form-control bg-white" placeholder="Select Operation..." required readonly>
+                 <button type="button" class="btn btn-outline-secondary" id="pickOpBtn">
+                    <i class="bi bi-gear"></i>
+                 </button>
+              </div>
+            </div>
+
+            <div class="mb-3">
+               <label class="form-label small fw-bold">5. Network Context</label>
+               <input type="text" id="ipAddress" name="ipAddress" class="form-control form-control-sm mb-2" placeholder="IP Address (Optional)" value="127.0.0.1">
+            </div>
+
+            <button type="submit" class="btn btn-filled btn-primary w-100 mt-3">
+              <i class="bi bi-play-circle me-2"></i> Evaluate Access
+            </button>
+
+          </form>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-7">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary d-flex justify-content-between align-items-center">
+          <span>Evaluation Result</span>
+          <span class="badge bg-secondary" id="statusCodeBadge">WAITING</span>
+        </div>
+        <div class="card-body bg-light" id="resultContainer">
+           <div class="text-center text-muted py-5">
+              <i class="bi bi-arrow-left-circle fs-1 opacity-25"></i>
+              <div class="mt-2">Run a simulation to see the decision logic.</div>
+           </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<%- include('../partials/modal') %>
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // Store user context for validation
+    let currentSelectedUser = {
+        id: '<%= user.id %>',
+        isVirtualSuperAdmin: <%= user.isVirtualSuperAdmin || false %>,
+        // Initialize with current user's organizations if available, else empty
+        organizations: <%- JSON.stringify(user.organizations || []) %>
+    };
+
+    // 1. User Picker
+    document.getElementById('pickUserBtn').addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.user({
+            title: 'Select User',
+            icon: 'bi-person-badge',
+            context: GenericPickerContexts.allUsers(),
+            onSelect: (item) => {
+                document.getElementById('selectedUserId').value = item.id;
+                document.getElementById('selectedUserName').value = `${item.name || item.username} (${item.id})`;
+                
+                // ✅ STORE SELECTED USER CONTEXT
+                currentSelectedUser = item;
+
+                // Auto-set Org to user's primary if available
+                if(item.primaryOrgId) {
+                    document.getElementById('selectedOrgId').value = item.primaryOrgId;
+                    document.getElementById('selectedOrgName').value = `Org #${item.primaryOrgId} (Default)`;
+                } else {
+                    document.getElementById('selectedOrgId').value = "";
+                    document.getElementById('selectedOrgName').value = "None Selected";
+                }
+            }
+        }));
+    });
+
+    // 2. Organization Picker (With Validation)
+    document.getElementById('pickOrgBtn').addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.organization({
+            title: 'Select Organization Context',
+            placeholder: 'Search organization...',
+            context: GenericPickerContexts.system('All Organizations', 'bi bi-building'),
+            onSelect: async (item) => {
+                
+                // ✅ VALIDATION LOGIC
+                if (currentSelectedUser) {
+                    // Bypass for Super Admins (Virtual or Database Flag)
+                    if (currentSelectedUser.isVirtualSuperAdmin === true || (currentSelectedUser.accessLevel >= 10)) {
+                        // Allowed to select any org
+                    } else {
+                        // Check Membership
+                        const userOrgs = currentSelectedUser.organizations || [];
+                        const isMember = userOrgs.some(o => String(o.orgId) === String(item.id));
+
+                        if (!isMember) {
+                            await showMessageModal({
+                                title: 'Invalid Organization',
+                                message: `The user <b>${currentSelectedUser.username || currentSelectedUser.email}</b> is not a member of <b>${item.name || 'this organization'}</b>.<br><br>Access would be denied by default.`,
+                                icon: 'warning',
+                                buttons: [{ text: 'OK', class: 'btn-warning' }]
+                            });
+                            
+                            // Clear Selection
+                            document.getElementById('selectedOrgId').value = "";
+                            document.getElementById('selectedOrgName').value = "Invalid Selection";
+                            return; 
+                        }
+                    }
+                }
+
+                document.getElementById('selectedOrgId').value = item.id;
+                document.getElementById('selectedOrgName').value = item.identity?.displayName || item.name || `Org #${item.id}`;
+            }
+        }));
+    });
+
+    // 3. Section Picker
+    document.getElementById('pickSectionBtn').addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.section({
+            title: 'Select Section',
+            context: GenericPickerContexts.system('All Sections', 'bi bi-grid'),
+            onSelect: (item) => {
+                document.getElementById('sectionId').value = item.id;
+            }
+        }));
+    });
+
+    // 4. Operation Picker
+    document.getElementById('pickOpBtn').addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.operation({
+            title: 'Select Operation',
+            context: GenericPickerContexts.system('All Operations', 'bi bi-grid'),
+            onSelect: (item) => {
+                document.getElementById('operationId').value = item.id;
+            }
+        }));
+    });
+
+
+    // --- SIMULATION HANDLER ---
+    const form = document.getElementById('accessDebugForm');
+    const resultContainer = document.getElementById('resultContainer');
+    const statusBadge = document.getElementById('statusCodeBadge');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        resultContainer.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted">Consulting Access Service...</div></div>';
+        statusBadge.className = 'badge bg-secondary';
+        statusBadge.innerText = 'PROCESSING';
+
+        const payload = {
+            userId: document.getElementById('selectedUserId').value,
+            orgId: document.getElementById('selectedOrgId').value,
+            sectionId: document.getElementById('sectionId').value,
+            operationId: document.getElementById('operationId').value,
+            ipAddress: document.getElementById('ipAddress').value
+        };
+
+        try {
+            const res = await fetch('/debug/access-debug/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await res.json();
+            renderResult(data);
+
+        } catch (err) {
+            resultContainer.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+            statusBadge.className = 'badge bg-danger';
+            statusBadge.innerText = 'ERROR';
+        }
+    });
+
+    function renderResult(data) {
+        if(data.status === 'error') {
+             resultContainer.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+             statusBadge.className = 'badge bg-danger';
+             statusBadge.innerText = 'ERROR';
+             return;
+        }
+
+        const decision = data.result;
+        const allowed = decision.allowed;
+        
+        statusBadge.className = allowed ? 'badge bg-success' : 'badge bg-danger';
+        statusBadge.innerText = allowed ? 'GRANTED' : 'DENIED';
+
+        let html = `
+            <div class="text-center mb-4">
+                <i class="bi ${allowed ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} display-1"></i>
+                <h4 class="mt-2 ${allowed ? 'text-success' : 'text-danger'} fw-bold">
+                    ${allowed ? 'Access Granted' : 'Access Denied'}
+                </h4>
+                <div class="lead fs-6 text-dark border rounded p-2 bg-white d-inline-block px-4 shadow-sm">
+                    ${decision.reason}
+                </div>
+                
+                <div class="mt-3">
+                    <span class="badge bg-info text-dark border px-3 py-2 shadow-sm">
+                        <i class="bi bi-bullseye me-2"></i>Scope: <strong>${decision.scopeId || 'Global'}</strong>
+                    </span>
+                </div>
+            </div>
+            
+            <h6 class="fw-bold border-bottom pb-2 mb-3 text-secondary">Effective Limits</h6>
+        `;
+
+        // ... (Limits Rendering Logic) ...
+        
+        resultContainer.innerHTML = html;
+    }
+
+});
+</script>

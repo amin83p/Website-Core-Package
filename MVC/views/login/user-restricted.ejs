@@ -1,0 +1,19 @@
+<div class="restricted-page">
+  <h1 class="page-heading size-md">Access Restricted</h1>
+  <div class="form-container size-md">
+    <div class="alert alert-warning">
+      <h4>Outside Your Allowed Time Frame</h4>
+      <p>Hello, <%= user.username %>.</p>
+      <p>Your account is limited to <strong>your specified hours</strong>. Please log in during your allowed time.</p>
+      <p>
+         Time: <strong><%=reason.startTime%> to <%=reason.endTime%>,</strong>.<br>
+         Days: <strong><%=reason.days%></strong> <br><br>
+      </p>
+      <p>If this is an error, please contact support.</p>
+    </div>
+    <div class="button-row">
+      <a href="/contact" class="btn btn-filled btn-info btn-md">Contcat Support</a>
+      <a href="/logout" class="btn btn-filled btn-danger btn-md">Logout</a>
+    </div>
+  </div>
+</div>

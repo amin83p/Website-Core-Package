@@ -1,0 +1,186 @@
+{
+  "audit": {
+    "lastUpdateUser": {
+      "id": "ROOT_001",
+      "username": "Amin",
+      "name": "Amin",
+      "accessLevel": 10,
+      "iat": 1776960381,
+      "exp": 1777133181,
+      "personId": "NO_PERSONID",
+      "personAvatarUrl": null,
+      "userAvatarUrl": null,
+      "email": "root@system.in",
+      "isVirtualSuperAdmin": true,
+      "isSystemAdmin": true,
+      "activeOrgId": "900000",
+      "allowedOrgs": [
+        {
+          "orgId": "SYSTEM",
+          "name": "SYSTEM / GLOBAL MODE",
+          "roles": [
+            "super_admin"
+          ],
+          "role": "Super Admin",
+          "memberStatus": "active"
+        },
+        {
+          "orgId": "464355",
+          "name": "Mohammad",
+          "roles": [
+            "admin"
+          ],
+          "role": "admin",
+          "memberStatus": "active",
+          "joinedAt": "2026-04-23T16:06:59.416Z",
+          "accessProfileIds": [],
+          "isOrgActive": true,
+          "hasActiveContract": false,
+          "isSelectable": false,
+          "switchDisabledReason": "Organization has no active contract."
+        },
+        {
+          "orgId": "486219",
+          "name": "Kalam-Melal",
+          "roles": [
+            "admin"
+          ],
+          "role": "admin",
+          "memberStatus": "active",
+          "joinedAt": "2026-04-23T16:06:59.416Z",
+          "accessProfileIds": [],
+          "isOrgActive": true,
+          "hasActiveContract": false,
+          "isSelectable": false,
+          "switchDisabledReason": "Organization has no active contract."
+        },
+        {
+          "orgId": "900000",
+          "name": "Amin Paknejad",
+          "roles": [
+            "admin"
+          ],
+          "role": "admin",
+          "memberStatus": "active",
+          "joinedAt": "2026-04-23T16:06:59.416Z",
+          "accessProfileIds": [],
+          "isOrgActive": true,
+          "hasActiveContract": true,
+          "isSelectable": true,
+          "switchDisabledReason": ""
+        }
+      ],
+      "activeProfile": {
+        "id": "VIRTUAL_ROOT",
+        "name": "SYSTEM_ROOT",
+        "fullAdmin": true,
+        "active": true,
+        "adminCategories": []
+      },
+      "activePolicy": null,
+      "activeOrgPolicy": null,
+      "canSwitchProfile": false,
+      "currentProfileMode": "SYSTEM",
+      "entitlement": {
+        "enforced": false,
+        "hasRecords": false,
+        "active": true,
+        "status": "bypass",
+        "reason": "Entitlement check bypassed for virtual super admin.",
+        "appliesToAllOrgs": false,
+        "effectiveStartDate": null,
+        "effectiveEndDate": null,
+        "nextStartDate": null,
+        "periods": []
+      },
+      "siteWarnings": []
+    },
+    "lastUpdateDateTime": "2026-04-23T16:06:59.420Z"
+  },
+  "bannedUsers": [],
+  "developer": {
+    "debugMode": false,
+    "bypassCache": false,
+    "mockExternalApis": false
+  },
+  "features": {
+    "registration": true,
+    "apiAccess": true,
+    "publicAccess": true,
+    "backgroundJobs": true
+  },
+  "globalSchedule": {
+    "weekdays": {}
+  },
+  "maintenance": {
+    "enabled": false,
+    "message": "We are currently performing scheduled maintenance. Please check back shortly.",
+    "allowedRoles": [],
+    "allowedIps": []
+  },
+  "network": {
+    "ipWhitelist": [],
+    "ipBlacklist": []
+  },
+  "requestControl": {
+    "enabled": true,
+    "mode": "monitor",
+    "logCooldownMs": 60000,
+    "excludePaths": [
+      "/health",
+      "/favicon.ico"
+    ],
+    "phase2": {
+      "enabled": false,
+      "enforceGroups": [
+        "auth",
+        "heavy"
+      ]
+    },
+    "phase3": {
+      "enabled": false
+    },
+    "routeCatalog": {
+      "disabledRouteIds": [],
+      "groupOverrides": {},
+      "routeSettings": {}
+    },
+    "routeOverrides": [],
+    "groups": {
+      "auth": {
+        "windowMs": 900000,
+        "max": 30,
+        "keyMode": "username_ip"
+      },
+      "picker": {
+        "windowMs": 60000,
+        "max": 120,
+        "keyMode": "user_or_ip"
+      },
+      "write": {
+        "windowMs": 60000,
+        "max": 80,
+        "keyMode": "user_or_ip"
+      },
+      "heavy": {
+        "windowMs": 600000,
+        "max": 20,
+        "keyMode": "user_or_ip"
+      },
+      "global": {
+        "windowMs": 60000,
+        "max": 300,
+        "keyMode": "user_or_ip"
+      }
+    }
+  },
+  "sections": [],
+  "sessionControl": {
+    "maxSessions": 2,
+    "maxDuration": 1440,
+    "idleTimeout": 1440
+  },
+  "smokeCheck": {
+    "lastRun": "2026-03-26T20:31:24.576Z"
+  }
+}

@@ -1,0 +1,620 @@
+{
+  "438186": {
+    "2026-03-05": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_1_954",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-09": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_2_173",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-10": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_3_638",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-11": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_4_447",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-12": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_5_400",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-16": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_6_284",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-17": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_7_901",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-18": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_8_383",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-19": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_9_387",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-23": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_10_398",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-24": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_11_964",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-25": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_12_676",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-26": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_13_842",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-30": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_14_954",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-03-31": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_15_464",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-01": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_16_402",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-02": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_17_832",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-06": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_18_83",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-07": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_19_917",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-08": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_20_853",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-09": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_21_860",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-13": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_22_922",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-14": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_23_163",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-15": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_24_802",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-16": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_25_78",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-20": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_26_525",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-21": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_27_573",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-22": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_28_443",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-23": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_29_570",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-27": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_30_651",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-28": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_31_742",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-29": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_32_337",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-04-30": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_33_517",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-04": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_34_819",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-05": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_35_152",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-06": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_36_52",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-07": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_37_978",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-11": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_38_194",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-12": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_39_700",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-13": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_40_142",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-14": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_41_483",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-18": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_42_508",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-19": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_43_268",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-20": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_44_134",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-21": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_45_287",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-25": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_46_842",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-26": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_47_833",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-27": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_48_602",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ],
+    "2026-05-28": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_49_57",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ]
+  },
+  "467108": {
+    "2026-03-04": [
+      {
+        "classId": "CLS-2026-4FKVE",
+        "sessionId": "SES_1773099243871_0_897",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "durationHours": 3
+      }
+    ]
+  },
+  "760360": {
+    "2026-02-02": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289316010",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-03": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289314549",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-04": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289318584",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-05": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289311258",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-06": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289315085",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-09": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289315229",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-11": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289319731",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-12": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289313357",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-13": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289315434",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-16": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289315965",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-17": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289312424",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-18": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289312250",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-19": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289315249",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-20": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289314921",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-23": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289319324",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-24": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289312484",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-25": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289319894",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ],
+    "2026-02-27": [
+      {
+        "classId": "CLS-2026-V0UKW",
+        "sessionId": "SES_17719194289319415",
+        "startTime": "01:50",
+        "endTime": "00:55",
+        "durationHours": 0
+      }
+    ]
+  }
+}

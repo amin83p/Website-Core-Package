@@ -1,0 +1,20 @@
+<div class="user-form-card">
+  <h1><%= user ? 'Edit' : 'Add' %> User</h1>
+  <% if (error) { %>
+    <div class="alert alert-danger"><%= error %></div>
+  <% } %>
+  <form action="<%= user ? '/users/' + user.id : '/users' %>" method="POST">
+    <div class="mb-3">
+      <label class="form-label">Username</label>
+      <input type="text" name="username" value="<%= user ? user.username : '' %>" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Email</label>
+      <input type="email" name="email" value="<%= user ? user.email : '' %>" class="form-control" required>
+    </div>
+    <div class="button-row">
+      <button type="submit" class="btn btn-filled btn-primary btn-md">Save</button>
+      <a href="/users" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,78 @@
+[
+  {
+    "title": "Smoke Task 1774557078536-297",
+    "status": "open",
+    "assignees": [
+      {
+        "userId": "USR-1774557078536-297"
+      }
+    ],
+    "id": "305792",
+    "comments": [
+      {
+        "text": "smoke comment",
+        "userId": "USR-1774557078536-297",
+        "id": "1774557083061653",
+        "createdAt": "2026-03-26T20:31:23.061Z"
+      }
+    ]
+  },
+  {
+    "title": "Smoke Task 1774556750651-330",
+    "status": "open",
+    "assignees": [
+      {
+        "userId": "USR-1774556750651-330"
+      }
+    ],
+    "id": "962662",
+    "comments": [
+      {
+        "text": "smoke comment",
+        "userId": "USR-1774556750651-330",
+        "id": "1774556753825580",
+        "createdAt": "2026-03-26T20:25:53.825Z"
+      }
+    ]
+  },
+  {
+    "id": "TASK_1770243513868",
+    "assignees": [
+      {
+        "userId": "SYS_ROOT_001",
+        "role": "viewer"
+      },
+      {
+        "userId": "816147",
+        "role": "executor"
+      },
+      {
+        "userId": "357011",
+        "role": "owner"
+      }
+    ],
+    "phaseName": "Planning",
+    "priority": "medium",
+    "progress": 0,
+    "projectName": "General",
+    "status": "in_progress",
+    "title": "Blood found on Nancy Guthrie’s porch belongs to her, sheriff says. “We believe Nancy is still out there”",
+    "updatedAt": "2026-02-07T08:24:57.526Z"
+  },
+  {
+    "id": "TASK_1770452810784",
+    "assignees": [
+      {
+        "userId": "SYS_ROOT_001",
+        "role": "owner"
+      }
+    ],
+    "phaseName": "Planning",
+    "priority": "medium",
+    "progress": 78,
+    "projectName": "Development",
+    "status": "review",
+    "title": "Some other one",
+    "updatedAt": "2026-02-07T19:46:21.358Z"
+  }
+]

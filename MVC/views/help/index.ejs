@@ -1,0 +1,442 @@
+<%
+  const f = filters || {};
+  const qs = (v) => encodeURIComponent(String(v || ''));
+  const totalArticles = Array.isArray(articles) ? articles.length : 0;
+  const totalCategories = Array.isArray(categories) ? categories.length : 0;
+  const selectedSectionId = String(f.sectionId || '').trim().toUpperCase();
+  const selectedOperationId = String(f.operationId || '').trim().toUpperCase();
+%>
+
+<style>
+  .help-center-page .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+  }
+  .help-center-page .topbar-title {
+    margin-left: 0;
+    padding-left: 0;
+  }
+  .help-center-page .page-heading {
+    text-align: left;
+    margin-bottom: 0 !important;
+  }
+  .help-center-page .results-inline {
+    color: #5d6d81;
+  }
+  .help-center-page .results-inline strong {
+    color: #0b5ed7;
+    font-weight: 700;
+  }
+  .help-center-page .filter-card {
+    border-radius: 14px;
+    border: 0;
+  }
+  .help-center-page .help-filter-row {
+    display: grid;
+    gap: 0.75rem;
+    align-items: end;
+  }
+  .help-center-page .help-filter-row.row-main {
+    grid-template-columns: 1.45fr 1fr;
+    margin-bottom: 0.55rem;
+  }
+  .help-center-page .help-filter-row.row-context {
+    grid-template-columns: 1.15fr 1.05fr auto;
+  }
+  .help-center-page .help-filter-cell.action-cell {
+    min-width: 170px;
+  }
+  .help-center-page .view-toolbar {
+    border: 1px solid #e5edf7;
+    border-radius: 12px;
+    background: #f9fbfe;
+  }
+  .help-center-page #helpResultsContainer.view-icon .help-result-item {
+    transition: all 0.2s ease;
+  }
+  .help-center-page .article-leading-icon {
+    display: none;
+  }
+  .help-center-page #helpResultsContainer.view-icon .article-leading-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(13, 110, 253, 0.12);
+    color: #0d6efd;
+    font-size: 1.2rem;
+    margin: 0 auto 0.45rem auto;
+  }
+  .help-center-page #helpResultsContainer.view-icon .article-card {
+    text-align: center;
+  }
+  .help-center-page #helpResultsContainer.view-icon .article-summary,
+  .help-center-page #helpResultsContainer.view-icon .article-context,
+  .help-center-page #helpResultsContainer.view-icon .article-tags,
+  .help-center-page #helpResultsContainer.view-icon .card-footer {
+    display: none !important;
+  }
+  .help-center-page #helpResultsContainer.view-list .help-result-item {
+    width: 100%;
+  }
+  .help-center-page #helpResultsContainer.view-list .article-card .card-body {
+    padding-bottom: 0.6rem;
+  }
+  .help-center-page #helpResultsContainer.view-list .article-card .card-footer {
+    padding-top: 0;
+  }
+  .help-center-page #helpResultsContainer.view-list .article-topline {
+    display: none;
+  }
+  @media (max-width: 1199px) {
+    .help-center-page .topbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .help-center-page .help-filter-row.row-main,
+    .help-center-page .help-filter-row.row-context {
+      grid-template-columns: 1fr;
+    }
+    .help-center-page .help-filter-cell.action-cell {
+      min-width: auto;
+    }
+  }
+  .help-center-page .filter-meta {
+    font-size: 0.78rem;
+    color: #6c7f95;
+    margin-top: 0.5rem;
+  }
+  .help-center-page .picker-readonly {
+    background: #fff !important;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .help-center-page .context-hit {
+    border-radius: 14px;
+    border: 1px solid #cfe2ff;
+    background: linear-gradient(155deg, #f4f9ff 0%, #ffffff 100%);
+  }
+  .help-center-page .article-card {
+    border: 0;
+    border-radius: 14px;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .help-center-page .article-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 .7rem 1.4rem rgba(20, 52, 105, 0.12) !important;
+  }
+  .help-center-page .article-topline {
+    height: 3px;
+    background: linear-gradient(90deg, #0d6efd 0%, #3da5ff 65%, #73c3ff 100%);
+  }
+  .help-center-page .empty-state {
+    border: 1px dashed #c6d5ea;
+    border-radius: 14px;
+    background: linear-gradient(150deg, #f8fbff 0%, #ffffff 100%);
+  }
+</style>
+
+<div class="sections-page help-center-page">
+  <div class="topbar">
+        <div class="topbar-title text-start">
+          <h1 class="page-heading size-md m-0">Help Center</h1>
+          <div class="text-muted mt-1">Find guidance by section, operation, category, or keywords.</div>
+          <div class="results-inline small mt-1">
+            Showing <strong><%= totalArticles %></strong> result(s) in <strong><%= totalCategories %></strong> categor(ies).
+          </div>
+          <div class="small text-muted mt-1">Resolve pattern: <code>/help/resolve?sectionId=...&amp;operationId=...</code></div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <% if (typeof canManage !== 'undefined' && canManage) { %>
+              <a href="/help/manage" class="btn btn-primary btn-filled"><i class="bi bi-sliders me-1"></i>Manage Help</a>
+            <% } %>
+            <a href="/help/center" class="btn btn-secondary btn-filled"><i class="bi bi-arrow-clockwise me-1"></i>Clear Filters</a>
+        </div>
+  </div>
+
+  <div class="card filter-card shadow-sm mb-3">
+    <div class="card-body p-3 p-lg-4">
+      <form action="/help/center" method="GET">
+        <div class="help-filter-row row-main">
+        <div class="help-filter-cell search-cell">
+          <label class="form-label fw-bold small">Search</label>
+          <input type="text" class="form-control" name="q" value="<%= f.q || '' %>" placeholder="Keywords, tags, article title">
+        </div>
+        <div class="help-filter-cell category-cell">
+          <label class="form-label fw-bold small">Category</label>
+          <select class="form-select" name="category">
+            <option value="">All categories</option>
+            <% (categories || []).forEach((c) => { %>
+              <option value="<%= c.name %>" <%= String(f.category || '') === String(c.name) ? 'selected' : '' %>>
+                <%= c.name %> (<%= c.count %>)
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        </div>
+        <div class="help-filter-row row-context">
+        <div class="help-filter-cell section-cell">
+          <label class="form-label fw-bold small">Section</label>
+          <input type="hidden" name="sectionId" id="hid_sectionId" value="<%= selectedSectionId %>">
+          <div class="input-group">
+            <input type="text" class="form-control picker-readonly text-uppercase" id="sectionPickerDisplay" value="<%= selectedSectionId %>" placeholder="Pick section..." readonly>
+            <button type="button" class="btn btn-outline-primary" id="btnPickSectionFilter"><i class="bi bi-diagram-3 me-1"></i>Pick</button>
+            <button type="button" class="btn btn-outline-secondary" id="btnClearSectionFilter"><i class="bi bi-x-lg"></i></button>
+          </div>
+        </div>
+        <div class="help-filter-cell operation-cell">
+          <label class="form-label fw-bold small">Operation</label>
+          <input type="hidden" name="operationId" id="hid_operationId" value="<%= selectedOperationId %>">
+          <div class="input-group">
+            <input type="text" class="form-control picker-readonly text-uppercase" id="operationPickerDisplay" value="<%= selectedOperationId %>" placeholder="Pick operation..." readonly>
+            <button type="button" class="btn btn-outline-primary" id="btnPickOperationFilter"><i class="bi bi-gear me-1"></i>Pick</button>
+            <button type="button" class="btn btn-outline-secondary" id="btnClearOperationFilter"><i class="bi bi-x-lg"></i></button>
+          </div>
+        </div>
+        <div class="help-filter-cell action-cell d-grid">
+          <button type="submit" class="btn btn-primary btn-filled px-4"><i class="bi bi-search me-1"></i>Search Help</button>
+        </div>
+        </div>
+        <div class="filter-meta d-flex flex-wrap align-items-center gap-3">
+          <span id="sectionPickerMeta"><%= selectedSectionId ? ('Section: ' + selectedSectionId) : 'Section: (none)' %></span>
+          <span id="operationPickerMeta"><%= selectedOperationId ? ('Operation: ' + selectedOperationId) : 'Operation: (none)' %></span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <% if (resolvedContextArticle) { %>
+    <div class="card context-hit shadow-sm mb-3">
+      <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <div class="small text-primary fw-bold text-uppercase">Context Match</div>
+          <div class="fw-bold"><%= resolvedContextArticle.title %></div>
+          <div class="small text-muted mt-1">
+            <span class="badge bg-light text-dark border me-1">Section: <%= f.sectionId || 'N/A' %></span>
+            <span class="badge bg-light text-dark border">Operation: <%= f.operationId || 'N/A' %></span>
+          </div>
+        </div>
+        <a class="btn btn-primary btn-filled" href="/help/article/<%= encodeURIComponent(resolvedContextArticle.slug) %>">
+          Open Matched Article
+        </a>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (!articles || articles.length === 0) { %>
+    <div class="card empty-state shadow-sm">
+      <div class="card-body py-5 text-center text-muted">
+        <i class="bi bi-search fs-3 d-block mb-2 text-primary"></i>
+        No help articles matched your current filters.
+      </div>
+    </div>
+  <% } else { %>
+    <div class="view-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 p-2 p-lg-3 mb-3">
+      <div class="btn-group btn-group-sm" role="group" aria-label="Result view mode">
+        <button type="button" class="btn btn-outline-primary active" id="btnViewCard" data-view-mode="card"><i class="bi bi-grid-3x2-gap me-1"></i>Card</button>
+        <button type="button" class="btn btn-outline-primary" id="btnViewIcon" data-view-mode="icon"><i class="bi bi-grid-3x3-gap me-1"></i>Icon</button>
+        <button type="button" class="btn btn-outline-primary" id="btnViewList" data-view-mode="list"><i class="bi bi-list-ul me-1"></i>List</button>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <label for="helpSortSelect" class="small fw-bold m-0 text-muted">Sort</label>
+        <select id="helpSortSelect" class="form-select form-select-sm" style="min-width: 220px;">
+          <option value="relevance">Relevance</option>
+          <option value="updated_desc">Updated (Newest)</option>
+          <option value="updated_asc">Updated (Oldest)</option>
+          <option value="title_asc">Title (A-Z)</option>
+          <option value="title_desc">Title (Z-A)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row g-3 view-card" id="helpResultsContainer">
+      <% articles.forEach((a, idx) => { %>
+        <div class="help-result-item col-lg-6" data-rank="<%= idx %>" data-title="<%= String(a.title || '').toLowerCase() %>" data-updated-ts="<%= new Date(a.updatedAt).getTime() %>">
+          <div class="card article-card shadow-sm h-100">
+            <div class="article-topline"></div>
+            <div class="card-body pb-2">
+              <div class="article-leading-icon"><i class="bi bi-file-earmark-text"></i></div>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="badge bg-light text-dark border"><%= a.category || 'Uncategorized' %></span>
+                <span class="small text-muted">Updated: <%= new Date(a.updatedAt).toLocaleString() %></span>
+              </div>
+              <h5 class="fw-bold mb-2 article-title">
+                <a href="/help/article/<%= encodeURIComponent(a.slug) %>" class="text-decoration-none"><%= a.title %></a>
+              </h5>
+              <p class="text-muted small mb-2 article-summary"><%= a.summary || 'No summary provided.' %></p>
+              <div class="small mb-2 article-context">
+                <span class="badge bg-white text-dark border me-1">Section: <%= a.sectionId || 'GLOBAL' %></span>
+                <span class="badge bg-white text-dark border">Operation: <%= a.operationId || 'DEFAULT' %></span>
+              </div>
+              <% if (Array.isArray(a.tags) && a.tags.length > 0) { %>
+                <div class="small text-muted article-tags">
+                  <% a.tags.slice(0, 6).forEach((t) => { %>
+                    <a class="badge bg-light text-dark border text-decoration-none me-1 mb-1" href="/help/center?q=<%= qs(t) %>"><%= t %></a>
+                  <% }) %>
+                </div>
+              <% } %>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0 d-flex flex-wrap gap-2">
+              <a href="/help/article/<%= encodeURIComponent(a.slug) %>" class="btn btn-sm btn-outline-primary btn-filled">Open Article</a>
+              <a href="/help/resolve?sectionId=<%= qs(a.sectionId) %>&operationId=<%= qs(a.operationId) %>" class="btn btn-sm btn-outline-secondary btn-filled">Resolve Context</a>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const hidSectionId = document.getElementById('hid_sectionId');
+  const hidOperationId = document.getElementById('hid_operationId');
+  const sectionDisplay = document.getElementById('sectionPickerDisplay');
+  const operationDisplay = document.getElementById('operationPickerDisplay');
+  const sectionMeta = document.getElementById('sectionPickerMeta');
+  const operationMeta = document.getElementById('operationPickerMeta');
+  const btnPickSection = document.getElementById('btnPickSectionFilter');
+  const btnPickOperation = document.getElementById('btnPickOperationFilter');
+  const btnClearSection = document.getElementById('btnClearSectionFilter');
+  const btnClearOperation = document.getElementById('btnClearOperationFilter');
+  const resultsContainer = document.getElementById('helpResultsContainer');
+  const sortSelect = document.getElementById('helpSortSelect');
+  const viewButtons = Array.from(document.querySelectorAll('[data-view-mode]'));
+
+  function setSection(value, detailText) {
+    const next = String(value || '').trim().toUpperCase();
+    const prev = String(hidSectionId.value || '').trim().toUpperCase();
+    hidSectionId.value = next;
+    sectionDisplay.value = next;
+    sectionMeta.textContent = detailText || (next ? `Section: ${next}` : 'Section: (none)');
+
+    if (next !== prev) {
+      setOperation('', '');
+    }
+    btnClearSection.disabled = !next;
+    updateOperationPickerState();
+  }
+
+  function setOperation(value, detailText) {
+    const next = String(value || '').trim().toUpperCase();
+    hidOperationId.value = next;
+    operationDisplay.value = next;
+    operationMeta.textContent = detailText || (next ? `Operation: ${next}` : 'Operation: (none)');
+    btnClearOperation.disabled = !next;
+  }
+
+  function updateOperationPickerState() {
+    const hasSection = Boolean(String(hidSectionId.value || '').trim());
+    btnPickOperation.disabled = !hasSection;
+    btnClearOperation.disabled = !String(hidOperationId.value || '').trim();
+  }
+
+  btnPickSection?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.normalizeConfig({
+      title: 'Select Section',
+      icon: 'bi-diagram-3',
+      apiEndpoint: '/help/manage/sections',
+      placeholder: 'Search section by name, id, or category...',
+      renderer: (item) => `
+        <div>
+          <div class="fw-bold text-dark">${item.name || item.id || ''}</div>
+          <div class="small text-muted font-monospace">ID: ${item.sectionNumericId || '-'}</div>
+          <div class="x-small text-muted">${item.category || ''}${item.homeURL ? ' | ' + item.homeURL : ''}</div>
+        </div>
+      `,
+      onSelect: (item) => {
+        const detail = `Category: ${item.category || '-'} | ID: ${item.sectionNumericId || '-'}`;
+        setSection(item.id || item.name || '', detail);
+      }
+    }));
+  });
+
+  btnPickOperation?.addEventListener('click', () => {
+    const sectionId = String(hidSectionId.value || '').trim().toUpperCase();
+    if (!sectionId) return;
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.normalizeConfig({
+      title: `Select Operation (${sectionId})`,
+      icon: 'bi-gear',
+      apiEndpoint: `/help/manage/operations?sectionId=${encodeURIComponent(sectionId)}`,
+      placeholder: 'Search operation...',
+      renderer: (item) => `
+        <div>
+          <div class="fw-bold text-dark">${item.name || item.id || ''}</div>
+          <div class="small text-muted font-monospace">Code: ${item.code || '-'}</div>
+        </div>
+      `,
+      onSelect: (item) => {
+        const detail = `Code: ${item.code || '-'} | Active: ${item.active === false ? 'No' : 'Yes'}`;
+        setOperation(item.id || item.name || '', detail);
+      }
+    }));
+  });
+
+  btnClearSection?.addEventListener('click', () => setSection('', 'Section: (none)'));
+  btnClearOperation?.addEventListener('click', () => setOperation('', 'Operation: (none)'));
+
+  setSection(hidSectionId?.value || '', String(sectionMeta?.textContent || '').trim());
+  setOperation(hidOperationId?.value || '', String(operationMeta?.textContent || '').trim());
+
+  function applyViewMode(mode) {
+    if (!resultsContainer) return;
+    const items = Array.from(resultsContainer.querySelectorAll('.help-result-item'));
+    resultsContainer.classList.remove('view-card', 'view-icon', 'view-list');
+    resultsContainer.classList.add(`view-${mode}`);
+
+    items.forEach((item) => {
+      item.classList.remove('col-lg-6', 'col-xl-3', 'col-lg-4', 'col-md-6', 'col-sm-6', 'col-12');
+      if (mode === 'icon') {
+        item.classList.add('col-xl-3', 'col-lg-4', 'col-md-6', 'col-sm-6');
+      } else if (mode === 'list') {
+        item.classList.add('col-12');
+      } else {
+        item.classList.add('col-lg-6');
+      }
+    });
+
+    viewButtons.forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.viewMode === mode);
+    });
+  }
+
+  function sortResults(mode) {
+    if (!resultsContainer) return;
+    const items = Array.from(resultsContainer.querySelectorAll('.help-result-item'));
+    const sorted = [...items].sort((a, b) => {
+      const rankA = Number(a.dataset.rank || 0);
+      const rankB = Number(b.dataset.rank || 0);
+      const titleA = String(a.dataset.title || '');
+      const titleB = String(b.dataset.title || '');
+      const updatedA = Number(a.dataset.updatedTs || 0);
+      const updatedB = Number(b.dataset.updatedTs || 0);
+
+      if (mode === 'title_asc') return titleA.localeCompare(titleB);
+      if (mode === 'title_desc') return titleB.localeCompare(titleA);
+      if (mode === 'updated_asc') return updatedA - updatedB;
+      if (mode === 'updated_desc') return updatedB - updatedA;
+      return rankA - rankB;
+    });
+    sorted.forEach((item) => resultsContainer.appendChild(item));
+  }
+
+  viewButtons.forEach((btn) => {
+    btn.addEventListener('click', () => applyViewMode(btn.dataset.viewMode || 'card'));
+  });
+  sortSelect?.addEventListener('change', () => sortResults(sortSelect.value));
+
+  applyViewMode('card');
+  if (sortSelect) sortSelect.value = 'relevance';
+});
+</script>
+

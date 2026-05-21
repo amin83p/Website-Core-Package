@@ -1,0 +1,291 @@
+<%
+  const isEdit = !!(sourceData && sourceData.id);
+  const formAction = isEdit ? `/benchpath/sources/edit/${sourceData.id}` : '/benchpath/sources/new';
+  const selectedUsableFor = Array.isArray(sourceData?.usableFor) ? sourceData.usableFor : [];
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Source' : 'Create Source' %></h1>
+    <div class="d-flex align-items-center gap-2">
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border">ID: <%= sourceData.id %></span>
+      <% } else { %>
+        <span class="badge bg-success border">New Item</span>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="form-container" style="width: 100%; max-width: 1400px;">
+    <form id="benchpathSourceForm" method="POST" action="<%= formAction %>">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+
+      <ul class="nav nav-tabs mb-3" id="sourceFormTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="required-tab" data-bs-toggle="tab" data-bs-target="#required-pane" type="button" role="tab" aria-controls="required-pane" aria-selected="true">
+            <i class="bi bi-shield-check me-1"></i> Required Fields
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="optional-tab" data-bs-toggle="tab" data-bs-target="#optional-pane" type="button" role="tab" aria-controls="optional-pane" aria-selected="false">
+            <i class="bi bi-journal-text me-1"></i> Optional Metadata
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
+        <div class="tab-pane fade show active" id="required-pane" role="tabpanel" aria-labelledby="required-tab" tabindex="0">
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">ID <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="id" value="<%= sourceData?.id || '' %>" <%= isEdit ? 'readonly' : '' %> required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Slug <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="slug" value="<%= sourceData?.slug || '' %>" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="title" value="<%= sourceData?.title || '' %>" required>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Source Type <span class="text-danger">*</span></label>
+              <select class="form-select" name="sourceType" required>
+                <option value="">Select...</option>
+                <% sourceTypeOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.sourceType === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Authority Level <span class="text-danger">*</span></label>
+              <select class="form-select" name="authorityLevel" required>
+                <option value="">Select...</option>
+                <% authorityLevelOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.authorityLevel === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Language <span class="text-danger">*</span></label>
+              <select class="form-select" name="language" required>
+                <option value="">Select...</option>
+                <% languageOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.language === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Usage Rights <span class="text-danger">*</span></label>
+              <select class="form-select" name="usageRights" required>
+                <option value="">Select...</option>
+                <% usageRightsOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.usageRights === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Usable For <span class="text-danger">*</span></label>
+            <div class="row g-2 border rounded p-2">
+              <% usableForOptions.forEach((opt) => { %>
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="usableFor_<%= opt %>" name="usableFor" value="<%= opt %>" <%= selectedUsableFor.includes(opt) ? 'checked' : '' %>>
+                    <label class="form-check-label small" for="usableFor_<%= opt %>"><%= opt %></label>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+            <div class="form-text">Select one or more values.</div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-4 mb-3">
+              <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
+              <select class="form-select" name="status" required>
+                <option value="">Select...</option>
+                <% statusOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.status === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label fw-bold">Review Status <span class="text-danger">*</span></label>
+              <select class="form-select" name="reviewStatus" required>
+                <option value="">Select...</option>
+                <% reviewStatusOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.reviewStatus === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label fw-bold">Extraction Status <span class="text-danger">*</span></label>
+              <select class="form-select" name="extractionStatus" required>
+                <option value="">Select...</option>
+                <% extractionStatusOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.extractionStatus === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="d-flex gap-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="isActive" name="isActive" value="true" <%= sourceData ? (sourceData.isActive ? 'checked' : '') : 'checked' %>>
+              <label class="form-check-label fw-bold" for="isActive">isActive</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="isSystem" name="isSystem" value="true" <%= sourceData?.isSystem ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="isSystem">isSystem</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="optional-pane" role="tabpanel" aria-labelledby="optional-tab" tabindex="0">
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Code</label>
+              <input type="text" class="form-control" name="code" value="<%= sourceData?.code || '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Short Title</label>
+              <input type="text" class="form-control" name="shortTitle" value="<%= sourceData?.shortTitle || '' %>">
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Framework</label>
+              <input type="text" class="form-control" name="framework" value="<%= sourceData?.framework || '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Publisher</label>
+              <input type="text" class="form-control" name="publisher" value="<%= sourceData?.publisher || '' %>">
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Authors (comma separated)</label>
+              <input type="text" class="form-control" name="authors" value="<%= Array.isArray(sourceData?.authors) ? sourceData.authors.join(', ') : '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Tags (comma separated)</label>
+              <input type="text" class="form-control" name="tags" value="<%= Array.isArray(sourceData?.tags) ? sourceData.tags.join(', ') : '' %>">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" name="description" rows="3"><%= sourceData?.description || '' %></textarea>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">File Extension</label>
+              <select class="form-select" name="fileExtension">
+                <option value="">Select...</option>
+                <% fileExtensionOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.fileExtension === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">File Size (bytes)</label>
+              <input type="number" min="0" class="form-control" name="fileSizeBytes" value="<%= sourceData?.fileSizeBytes ?? 0 %>">
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Year</label>
+              <input type="number" class="form-control" name="year" value="<%= sourceData?.year ?? '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Country</label>
+              <input type="text" class="form-control" name="country" value="<%= sourceData?.country || '' %>">
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" name="notes" rows="2"><%= sourceData?.notes || '' %></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-save me-1"></i> Save</button>
+        <a href="/benchpath/sources" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/benchpath/sources">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const form = document.getElementById('benchpathSourceForm');
+    if (!form) return;
+
+    let isSubmitting = false;
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (isSubmitting) return;
+
+      isSubmitting = true;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const payload = new URLSearchParams(new FormData(form));
+        const response = await fetch(form.action, {
+          method: (form.method || 'POST').toUpperCase(),
+          headers: {
+            'x-ajax-request': '1',
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+          },
+          body: payload
+        });
+
+        const result = await response.json().catch(() => ({ status: 'error', message: `Server returned HTTP ${response.status}.` }));
+        const isSuccess = response.ok && result?.status === 'success';
+
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: isSuccess ? 'Saved' : 'Save Failed',
+            icon: isSuccess ? 'success' : 'error',
+            message: result?.message || (isSuccess ? 'Saved successfully.' : 'Unable to save.'),
+            buttons: [{ text: 'OK', class: isSuccess ? 'btn-success' : 'btn-danger' }]
+          });
+        }
+
+        if (isSuccess) {
+          window.location.href = '/benchpath/sources';
+        }
+      } catch (error) {
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Save Failed',
+            icon: 'error',
+            message: error?.message || 'Unexpected network error.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        }
+      } finally {
+        isSubmitting = false;
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  })();
+</script>

@@ -1,0 +1,276 @@
+<%
+  const isArchivedMode = archivedMode === true;
+  const resolvedListBasePath = (typeof listBasePath === 'string' && listBasePath.trim())
+    ? listBasePath.trim()
+    : '/pte/students';
+  const resolvedListArchivedPath = (typeof listArchivedPath === 'string' && listArchivedPath.trim())
+    ? listArchivedPath.trim()
+    : (resolvedListBasePath + '/archived');
+  const resolvedRecoverPathBase = (typeof recoverPathBase === 'string' && recoverPathBase.trim())
+    ? recoverPathBase.trim()
+    : (resolvedListBasePath + '/recover');
+  const resolvedDeletePathBase = (typeof deletePathBase === 'string' && deletePathBase.trim())
+    ? deletePathBase.trim()
+    : (resolvedListBasePath + '/delete');
+  const resolvedEditPathBase = (typeof editPathBase === 'string' && editPathBase.trim())
+    ? editPathBase.trim()
+    : (resolvedListBasePath + '/edit');
+  const resolvedPromotePathBase = (typeof promotePathBase === 'string' && promotePathBase.trim())
+    ? promotePathBase.trim()
+    : (resolvedListBasePath + '/promote');
+  const resolvedShowPromoteAction = showPromoteAction === true;
+  const normalizedNewUrl = (typeof newUrl === 'string' && newUrl.trim())
+    ? newUrl.trim()
+    : resolvedListBasePath.replace(/^\/+/, '');
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+  const peopleDashboardHref = typeof ptePeopleSectionDashboardHref === 'string' && ptePeopleSectionDashboardHref
+    ? ptePeopleSectionDashboardHref
+    : '/dashboard/section-nav/PTE_PEOPLE';
+  const secondaryManageBtn = isArchivedMode
+    ? '<a href="' + resolvedListBasePath + '" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-list-check me-1"></i> ' + (secondaryActiveLabel || 'Active Applicants') + '</a>'
+    : '<a href="' + resolvedListArchivedPath + '" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-archive me-1"></i> ' + (secondaryArchivedLabel || 'Archived Applicants') + '</a>';
+%>
+
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  headerManageBtns: [
+    '<a href="' + dashboardHref + '" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> PTE Dashboard</a>',
+    '<a href="' + peopleDashboardHref + '" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-people-fill me-1"></i> PTE People Dashboard</a>'
+  ],
+  manageBtns: [
+    secondaryManageBtn
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search applicants by id, person, user, country, local id, or status...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Applicant</th>
+        <th>Person</th>
+        <th>User Account</th>
+        <th>Country / ID</th>
+        <th>Courses / Packages</th>
+        <th>Status</th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">No applicants found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const display = item.display || {}; %>
+        <% const selectedPackages = Array.isArray(item.selectedPackages) ? item.selectedPackages : []; %>
+        <% const courses = Array.isArray(item.courses) ? item.courses : []; %>
+        <% const academicStatus = String(item.globalAcademicStatus || '').trim() || (String(item.status || '').toLowerCase() === 'archived' ? 'Archived' : 'Active'); %>
+        <% const statusIsArchived = String(item.status || '').toLowerCase() === 'archived'; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.applicantId || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
+          </td>
+          <td>
+            <div class="fw-bold text-dark"><%= display.personName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.personId || '-' %></div>
+          </td>
+          <td>
+            <div class="fw-bold text-dark"><%= display.userName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.userId || '-' %></div>
+          </td>
+          <td>
+            <div class="small text-dark"><%= item.countryOfOrigin || '-' %></div>
+            <div class="x-small text-muted">Local/National ID: <%= item.localId || '-' %></div>
+          </td>
+          <td>
+            <div class="small text-dark"><%= courses.length %> course(s)</div>
+            <div class="x-small text-muted">
+              <% if (courses.length) { %>
+                <%= courses.slice(0, 2).map((row) => (row.name ? (row.name + ' (' + row.id + ')') : row.id)).join(', ') %><%= courses.length > 2 ? ', ...' : '' %>
+              <% } else { %>
+                -
+              <% } %>
+            </div>
+            <div class="small text-dark mt-1"><%= selectedPackages.length %> package(s)</div>
+            <div class="x-small text-muted">
+              <% if (selectedPackages.length) { %>
+                <%= selectedPackages.slice(0, 2).map((row) => (row.name ? (row.name + ' (' + row.id + ')') : row.id)).join(', ') %><%= selectedPackages.length > 2 ? ', ...' : '' %>
+              <% } else { %>
+                -
+              <% } %>
+            </div>
+          </td>
+          <td>
+            <span class="badge <%= statusIsArchived ? 'bg-secondary' : 'bg-success' %>"><%= statusIsArchived ? 'Archived' : 'Active' %></span>
+            <div class="x-small text-muted mt-1"><%= academicStatus %></div>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="<%= resolvedEditPathBase %>/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <% if (resolvedShowPromoteAction && !statusIsArchived) { %>
+                  <button
+                    class="btn btn-outline-warning btn-sm pte-promote-btn"
+                    data-id="<%= item.id %>"
+                    data-promote-url="<%= resolvedPromotePathBase %>/<%= item.id %>">
+                    <i class="bi bi-arrow-up-circle me-2"></i>Promote
+                  </button>
+                <% } %>
+                <% if (!statusIsArchived) { %>
+                  <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>" data-delete-url="<%= resolvedDeletePathBase %>/<%= item.id %>">
+                    <i class="bi bi-archive me-2"></i>Archive
+                  </button>
+                <% } else { %>
+                  <button class="btn btn-outline-success btn-sm pte-recover-btn" data-id="<%= item.id %>">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Recover
+                  </button>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: normalizedNewUrl
+}) %>
+
+<%- include('../../partials/tablePages-end') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const recoverPathBase = '<%= resolvedRecoverPathBase %>';
+  const listBasePath = '<%= resolvedListBasePath %>';
+  const isPublicAudience = <%= resolvedShowPromoteAction ? 'true' : 'false' %>;
+  const actionStateRef = document.getElementById('actionStateIdRef');
+  const actionStateId = actionStateRef ? String(actionStateRef.getAttribute('data-id') || '').trim() : '';
+
+  async function showMessage(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+      return;
+    }
+    alert(title + ': ' + message);
+  }
+
+  document.querySelectorAll('.pte-recover-btn').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const id = String(button.getAttribute('data-id') || '').trim();
+      if (!id) return;
+
+      button.disabled = true;
+      const originalHtml = button.innerHTML;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Recovering...';
+
+      try {
+        const url = recoverPathBase + '/' + encodeURIComponent(id)
+          + '?actionStateId=' + encodeURIComponent(actionStateId);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'X-AJAX-Request': 'true',
+            'Accept': 'application/json'
+          },
+          credentials: 'include'
+        });
+        const data = await response.json();
+        if (!response.ok || !data || data.status !== 'success') {
+          throw new Error((data && data.message) || ('Request failed with status ' + response.status + '.'));
+        }
+        await showMessage('Success', data.message || 'Applicant recovered successfully.', 'success');
+        window.location.reload();
+      } catch (error) {
+        await showMessage('Recover Failed', error.message || 'Unexpected recover error.', 'error');
+        button.disabled = false;
+        button.innerHTML = originalHtml;
+      }
+    });
+  });
+
+  if (isPublicAudience) {
+    document.querySelectorAll('.pte-promote-btn').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const promoteUrlRaw = String(button.getAttribute('data-promote-url') || '').trim();
+        if (!promoteUrlRaw) return;
+
+        let proceed = false;
+        if (typeof window.showMessageModal === 'function') {
+          const selected = await window.showMessageModal({
+            title: 'Promote Applicant',
+            icon: 'question',
+            message: 'Promote this user to regular PTE applicant?',
+            buttons: [
+              { text: 'Cancel', class: 'btn-secondary' },
+              { text: 'Promote', class: 'btn-primary' }
+            ]
+          });
+          proceed = selected === 'Promote';
+        } else {
+          proceed = window.confirm('Promote this user to regular PTE applicant?');
+        }
+        if (!proceed) return;
+
+        button.disabled = true;
+        const originalHtml = button.innerHTML;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Promoting...';
+
+        try {
+          const promoteUrl = promoteUrlRaw + '?actionStateId=' + encodeURIComponent(actionStateId);
+          const response = await fetch(promoteUrl, {
+            method: 'POST',
+            headers: {
+              'X-AJAX-Request': 'true',
+              'Accept': 'application/json'
+            },
+            credentials: 'include'
+          });
+          const data = await response.json();
+          if (!response.ok || !data || data.status !== 'success') {
+            throw new Error((data && data.message) || ('Request failed with status ' + response.status + '.'));
+          }
+          await showMessage('Success', data.message || 'Applicant promoted successfully.', 'success');
+          window.location.href = (data && data.redirectTo) ? data.redirectTo : listBasePath;
+        } catch (error) {
+          await showMessage('Promote Failed', error.message || 'Unexpected promote error.', 'error');
+          button.disabled = false;
+          button.innerHTML = originalHtml;
+        }
+      });
+    });
+  }
+});
+</script>

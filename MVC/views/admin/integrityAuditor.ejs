@@ -1,0 +1,197 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h2 class="page-heading size-md m-0">Data Integrity Auditor</h2>
+    <span class="badge bg-warning text-dark border">System Integrity Tool</span>
+  </div>
+
+  <div class="dash-hero mb-4 p-4">
+    <div class="row align-items-center">
+      <div class="col-md-1 text-center">
+        <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center mx-auto"
+             style="width: 64px; height: 64px; font-size: 1.5rem;">
+          <i class="bi bi-clipboard2-pulse text-secondary"></i>
+        </div>
+      </div>
+      <div class="col-md-11">
+        <h3 class="fw-bold mb-1">System Data Health Check</h3>
+        <p class="text-muted small mb-0">
+          Runs a whole-system scan for duplicate person-user links, duplicate org memberships, orphaned student/teacher/staff records, missing role assignments, and broken linked school accounts.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary">Run Audit</div>
+        <div class="card-body">
+          <div class="small text-muted mb-3">
+            This report is read-only. It does not change any data.
+          </div>
+          <button type="button" class="btn btn-filled btn-primary w-100" id="runIntegrityAuditBtn">
+            <i class="bi bi-search me-2"></i>Run Integrity Audit
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-8">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="small text-muted">Total Issues</div>
+              <div class="fs-3 fw-bold text-dark" id="sum_totalIssues">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="small text-muted">Errors</div>
+              <div class="fs-3 fw-bold text-danger" id="sum_errors">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="small text-muted">Warnings</div>
+              <div class="fs-3 fw-bold text-warning" id="sum_warnings">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary">Scope Summary</div>
+        <div class="card-body" id="checkedScope">
+          <div class="text-muted small">Run the audit to load record counts.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-light border-0 fw-bold text-primary d-flex justify-content-between align-items-center">
+          <span>Issues</span>
+          <span class="small text-muted">Newest report only</span>
+        </div>
+        <div class="card-body bg-light p-3" id="integrityIssuesContainer" style="max-height: 650px; overflow-y: auto;">
+          <div class="text-center text-muted py-5">
+            <i class="bi bi-shield-check fs-1 opacity-25"></i>
+            <div class="mt-2">Run the audit to inspect data integrity issues.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const runBtn = document.getElementById('runIntegrityAuditBtn');
+  const issuesContainer = document.getElementById('integrityIssuesContainer');
+  const checkedScope = document.getElementById('checkedScope');
+
+  function safeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function setSummary(summary) {
+    document.getElementById('sum_totalIssues').textContent = Number(summary?.totalIssues || 0);
+    document.getElementById('sum_errors').textContent = Number(summary?.errors || 0);
+    document.getElementById('sum_warnings').textContent = Number(summary?.warnings || 0);
+
+    const checked = summary?.checked || {};
+    checkedScope.innerHTML = `
+      <div class="row g-3">
+        <div class="col-md-2"><div class="border rounded bg-white p-3 text-center"><div class="small text-muted">Persons</div><div class="fw-bold">${Number(checked.persons || 0)}</div></div></div>
+        <div class="col-md-2"><div class="border rounded bg-white p-3 text-center"><div class="small text-muted">Users</div><div class="fw-bold">${Number(checked.users || 0)}</div></div></div>
+        <div class="col-md-2"><div class="border rounded bg-white p-3 text-center"><div class="small text-muted">Students</div><div class="fw-bold">${Number(checked.students || 0)}</div></div></div>
+        <div class="col-md-2"><div class="border rounded bg-white p-3 text-center"><div class="small text-muted">Teachers</div><div class="fw-bold">${Number(checked.teachers || 0)}</div></div></div>
+        <div class="col-md-2"><div class="border rounded bg-white p-3 text-center"><div class="small text-muted">Staff</div><div class="fw-bold">${Number(checked.staff || 0)}</div></div></div>
+        <div class="col-md-2"><div class="border rounded bg-white p-3 text-center"><div class="small text-muted">Accounts</div><div class="fw-bold">${Number(checked.schoolAccounts || 0)}</div></div></div>
+      </div>
+    `;
+  }
+
+  function renderIssues(issues) {
+    const list = Array.isArray(issues) ? issues : [];
+    if (!list.length) {
+      issuesContainer.innerHTML = `
+        <div class="alert alert-success border-success bg-success-subtle mb-0">
+          <div class="fw-bold mb-1"><i class="bi bi-check-circle me-2"></i>No issues found</div>
+          <div class="small text-muted">The audited records passed the current integrity checks.</div>
+        </div>
+      `;
+      return;
+    }
+
+    issuesContainer.innerHTML = `
+      <div class="table-responsive">
+        <table class="table table-sm align-middle bg-white shadow-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Severity</th>
+              <th>Type</th>
+              <th>Entity</th>
+              <th>Record</th>
+              <th>Person</th>
+              <th>Org</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map((issue) => `
+              <tr>
+                <td><span class="badge ${issue.severity === 'error' ? 'bg-danger' : 'bg-warning text-dark'}">${safeHtml(issue.severity)}</span></td>
+                <td><code>${safeHtml(issue.type)}</code></td>
+                <td>${safeHtml(issue.entity)}</td>
+                <td class="font-monospace small">${safeHtml(issue.recordId)}</td>
+                <td class="font-monospace small">${safeHtml(issue.personId)}</td>
+                <td class="font-monospace small">${safeHtml(issue.orgId)}</td>
+                <td>${safeHtml(issue.message)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  runBtn.addEventListener('click', async () => {
+    const original = runBtn.innerHTML;
+    runBtn.disabled = true;
+    runBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running...';
+    issuesContainer.innerHTML = '<div class="text-center text-primary py-5"><div class="spinner-border"></div><div class="mt-2">Scanning data...</div></div>';
+
+    try {
+      const res = await fetch('/debug/integrity-audit/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (data.status !== 'success') {
+        throw new Error(data.message || 'Integrity audit failed.');
+      }
+      setSummary(data.summary || {});
+      renderIssues(data.issues || []);
+    } catch (error) {
+      issuesContainer.innerHTML = `<div class="alert alert-danger border-danger mb-0">${safeHtml(error.message || 'Integrity audit failed.')}</div>`;
+    } finally {
+      runBtn.disabled = false;
+      runBtn.innerHTML = original;
+    }
+  });
+});
+</script>

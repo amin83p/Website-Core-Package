@@ -1,0 +1,96 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: false,
+  print: true,
+  manageBtns: [`
+      <a href="/help/center" class="btn btn-filled btn-secondary btn-md mb-2">
+        <i class="bi bi-life-preserver me-1"></i> Help Center
+      </a>
+  `]
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search help items...',
+  fields: [
+    { name: 'category', label: 'Category', type: 'select', options: categories || [] },
+    { name: 'contentMode', label: 'Content Mode', type: 'select', options: ['richtext', 'html_page'] },
+    { name: 'active', label: 'Status', type: 'select', options: ['active', 'inactive'] }
+  ]
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable dragable ps-4" data-column="helpItem">Help Item <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="context">Context <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="audience">Audience <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="source">Source <span class="sort-icon"></span></th>
+        <th class="draggable dragable text-center" data-column="state">State <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr><td colspan="6" class="text-center py-4 text-muted">No help items found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.title || 'Untitled' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.slug || '-' %> | <%= item.id || '-' %></div>
+            <div class="x-small text-muted"><%= item.summary || 'No summary' %></div>
+          </td>
+          <td>
+            <div class="small"><span class="badge bg-light text-dark border me-1">Section: <%= item.sectionId || 'GLOBAL' %></span></div>
+            <div class="small mt-1"><span class="badge bg-light text-dark border">Operation: <%= item.operationId || 'DEFAULT' %></span></div>
+          </td>
+          <td>
+            <% const audience = Array.isArray(item.audience) ? item.audience : []; %>
+            <% if (!audience.length) { %>
+              <span class="text-muted small">all</span>
+            <% } else { %>
+              <div class="d-flex flex-wrap gap-1">
+                <% audience.forEach((a) => { %>
+                  <span class="badge bg-light text-dark border"><%= a %></span>
+                <% }) %>
+              </div>
+            <% } %>
+          </td>
+          <td>
+            <div class="small"><span class="badge bg-white text-dark border text-uppercase"><%= item.contentMode || 'richtext' %></span></div>
+            <% if (item.contentMode === 'html_page') { %>
+              <div class="x-small text-muted mt-1"><%= item.contentPagePath || 'No page path' %></div>
+            <% } else { %>
+              <div class="x-small text-muted mt-1">Rich text content</div>
+            <% } %>
+          </td>
+          <td class="text-center">
+            <div><span class="badge <%= item.active ? 'bg-success' : 'bg-secondary' %>"><%= item.active ? 'ACTIVE' : 'INACTIVE' %></span></div>
+            <div class="x-small text-muted mt-1">Priority: <%= item.priority || 0 %></div>
+            <div class="x-small text-muted"><%= item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '-' %></div>
+          </td>
+          <td class="table-actions">
+            <% if (item.slug) { %>
+              <a href="/help/article/<%= encodeURIComponent(item.slug) %>" class="btn btn-sm btn-outline-info">View</a>
+            <% } %>
+            <a href="/help/manage/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: 'help/manage'
+}) %>
+
+<%- include('../partials/tablePages-end') %>

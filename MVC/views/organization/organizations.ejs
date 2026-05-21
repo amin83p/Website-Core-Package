@@ -1,0 +1,155 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search organizations...',
+  fields: searchableFields || [
+    'id',
+    'identity.displayName',
+    'identity.legalName',
+    'identity.type',
+    'contact.email',
+    'contact.address.city',
+    'contact.address.country',
+    'billing.plan',
+    'billing.status',
+    'domain.primaryDomain',
+    'notes'
+  ]
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4 draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="name">Organization <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="plan">Plan <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="contracts">Contracts <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="email">Contact <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="active">Active <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="createDateTime">Created <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Updated <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (data && data.length > 0) { %>
+        <% data.forEach(org => { %>
+          <tr>
+            <td class="ps-4">
+              <span class="font-monospace"><%= org.id %></span>
+            </td>
+
+            <td>
+              <div class="fw-bold text-dark"><%= org.identity?.displayName || 'N/A' %></div>
+              <% if (org.identity?.legalName && org.identity.legalName !== org.identity.displayName) { %>
+                <div class="text-muted x-small"><%= org.identity.legalName %></div>
+              <% } %>
+              <% if (org.identity?.type) { %>
+                <div class="x-small text-muted mt-1"><%= org.identity.type %></div>
+              <% } %>
+            </td>
+
+            <td>
+              <% const plan = org.billing?.plan || 'free'; %>
+              <span class="badge <%= plan === 'enterprise' || plan === 'paid' ? 'bg-primary' : 'bg-light text-dark border' %>">
+                <%= plan.toUpperCase() %>
+              </span>
+              <div class="x-small text-muted mt-1"><%= org.billing?.status || 'n/a' %></div>
+            </td>
+
+            <td>
+              <% const count = Number(org.contractCount || 0); %>
+              <span class="badge <%= count > 0 ? 'bg-success' : 'bg-light text-dark border' %>"><%= count %></span>
+              <% if (count > 0) { %>
+                <div class="x-small mt-1">
+                  <a href="/contracts?q=<%= encodeURIComponent(org.id) %>&type=exact_match&searchFields=orgId">View</a>
+                </div>
+              <% } %>
+            </td>
+
+            <td>
+              <div><%= org.contact?.email || 'N/A' %></div>
+              <% if (org.contact?.phone) { %>
+                <div class="x-small text-muted"><%= org.contact.phone %></div>
+              <% } %>
+            </td>
+
+            <td>
+              <% if (org.active) { %>
+                <span class="badge bg-success">Active</span>
+              <% } else { %>
+                <span class="badge bg-secondary">Inactive</span>
+              <% } %>
+            </td>
+
+            <% const audit = org.audit || {}; %>
+            <td>
+              <% if (audit.createDateTime) { %>
+                <%= new Date(audit.createDateTime).toLocaleString() %>
+                <% if (audit.createUser) { %>
+                  <div class="text-muted x-small">by <%= audit.createUser %></div>
+                <% } %>
+              <% } else { %>
+                <span class="text-muted">N/A</span>
+              <% } %>
+            </td>
+
+            <td>
+              <% if (audit.lastUpdateDateTime) { %>
+                <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+                <% if (audit.lastUpdateUser) { %>
+                  <div class="text-muted x-small">by <%= audit.lastUpdateUser %></div>
+                <% } %>
+              <% } else { %>
+                <span class="text-muted">N/A</span>
+              <% } %>
+            </td>
+
+            <td class="table-actions text-end pe-4">
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= org.id %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= org.id %>">
+                  <a href="/<%=newUrl%>/edit/<%= org.id %>" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil-square me-2"></i>Edit
+                  </a>
+                  <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= org.id %>">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </button>
+                </div>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      <% } else { %>
+        <tr>
+          <td colspan="9" class="text-center py-4 text-muted">
+            No organizations found.
+          </td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+    pagination: pagination,
+    filters: filters,
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>

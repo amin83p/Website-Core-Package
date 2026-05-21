@@ -1,0 +1,12 @@
+{
+  "subjectId": "SUB-EAL-S6HIG",
+  "code": "sdfasdfasdfasd",
+  "title": "aasfasdfasdfas",
+  "createdOn": "2026-02-24T17:39:19.303Z",
+  "folders": {
+    "sessions": "Contains session-specific materials",
+    "media": "Contains images, videos, and global subject media",
+    "attachments": "Contains general syllabi and reading lists"
+  },
+  "files": []
+}

@@ -1,0 +1,13 @@
+{
+  "id": "public-page-content",
+  "pages": {},
+  "isActive": true,
+  "createdAt": "2026-05-20T00:00:00.000Z",
+  "updatedAt": "2026-05-20T00:00:00.000Z",
+  "audit": {
+    "createUser": "system",
+    "createDateTime": "2026-05-20T00:00:00.000Z",
+    "lastUpdateUser": "system",
+    "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+  }
+}

@@ -1,0 +1,288 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="page-heading size-md m-0">Table Styler</h2>
+        <p class="text-muted mb-0">Customize data grids, search bars, and controls.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/styles" class="btn btn-outline-secondary btn-sm">Back</a>
+        <button type="submit" form="tableForm" class="btn btn-primary btn-sm btn-filled">
+            <i class="bi bi-save-fill me-1"></i> Save Changes
+        </button>
+    </div>
+  </div>
+
+  <div class="row g-4">
+      
+      <div class="col-lg-4">
+          <div class="card border-0 shadow-lg sticky-top" style="top: 20px;">
+              <div class="card-header bg-dark text-white fw-bold">
+                  Appearance Settings
+              </div>
+              <div class="card-body bg-light">
+                  <form id="tableForm" action="/styles/tables/save" method="POST">
+                      
+                      <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
+                          <li class="nav-item">
+                              <button class="nav-link active small py-1" data-bs-toggle="pill" data-bs-target="#tab-colors" type="button">Colors</button>
+                          </li>
+                          <li class="nav-item">
+                              <button class="nav-link small py-1" data-bs-toggle="pill" data-bs-target="#tab-controls" type="button">Controls</button>
+                          </li>
+                          <li class="nav-item">
+                              <button class="nav-link small py-1" data-bs-toggle="pill" data-bs-target="#tab-layout" type="button">Layout</button>
+                          </li>
+                      </ul>
+
+                      <div class="tab-content">
+                          
+                          <div class="tab-pane fade show active" id="tab-colors">
+                              <h6 class="fw-bold text-primary mb-3">Header & Body</h6>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Header Background</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= tableVars.headerBg %>" oninput="updatePreview('--table-header-bg', this.value)">
+                                      <input type="text" name="--table-header-bg" id="val_headerBg" class="form-control font-monospace" value="<%= tableVars.headerBg %>">
+                                  </div>
+                              </div>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Header Text</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= tableVars.headerText %>" oninput="updatePreview('--table-header-text', this.value)">
+                                      <input type="text" name="--table-header-text" id="val_headerText" class="form-control font-monospace" value="<%= tableVars.headerText %>">
+                                  </div>
+                              </div>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Row Hover Highlight</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= tableVars.rowHover %>" oninput="updatePreview('--table-row-hover', this.value)">
+                                      <input type="text" name="--table-row-hover" id="val_rowHover" class="form-control font-monospace" value="<%= tableVars.rowHover %>">
+                                  </div>
+                              </div>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Border Lines</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= tableVars.borderColor %>" oninput="updatePreview('--table-border-color', this.value)">
+                                      <input type="text" name="--table-border-color" id="val_borderColor" class="form-control font-monospace" value="<%= tableVars.borderColor %>">
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div class="tab-pane fade" id="tab-controls">
+                              
+                              <h6 class="fw-bold text-primary mb-3">Search Inputs & Dropdowns</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Background Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= tableVars.controlBg %>" oninput="updatePreview('--control-bg', this.value)">
+                                      <input type="text" name="--control-bg" id="val_controlBg" class="form-control font-monospace" value="<%= tableVars.controlBg %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Border Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= tableVars.controlBorder %>" oninput="updatePreview('--control-border', this.value)">
+                                      <input type="text" name="--control-border" id="val_controlBorder" class="form-control font-monospace" value="<%= tableVars.controlBorder %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Text Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= tableVars.controlText %>" oninput="updatePreview('--control-text', this.value)">
+                                      <input type="text" name="--control-text" id="val_controlText" class="form-control font-monospace" value="<%= tableVars.controlText %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-4">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Roundness</span>
+                                      <span id="cRadVal" class="text-primary"><%= tableVars.controlRadius %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="25" step="1" 
+                                         value="<%= parseInt(tableVars.controlRadius) %>"
+                                         oninput="updatePreview('--control-radius', this.value + 'px'); document.getElementById('cRadVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--control-radius" id="val_controlRadius" value="<%= tableVars.controlRadius %>">
+                              </div>
+
+                              <h6 class="fw-bold text-primary mb-3">Toggles & Focus</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Toggle / Active Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= tableVars.switchColor %>" oninput="updatePreview('--switch-checked-bg', this.value)">
+                                      <input type="text" name="--switch-checked-bg" id="val_switchColor" class="form-control font-monospace" value="<%= tableVars.switchColor %>">
+                                  </div>
+                                  <div class="form-text x-small">Used for checkboxes, switches, and focus rings.</div>
+                              </div>
+
+                          </div>
+
+                          <div class="tab-pane fade" id="tab-layout">
+                              <h6 class="fw-bold text-primary mb-3">Action Buttons</h6>
+                              <div class="card p-2 border-0 bg-white shadow-sm mb-3">
+                                  <label class="form-label small fw-bold text-muted mb-2">Orientation</label>
+                                  <div class="btn-group w-100" role="group">
+                                      <input type="radio" class="btn-check" name="--table-action-dir" id="dir_row" value="row" 
+                                             autocomplete="off" <%= tableVars.actionDir === 'row' ? 'checked' : '' %>
+                                             onchange="updatePreview('--table-action-dir', 'row'); updatePreview('--table-action-align', 'center');">
+                                      <label class="btn btn-outline-secondary btn-sm" for="dir_row">Horizontal</label>
+                                    
+                                      <input type="radio" class="btn-check" name="--table-action-dir" id="dir_col" value="column" 
+                                             autocomplete="off" <%= tableVars.actionDir === 'column' ? 'checked' : '' %>
+                                             onchange="updatePreview('--table-action-dir', 'column'); updatePreview('--table-action-align', 'stretch');">
+                                      <label class="btn btn-outline-secondary btn-sm" for="dir_col">Vertical</label>
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Row Height (Padding)</span>
+                                      <span id="padVal" class="text-primary"><%= tableVars.paddingY %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="4" max="24" step="1" 
+                                         value="<%= parseInt(tableVars.paddingY) %>"
+                                         oninput="updatePreview('--table-padding-y', this.value + 'px'); document.getElementById('padVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--table-padding-y" id="val_paddingY" value="<%= tableVars.paddingY %>">
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Table Roundness</span>
+                                      <span id="radVal" class="text-primary"><%= tableVars.radius %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="20" step="1"
+                                         value="<%= parseInt(tableVars.radius) %>"
+                                         oninput="updatePreview('--table-radius', this.value + 'px'); document.getElementById('radVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--table-radius" id="val_radius" value="<%= tableVars.radius %>">
+                              </div>
+                          </div>
+
+                      </div>
+
+                  </form>
+              </div>
+          </div>
+      </div>
+
+      <div class="col-lg-8">
+          <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white border-bottom-0 pt-3 fw-bold text-secondary d-flex justify-content-between align-items-center">
+                  <span>Live Preview</span>
+                  <span class="badge bg-light text-muted border">Real Data Simulation</span>
+              </div>
+              <div class="card-body p-4 bg-light">
+                  
+                  <div class="search-container mb-3">
+                      <div class="search-wrapper">
+                          <select class="form-select search-select" style="max-width: 150px;">
+                              <option>Name</option>
+                              <option>Email</option>
+                          </select>
+                          <input type="text" class="form-control search-input" placeholder="Search records...">
+                          <div class="form-check form-switch ms-3">
+                              <input class="form-check-input" type="checkbox" id="fitToggle" checked>
+                              <label class="form-check-label small" for="fitToggle">Fit Screen</label>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="table-scroll-wrapper fit-mode bg-white shadow-sm">
+                      <table class="table-responsive align-middle mb-0" style="width:100%">
+                          <thead>
+                              <tr>
+                                  <th style="width: 50px;">#</th>
+                                  <th>User</th>
+                                  <th>Role</th>
+                                  <th>Status</th>
+                                  <th class="text-end">Actions</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              <tr>
+                                  <td>1</td>
+                                  <td><span class="fw-bold text-primary">Admin User</span><br><span class="text-muted small">admin@example.com</span></td>
+                                  <td><span class="badge bg-danger">Administrator</span></td>
+                                  <td><span class="badge bg-success">Active</span></td>
+                                  <td class="text-end">
+                                      <div class="table-actions">
+                                        <button class="btn btn-sm btn-light border w-100">Edit</button>
+                                        <button class="btn btn-sm btn-light border w-100">Delete</button>
+                                      </div>
+                                  </td>
+                              </tr>
+                              <tr>
+                                  <td>2</td>
+                                  <td><span class="fw-bold text-dark">John Doe</span><br><span class="text-muted small">john@example.com</span></td>
+                                  <td><span class="badge bg-primary">Editor</span></td>
+                                  <td><span class="badge bg-secondary">Offline</span></td>
+                                  <td class="text-end">
+                                      <div class="table-actions">
+                                        <button class="btn btn-sm btn-light border w-100">Edit</button>
+                                        <button class="btn btn-sm btn-light border w-100">Delete</button>
+                                      </div>
+                                  </td>
+                              </tr>
+                          </tbody>
+                      </table>
+                  </div>
+
+              </div>
+          </div>
+      </div>
+
+  </div>
+</div>
+
+<script>
+    function updatePreview(varName, val) {
+        // Sync hidden/text inputs
+        const shortName = varName.replace('--table-', '').replace('--control-', 'control').replace('--switch-checked-bg', 'switchColor').replace(/-([a-z])/g, g => g[1].toUpperCase());
+        
+        // Handle specific naming exceptions for ID matching
+        let inputId = 'val_' + shortName;
+        if(varName === '--table-padding-y') inputId = 'val_paddingY';
+        if(varName === '--table-radius') inputId = 'val_radius';
+        if(varName === '--control-radius') inputId = 'val_controlRadius';
+
+        const textInput = document.getElementById(inputId);
+        if(textInput) textInput.value = val;
+
+        // Apply globally
+        document.documentElement.style.setProperty(varName, val);
+        
+        // Apply focus color derived from switch color
+        if(varName === '--switch-checked-bg') {
+            document.documentElement.style.setProperty('--control-focus-color', val + '40'); // 25% opacity
+        }
+    }
+
+    // Submit Handler (Unchanged)
+    document.getElementById('tableForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.querySelector('button[type="submit"]');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        btn.disabled = true;
+
+        try {
+            const fd = new FormData(e.target);
+            const data = Object.fromEntries(fd.entries());
+            const res = await fetch(e.target.action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' }, body: JSON.stringify(data) });
+            const result = await res.json();
+            if (result.status === 'success') {
+                if(typeof showMessageModal === 'function') await showMessageModal({ title: 'Saved', icon: 'success', message: 'Styles updated.', buttons: [{text:'OK', class:'btn-success'}]});
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            } else {
+                alert('Error: ' + result.message);
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            }
+        } catch (err) {
+            console.error(err); alert('Network error.');
+            btn.disabled = false; btn.innerHTML = originalHtml;
+        }
+    });
+</script>

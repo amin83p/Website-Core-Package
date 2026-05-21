@@ -1,0 +1,173 @@
+<div class="container py-5">
+  <div class="dash-hero mb-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+      <h1 class="page-heading size-lg mb-1 text-warning"><%= pageTitle || 'Membership Inactive' %></h1>
+      <div class="text-muted" style="font-size:1.05rem;">
+        <%= pageSubtitle || 'Your account is signed in, but this organization is currently blocked by membership rules.' %>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-primary btn-filled btn-md js-membership-action-btn" id="btnMembershipRefresh" data-action="refresh">
+        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+      </button>
+      <% if (hasSwitchableOrgs && !blockAppliesAll) { %>
+        <button type="button" class="btn btn-outline-primary btn-md js-membership-action-btn" id="openOrgSwitchBtn" data-action="switch">
+          <i class="bi bi-arrow-left-right me-1"></i> Switch Organization
+        </button>
+      <% } %>
+      <a href="/logout" class="btn btn-outline-secondary btn-md js-membership-action-btn" id="btnMembershipLogout" data-action="logout">
+        <i class="bi bi-box-arrow-right me-1"></i> Logout
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4 align-items-stretch">
+    <div class="col-lg-4">
+      <div class="module-card h-100 d-flex flex-column justify-content-center text-center p-5">
+        <div class="module-accent"></div>
+        <div class="mb-3 text-warning opacity-75">
+          <i class="bi <%= pageVariant === 'validity' ? 'bi-hourglass-split' : 'bi-shield-exclamation' %>" style="font-size:4rem;"></i>
+        </div>
+        <h2 class="display-6 fw-bold text-warning mb-0"><%= pageVariant === 'validity' ? 'Validity Window Closed' : 'Access Paused' %></h2>
+        <div class="text-muted text-uppercase fw-bold small letter-spacing-1 mt-1">
+          <%= pageVariant === 'validity' ? 'Membership Validity' : 'Membership Control' %>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="module-card h-100">
+        <div class="module-accent"></div>
+        <h4 class="fw-bold mb-3">Why this page appears</h4>
+
+        <div class="alert alert-warning border-0 bg-warning-subtle text-dark mb-4">
+          <i class="bi bi-info-circle-fill me-2"></i>
+          <strong><%- entitlement?.reason || 'Membership is currently inactive for the selected organization.' %></strong>
+        </div>
+
+        <%
+          const reasonCode = String(entitlement?.status || '').toLowerCase();
+          let reasonLabel = 'Unknown';
+          let reasonBadgeClass = 'text-bg-secondary';
+          let reasonHint = 'Membership restriction is active. Contact support if this persists.';
+          if (reasonCode === 'deactivated_global') {
+            reasonLabel = 'Deactivated (Global)';
+            reasonBadgeClass = 'text-bg-danger';
+            reasonHint = 'Membership is manually disabled for all organizations.';
+          } else if (reasonCode === 'deactivated_org') {
+            reasonLabel = 'Deactivated (Organization)';
+            reasonBadgeClass = 'text-bg-danger';
+            reasonHint = 'Membership is manually disabled for this organization only.';
+          } else if (reasonCode === 'expired') {
+            reasonLabel = 'Validity Expired';
+            reasonBadgeClass = 'text-bg-warning';
+            reasonHint = 'The merged membership period ended before today.';
+          } else if (reasonCode === 'upcoming') {
+            reasonLabel = 'Validity Upcoming';
+            reasonBadgeClass = 'text-bg-info';
+            reasonHint = 'Membership starts in the future and is not active yet.';
+          }
+        %>
+
+        <div class="p-3 border rounded bg-light mb-4">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="fw-bold mb-0">Reason Type</h6>
+            <span class="badge <%= reasonBadgeClass %>"><%= reasonLabel %></span>
+          </div>
+          <div class="small text-muted mb-1">
+            Support code:
+            <span class="font-monospace fw-semibold"><%= reasonCode || 'n/a' %></span>
+          </div>
+          <div class="small text-muted"><%= reasonHint %></div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light h-100">
+              <h6 class="fw-bold mb-2">Current Organization</h6>
+              <div class="small text-dark fw-semibold">
+                <%= currentOrg?.name || currentOrg?.orgName || currentOrg?.organizationName || ('Org #' + (currentOrg?.orgId || 'N/A')) %>
+              </div>
+              <% if (currentOrg?.orgId) { %>
+                <div class="small text-muted mt-1">#<%= currentOrg.orgId %></div>
+              <% } %>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light h-100">
+              <h6 class="fw-bold mb-2">Next Step</h6>
+              <% if (blockAppliesAll) { %>
+                <div class="small text-danger fw-semibold">This affects all organizations on your account.</div>
+                <div class="small text-muted mt-1">Switching organizations is not available right now.</div>
+              <% } else if (hasSwitchableOrgs) { %>
+                <div class="small text-info-emphasis fw-semibold">Other organizations are available.</div>
+                <div class="small text-muted mt-1">Use the switch button to try another organization.</div>
+              <% } else { %>
+                <div class="small text-muted fw-semibold">No other accessible organization found.</div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 border rounded bg-white">
+          Contact your administrator or organization to activate or renew your membership.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const refreshBtn = document.getElementById('btnMembershipRefresh');
+    const switchBtn = document.getElementById('openOrgSwitchBtn');
+    const logoutBtn = document.getElementById('btnMembershipLogout');
+    const modalEl = document.getElementById('orgSwitchModal');
+
+    function setBusy(button, label) {
+      if (!button || button.dataset.busy === '1') return;
+      button.dataset.busy = '1';
+      button.dataset.originalHtml = button.innerHTML;
+      button.classList.add('disabled');
+      button.setAttribute('aria-disabled', 'true');
+      if (button.tagName === 'BUTTON') button.disabled = true;
+      button.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${label}`;
+    }
+
+    function clearBusy(button) {
+      if (!button || button.dataset.busy !== '1') return;
+      button.dataset.busy = '0';
+      const original = button.dataset.originalHtml;
+      if (original) button.innerHTML = original;
+      button.classList.remove('disabled');
+      button.removeAttribute('aria-disabled');
+      if (button.tagName === 'BUTTON') button.disabled = false;
+    }
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        setBusy(refreshBtn, 'Refreshing...');
+        setTimeout(() => window.location.reload(), 120);
+      });
+    }
+
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (logoutBtn.dataset.busy === '1') return;
+        setBusy(logoutBtn, 'Logging out...');
+        setTimeout(() => window.location.assign('/logout'), 120);
+      });
+    }
+
+    if (switchBtn) {
+      switchBtn.addEventListener('click', () => {
+        if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
+        setBusy(switchBtn, 'Opening...');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+        setTimeout(() => clearBusy(switchBtn), 350);
+      });
+    }
+  });
+</script>

@@ -1,0 +1,537 @@
+<%
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+  const reportData = report && typeof report === 'object' ? report : {};
+  const summary = reportData.summary && typeof reportData.summary === 'object' ? reportData.summary : {};
+  const bySkill = Array.isArray(reportData.bySkill) ? reportData.bySkill : [];
+  const byType = Array.isArray(reportData.byAttemptType) ? reportData.byAttemptType : [];
+  const byUser = Array.isArray(reportData.byUser) ? reportData.byUser : [];
+  const trend = Array.isArray(reportData.trend) ? reportData.trend : [];
+  const filterRows = filters && typeof filters === 'object' ? filters : {};
+  const optionRows = optionSets && typeof optionSets === 'object' ? optionSets : {};
+  const attemptTypeRows = Array.isArray(optionRows.attemptTypes) ? optionRows.attemptTypes : [];
+  const statusRows = Array.isArray(optionRows.sessionStatuses) ? optionRows.sessionStatuses : [];
+  const selectedUsersRows = Array.isArray(selectedUsers) ? selectedUsers : [];
+  const hasAttemptOverallFiltersApplied = Boolean(
+    String(filterRows.q || '').trim()
+    || String(filterRows.attemptType || '').trim()
+    || String(filterRows.status || '').trim()
+    || String(filterRows.startedFrom || '').trim()
+    || String(filterRows.startedTo || '').trim()
+    || String(filterRows.userId || '').trim()
+    || selectedUsersRows.length
+  );
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-graph-up-arrow me-2"></i>PTE Attempt Overall Performance</h1>
+    <div class="d-flex align-items-center">
+      <a href="<%= dashboardHref %>" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-speedometer2 me-1"></i> PTE Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="d-flex align-items-center justify-content-end mb-3 flex-wrap">
+    <div class="d-flex align-items-center flex-wrap">
+      <a href="/pte/attempt/ledger" class="btn btn-outline-secondary btn-md me-2 mb-2">
+        <i class="bi bi-list-columns-reverse me-1"></i> Attempt Ledger
+      </a>
+      <a href="/pte/attempt/details" class="btn btn-outline-secondary btn-md me-2 mb-2">
+        <i class="bi bi-journal-text me-1"></i> Attempt Details
+      </a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Overall Performance</div>
+      <button
+        id="pteAttemptOverallFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#pteAttemptOverallFilterCollapse"
+        aria-expanded="<%= hasAttemptOverallFiltersApplied ? 'true' : 'false' %>"
+        aria-controls="pteAttemptOverallFilterCollapse"
+        aria-label="<%= hasAttemptOverallFiltersApplied ? 'Close filters' : 'Open filters' %>">
+        <i id="pteAttemptOverallFilterToggleIcon" class="bi <%= hasAttemptOverallFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+      </button>
+    </div>
+    <div class="collapse<%= hasAttemptOverallFiltersApplied ? ' show' : '' %>" id="pteAttemptOverallFilterCollapse">
+      <form method="GET" action="/pte/attempt/overall-performance" id="pteAttemptOverallFilterForm" class="card-body p-3">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">Search</label>
+            <input type="text" class="form-control size-md" name="q" value="<%= filterRows.q || '' %>" placeholder="Search by id, type, status...">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Attempt Type</label>
+            <select class="form-select size-md" name="attemptType">
+              <option value="">All Types</option>
+              <% attemptTypeRows.forEach((row) => { %>
+                <option value="<%= row.value %>" <%= String(filterRows.attemptType || '').toLowerCase() === String(row.value || '').toLowerCase() ? 'selected' : '' %>>
+                  <%= row.label || row.value %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Status</label>
+            <select class="form-select size-md" name="status">
+              <option value="">All Statuses</option>
+              <% statusRows.forEach((row) => { %>
+                <option value="<%= row.value %>" <%= String(filterRows.status || '').toLowerCase() === String(row.value || '').toLowerCase() ? 'selected' : '' %>>
+                  <%= row.label || row.value %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Started From</label>
+            <input type="date" class="form-control size-md" name="startedFrom" value="<%= filterRows.startedFrom || '' %>">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Started To</label>
+            <input type="date" class="form-control size-md" name="startedTo" value="<%= filterRows.startedTo || '' %>">
+          </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-12">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+              <label class="form-label mb-0">User</label>
+              <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-outline-primary btn-md" id="btnPickOverallUser">
+                  <i class="bi bi-person me-1"></i>Select User
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-md" id="btnClearOverallUser">
+                  Clear User
+                </button>
+              </div>
+            </div>
+            <div id="overallSelectedUserBox" class="border rounded p-2 bg-light-subtle small"></div>
+          </div>
+        </div>
+
+        <div class="row g-3 align-items-start mt-1">
+          <div class="col-12 d-flex justify-content-xl-end gap-2 pt-xl-2">
+            <a href="/pte/attempt/overall-performance" class="btn btn-outline-secondary btn-md">Reset</a>
+            <button type="submit" class="btn btn-filled btn-primary btn-md">
+              <i class="bi bi-funnel me-1"></i>Apply
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Total Sessions</div>
+          <div class="display-6 fw-bold"><%= Number(summary.totalSessions || 0) %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Completed Sessions</div>
+          <div class="display-6 fw-bold"><%= Number(summary.completedSessions || 0) %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Avg Session Score</div>
+          <div class="display-6 fw-bold"><%= Number(summary.averageSessionPercentage || 0).toFixed(2) %>%</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Avg Item Time</div>
+          <div class="display-6 fw-bold"><%= Number(summary.averageItemTimeSeconds || 0).toFixed(2) %>s</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-xl-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-0 pt-3 pb-0">
+          <h5 class="fw-bold m-0"><i class="bi bi-bar-chart-line me-2"></i>Skill Performance</h5>
+        </div>
+        <div class="card-body pt-3">
+          <canvas id="overallSkillChart" height="180"></canvas>
+          <div class="table-responsive mt-3">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Skill</th>
+                  <th>Items</th>
+                  <th>Avg %</th>
+                  <th>Avg Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!bySkill.length) { %>
+                  <tr><td colspan="4" class="text-center text-muted py-3">No skill data available.</td></tr>
+                <% } %>
+                <% bySkill.forEach((row) => { %>
+                  <tr>
+                    <td class="text-capitalize"><%= row.skill || '-' %></td>
+                    <td><%= Number(row.itemCount || 0) %></td>
+                    <td><%= Number(row.averagePercentage || 0).toFixed(2) %>%</td>
+                    <td><%= Number(row.averageTimeSeconds || 0).toFixed(2) %>s</td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-0 pt-3 pb-0">
+          <h5 class="fw-bold m-0"><i class="bi bi-activity me-2"></i>Session Trend</h5>
+        </div>
+        <div class="card-body pt-3">
+          <canvas id="overallTrendChart" height="180"></canvas>
+          <div class="small text-muted mt-2">Shows most recent session percentages in chronological order.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-xl-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-0 pt-3 pb-0">
+          <h5 class="fw-bold m-0"><i class="bi bi-ui-checks-grid me-2"></i>By Attempt Type</h5>
+        </div>
+        <div class="card-body pt-3">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Attempt Type</th>
+                  <th>Sessions</th>
+                  <th>Completed</th>
+                  <th>Avg %</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!byType.length) { %>
+                  <tr><td colspan="4" class="text-center text-muted py-3">No attempt-type data available.</td></tr>
+                <% } %>
+                <% byType.forEach((row) => { %>
+                  <tr>
+                    <td class="text-capitalize"><%= String(row.attemptType || '-').replace(/_/g, ' ') %></td>
+                    <td><%= Number(row.sessionCount || 0) %></td>
+                    <td><%= Number(row.completedCount || 0) %></td>
+                    <td><%= Number(row.averagePercentage || 0).toFixed(2) %>%</td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-0 pt-3 pb-0">
+          <h5 class="fw-bold m-0"><i class="bi bi-people me-2"></i>By User</h5>
+        </div>
+        <div class="card-body pt-3">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Sessions</th>
+                  <th>Avg %</th>
+                  <th>Latest</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!byUser.length) { %>
+                  <tr><td colspan="4" class="text-center text-muted py-3">No per-user rows for current filters.</td></tr>
+                <% } %>
+                <% byUser.forEach((row) => { %>
+                  <tr>
+                    <td>
+                      <div class="small fw-bold"><%= row.userLabel || row.userId || '-' %></div>
+                      <div class="x-small text-muted font-monospace"><%= row.userId || '-' %></div>
+                    </td>
+                    <td><%= Number(row.sessionCount || 0) %></td>
+                    <td><%= Number(row.averagePercentage || 0).toFixed(2) %>%</td>
+                    <td class="small"><%= row.latestStartedAtDisplay || '-' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker', { user }) %>
+
+<script id="pteOverallReportJson" type="application/json"><%- JSON.stringify(reportData || {}).replace(/</g, '\\u003c') %></script>
+<script>
+(() => {
+  const selectedUsers = <%- JSON.stringify(selectedUsersRows || []).replace(/</g, '\\u003c') %>;
+  const filterForm = document.getElementById('pteAttemptOverallFilterForm');
+  const report = (() => {
+    try {
+      const node = document.getElementById('pteOverallReportJson');
+      return JSON.parse((node && node.textContent) || '{}');
+    } catch (_) {
+      return {};
+    }
+  })();
+  if (!filterForm) return;
+
+  const selectedBox = document.getElementById('overallSelectedUserBox');
+  const pickBtn = document.getElementById('btnPickOverallUser');
+  const clearBtn = document.getElementById('btnClearOverallUser');
+
+  function initCollapseToggleIcon(options = {}) {
+    const collapseEl = document.getElementById(String(options.collapseId || ''));
+    const buttonEl = document.getElementById(String(options.buttonId || ''));
+    const iconEl = document.getElementById(String(options.iconId || ''));
+    if (!collapseEl || !buttonEl || !iconEl) return;
+
+    const openIcon = String(options.openIcon || 'bi-chevron-down');
+    const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+    const openLabel = String(options.openLabel || 'Open filters');
+    const closeLabel = String(options.closeLabel || 'Close filters');
+
+    const setState = (expanded) => {
+      iconEl.classList.remove(openIcon, closeIcon);
+      iconEl.classList.add(expanded ? closeIcon : openIcon);
+      buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+    };
+
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+    collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+  }
+
+  initCollapseToggleIcon({
+    collapseId: 'pteAttemptOverallFilterCollapse',
+    buttonId: 'pteAttemptOverallFilterToggleBtn',
+    iconId: 'pteAttemptOverallFilterToggleIcon',
+    openIcon: 'bi-chevron-down',
+    closeIcon: 'bi-chevron-up',
+    openLabel: 'Open filters',
+    closeLabel: 'Close filters'
+  });
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function normalizeId(value) {
+    return String(value || '').trim();
+  }
+
+  function renderSelectedUser() {
+    if (!selectedBox) return;
+    if (!selectedUsers.length) {
+      selectedBox.innerHTML = '<div class="text-muted">No specific user selected.</div>';
+      return;
+    }
+    const row = selectedUsers[0];
+    const id = normalizeId(row?.id);
+    const label = String(row?.name || row?.username || row?.email || id).trim() || id;
+    selectedBox.innerHTML = ''
+      + '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-2 py-1">'
+      + '  <div>'
+      + '    <div class="fw-bold">' + esc(label) + '</div>'
+      + '    <div class="x-small text-muted font-monospace">' + esc(id) + '</div>'
+      + '    <input type="hidden" name="userId" value="' + esc(id) + '">'
+      + '  </div>'
+      + '  <button type="button" class="btn btn-outline-danger btn-sm" id="overallRemoveUser"><i class="bi bi-x-lg"></i></button>'
+      + '</div>';
+    const removeBtn = document.getElementById('overallRemoveUser');
+    removeBtn?.addEventListener('click', () => {
+      selectedUsers.length = 0;
+      renderSelectedUser();
+    });
+  }
+
+  function setUser(row) {
+    const id = normalizeId(row?.id);
+    if (!id) return;
+    selectedUsers.length = 0;
+    selectedUsers.push({
+      id,
+      name: String(row?.name || row?.username || row?.email || id).trim(),
+      username: String(row?.username || '').trim(),
+      email: String(row?.email || '').trim()
+    });
+    renderSelectedUser();
+  }
+
+  pickBtn?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.user({
+      title: 'Select User',
+      apiEndpoint: '/pte/attempt/ledger/picker/users',
+      placeholder: 'Search users by name, username, email, or id...',
+      multiselect: false,
+      context,
+      onSelect: (item) => {
+        const selected = Array.isArray(item) ? item[0] : item;
+        setUser(selected);
+      }
+    }));
+  });
+
+  clearBtn?.addEventListener('click', () => {
+    selectedUsers.length = 0;
+    renderSelectedUser();
+  });
+
+  function drawBars(canvasId, labels = [], values = [], barColor = '#0d6efd') {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || typeof canvas.getContext !== 'function') return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.clientWidth || 640;
+    const h = canvas.height = canvas.clientHeight || 180;
+    ctx.clearRect(0, 0, w, h);
+    if (!labels.length || !values.length) {
+      ctx.fillStyle = '#6c757d';
+      ctx.font = '14px Arial';
+      ctx.fillText('No chart data for current filters.', 16, 24);
+      return;
+    }
+
+    const top = 16;
+    const left = 36;
+    const bottom = h - 28;
+    const right = w - 12;
+    const max = Math.max(1, ...values.map((v) => Number(v || 0)));
+    const slot = Math.max(24, (right - left) / labels.length);
+    const barW = Math.max(10, slot * 0.52);
+
+    ctx.strokeStyle = '#d9e2ec';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, bottom);
+    ctx.lineTo(right, bottom);
+    ctx.stroke();
+
+    labels.forEach((label, idx) => {
+      const value = Number(values[idx] || 0);
+      const x = left + (slot * idx) + ((slot - barW) / 2);
+      const height = Math.max(0, ((bottom - top) * (value / max)));
+      const y = bottom - height;
+      ctx.fillStyle = barColor;
+      ctx.fillRect(x, y, barW, height);
+
+      ctx.fillStyle = '#334e68';
+      ctx.font = '10px Arial';
+      const text = String(label || '').slice(0, 14);
+      ctx.save();
+      ctx.translate(x + (barW / 2), bottom + 10);
+      ctx.rotate(-Math.PI / 7);
+      ctx.fillText(text, -ctx.measureText(text).width / 2, 0);
+      ctx.restore();
+    });
+  }
+
+  function drawLine(canvasId, labels = [], values = [], lineColor = '#198754') {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || typeof canvas.getContext !== 'function') return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.clientWidth || 640;
+    const h = canvas.height = canvas.clientHeight || 180;
+    ctx.clearRect(0, 0, w, h);
+    if (!labels.length || !values.length) {
+      ctx.fillStyle = '#6c757d';
+      ctx.font = '14px Arial';
+      ctx.fillText('No chart data for current filters.', 16, 24);
+      return;
+    }
+
+    const top = 18;
+    const left = 36;
+    const bottom = h - 26;
+    const right = w - 16;
+    const max = Math.max(100, ...values.map((v) => Number(v || 0)));
+    const min = Math.min(0, ...values.map((v) => Number(v || 0)));
+    const range = Math.max(1, max - min);
+
+    ctx.strokeStyle = '#d9e2ec';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, bottom);
+    ctx.lineTo(right, bottom);
+    ctx.stroke();
+
+    const points = values.map((v, idx) => {
+      const ratio = (Number(v || 0) - min) / range;
+      const x = left + ((right - left) * (labels.length === 1 ? 0.5 : idx / (labels.length - 1)));
+      const y = bottom - ((bottom - top) * ratio);
+      return { x, y, value: Number(v || 0), label: labels[idx] || '' };
+    });
+
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    points.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    points.forEach((p) => {
+      ctx.fillStyle = lineColor;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  const skillRows = Array.isArray(report?.bySkill) ? report.bySkill : [];
+  const trendRows = Array.isArray(report?.trend) ? report.trend : [];
+  drawBars(
+    'overallSkillChart',
+    skillRows.map((row) => String(row?.skill || '').toUpperCase()),
+    skillRows.map((row) => Number(row?.averagePercentage || 0)),
+    '#0d6efd'
+  );
+  drawLine(
+    'overallTrendChart',
+    trendRows.map((row) => String(row?.id || '').slice(-6)),
+    trendRows.map((row) => Number(row?.percentage || 0)),
+    '#20a85b'
+  );
+
+  renderSelectedUser();
+})();
+</script>

@@ -1,0 +1,1073 @@
+<%
+  const e = (entry && typeof entry === 'object') ? entry : {};
+  const group = (groupRecord && typeof groupRecord === 'object') ? groupRecord : null;
+  const planSeed = (initialCreditPlan && typeof initialCreditPlan === 'object') ? initialCreditPlan : null;
+  const isIndividualEdit = Boolean(e.id) && !group;
+  const isGroupEdit = Boolean(group && group.id);
+  const isBuilderMode = !isIndividualEdit;
+  const routeId = String(e.id || '').trim();
+  const groupId = String((group && group.id) || '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const options = (formOptions && typeof formOptions === 'object') ? formOptions : {};
+  const sourceOptions = (options.source && typeof options.source === 'object') ? options.source : {};
+  const sourceDefaults = (options.defaults && typeof options.defaults === 'object') ? options.defaults : {};
+  const sourceModules = Array.isArray(sourceOptions.modules) ? sourceOptions.modules : [];
+  const sourceEventTypes = Array.isArray(sourceOptions.eventTypes) ? sourceOptions.eventTypes : [];
+  const editSource = (e.source && typeof e.source === 'object') ? e.source : {};
+  const builderBackUrl = isGroupEdit ? '/activity-quota/add-credit/groups' : '/activity-quota/add-credit';
+  const builderActionUrl = isGroupEdit
+    ? ('/activity-quota/add-credit/groups/edit/' + encodeURIComponent(groupId))
+    : '/activity-quota/add-credit/new';
+  const builderSubmitLabel = isGroupEdit ? 'Update Group Credit Entries' : 'Save Credit Entries';
+  const titleBackHref = builderBackUrl;
+
+  function toDateTimeLocal(isoValue) {
+    const raw = String(isoValue || '').trim();
+    if (!raw) return '';
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+  }
+
+  const builderDateTime = toDateTimeLocal(
+    (planSeed && planSeed.dateTime)
+      ? planSeed.dateTime
+      : new Date().toISOString()
+  );
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= title %></h1>
+    <a href="<%= titleBackHref %>" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i> Back to List
+    </a>
+  </div>
+
+  <% if (isIndividualEdit) { %>
+    <div class="form-container wide" style="max-width: 1100px;">
+      <form id="activityQuotaAddCreditEditForm" action="/activity-quota/add-credit/edit/<%= routeId %>" method="POST">
+        <input type="hidden" name="actionStateId" value="<%= asid %>">
+
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-4">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Target User ID *</label>
+                <input type="text" name="userId" class="form-control size-md font-monospace" value="<%= e.userId || '' %>" required>
+                <div class="form-text"><%= (e.display && e.display.userLabel) ? e.display.userLabel : (e.userId || '-') %></div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Date & Time *</label>
+                <input type="datetime-local" name="dateTime" class="form-control size-md" value="<%= toDateTimeLocal(e.dateTime || new Date().toISOString()) %>" required>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Section *</label>
+                <input type="text" name="section" class="form-control size-md font-monospace" value="<%= e.section || 'ACTIVITY_QUOTA' %>" required>
+                <div class="form-text"><%= (e.display && e.display.sectionLabel) ? e.display.sectionLabel : (e.section || '-') %></div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Operation *</label>
+                <input type="text" name="operation" class="form-control size-md font-monospace" value="<%= e.operation || 'CONFIGURE' %>" required>
+                <div class="form-text"><%= (e.display && e.display.operationLabel) ? e.display.operationLabel : (e.operation || '-') %></div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Call Credit *</label>
+                <input type="number" name="call" min="0" step="0.000001" class="form-control size-md" value="<%= Number(e.call || 0) %>" required>
+              </div>
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Amount Credit *</label>
+                <input type="number" name="amount" min="0" step="0.000001" class="form-control size-md" value="<%= Number(e.amount || 0) %>" required>
+              </div>
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Token Credit *</label>
+                <input type="number" name="token" min="0" step="0.000001" class="form-control size-md" value="<%= Number(e.token || 0) %>" required>
+              </div>
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Volume Credit *</label>
+                <input type="number" name="volume" min="0" step="0.000001" class="form-control size-md" value="<%= Number(e.volume || 0) %>" required>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Source Module</label>
+                <select name="module" class="form-select size-md">
+                  <% if (sourceModules.length === 0) { %>
+                    <option value="<%= editSource.module || sourceDefaults.module || 'activity_quota_add_credit' %>" selected><%= editSource.module || sourceDefaults.module || 'activity_quota_add_credit' %></option>
+                  <% } %>
+                  <% sourceModules.forEach((item) => { %>
+                    <option value="<%= item.value %>" <%= (editSource.module || sourceDefaults.module || '') === item.value ? 'selected' : '' %>><%= item.label %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Source Event Type</label>
+                <select name="eventType" class="form-select size-md">
+                  <% if (sourceEventTypes.length === 0) { %>
+                    <option value="<%= editSource.eventType || sourceDefaults.eventType || 'manual_credit' %>" selected><%= editSource.eventType || sourceDefaults.eventType || 'manual_credit' %></option>
+                  <% } %>
+                  <% sourceEventTypes.forEach((item) => { %>
+                    <option value="<%= item.value %>" <%= (editSource.eventType || sourceDefaults.eventType || '') === item.value ? 'selected' : '' %>><%= item.label %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Source Event ID</label>
+                <input type="text" name="eventId" class="form-control size-md font-monospace" value="<%= editSource.eventId || '' %>">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-12 mb-0">
+                <label class="form-label fw-bold">Idempotency Key</label>
+                <input type="text" name="idempotencyKey" class="form-control size-md font-monospace" value="<%= editSource.idempotencyKey || '' %>">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="button-row mt-4 pt-3 border-top">
+          <button type="submit" id="aqCreditEditSaveBtn" class="btn btn-filled btn-primary btn-md fw-bold px-4">Update Credit Entry</button>
+          <a href="/activity-quota/add-credit" class="btn btn-filled btn-secondary btn-md" id="btnCancelAddCreditEdit" data-return-url="/activity-quota/add-credit">Cancel</a>
+        </div>
+      </form>
+    </div>
+  <% } else { %>
+    <div class="form-container wide" style="max-width: 1300px;">
+      <% if (isGroupEdit) { %>
+        <div class="alert alert-info border mb-3">
+          <div class="fw-bold">Editing Group: <span class="font-monospace"><%= groupId %></span></div>
+          <div class="small mb-0">Saving updates rewrites all ledger rows linked to this grouped allocation.</div>
+        </div>
+      <% } %>
+
+      <form id="activityQuotaAddCreditForm" action="<%= builderActionUrl %>" method="POST">
+        <input type="hidden" name="actionStateId" value="<%= asid %>">
+        <input type="hidden" name="creditPlan" id="aqCreditPlanInput">
+
+        <script type="application/json" id="aqFormOptions"><%- JSON.stringify(options || {}) %></script>
+        <script type="application/json" id="aqInitialCreditPlan"><%- JSON.stringify(planSeed || {}) %></script>
+
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body p-4">
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Effective Date & Time *</label>
+                <input type="datetime-local" id="aqDateTimeInput" class="form-control size-md" value="<%= builderDateTime %>" required>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Source Module *</label>
+                <select id="aqSourceModuleSelect" class="form-select size-md"></select>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Source Event Type *</label>
+                <select id="aqSourceEventTypeSelect" class="form-select size-md"></select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Event ID Mode *</label>
+                <select id="aqEventIdModeSelect" class="form-select size-md"></select>
+              </div>
+              <div class="col-md-3 mb-3 d-none" id="aqEventIdCustomWrap">
+                <label class="form-label fw-bold">Custom Event ID</label>
+                <input type="text" id="aqEventIdInput" class="form-control size-md font-monospace" placeholder="e.g. PKG-APR-2026">
+              </div>
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Idempotency Mode *</label>
+                <select id="aqIdempotencyModeSelect" class="form-select size-md"></select>
+              </div>
+              <div class="col-md-3 mb-3 d-none" id="aqIdempotencyCustomWrap">
+                <label class="form-label fw-bold">Custom Idempotency Key</label>
+                <input type="text" id="aqIdempotencyKeyInput" class="form-control size-md font-monospace" placeholder="e.g. PKG-APR-2026-BATCH">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="m-0 fw-bold text-dark">Target Users</h5>
+              <button type="button" class="btn btn-primary btn-filled btn-sm" id="aqPickUsersBtn">
+                <i class="bi bi-search me-1"></i> Add Users
+              </button>
+            </div>
+            <div id="aqSelectedUsers" class="border rounded p-3 bg-light-subtle"></div>
+            <div id="aqMultiUserNotice" class="alert alert-info py-2 px-3 mt-3 mb-2 d-none">
+              Multiple users selected. Credits are saved individually for each selected user.
+            </div>
+            <div id="aqBatchInfo" class="form-text">Credits are generated per user and per operation.</div>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-3">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="m-0 fw-bold text-dark">Sections & Operations</h5>
+              <button type="button" class="btn btn-primary btn-filled btn-sm" id="aqPickSectionsBtn">
+                <i class="bi bi-search me-1"></i> Add Sections
+              </button>
+            </div>
+            <div id="aqSectionsContainer" class="accordion"></div>
+            <div class="form-text">Each selected section creates a collapsible block. Add operations per section and set credits on each operation row.</div>
+          </div>
+        </div>
+
+        <div class="button-row mt-4 pt-3 border-top">
+          <button type="submit" id="aqCreditBuilderSaveBtn" class="btn btn-filled btn-primary btn-md fw-bold px-4"><%= builderSubmitLabel %></button>
+          <a href="<%= builderBackUrl %>" class="btn btn-filled btn-secondary btn-md" id="btnCancelAddCreditBuilder" data-return-url="<%= builderBackUrl %>">Cancel</a>
+        </div>
+      </form>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<% if (isBuilderMode) { %>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('activityQuotaAddCreditForm');
+  if (!form) return;
+
+  const dateTimeInput = document.getElementById('aqDateTimeInput');
+  const planInput = document.getElementById('aqCreditPlanInput');
+  const sourceModuleSelect = document.getElementById('aqSourceModuleSelect');
+  const sourceEventTypeSelect = document.getElementById('aqSourceEventTypeSelect');
+  const eventIdModeSelect = document.getElementById('aqEventIdModeSelect');
+  const eventIdCustomWrap = document.getElementById('aqEventIdCustomWrap');
+  const eventIdInput = document.getElementById('aqEventIdInput');
+  const idempotencyModeSelect = document.getElementById('aqIdempotencyModeSelect');
+  const idempotencyCustomWrap = document.getElementById('aqIdempotencyCustomWrap');
+  const idempotencyKeyInput = document.getElementById('aqIdempotencyKeyInput');
+  const pickUsersBtn = document.getElementById('aqPickUsersBtn');
+  const selectedUsersEl = document.getElementById('aqSelectedUsers');
+  const multiUserNoticeEl = document.getElementById('aqMultiUserNotice');
+  const batchInfoEl = document.getElementById('aqBatchInfo');
+  const pickSectionsBtn = document.getElementById('aqPickSectionsBtn');
+  const sectionsContainerEl = document.getElementById('aqSectionsContainer');
+  const saveBtn = document.getElementById('aqCreditBuilderSaveBtn');
+  const cancelBtn = document.getElementById('btnCancelAddCreditBuilder');
+  const saveRedirectUrl = '<%= builderBackUrl %>';
+  let isSubmitting = false;
+
+  function parseJsonScript(scriptId) {
+    try {
+      const node = document.getElementById(scriptId);
+      return JSON.parse((node && node.textContent) || '{}');
+    } catch (_) {
+      return {};
+    }
+  }
+
+  const defaultOptions = parseJsonScript('aqFormOptions');
+  const initialPlan = parseJsonScript('aqInitialCreditPlan');
+
+  const state = {
+    sourceOptions: defaultOptions,
+    sourceDraft: {
+      module: '',
+      eventType: '',
+      eventIdMode: 'auto',
+      eventId: '',
+      idempotencyMode: 'auto',
+      idempotencyKey: ''
+    },
+    selectedUsers: [],
+    selectedSections: [],
+    expandedSectionId: ''
+  };
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async function showNotice(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+    alert(title + ': ' + message);
+  }
+
+  function cacheButtonHtml(button) {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+  }
+
+  function setButtonBusy(button, label) {
+    if (!button) return;
+    cacheButtonHtml(button);
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + escapeHtml(label);
+  }
+
+  function restoreButton(button) {
+    if (!button) return;
+    if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+    button.disabled = false;
+  }
+
+  function restoreActionButtons() {
+    isSubmitting = false;
+    restoreButton(saveBtn);
+    restoreButton(cancelBtn);
+  }
+
+  function numberValue(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) return 0;
+    return Number(numeric.toFixed(6));
+  }
+
+  function normalizeModeValue(value) {
+    return String(value || '').trim().toLowerCase() === 'custom' ? 'custom' : 'auto';
+  }
+
+  function parseOptionRows(rows) {
+    return (Array.isArray(rows) ? rows : []).map((row) => ({
+      value: String((row && row.value) || '').trim(),
+      label: String((row && (row.label || row.value)) || '').trim()
+    })).filter((row) => row.value);
+  }
+
+  function renderSelectOptions(selectEl, rows, selectedValue) {
+    const options = parseOptionRows(rows);
+    const selected = String(selectedValue || '').trim();
+    if (selected && !options.some((item) => item.value === selected)) {
+      options.unshift({ value: selected, label: selected });
+    }
+    selectEl.innerHTML = options.map((row) => {
+      const selectedAttr = row.value === selected ? 'selected' : '';
+      return '<option value="' + escapeHtml(row.value) + '" ' + selectedAttr + '>' + escapeHtml(row.label) + '</option>';
+    }).join('');
+    if (!selectEl.value && options.length > 0) {
+      selectEl.value = options[0].value;
+    }
+  }
+
+  function getSourceDefaults() {
+    const source = state.sourceOptions && state.sourceOptions.source ? state.sourceOptions.source : {};
+    const defaults = state.sourceOptions && state.sourceOptions.defaults ? state.sourceOptions.defaults : {};
+    const modules = parseOptionRows(source.modules);
+    const eventTypes = parseOptionRows(source.eventTypes);
+    const eventIdModes = parseOptionRows(source.eventIdModes);
+    const idempotencyModes = parseOptionRows(source.idempotencyModes);
+    return {
+      module: state.sourceDraft.module || defaults.module || (modules[0] && modules[0].value) || '',
+      eventType: state.sourceDraft.eventType || defaults.eventType || (eventTypes[0] && eventTypes[0].value) || '',
+      eventIdMode: normalizeModeValue(state.sourceDraft.eventIdMode || defaults.eventIdMode || (eventIdModes[0] && eventIdModes[0].value) || 'auto'),
+      idempotencyMode: normalizeModeValue(state.sourceDraft.idempotencyMode || defaults.idempotencyMode || (idempotencyModes[0] && idempotencyModes[0].value) || 'auto')
+    };
+  }
+
+  function toggleSourceCustomInputs() {
+    const eventIdMode = normalizeModeValue(eventIdModeSelect.value);
+    const idempotencyMode = normalizeModeValue(idempotencyModeSelect.value);
+    eventIdCustomWrap.classList.toggle('d-none', eventIdMode !== 'custom');
+    idempotencyCustomWrap.classList.toggle('d-none', idempotencyMode !== 'custom');
+  }
+
+  function applySourceControls() {
+    const source = state.sourceOptions && state.sourceOptions.source ? state.sourceOptions.source : {};
+    const defaults = getSourceDefaults();
+
+    renderSelectOptions(sourceModuleSelect, source.modules, defaults.module);
+    renderSelectOptions(sourceEventTypeSelect, source.eventTypes, defaults.eventType);
+    renderSelectOptions(eventIdModeSelect, source.eventIdModes, defaults.eventIdMode);
+    renderSelectOptions(idempotencyModeSelect, source.idempotencyModes, defaults.idempotencyMode);
+
+    if (state.sourceDraft.eventId) eventIdInput.value = state.sourceDraft.eventId;
+    if (state.sourceDraft.idempotencyKey) idempotencyKeyInput.value = state.sourceDraft.idempotencyKey;
+    toggleSourceCustomInputs();
+  }
+
+  function getOperationCount() {
+    return state.selectedSections.reduce((sum, section) => {
+      const count = Array.isArray(section.operations) ? section.operations.length : 0;
+      return sum + count;
+    }, 0);
+  }
+
+  function renderBatchInfo() {
+    const userCount = state.selectedUsers.length;
+    const operationCount = getOperationCount();
+    const totalRows = userCount * operationCount;
+
+    if (userCount > 1) {
+      multiUserNoticeEl.classList.remove('d-none');
+    } else {
+      multiUserNoticeEl.classList.add('d-none');
+    }
+
+    if (!userCount || !operationCount) {
+      batchInfoEl.textContent = 'Credits are generated per user and per operation.';
+      return;
+    }
+
+    batchInfoEl.textContent = 'This submission will create '
+      + totalRows + ' ledger entr' + (totalRows === 1 ? 'y' : 'ies')
+      + ' (' + userCount + ' user' + (userCount === 1 ? '' : 's')
+      + ' x ' + operationCount + ' operation' + (operationCount === 1 ? '' : 's') + ').';
+  }
+
+  function upsertUser(item) {
+    const user = (item && typeof item === 'object') ? item : {};
+    const id = String(user.id || user.userId || '').trim();
+    if (!id) return;
+    const existing = state.selectedUsers.find((row) => row.id === id);
+    const next = {
+      id,
+      name: String(user.name || user.username || user.email || id).trim(),
+      username: String(user.username || '').trim(),
+      email: String(user.email || '').trim()
+    };
+    if (existing) {
+      existing.name = next.name;
+      existing.username = next.username;
+      existing.email = next.email;
+      return;
+    }
+    state.selectedUsers.push(next);
+  }
+
+  function removeUser(userId) {
+    const target = String(userId || '').trim();
+    state.selectedUsers = state.selectedUsers.filter((row) => row.id !== target);
+    renderUsers();
+  }
+
+  function renderUsers() {
+    if (!state.selectedUsers.length) {
+      selectedUsersEl.innerHTML = '<div class="text-muted">No users selected yet.</div>';
+      renderBatchInfo();
+      return;
+    }
+
+    selectedUsersEl.innerHTML = state.selectedUsers.map((row) => {
+      const subtitleParts = [];
+      if (row.username) subtitleParts.push(row.username);
+      if (row.email) subtitleParts.push(row.email);
+      const subtitle = subtitleParts.join(' | ');
+      return ''
+        + '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-3 py-2 mb-2">'
+        + '  <div class="overflow-hidden">'
+        + '    <div class="fw-bold text-truncate">' + escapeHtml(row.name || row.id) + '</div>'
+        + '    <div class="x-small text-muted font-monospace text-truncate">' + escapeHtml(row.id) + (subtitle ? ' | ' + escapeHtml(subtitle) : '') + '</div>'
+        + '  </div>'
+        + '  <button type="button" class="btn btn-outline-danger btn-sm" data-aq-remove-user="' + escapeHtml(row.id) + '">'
+        + '    <i class="bi bi-x-lg"></i>'
+        + '  </button>'
+        + '</div>';
+    }).join('');
+
+    renderBatchInfo();
+  }
+
+  function upsertSection(item, options) {
+    const section = (item && typeof item === 'object') ? item : {};
+    const id = String(section.id || section.sectionId || '').trim();
+    if (!id) return false;
+    if (state.selectedSections.some((row) => row.id === id)) return false;
+    state.selectedSections.push({
+      id,
+      name: String(section.name || id).trim(),
+      operations: []
+    });
+    if (!options || options.focus !== false) {
+      state.expandedSectionId = id;
+    }
+    return true;
+  }
+
+  function removeSection(sectionId) {
+    const target = String(sectionId || '').trim();
+    state.selectedSections = state.selectedSections.filter((row) => row.id !== target);
+    if (state.expandedSectionId === target) {
+      state.expandedSectionId = state.selectedSections.length ? state.selectedSections[0].id : '';
+    }
+    renderSections();
+  }
+
+  function upsertOperation(sectionId, item) {
+    const targetSection = state.selectedSections.find((row) => row.id === String(sectionId || '').trim());
+    if (!targetSection) return;
+    const operation = (item && typeof item === 'object') ? item : {};
+    const id = String(operation.id || operation.operationId || '').trim();
+    if (!id) return;
+    if (targetSection.operations.some((row) => row.id === id)) return;
+    targetSection.operations.push({
+      id,
+      name: String(operation.name || id).trim(),
+      call: 0,
+      amount: 0,
+      token: 0,
+      volume: 0
+    });
+    state.expandedSectionId = targetSection.id;
+  }
+
+  function removeOperation(sectionId, operationId) {
+    const targetSection = state.selectedSections.find((row) => row.id === String(sectionId || '').trim());
+    if (!targetSection) return;
+    const targetOperationId = String(operationId || '').trim();
+    targetSection.operations = targetSection.operations.filter((row) => row.id !== targetOperationId);
+    state.expandedSectionId = targetSection.id;
+    renderSections();
+  }
+
+  function setOperationMetric(sectionId, operationId, field, value) {
+    const targetSection = state.selectedSections.find((row) => row.id === String(sectionId || '').trim());
+    if (!targetSection) return;
+    const targetOperation = targetSection.operations.find((row) => row.id === String(operationId || '').trim());
+    if (!targetOperation) return;
+    targetOperation[field] = numberValue(value);
+  }
+
+  function renderSections() {
+    if (!state.selectedSections.length) {
+      sectionsContainerEl.innerHTML = '<div class="text-muted">No sections selected yet.</div>';
+      state.expandedSectionId = '';
+      renderBatchInfo();
+      return;
+    }
+
+    const expandedSectionId = state.selectedSections.some((section) => section.id === state.expandedSectionId)
+      ? state.expandedSectionId
+      : state.selectedSections[0].id;
+    state.expandedSectionId = expandedSectionId;
+
+    sectionsContainerEl.innerHTML = state.selectedSections.map((section, index) => {
+      const collapseId = 'aqSectionCollapse' + index;
+      const sectionIdEscaped = escapeHtml(section.id);
+      const operationRows = Array.isArray(section.operations) ? section.operations : [];
+      const isExpanded = section.id === expandedSectionId;
+      return ''
+        + '<div class="accordion-item border mb-2">'
+        + '  <h2 class="accordion-header" id="aqSectionHeading' + index + '">'
+        + '    <button class="accordion-button ' + (isExpanded ? '' : 'collapsed') + '" type="button" data-bs-toggle="collapse" data-bs-target="#' + collapseId + '" aria-expanded="' + (isExpanded ? 'true' : 'false') + '">'
+        + '      <div class="d-flex align-items-center justify-content-between w-100 me-2">'
+        + '        <div>'
+        + '          <div class="fw-bold">' + escapeHtml(section.name || section.id) + '</div>'
+        + '          <div class="x-small text-muted font-monospace">' + sectionIdEscaped + '</div>'
+        + '        </div>'
+        + '        <span class="badge bg-light text-dark border">' + operationRows.length + ' operation' + (operationRows.length === 1 ? '' : 's') + '</span>'
+        + '      </div>'
+        + '    </button>'
+        + '  </h2>'
+        + '  <div id="' + collapseId + '" class="accordion-collapse collapse ' + (isExpanded ? 'show' : '') + '">'
+        + '    <div class="accordion-body bg-light-subtle">'
+        + '      <div class="d-flex justify-content-between align-items-center mb-3">'
+        + '        <button type="button" class="btn btn-outline-primary btn-sm" data-aq-add-operations="' + sectionIdEscaped + '">'
+        + '          <i class="bi bi-search me-1"></i> Add Operations'
+        + '        </button>'
+        + '        <button type="button" class="btn btn-outline-danger btn-sm" data-aq-remove-section="' + sectionIdEscaped + '">'
+        + '          <i class="bi bi-trash me-1"></i> Remove Section'
+        + '        </button>'
+        + '      </div>'
+        + '      <div class="table-responsive bg-white border rounded">'
+        + '        <table class="table table-sm align-middle mb-0">'
+        + '          <thead class="table-light">'
+        + '            <tr>'
+        + '              <th>Operation</th>'
+        + '              <th style="width: 120px;">Call</th>'
+        + '              <th style="width: 120px;">Amount</th>'
+        + '              <th style="width: 120px;">Token</th>'
+        + '              <th style="width: 120px;">Volume</th>'
+        + '              <th style="width: 70px;"></th>'
+        + '            </tr>'
+        + '          </thead>'
+        + '          <tbody>'
+        + (operationRows.length === 0
+          ? '<tr><td colspan="6" class="text-center text-muted py-3">No operations added for this section.</td></tr>'
+          : '')
+        + operationRows.map((operation) => {
+          const operationIdEscaped = escapeHtml(operation.id);
+          return ''
+            + '<tr>'
+            + '  <td>'
+            + '    <div class="fw-bold">' + escapeHtml(operation.name || operation.id) + '</div>'
+            + '    <div class="x-small text-muted font-monospace">' + operationIdEscaped + '</div>'
+            + '  </td>'
+            + '  <td><input type="number" step="0.000001" min="0" class="form-control form-control-sm" data-aq-metric="call" data-aq-section-id="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '" value="' + Number(operation.call || 0) + '"></td>'
+            + '  <td><input type="number" step="0.000001" min="0" class="form-control form-control-sm" data-aq-metric="amount" data-aq-section-id="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '" value="' + Number(operation.amount || 0) + '"></td>'
+            + '  <td><input type="number" step="0.000001" min="0" class="form-control form-control-sm" data-aq-metric="token" data-aq-section-id="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '" value="' + Number(operation.token || 0) + '"></td>'
+            + '  <td><input type="number" step="0.000001" min="0" class="form-control form-control-sm" data-aq-metric="volume" data-aq-section-id="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '" value="' + Number(operation.volume || 0) + '"></td>'
+            + '  <td class="text-center">'
+            + '    <button type="button" class="btn btn-outline-danger btn-sm" data-aq-remove-operation="' + sectionIdEscaped + '" data-aq-operation-id="' + operationIdEscaped + '">'
+            + '      <i class="bi bi-x-lg"></i>'
+            + '    </button>'
+            + '  </td>'
+            + '</tr>';
+        }).join('')
+        + '          </tbody>'
+        + '        </table>'
+        + '      </div>'
+        + '    </div>'
+        + '  </div>'
+        + '</div>';
+    }).join('');
+
+    renderBatchInfo();
+  }
+
+  function openUsersPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.user({
+      title: 'Select Users',
+      icon: 'bi-people',
+      apiEndpoint: '/activity-quota/add-credit/picker/users',
+      searchFields: 'id,username,email,name',
+      placeholder: 'Search users by id, username, or email...',
+      multiselect: true,
+      context,
+      onSelect: (items) => {
+        const list = Array.isArray(items) ? items : [items];
+        list.forEach((item) => upsertUser(item));
+        renderUsers();
+      }
+    }));
+  }
+
+  function openSectionsPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Visible Section Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.section({
+      title: 'Select Sections',
+      icon: 'bi-collection',
+      apiEndpoint: '/activity-quota/add-credit/picker/sections',
+      searchFields: 'id,name,description,category',
+      placeholder: 'Search sections...',
+      multiselect: true,
+      context,
+      onSelect: (items) => {
+        const list = Array.isArray(items) ? items : [items];
+        let firstNewSectionId = '';
+        list.forEach((item) => {
+          const created = upsertSection(item, { focus: false });
+          if (created && !firstNewSectionId) {
+            firstNewSectionId = String((item && (item.id || item.sectionId)) || '').trim();
+          }
+        });
+        if (firstNewSectionId) {
+          state.expandedSectionId = firstNewSectionId;
+        }
+        renderSections();
+      }
+    }));
+  }
+
+  function openOperationsPicker(sectionId) {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const targetSection = state.selectedSections.find((row) => row.id === String(sectionId || '').trim());
+    if (!targetSection) return;
+
+    window.GenericPicker.open(window.GenericPickerPresets.operation({
+      title: 'Select Operations (' + (targetSection.name || targetSection.id) + ')',
+      icon: 'bi-gear',
+      apiEndpoint: '/activity-quota/add-credit/picker/operations?sectionId=' + encodeURIComponent(targetSection.id),
+      searchFields: 'id,name,description',
+      placeholder: 'Search operations for this section...',
+      multiselect: true,
+      context: {
+        label: 'Selected Section',
+        value: String(targetSection.name || targetSection.id),
+        icon: 'bi bi-grid'
+      },
+      onSelect: (items) => {
+        const list = Array.isArray(items) ? items : [items];
+        list.forEach((item) => upsertOperation(targetSection.id, item));
+        state.expandedSectionId = targetSection.id;
+        renderSections();
+      }
+    }));
+  }
+
+  function hasPositiveMetric(operation) {
+    return ['call', 'amount', 'token', 'volume'].some((field) => Number((operation && operation[field]) || 0) > 0);
+  }
+
+  async function validateBeforeSubmit() {
+    if (!state.selectedUsers.length) {
+      await showNotice('Validation', 'Select at least one user.', 'warning');
+      return false;
+    }
+    if (!state.selectedSections.length) {
+      await showNotice('Validation', 'Select at least one section.', 'warning');
+      return false;
+    }
+
+    for (const section of state.selectedSections) {
+      if (!Array.isArray(section.operations) || section.operations.length === 0) {
+        await showNotice('Validation', 'Section "' + (section.name || section.id) + '" must include at least one operation.', 'warning');
+        return false;
+      }
+      for (const operation of section.operations) {
+        if (!hasPositiveMetric(operation)) {
+          await showNotice('Validation', 'Operation "' + (operation.name || operation.id) + '" in section "' + (section.name || section.id) + '" must include at least one positive metric.', 'warning');
+          return false;
+        }
+      }
+    }
+
+    if (normalizeModeValue(eventIdModeSelect.value) === 'custom' && !String(eventIdInput.value || '').trim()) {
+      await showNotice('Validation', 'Custom Event ID mode requires an Event ID value.', 'warning');
+      return false;
+    }
+
+    if (normalizeModeValue(idempotencyModeSelect.value) === 'custom' && !String(idempotencyKeyInput.value || '').trim()) {
+      await showNotice('Validation', 'Custom Idempotency mode requires an Idempotency Key.', 'warning');
+      return false;
+    }
+
+    return true;
+  }
+
+  function buildPlanPayload() {
+    const dateTimeRaw = String(dateTimeInput.value || '').trim();
+    const dateTime = dateTimeRaw ? new Date(dateTimeRaw).toISOString() : new Date().toISOString();
+
+    return {
+      dateTime,
+      users: state.selectedUsers.map((row) => ({
+        id: row.id,
+        name: row.name || row.id,
+        username: row.username || '',
+        email: row.email || ''
+      })),
+      sections: state.selectedSections.map((section) => ({
+        id: section.id,
+        name: section.name || section.id,
+        operations: (Array.isArray(section.operations) ? section.operations : []).map((operation) => ({
+          id: operation.id,
+          name: operation.name || operation.id,
+          call: numberValue(operation.call),
+          amount: numberValue(operation.amount),
+          token: numberValue(operation.token),
+          volume: numberValue(operation.volume)
+        }))
+      })),
+      source: {
+        module: String(sourceModuleSelect.value || '').trim(),
+        eventType: String(sourceEventTypeSelect.value || '').trim(),
+        eventIdMode: normalizeModeValue(eventIdModeSelect.value),
+        eventId: String(eventIdInput.value || '').trim(),
+        idempotencyMode: normalizeModeValue(idempotencyModeSelect.value),
+        idempotencyKey: String(idempotencyKeyInput.value || '').trim()
+      }
+    };
+  }
+
+  async function hydrateOptionsFromBackend() {
+    try {
+      const response = await fetch('/activity-quota/add-credit/form-options', {
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data || data.status !== 'success' || !data.results) return;
+      state.sourceOptions = data.results;
+      applySourceControls();
+    } catch (_) {
+      // Keep server-side options.
+    }
+  }
+
+  function hydrateFromInitialPlan() {
+    const source = (initialPlan && typeof initialPlan.source === 'object') ? initialPlan.source : {};
+
+    state.sourceDraft.module = String(source.module || '').trim();
+    state.sourceDraft.eventType = String(source.eventType || '').trim();
+    state.sourceDraft.eventIdMode = normalizeModeValue(source.eventIdMode || source.sourceMode || 'auto');
+    state.sourceDraft.eventId = String(source.eventId || '').trim();
+    state.sourceDraft.idempotencyMode = normalizeModeValue(source.idempotencyMode || source.sourceMode || 'auto');
+    state.sourceDraft.idempotencyKey = String(source.idempotencyKey || '').trim();
+
+    const users = Array.isArray(initialPlan.users) ? initialPlan.users : [];
+    users.forEach((user) => upsertUser(user));
+
+    const sections = Array.isArray(initialPlan.sections) ? initialPlan.sections : [];
+    let firstSectionId = '';
+    sections.forEach((rawSection) => {
+      const section = (rawSection && typeof rawSection === 'object') ? rawSection : {};
+      const sectionId = String(section.id || section.sectionId || '').trim();
+      if (!sectionId) return;
+
+      const created = upsertSection({ id: sectionId, name: String(section.name || sectionId).trim() }, { focus: false });
+      if ((created || !firstSectionId) && !firstSectionId) firstSectionId = sectionId;
+      const targetSection = state.selectedSections.find((row) => row.id === sectionId);
+      if (!targetSection) return;
+
+      targetSection.operations = [];
+      const operations = Array.isArray(section.operations) ? section.operations : [];
+      operations.forEach((rawOperation) => {
+        const operation = (rawOperation && typeof rawOperation === 'object') ? rawOperation : {};
+        const operationId = String(operation.id || operation.operationId || '').trim();
+        if (!operationId) return;
+        targetSection.operations.push({
+          id: operationId,
+          name: String(operation.name || operationId).trim(),
+          call: numberValue(operation.call),
+          amount: numberValue(operation.amount),
+          token: numberValue(operation.token),
+          volume: numberValue(operation.volume)
+        });
+      });
+    });
+    state.expandedSectionId = firstSectionId || '';
+  }
+
+  selectedUsersEl.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-aq-remove-user]');
+    if (!removeBtn) return;
+    removeUser(removeBtn.getAttribute('data-aq-remove-user'));
+  });
+
+  sectionsContainerEl.addEventListener('click', (event) => {
+    const removeSectionBtn = event.target.closest('[data-aq-remove-section]');
+    if (removeSectionBtn) {
+      removeSection(removeSectionBtn.getAttribute('data-aq-remove-section'));
+      return;
+    }
+
+    const addOperationsBtn = event.target.closest('[data-aq-add-operations]');
+    if (addOperationsBtn) {
+      openOperationsPicker(addOperationsBtn.getAttribute('data-aq-add-operations'));
+      return;
+    }
+
+    const removeOperationBtn = event.target.closest('[data-aq-remove-operation]');
+    if (removeOperationBtn) {
+      removeOperation(
+        removeOperationBtn.getAttribute('data-aq-remove-operation'),
+        removeOperationBtn.getAttribute('data-aq-operation-id')
+      );
+    }
+  });
+
+  sectionsContainerEl.addEventListener('input', (event) => {
+    const input = event.target.closest('[data-aq-metric]');
+    if (!input) return;
+    setOperationMetric(
+      input.getAttribute('data-aq-section-id'),
+      input.getAttribute('data-aq-operation-id'),
+      input.getAttribute('data-aq-metric'),
+      input.value
+    );
+    renderBatchInfo();
+  });
+
+  pickUsersBtn.addEventListener('click', openUsersPicker);
+  pickSectionsBtn.addEventListener('click', openSectionsPicker);
+
+  sourceModuleSelect.addEventListener('change', () => {
+    state.sourceDraft.module = String(sourceModuleSelect.value || '').trim();
+  });
+  sourceEventTypeSelect.addEventListener('change', () => {
+    state.sourceDraft.eventType = String(sourceEventTypeSelect.value || '').trim();
+  });
+  eventIdModeSelect.addEventListener('change', () => {
+    state.sourceDraft.eventIdMode = normalizeModeValue(eventIdModeSelect.value);
+    toggleSourceCustomInputs();
+  });
+  idempotencyModeSelect.addEventListener('change', () => {
+    state.sourceDraft.idempotencyMode = normalizeModeValue(idempotencyModeSelect.value);
+    toggleSourceCustomInputs();
+  });
+  eventIdInput.addEventListener('input', () => {
+    state.sourceDraft.eventId = String(eventIdInput.value || '').trim();
+  });
+  idempotencyKeyInput.addEventListener('input', () => {
+    state.sourceDraft.idempotencyKey = String(idempotencyKeyInput.value || '').trim();
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+    const valid = await validateBeforeSubmit();
+    if (!valid) {
+      restoreActionButtons();
+      return;
+    }
+    isSubmitting = true;
+    setButtonBusy(saveBtn, 'Saving...');
+    if (cancelBtn) cancelBtn.disabled = true;
+    planInput.value = JSON.stringify(buildPlanPayload());
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        body: new URLSearchParams(new FormData(form)).toString()
+      });
+
+      let result = null;
+      try {
+        result = await response.json();
+      } catch (_) {
+        result = null;
+      }
+
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Request failed with status ' + response.status + '.'));
+      }
+
+      await showNotice('Success', result.message || 'Credit entries saved successfully.', 'success');
+      window.location.href = saveRedirectUrl || '/activity-quota/add-credit';
+    } catch (error) {
+      await showNotice('Save Failed', error.message || 'Unexpected save error.', 'error');
+      restoreActionButtons();
+    }
+  });
+
+  if (cancelBtn) {
+    cacheButtonHtml(cancelBtn);
+    cancelBtn.addEventListener('click', (event) => {
+      if (isSubmitting) {
+        event.preventDefault();
+        return;
+      }
+      setButtonBusy(cancelBtn, 'Cancelling...');
+      if (saveBtn) saveBtn.disabled = true;
+    });
+  }
+
+  cacheButtonHtml(saveBtn);
+
+  hydrateFromInitialPlan();
+  applySourceControls();
+  renderUsers();
+  renderSections();
+  hydrateOptionsFromBackend();
+});
+</script>
+<% } %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const editForm = document.getElementById('activityQuotaAddCreditEditForm');
+  if (!editForm) return;
+  const editSaveBtn = document.getElementById('aqCreditEditSaveBtn');
+  const editCancelBtn = document.getElementById('btnCancelAddCreditEdit');
+  let isSubmitting = false;
+
+  async function showResultModal(title, message, icon) {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title: title,
+        message: message,
+        icon: icon || 'info',
+        buttons: [{ text: 'OK', class: icon === 'success' ? 'btn-success' : (icon === 'error' ? 'btn-danger' : 'btn-primary') }]
+      });
+      return;
+    }
+    alert(title + ': ' + message);
+  }
+
+  function cacheButtonHtml(button) {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+  }
+
+  function setButtonBusy(button, label) {
+    if (!button) return;
+    cacheButtonHtml(button);
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + String(label || 'Working...');
+  }
+
+  function restoreButton(button) {
+    if (!button) return;
+    if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+    button.disabled = false;
+  }
+
+  editForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+    isSubmitting = true;
+    setButtonBusy(editSaveBtn, 'Saving...');
+    if (editCancelBtn) editCancelBtn.disabled = true;
+    try {
+      const response = await fetch(editForm.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        body: new URLSearchParams(new FormData(editForm)).toString()
+      });
+
+      let result = null;
+      try {
+        result = await response.json();
+      } catch (_) {
+        result = null;
+      }
+
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Request failed with status ' + response.status + '.'));
+      }
+
+      await showResultModal('Success', result.message || 'Credit entry updated successfully.', 'success');
+      window.location.href = '/activity-quota/add-credit';
+    } catch (error) {
+      await showResultModal('Save Failed', error.message || 'Unexpected save error.', 'error');
+      isSubmitting = false;
+      restoreButton(editSaveBtn);
+      restoreButton(editCancelBtn);
+    }
+  });
+
+  if (editCancelBtn) {
+    cacheButtonHtml(editCancelBtn);
+    editCancelBtn.addEventListener('click', (event) => {
+      if (isSubmitting) {
+        event.preventDefault();
+        return;
+      }
+      setButtonBusy(editCancelBtn, 'Cancelling...');
+      if (editSaveBtn) editSaveBtn.disabled = true;
+    });
+  }
+
+  cacheButtonHtml(editSaveBtn);
+});
+</script>

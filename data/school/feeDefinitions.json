@@ -1,0 +1,33 @@
+[
+  {
+    "orgId": "SYSTEM",
+    "code": "TUITION-LINC-2026",
+    "name": "Tuition fee for new students in LINC class",
+    "description": "",
+    "type": "charge",
+    "status": "active",
+    "defaultAmount": 1010,
+    "currency": "CAD",
+    "frequency": "one_time",
+    "isOptional": false,
+    "taxable": false,
+    "applicableFeeCategories": [],
+    "tags": [],
+    "notes": "",
+    "metadata": {},
+    "autoTransaction": {
+      "enabled": true,
+      "debitAccountId": "ACC_4120",
+      "creditAccountId": "ACC_4110",
+      "applyMode": "on_enrollment",
+      "transactionType": "charge",
+      "fixedAmount": 1010,
+      "allowManualAmountOverride": true,
+      "memoTemplate": ""
+    },
+    "id": "FEE84300",
+    "audit": {
+      "createDateTime": "2026-02-24T23:31:56.624Z"
+    }
+  }
+]

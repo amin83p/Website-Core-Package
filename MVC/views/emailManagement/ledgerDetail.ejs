@@ -1,0 +1,130 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="page-heading size-md m-0">Email Ledger Detail</h1>
+    <div class="d-flex gap-2">
+      <a href="/email-management/ledger" class="btn btn-outline-secondary btn-md">
+        <i class="bi bi-arrow-left me-1"></i> Back to Ledger
+      </a>
+      <a href="/email-management/templates" class="btn btn-outline-primary btn-md">
+        <i class="bi bi-envelope-paper me-1"></i> Email Templates
+      </a>
+    </div>
+  </div>
+
+  <%
+    const row = (entry && typeof entry === 'object') ? entry : {};
+    const envelope = (row.envelope && typeof row.envelope === 'object') ? row.envelope : {};
+    const content = (row.content && typeof row.content === 'object') ? row.content : {};
+    const providerMeta = (row.providerMeta && typeof row.providerMeta === 'object') ? row.providerMeta : {};
+    const creator = (row.creator && typeof row.creator === 'object') ? row.creator : {};
+    const meta = (row.meta && typeof row.meta === 'object') ? row.meta : {};
+
+    function pretty(value) {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch (_) {
+        return String(value || '');
+      }
+    }
+  %>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="small text-muted">Entry ID</div>
+          <div class="fw-bold font-monospace"><%= row.id || '-' %></div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Date/Time</div>
+          <div class="fw-bold"><%= row.dateTime ? new Date(row.dateTime).toLocaleString() : '-' %></div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Status</div>
+          <div class="fw-bold"><%= row.status || '-' %></div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Org ID</div>
+          <div class="fw-bold font-monospace"><%= row.orgId || '-' %></div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Section / Operation</div>
+          <div class="fw-bold font-monospace"><%= (row.sectionId || '-') + '::' + (row.operationId || '-') %></div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Event Key</div>
+          <div class="fw-bold font-monospace"><%= row.eventKey || '-' %></div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Provider</div>
+          <div class="fw-bold"><%= row.provider || '-' %></div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Provider Status Code</div>
+          <div class="fw-bold"><%= providerMeta.statusCode || row.providerStatusCode || '-' %></div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Provider Message ID</div>
+          <div class="fw-bold font-monospace"><%= providerMeta.messageId || row.providerMessageId || '-' %></div>
+        </div>
+        <div class="col-md-6">
+          <div class="small text-muted">From</div>
+          <div class="fw-bold font-monospace"><%= envelope.from || '-' %></div>
+        </div>
+        <div class="col-md-6">
+          <div class="small text-muted">Reply-To</div>
+          <div class="fw-bold font-monospace"><%= envelope.replyTo || '-' %></div>
+        </div>
+        <div class="col-12">
+          <div class="small text-muted">Recipients</div>
+          <div class="fw-bold font-monospace"><%= (Array.isArray(envelope.to) && envelope.to.length) ? envelope.to.join(', ') : '-' %></div>
+        </div>
+        <div class="col-12">
+          <div class="small text-muted">Subject</div>
+          <div class="fw-bold"><%= content.subject || '-' %></div>
+        </div>
+        <% if (row.errorMessage) { %>
+          <div class="col-12">
+            <div class="small text-muted">Error</div>
+            <div class="fw-semibold text-danger"><%= row.errorMessage %></div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold">Text Body</div>
+    <div class="card-body">
+      <pre class="mb-0 p-3 rounded border bg-light-subtle" style="white-space: pre-wrap;"><%= content.text || '-' %></pre>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold">HTML Body</div>
+    <div class="card-body">
+      <pre class="mb-0 p-3 rounded border bg-light-subtle" style="white-space: pre-wrap;"><%= content.html || '-' %></pre>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold">Creator</div>
+    <div class="card-body">
+      <pre class="mb-0 p-3 rounded border bg-light-subtle"><%= pretty(creator) %></pre>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold">Meta</div>
+    <div class="card-body">
+      <pre class="mb-0 p-3 rounded border bg-light-subtle"><%= pretty(meta) %></pre>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold">Provider Raw Response</div>
+    <div class="card-body">
+      <pre class="mb-0 p-3 rounded border bg-light-subtle"><%= pretty(providerMeta.raw || {}) %></pre>
+    </div>
+  </div>
+</div>

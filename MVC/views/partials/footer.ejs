@@ -1,0 +1,280 @@
+<%
+  const isLoggedIn = (typeof user !== 'undefined' && !!user);
+  const footerBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
+  const footerLogoUrl = footerBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
+  const footerLogoAlt = footerBrand.footerLogoAlt || footerBrand.ownerDisplayName || footerBrand.appName || 'Amin Paknejad';
+  const footerAboutTitle = footerBrand.footerAboutTitle || 'About Amin Paknejad';
+  const footerAboutText = footerBrand.footerAboutText || 'Amin Paknejad, PhD, is a Calgary-based engineer, software developer, and instructor. His work focuses on CFD, scientific computing, and building practical tools that make research and engineering workflows faster and more reliable.';
+  const footerAboutHtml = footerBrand.footerAboutHtml || footerAboutText;
+  const footerShowNewsletter = footerBrand.footerShowNewsletter !== false;
+  const footerSocials = [
+    { url: footerBrand.instagramUrl || '', icon: 'bi-instagram', label: 'Instagram' },
+    { url: footerBrand.facebookUrl || '', icon: 'bi-facebook', label: 'Facebook' },
+    { url: footerBrand.linkedinUrl || '', icon: 'bi-linkedin', label: 'LinkedIn' },
+    { url: footerBrand.youtubeUrl || '', icon: 'bi-youtube', label: 'YouTube' }
+  ].filter((row) => String(row.url || '').trim());
+%>
+<footer class="site-footer-collapsible <%= isLoggedIn ? 'footer-logged-in is-collapsed' : '' %>" data-footer-user-mode="<%= isLoggedIn ? 'logged-in' : 'guest' %>">
+  <% if (isLoggedIn) { %>
+    <button
+      class="btn btn-sm footer-key-btn footer-toggle-btn footer-edge-toggle"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#siteFooterContent"
+      aria-expanded="false"
+      aria-controls="siteFooterContent"
+      aria-label="Toggle footer"
+      title="Show footer">
+      <span class="footer-toggle-symbol" aria-hidden="true">▾</span>
+    </button>
+  <% } else { %>
+    <div class="container d-md-none mb-3">
+      <button
+        class="btn btn-sm btn-light w-100 d-flex align-items-center justify-content-between footer-toggle-btn"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#siteFooterContent"
+        aria-expanded="false"
+        aria-controls="siteFooterContent">
+        <span class="fw-bold small">Show Footer</span>
+        <i class="bi bi-chevron-down"></i>
+      </button>
+    </div>
+  <% } %>
+
+  <div id="siteFooterContent" class="<%= isLoggedIn ? 'collapse' : 'collapse d-md-block' %>">
+  <div class="container">
+    <div class="row">
+
+      <!-- ABOUT -->
+      <div class="col-lg-4 col-md-6 mb-4 footer-column">
+        <h5><%= footerAboutTitle %></h5>
+
+        <div class="footer-about-copy" style="text-align: justify;">
+          <img src="<%= footerLogoUrl %>"
+               alt="<%= footerLogoAlt %>"
+               class="footer-about-logo float-start me-3 mb-2">
+
+          <%- footerAboutHtml %>
+        </div>
+      </div>
+
+      <!-- RESOURCES -->
+      <div class="col-lg-4 col-md-6 mb-4 footer-column">
+        <h5>Resources</h5>
+        <ul>
+          <li><a href="/important-notices">Important Notices</a></li>
+          <li><a href="/resource-library">Resource Library</a></li>
+          <li><a href="/faq">FAQ</a></li>
+          <li><a href="/contact">Contact Us</a></li>
+        </ul>
+      </div>
+
+      <!-- STAY CONNECTED -->
+      <div class="col-lg-4 col-md-12 mb-4 footer-column">
+        <h5>Stay Connected</h5>
+
+        <div class="social-icons mb-3">
+          <% if (footerSocials.length) { %>
+            <% footerSocials.forEach((social) => { %>
+              <a href="<%= social.url %>" target="_blank" rel="noopener noreferrer" aria-label="<%= social.label %>"><i class="bi <%= social.icon %>"></i></a>
+            <% }) %>
+          <% } else { %>
+            <span class="small text-muted">Social links are not configured.</span>
+          <% } %>
+        </div>
+
+        <% if (footerShowNewsletter) { %>
+          <!-- Newsletter -->
+          <form id="newsletterForm" class="newsletter-form">
+            <input id="newsletterEmail"
+                   type="email"
+                   name="email"
+                   placeholder="Subscribe to our newsletter"
+                   class="newsletter-input"
+                   required>
+            <button type="submit" class="newsletter-btn">Subscribe</button>
+          </form>
+
+          <div class="mt-2 small">
+            <a href="/newsletter/unsubscribe" style="color: inherit; text-decoration: underline;">
+              Unsubscribe
+            </a>
+          </div>
+        <% } %>
+      </div>
+
+    </div>
+  </div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    const footerRoot = document.querySelector('footer.site-footer-collapsible');
+    const form = document.getElementById('newsletterForm');
+    const emailEl = document.getElementById('newsletterEmail');
+    const footerContentEl = document.getElementById('siteFooterContent');
+    const footerToggleBtn = document.querySelector('.footer-toggle-btn');
+    const footerToggleLabel = footerToggleBtn ? footerToggleBtn.querySelector('span') : null;
+    const footerToggleSymbol = footerToggleBtn ? footerToggleBtn.querySelector('.footer-toggle-symbol') : null;
+    const isLoggedInFooter = footerRoot && footerRoot.dataset.footerUserMode === 'logged-in';
+    const storageKey = 'siteFooterCollapsed';
+
+    const parseRgb = (colorText) => {
+      const raw = String(colorText || '').trim();
+      const m = raw.match(/rgba?\(([^)]+)\)/i);
+      if (!m) return null;
+      const parts = m[1].split(',').map((part) => Number(String(part || '').trim()));
+      if (parts.length < 3 || parts.some((n, idx) => idx < 3 && !Number.isFinite(n))) return null;
+      return {
+        r: Math.max(0, Math.min(255, parts[0])),
+        g: Math.max(0, Math.min(255, parts[1])),
+        b: Math.max(0, Math.min(255, parts[2]))
+      };
+    };
+
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const toRgb = (rgb) => `rgb(${clamp(Math.round(rgb.r), 0, 255)}, ${clamp(Math.round(rgb.g), 0, 255)}, ${clamp(Math.round(rgb.b), 0, 255)})`;
+    const mix = (base, target, weight) => ({
+      r: base.r + (target.r - base.r) * weight,
+      g: base.g + (target.g - base.g) * weight,
+      b: base.b + (target.b - base.b) * weight
+    });
+    const luminance = (rgb) => {
+      const toLin = (v) => {
+        const x = v / 255;
+        return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * toLin(rgb.r) + 0.7152 * toLin(rgb.g) + 0.0722 * toLin(rgb.b);
+    };
+
+    const applyFooterToggleTheme = () => {
+      if (!footerRoot || !footerToggleBtn || !isLoggedInFooter) return;
+      const bg = parseRgb(window.getComputedStyle(footerRoot).backgroundColor);
+      if (!bg) return;
+
+      const isDarkBg = luminance(bg) < 0.45;
+      if (isDarkBg) {
+        const baseBg = mix(bg, { r: 255, g: 255, b: 255 }, 0.18);
+        const hoverBg = mix(bg, { r: 255, g: 255, b: 255 }, 0.28);
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-bg', toRgb(baseBg));
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-bg-hover', toRgb(hoverBg));
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-border', toRgb(mix(baseBg, { r: 255, g: 255, b: 255 }, 0.35)));
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-border-hover', toRgb(mix(hoverBg, { r: 255, g: 255, b: 255 }, 0.35)));
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-fg', 'rgb(248, 250, 252)');
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-fg-hover', 'rgb(255, 255, 255)');
+      } else {
+        const baseBg = mix(bg, { r: 255, g: 255, b: 255 }, 0.7);
+        const hoverBg = mix(bg, { r: 255, g: 255, b: 255 }, 0.82);
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-bg', toRgb(baseBg));
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-bg-hover', toRgb(hoverBg));
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-border', toRgb(mix(bg, { r: 45, g: 55, b: 72 }, 0.28)));
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-border-hover', toRgb(mix(bg, { r: 45, g: 55, b: 72 }, 0.4)));
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-fg', 'rgb(51, 65, 85)');
+        footerToggleBtn.style.setProperty('--footer-edge-toggle-fg-hover', 'rgb(30, 41, 59)');
+      }
+    };
+
+    const applyToggleUi = (isShown) => {
+      if (footerRoot && isLoggedInFooter) {
+        footerRoot.classList.toggle('is-collapsed', !isShown);
+      }
+      if (!footerToggleBtn) return;
+      if (isLoggedInFooter) {
+        if (footerToggleSymbol) footerToggleSymbol.textContent = isShown ? '▴' : '▾';
+        footerToggleBtn.setAttribute('title', isShown ? 'Hide footer' : 'Show footer');
+      } else if (footerToggleLabel) {
+        footerToggleLabel.textContent = isShown ? 'Hide Footer' : 'Show Footer';
+        const guestIcon = footerToggleBtn.querySelector('i');
+        if (guestIcon) guestIcon.className = isShown ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+      }
+    };
+
+    if (isLoggedInFooter && footerContentEl) {
+      try {
+        const storedState = localStorage.getItem(storageKey);
+        const shouldShow = storedState === 'shown';
+        if (shouldShow) {
+          footerContentEl.classList.add('show');
+          if (footerToggleBtn) footerToggleBtn.setAttribute('aria-expanded', 'true');
+        } else {
+          footerContentEl.classList.remove('show');
+          if (footerToggleBtn) footerToggleBtn.setAttribute('aria-expanded', 'false');
+        }
+      } catch (err) {
+        footerContentEl.classList.remove('show');
+        if (footerToggleBtn) footerToggleBtn.setAttribute('aria-expanded', 'false');
+      }
+      applyToggleUi(footerContentEl.classList.contains('show'));
+      applyFooterToggleTheme();
+    }
+
+    window.addEventListener('resize', applyFooterToggleTheme);
+
+    if (footerContentEl && footerToggleBtn) {
+      footerContentEl.addEventListener('shown.bs.collapse', () => {
+        applyToggleUi(true);
+        if (isLoggedInFooter) {
+          try { localStorage.setItem(storageKey, 'shown'); } catch (err) {}
+        }
+      });
+      footerContentEl.addEventListener('hidden.bs.collapse', () => {
+        applyToggleUi(false);
+        if (isLoggedInFooter) {
+          try { localStorage.setItem(storageKey, 'hidden'); } catch (err) {}
+        }
+      });
+    }
+
+    if (!form || !emailEl) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = (emailEl.value || '').trim();
+      if (!email) return;
+
+      try {
+        const res = await fetch('/newsletter/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-ajax-request': '1' },
+          body: JSON.stringify({ email, meta: { page: window.location.pathname } })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Subscribe failed.');
+
+        const code = data.result && data.result.manageCode ? data.result.manageCode : '';
+        const msg = code
+          ? `Subscribed successfully. The refrence code for the operation is: <b>${code}</b>`
+          : 'Subscribed successfully.';
+
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Newsletter',
+            icon: 'success',
+            message: msg,
+            buttons: [{ text: 'OK', class: 'btn-success' }]
+          });
+        } else {
+          alert(msg);
+        }
+
+        form.reset();
+      } catch (err) {
+        const msg = err && err.message ? err.message : 'Subscribe failed.';
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Newsletter',
+            icon: 'error',
+            message: msg,
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(msg);
+        }
+      }
+    });
+  })();
+</script>

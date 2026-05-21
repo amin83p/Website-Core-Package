@@ -1,0 +1,771 @@
+<%
+  const isEdit = !!(task && task.id);
+  const stateId = (typeof actionStateId !== 'undefined') ? actionStateId : '';
+
+  const initAssignments = (task && task.assignments) ? task.assignments : [];
+  
+  const initSteps = (task && task.checkpoints) ? task.checkpoints.map(cp => {
+      let d = '';
+      if(cp.dates && cp.dates.current) d = cp.dates.current;
+      else if(cp.date) d = cp.date; 
+      
+      return {
+          id: cp.id,
+          title: cp.title,
+          date: d,
+          weight: cp.weight || 0,
+          criteria: cp.criteria || '',
+          lockStep: cp.lockStep || '',
+          lockStatus: cp.lockStatus || 'completed'
+      };
+  }) : [];
+
+  let allFiles = [];
+  if (isEdit && task) {
+      if (task.deliverables) {
+          allFiles = [...task.deliverables.map(f => ({...f, isGlobal: true}))];
+      }
+      if (task.checkpoints) {
+          task.checkpoints.forEach(cp => {
+              if (cp.deliverables) {
+                  allFiles.push(...cp.deliverables.map(f => ({
+                      ...f, 
+                      stepName: cp.title, 
+                      checkpointId: cp.id, 
+                      isGlobal: false
+                  })));
+              }
+          });
+      }
+      allFiles.sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+  }
+%>
+
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+
+<div class="tasks-page">
+  
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Task Structure' : 'Create New Task' %></h1>
+        <% if (isEdit) { %>
+            <div class="text-muted small mt-1">ID: <%= task.id %></div>
+        <% } %>
+    </div>
+    
+    <% if (isEdit) { %>
+        <div class="d-flex gap-2">
+            <a href="/tasks/<%= task.id %>" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-eye me-1"></i> View Dashboard
+            </a>
+        </div>
+    <% } %>
+  </div>
+
+  <div class="row">
+      <div class="col-12">
+          <div class="form-container" style="width: 100%; max-width: 100%;">
+            <form id="taskForm" action="<%= isEdit ? '/tasks/edit/' + task.id : '/tasks/new' %>" method="POST" novalidate>
+              
+              <input type="hidden" name="actionStateId" id="actionStateIdInput" value="<%= stateId %>">
+              <input type="hidden" name="assignments" id="assignmentsInput">
+              <input type="hidden" name="steps" id="stepsInput">
+              <input type="hidden" name="description" id="hiddenDescription">
+              
+              <script type="application/json" id="initAssignmentsData"><%- JSON.stringify(initAssignments) %></script>
+              <script type="application/json" id="initStepsData"><%- JSON.stringify(initSteps) %></script>
+              <script type="application/json" id="initFilesData"><%- JSON.stringify(allFiles) %></script>
+
+              <ul class="nav nav-tabs mb-4" id="taskTabs" role="tablist">
+                <li class="nav-item"><button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button">General Details</button></li>
+                <li class="nav-item"><button class="nav-link" id="team-tab" data-bs-toggle="tab" data-bs-target="#team" type="button">Team & Roles</button></li>
+                <li class="nav-item"><button class="nav-link" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline" type="button">Timeline & Steps</button></li>
+                <% if(isEdit) { %>
+                <li class="nav-item"><button class="nav-link" id="files-tab" data-bs-toggle="tab" data-bs-target="#files" type="button">Attached Files <span class="badge bg-secondary ms-1 rounded-pill"><%= allFiles.length %></span></button></li>
+                <% } %>
+              </ul>
+
+              <div class="tab-content">
+                <div class="tab-pane fade show active" id="general">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label class="form-label">Task Title <span class="text-danger">*</span></label>
+                                <input type="text" name="title" id="inpTitle" class="form-control size-md" value="<%= task ? task.title : '' %>" required>
+                                <div class="invalid-feedback">Task title is required.</div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Project / Context</label>
+                                    <input type="text" name="projectName" list="projectList" class="form-control size-md" value="<%= task ? task.projectName : '' %>">
+                                    <datalist id="projectList"><option value="General"><option value="Audit"><option value="Development"></datalist>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Phase</label>
+                                    <input type="text" name="phaseName" class="form-control size-md" value="<%= task ? task.phaseName : '' %>" placeholder="e.g. Planning">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <div class="resizable-editor-container">
+                                    <div id="desc-editor" class="quill-docked">
+                                        <%- task ? task.description : '' %>
+                                    </div>
+                                </div>
+                                <div class="form-text small text-muted text-end">Drag bottom right corner to resize</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0 mb-3">
+                                <div class="card-body">
+                                    <h6 class="fw-bold text-primary mb-3">Status & Priority</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold">Priority</label>
+                                        <select name="priority" class="form-select size-sm">
+                                            <% ['low', 'medium', 'high', 'critical'].forEach(p => { %>
+                                                <option value="<%= p %>" <%= (task && task.priority === p) ? 'selected' : '' %>><%= p.charAt(0).toUpperCase() + p.slice(1) %></option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+                                    <% if (isEdit) { %>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold">Status</label>
+                                        <select name="status" class="form-select size-sm">
+                                            <% ['todo', 'in_progress', 'review', 'done'].forEach(s => { %>
+                                                <option value="<%= s %>" <%= (task && task.status === s) ? 'selected' : '' %>><%= s.replace('_', ' ').toUpperCase() %></option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+                                    <% } %>
+                                    <hr>
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-bold">Start Date</label>
+                                        <input type="date" name="startDate" class="form-control size-sm" value="<%= task && task.dates ? task.dates.start : '' %>">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-bold text-danger">Due Date</label>
+                                        <input type="date" name="dueDate" class="form-control size-sm" value="<%= task && task.dates ? task.dates.due : '' %>">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="team">
+                    <div class="row">
+                        <div class="col-md-5 border-end">
+                            <h6 class="fw-bold text-secondary mb-3">Add Member</h6>
+                            <div class="mb-3">
+                                <label class="form-label small text-muted">Select User</label>
+                                <div class="input-group">
+                                     <input type="hidden" id="selectedUserId">
+                                     <input type="text" id="selectedUserName" class="form-control size-sm bg-white" placeholder="No user selected" readonly>
+                                     <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickUser"><i class="bi bi-search"></i></button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small text-muted">Role</label>
+                                <select class="form-select size-sm mb-2" id="roleSelect">
+                                    <option value="viewer">Viewer</option>
+                                    <option value="editor" selected>Editor</option>
+                                    <option value="owner">Owner</option>
+                                    <option value="coordinator">Coordinator</option>
+                                    <option value="approver">Approver</option>
+                                    <option value="executor">Executor</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm w-100" id="btnAddUser">
+                                <i class="bi bi-person-plus-fill me-1"></i> Add to Team
+                            </button>
+                        </div>
+                        <div class="col-md-7">
+                            <h6 class="fw-bold text-primary mb-3">Assignments</h6>
+                            <div class="table-responsive border rounded bg-white" style="min-height: 150px;">
+                                <table class="table table-sm table-hover mb-0 align-middle">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-3">User</th>
+                                            <th>Role</th>
+                                            <th>Status</th>
+                                            <th class="text-end pe-3">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="assignmentsTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="timeline">
+                    <div class="row">
+                        <div class="col-md-5 border-end">
+                             <h6 class="fw-bold text-secondary mb-3" id="stepFormTitle">Add Checkpoint</h6>
+                             <div class="mb-2">
+                                <label class="small text-muted">Title *</label>
+                                <input type="text" id="stepTitle" class="form-control size-sm" placeholder="e.g. Draft Review">
+                             </div>
+                             <div class="row g-2 mb-2">
+                                 <div class="col-6">
+                                    <label class="small text-muted">Date</label>
+                                    <input type="date" id="stepDate" class="form-control size-sm">
+                                 </div>
+                                 <div class="col-6">
+                                    <label class="small text-muted">Weight (%)</label>
+                                    <input type="number" id="stepWeight" class="form-control size-sm" placeholder="0">
+                                 </div>
+                             </div>
+                             
+                             <div class="mb-2">
+                                <label class="small text-muted">Lock (Dependency)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text small bg-light" style="font-size: 0.75rem;">Step #</span>
+                                    <input type="number" id="stepLockNum" class="form-control size-sm" placeholder="Ex: 1">
+                                    <select id="stepLockStatus" class="form-select size-sm" style="flex-grow: 1.5;">
+                                        <option value="completed">Completed</option>
+                                        <option value="submitted">Submitted</option>
+                                        <option value="deleted">Deleted</option>
+                                    </select>
+                                </div>
+                                <div class="form-text x-small text-muted">Step opens when dependency meets criteria.</div>
+                             </div>
+
+                             <div class="mb-2">
+                                <label class="small text-muted">Definition File (Optional)</label>
+                                <input type="file" id="stepFile" class="form-control size-sm">
+                                <div class="form-text x-small">This file will be part of the step definition.</div>
+                             </div>
+
+                             <div class="mb-2">
+                                <label class="small text-muted">Criteria / Note</label>
+                                <div class="resizable-editor-container">
+                                    <div id="criteria-editor" class="quill-docked"></div>
+                                </div>
+                                <div class="form-text small text-muted text-end">Drag bottom right corner to resize</div>
+                             </div>
+                             
+                             <button type="button" class="btn btn-secondary btn-sm w-100 mt-2" id="btnAddStep">
+                                <i class="bi bi-plus-lg me-1"></i> <span id="btnAddStepText">Add Checkpoint</span>
+                             </button>
+                             <button type="button" class="btn btn-outline-danger btn-sm w-100 mt-1 d-none" id="btnCancelEdit">
+                                Cancel Edit
+                             </button>
+                        </div>
+                        <div class="col-md-7">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold text-primary m-0">Timeline</h6>
+                                <span class="badge bg-light text-dark border">Total Weight: <span id="totalWeightDisplay">0</span>%</span>
+                            </div>
+                            
+                            <div class="table-responsive border rounded bg-white" style="max-height: 500px; overflow-y: auto;">
+                                <table class="table table-sm table-hover mb-0 align-middle">
+                                    <thead class="bg-light sticky-top">
+                                        <tr>
+                                            <th class="ps-3" style="width: 40px;">#</th>
+                                            <th>Title</th>
+                                            <th>Detail</th>
+                                            <th class="text-end pe-3">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="stepsTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <% if(isEdit) { %>
+                <div class="tab-pane fade" id="files">
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="fw-bold text-primary mb-3">Attached Files</h6>
+                            <% if(allFiles.length > 0) { %>
+                                <div class="table-responsive border rounded bg-white">
+                                    <table class="table table-hover mb-0 align-middle">
+                                        <thead class="bg-light">
+                                            <tr>
+                                                <th class="ps-3">Filename</th>
+                                                <th>Context</th>
+                                                <th>Uploaded</th>
+                                                <th class="text-end pe-3">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <% allFiles.forEach(f => { %>
+                                                <tr>
+                                                    <td class="ps-3">
+                                                        <a href="<%= f.url %>" target="_blank" class="text-decoration-none fw-bold text-dark">
+                                                            <i class="bi bi-file-earmark-text text-primary me-2"></i><%= f.filename %>
+                                                        </a>
+                                                        <% if(f.description && f.description !== '[Definition]') { %><div class="small text-muted ms-4"><%= f.description %></div><% } %>
+                                                    </td>
+                                                    <td>
+                                                        <% if(f.isGlobal) { %>
+                                                            <span class="badge bg-secondary">Global</span>
+                                                        <% } else { %>
+                                                            <span class="badge bg-info text-dark" title="Step ID: <%= f.checkpointId %>">Step: <%= f.stepName %></span>
+                                                            <% if(f.description === '[Definition]') { %><span class="badge bg-warning text-dark border ms-1">Definition</span><% } %>
+                                                        <% } %>
+                                                    </td>
+                                                    <td class="small text-muted"><%= new Date(f.uploadedAt).toLocaleDateString() %></td>
+                                                    <td class="text-end pe-3">
+                                                        <a href="<%= f.url %>" download class="btn btn-sm btn-light border"><i class="bi bi-download"></i></a>
+                                                    </td>
+                                                </tr>
+                                            <% }) %>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <% } else { %>
+                                <div class="text-center p-5 text-muted bg-light rounded border-dashed">
+                                    <i class="bi bi-folder2-open fs-1 opacity-25"></i>
+                                    <p class="mt-2">No files attached to this task yet.</p>
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+
+              </div>
+
+              <div class="button-row mt-4 pt-3 border-top">
+                <button type="submit" id="btnSaveTask" class="btn btn-filled btn-primary btn-md">Save Task</button>
+                <a href="/tasks" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+              </div>
+            </form>
+          </div>
+      </div>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- 1. RICH TEXT EDITORS ---
+    var toolbarOptions = [['bold', 'italic', 'underline', 'strike'], [{ 'list': 'ordered'}, { 'list': 'bullet' }], [{ 'color': [] }, { 'background': [] }], ['clean']];
+    var descQuill = new Quill('#desc-editor', { theme: 'snow', placeholder: 'Task details...', modules: { toolbar: toolbarOptions } });
+    var criteriaQuill = new Quill('#criteria-editor', { theme: 'snow', placeholder: 'Definition of done...', modules: { toolbar: toolbarOptions } });
+
+    // --- 2. STATE & DOM ---
+    let assignments = [];
+    let steps = [];
+    let editingStepIdx = -1;
+    let pendingStepFiles = {}; 
+    let existingFiles = []; 
+
+    const assignmentsTableBody = document.getElementById('assignmentsTableBody');
+    const stepsTableBody = document.getElementById('stepsTableBody');
+    const form = document.getElementById('taskForm');
+    const saveBtn = document.getElementById('btnSaveTask');
+    const totalWeightDisplay = document.getElementById('totalWeightDisplay');
+    
+    // Step Inputs
+    const stepTitleIn = document.getElementById('stepTitle');
+    const stepDateIn = document.getElementById('stepDate');
+    const stepWeightIn = document.getElementById('stepWeight');
+    const stepLockNumIn = document.getElementById('stepLockNum');
+    const stepLockStatusIn = document.getElementById('stepLockStatus');
+    const stepFileIn = document.getElementById('stepFile');
+    const btnAddStep = document.getElementById('btnAddStep');
+    const btnAddStepText = document.getElementById('btnAddStepText');
+    const btnCancelEdit = document.getElementById('btnCancelEdit');
+    const stepFormTitle = document.getElementById('stepFormTitle');
+
+    // --- 3. INIT ---
+    try {
+        const initA = JSON.parse(document.getElementById('initAssignmentsData').textContent);
+        const initS = JSON.parse(document.getElementById('initStepsData').textContent);
+        existingFiles = JSON.parse(document.getElementById('initFilesData')?.textContent || '[]');
+        
+        initA.forEach(a => assignments.push(a));
+        initS.forEach(s => steps.push(s));
+        renderAssignments();
+        renderSteps();
+    } catch(e) { console.error("Init Error", e); }
+
+    // --- 4. ASSIGNMENT LOGIC ---
+    if(document.getElementById('btnPickUser')) {
+        document.getElementById('btnPickUser').addEventListener('click', () => {
+            GenericPicker.open(GenericPickerPresets.user({
+                title: 'Select User',
+                context: GenericPickerContexts.scope('Users'),
+                onSelect: (item) => {
+                    document.getElementById('selectedUserId').value = item.id;
+                    document.getElementById('selectedUserName').value = `${item.name || item.username}`;
+                }
+            }));
+        });
+    }
+
+    document.getElementById('btnAddUser').addEventListener('click', async () => {
+        const id = document.getElementById('selectedUserId').value;
+        if(!id){
+            if(typeof showMessageModal === 'function') {
+                await showMessageModal({title: 'Users/Team', message: "Select user first.", icon: 'warning', buttons: [{text:'Ok', class:'btn-warning'}]});
+            } else { return alert("Select user first."); }
+            return;
+        }
+        
+        const existing = assignments.find(a => a.userId === id);
+        if(existing) {
+            let confirmed = false;
+            if(typeof showMessageModal === 'function') {
+                const res = await showMessageModal({title: 'Replace User Role?', message: `User already exists as ${existing.role}. Update role?`, 
+                icon: 'warning', buttons: [{text:'Cancel', class:'btn-secondary'}, {text:'Update', class:'btn-warning'}]});
+                confirmed = (res === 'Update');
+            } else { confirmed = confirm("User exists. Update role?"); }
+            
+            if(!confirmed) return;
+            existing.status = 'active';
+            existing.role = document.getElementById('roleSelect').value;
+        } else {
+            assignments.push({
+                userId: id,
+                name: document.getElementById('selectedUserName').value,
+                role: document.getElementById('roleSelect').value,
+                status: 'active'
+            });
+        }
+        document.getElementById('selectedUserId').value = '';
+        document.getElementById('selectedUserName').value = '';
+        renderAssignments();
+    });
+
+    function renderAssignments() {
+        assignmentsTableBody.innerHTML = '';
+        if(assignments.length === 0) {
+            assignmentsTableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted p-3">No assignments</td></tr>';
+            return;
+        }
+        
+        assignments.forEach(a => {
+            if(a.status === 'disabled') return;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="ps-3 fw-bold">${a.name}</td>
+                <td><span class="badge bg-light text-dark border">${a.role}</span></td>
+                <td><span class="badge bg-success-subtle text-success">Active</span></td>
+                <td class="text-end pe-3">
+                    <button type="button" class="btn btn-xs btn-outline-danger remove-user" title="Remove"><i class="bi bi-trash"></i></button>
+                </td>
+            `;
+            tr.querySelector('.remove-user').onclick = () => {
+                a.status = 'disabled';
+                renderAssignments();
+            };
+            assignmentsTableBody.appendChild(tr);
+        });
+    }
+
+    // --- 5. CHECKPOINT LOGIC ---
+    
+    btnAddStep.addEventListener('click', () => {
+        const title = stepTitleIn.value;
+        if(!title) return stepTitleIn.focus();
+        
+        const criteriaHTML = criteriaQuill.root.innerHTML === '<p><br></p>' ? '' : criteriaQuill.root.innerHTML;
+        
+        const stepData = {
+            id: editingStepIdx > -1 ? steps[editingStepIdx].id : null,
+            title: title,
+            date: stepDateIn.value || '',
+            weight: parseInt(stepWeightIn.value) || 0,
+            criteria: criteriaHTML,
+            lockStep: stepLockNumIn.value || '',
+            lockStatus: stepLockStatusIn.value || 'completed'
+        };
+
+        const targetIndex = editingStepIdx > -1 ? editingStepIdx : steps.length;
+
+        if (stepFileIn.files.length > 0) {
+            pendingStepFiles[targetIndex] = stepFileIn.files[0];
+        }
+
+        if(editingStepIdx > -1) {
+            steps[editingStepIdx] = stepData;
+            resetStepForm();
+        } else {
+            steps.push(stepData);
+            clearStepInputs();
+        }
+        renderSteps();
+    });
+
+    btnCancelEdit.addEventListener('click', resetStepForm);
+
+    function clearStepInputs() {
+        stepTitleIn.value = '';
+        stepWeightIn.value = '';
+        stepDateIn.value = '';
+        stepLockNumIn.value = '';
+        stepLockStatusIn.value = 'completed';
+        stepFileIn.value = '';
+        criteriaQuill.setContents([]);
+    }
+
+    function resetStepForm() {
+        editingStepIdx = -1;
+        stepFormTitle.textContent = 'Add Checkpoint';
+        btnAddStepText.textContent = 'Add Checkpoint';
+        btnAddStep.classList.remove('btn-warning');
+        btnAddStep.classList.add('btn-secondary');
+        btnCancelEdit.classList.add('d-none');
+        clearStepInputs();
+    }
+
+    window.editStep = function(idx) {
+        const s = steps[idx];
+        editingStepIdx = idx;
+        stepTitleIn.value = s.title;
+        stepDateIn.value = s.date;
+        stepWeightIn.value = s.weight;
+        stepLockNumIn.value = s.lockStep || '';
+        stepLockStatusIn.value = s.lockStatus || 'completed';
+        criteriaQuill.root.innerHTML = s.criteria || '';
+        
+        stepFormTitle.textContent = `Editing Step #${idx + 1}`;
+        btnAddStepText.textContent = 'Update Checkpoint';
+        btnAddStep.classList.add('btn-warning');
+        btnCancelEdit.classList.remove('d-none');
+        stepTitleIn.focus();
+    };
+
+    window.removeStep = function(idx) {
+        if(!confirm("Remove this step?")) return;
+        if(editingStepIdx === idx) resetStepForm();
+        steps.splice(idx, 1);
+        delete pendingStepFiles[idx];
+        renderSteps();
+    };
+
+    // Delete Definition File
+    window.deleteStepFile = async function(url, cpId) {
+        const fileMsg="Selected file will be deleted <b>Permanently</b><br>Do you want to delete this definition file?"
+        if(typeof showMessageModal === 'function') {
+            const resfileMsg = await showMessageModal(
+                { 
+                    title: 'File/Document', 
+                    icon: 'warning', 
+                    message: fileMsg, 
+                    buttons: [{text:'Cancel', class:'btn-secondary'},{text:'Delete', class:'btn-warning'}]
+                });
+            if(resfileMsg !== "Delete") return;
+        } else { 
+            if(!confirm(fileMsg)) return; 
+        }
+        
+        const taskId = '<%= task && task.id ? task.id : "" %>';
+        const actionId = document.querySelector('input[name="actionStateId"]').value;
+
+        try {
+            const res = await fetch('/tasks/deliverable/delete', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json', 'X-AJAX-Request':'true'},
+                body: JSON.stringify({ 
+                    taskId: taskId, 
+                    fileUrl: url, 
+                    checkpointId: cpId,
+                    actionStateId: actionId
+                })
+            });
+            const d = await res.json();
+            if(d.status === 'success') {
+                existingFiles = existingFiles.filter(f => f.url !== url);
+                renderSteps();
+            } else { alert(d.message); }
+        } catch(e) { alert("Error deleting file"); }
+    };
+
+    function renderSteps() {
+        stepsTableBody.innerHTML = '';
+        let totalW = 0;
+        
+        if(steps.length === 0) {
+            stepsTableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted p-4">No checkpoints defined.</td></tr>';
+            totalWeightDisplay.textContent = 0;
+            return;
+        }
+
+        steps.forEach((s, idx) => {
+            totalW += (parseInt(s.weight) || 0);
+            
+            let infoHtml = `<div class="small text-muted">${s.date || 'No Date'} • ${s.weight}%</div>`;
+            if(s.lockStep) infoHtml += `<div class="x-small text-warning"><i class="bi bi-lock"></i> After Step ${s.lockStep} (${s.lockStatus})</div>`;
+            
+            let fileHtml = '';
+            // Pending Files
+            if (pendingStepFiles[idx]) {
+                fileHtml += `<div class="text-success x-small"><i class="bi bi-plus-circle"></i> ${pendingStepFiles[idx].name} (Pending)</div>`;
+            }
+            // Existing Files (Show All)
+            if (s.id) {
+                const attached = existingFiles.filter(f => f.checkpointId === s.id);
+                attached.forEach(f => {
+                    fileHtml += `
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <a href="${f.url}" target="_blank" class="x-small text-primary text-truncate" style="max-width:100px;">${f.filename}</a>
+                            <i class="bi bi-x text-danger cursor-pointer" onclick="deleteStepFile('${f.url}', '${s.id}')" title="Delete"></i>
+                        </div>`;
+                });
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="ps-3 text-muted">${idx+1}</td>
+                <td class="fw-bold">${s.title}</td>
+                <td>${infoHtml}${fileHtml}</td>
+                <td class="text-end pe-3">
+                    <button type="button" class="btn btn-xs btn-outline-primary me-1" onclick="editStep(${idx})" title="Edit"><i class="bi bi-pencil-fill"></i></button>
+                    <button type="button" class="btn btn-xs btn-outline-danger" onclick="removeStep(${idx})" title="Remove"><i class="bi bi-trash-fill"></i></button>
+                </td>
+            `;
+            stepsTableBody.appendChild(tr);
+        });
+        totalWeightDisplay.textContent = totalW;
+    }
+
+    // --- 6. SUBMIT LOGIC (Updated with Token Refresh) ---
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const titleIn = document.getElementById('inpTitle');
+        if(!titleIn.value.trim()) {
+            titleIn.classList.add('is-invalid');
+            new bootstrap.Tab(document.querySelector('#general-tab')).show();
+            titleIn.focus();
+            return;
+        } else { titleIn.classList.remove('is-invalid'); }
+
+        document.getElementById('assignmentsInput').value = JSON.stringify(assignments);
+        document.getElementById('stepsInput').value = JSON.stringify(steps);
+        document.getElementById('hiddenDescription').value = descQuill.root.innerHTML;
+        
+        const actionStateId = document.querySelector('input[name="actionStateId"]').value;
+        const formData = new FormData(form);
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        saveBtn.disabled = true;
+
+        try {
+            // PHASE 1: Structure Save (Consumes current actionStateId)
+            const res = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+                body: new URLSearchParams(formData).toString()
+            });
+            const data = await res.json();
+            
+            if(data.status === 'success') {
+                
+                // PHASE 2: Upload Files
+                const newCheckpoints = (data.task && data.task.checkpoints) ? data.task.checkpoints : [];
+                const taskId = data.taskId || '<%= task && task.id ? task.id : "" %>'; 
+                const pendingKeys = Object.keys(pendingStepFiles);
+                
+                if (taskId && pendingKeys.length > 0) {
+                    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Refreshing Token...';
+
+                    // ✅ STEP 2.1: Fetch NEW ActionStateId
+                    // We call the Edit endpoint to get a fresh valid ID for the uploads
+                    let freshActionStateId = null;
+                    try {
+                        const tokenRes = await fetch(`/tasks/edit/${taskId}`, {
+                            method: 'GET',
+                            headers: { 'X-AJAX-Request': 'true' }
+                        });
+                        const tokenData = await tokenRes.json();
+                        if(tokenData.actionStateId) {
+                            freshActionStateId = tokenData.actionStateId;
+                            // Update hidden input for future saves without reload
+                            document.getElementById('actionStateIdInput').value = freshActionStateId;
+                        }
+                    } catch(err) {
+                        console.error("Failed to refresh token", err);
+                    }
+
+                    // ✅ STEP 2.2: Proceed with Uploads if we have a token
+                    if (freshActionStateId) {
+                        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Uploading Files...';
+                        
+                        for(const idx of pendingKeys) {
+                            const stepId = newCheckpoints[idx] ? newCheckpoints[idx].id : null;
+                            
+                            if(stepId) {
+                                const fd = new FormData();
+                                fd.append('taskId', taskId);
+                                fd.append('checkpointId', stepId);
+                                fd.append('description', '[Definition]');
+                                fd.append('file', pendingStepFiles[idx]);
+                                
+                                // ID passed via URL Query String (as established previously)
+                                const url = `/tasks/deliverable/upload?actionStateId=${encodeURIComponent(freshActionStateId)}`;
+                                
+                                await fetch(url, { 
+                                    method: 'POST', 
+                                    headers: {'X-AJAX-Request':'true'}, 
+                                    body: fd 
+                                });
+                            }
+                        }
+                    } else {
+                        const msg1= "Security Token Refresh Failed. Files could not be uploaded. Please reload and try attaching files again.";
+                        if(typeof showMessageModal === 'function') {
+                            await showMessageModal({ title: 'Error', icon: 'error', message: msg1, buttons: [{text:'OK', class:'btn-danger'}]});
+                        } else { alert(msg1); }
+                    }
+                }
+
+                if(typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Success', icon: 'success', message: data.message, buttons: [{text:'OK', class:'btn-success'}]});
+                }
+                window.location.href = '/tasks';
+
+                // Reset pending files
+                pendingStepFiles = {};
+                
+                // Update URL if it was a new task
+                if(!window.location.href.includes('edit') && taskId) {
+                    window.history.pushState({}, '', '/tasks/edit/' + taskId);
+                }
+                
+                saveBtn.innerHTML = 'Save Task';
+                saveBtn.disabled = false;
+
+            } else {
+                if(typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Error', icon: 'error', message: data.message, buttons: [{text:'OK', class:'btn-danger'}]});
+                } else { alert(data.message); }
+                saveBtn.innerHTML = originalText;
+                saveBtn.disabled = false;
+            }
+        } catch(err) {
+            console.error(err);
+            if(typeof showMessageModal === 'function') {
+                await showMessageModal({ title: 'Error', icon: 'error', message: "Network error", buttons: [{text:'OK', class:'btn-danger'}]});
+            } else { alert("Unexpected error."); }
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+        }
+    });
+    
+});
+</script>
+<style>
+    .form-control.is-invalid { border-color: #dc3545; background-image: none; }
+    .x-small { font-size: 0.75rem; }
+    .ql-toolbar.ql-snow { border-top-left-radius: 4px; border-top-right-radius: 4px; }
+    .ql-container.ql-snow { border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
+    .resizable-editor-container {
+        resize: vertical; overflow: hidden; min-height: 150px; border: 1px solid #ccc; border-radius: 4px; display: flex; flex-direction: column;
+    }
+    .quill-docked { flex-grow: 1; display: flex; flex-direction: column; height: 100%; }
+    .quill-docked .ql-editor { flex-grow: 1; overflow-y: auto; }
+    .cursor-pointer { cursor: pointer; }
+</style>

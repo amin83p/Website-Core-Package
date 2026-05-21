@@ -1,0 +1,217 @@
+<%
+  // Extract data for cleaner template usage
+  const isEdit = !!(subscription && subscription.id);
+  const currentGroupId = subscription ? subscription.groupId : '';
+%>
+
+<div class="sections-page">
+  
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0">            
+      <%= isEdit ? 'Edit Subscriber' : 'New Subscriber' %>
+    </h1>
+    <% if (isEdit) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= subscription.id %></span>
+    <% } else { %>
+        <span class="badge bg-success border">New Definition</span>
+    <% } %>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="subscriptionForm" action="<%= isEdit ? '/newsletter/admin/update/' + subscription.id : '/newsletter/admin/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Email Address <span class="text-danger">*</span></label>
+            <input type="email" name="email" class="form-control size-md" 
+                   value="<%= subscription ? subscription.email : '' %>" 
+                   placeholder="user@example.com" required>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Subscription Group</label>
+            
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-collection text-primary"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0" id="groupNameDisplay" 
+                       value="<%= (subscription && subscription.groupName) ? subscription.groupName : (currentGroupId || '') %>"
+                       placeholder="Select a group (Optional)..." readonly style="cursor: pointer; background-color: #fff;">
+                
+                <button class="btn btn-outline-primary" type="button" id="btnGroupPicker">
+                    <i class="bi bi-search me-1"></i>Search
+                </button>
+                
+                <button class="btn btn-outline-secondary" type="button" id="btnClearGroup" title="Clear Selection">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <input type="hidden" name="groupId" id="groupIdInput" value="<%= currentGroupId %>">
+            <div class="form-text">Assign this user to a specific newsletter list.</div>
+          </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Internal Note</label>
+        <textarea name="note" class="form-control size-md" rows="3" 
+                  placeholder="Admin notes (not visible to user)..."><%= subscription ? subscription.note : '' %></textarea>
+      </div>
+
+      <div class="row align-items-center">
+          <div class="col-md-4 mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="activeCheck" name="active" 
+                     <%= (!subscription || subscription.active) ? 'checked' : '' %>>
+              <label class="form-check-label" for="activeCheck">Active</label>
+              <div class="form-text x-small text-muted mt-0">
+                  If unchecked, user will be inactive.
+              </div>
+            </div>
+          </div>
+
+          <% if (isEdit) { %>
+            <div class="col-md-4 mb-3">
+                 <label class="form-label small fw-bold text-muted d-block">Manage Code</label>
+                 <span class="font-monospace small bg-light border px-2 py-1 rounded text-dark"><%= subscription.manageCode %></span>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label small fw-bold text-muted d-block">Current Status</label>
+                <% if(subscription.status === 'subscribed') { %>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">Subscribed</span>
+                <% } else { %>
+                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle"><%= subscription.status %></span>
+                <% } %>
+            </div>
+          <% } %>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Subscriber</button>
+        <a href="/newsletter/admin" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction"> Cancel </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('subscriptionForm');
+  const groupInput = document.getElementById('groupIdInput');
+  const groupNameDisplay = document.getElementById('groupNameDisplay');
+  const btnClearGroup = document.getElementById('btnClearGroup');
+  const btnGroupPicker = document.getElementById('btnGroupPicker');
+
+  // Helper to update UI
+  const updateGroupUI = (id, name) => {
+      groupInput.value = id || '';
+      groupNameDisplay.value = name || '';
+  };
+
+  if(btnClearGroup) {
+      btnClearGroup.addEventListener('click', () => updateGroupUI('', ''));
+  }
+
+  // --- PICKER ---
+  if(btnGroupPicker) {
+      btnGroupPicker.addEventListener('click', () => {
+          if (typeof GenericPicker === 'undefined') return console.error('GenericPicker missing');
+
+          GenericPicker.open(GenericPickerPresets.group({
+            title: 'Select Subscription Group',
+            context: GenericPickerContexts.allGroups(),
+            renderer: (item) => {
+                return `
+                    <div class="d-flex justify-content-between align-items-center w-100">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rounded bg-white border d-flex align-items-center justify-content-center shadow-sm text-primary" style="width: 40px; height: 40px;">
+                                <i class="bi bi-collection-fill fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-dark">${item.name}</div>
+                                <div class="text-muted small">${item.description || 'No description'}</div>
+                            </div>
+                        </div>
+                        <div class="badge bg-light text-secondary border font-monospace">${item.id}</div>
+                    </div>
+                `;
+            },
+            onSelect: (item) => {
+                updateGroupUI(item.id, item.name);
+            }
+          }));
+      });
+  }
+  
+  // Also allow clicking input to open picker
+  if(groupNameDisplay) {
+      groupNameDisplay.addEventListener('click', () => {
+          if(btnGroupPicker) btnGroupPicker.click();
+      });
+  }
+
+  // --- SUBMIT ---
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+      }
+
+      const formData = new FormData(form);
+      formData.set('active', document.getElementById('activeCheck').checked ? 'true' : 'false');
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true' 
+          },
+          body: new URLSearchParams(formData).toString()
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Success', icon: 'success', message: result.message || 'Saved.',
+              buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+            });
+          }
+          window.location.href = '/newsletter/admin';
+        } else {
+          if (submitBtn) {
+             submitBtn.disabled = false;
+             submitBtn.innerHTML = 'Save Subscriber'; 
+          }
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Error', icon: 'error', message: result.message || 'Failed.',
+              buttons: [{ text: 'OK', class: 'btn-danger btn-md' }]
+            });
+          } else { 
+            alert(result.message);
+          }
+        }
+      } catch (error) {
+        if (submitBtn) {
+             submitBtn.disabled = false;
+             submitBtn.innerHTML = 'Save Subscriber';
+        }
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Error', icon: 'error', message: 'Unexpected error occurred.',
+            buttons: [{ text: 'OK', class: 'btn-danger btn-md' }]
+          });
+        }
+      }
+    });
+  }
+});
+</script>

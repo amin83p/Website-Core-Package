@@ -1,0 +1,170 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0"><%= operation ? 'Edit Operation' : 'New Operation' %></h1>
+      <% if(operation) { %> <span class="badge bg-primary border font-monospace">ID: <%= operation.id %></span> <% } %>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="operationForm" action="<%= operation ? '/operations/edit/' + operation.id : '/operations/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <div class="mb-3">
+        <label class="form-label">Name</label>
+        <input type="text" 
+               name="name" 
+               class="form-control size-md name-input" 
+               value="<%= operation ? operation.name : '' %>" 
+               pattern="^[A-Z][A-Z_]*[A-Z]$"
+               placeholder="e.g. CREATE_USER"
+               required>
+        <small class="form-text">
+          Uppercase letters and underscores only (e.g., CREATE_USER).
+        </small>
+      </div>
+
+      <div class="row">
+          <div class="col-md-4 mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="activeCheck" name="active" 
+                     <%= (!operation || operation.active) ? 'checked' : '' %>>
+              <label class="form-check-label" for="activeCheck">Active</label>
+            </div>
+          </div>
+          
+          <div class="col-md-4 mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="trackStateCheck" name="trackState" 
+                     <%= (!operation || operation.trackState !== false) ? 'checked' : '' %>>
+              <label class="form-check-label" for="trackStateCheck">Track Activity</label>
+              <div class="form-text x-small text-muted mt-0">
+                  Enables attempt limiting and activity history logging.
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-4 mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="keepActiveCheck" name="keepActive" 
+                     <%= (operation && operation.keepActive) ? 'checked' : '' %>>
+              <label class="form-check-label text-primary fw-bold" for="keepActiveCheck">Wait for Input</label>
+              <div class="form-text x-small text-muted mt-0">
+                  Don't auto-complete. Keeps session active for multi-step forms.
+              </div>
+            </div>
+          </div>
+      </div>
+
+      <% if (operation && operation.system) { %>
+        <div class="alert alert-warning py-2 mb-3 small">
+          <i class="bi bi-shield-lock-fill me-1"></i>
+          This is a <strong>System Operation</strong>. Core properties cannot be modified.
+        </div>
+      <% } %>
+
+      <div class="button-row">
+        <% if (!operation || !operation.system) { %>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save</button>
+        <% } %>
+        <!-- <a href="/operations" class="btn btn-filled btn-secondary btn-md">Cancel</a> -->
+        <a href="/operations" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/operations"> Cancel </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('operationForm');
+  const nameInput = document.querySelector('.name-input');
+   if(nameInput) {
+      nameInput.addEventListener('input', () => {
+        let value = nameInput.value.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z_]/g, '');
+        nameInput.value = value;
+      });
+  }
+ 
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      // 1. Stop native submission
+      e.preventDefault();
+      
+      // 2. Prevent Double-Click: Disable button immediately
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+          submitBtn.disabled = true;
+          // Optional: Add spinner
+          const originalText = submitBtn.innerHTML;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+      }
+
+      const formData = new FormData(form);
+
+      // Helper to handle switches manually using safe selectors
+      const setSwitch = (id, name) => {
+          const el = form.querySelector('#' + id);
+          if (el) formData.set(name, el.checked ? 'true' : 'false');
+      };
+
+      setSwitch('activeCheck', 'active');
+      setSwitch('trackStateCheck', 'trackState');
+      setSwitch('keepActiveCheck', 'keepActive'); 
+
+      const data = new URLSearchParams(formData);
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true',
+            ...(formData.get('actionStateId') ? { 'X-Action-State-Id': String(formData.get('actionStateId')) } : {})
+          },
+          body: data.toString()
+        });
+        
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Success', icon: 'success', message: result.message || 'Operation saved.',
+              buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+            });
+          }
+          window.location.href = '/operations';
+        } else {
+          // Re-enable button on logic error so user can retry
+          if (submitBtn) {
+             submitBtn.disabled = false;
+             submitBtn.innerHTML = 'Save'; // Restore text
+          }
+
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Error', icon: 'error', message: result.message || 'Failed to save.',
+              buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+            });
+          } else { 
+            alert(result.message); 
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        
+        // Re-enable button on network error
+        if (submitBtn) {
+             submitBtn.disabled = false;
+             submitBtn.innerHTML = 'Save';
+        }
+
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Error', icon: 'error', message: 'Unexpected error occurred.',
+            buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+          });
+        }
+      }
+    });
+  }
+});
+</script>

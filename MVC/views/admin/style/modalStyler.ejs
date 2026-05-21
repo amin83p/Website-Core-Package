@@ -1,0 +1,226 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="page-heading size-md m-0">Modal Styler</h2>
+        <p class="text-muted mb-0">Customize popups, dialogs, and overlays.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/styles" class="btn btn-outline-secondary btn-sm">Back</a>
+        <button type="submit" form="modalForm" class="btn btn-primary btn-sm btn-filled">
+            <i class="bi bi-save-fill me-1"></i> Save Changes
+        </button>
+    </div>
+  </div>
+
+  <div class="row g-4">
+      
+      <div class="col-lg-4">
+          <div class="card border-0 shadow-lg sticky-top" style="top: 20px;">
+              <div class="card-header bg-dark text-white fw-bold">
+                  Modal Appearance
+              </div>
+              <div class="card-body bg-light">
+                  <form id="modalForm" action="/styles/modals/save" method="POST">
+                      
+                      <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
+                          <li class="nav-item">
+                              <button class="nav-link active small py-1" data-bs-toggle="pill" data-bs-target="#tab-window" type="button">Window</button>
+                          </li>
+                          <li class="nav-item">
+                              <button class="nav-link small py-1" data-bs-toggle="pill" data-bs-target="#tab-backdrop" type="button">Backdrop</button>
+                          </li>
+                      </ul>
+
+                      <div class="tab-content">
+                          
+                          <div class="tab-pane fade show active" id="tab-window">
+                              <h6 class="fw-bold text-primary mb-3">Colors</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Header Background</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= modalVars.headerBg %>" oninput="updatePreview('--modal-header-bg', this.value)">
+                                      <input type="text" name="--modal-header-bg" id="val_headerBg" class="form-control font-monospace" value="<%= modalVars.headerBg %>">
+                                  </div>
+                              </div>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Header Text</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= modalVars.headerText %>" oninput="updatePreview('--modal-header-text', this.value)">
+                                      <input type="text" name="--modal-header-text" id="val_headerText" class="form-control font-monospace" value="<%= modalVars.headerText %>">
+                                  </div>
+                              </div>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Body Background</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= modalVars.bg %>" oninput="updatePreview('--modal-bg', this.value)">
+                                      <input type="text" name="--modal-bg" id="val_bg" class="form-control font-monospace" value="<%= modalVars.bg %>">
+                                  </div>
+                              </div>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Border Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= modalVars.borderColor %>" oninput="updatePreview('--modal-border-color', this.value)">
+                                      <input type="text" name="--modal-border-color" id="val_borderColor" class="form-control font-monospace" value="<%= modalVars.borderColor %>">
+                                  </div>
+                              </div>
+
+                              <hr class="text-muted opacity-25">
+
+                              <h6 class="fw-bold text-primary mb-3">Shape</h6>
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Corner Radius</span>
+                                      <span id="radVal" class="text-primary"><%= modalVars.radius %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="30" step="1" 
+                                         value="<%= parseInt(modalVars.radius) %>"
+                                         oninput="updatePreview('--modal-radius', this.value + 'px'); document.getElementById('radVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--modal-radius" id="val_radius" value="<%= modalVars.radius %>">
+                              </div>
+                          </div>
+
+                          <div class="tab-pane fade" id="tab-backdrop">
+                              <h6 class="fw-bold text-primary mb-3">Overlay Effects</h6>
+                              
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted">Backdrop Color</label>
+                                  <div class="input-group input-group-sm">
+                                      <input type="color" class="form-control form-control-color" value="<%= modalVars.backdropColor %>" oninput="updatePreview('--modal-backdrop-color', this.value)">
+                                      <input type="text" name="--modal-backdrop-color" id="val_backdropColor" class="form-control font-monospace" value="<%= modalVars.backdropColor %>">
+                                  </div>
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Opacity</span>
+                                      <span id="opVal" class="text-primary"><%= modalVars.backdropOpacity %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="1" step="0.05" 
+                                         value="<%= parseFloat(modalVars.backdropOpacity) %>"
+                                         oninput="updatePreview('--modal-backdrop-opacity', this.value); document.getElementById('opVal').innerText = this.value">
+                                  <input type="hidden" name="--modal-backdrop-opacity" id="val_backdropOpacity" value="<%= modalVars.backdropOpacity %>">
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                                      <span>Blur Amount (Glass Effect)</span>
+                                      <span id="blurVal" class="text-primary"><%= modalVars.backdropBlur %></span>
+                                  </label>
+                                  <input type="range" class="form-range" min="0" max="15" step="1" 
+                                         value="<%= parseInt(modalVars.backdropBlur) %>"
+                                         oninput="updatePreview('--modal-backdrop-blur', this.value + 'px'); document.getElementById('blurVal').innerText = this.value + 'px'">
+                                  <input type="hidden" name="--modal-backdrop-blur" id="val_backdropBlur" value="<%= modalVars.backdropBlur %>">
+                                  <div class="form-text x-small">Set > 0px for a frosted glass look.</div>
+                              </div>
+
+                              <div class="alert alert-info border-0 mt-4 small">
+                                  <i class="bi bi-lightbulb-fill me-1"></i> Click the "Test Live Modal" button on the right to see backdrop effects.
+                              </div>
+                          </div>
+
+                      </div>
+
+                  </form>
+              </div>
+          </div>
+      </div>
+
+      <div class="col-lg-8">
+          <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white border-bottom-0 pt-3 fw-bold text-secondary d-flex justify-content-between align-items-center">
+                  <span>Static Preview</span>
+                  <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#testModal">
+                      <i class="bi bi-play-fill me-1"></i> Test Live Modal
+                  </button>
+              </div>
+              <div class="card-body p-4 bg-light d-flex align-items-center justify-content-center">
+                  
+                  <div style="width: 100%; max-width: 500px;">
+                      
+                      <div class="modal-dialog" style="pointer-events: none; margin: 0;">
+                          <div class="modal-content shadow-lg">
+                              <div class="modal-header">
+                                  <h5 class="modal-title fw-bold">Modal Title</h5>
+                                  <button type="button" class="btn-close"></button>
+                              </div>
+                              <div class="modal-body">
+                                  <p>This is a static preview of the modal window content.</p>
+                                  <p class="mb-0 text-muted small">Adjusting colors on the left updates this box instantly.</p>
+                              </div>
+                              <div class="modal-footer">
+                                  <button type="button" class="btn btn-secondary btn-sm">Close</button>
+                                  <button type="button" class="btn btn-primary btn-filled btn-sm">Save Changes</button>
+                              </div>
+                          </div>
+                      </div>
+
+                  </div>
+
+              </div>
+          </div>
+      </div>
+
+  </div>
+</div>
+
+<div class="modal fade" id="testModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Live Test Modal</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Check the backdrop behind this window!</p>
+        <p class="mb-0">
+            If you set a blur value, the background should look frosted.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary btn-filled">Okay</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    function updatePreview(varName, val) {
+        // Sync Inputs
+        const shortName = varName.replace('--modal-', '').replace(/-([a-z])/g, g => g[1].toUpperCase());
+        const inputId = 'val_' + shortName;
+        
+        const textInput = document.getElementById(inputId);
+        if(textInput) textInput.value = val;
+
+        // Apply Globally
+        document.documentElement.style.setProperty(varName, val);
+    }
+
+    document.getElementById('modalForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.querySelector('button[type="submit"]');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        btn.disabled = true;
+
+        try {
+            const fd = new FormData(e.target);
+            const data = Object.fromEntries(fd.entries());
+            const res = await fetch(e.target.action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' }, body: JSON.stringify(data) });
+            const result = await res.json();
+            if (result.status === 'success') {
+                if(typeof showMessageModal === 'function') await showMessageModal({ title: 'Saved', icon: 'success', message: 'Modal styles updated.', buttons: [{text:'OK', class:'btn-success'}]});
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            } else {
+                alert('Error: ' + result.message);
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            }
+        } catch (err) {
+            console.error(err); alert('Network error.');
+            btn.disabled = false; btn.innerHTML = originalHtml;
+        }
+    });
+</script>

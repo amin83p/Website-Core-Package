@@ -1,0 +1,48 @@
+<div class="profile-page">
+  <h1 class="page-heading size-md">User Profile</h1>
+  <div class="card-container size-md">
+    <div class="profile-header">
+      <img src="/images/avatar-placeholder.png" alt="User Avatar" class="profile-avatar">
+      <h2><%= user.username %></h2>
+    </div>
+    <div class="profile-details">
+      <p><strong>Email:</strong> <%= user.email %></p>
+      <p><strong>ID:</strong> <%= user.id %></p>
+    </div>
+    <div class="button-row">
+      <button class="btn btn-filled btn-edit btn-md edit-profile-btn">Edit Profile</button>
+      <button class="btn btn-filled btn-delete btn-md delete-profile-btn" data-id="<%= user.id %>">Delete Profile</button>
+    </div>
+  </div>
+
+  <!-- Edit Profile Modal -->
+  <div class="modal fade" id="editProfileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header text-info">
+          <i class="bi bi-pencil-square"></i>
+          <h5 class="modal-title">Edit Profile</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="editProfileForm" action="/profile" method="POST">
+            <div class="mb-3">
+              <label class="form-label">Username</label>
+              <input type="text" name="username" value="<%= user.username %>" class="form-control size-md" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Email</label>
+              <input type="email" name="email" value="<%= user.email %>" class="form-control size-md" required>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-filled btn-secondary btn-md" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" form="editProfileForm" class="btn btn-filled btn-edit btn-md">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/scripts/profile.js"></script>

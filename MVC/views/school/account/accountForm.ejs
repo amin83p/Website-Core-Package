@@ -1,0 +1,346 @@
+<%
+  const a = account || {};
+  const isEdit = !!a.id;
+  const routeId = (a.id || '');
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const ownerLockState = ownerLock || { isLocked: false, owners: [] };
+  const lockImportant = !!ownerLockState.isLocked;
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-diagram-2-fill me-2"></i><%= title %></h1>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromAccount"><i class="bi bi-copy me-1"></i> Copy From Account</button>
+      <a href="/school/accounts/help" class="btn btn-outline-primary btn-sm"><i class="bi bi-journal-text me-1"></i> Help</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="accountForm" action="<%= isEdit ? '/school/accounts/edit/' + routeId : '/school/accounts/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
+      <% if (lockImportant) { %>
+        <div class="alert alert-warning border-warning shadow-sm mb-3">
+          <div class="fw-bold mb-1"><i class="bi bi-lock-fill me-1"></i>Owner-Locked Account</div>
+          <div class="small">
+            This account is linked to an owner record and critical fields are protected.
+            Update owner-related state from the owner module.
+          </div>
+          <div class="small mt-1">
+            Linked owner(s):
+            <%= (ownerLockState.owners || []).map(o => `${String(o.type || '').toUpperCase()}: ${o.id} (${o.status || 'Unknown'})`).join(', ') %>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label fw-bold">Account ID</label>
+              <input type="text" name="accountId" class="form-control size-md font-monospace" value="<%= a.id || '' %>" placeholder="Auto-generated if blank" <%= isEdit ? 'readonly' : '' %>>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label fw-bold">Code *</label>
+              <input type="text" name="code" class="form-control size-md font-monospace" value="<%= a.code || '' %>" placeholder="e.g. 1101" required <%= lockImportant ? 'disabled' : '' %>>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label fw-bold">Status *</label>
+              <select name="status" class="form-select size-md" required <%= lockImportant ? 'disabled' : '' %>>
+                <% (accountStatuses || []).forEach(st => { %>
+                  <option value="<%= st %>" <%= (a.status || 'active') === st ? 'selected' : '' %>><%= st %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-8 mb-3">
+              <label class="form-label fw-bold">Name *</label>
+              <input type="text" name="name" class="form-control size-md" value="<%= a.name || '' %>" placeholder="e.g. Accounts Receivable" required>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label fw-bold">Type *</label>
+              <select name="type" id="typeField" class="form-select size-md" required <%= lockImportant ? 'disabled' : '' %>>
+                <% (accountTypes || []).forEach(tp => { %>
+                  <option value="<%= tp %>" <%= (a.type || '') === tp ? 'selected' : '' %>><%= tp %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <label class="form-label fw-bold">Level *</label>
+              <input type="number" name="level" id="levelField" class="form-control size-md" min="1" max="6" value="<%= a.level || 1 %>" required <%= lockImportant ? 'disabled' : '' %>>
+            </div>
+            <div class="col-md-5 mb-3">
+              <label class="form-label fw-bold">Parent Account</label>
+              <select name="parentId" id="parentField" class="form-select size-md" <%= lockImportant ? 'disabled' : '' %>>
+                <option value="">(No Parent)</option>
+                <% (parentAccounts || []).forEach(p => { %>
+                  <option value="<%= p.id %>" data-level="<%= p.level %>" data-type="<%= p.type %>" <%= String(a.parentId || '') === String(p.id) ? 'selected' : '' %>>
+                    [L<%= p.level %>] <%= p.code %> - <%= p.name %>
+                  </option>
+                <% }) %>
+              </select>
+              <div class="form-text small">If selected, level must be parent level + 1 and type should match.</div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label fw-bold">Normal Balance *</label>
+              <select name="normalBalance" class="form-select size-md" required <%= lockImportant ? 'disabled' : '' %>>
+                <option value="debit" <%= (a.normalBalance || 'debit') === 'debit' ? 'selected' : '' %>>debit</option>
+                <option value="credit" <%= (a.normalBalance || '') === 'credit' ? 'selected' : '' %>>credit</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <div class="form-check mt-4">
+                <input class="form-check-input" type="checkbox" id="isControl" name="isControl" value="true" <%= a.isControl ? 'checked' : '' %> <%= lockImportant ? 'disabled' : '' %>>
+                <label class="form-check-label fw-bold" for="isControl">Control Account</label>
+              </div>
+            </div>
+            <div class="col-md-3 mb-3">
+              <div class="form-check mt-4">
+                <input class="form-check-input" type="checkbox" id="allowPost" name="allowPost" value="true" <%= a.allowPost ? 'checked' : '' %> <%= lockImportant ? 'disabled' : '' %>>
+                <label class="form-check-label fw-bold" for="allowPost">Allow Posting</label>
+              </div>
+            </div>
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Party Role Label</label>
+                <select name="partyRole" class="form-select size-md" <%= lockImportant ? 'disabled' : '' %>>
+                  <% (accountPartyRoles || ['none']).forEach(role => { %>
+                    <option value="<%= role %>" <%= String(a.partyRole || 'none') === String(role) ? 'selected' : '' %>><%= role %></option>
+                  <% }) %>
+                </select>
+                <div class="form-text small">Use labels like student, teacher, staff for dynamic transaction substitution.</div>
+              </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label fw-bold">Description</label>
+              <input type="text" name="description" class="form-control size-md" value="<%= a.description || '' %>" placeholder="Optional notes...">
+            </div>
+          </div>
+
+          <div class="card border-primary-subtle bg-light-subtle mb-2">
+            <div class="card-body">
+              <div class="row align-items-end">
+                <div class="col-md-5 mb-3 mb-md-0">
+                  <label class="form-label fw-bold text-primary mb-1">Head Account For</label>
+                  <select name="headCategory" class="form-select size-md border-primary" <%= lockImportant ? 'disabled' : '' %>>
+                    <% (accountHeadCategories || ['none']).forEach(category => { %>
+                      <option value="<%= category %>" <%= String(a.headCategory || 'none') === String(category) ? 'selected' : '' %>><%= category %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-md-7">
+                  <div class="form-text small mt-0">
+                    Use this to define section parent accounts (students, teachers, etc.). When a new self-funded student is admitted,
+                    their account is auto-created under the active <code>students</code> head account.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md fw-bold px-4">Save Account</button>
+        <a href="/school/accounts" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/school/accounts">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const form = document.getElementById('accountForm');
+  const currentAccountId = <%- JSON.stringify(routeId || '') %>;
+
+  function showMsg(opts) {
+    if (typeof showMessageModal === 'function') return showMessageModal(opts);
+    alert(opts?.message || 'Done');
+    return Promise.resolve();
+  }
+
+  function parseBoolLike(value) {
+    if (typeof value === 'boolean') return value;
+    const text = String(value || '').trim().toLowerCase();
+    return text === 'true' || text === '1' || text === 'yes' || text === 'on';
+  }
+
+  function setInputValue(selector, value) {
+    const field = form.querySelector(selector);
+    if (!field || field.disabled) return;
+    field.value = value === undefined || value === null ? '' : String(value);
+  }
+
+  function setSelectValue(selector, value, fallbackValue) {
+    const field = form.querySelector(selector);
+    if (!field || field.disabled) return;
+    const normalized = String(value === undefined || value === null ? '' : value);
+    const hasOption = Array.from(field.options || []).some(function (opt) {
+      return String(opt.value) === normalized;
+    });
+    if (hasOption) field.value = normalized;
+    else if (fallbackValue !== undefined) field.value = String(fallbackValue);
+  }
+
+  function setCheckboxValue(selector, value) {
+    const field = form.querySelector(selector);
+    if (!field || field.disabled) return;
+    field.checked = parseBoolLike(value);
+  }
+
+  function setParentValue(value) {
+    const field = form.querySelector('select[name="parentId"]');
+    if (!field || field.disabled) return;
+    const parentId = String(value || '').trim();
+    const hasOption = parentId && Array.from(field.options || []).some(function (opt) {
+      return String(opt.value) === parentId;
+    });
+    field.value = hasOption ? parentId : '';
+  }
+
+  function applyAccountTemplate(item) {
+    if (!item || typeof item !== 'object') return;
+    setInputValue('input[name="code"]', item.code || '');
+    setSelectValue('select[name="status"]', item.status || 'active', 'active');
+    setInputValue('input[name="name"]', item.name || '');
+    setSelectValue('select[name="type"]', item.type || '', '');
+    setInputValue('input[name="level"]', item.level || 1);
+    setParentValue(item.parentId || '');
+    setSelectValue('select[name="normalBalance"]', item.normalBalance || 'debit', 'debit');
+    setCheckboxValue('#isControl', item.isControl);
+    setCheckboxValue('#allowPost', item.allowPost);
+    setSelectValue('select[name="partyRole"]', item.partyRole || 'none', 'none');
+    setSelectValue('select[name="headCategory"]', item.headCategory || 'none', 'none');
+    setInputValue('input[name="description"]', item.description || '');
+  }
+
+  function autoAlignLevelAndType() {
+    const parentField = document.getElementById('parentField');
+    const levelField = document.getElementById('levelField');
+    const typeField = document.getElementById('typeField');
+    if (!parentField || !levelField || !typeField) return;
+
+    const selected = parentField.options[parentField.selectedIndex];
+    if (!selected || !selected.value) return;
+
+    const parentLevel = Number(selected.getAttribute('data-level') || 1);
+    const parentType = String(selected.getAttribute('data-type') || '').trim();
+
+    if (parentLevel) levelField.value = Math.min(parentLevel + 1, 6);
+    if (parentType) typeField.value = parentType;
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const parentField = document.getElementById('parentField');
+    if (parentField) {
+      parentField.addEventListener('change', autoAlignLevelAndType);
+    }
+
+    const copyBtn = document.getElementById('btnCopyFromAccount');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        if (!window.GenericPicker || !window.GenericPickerPresets) {
+          showMsg({
+            title: 'Unavailable',
+            icon: 'warning',
+            message: 'Account picker is not available.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          return;
+        }
+        GenericPicker.open(GenericPickerPresets.account({
+          title: 'Copy From Account',
+          icon: 'bi-copy',
+          placeholder: 'Search accounts to copy...',
+          onSelect: async function (item) {
+            const sourceId = String(item?.id || '').trim();
+            if (!sourceId) return;
+            if (currentAccountId && sourceId === String(currentAccountId)) {
+              await showMsg({
+                title: 'Invalid Selection',
+                icon: 'warning',
+                message: 'Select a different account to copy from.',
+                buttons: [{ text: 'OK', class: 'btn-warning' }]
+              });
+              return;
+            }
+            applyAccountTemplate(item);
+            await showMsg({
+              title: 'Template Applied',
+              icon: 'success',
+              message: 'Account fields were copied. Review and edit values before saving.',
+              buttons: [{ text: 'OK', class: 'btn-success' }]
+            });
+          }
+        }));
+      });
+    }
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+      try {
+        const formData = new FormData(form);
+        const data = new URLSearchParams(formData);
+
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+          body: data.toString()
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error('Server returned non-JSON response (Status ' + response.status + ')');
+        }
+
+        const result = await response.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+          : { stop: false };
+        if (guarded.stop) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+          return;
+        }
+
+        await showMsg({
+          title: result.status === 'success' ? 'Success' : 'Error',
+          icon: result.status === 'success' ? 'success' : 'error',
+          message: result.message || 'Operation completed.',
+          buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
+        });
+
+        if (result.status === 'success') {
+          window.location.href = '/school/accounts';
+        } else {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
+      } catch (error) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        await showMsg({
+          title: 'System Error',
+          icon: 'error',
+          message: error.message || 'An unexpected network error occurred.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      }
+    });
+  });
+})();
+</script>

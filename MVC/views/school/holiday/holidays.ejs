@@ -1,0 +1,220 @@
+<%- include('../../partials/tablePages-start', {
+  title: 'School Holidays & Off Days',
+  newUrl: 'school/holidays', // We will intercept this URL via JS below to open the modal
+  newLabel: 'Add Holiday',
+  user: user,
+  tableName: 'Holidays_List',
+  btn_export: true,
+  print: true,
+  manageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>'
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search holidays...',
+  fields: [
+      { name: 'type', label: 'Type', type: 'select', options: ['National Holiday','School Break','Staff Development','Weather Emergency','Other'] }
+  ]
+}) %>
+
+<div class="bg-light border rounded px-4 py-3 mb-4 d-flex align-items-center gap-3">
+    <label class="fw-bold mb-0 text-dark"><i class="bi bi-calendar-range me-2"></i>Select Year:</label>
+    <form id="yearForm" action="/school/holidays" method="GET" class="m-0">
+        <select name="year" class="form-select form-select-sm border-secondary w-auto fw-bold" onchange="document.getElementById('yearForm').submit();">
+            <% const baseYear = new Date().getFullYear() - 1; %>
+            <% for(let i = 0; i < 5; i++) { const y = baseYear + i; %>
+                <option value="<%= y %>" <%= currentYear == y ? 'selected' : '' %>><%= y %></option>
+            <% } %>
+        </select>
+    </form>
+</div>
+
+<div class="table-scroll-wrapper">
+    <table class="table-responsive size-md" id="first-table">
+        <thead>
+            <tr>
+                <th class="draggable ps-4" data-column="date" style="width: 150px;">Date</th>
+                <th class="draggable" data-column="title">Holiday / Event Title</th>
+                <th class="draggable" data-column="type" style="width: 200px;">Type</th>
+                <th class="draggable" data-column="notes">Notes</th>
+                <th class="text-end pe-4" style="width: 150px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (data.length === 0) { %>
+                <tr><td colspan="5" class="text-center py-5 text-muted">No holidays recorded for <%= currentYear %>.</td></tr>
+            <% } else { %>
+                <% data.forEach(item => { 
+                    const d = new Date(item.date + 'T00:00:00'); 
+                    const displayDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                %>
+                <tr>
+                    <td class="ps-4 fw-bold text-dark"><%= displayDate %></td>
+                    <td class="fw-bold text-primary"><%= item.title %></td>
+                    <td>
+                        <% 
+                           let badgeClass = 'bg-secondary';
+                           if(item.type === 'National Holiday') badgeClass = 'bg-primary';
+                           if(item.type === 'School Break') badgeClass = 'bg-info text-dark';
+                           if(item.type === 'Weather Emergency') badgeClass = 'bg-danger';
+                        %>
+                        <span class="badge <%= badgeClass %>"><%= item.type %></span>
+                    </td>
+                    <td class="text-muted small text-truncate" style="max-width: 250px;"><%= item.notes || '-' %></td>
+                    <td class="table-actions text-end pe-4">
+                        <button class="btn btn-sm btn-filled btn-edit me-1" 
+                            onclick="openHolidayModal('<%= item.id %>', '<%= item.date %>', '<%= item.title.replace(/'/g, "\\'") %>', '<%= item.type %>', '<%= (item.notes||'').replace(/'/g, "\\'") %>')">
+                            Edit
+                        </button>
+                        <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+                <% }) %>
+            <% } %>
+        </tbody>
+    </table>
+</div>
+
+<%- include('../../partials/tablePages-end') %>
+
+<div class="modal fade" id="holidayModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="holidayModalTitle">Add Holiday</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="holidayForm">
+                    <input type="hidden" id="hol_id">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Date *</label>
+                        <input type="date" id="hol_date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Title *</label>
+                        <input type="text" id="hol_title" class="form-control" placeholder="e.g. Thanksgiving Break" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Type</label>
+                        <select id="hol_type" class="form-select">
+                            <option value="National Holiday">National Holiday</option>
+                            <option value="School Break">School Break</option>
+                            <option value="Staff Development">Staff Development (No Students)</option>
+                            <option value="Weather Emergency">Weather / Emergency</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Notes</label>
+                        <textarea id="hol_notes" class="form-control" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary fw-bold" id="btn_saveHoliday">Save Holiday</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let modalInstance = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+    // 1. Initialize Modal
+    if (typeof bootstrap !== 'undefined') {
+        modalInstance = new bootstrap.Modal(document.getElementById('holidayModal'));
+    }
+
+    // 2. Intercept the standard "Add" button from tablePages-start
+    const newBtn = document.querySelector('a[href="/school/holidays/new"]');
+    if (newBtn) {
+        newBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            openHolidayModal();
+        });
+    }
+
+    // 3. Save Logic
+    document.getElementById('btn_saveHoliday').addEventListener('click', async () => {
+        const form = document.getElementById('holidayForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const payload = {
+            id: document.getElementById('hol_id').value,
+            date: document.getElementById('hol_date').value,
+            title: document.getElementById('hol_title').value,
+            type: document.getElementById('hol_type').value,
+            notes: document.getElementById('hol_notes').value,
+            actionStateId
+        };
+
+        const submitBtn = document.getElementById('btn_saveHoliday');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+        try {
+            const res = await fetch('/school/holidays/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+                : { stop: false };
+            if (guarded.stop) return;
+
+            if (modalInstance) modalInstance.hide();
+
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({ 
+                    title: result.status === 'success' ? 'Success' : 'Error', 
+                    icon: result.status === 'success' ? 'success' : 'error', 
+                    message: result.message, 
+                    buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }] 
+                });
+                if (result.status === 'success') window.location.reload();
+            } else {
+                alert(result.message);
+                if (result.status === 'success') window.location.reload();
+            }
+        } catch (error) {
+            console.error(error);
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({ title: 'System Error', icon: 'error', message: 'A network error occurred.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+            } else { alert('A network error occurred.'); }
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    });
+});
+
+// --- Helper Functions ---
+
+function openHolidayModal(id = '', date = '', title = '', type = 'National Holiday', notes = '') {
+    document.getElementById('holidayModalTitle').innerText = id ? 'Edit Holiday' : 'Add Holiday';
+    document.getElementById('hol_id').value = id;
+    document.getElementById('hol_date').value = date;
+    document.getElementById('hol_title').value = title;
+    document.getElementById('hol_type').value = type;
+    document.getElementById('hol_notes').value = notes;
+    
+    if (modalInstance) modalInstance.show();
+}
+
+async function deleteHoliday(id, title) {
+    // Delete handling is centralized in public/scripts/main.js.
+}
+</script>

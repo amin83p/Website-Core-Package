@@ -1,0 +1,812 @@
+[
+  {
+    "id": "RPTTPL-2026-E4J63",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-03-09T18:26:18.060Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-05-07T04:53:13.252Z"
+    },
+    "description": "",
+    "docxTemplate": {
+      "fileName": "Sample_report_1774740232052_1778097783412.docx",
+      "originalName": "Sample_report_1774740232052.docx",
+      "path": "uploads\\GLOBAL\\reports\\Sample_report_1774740232052_1778097783412.docx",
+      "url": "/uploads/GLOBAL/reports/Sample_report_1774740232052_1778097783412.docx",
+      "uploadedAt": "2026-05-06T20:03:03.834Z"
+    },
+    "orgId": "900000",
+    "placeholderMap": {
+      "teacher_name": "{{teacher_name}}",
+      "class_name": "{{class_name}}",
+      "report_date": "{{report_date}}",
+      "sample": "{{student_attendance_present}}",
+      "student_full_name": "{{student_full_name}}",
+      "futuregoal_listening": "{{futuregoal_listening}}",
+      "futuregoal_reading": "{{futuregoal_reading}}",
+      "futuregoal_writing": "{{futuregoal_writing}}",
+      "futuregoal_speaking": "{{futuregoal_speaking}}",
+      "Progress": "{{Progress}}",
+      "classEffort": "{{classEffort}}",
+      "Class_Participation": "{{Class_Participation}}",
+      "Returns_All_Assignments_On_Time": "{{Returns_All_Assignments_On_Time}}",
+      "Writes_All_Tests_On_Scheduled_Time": "{{Writes_All_Tests_On_Scheduled_Time}}",
+      "Academic_Progress": "{{Academic_Progress}}",
+      "Punctuality_For_Class": "{{Punctuality_For_Class}}",
+      "Attendance": "{{Attendance}}",
+      "Respects_The_Teachers": "{{Respects_The_Teachers}}",
+      "Treats_Other_Students_With_Respect": "{{Treats_Other_Students_With_Respect}}",
+      "sample_field_for_test": "{{sample_field_for_test}}",
+      "Average_Class_Mark": "{{Average_Class_Mark}}",
+      "Returns_Assignments": "{{Returns_Assignments}}",
+      "Writes_Tests": "{{Writes_Tests}}",
+      "Punctuality": "{{Punctuality}}",
+      "Treats_Other_Students": "{{Treats_Other_Students}}"
+    },
+    "schema": {
+      "version": 1,
+      "fields": [
+        {
+          "id": "report_date",
+          "label": "Report Date",
+          "type": "date",
+          "required": false,
+          "readOnly": true,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "report_date",
+          "helpText": "",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "class_name",
+          "label": "Class Name",
+          "type": "text",
+          "required": false,
+          "readOnly": true,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "class_name",
+          "helpText": "",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "teacher_name",
+          "label": "Teacher Name",
+          "type": "text",
+          "required": false,
+          "readOnly": true,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "teacher_name",
+          "helpText": "",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "student_full_name",
+          "label": "Student Name",
+          "type": "text",
+          "required": false,
+          "readOnly": true,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "student_full_name",
+          "helpText": "",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "__section_new_section",
+          "label": "1- Student Performance",
+          "type": "section",
+          "required": false,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": true,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "",
+          "helpText": "",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Progress",
+          "label": "Progress",
+          "type": "select",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": true,
+          "backgroundColor": "#82d393",
+          "prefillKey": "",
+          "helpText": "If the student has overall academic progress in the report frame.",
+          "options": [
+            {
+              "value": "Yes",
+              "label": "Yes"
+            },
+            {
+              "value": "No",
+              "label": "No"
+            }
+          ],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Academic_Progress",
+          "label": "Academic Progress",
+          "type": "select",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "",
+          "helpText": "If the student has overall academic progress in the report frame.",
+          "options": [
+            {
+              "value": "Yes",
+              "label": "Yes"
+            },
+            {
+              "value": "No",
+              "label": "No"
+            }
+          ],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "__subheader_new_subheader",
+          "label": "Student Performance",
+          "type": "subheader",
+          "required": false,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": true,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "",
+          "helpText": "",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "classEffort",
+          "label": "Class Effort",
+          "type": "number",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "50",
+          "helpText": "Please input a value between 0 and 100.",
+          "options": [],
+          "validationRules": [
+            {
+              "id": "range_0_100",
+              "enabled": true,
+              "severity": "error",
+              "when": "always",
+              "expression": "num(value) >= 0 && num(value) <= 100",
+              "message": "Value must be between 0 and 100."
+            }
+          ],
+          "conversionRule": {
+            "enabled": true,
+            "expression": "caseof(\n  true,\n  num(value) =0 , \"-\",\n  num(value) < 40, \"Unsatisfying\",\n  num(value) < 64, \"Need Improvement\",\n  num(value) < 85, \"Satisfying\",\n  \"Superior\"\n)",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Class_Participation",
+          "label": "Class Participation",
+          "type": "number",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "50",
+          "helpText": "Please input a value between 0 and 100.",
+          "options": [],
+          "validationRules": [
+            {
+              "id": "range_0_100",
+              "enabled": true,
+              "severity": "error",
+              "when": "always",
+              "expression": "num(value) >= 0 && num(value) <= 100",
+              "message": "Value must be between 0 and 100."
+            }
+          ],
+          "conversionRule": {
+            "enabled": true,
+            "expression": "caseof(\n  true,\n  num(value) =0 , \"-\",\n  num(value) < 40, \"Unsatisfying\",\n  num(value) < 64, \"Need Improvement\",\n  num(value) < 85, \"Satisfying\",\n  \"Superior\"\n)",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Returns_Assignments",
+          "label": "Returns All Assignments On Time",
+          "type": "number",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "50",
+          "helpText": "Please input a value between 0 and 100.",
+          "options": [],
+          "validationRules": [
+            {
+              "id": "range_0_100",
+              "enabled": true,
+              "severity": "error",
+              "when": "always",
+              "expression": "num(value) >= 0 && num(value) <= 100",
+              "message": "Value must be between 0 and 100."
+            }
+          ],
+          "conversionRule": {
+            "enabled": true,
+            "expression": "caseof(\n  true,\n  num(value) =0 , \"-\",\n  num(value) < 40, \"Unsatisfying\",\n  num(value) < 64, \"Need Improvement\",\n  num(value) < 85, \"Satisfying\",\n  \"Superior\"\n)",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "__row_break_new_row",
+          "label": "New Row",
+          "type": "row_break",
+          "required": false,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": true,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "",
+          "helpText": "",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Writes_Tests",
+          "label": "Writes All Tests On Scheduled Time",
+          "type": "number",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "50",
+          "helpText": "Please input a value between 0 and 100.",
+          "options": [],
+          "validationRules": [
+            {
+              "id": "range_0_100",
+              "enabled": true,
+              "severity": "error",
+              "when": "always",
+              "expression": "num(value) >= 0 && num(value) <= 100",
+              "message": "Value must be between 0 and 100."
+            }
+          ],
+          "conversionRule": {
+            "enabled": true,
+            "expression": "caseof(\n  true,\n  num(value) =0 , \"-\",\n  num(value) < 40, \"Unsatisfying\",\n  num(value) < 64, \"Need Improvement\",\n  num(value) < 85, \"Satisfying\",\n  \"Superior\"\n)",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Punctuality",
+          "label": "Punctuality For Class",
+          "type": "number",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "50",
+          "helpText": "Please input a value between 0 and 100.",
+          "options": [],
+          "validationRules": [
+            {
+              "id": "range_0_100",
+              "enabled": true,
+              "severity": "error",
+              "when": "always",
+              "expression": "num(value) >= 0 && num(value) <= 100",
+              "message": "Value must be between 0 and 100."
+            }
+          ],
+          "conversionRule": {
+            "enabled": true,
+            "expression": "caseof(\n  true,\n  num(value) =0 , \"-\",\n  num(value) < 40, \"Unsatisfying\",\n  num(value) < 64, \"Need Improvement\",\n  num(value) < 85, \"Satisfying\",\n  \"Superior\"\n)",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Attendance",
+          "label": "Attendance",
+          "type": "number",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "50",
+          "helpText": "Please input a value between 0 and 100.",
+          "options": [],
+          "validationRules": [
+            {
+              "id": "range_0_100",
+              "enabled": true,
+              "severity": "error",
+              "when": "always",
+              "expression": "num(value) >= 0 && num(value) <= 100",
+              "message": "Value must be between 0 and 100."
+            }
+          ],
+          "conversionRule": {
+            "enabled": true,
+            "expression": "caseof(\n  true,\n  num(value) =0 , \"-\",\n  num(value) < 40, \"Unsatisfying\",\n  num(value) < 64, \"Need Improvement\",\n  num(value) < 85, \"Satisfying\",\n  \"Superior\"\n)",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "__row_break_new_row_copy",
+          "label": "New Row (Copy)",
+          "type": "row_break",
+          "required": false,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": true,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "",
+          "helpText": "",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Respects_The_Teachers",
+          "label": "Respects The Teachers",
+          "type": "number",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "100",
+          "helpText": "Please input a value between 0 and 100.",
+          "options": [],
+          "validationRules": [
+            {
+              "id": "range_0_100",
+              "enabled": true,
+              "severity": "error",
+              "when": "always",
+              "expression": "num(value) >= 0 && num(value) <= 100",
+              "message": "Value must be between 0 and 100."
+            }
+          ],
+          "conversionRule": {
+            "enabled": true,
+            "expression": "caseof(\n  true,\n  num(value) =0 , \"-\",\n  num(value) < 40, \"Unsatisfying\",\n  num(value) < 64, \"Need Improvement\",\n  num(value) < 85, \"Satisfying\",\n  \"Superior\"\n)",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Treats_Other_Students",
+          "label": "Treats Other Students With Respect",
+          "type": "number",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "100",
+          "helpText": "Please input a value between 0 and 100.",
+          "options": [],
+          "validationRules": [
+            {
+              "id": "range_0_100",
+              "enabled": true,
+              "severity": "error",
+              "when": "always",
+              "expression": "num(value) >= 0 && num(value) <= 100",
+              "message": "Value must be between 0 and 100."
+            }
+          ],
+          "conversionRule": {
+            "enabled": true,
+            "expression": "caseof(\n  true,\n  num(value) =0 , \"-\",\n  num(value) < 40, \"Unsatisfying\",\n  num(value) < 64, \"Need Improvement\",\n  num(value) < 85, \"Satisfying\",\n  \"Superior\"\n)",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "Average_Class_Mark",
+          "label": "Average Class Mark (Auto Calculation)",
+          "type": "number",
+          "required": false,
+          "readOnly": true,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": false,
+          "valueMode": "calculated",
+          "calculationRule": {
+            "enabled": true,
+            "expression": "(num(answers.Attendance)+num(answers.Punctuality)+num(answers.Respects_The_Teachers)+num(answers.Returns_Assignments)+num(answers.Treats_Other_Students)+num(answers.Writes_Tests)+num(answers.classEffort)+num(answers.Class_Participation))/8.0",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [
+            "Attendance",
+            "Punctuality",
+            "Respects_The_Teachers",
+            "Returns_Assignments",
+            "Treats_Other_Students",
+            "Writes_Tests",
+            "classEffort",
+            "Class_Participation"
+          ],
+          "hasBorder": true,
+          "backgroundColor": "#e5c3c3",
+          "prefillKey": "100",
+          "helpText": "",
+          "options": [],
+          "validationRules": [
+            {
+              "id": "range_0_100",
+              "enabled": true,
+              "severity": "error",
+              "when": "always",
+              "expression": "num(value) >= 0 && num(value) <= 100",
+              "message": "Value must be between 0 and 100."
+            }
+          ],
+          "conversionRule": {
+            "enabled": true,
+            "expression": "caseof(\n  true,\n  num(value) =0 , \"-\",\n  num(value) < 40, \"Unsatisfying\",\n  num(value) < 64, \"Need Improvement\",\n  num(value) < 85, \"Satisfying\",\n  \"Superior\"\n)",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "__section_new_section_copy",
+          "label": "2 - Additional Information Provided by Equilibrium school",
+          "type": "section",
+          "required": false,
+          "readOnly": false,
+          "sharedAcrossStudents": false,
+          "fullPageWidth": true,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "",
+          "helpText": "",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "futuregoal_listening",
+          "label": "Future Goal: Listening",
+          "type": "textarea",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": true,
+          "fullPageWidth": true,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "Please write up to 5 sentences about the future plan for this skill.",
+          "helpText": "Please write up to 5 sentences about the future plan for this skill. You may use sentences starting with \"I will... We will....\"",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "futuregoal_reading",
+          "label": "Future Goal: Reading",
+          "type": "textarea",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": true,
+          "fullPageWidth": true,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "Please write up to 5 sentences about the future plan for this skill.",
+          "helpText": "Please write up to 5 sentences about the future plan for this skill. You may use sentences starting with \"I will... We will....\"",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "futuregoal_writing",
+          "label": "Future Goal: Writing",
+          "type": "textarea",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": true,
+          "fullPageWidth": true,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "Please write up to 5 sentences about the future plan for this skill.",
+          "helpText": "Please write up to 5 sentences about the future plan for this skill. You may use sentences starting with \"I will... We will....\"",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        },
+        {
+          "id": "futuregoal_speaking",
+          "label": "Future Goal: Speaking",
+          "type": "textarea",
+          "required": true,
+          "readOnly": false,
+          "sharedAcrossStudents": true,
+          "fullPageWidth": true,
+          "valueMode": "manual",
+          "calculationRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "keep_last"
+          },
+          "calculationDependencies": [],
+          "hasBorder": false,
+          "backgroundColor": "",
+          "prefillKey": "Please write up to 5 sentences about the future plan for this skill.",
+          "helpText": "Please write up to 5 sentences about the future plan for this skill. You may use sentences starting with \"I will... We will....\"",
+          "options": [],
+          "validationRules": [],
+          "conversionRule": {
+            "enabled": false,
+            "expression": "",
+            "onError": "use_raw"
+          }
+        }
+      ]
+    },
+    "status": "active",
+    "title": "Two-Week Progress Report",
+    "type": "wcb report",
+    "version": 1
+  }
+]

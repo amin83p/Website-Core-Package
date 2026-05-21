@@ -1,0 +1,245 @@
+<%
+  const record = usageRecord || {};
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0">AI Token Usage Detail</h1>
+    <span class="badge bg-primary border">ID: <%= record.id || '-' %></span>
+  </div>
+
+  <div class="form-container" style="width: 100%; max-width: 1450px;">
+    <form id="aiTokenUsageForm" action="/ielts/ai-token-usage/edit/<%= record.id %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+
+      <div class="row">
+        <div class="col-lg-8 mb-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-bold text-primary">
+              <i class="bi bi-cpu-fill me-2"></i>Usage Snapshot
+            </div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Consumed At</label>
+                  <input type="text" class="form-control" value="<%= record.consumedAt ? new Date(record.consumedAt).toLocaleString() : '-' %>" readonly>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">User ID</label>
+                  <input type="text" class="form-control" value="<%= record.userId || '-' %>" readonly>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Org ID</label>
+                  <input type="text" class="form-control" value="<%= record.orgId || '-' %>" readonly>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Provider</label>
+                  <input type="text" class="form-control" value="<%= record.providerId || '-' %>" readonly>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Provider Key</label>
+                  <input type="text" class="form-control" value="<%= record.providerRecordName || record.providerRecordId || '-' %>" readonly>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Model</label>
+                  <input type="text" class="form-control" value="<%= record.modelUsed || '-' %>" readonly>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Request Label</label>
+                  <input type="text" class="form-control" value="<%= record.requestLabel || '-' %>" readonly>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Status</label>
+                  <input type="text" class="form-control" value="<%= record.status || 'success' %>" readonly>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Prompt Tokens</label>
+                  <input type="text" class="form-control" value="<%= record.promptTokenCount ?? '-' %>" readonly>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Output Tokens</label>
+                  <input type="text" class="form-control" value="<%= record.candidatesTokenCount ?? '-' %>" readonly>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Total Tokens</label>
+                  <input type="text" class="form-control fw-semibold" value="<%= record.totalTokenCount ?? '-' %>" readonly>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Cached Tokens</label>
+                  <input type="text" class="form-control" value="<%= record.cachedContentTokenCount ?? '-' %>" readonly>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-bold text-primary">
+              <i class="bi bi-receipt-cutoff me-2"></i>Billing Control
+            </div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Billing Status</label>
+                <select class="form-select" name="billingStatus">
+                  <% (billingStatusOptions || []).forEach((opt) => { %>
+                    <option value="<%= opt.id %>" <%= String(record.billingStatus || 'unbilled') === String(opt.id) ? 'selected' : '' %>><%= opt.label %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Billing Reference</label>
+                <input type="text" class="form-control" name="billingReference" value="<%= record.billingReference || '' %>" placeholder="Invoice or batch ID">
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Billing Notes</label>
+                <textarea class="form-control" name="billingNotes" rows="7" placeholder="Optional notes for finance/audit..."><%= record.billingNotes || '' %></textarea>
+              </div>
+              <div class="small text-muted">
+                Saving this form updates only billing fields. Usage metrics are immutable.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-12 mb-4">
+          <div class="card shadow-sm border-0">
+            <div class="card-header bg-light fw-bold text-primary">
+              <i class="bi bi-braces me-2"></i>Request Metadata
+            </div>
+            <div class="card-body">
+              <textarea class="form-control font-monospace" rows="12" readonly><%= JSON.stringify(record.requestMeta || {}, null, 2) %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-3 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">
+          <i class="bi bi-save me-1"></i> Save
+        </button>
+        <a href="/ielts/ai-token-usage" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal') %>
+
+<script>
+  async function showSaveResultModal({ title, icon, message }) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title,
+        icon,
+        message,
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  const aiTokenUsageForm = document.getElementById('aiTokenUsageForm');
+  const aiTokenUsageSaveBtn = aiTokenUsageForm ? aiTokenUsageForm.querySelector('button[type="submit"]') : null;
+  const aiTokenUsageCancelBtn = document.getElementById('btnCancelAction');
+  let isSubmitting = false;
+
+  function cacheButtonHtml(button) {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+  }
+
+  function setButtonBusy(button, label) {
+    if (!button) return;
+    cacheButtonHtml(button);
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + (label || 'Working...');
+    if (button.tagName === 'A') {
+      button.classList.add('disabled');
+      button.setAttribute('aria-disabled', 'true');
+      button.style.pointerEvents = 'none';
+    }
+  }
+
+  function restoreButton(button) {
+    if (!button) return;
+    if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+    button.disabled = false;
+    if (button.tagName === 'A') {
+      button.classList.remove('disabled');
+      button.removeAttribute('aria-disabled');
+      button.style.pointerEvents = '';
+    }
+  }
+
+  cacheButtonHtml(aiTokenUsageSaveBtn);
+  cacheButtonHtml(aiTokenUsageCancelBtn);
+
+  if (aiTokenUsageCancelBtn) {
+    aiTokenUsageCancelBtn.addEventListener('click', (event) => {
+      if (isSubmitting) {
+        event.preventDefault();
+        return;
+      }
+      setButtonBusy(aiTokenUsageCancelBtn, 'Cancelling...');
+      if (aiTokenUsageSaveBtn) aiTokenUsageSaveBtn.disabled = true;
+    });
+  }
+
+  aiTokenUsageForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    isSubmitting = true;
+    const form = e.currentTarget;
+
+    try {
+      setButtonBusy(aiTokenUsageSaveBtn, 'Saving...');
+      if (aiTokenUsageCancelBtn) aiTokenUsageCancelBtn.disabled = true;
+
+      const formData = new FormData(form);
+      const payload = new URLSearchParams();
+      for (const [key, value] of formData.entries()) {
+        payload.append(key, value);
+      }
+
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'x-ajax-request': 'true'
+        },
+        body: payload.toString()
+      });
+
+      let result = null;
+      try {
+        result = await response.json();
+      } catch (_) {
+        result = { status: 'error', message: 'Unexpected response while saving record.' };
+      }
+
+      if (!response.ok || result.status !== 'success') {
+        throw new Error(result.message || 'Failed to save AI token usage record.');
+      }
+
+      await showSaveResultModal({
+        title: 'Saved',
+        icon: 'success',
+        message: result.message || 'AI token usage record updated.'
+      });
+      window.location.href = '/ielts/ai-token-usage';
+    } catch (error) {
+      await showSaveResultModal({
+        title: 'Save Failed',
+        icon: 'error',
+        message: error.message || 'Unable to save AI token usage record.'
+      });
+      isSubmitting = false;
+      restoreButton(aiTokenUsageSaveBtn);
+      restoreButton(aiTokenUsageCancelBtn);
+    }
+  });
+</script>

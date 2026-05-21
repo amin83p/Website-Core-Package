@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-23T01:50:39.753Z",
+    "script": "scripts/benchpath/reference/generateReferenceScaffolds.js",
+    "dryRun": false
+  },
+  "inputs": {
+    "competencyCount": 5,
+    "fragmentCount": 13
+  },
+  "entities": {
+    "indicators": {
+      "beforeCount": 0,
+      "afterCount": 5,
+      "createdIds": [
+        "ind:listening:5:interacting-with-others:001",
+        "ind:speaking:5:sharing-information:001",
+        "ind:reading:6:comprehending-information:001",
+        "ind:writing:6:getting-things-done:001",
+        "ind:writing:8:sharing-information:001"
+      ],
+      "withFragmentSupport": [],
+      "withoutFragmentSupport": [
+        "ind:listening:5:interacting-with-others:001",
+        "ind:speaking:5:sharing-information:001",
+        "ind:reading:6:comprehending-information:001",
+        "ind:writing:6:getting-things-done:001",
+        "ind:writing:8:sharing-information:001"
+      ]
+    },
+    "featuresOfCommunication": {
+      "beforeCount": 0,
+      "afterCount": 5,
+      "createdIds": [
+        "foc:listening:5:interacting-with-others:001",
+        "foc:speaking:5:sharing-information:001",
+        "foc:reading:6:comprehending-information:001",
+        "foc:writing:6:getting-things-done:001",
+        "foc:writing:8:sharing-information:001"
+      ],
+      "withFragmentSupport": [
+        "foc:listening:5:interacting-with-others:001",
+        "foc:speaking:5:sharing-information:001",
+        "foc:reading:6:comprehending-information:001",
+        "foc:writing:6:getting-things-done:001",
+        "foc:writing:8:sharing-information:001"
+      ],
+      "withoutFragmentSupport": []
+    },
+    "sampleTaskLabels": {
+      "beforeCount": 0,
+      "afterCount": 5,
+      "createdIds": [
+        "stl:listening:5:interacting-with-others:001",
+        "stl:speaking:5:sharing-information:001",
+        "stl:reading:6:comprehending-information:001",
+        "stl:writing:6:getting-things-done:001",
+        "stl:writing:8:sharing-information:001"
+      ],
+      "withFragmentSupport": [
+        "stl:reading:6:comprehending-information:001"
+      ],
+      "withoutFragmentSupport": [
+        "stl:listening:5:interacting-with-others:001",
+        "stl:speaking:5:sharing-information:001",
+        "stl:writing:6:getting-things-done:001",
+        "stl:writing:8:sharing-information:001"
+      ]
+    }
+  },
+  "validationRuleHint": "If mapped fragment coverage exists for indicators/features/sampleTaskLabels, corresponding entity files must not remain empty."
+}

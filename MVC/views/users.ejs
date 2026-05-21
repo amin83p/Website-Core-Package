@@ -1,0 +1,38 @@
+<div class="users-page">
+  <h1 class="page-heading size-md">Users</h1>
+  <% if (message) { %>
+    <% if (message.error) { %>
+      <div class="alert alert-danger"><%= message.text %></div>
+    <% } else { %>
+      <div class="alert alert-info"><%= message.text %></div>
+    <% } %>
+  <% } %>
+    <form action="/users/search" method="GET" class="search-form-container size-md">
+    <input type="text" name="q" placeholder="Search by name/email" class="form-control">
+    <button type="submit" class="btn btn-filled btn-primary btn-md">Search</button>
+  </form>
+  <a href="/users/new" class="btn btn-filled btn-add btn-md mb-3">Add User</a>
+  <div class="card-container size-md">
+    <table class="table-responsive size-md" id="users-table">
+      <thead>
+        <tr>
+          <th class="draggable" data-column="username">Username<span class="sort-icon"></span></th>
+          <th class="draggable" data-column="email">Email<span class="sort-icon"></span></th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% users.forEach(user => { %>
+          <tr>
+            <td><%= user.username %></td>
+            <td><%= user.email %></td>
+            <td class="table-actions">
+              <a href="/users/<%= user.id %>/edit" class="btn btn-sm btn-filled btn-edit">Edit</a>
+              <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= user.id %>">Delete</button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

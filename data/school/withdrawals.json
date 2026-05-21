@@ -1,0 +1,126 @@
+[
+  {
+    "orgId": "900000",
+    "type": "program",
+    "status": "rejected",
+    "studentId": "STU52105",
+    "personId": "144922",
+    "reason": "non_payment",
+    "reasonDetail": "",
+    "initiatorType": "admin",
+    "initiatorId": "ROOT_001",
+    "requestDate": "2026-03-14",
+    "effectiveDate": "2026-03-14",
+    "approvedDate": "2026-03-14",
+    "completedDate": "",
+    "approvedBy": "ROOT_001",
+    "processedBy": "ROOT_001",
+    "programRegistrationId": "SPR-1773473246341-1121",
+    "termRegistrationId": "",
+    "classEnrollmentId": "",
+    "classId": "",
+    "programId": "PRG93679",
+    "termId": "",
+    "resolutionPlan": {
+      "workflowVersion": "withdrawal-v2",
+      "submittedByUserId": "ROOT_001",
+      "queueStatus": "pending_approval",
+      "finalizeMode": "awaiting_review",
+      "programAdministratorPersonId": "153279"
+    },
+    "financialImpact": {
+      "refundAmount": 2404,
+      "penaltyAmount": 0,
+      "totalAmount": 2404,
+      "currency": "CAD",
+      "refundTransactionIds": [],
+      "refundPolicy": "",
+      "notes": ""
+    },
+    "academicImpact": {
+      "gradeAssigned": "W",
+      "appearsOnTranscript": true,
+      "voidedAcademicEntryIds": [],
+      "notes": ""
+    },
+    "rosterImpact": {
+      "removedEnrollments": [],
+      "notes": ""
+    },
+    "childWithdrawals": [],
+    "parentWithdrawalId": "",
+    "documentation": [],
+    "notes": "",
+    "internalNotes": "Request submitted by ROOT_001 (Amin).\nRequest rejected by ROOT_001 (Amin): You are not allowed to withdraw from the program, at this point all the requests are declined and you can apply this laallalla",
+    "errors": [],
+    "warnings": [],
+    "id": "PWD-1773473293218-7159",
+    "audit": {
+      "createDateTime": "2026-03-14T07:28:13.218Z",
+      "createUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-14T07:43:42.934Z",
+      "lastUpdateUser": "ROOT_001"
+    }
+  },
+  {
+    "orgId": "900000",
+    "type": "program",
+    "status": "pending_approval",
+    "studentId": "STU52105",
+    "personId": "144922",
+    "reason": "financial",
+    "reasonDetail": "",
+    "initiatorType": "admin",
+    "initiatorId": "ROOT_001",
+    "requestDate": "2026-03-14",
+    "effectiveDate": "2026-03-14",
+    "approvedDate": "",
+    "completedDate": "",
+    "approvedBy": "",
+    "processedBy": "",
+    "programRegistrationId": "SPR-1773473246341-1121",
+    "termRegistrationId": "",
+    "classEnrollmentId": "",
+    "classId": "",
+    "programId": "PRG93679",
+    "termId": "",
+    "resolutionPlan": {
+      "workflowVersion": "withdrawal-v2",
+      "submittedByUserId": "ROOT_001",
+      "queueStatus": "pending_approval",
+      "finalizeMode": "awaiting_review",
+      "programAdministratorPersonId": "153279"
+    },
+    "financialImpact": {
+      "refundAmount": 2404,
+      "penaltyAmount": 0,
+      "totalAmount": 2404,
+      "currency": "CAD",
+      "refundTransactionIds": [],
+      "refundPolicy": "",
+      "notes": ""
+    },
+    "academicImpact": {
+      "gradeAssigned": "W",
+      "appearsOnTranscript": true,
+      "voidedAcademicEntryIds": [],
+      "notes": ""
+    },
+    "rosterImpact": {
+      "removedEnrollments": [],
+      "notes": ""
+    },
+    "childWithdrawals": [],
+    "parentWithdrawalId": "",
+    "documentation": [],
+    "notes": "",
+    "internalNotes": "Request submitted by ROOT_001 (Amin).",
+    "errors": [],
+    "warnings": [],
+    "id": "PWD-1773474529139-1304",
+    "audit": {
+      "createDateTime": "2026-03-14T07:48:49.139Z",
+      "createUser": "ROOT_001"
+    }
+  }
+]

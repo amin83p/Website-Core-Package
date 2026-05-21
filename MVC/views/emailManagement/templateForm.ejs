@@ -1,0 +1,726 @@
+<%
+  const isEdit = Boolean(template && template.id);
+  const row = template || {};
+  const safeEventCatalog = Array.isArray(eventCatalog) ? eventCatalog : [];
+  const selectedEventKey = String(row.eventKey || '').toUpperCase();
+  const selectedSection = String(row.sectionId || '').toUpperCase();
+  const selectedOperation = String(row.operationId || '').toUpperCase();
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Email Template' : 'Create Email Template' %></h1>
+    <% if (isEdit) { %>
+      <span class="badge bg-primary border font-monospace">ID: <%= row.id %></span>
+    <% } else { %>
+      <span class="badge bg-success border">New Template</span>
+    <% } %>
+  </div>
+
+  <div class="form-container" style="width:100%;max-width:1400px;">
+    <form id="emailManagementTemplateForm" action="<%= isEdit ? ('/email-management/templates/' + row.id) : '/email-management/templates/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+
+      <div class="row g-3">
+        <div class="col-lg-7">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light fw-bold text-primary">
+              <i class="bi bi-envelope-paper me-2"></i>Template Definition
+            </div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-md-12">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Email Event <span class="text-danger">*</span></label>
+                  <div class="input-group">
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="emailTemplateEventDisplay"
+                      placeholder="Pick a supported email event"
+                      value=""
+                      readonly
+                    >
+                    <button class="btn btn-outline-primary" type="button" id="emailTemplatePickEventBtn">
+                      <i class="bi bi-search me-1"></i> Pick
+                    </button>
+                  </div>
+                  <input type="hidden" name="eventKey" id="emailTemplateEventKeyHidden" value="<%= selectedEventKey %>" required>
+                  <input type="hidden" name="sectionId" id="emailTemplateSectionIdHidden" value="<%= selectedSection %>">
+                  <input type="hidden" name="operationId" id="emailTemplateOperationIdHidden" value="<%= selectedOperation %>">
+                </div>
+                <div class="col-md-12">
+                  <div class="small text-muted mb-1">Mapped Backend Route</div>
+                  <div id="emailTemplateMappedRoute" class="font-monospace small">-</div>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Sender Template <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  class="form-control font-monospace"
+                  name="senderTemplate"
+                  value="<%= row.senderTemplate || '' %>"
+                  placeholder="info@domain.com"
+                  required
+                >
+                <div class="form-text">Resend supports custom sender via `from` when the address/domain is verified.</div>
+              </div>
+
+              <div class="mt-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Recipient Template <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  class="form-control font-monospace"
+                  name="recipientTemplate"
+                  value="<%= row.recipientTemplate || '' %>"
+                  placeholder="{{USER_EMAIL}} or admin@domain.com"
+                  required
+                >
+                <div class="form-text">Use comma/semicolon for multiple recipients.</div>
+              </div>
+
+              <div class="mt-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Subject Template <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  class="form-control"
+                  name="subjectTemplate"
+                  value="<%= row.subjectTemplate || '' %>"
+                  placeholder="Password reset code"
+                  required
+                >
+              </div>
+
+              <div class="mt-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Body Template <span class="text-danger">*</span></label>
+                <textarea
+                  class="form-control font-monospace"
+                  id="emailBodyTemplateField"
+                  name="bodyTemplate"
+                  rows="12"
+                  placeholder="Your password reset code is {{RESET_CODE}}."
+                  required
+                  data-html-template-title="Body Template Editor"
+                ><%= row.bodyTemplate || '' %></textarea>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    id="emailOpenBodyTemplateEditorBtn"
+                  >
+                    <i class="bi bi-code-square me-1"></i>Open Rich Editor
+                  </button>
+                  <span class="small text-muted">Edit in modal and save back to this field.</span>
+                </div>
+              </div>
+
+              <div class="mt-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="emailTemplateActiveSwitch" name="isActive" <%= row.isActive === false ? '' : 'checked' %>>
+                <label class="form-check-label fw-bold small" for="emailTemplateActiveSwitch">Active template</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-light fw-bold text-primary">
+              <i class="bi bi-braces me-2"></i>Placeholder Guide
+            </div>
+            <div class="card-body d-flex flex-column gap-3">
+              <div>
+                <div class="small text-muted mb-1">Selected Template Key</div>
+                <div class="font-monospace small" id="emailTemplateSelectedKey">-</div>
+              </div>
+              <div>
+                <div class="small text-muted mb-1">Template Label</div>
+                <div class="fw-semibold" id="emailTemplateDefinitionLabel">No strict placeholder registry for this selection.</div>
+              </div>
+              <div>
+                <div class="small text-muted mb-1">Allowed Placeholders</div>
+                <div id="emailTemplateAllowedPlaceholders" class="d-flex flex-wrap gap-2"></div>
+              </div>
+              <div>
+                <div class="small text-muted mb-1">Required Placeholders</div>
+                <div id="emailTemplateRequiredPlaceholders" class="d-flex flex-wrap gap-2"></div>
+              </div>
+              <div class="alert alert-light border small mb-0">
+                Placeholders are strict and case-sensitive (`{{PLACEHOLDER_KEY}}`). Unknown placeholders are rejected on save.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md" id="emailTemplateSaveBtn">
+          <i class="bi bi-save me-1"></i> Save
+        </button>
+        <a href="/email-management/templates" class="btn btn-filled btn-secondary btn-md" id="emailTemplateCancelBtn">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker', { user }) %>
+<%- include('../partials/htmlTemplateEditorModal', { htmlEditorModalId: 'htmlTemplateEditorModal', htmlEditorModalEditorId: 'htmlTemplateEditorModalEditor' }) %>
+<%- include('../partials/htmlTemplateInsertImageModal', { htmlTemplateInsertImageModalId: 'htmlTemplateInsertImageModal' }) %>
+<%- include('../partials/modal_MediaManager') %>
+<script src="/scripts/htmlTemplateEditor.js"></script>
+<script src="/scripts/htmlTemplateEditorModal.js"></script>
+
+<script>
+  (function () {
+    async function showModalMessage(config = {}) {
+      if (typeof showMessageModal === 'function') {
+        return showMessageModal(config);
+      }
+      console.error('showMessageModal is unavailable.', config);
+      return null;
+    }
+
+    const eventKeyHidden = document.getElementById('emailTemplateEventKeyHidden');
+    const eventDisplayInput = document.getElementById('emailTemplateEventDisplay');
+    const pickEventBtn = document.getElementById('emailTemplatePickEventBtn');
+    const sectionIdHidden = document.getElementById('emailTemplateSectionIdHidden');
+    const operationIdHidden = document.getElementById('emailTemplateOperationIdHidden');
+    const mappedRouteNode = document.getElementById('emailTemplateMappedRoute');
+    const selectedKeyNode = document.getElementById('emailTemplateSelectedKey');
+    const labelNode = document.getElementById('emailTemplateDefinitionLabel');
+    const allowedNode = document.getElementById('emailTemplateAllowedPlaceholders');
+    const requiredNode = document.getElementById('emailTemplateRequiredPlaceholders');
+    const imageInsertModalEl = document.getElementById('htmlTemplateInsertImageModal');
+    const imageUrlInput = document.getElementById('htmlTemplateImageUrlInput');
+    const imageAltInput = document.getElementById('htmlTemplateImageAltInput');
+    const imageInsertFromUrlBtn = document.getElementById('htmlTemplateInsertImageFromUrlBtn');
+    const imageInsertFromLibraryBtn = document.getElementById('htmlTemplateOpenSavedImageLibraryBtn');
+    const mediaManagerModalEl = document.getElementById('mediaManagerModal');
+    const mediaManagerModal = (window.bootstrap && window.bootstrap.Modal && mediaManagerModalEl)
+      ? new window.bootstrap.Modal(mediaManagerModalEl)
+      : null;
+    const mediaManagerModalApi = (window.MediaManagerModal && typeof window.MediaManagerModal.open === 'function')
+      ? window.MediaManagerModal
+      : null;
+
+    const registryMap = <%- JSON.stringify(placeholderRegistryMap || {}) %>;
+    const catalog = <%- JSON.stringify(safeEventCatalog || []) %>;
+    const selectedEventKey = <%- JSON.stringify(selectedEventKey || '') %>;
+    const selectedSection = <%- JSON.stringify(selectedSection || '') %>;
+    const selectedOperation = <%- JSON.stringify(selectedOperation || '') %>;
+    let imageInsertTargetEditorId = 'htmlTemplateEditorModalEditor';
+    const savedImageLibraryFolderCache = new Map();
+    const savedImageLibraryInflightByFolder = new Map();
+
+    const imageInsertModal = (window.bootstrap && window.bootstrap.Modal && imageInsertModalEl)
+      ? window.bootstrap.Modal.getOrCreateInstance(imageInsertModalEl)
+      : null;
+
+    function appendActionState(url) {
+      const base = String(url || '').trim();
+      if (!base) return base;
+      const token = String(document.querySelector('input[name="actionStateId"]')?.value || '').trim();
+      if (!token) return base;
+      return base + (base.includes('?') ? '&' : '?') + 'actionStateId=' + encodeURIComponent(token);
+    }
+
+    function cleanText(value) {
+      return String(value || '').replace(/\0/g, '').trim();
+    }
+
+    function escapeAttr(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function normalizeImageUrl(value) {
+      const token = cleanText(value);
+      if (!token) return '';
+      if (/^https?:\/\//i.test(token)) return token;
+      if (/^\/uploads\//i.test(token)) return token;
+      if (/^uploads\//i.test(token)) return '/' + token;
+      return token;
+    }
+
+    function normalizeFolderToken(value) {
+      const token = cleanText(value).replace(/\\/g, '/');
+      if (!token || token === '/' || token === '.') return '';
+      return token
+        .split('/')
+        .map((part) => cleanText(part))
+        .filter(Boolean)
+        .join('/');
+    }
+
+    function closeImageInsertModal() {
+      if (imageInsertModal) imageInsertModal.hide();
+      else if (imageInsertModalEl) {
+        imageInsertModalEl.classList.remove('show');
+        imageInsertModalEl.style.display = 'none';
+      }
+    }
+
+    function waitForImageInsertModalHidden(timeoutMs = 450) {
+      return new Promise((resolve) => {
+        if (!imageInsertModalEl || !imageInsertModalEl.classList.contains('show')) {
+          resolve();
+          return;
+        }
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          imageInsertModalEl.removeEventListener('hidden.bs.modal', onHidden);
+          resolve();
+        };
+        const onHidden = () => done();
+        imageInsertModalEl.addEventListener('hidden.bs.modal', onHidden, { once: true });
+        closeImageInsertModal();
+        window.setTimeout(done, Math.max(120, Number(timeoutMs) || 450));
+      });
+    }
+
+    function openImageInsertModal(editorId = 'htmlTemplateEditorModalEditor') {
+      imageInsertTargetEditorId = cleanText(editorId) || 'htmlTemplateEditorModalEditor';
+      if (imageUrlInput) imageUrlInput.value = '';
+      if (imageAltInput) imageAltInput.value = '';
+      if (imageInsertModal) {
+        imageInsertModal.show();
+        return;
+      }
+      if (imageInsertModalEl) {
+        imageInsertModalEl.classList.add('show');
+        imageInsertModalEl.style.display = 'block';
+      }
+    }
+
+    function insertImageIntoEditor(editorId, urlValue, altValue = '') {
+      const editorToken = cleanText(editorId) || 'htmlTemplateEditorModalEditor';
+      const url = normalizeImageUrl(urlValue);
+      if (!url) return false;
+      if (window.HtmlTemplateEditor && typeof window.HtmlTemplateEditor.insertImage === 'function') {
+        return window.HtmlTemplateEditor.insertImage(editorToken, url, cleanText(altValue));
+      }
+      if (window.HtmlTemplateEditor && typeof window.HtmlTemplateEditor.insertHtml === 'function') {
+        const html = `<img src="${escapeAttr(url)}" alt="${escapeAttr(cleanText(altValue))}">`;
+        return window.HtmlTemplateEditor.insertHtml(editorToken, html);
+      }
+      return false;
+    }
+
+    async function fetchSavedImageLibrary(options = {}) {
+      const forceRefresh = options && options.forceRefresh === true;
+      const folder = normalizeFolderToken(options && options.folder);
+      const cacheKey = folder || '__root__';
+      if (!forceRefresh && savedImageLibraryFolderCache.has(cacheKey)) {
+        return savedImageLibraryFolderCache.get(cacheKey);
+      }
+      if (!forceRefresh && savedImageLibraryInflightByFolder.has(cacheKey)) {
+        return savedImageLibraryInflightByFolder.get(cacheKey);
+      }
+      const endpoint = appendActionState('/email-management/templates/media/library');
+      const requestUrl = folder
+        ? (endpoint + (endpoint.includes('?') ? '&' : '?') + 'folder=' + encodeURIComponent(folder))
+        : endpoint;
+
+      const requestPromise = (async () => {
+        const response = await fetch(requestUrl, {
+          method: 'GET',
+          headers: { 'x-ajax-request': 'true' }
+        });
+        let result = null;
+        try {
+          result = await response.json();
+        } catch (_) {
+          result = null;
+        }
+        if (!response.ok || !result || result.status !== 'success') {
+          throw new Error((result && result.message) || `Unable to load saved media library (status ${response.status}).`);
+        }
+        const rows = Array.isArray(result.results) ? result.results : [];
+        const payload = {
+          rows,
+          message: cleanText(result.message) || (rows.length ? `Loaded ${rows.length} image file(s).` : 'No saved image files found.'),
+          defaults: result.defaults && typeof result.defaults === 'object' ? result.defaults : null,
+          folders: Array.isArray(result.folders) ? result.folders : [],
+          currentFolder: normalizeFolderToken(result.currentFolder || folder),
+          parentFolder: normalizeFolderToken(result.parentFolder),
+          defaultFolder: normalizeFolderToken(result.defaultFolder)
+        };
+        savedImageLibraryFolderCache.set(cacheKey, payload);
+        return payload;
+      })();
+      savedImageLibraryInflightByFolder.set(cacheKey, requestPromise);
+
+      try {
+        return await requestPromise;
+      } finally {
+        savedImageLibraryInflightByFolder.delete(cacheKey);
+      }
+    }
+
+    async function openSavedImageLibraryPicker(editorId) {
+      if (!mediaManagerModalApi || typeof mediaManagerModalApi.open !== 'function') {
+        await showModalMessage({
+          title: 'Saved Media Unavailable',
+          icon: 'warning',
+          message: 'Saved media library is not available on this page.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        return;
+      }
+
+      const initial = await fetchSavedImageLibrary({ forceRefresh: false });
+      if (typeof mediaManagerModalApi.setModalCompat === 'function') {
+        mediaManagerModalApi.setModalCompat({
+          modalEl: mediaManagerModalEl,
+          modalInstance: mediaManagerModal
+        });
+      }
+      if (typeof mediaManagerModalApi.setRows === 'function') {
+        mediaManagerModalApi.setRows(initial.rows);
+      }
+
+      await mediaManagerModalApi.open({
+        mode: 'assign',
+        mediaKind: 'image',
+        maxSelection: 1,
+        title: 'Select Image From Saved Media Library',
+        defaultView: 'list',
+        defaultFolder: initial.defaultFolder || 'email-templates',
+        defaultPageSize: 30,
+        forceRefresh: true,
+        onRefresh: async (query = {}) => {
+          const refreshed = await fetchSavedImageLibrary({
+            forceRefresh: true,
+            folder: query && query.folder
+          });
+          return {
+            rows: refreshed.rows,
+            message: refreshed.message,
+            defaults: refreshed.defaults,
+            folders: refreshed.folders,
+            currentFolder: refreshed.currentFolder,
+            parentFolder: refreshed.parentFolder,
+            defaultFolder: refreshed.defaultFolder
+          };
+        },
+        onUpload: async () => {
+          await showModalMessage({
+            title: 'Upload Not Available',
+            icon: 'info',
+            message: 'Upload is not enabled for this picker. Use existing saved files.',
+            buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+          return { rows: [], message: 'Upload is disabled.' };
+        },
+        onApply: async (selectedRows) => {
+          const row = Array.isArray(selectedRows) ? selectedRows[0] : null;
+          const imageUrl = normalizeImageUrl(row?.url || '');
+          if (!imageUrl) {
+            await showModalMessage({
+              title: 'Image URL Missing',
+              icon: 'warning',
+              message: 'Selected media item does not have a usable URL.',
+              buttons: [{ text: 'OK', class: 'btn-primary' }]
+            });
+            return;
+          }
+          const altText = cleanText(row?.originalName || row?.name || row?.filename || '');
+          insertImageIntoEditor(editorId, imageUrl, altText);
+        }
+      });
+    }
+
+    function clearChildren(node) {
+      if (!node) return;
+      while (node.firstChild) node.removeChild(node.firstChild);
+    }
+
+    function insertPlaceholderToken(token) {
+      const cleanToken = String(token || '').trim();
+      if (!cleanToken) return;
+      const wrapped = cleanToken.startsWith('{{') ? cleanToken : (`{{${cleanToken}}}`);
+
+      const modalEl = document.getElementById('htmlTemplateEditorModal');
+      const modalOpen = Boolean(modalEl && modalEl.classList.contains('show'));
+      if (modalOpen && window.HtmlTemplateEditor && typeof window.HtmlTemplateEditor.insertText === 'function') {
+        const inserted = window.HtmlTemplateEditor.insertText('htmlTemplateEditorModalEditor', wrapped);
+        if (inserted) return;
+      }
+
+      const fallback = document.getElementById('emailBodyTemplateField');
+      if (!fallback) return;
+      const start = Number(fallback.selectionStart || fallback.value.length || 0);
+      const end = Number(fallback.selectionEnd || fallback.value.length || 0);
+      const source = String(fallback.value || '');
+      fallback.value = source.slice(0, start) + wrapped + source.slice(end);
+      fallback.selectionStart = fallback.selectionEnd = start + wrapped.length;
+    }
+
+    function createTag(text, className, tokenValue = '') {
+      const span = document.createElement('span');
+      span.className = className;
+      span.textContent = text;
+      if (tokenValue) {
+        span.classList.add('cursor-pointer');
+        span.title = 'Click to insert into Body Template';
+        span.setAttribute('role', 'button');
+        span.setAttribute('tabindex', '0');
+        span.addEventListener('click', () => insertPlaceholderToken(tokenValue));
+        span.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            insertPlaceholderToken(tokenValue);
+          }
+        });
+      }
+      return span;
+    }
+
+    function normalizeToken(value) {
+      return String(value || '').trim().toUpperCase();
+    }
+
+    function findEventByKey(eventKey) {
+      const token = normalizeToken(eventKey);
+      return catalog.find((row) => normalizeToken(row?.eventKey) === token) || null;
+    }
+
+    function setSelectedEvent(eventRow) {
+      const key = normalizeToken(eventRow?.eventKey || eventRow?.id || '');
+      const fromCatalog = findEventByKey(key);
+      const selected = fromCatalog || eventRow || null;
+      const label = String(selected?.label || selected?.name || key || '').trim();
+      const sectionId = normalizeToken(selected?.sectionId || '');
+      const operationId = normalizeToken(selected?.operationId || '');
+
+      if (eventKeyHidden) eventKeyHidden.value = key;
+      if (eventDisplayInput) eventDisplayInput.value = label;
+      if (sectionIdHidden) sectionIdHidden.value = sectionId;
+      if (operationIdHidden) operationIdHidden.value = operationId;
+      renderPlaceholderHelp();
+    }
+
+    function renderPlaceholderHelp() {
+      const key = normalizeToken(eventKeyHidden?.value || '');
+      const eventRow = findEventByKey(key);
+      const sectionId = normalizeToken(eventRow?.sectionId || sectionIdHidden?.value || '');
+      const operationId = normalizeToken(eventRow?.operationId || operationIdHidden?.value || '');
+      if (sectionIdHidden) sectionIdHidden.value = sectionId;
+      if (operationIdHidden) operationIdHidden.value = operationId;
+
+      selectedKeyNode.textContent = key || '-';
+      mappedRouteNode.textContent = sectionId && operationId ? (sectionId + '::' + operationId) : '-';
+
+      const def = key ? registryMap[key] : null;
+      clearChildren(allowedNode);
+      clearChildren(requiredNode);
+
+      if (!def) {
+        labelNode.textContent = 'No strict placeholder registry for this selection.';
+        allowedNode.appendChild(createTag('No placeholders defined', 'badge bg-light text-muted border'));
+        requiredNode.appendChild(createTag('No required placeholders', 'badge bg-light text-muted border'));
+        return;
+      }
+
+      labelNode.textContent = def.label || key;
+      (Array.isArray(def.allowed) && def.allowed.length ? def.allowed : ['None']).forEach((token) => {
+        const isInsertable = String(token || '').toUpperCase() !== 'NONE';
+        allowedNode.appendChild(createTag('{{' + token + '}}', 'badge bg-primary-subtle text-primary border', isInsertable ? String(token || '') : ''));
+      });
+      (Array.isArray(def.required) && def.required.length ? def.required : ['None']).forEach((token) => {
+        const isInsertable = String(token || '').toUpperCase() !== 'NONE';
+        requiredNode.appendChild(createTag('{{' + token + '}}', 'badge bg-warning-subtle text-dark border', isInsertable ? String(token || '') : ''));
+      });
+    }
+
+    function getCurrentPlaceholderTokens() {
+      const key = normalizeToken(eventKeyHidden?.value || '');
+      const def = key ? registryMap[key] : null;
+      if (!def || !Array.isArray(def.allowed)) return [];
+      return def.allowed
+        .map((token) => String(token || '').trim())
+        .filter((token) => token && token.toUpperCase() !== 'NONE');
+    }
+
+    function openBodyTemplateModalEditor() {
+      const target = document.getElementById('emailBodyTemplateField');
+      if (!target || !window.HtmlTemplateEditorModal || typeof window.HtmlTemplateEditorModal.open !== 'function') return;
+      window.HtmlTemplateEditorModal.open({
+        target,
+        title: 'Body Template Editor',
+        tokens: getCurrentPlaceholderTokens()
+      });
+    }
+
+    if (pickEventBtn) {
+      pickEventBtn.addEventListener('click', () => {
+        if (!window.GenericPicker || typeof window.GenericPicker.open !== 'function') return;
+        const pickerBaseConfig = {
+          title: 'Select Email Event',
+          icon: 'bi-envelope-paper',
+          apiEndpoint: '/email-management/templates/picker/events',
+          placeholder: 'Search supported email events (type --- to show all)...',
+          searchFields: 'id,name,label,sectionId,operationId,description',
+          limit: 20,
+          onSelect: (item) => {
+            setSelectedEvent({
+              eventKey: normalizeToken(item?.eventKey || item?.id || ''),
+              label: String(item?.label || item?.name || item?.id || '').trim(),
+              sectionId: normalizeToken(item?.sectionId || ''),
+              operationId: normalizeToken(item?.operationId || '')
+            });
+          }
+        };
+        const normalizedPickerConfig = (window.GenericPickerPresets && typeof window.GenericPickerPresets.normalizeConfig === 'function')
+          ? window.GenericPickerPresets.normalizeConfig(pickerBaseConfig)
+          : pickerBaseConfig;
+        window.GenericPicker.open(normalizedPickerConfig);
+      });
+    }
+
+    let initialEvent = selectedEventKey ? findEventByKey(selectedEventKey) : null;
+    if (!initialEvent && selectedSection && selectedOperation) {
+      const fallback = catalog.find((event) => (
+        normalizeToken(event?.sectionId) === normalizeToken(selectedSection)
+        && normalizeToken(event?.operationId) === normalizeToken(selectedOperation)
+      ));
+      if (fallback) initialEvent = fallback;
+    }
+    if (initialEvent) {
+      setSelectedEvent(initialEvent);
+    } else {
+      if (eventDisplayInput) eventDisplayInput.value = '';
+      renderPlaceholderHelp();
+    }
+
+    const openBodyEditorBtn = document.getElementById('emailOpenBodyTemplateEditorBtn');
+    if (openBodyEditorBtn) {
+      openBodyEditorBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        openBodyTemplateModalEditor();
+      });
+    }
+
+    if (imageInsertFromUrlBtn) {
+      imageInsertFromUrlBtn.addEventListener('click', async (event) => {
+        event.preventDefault();
+        const imageUrl = normalizeImageUrl(imageUrlInput?.value || '');
+        if (!imageUrl) {
+          await showModalMessage({
+            title: 'Image URL Required',
+            icon: 'warning',
+            message: 'Please enter a valid image URL or choose from Saved Media Library.',
+            buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+          return;
+        }
+        insertImageIntoEditor(imageInsertTargetEditorId, imageUrl, cleanText(imageAltInput?.value || ''));
+        closeImageInsertModal();
+      });
+    }
+
+    if (imageInsertFromLibraryBtn) {
+      imageInsertFromLibraryBtn.addEventListener('click', async (event) => {
+        event.preventDefault();
+        await waitForImageInsertModalHidden();
+        try {
+          await openSavedImageLibraryPicker(imageInsertTargetEditorId);
+        } catch (error) {
+          await showModalMessage({
+            title: 'Saved Media Error',
+            icon: 'error',
+            message: error?.message || 'Unable to open saved media library.',
+            buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+        }
+      });
+    }
+
+    window.HtmlTemplateEditorHooks = window.HtmlTemplateEditorHooks || {};
+    window.HtmlTemplateEditorHooks.onInsertImage = ({ editorId }) => {
+      openImageInsertModal(editorId || 'htmlTemplateEditorModalEditor');
+      return true;
+    };
+
+    const form = document.getElementById('emailManagementTemplateForm');
+    const saveBtn = document.getElementById('emailTemplateSaveBtn');
+    const cancelBtn = document.getElementById('emailTemplateCancelBtn');
+    let submitting = false;
+
+    function setBusy(button, label) {
+      if (!button) return;
+      if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + label;
+    }
+
+    function restore(button) {
+      if (!button) return;
+      button.disabled = false;
+      if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (submitting) return;
+      submitting = true;
+
+      try {
+        setBusy(saveBtn, 'Saving...');
+        if (cancelBtn) {
+          cancelBtn.classList.add('disabled');
+          cancelBtn.style.pointerEvents = 'none';
+          cancelBtn.setAttribute('aria-disabled', 'true');
+        }
+
+        const formData = new FormData(form);
+        formData.set('isActive', document.getElementById('emailTemplateActiveSwitch').checked ? 'true' : 'false');
+        const payload = new URLSearchParams();
+        for (const [key, value] of formData.entries()) payload.append(key, value);
+
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-ajax-request': 'true' },
+          body: payload.toString()
+        });
+
+        let result = null;
+        try {
+          result = await response.json();
+        } catch (_) {
+          result = { status: 'error', message: 'Unexpected response while saving template.' };
+        }
+        if (!response.ok || result.status !== 'success') {
+          throw new Error(result.message || 'Failed to save template.');
+        }
+
+        await showModalMessage({
+          title: 'Saved',
+          icon: 'success',
+          message: result.message || 'Email template saved successfully.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        window.location.href = '/email-management/templates';
+      } catch (error) {
+        await showModalMessage({
+          title: 'Save Failed',
+          icon: 'error',
+          message: error?.message || 'Unable to save template.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        submitting = false;
+        restore(saveBtn);
+        if (cancelBtn) {
+          cancelBtn.classList.remove('disabled');
+          cancelBtn.style.pointerEvents = '';
+          cancelBtn.removeAttribute('aria-disabled');
+        }
+      }
+    });
+  })();
+</script>

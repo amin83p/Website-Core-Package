@@ -1,0 +1,73 @@
+[
+  {
+    "orgId": "900000",
+    "classId": "609077",
+    "reportScope": "each_student",
+    "targetStudentIds": [],
+    "templateId": "RPTTPL-2026-E4J63",
+    "templateVersion": 1,
+    "teacherIds": [
+      "560378"
+    ],
+    "conflictPermitted": true,
+    "taskStartTime": "11:30",
+    "taskEndTime": "12:30",
+    "reportStartDate": "2026-04-01",
+    "reportDueDate": "2026-04-09",
+    "status": "active",
+    "notes": "",
+    "timesheetReflection": false,
+    "allocatedHours": 0,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-08T19:34:17.826Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-08T19:34:17.826Z"
+    },
+    "targetType": "date",
+    "sessionId": "",
+    "sessionDate": "2026-04-09",
+    "dueDate": "2026-04-09",
+    "id": "285451",
+    "sharedAnswers": {
+      "futuregoal_listening": "Working on basic listening files and audios.",
+      "futuregoal_reading": "working on 2.",
+      "futuregoal_writing": "Writing on 3.",
+      "futuregoal_speaking": "Speaking on 4."
+    }
+  },
+  {
+    "orgId": "900000",
+    "classId": "609077",
+    "reportScope": "each_student",
+    "targetStudentIds": [],
+    "templateId": "RPTTPL-2026-E4J63",
+    "templateVersion": 1,
+    "teacherIds": [
+      "560378"
+    ],
+    "conflictPermitted": true,
+    "taskStartTime": "11:45",
+    "taskEndTime": "12:00",
+    "reportStartDate": "2026-04-01",
+    "reportDueDate": "2026-04-08",
+    "status": "active",
+    "notes": "",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-08T16:45:52.530Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-08T20:07:31.952Z"
+    },
+    "targetType": "session",
+    "sessionId": "SES_17750306503204715",
+    "sessionDate": "2026-04-08",
+    "dueDate": "",
+    "id": "579870",
+    "allocatedHours": 0,
+    "timesheetReflection": false,
+    "sharedAnswers": {
+      "sample": 0
+    }
+  }
+]

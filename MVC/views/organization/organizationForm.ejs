@@ -1,0 +1,447 @@
+<%
+  const org = organization || {};
+  const isEdit = !!org.id;
+  const identity = org.identity || {};
+  const contact = org.contact || {};
+  const address = contact.address || {};
+  const domain = org.domain || {};
+  const billing = org.billing || {};
+  const settings = org.settings || {};
+  const people = org.people || {};
+  const audit = org.audit || {};
+  const orgContracts = Array.isArray(organizationContracts) ? organizationContracts : [];
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Organization' : 'New Organization' %></h1>
+    <% if (isEdit) { %>
+      <span class="badge bg-primary border font-monospace">ID: <%= org.id %></span>
+    <% } %>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="organizationForm" action="<%= isEdit ? '/organizations/edit/' + org.id : '/organizations/new' %>" method="POST">
+      <input type="hidden" id="adminsHidden" name="admins" value='<%- JSON.stringify(people.admins || []) %>'>
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+
+      <ul class="nav nav-tabs mb-4" id="orgTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-identity" type="button">Identity</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-contact" type="button">Contact</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-domain" type="button">Domain & Access</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-billing" type="button">Billing</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-people" type="button">People</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-contracts" type="button">Contracts</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-notes" type="button">Notes</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-identity">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Legal Name *</label>
+              <input name="legalName" class="form-control size-md" required value="<%= identity.legalName || '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Display Name *</label>
+              <input name="displayName" class="form-control size-md" required value="<%= identity.displayName || '' %>">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Type</label>
+              <input name="type" class="form-control size-md" placeholder="school, company, ngo" value="<%= identity.type || '' %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Registration No.</label>
+              <input name="registrationNo" class="form-control size-md" value="<%= identity.registrationNo || '' %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Tax ID</label>
+              <input name="taxId" class="form-control size-md" value="<%= identity.taxId || '' %>">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Website</label>
+              <input name="website" class="form-control size-md" value="<%= identity.website || '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Logo URL</label>
+              <input name="logoUrl" class="form-control size-md" value="<%= identity.logoUrl || '' %>">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Industry</label>
+              <input name="industry" class="form-control size-md" value="<%= identity.industry || '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Size</label>
+              <input name="size" class="form-control size-md" placeholder="1-10, 10-50, 100+" value="<%= identity.size || '' %>">
+            </div>
+          </div>
+
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="activeCheck" name="active" <%= org.active ? 'checked' : '' %>>
+            <label class="form-check-label" for="activeCheck">Active Organization</label>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-contact">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Contact Email</label>
+              <input name="contactEmail" type="email" class="form-control size-md" value="<%= contact.email || '' %>">
+            </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Phone</label>
+              <input name="phone" class="form-control size-md" value="<%= contact.phone || '' %>">
+            </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Alt Phone</label>
+              <input name="phoneAlt" class="form-control size-md" value="<%= contact.phoneAlt || '' %>">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Fax</label>
+            <input name="fax" class="form-control size-md" value="<%= contact.fax || '' %>">
+          </div>
+
+          <hr>
+          <h6 class="fw-bold mb-2">Address</h6>
+
+          <div class="mb-3">
+            <label class="form-label">Line 1</label>
+            <input name="addressLine1" class="form-control size-md" value="<%= address.line1 || '' %>">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Line 2</label>
+            <input name="addressLine2" class="form-control size-md" value="<%= address.line2 || '' %>">
+          </div>
+
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">City</label>
+              <input name="city" class="form-control size-md" value="<%= address.city || '' %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Province/State</label>
+              <input name="provinceState" class="form-control size-md" value="<%= address.provinceState || '' %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Postal Code</label>
+              <input name="postalCode" class="form-control size-md" value="<%= address.postalCode || '' %>">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Country</label>
+            <input name="country" class="form-control size-md" value="<%= address.country || '' %>">
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-domain">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Primary Domain</label>
+              <input name="primaryDomain" class="form-control size-md" placeholder="example.org" value="<%= domain.primaryDomain || '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Allowed Domains (comma-separated)</label>
+              <input name="allowedDomains" class="form-control size-md" placeholder="example.org, example.com" value="<%= (domain.allowedDomains || []).join(', ') %>">
+            </div>
+          </div>
+
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="autoJoinEnabled" name="autoJoinEnabled" <%= domain.autoJoinEnabled ? 'checked' : '' %>>
+            <label class="form-check-label" for="autoJoinEnabled">Auto-Join Enabled</label>
+          </div>
+
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="ssoEnabled" name="ssoEnabled" <%= domain.ssoEnabled ? 'checked' : '' %>>
+            <label class="form-check-label" for="ssoEnabled">SSO Enabled</label>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-billing">
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Plan</label>
+              <% const plan = billing.plan || 'free'; %>
+              <select name="plan" class="form-select size-md">
+                <option value="free" <%= plan==='free'?'selected':'' %>>Free</option>
+                <option value="paid" <%= plan==='paid'?'selected':'' %>>Paid</option>
+                <option value="enterprise" <%= plan==='enterprise'?'selected':'' %>>Enterprise</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Billing Status</label>
+              <% const bs = billing.status || 'active'; %>
+              <select name="billingStatus" class="form-select size-md">
+                <option value="active" <%= bs==='active'?'selected':'' %>>Active</option>
+                <option value="trial" <%= bs==='trial'?'selected':'' %>>Trial</option>
+                <option value="past_due" <%= bs==='past_due'?'selected':'' %>>Past Due</option>
+                <option value="cancelled" <%= bs==='cancelled'?'selected':'' %>>Cancelled</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Currency</label>
+              <input name="currency" class="form-control size-md" placeholder="USD, CAD" value="<%= billing.currency || 'USD' %>">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Seats Limit</label>
+              <input name="seatsLimit" type="number" class="form-control size-md" value="<%= billing.seatsLimit ?? '' %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Seats Used</label>
+              <input name="seatsUsed" type="number" class="form-control size-md" value="<%= billing.seatsUsed ?? 0 %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Billing Cycle</label>
+              <input name="billingCycle" class="form-control size-md" placeholder="monthly / annual" value="<%= billing.billingCycle || '' %>">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Billing Email</label>
+              <input name="billingEmail" type="email" class="form-control size-md" value="<%= billing.billingEmail || '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Next Invoice Date</label>
+              <input name="nextInvoiceDate" type="date" class="form-control size-md" value="<%= billing.nextInvoiceDate || '' %>">
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-people">
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Owner User ID</label>
+              <input name="ownerUserId" type="number" class="form-control size-md" value="<%= people.ownerUserId ?? '' %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Members Count</label>
+              <input name="membersCount" type="number" class="form-control size-md" value="<%= people.membersCount ?? 0 %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Default Access Level</label>
+              <input name="defaultAccessLevel" type="number" class="form-control size-md" value="<%= settings.defaultAccessLevel ?? 0 %>">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="allowSelfRegistration" name="allowSelfRegistration" <%= settings.allowSelfRegistration ? 'checked' : '' %>>
+                <label class="form-check-label" for="allowSelfRegistration">Allow Self Registration</label>
+              </div>
+
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="requireAdminApprovalForImport" name="requireAdminApprovalForImport" <%= settings.requireAdminApprovalForImport ? 'checked' : '' %>>
+                <label class="form-check-label" for="requireAdminApprovalForImport">Require Admin Approval for Import</label>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Data Retention Days</label>
+                <input name="dataRetentionDays" type="number" class="form-control size-md" value="<%= settings.dataRetentionDays ?? '' %>">
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Admins (JSON Array)</label>
+              <textarea id="adminsEditor" class="form-control size-md" rows="8" placeholder='[{"userId":"123","role":"admin"}]'><%- JSON.stringify(people.admins || [], null, 2) %></textarea>
+              <div class="form-text">Optional. This writes to <code>people.admins</code>.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-contracts">
+          <% if (!isEdit) { %>
+            <div class="alert alert-info mb-0">Save the organization first, then manage contracts from this tab.</div>
+          <% } else { %>
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+              <h6 class="fw-bold m-0">Contracts linked to this organization</h6>
+              <div class="d-flex gap-2">
+                <a href="/contracts/new?orgId=<%= encodeURIComponent(org.id) %>&orgName=<%= encodeURIComponent(identity.displayName || '') %>" class="btn btn-sm btn-filled btn-primary">
+                  <i class="bi bi-plus-circle me-1"></i> Add Contract
+                </a>
+                <a href="/contracts?q=<%= encodeURIComponent(org.id) %>&type=exact_match&searchFields=orgId" class="btn btn-sm btn-filled btn-secondary">Open Contracts List</a>
+              </div>
+            </div>
+
+            <div class="table-scroll-wrapper">
+              <table class="table-responsive size-md">
+                <thead>
+                  <tr>
+                    <th>Title / ID</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% if (!orgContracts.length) { %>
+                    <tr>
+                      <td colspan="6" class="text-center text-muted py-4">No contracts found for this organization.</td>
+                    </tr>
+                  <% } %>
+
+                  <% orgContracts.forEach((c) => { %>
+                    <tr>
+                      <td>
+                        <div class="fw-bold"><%= c.title || 'Untitled' %></div>
+                        <div class="x-small text-muted font-monospace"><%= c.id %></div>
+                      </td>
+                      <td><span class="badge bg-light text-secondary border"><%= c.type || 'N/A' %></span></td>
+                      <td>
+                        <% const status = String(c.status || 'draft').toLowerCase(); %>
+                        <span class="badge <%= status === 'active' ? 'bg-success' : (status === 'expired' ? 'bg-danger' : (status === 'cancelled' ? 'bg-secondary' : 'bg-warning text-dark')) %>">
+                          <%= status.toUpperCase() %>
+                        </span>
+                      </td>
+                      <td><%= c.startDate || 'N/A' %></td>
+                      <td><%= c.endDate || 'No Expiry' %></td>
+                      <td class="text-end table-actions">
+                        <a href="/contracts/edit/<%= c.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+                        <a href="/contracts?q=<%= encodeURIComponent(c.id) %>&type=exact_match&searchFields=id" class="btn btn-sm btn-outline-danger">Delete</a>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="tab-pane fade" id="tab-notes">
+          <div class="mb-3">
+            <label class="form-label">Tags (comma-separated)</label>
+            <input name="tags" class="form-control size-md" value="<%= (org.tags || []).join(', ') %>">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-control size-md" rows="5" placeholder="Notes about this organization"><%= org.notes || '' %></textarea>
+          </div>
+
+          <% if (isEdit) { %>
+            <hr>
+            <div class="row text-muted small">
+              <div class="col-md-6">
+                <div><strong>Created:</strong> <%= audit.createDateTime ? new Date(audit.createDateTime).toLocaleString() : 'N/A' %></div>
+                <div><strong>Created By:</strong> <%= audit.createUser ?? 'N/A' %></div>
+              </div>
+              <div class="col-md-6">
+                <div><strong>Updated:</strong> <%= audit.lastUpdateDateTime ? new Date(audit.lastUpdateDateTime).toLocaleString() : 'N/A' %></div>
+                <div><strong>Updated By:</strong> <%= audit.lastUpdateUser ?? 'N/A' %></div>
+              </div>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Organization</button>
+        <a href="/organizations" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/organizations">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('organizationForm');
+  const adminsHidden = document.getElementById('adminsHidden');
+  const adminsEditor = document.getElementById('adminsEditor');
+
+  function syncAdminsHidden() {
+    if (!adminsHidden || !adminsEditor) return;
+    try {
+      const parsed = JSON.parse(adminsEditor.value || '[]');
+      adminsHidden.value = JSON.stringify(Array.isArray(parsed) ? parsed : []);
+      adminsEditor.classList.remove('is-invalid');
+    } catch (_) {
+      adminsHidden.value = '[]';
+      adminsEditor.classList.add('is-invalid');
+    }
+  }
+
+  if (adminsEditor) {
+    adminsEditor.addEventListener('input', syncAdminsHidden);
+    syncAdminsHidden();
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    syncAdminsHidden();
+
+    const fd = new FormData(form);
+    fd.set('active', document.getElementById('activeCheck')?.checked ? 'true' : 'false');
+    fd.set('autoJoinEnabled', document.getElementById('autoJoinEnabled')?.checked ? 'true' : 'false');
+    fd.set('ssoEnabled', document.getElementById('ssoEnabled')?.checked ? 'true' : 'false');
+    fd.set('allowSelfRegistration', document.getElementById('allowSelfRegistration')?.checked ? 'true' : 'false');
+    fd.set('requireAdminApprovalForImport', document.getElementById('requireAdminApprovalForImport')?.checked ? 'true' : 'false');
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalLabel = submitBtn?.innerHTML || 'Save Organization';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    }
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams(fd).toString()
+      });
+
+      const result = await response.json();
+      const ok = result && result.status === 'success';
+
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: ok ? 'Success' : 'Error',
+          icon: ok ? 'success' : 'error',
+          message: result?.message || (ok ? 'Saved successfully.' : 'Failed to save organization.'),
+          buttons: [{ text: 'OK', class: ok ? 'btn-success' : 'btn-danger' }]
+        });
+      }
+
+      if (ok) {
+        window.location.href = '/organizations';
+        return;
+      }
+    } catch (error) {
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Error',
+          icon: 'error',
+          message: error?.message || 'Unexpected error while saving organization.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalLabel;
+      }
+    }
+  });
+});
+</script>

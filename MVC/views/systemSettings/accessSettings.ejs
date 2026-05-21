@@ -1,0 +1,82 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0">Access & Security</h1>
+      <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Configuration</span>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="accessSettingsForm" action="/systemSettings/access" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom-0">
+           <h6 class="fw-bold text-dark m-0"><i class="bi bi-shield-lock me-2"></i>Access Levels</h6>
+        </div>
+        <div class="card-body pt-0">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label small fw-bold text-muted">High Access Min</label>
+                    <input type="number" name="highAccessMin" class="form-control" value="<%= settings.access.highAccessMin %>" required>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label small fw-bold text-muted">High Access Max</label>
+                    <input type="number" name="highAccessMax" class="form-control" value="<%= settings.access.highAccessMax %>" required>
+                </div>
+                 <div class="col-md-4 mb-3">
+                    <label class="form-label small fw-bold text-muted">Self Access Level</label>
+                    <input type="number" name="selfAccessLevel" class="form-control" value="<%= settings.access.selfAccessLevel %>" required>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom-0">
+           <h6 class="fw-bold text-dark m-0"><i class="bi bi-person-badge-fill me-2"></i>Immune Super Admins</h6>
+        </div>
+        <div class="card-body pt-0">
+            <div class="mb-3">
+                <label class="form-label">Email Addresses (One per line)</label>
+                <textarea name="immuneSuperAdmins" class="form-control font-monospace size-sm" rows="5" placeholder="admin@localhost.com"><%= adminStr %></textarea>
+                <div class="form-text">These users cannot be deleted or modified by standard admins.</div>
+            </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+          <a href="/systemSettings" class="btn btn-secondary btn-filled btn-md">Back to Dashboard</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save Access Settings</button>
+      </div>
+   </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('accessSettingsForm');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; }
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+          body: new URLSearchParams(new FormData(form)).toString()
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          if (typeof showMessageModal === 'function') await showMessageModal({ title: 'Success', icon: 'success', message: result.message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+          window.location.reload();
+        } else throw new Error(result.message || 'Failed.');
+      } catch (error) {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = 'Save Access Settings'; }
+        if (typeof showMessageModal === 'function') await showMessageModal({ title: 'Error', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        else alert(error.message);
+      }
+    });
+  }
+});
+</script>

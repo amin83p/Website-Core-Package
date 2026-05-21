@@ -1,0 +1,313 @@
+[
+  {
+    "id": "464355",
+    "active": true,
+    "audit": {
+      "createUser": "1",
+      "createDateTime": "2025-11-21T18:20:17.597Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-01-20T05:08:19.512Z"
+    },
+    "billing": {
+      "plan": "free",
+      "status": "active",
+      "currency": "USD",
+      "seatsLimit": null,
+      "seatsUsed": 0,
+      "billingEmail": null,
+      "billingCycle": null,
+      "nextInvoiceDate": null
+    },
+    "contact": {
+      "email": null,
+      "phone": null,
+      "phoneAlt": null,
+      "fax": null,
+      "address": {
+        "line1": null,
+        "line2": null,
+        "city": null,
+        "provinceState": null,
+        "postalCode": null,
+        "country": null
+      }
+    },
+    "contracts": [
+      {
+        "id": "C-DWVK67T",
+        "title": "",
+        "type": "subscription",
+        "status": "active",
+        "startDate": "2025-11-30",
+        "endDate": "2026-03-04",
+        "renewal": {
+          "autoRenew": true,
+          "renewalPeriodMonths": 12,
+          "renewalNoticeDays": 30
+        },
+        "financials": {
+          "amount": null,
+          "currency": null,
+          "billingFrequency": null
+        },
+        "scope": {
+          "services": [],
+          "notes": null
+        },
+        "attachments": [],
+        "contacts": {
+          "orgSignatory": {
+            "name": null,
+            "email": null,
+            "phone": null
+          },
+          "ourSignatory": {
+            "name": null,
+            "email": null,
+            "phone": null
+          }
+        },
+        "audit": {}
+      }
+    ],
+    "domain": {
+      "primaryDomain": null,
+      "allowedDomains": [],
+      "autoJoinEnabled": false,
+      "ssoEnabled": false
+    },
+    "identity": {
+      "legalName": "Website",
+      "displayName": "Mohammad",
+      "type": "Inc.",
+      "registrationNo": "123456789.",
+      "taxId": "123456789.",
+      "website": "localhost",
+      "logoUrl": null,
+      "industry": "Engineering",
+      "size": "1000"
+    },
+    "notes": null,
+    "people": {
+      "ownerUserId": null,
+      "admins": [],
+      "membersCount": 0
+    },
+    "settings": {
+      "defaultAccessLevel": 0,
+      "allowSelfRegistration": false,
+      "requireAdminApprovalForImport": false,
+      "dataRetentionDays": null
+    },
+    "tags": []
+  },
+  {
+    "id": "486219",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2025-12-06T03:38:03.416Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2025-12-06T03:38:03.416Z"
+    },
+    "billing": {
+      "plan": "paid",
+      "status": "active",
+      "currency": "IRR",
+      "seatsLimit": 15,
+      "seatsUsed": 0,
+      "billingEmail": null,
+      "billingCycle": null,
+      "nextInvoiceDate": null
+    },
+    "contact": {
+      "email": "info@kalmmelal.ir",
+      "phone": "22703811",
+      "phoneAlt": null,
+      "fax": null,
+      "address": {
+        "line1": "No 42 HosseinZadeh Alley",
+        "line2": "Mehr St Jey St",
+        "city": "Esfahan",
+        "provinceState": "Esfahan",
+        "postalCode": "8199649866",
+        "country": "Iran"
+      }
+    },
+    "contracts": [
+      {
+        "id": "C-7NQ2KL4",
+        "title": "",
+        "type": "subscription",
+        "status": "draft",
+        "startDate": "",
+        "endDate": null,
+        "renewal": {
+          "autoRenew": true,
+          "renewalPeriodMonths": 12,
+          "renewalNoticeDays": 30
+        },
+        "financials": {
+          "amount": null,
+          "currency": null,
+          "billingFrequency": null
+        },
+        "scope": {
+          "services": [],
+          "notes": null
+        },
+        "attachments": [],
+        "contacts": {
+          "orgSignatory": {
+            "name": null,
+            "email": null,
+            "phone": null
+          },
+          "ourSignatory": {
+            "name": null,
+            "email": null,
+            "phone": null
+          }
+        },
+        "audit": {}
+      }
+    ],
+    "domain": {
+      "primaryDomain": null,
+      "allowedDomains": [],
+      "autoJoinEnabled": false,
+      "ssoEnabled": false
+    },
+    "identity": {
+      "legalName": "Kalam Melal Language Institute",
+      "displayName": "Kalam-Melal",
+      "type": "Institute",
+      "registrationNo": "12254",
+      "taxId": "112125444545",
+      "website": "www.kalammelal.ir",
+      "logoUrl": null,
+      "industry": null,
+      "size": null
+    },
+    "notes": null,
+    "people": {
+      "ownerUserId": null,
+      "admins": [],
+      "membersCount": 0
+    },
+    "settings": {
+      "defaultAccessLevel": 0,
+      "allowSelfRegistration": false,
+      "requireAdminApprovalForImport": false,
+      "dataRetentionDays": null
+    },
+    "tags": []
+  },
+  {
+    "id": "900000",
+    "active": true,
+    "audit": {
+      "createUser": "1",
+      "createDateTime": "2025-11-21T16:34:50.278Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-01-31T07:27:07.958Z"
+    },
+    "billing": {
+      "plan": "paid",
+      "status": "active",
+      "currency": "USD",
+      "seatsLimit": null,
+      "seatsUsed": 0,
+      "billingEmail": null,
+      "billingCycle": null,
+      "nextInvoiceDate": null
+    },
+    "contact": {
+      "email": null,
+      "phone": null,
+      "phoneAlt": null,
+      "fax": null,
+      "address": {
+        "line1": null,
+        "line2": null,
+        "city": null,
+        "provinceState": null,
+        "postalCode": null,
+        "country": null
+      }
+    },
+    "contracts": [
+      {
+        "id": "C-KCHCYO6",
+        "title": "",
+        "type": "subscription",
+        "status": "active",
+        "startDate": "2025-01-01",
+        "endDate": "2026-01-21",
+        "renewal": {
+          "autoRenew": true,
+          "renewalPeriodMonths": 12,
+          "renewalNoticeDays": 30
+        },
+        "financials": {
+          "amount": null,
+          "currency": null,
+          "billingFrequency": null
+        },
+        "scope": {
+          "services": [],
+          "notes": null
+        },
+        "attachments": [],
+        "contacts": {
+          "orgSignatory": {
+            "name": null,
+            "email": null,
+            "phone": null
+          },
+          "ourSignatory": {
+            "name": null,
+            "email": null,
+            "phone": null
+          }
+        },
+        "audit": {
+          "createUser": 1,
+          "createDateTime": "2025-11-21T16:34:50.278Z",
+          "lastUpdateUser": 1,
+          "lastUpdateDateTime": "2025-11-21T16:34:50.278Z"
+        }
+      }
+    ],
+    "domain": {
+      "primaryDomain": null,
+      "allowedDomains": [],
+      "autoJoinEnabled": false,
+      "ssoEnabled": false
+    },
+    "identity": {
+      "legalName": "Website",
+      "displayName": "Amin Paknejad",
+      "type": "Inc.",
+      "registrationNo": "123456789.",
+      "taxId": "123456789.",
+      "website": "localhost",
+      "logoUrl": null,
+      "industry": "Engineering",
+      "size": "1000"
+    },
+    "notes": null,
+    "people": {
+      "ownerUserId": null,
+      "admins": [],
+      "membersCount": 0
+    },
+    "settings": {
+      "defaultAccessLevel": 0,
+      "allowSelfRegistration": false,
+      "requireAdminApprovalForImport": false,
+      "dataRetentionDays": null
+    },
+    "tags": []
+  }
+]

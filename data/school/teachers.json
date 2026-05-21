@@ -1,0 +1,170 @@
+[
+  {
+    "id": "TCH26298",
+    "audit": {
+      "createDateTime": "2026-03-12T22:20:51.910Z",
+      "lastUpdateDateTime": "2026-03-12T22:20:51.919Z"
+    },
+    "certification": "",
+    "compensationProfiles": [
+      {
+        "id": "CMP_1773354023420_53",
+        "departmentId": "DEP_1771788678638",
+        "paymentMethod": "hourly",
+        "hourlyRate": 36,
+        "paymentAmount": 0,
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2026-11-30",
+        "contractId": "2026332654",
+        "notes": ""
+      }
+    ],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788678638",
+    "employeeNumber": "123456789",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-01-01",
+    "instructionalMode": "Hybrid",
+    "maxWeeklyHours": "",
+    "notes": "",
+    "orgId": "900000",
+    "personId": "560378",
+    "specialization": "",
+    "status": "Active",
+    "teacherAccountId": "ACC_1773354051916_829",
+    "teachingFocus": ""
+  },
+  {
+    "id": "TCH26663",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.583Z",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.585Z"
+    },
+    "certification": "TESL Alberta",
+    "compensationProfiles": [],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788798860",
+    "employeeNumber": "SMP-TCH-3",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "instructionalMode": "In-person",
+    "maxWeeklyHours": 35,
+    "notes": "Generated sample teacher.",
+    "orgId": "900000",
+    "personId": "201955",
+    "specialization": "Business English",
+    "status": "Active",
+    "teacherAccountId": "ACC_1772254486584_635",
+    "teachingFocus": "Generated sample teacher profile"
+  },
+  {
+    "id": "TCH49223",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.588Z",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.590Z"
+    },
+    "certification": "TESL Alberta",
+    "compensationProfiles": [],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788828384",
+    "employeeNumber": "SMP-TCH-4",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "instructionalMode": "Online",
+    "maxWeeklyHours": 35,
+    "notes": "Generated sample teacher.",
+    "orgId": "900000",
+    "personId": "467108",
+    "specialization": "Adult Literacy",
+    "status": "Active",
+    "teacherAccountId": "ACC_1772254486589_294",
+    "teachingFocus": "Generated sample teacher profile"
+  },
+  {
+    "id": "TCH58304",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.578Z",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.581Z"
+    },
+    "certification": "TESL Alberta",
+    "compensationProfiles": [],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788762810",
+    "employeeNumber": "SMP-TCH-2",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "instructionalMode": "In-person",
+    "maxWeeklyHours": 35,
+    "notes": "Generated sample teacher.",
+    "orgId": "900000",
+    "personId": "316271",
+    "specialization": "IELTS Preparation",
+    "status": "Active",
+    "teacherAccountId": "ACC_1772254486579_591",
+    "teachingFocus": "Generated sample teacher profile"
+  },
+  {
+    "id": "TCH68960",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.573Z",
+      "lastUpdateDateTime": "2026-03-10T20:35:29.206Z"
+    },
+    "certification": "TESL Alberta",
+    "compensationProfiles": [
+      {
+        "id": "CMP_1773174896637_456",
+        "departmentId": "DEP_1771788678638",
+        "paymentMethod": "hourly",
+        "hourlyRate": 36,
+        "paymentAmount": 0,
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2026-12-31",
+        "contractId": "33265101",
+        "notes": ""
+      }
+    ],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788678638",
+    "employeeNumber": "SMP-TCH-1",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "instructionalMode": "Online",
+    "maxWeeklyHours": 35,
+    "notes": "Generated sample teacher.",
+    "orgId": "900000",
+    "personId": "153279",
+    "specialization": "Academic English",
+    "status": "Active",
+    "teacherAccountId": "ACC_1772254486574_498",
+    "teachingFocus": "Generated sample teacher profile"
+  },
+  {
+    "id": "TCH82311",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.592Z",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.595Z"
+    },
+    "certification": "TESL Alberta",
+    "compensationProfiles": [],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788678638",
+    "employeeNumber": "SMP-TCH-5",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "instructionalMode": "In-person",
+    "maxWeeklyHours": 35,
+    "notes": "Generated sample teacher.",
+    "orgId": "900000",
+    "personId": "438186",
+    "specialization": "Settlement Language",
+    "status": "Active",
+    "teacherAccountId": "ACC_1772254486594_584",
+    "teachingFocus": "Generated sample teacher profile"
+  }
+]

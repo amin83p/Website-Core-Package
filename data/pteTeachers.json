@@ -1,0 +1,27 @@
+[
+  {
+    "orgId": "900000",
+    "personId": "760360",
+    "userId": "816147",
+    "teacherId": "",
+    "notes": "",
+    "courses": [],
+    "status": "active",
+    "personRoleToken": "PTE_Teacher",
+    "creator": {
+      "type": "user",
+      "displayName": "Amin",
+      "userId": "ROOT_001",
+      "username": "Amin",
+      "email": "root@system.in",
+      "orgId": "900000"
+    },
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-24T21:00:28.204Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-24T21:00:28.204Z"
+    },
+    "id": "PTETCH2026042499810"
+  }
+]

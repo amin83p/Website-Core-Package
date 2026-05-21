@@ -1,0 +1,234 @@
+<section class="sections-page">
+  <div class="dash-hero mb-5 p-5 text-center text-md-start">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <h1 class="display-6 fw-bold mb-2 text-primary">
+          <i class="bi bi-envelope-slash me-2"></i>
+          Unsubscribe
+        </h1>
+        <p class="lead text-muted mb-0" style="font-size: 1.1rem;">
+          Enter your email to unsubscribe from the newsletter.
+        </p>
+      </div>
+      <div class="col-md-4 d-none d-md-block text-center opacity-75">
+        <i class="bi bi-shield-lock-fill text-primary" style="font-size: 7rem;"></i>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 720px;">
+    <form id="unsubscribeForm" class="row g-3">
+    <div class="col-12">
+    <div id="unsubscribeStatus" class="form-message" role="status" aria-live="polite" hidden>
+        <div class="form-message__icon" aria-hidden="true"></div>
+        <div class="form-message__body">
+        <div class="form-message__title"></div>
+        <div class="form-message__text"></div>
+        </div>
+        <button type="button" class="form-message__close btn btn-sm btn-filled btn-secondary" aria-label="Close">
+        <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-control size-md" id="email" name="email" type="email" value="<%=email %>" required placeholder="name@example.com">
+      </div>
+
+      <div class="col-12 d-flex gap-2 justify-content-end flex-wrap mt-2">
+        <a href="<%= homeUrl %>" class="btn btn-secondary btn-filled btn-md">
+          <i class="bi bi-house me-2"></i>
+          Back to home
+        </a>
+
+        <button id="unsubscribeBtn" type="submit" class="btn btn-danger btn-filled btn-md">
+          <i class="bi bi-trash3 me-2"></i>
+          Unsubscribe
+        </button>
+      </div>
+    </form>
+  </div>
+<style>
+    .form-message {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 14px;
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-sm);
+  background: #fff;
+}
+
+.form-message[hidden] { display: none !important; }
+
+.form-message__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(0,0,0,0.03);
+  font-size: 1.1rem;
+}
+
+.form-message__body { min-width: 0; flex: 1 1 auto; }
+
+.form-message__title {
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.form-message__text {
+  margin-top: 4px;
+  color: var(--color-text);
+  opacity: 0.9;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.form-message__close {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+/* Variants */
+.form-message.is-success {
+  background: rgba(40, 167, 69, 0.08);
+  border-color: rgba(40, 167, 69, 0.18);
+}
+
+.form-message.is-success .form-message__icon {
+  background: rgba(40, 167, 69, 0.12);
+  border-color: rgba(40, 167, 69, 0.22);
+  color: #16a34a;
+}
+
+.form-message.is-success .form-message__icon::before {
+  content: "✓";
+  font-weight: 900;
+}
+
+.form-message.is-error {
+  background: rgba(220, 53, 69, 0.08);
+  border-color: rgba(220, 53, 69, 0.18);
+}
+
+.form-message.is-error .form-message__icon {
+  background: rgba(220, 53, 69, 0.12);
+  border-color: rgba(220, 53, 69, 0.22);
+  color: #dc2626;
+}
+
+.form-message.is-error .form-message__icon::before {
+  content: "!";
+  font-weight: 900;
+}
+</style>
+
+<script>
+  (function () {
+    const form = document.getElementById('unsubscribeForm');
+    const btn = document.getElementById('unsubscribeBtn');
+    const statusEl = document.getElementById('unsubscribeStatus');
+
+    if (!form) return;
+
+    function hideInlineMessage() {
+      if (!statusEl) return;
+      statusEl.hidden = true;
+    }
+
+    function showInlineMessage(type, title, text) {
+      if (!statusEl) return;
+
+      statusEl.classList.remove('is-success', 'is-error');
+      if (type === 'success') statusEl.classList.add('is-success');
+      if (type === 'error') statusEl.classList.add('is-error');
+
+      const titleEl = statusEl.querySelector('.form-message__title');
+      const textEl = statusEl.querySelector('.form-message__text');
+
+      if (titleEl) titleEl.textContent = title || '';
+      if (textEl) textEl.textContent = text || '';
+
+      statusEl.hidden = false;
+    }
+
+    // Bind close button once
+    statusEl?.querySelector('.form-message__close')?.addEventListener('click', hideInlineMessage);
+
+    function setStatus(type, msg) {
+      if (!type) return hideInlineMessage();
+
+      const title = type === 'success' ? 'Done' : 'Action failed';
+      showInlineMessage(type, title, msg);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      setStatus('', '');
+
+      const email = (document.getElementById('email')?.value || '').trim();
+      if (!email) {
+        setStatus('error', 'Please enter your email.');
+        return;
+      }
+
+      const original = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Processing...`;
+      }
+
+      try {
+        const res = await fetch('/newsletter/api/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-ajax-request': '1' },
+          body: JSON.stringify({ email, meta: { page: window.location.pathname } })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Unsubscribe failed.');
+
+        const msg = data.message || 'If this email exists in our system, it has been unsubscribed.';
+
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Newsletter',
+            icon: 'success',
+            message: msg,
+            buttons: [{ text: 'OK', class: 'btn-success' }]
+          });
+          form.reset();
+        } else {
+          setStatus('success', msg);
+          form.reset();
+        }
+      } catch (err) {
+        const msg = err?.message || 'Unsubscribe failed.';
+
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Newsletter',
+            icon: 'error',
+            message: msg,
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          setStatus('error', msg);
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = original;
+        }
+      }
+    });
+  })();
+</script>

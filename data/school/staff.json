@@ -1,0 +1,112 @@
+[
+  {
+    "id": "STF11459",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.617Z",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.619Z"
+    },
+    "compensationProfiles": [],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788678638",
+    "employeeNumber": "SMP-STF-5",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "jobTitle": "Finance Clerk",
+    "notes": "Generated sample staff.",
+    "orgId": "900000",
+    "personId": "704169",
+    "responsibilities": "Generated sample staff responsibilities.",
+    "staffAccountId": "ACC_1772254486618_920",
+    "status": "Active",
+    "workLocation": "Main Campus"
+  },
+  {
+    "id": "STF13273",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.612Z",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.614Z"
+    },
+    "compensationProfiles": [],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788828384",
+    "employeeNumber": "SMP-STF-4",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "jobTitle": "Operations Assistant",
+    "notes": "Generated sample staff.",
+    "orgId": "900000",
+    "personId": "736401",
+    "responsibilities": "Generated sample staff responsibilities.",
+    "staffAccountId": "ACC_1772254486613_765",
+    "status": "Active",
+    "workLocation": "Main Campus"
+  },
+  {
+    "id": "STF14262",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.602Z",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.604Z"
+    },
+    "compensationProfiles": [],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788762810",
+    "employeeNumber": "SMP-STF-2",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "jobTitle": "Student Services Officer",
+    "notes": "Generated sample staff.",
+    "orgId": "900000",
+    "personId": "440393",
+    "responsibilities": "Generated sample staff responsibilities.",
+    "staffAccountId": "ACC_1772254486603_467",
+    "status": "Active",
+    "workLocation": "Main Campus"
+  },
+  {
+    "id": "STF31285",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.597Z",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.600Z"
+    },
+    "compensationProfiles": [],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788678638",
+    "employeeNumber": "SMP-STF-1",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "jobTitle": "Admissions Coordinator",
+    "notes": "Generated sample staff.",
+    "orgId": "900000",
+    "personId": "827818",
+    "responsibilities": "Generated sample staff responsibilities.",
+    "staffAccountId": "ACC_1772254486599_455",
+    "status": "Active",
+    "workLocation": "Main Campus"
+  },
+  {
+    "id": "STF43890",
+    "audit": {
+      "createDateTime": "2026-02-28T04:54:46.607Z",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.609Z"
+    },
+    "compensationProfiles": [],
+    "contractEndDate": "",
+    "defaultPayRateId": "",
+    "departmentId": "DEP_1771788798860",
+    "employeeNumber": "SMP-STF-3",
+    "employmentType": "Full-Time",
+    "hireDate": "2026-02-28",
+    "jobTitle": "Registrar Assistant",
+    "notes": "Generated sample staff.",
+    "orgId": "900000",
+    "personId": "476689",
+    "responsibilities": "Generated sample staff responsibilities.",
+    "staffAccountId": "ACC_1772254486608_699",
+    "status": "Active",
+    "workLocation": "Main Campus"
+  }
+]

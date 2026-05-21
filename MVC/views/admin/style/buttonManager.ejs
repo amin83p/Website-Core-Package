@@ -1,0 +1,274 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="page-heading size-md m-0">Button Studio</h2>
+        <p class="text-muted mb-0">Create custom buttons or override system defaults.</p>
+    </div>
+    <a href="/styles" class="btn btn-outline-secondary btn-sm">Back to Theme Editor</a>
+  </div>
+
+  <div class="row g-4">
+      
+      <div class="col-lg-4">
+          <div class="card border-0 shadow-lg sticky-top" style="top: 20px; z-index: 100;">
+              <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+                  <span id="editorTitle">Button Editor</span>
+                  <button type="button" class="btn btn-sm btn-outline-light py-0" onclick="resetForm()">
+                    <i class="bi bi-plus-lg"></i> New
+                  </button>
+              </div>
+              <div class="card-body bg-light">
+                  
+                  <div class="text-center p-4 bg-white rounded border border-dashed mb-4 d-flex flex-column align-items-center justify-content-center" style="min-height: 140px;">
+                      <label class="small text-muted text-uppercase fw-bold mb-3">Live Preview</label>
+                      <button id="livePreviewBtn" class="btn px-4 py-2">Preview Button</button>
+                  </div>
+
+                  <form id="btnForm" action="/styles/buttons/save" method="POST">
+                      <input type="hidden" id="oldName" name="oldName" value="">
+
+                      <div class="mb-3">
+                          <label class="form-label small fw-bold text-muted">Class Name</label>
+                          <div class="input-group">
+                              <span class="input-group-text bg-white text-muted border-end-0">.</span>
+                              <input type="text" name="name" id="btnName" class="form-control fw-bold border-start-0 ps-0" placeholder="btn-custom" required oninput="updatePreview()">
+                          </div>
+                      </div>
+
+                      <div class="row g-2 mb-3">
+                          <div class="col-6">
+                              <label class="form-label small fw-bold text-muted">Background</label>
+                              <div class="input-group input-group-sm">
+                                <input type="color" name="bg" id="btnBg" class="form-control form-control-color w-100" value="#0d6efd" oninput="updatePreview()">
+                              </div>
+                          </div>
+                          <div class="col-6">
+                              <label class="form-label small fw-bold text-muted">Text Color</label>
+                              <div class="input-group input-group-sm">
+                                <input type="color" name="color" id="btnColor" class="form-control form-control-color w-100" value="#ffffff" oninput="updatePreview()">
+                              </div>
+                          </div>
+                      </div>
+
+                      <div class="mb-3">
+                          <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                              <span>Corner Radius</span>
+                              <span id="radiusVal" class="text-primary">4px</span>
+                          </label>
+                          <input type="range" name="radius" id="btnRadius" class="form-range" min="0" max="50" value="4" oninput="updatePreview()">
+                      </div>
+
+                      <div class="mb-4">
+                          <label class="form-label small fw-bold text-muted">Hover Effect</label>
+                          <select name="hover" id="btnHover" class="form-select form-select-sm" onchange="updatePreview()">
+                              <option value="translateY(-3px)">Lift Up (Standard)</option>
+                              <option value="translateY(2px)">Press Down</option>
+                              <option value="scale(1.05)">Scale Up</option>
+                              <option value="none">None</option>
+                          </select>
+                      </div>
+
+                      <div class="d-grid gap-2">
+                          <button type="submit" class="btn btn-primary btn-filled">
+                              <i class="bi bi-check-lg me-2"></i> Save / Override
+                          </button>
+                          <button type="button" id="deleteBtn" class="btn btn-outline-danger d-none" onclick="triggerDelete()">
+                              <i class="bi bi-trash me-2"></i> <span id="deleteText">Delete</span>
+                          </button>
+                      </div>
+                  </form>
+
+              </div>
+          </div>
+      </div>
+
+      <div class="col-lg-8">
+          <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white border-bottom-0 pt-3">
+                  <ul class="nav nav-tabs card-header-tabs" id="libraryTabs" role="tablist">
+                      <li class="nav-item">
+                          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-custom" type="button">
+                              Custom & Overrides <span class="badge bg-primary rounded-pill ms-2"><%= customButtons.length %></span>
+                          </button>
+                      </li>
+                      <li class="nav-item">
+                          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-system" type="button">
+                              System Defaults <span class="badge bg-light text-dark border ms-2"><%= systemButtons.length %></span>
+                          </button>
+                      </li>
+                  </ul>
+              </div>
+              
+              <div class="card-body bg-light p-4">
+                  <div class="tab-content">
+                      
+                      <div class="tab-pane fade show active" id="tab-custom">
+                          <% if (customButtons.length === 0) { %>
+                              <div class="text-center py-5 text-muted">
+                                  <i class="bi bi-box-seam fs-1 opacity-25"></i>
+                                  <p class="mt-2">No custom buttons yet.</p>
+                              </div>
+                          <% } else { %>
+                              <div class="row g-3">
+                                  <% customButtons.forEach(btn => { %>
+                                      <div class="col-md-6 col-xl-4">
+                                          <%- include('partials/_buttonCard', { btn: btn, type: 'custom' }) %>
+                                      </div>
+                                  <% }) %>
+                              </div>
+                          <% } %>
+                      </div>
+
+                      <div class="tab-pane fade" id="tab-system">
+                          <div class="alert alert-info border-0 mb-4 d-flex align-items-center">
+                              <i class="bi bi-info-circle-fill me-3 fs-4"></i>
+                              <div class="small">
+                                  <strong>System Buttons</strong> are detected from your <code>main.css</code>. 
+                                  Editing them creates an <strong>Override</strong>. 
+                                  If you delete an override, the original system style is restored.
+                              </div>
+                          </div>
+                          <div class="row g-3">
+                              <% systemButtons.forEach(btn => { %>
+                                  <div class="col-md-6 col-xl-4">
+                                      <div class="card h-100 border shadow-sm btn-card position-relative">
+                                          <div class="card-body text-center py-4">
+                                              <button class="<%= btn.name %> system-btn-ref d-none">REF</button>
+                                              
+                                              <button class="<%= btn.name %> mb-3 px-3 py-2 pointer-events-none">
+                                                  <%= btn.name %>
+                                              </button>
+                                              
+                                              <div class="bg-light rounded px-2 py-1 border d-flex align-items-center justify-content-center gap-2">
+                                                  <code class="small text-dark">.<%= btn.name %></code>
+                                              </div>
+                                          </div>
+                                          <div class="card-footer bg-white border-top-0 text-center py-2">
+                                              <button class="btn btn-sm btn-link text-decoration-none text-primary w-100" 
+                                                      onclick="loadSystemButton('<%= btn.name %>')">
+                                                  Override / Customize
+                                              </button>
+                                          </div>
+                                      </div>
+                                  </div>
+                              <% }) %>
+                          </div>
+                      </div>
+
+                  </div>
+              </div>
+          </div>
+      </div>
+
+  </div>
+</div>
+
+<script>
+    // --- RGB to HEX Helper ---
+    function rgbToHex(rgb) {
+        if(!rgb || rgb === 'rgba(0, 0, 0, 0)') return '#000000';
+        if(rgb.startsWith('#')) return rgb;
+        const [r, g, b] = rgb.match(/\d+/g);
+        return "#" + ((1 << 24) + (+r << 16) + (+g << 8) + +b).toString(16).slice(1);
+    }
+
+    const previewBtn = document.getElementById('livePreviewBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const deleteText = document.getElementById('deleteText');
+    
+    const inputs = {
+        name: document.getElementById('btnName'),
+        bg: document.getElementById('btnBg'),
+        color: document.getElementById('btnColor'),
+        radius: document.getElementById('btnRadius'),
+        hover: document.getElementById('btnHover'),
+        oldName: document.getElementById('oldName')
+    };
+
+    function updatePreview() {
+        const bg = inputs.bg.value;
+        const color = inputs.color.value;
+        const radius = inputs.radius.value;
+        
+        previewBtn.style.backgroundColor = bg;
+        previewBtn.style.color = color;
+        previewBtn.style.borderRadius = radius + 'px';
+        previewBtn.textContent = inputs.name.value || 'Preview';
+        
+        document.getElementById('radiusVal').textContent = radius + 'px';
+    }
+
+    function loadButton(btnData) {
+        document.getElementById('editorTitle').textContent = 'Edit Custom Button';
+        inputs.oldName.value = btnData.name;
+        inputs.name.value = btnData.name;
+        inputs.name.readOnly = false;
+        
+        inputs.bg.value = btnData.bg.startsWith('#') ? btnData.bg : rgbToHex(btnData.bg);
+        inputs.color.value = btnData.color.startsWith('#') ? btnData.color : rgbToHex(btnData.color);
+        inputs.radius.value = btnData.radius;
+        inputs.hover.value = btnData.hover;
+        
+        deleteBtn.classList.remove('d-none');
+        deleteText.textContent = "Delete Button";
+        updatePreview();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Load a System Button by reading its computed style from the hidden element
+    function loadSystemButton(className) {
+        const hiddenEl = document.querySelector(`button.${className}.system-btn-ref`);
+        if(!hiddenEl) return;
+
+        const style = window.getComputedStyle(hiddenEl);
+        
+        document.getElementById('editorTitle').textContent = 'Override System Button';
+        inputs.oldName.value = className;
+        inputs.name.value = className;
+        inputs.name.readOnly = true; // Cannot rename system overrides
+        
+        inputs.bg.value = rgbToHex(style.backgroundColor);
+        inputs.color.value = rgbToHex(style.color);
+        inputs.radius.value = parseInt(style.borderRadius) || 4;
+        
+        // Default hover for system override if unknown
+        inputs.hover.value = 'translateY(-3px)'; 
+
+        deleteBtn.classList.add('d-none'); // Cannot delete, only save override
+        updatePreview();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+        document.getElementById('editorTitle').textContent = 'Create Button';
+        document.getElementById('btnForm').reset();
+        inputs.name.readOnly = false;
+        inputs.oldName.value = '';
+        deleteBtn.classList.add('d-none');
+        updatePreview();
+    }
+
+    document.getElementById('btnForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            const fd = new FormData(e.target);
+            const data = Object.fromEntries(fd.entries());
+            const res = await fetch(e.target.action, { method: 'POST', headers: {'Content-Type':'application/json','X-AJAX-Request':'true'}, body: JSON.stringify(data)});
+            const result = await res.json();
+            if(result.status === 'success') window.location.reload();
+            else alert(result.message);
+        } catch(err) { alert('Error saving.'); }
+    });
+
+    async function triggerDelete() {
+        const name = inputs.oldName.value;
+        if(!confirm(`Delete .${name}?`)) return;
+        try {
+            const res = await fetch('/styles/buttons/delete', { method: 'POST', headers: {'Content-Type':'application/json','X-AJAX-Request':'true'}, body: JSON.stringify({ name })});
+            window.location.reload();
+        } catch(err) { alert('Error deleting.'); }
+    }
+
+    updatePreview();
+</script>

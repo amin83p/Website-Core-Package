@@ -1,0 +1,837 @@
+<%
+  const a = accessItem || {};
+  const isEdit = !!a.id;
+  const configuredSections = a.sections || [];
+  const valid = a.validity || {};
+  
+  const canSelectOrg = (user && user.accessLevel >= 10);
+  let currentOrgId = a.orgId;
+  let currentOrgName = 'Global / System';
+  if (!canSelectOrg && !currentOrgId) {
+      currentOrgId = user.primaryOrgId || user.activeOrgId;
+  }
+
+  if (currentOrgId) {
+      let orgObj = (typeof organizations !== 'undefined' ? organizations : []).find(o => String(o.id) === String(currentOrgId));
+      if (!orgObj && user.allowedOrgs) {
+          orgObj = user.allowedOrgs.find(o => String(o.orgId) === String(currentOrgId));
+      }
+      if (orgObj) {
+          currentOrgName = orgObj.identity?.displayName || orgObj.name || ('Org #' + currentOrgId);
+      } else {
+          currentOrgName = 'Org #' + currentOrgId;
+      }
+  }
+
+  const isFullAdmin = a.fullAdmin === true;
+  // ✅ Extract saved categories
+  const currentCategories = a.adminCategories || [];
+  const cats = typeof validCategories !== 'undefined' ? validCategories : ['GENERAL'];
+%>
+
+<div class="sections-page">
+  <%- include('../partials/formPage_PageTitle', {
+    isEditMode: isEdit,
+    name: 'Access Profile',
+    id: a?.id || 0
+  }) %>
+  
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="accessForm" action="<%= isEdit ? '/accesses/edit/' + a.id : '/accesses/new' %>" method="POST">
+      
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      <input type="hidden" id="sectionsHidden" name="sections">
+
+      <script type="application/json" id="initConfiguredSections"><%- JSON.stringify(configuredSections) %></script>
+      <script type="application/json" id="initSystemSections"><%- JSON.stringify(sections || []) %></script>
+      <script type="application/json" id="initSystemOperations"><%- JSON.stringify(operations || []) %></script>
+      <script type="application/json" id="initSystemScopes"><%- JSON.stringify(scopes || []) %></script>
+
+      <div class="card p-4 mb-4 bg-white border shadow-sm">
+        
+        <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">Profile Name</label>
+              <input type="text" id="nameInput" name="name" class="form-control size-md fw-bold" 
+                      value="<%= a.name || '' %>" placeholder="e.g. FINANCE_MANAGER" required>
+            </div>
+            
+            <div class="col-md-6">
+               <label class="form-label small fw-bold text-muted">Organization</label>
+               <div class="input-group">
+                   <input type="hidden" name="orgId" id="selectedOrgId" value="<%= currentOrgId || '' %>">
+                   <input type="text" id="selectedOrgName" class="form-control size-md bg-white text-dark" 
+                          value="<%= currentOrgName %>" readonly>
+                   <% if (canSelectOrg) { %>
+                       <button type="button" class="btn btn-outline-primary" id="openOrgPickerBtn" title="Select Organization">
+                            <i class="bi bi-search"></i>
+                       </button>
+                       <button type="button" class="btn btn-outline-secondary" id="clearOrgBtn" title="Reset to Global">
+                            <i class="bi bi-x-lg"></i>
+                       </button>
+                  <% } else { %>
+                       <button class="btn btn-light border" type="button" disabled>
+                           <i class="bi bi-lock-fill text-muted"></i>
+                       </button>
+                  <% } %>
+               </div>
+               <% if (!canSelectOrg) { %>
+                  <div class="form-text x-small text-muted">Locked to your active organization.</div>
+               <% } %>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label small fw-bold text-muted">Valid From</label>
+                <input type="date" name="startDate" class="form-control size-md" value="<%= valid.startDate || '' %>">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-bold text-muted">Valid Until</label>
+                <input type="date" name="endDate" class="form-control size-md" value="<%= valid.endDate || '' %>">
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <label class="form-label small fw-bold text-muted">Description</label>
+                <textarea name="description" class="form-control size-md" rows="3" placeholder="Describe the purpose of this access pool..."><%= a.description || '' %></textarea>
+            </div>
+        </div>
+
+        <div class="row border-top pt-3 mt-3">
+             <div class="col-md-12 d-flex align-items-center">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="activeCheck" name="active" <%= a.active !== false ? 'checked' : '' %>>
+                    <label class="form-check-label small fw-bold" for="activeCheck">Active Profile</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="row border-top pt-3 mt-3">
+             <div class="col-md-12">
+                 <div class="p-3 border border-danger bg-danger-subtle rounded position-relative">
+                    <span class="position-absolute top-0 start-0 translate-middle badge rounded-pill bg-danger border border-light shadow-sm" style="margin-left: 20px; margin-top: 5px;">High Privilege Zone</span>
+                    
+                    <div class="row">
+                        <div class="col-md-4 border-end border-danger-subtle">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input " type="checkbox" id="fullAdminCheck" name="fullAdmin" value="true" <%= isFullAdmin ? 'checked' : '' %>>
+                                <label class="form-check-label fw-bold text-danger" for="fullAdminCheck">FULL SYSTEM ADMIN</label>
+                            </div>
+                            <div class="form-text text-danger x-small mt-2">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                Grants unrestricted access to ALL sections and ALL categories. Overrides all other settings.
+                            </div>
+                        </div>
+
+                        <div class="col-md-8 ps-4">
+                            <label class="form-label fw-bold text-danger mb-2 small">Administrative Categories (Scoped Admin)</label>
+
+                            <!-- Category picker (server-driven) -->
+                            <div class="d-flex flex-wrap gap-2 align-items-start">
+                              <div style="min-width: 260px; max-width: 420px;" class="flex-grow-1">
+                                <select class="form-select form-select-sm" id="adminCategorySelect" <%= isFullAdmin ? 'disabled' : '' %>>
+                                  <option value="" selected disabled>Select a category…</option>
+                                  <% cats.forEach(cat => { %>
+                                    <option value="<%= cat %>"><%= cat %></option>
+                                  <% }) %>
+                                </select>
+                                <div class="form-text text-muted x-small mt-1">
+                                  Choose a category and click <b>Add</b>.
+                                </div>
+                              </div>
+
+                              <div>
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-filled" id="addAdminCategoryBtn" <%= isFullAdmin ? 'disabled' : '' %>>
+                                  <i class="bi bi-plus-lg me-1"></i> Add
+                                </button>
+                              </div>
+                            </div>
+
+                            <!-- Selected categories -->
+                            <div id="adminCategoryBadges" class="d-flex flex-wrap gap-2 mt-3"></div>
+
+                            <!-- Hidden inputs submitted to server -->
+                            <div id="adminCategoriesHidden" class="d-none">
+                              <% (currentCategories || []).forEach(cat => { %>
+                                <input type="hidden" name="adminCategories" value="<%= cat %>">
+                              <% }) %>
+                            </div>
+
+                            <div class="form-text text-muted x-small mt-2">
+                                Users will have <b>Admin Access</b> to all sections belonging to the selected categories.
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+      </div>
+
+      <div id="sectionsContainer" class="d-flex border rounded overflow-hidden shadow-sm bg-white" style="min-height: 600px;">
+         <div id="sidebar" class="bg-light d-flex flex-column border-end" style="width: 300px; min-width: 200px;">
+            <div class="p-3 border-bottom bg-white">
+                <label class="form-label fw-bold text-primary mb-2">Configured Sections</label>
+                <div class="d-grid mb-2">
+                   <button type="button" class="btn btn-outline-info btn-md btn-filled" id="copyProfileBtn" title="Load sections from another profile">
+                        <i class="bi bi-cloud-download me-2"></i> Copy From Profile
+                    </button>
+                </div>
+                <div class="d-grid mb-2">
+                   <button type="button" class="btn btn-primary btn-md btn-filled" id="addSectionBtn">
+                      <i class="bi bi-plus-lg me-2"></i> Add Section
+                   </button>
+                </div>
+                <div class="position-relative">
+                    <i class="bi bi-search position-absolute text-muted small" style="left: 10px; top: 8px;"></i>
+                    <input type="text" id="sectionSearch" class="form-control form-control-sm ps-4" placeholder="Filter list...">
+                </div>
+            </div>
+            <div class="flex-grow-1 overflow-auto" id="sectionsSidebarList" style="max-height: 600px;"></div>
+         </div>
+         
+         <div id="resizer" style="width: 5px; cursor: col-resize; background:#eee;"></div>
+
+         <div id="mainPanel" class="flex-grow-1 bg-white d-flex flex-column">
+            <div id="sectionDetailPanel" class="flex-grow-1 p-0 h-100">
+               <div class="h-100 d-flex flex-column align-items-center justify-content-center text-muted p-5">
+                  <i class="bi bi-layout-sidebar-inset fs-1 opacity-25 mb-2"></i>
+                  <div>Select a section from the list to configure permissions.</div>
+               </div>
+            </div>
+         </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md" id="btnSaveAction">Save Profile</button>
+        <a href="/accesses" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/accesses"> Cancel </a>
+      </div>
+  
+   </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+<%- include('../partials/adminVerificationModal') %>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const sidebar = document.getElementById("sidebar");
+      const resizer = document.getElementById("resizer");
+      const container = resizer.parentElement;
+      let isResizing = false;
+      resizer.addEventListener("mousedown", function(e) { isResizing = true; document.body.style.cursor = "col-resize"; });
+      document.addEventListener("mousemove", function(e) {
+        if (!isResizing) return;
+        const newWidth = e.clientX - container.offsetLeft;
+        if (newWidth > 200 && newWidth < 600) sidebar.style.width = newWidth + "px";
+      });
+      document.addEventListener("mouseup", function() { isResizing = false; document.body.style.cursor = "default"; });
+    });
+</script>
+    
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const accessFormEl = document.getElementById('accessForm');
+  const saveActionBtn = document.getElementById('btnSaveAction');
+  const cancelActionBtn = document.getElementById('btnCancelAction');
+  let isFormBusy = false;
+
+  function cacheButtonHtml(btn) {
+    if (!btn) return;
+    if (!btn.dataset.defaultHtml) btn.dataset.defaultHtml = btn.innerHTML;
+  }
+
+  function setButtonBusy(btn, label) {
+    if (!btn) return;
+    cacheButtonHtml(btn);
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>${label}`;
+  }
+
+  function restoreButton(btn) {
+    if (!btn) return;
+    if (btn.dataset.defaultHtml) btn.innerHTML = btn.dataset.defaultHtml;
+    btn.disabled = false;
+  }
+
+  function restoreFormActionButtons() {
+    isFormBusy = false;
+    restoreButton(saveActionBtn);
+    restoreButton(cancelActionBtn);
+  }
+
+  cacheButtonHtml(saveActionBtn);
+  cacheButtonHtml(cancelActionBtn);
+
+  if (cancelActionBtn) {
+    cancelActionBtn.addEventListener('click', () => {
+      if (isFormBusy) return;
+      isFormBusy = true;
+      setButtonBusy(cancelActionBtn, 'Cancelling...');
+      if (saveActionBtn) saveActionBtn.disabled = true;
+    });
+  }
+
+  const systemSections = JSON.parse(document.getElementById('initSystemSections').textContent || '[]');
+  const systemOps = JSON.parse(document.getElementById('initSystemOperations').textContent || '[]');
+  const systemScopes = JSON.parse(document.getElementById('initSystemScopes').textContent || '[]');
+  const scopeMap = new Map(systemScopes.map((scope) => [String(scope.id || ''), scope]));
+  let configured = JSON.parse(document.getElementById('initConfiguredSections').textContent || '[]');
+  let activeIndex = -1;
+
+  const nameInput = document.getElementById('nameInput');
+  if(nameInput) {
+    nameInput.addEventListener('input', (e) => {
+        let val = e.target.value.toUpperCase();
+        val = val.replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+        e.target.value = val;
+    });
+  }
+
+  // --- FULL ADMIN & CATEGORY LOGIC ---
+  const fullAdminCheck = document.getElementById('fullAdminCheck');
+  const sectionsContainer = document.getElementById('sectionsContainer');
+  const activeCheck = document.getElementById('activeCheck');
+  const startDateInput = document.querySelector('input[name="startDate"]');
+  const endDateInput = document.querySelector('input[name="endDate"]');
+
+  // Category UI elements (dropdown -> add -> pills -> hidden inputs)
+  const adminCategorySelect = document.getElementById('adminCategorySelect');
+  const addAdminCategoryBtn = document.getElementById('addAdminCategoryBtn');
+  const adminCategoryBadges = document.getElementById('adminCategoryBadges');
+  const adminCategoriesHidden = document.getElementById('adminCategoriesHidden');
+
+  const notify = async ({ title, message, icon = 'info' }) => {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({ title, message, icon, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      return;
+    }
+    alert(title + ': ' + (message || ''));
+  };
+
+  function summarizeScope(scopeId) {
+    const scope = scopeMap.get(String(scopeId || ''));
+    if (!scope) return 'Select a scope to define the record boundary for this operation.';
+    const definition = scope.definition || {};
+    const bindings = definition.bindings || {};
+    const options = definition.options || {};
+    const parts = [String(definition.mode || scope.name || '').toUpperCase()];
+    if (bindings.orgSource && bindings.orgSource !== 'none') parts.push('Org=' + bindings.orgSource);
+    if (bindings.departmentSource && bindings.departmentSource !== 'none') parts.push('Dept=' + bindings.departmentSource);
+    if (bindings.divisionSource && bindings.divisionSource !== 'none') parts.push('Division=' + bindings.divisionSource);
+    if (bindings.ownerSource && bindings.ownerSource !== 'none') parts.push('Owner=' + bindings.ownerSource);
+    if (bindings.userSource && bindings.userSource !== 'none') parts.push('User=' + bindings.userSource);
+    if (bindings.personSource && bindings.personSource !== 'none') parts.push('Person=' + bindings.personSource);
+    if (options.includeGlobal) parts.push('Includes Global');
+    if (options.treatDepartmentAsOrganization) parts.push('Dept=>Org');
+    if (options.treatDivisionAsOrganization) parts.push('Division=>Org');
+    return parts.join(' | ');
+  }
+
+  function updateScopeHint(selectEl) {
+    const row = selectEl ? selectEl.closest('tr') : null;
+    const hint = row ? row.querySelector('.scope-hint') : null;
+    if (hint) hint.textContent = summarizeScope(selectEl.value);
+  }
+
+  function readSelectedCategories() {
+    const inputs = adminCategoriesHidden ? Array.from(adminCategoriesHidden.querySelectorAll('input[name="adminCategories"]')) : [];
+    const vals = inputs.map(i => (i.value || '').toString().trim()).filter(Boolean);
+    // de-dupe while preserving order
+    const seen = new Set();
+    const out = [];
+    for (const v of vals) {
+      if (!seen.has(v)) { seen.add(v); out.push(v); }
+    }
+    return out;
+  }
+
+  function writeSelectedCategories(categories) {
+    if (!adminCategoriesHidden || !adminCategoryBadges) return;
+    adminCategoriesHidden.innerHTML = '';
+    categories.forEach(cat => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden';
+      inp.name = 'adminCategories';
+      inp.value = cat;
+      adminCategoriesHidden.appendChild(inp);
+    });
+
+    adminCategoryBadges.innerHTML = '';
+    if (categories.length === 0) {
+      adminCategoryBadges.innerHTML = '<div class="text-muted x-small">No scoped admin categories selected.</div>';
+      return;
+    }
+    categories.forEach(cat => {
+      const badge = document.createElement('span');
+      badge.className = 'badge rounded-pill bg-white text-danger border border-danger-subtle shadow-sm d-inline-flex align-items-center gap-2 py-2 px-3';
+      badge.style.fontWeight = '600';
+      badge.innerHTML = `
+        <span>${cat}</span>
+        <button type="button" class="btn btn-sm p-0 border-0 text-danger" aria-label="Remove ${cat}" title="Remove">
+          <i class="bi bi-x-circle-fill"></i>
+        </button>
+      `;
+      badge.querySelector('button').addEventListener('click', () => {
+        const next = readSelectedCategories().filter(x => x !== cat);
+        writeSelectedCategories(next);
+      });
+      adminCategoryBadges.appendChild(badge);
+    });
+  }
+
+  function updateAdminState() {
+    const isFullAdmin = !!(fullAdminCheck && fullAdminCheck.checked);
+
+    // Disable/enable category controls
+    if (adminCategorySelect) adminCategorySelect.disabled = isFullAdmin;
+    if (addAdminCategoryBtn) addAdminCategoryBtn.disabled = isFullAdmin;
+
+    if (isFullAdmin) {
+      // Clear scoped categories when FULL ADMIN is enabled (not needed and avoids confusion)
+      writeSelectedCategories([]);
+
+      // Disable Manual Section Config
+      if (sectionsContainer) {
+        sectionsContainer.style.opacity = '0.4';
+        sectionsContainer.style.pointerEvents = 'none';
+        sectionsContainer.style.filter = 'grayscale(100%)';
+      }
+
+      // Force Immunity
+      if (activeCheck) { activeCheck.checked = true; activeCheck.disabled = true; }
+      if (startDateInput) { startDateInput.value = ''; startDateInput.disabled = true; }
+      if (endDateInput) { endDateInput.value = ''; endDateInput.disabled = true; }
+    } else {
+      // Enable Manual Section Config
+      if (sectionsContainer) {
+        sectionsContainer.style.opacity = '1';
+        sectionsContainer.style.pointerEvents = 'auto';
+        sectionsContainer.style.filter = 'none';
+      }
+
+      if (activeCheck) activeCheck.disabled = false;
+      if (startDateInput) startDateInput.disabled = false;
+      if (endDateInput) endDateInput.disabled = false;
+    }
+  }
+
+  // Init badges from server-provided currentCategories (rendered as hidden inputs)
+  writeSelectedCategories(readSelectedCategories());
+
+  if (addAdminCategoryBtn) {
+    addAdminCategoryBtn.addEventListener('click', async () => {
+      if (!adminCategorySelect || !adminCategorySelect.value) {
+        await notify({ title: 'Select a Category', message: 'Please select a category to add.', icon: 'warning' });
+        return;
+      }
+      const cat = adminCategorySelect.value;
+      const current = readSelectedCategories();
+      if (current.includes(cat)) {
+        await notify({ title: 'Already Added', message: `Category <b>${cat}</b> is already selected.`, icon: 'info' });
+        return;
+      }
+      current.push(cat);
+      writeSelectedCategories(current);
+      adminCategorySelect.value = '';
+    });
+  }
+
+  if (fullAdminCheck) {
+    fullAdminCheck.addEventListener('change', updateAdminState);
+    updateAdminState();
+  }
+// (Existing Org Picker Logic - Unchanged)
+  const orgPickerBtn = document.getElementById('openOrgPickerBtn');
+  const clearOrgBtn = document.getElementById('clearOrgBtn');
+  const orgIdInput = document.getElementById('selectedOrgId');
+  const orgNameInput = document.getElementById('selectedOrgName');
+  if (orgPickerBtn) {
+      orgPickerBtn.addEventListener('click', () => {
+          GenericPicker.open(GenericPickerPresets.organization({
+              title: 'Select Organization',
+              context: GenericPickerContexts.allOrganizations(),
+              onSelect: async (item) => {
+                  orgIdInput.value = item.id;
+                  orgNameInput.value = item.identity?.displayName || item.name || `Org #${item.id}`;
+              }
+          }));
+      });
+      clearOrgBtn.addEventListener('click', () => {
+          orgIdInput.value = "";
+          orgNameInput.value = "Global / System";
+      });
+  }
+
+  // (Existing Sidebar/Detail Logic - Shortened for brevity as it's identical to previous version)
+  // ... [Assume identical renderSidebar, renderDetail logic here] ...
+  // ... [Using setOperationsEnabled, onAdminAccessChange, etc.] ...
+
+  // Toggle enabled/disabled on all operation controls inside the detail panel
+  function setOperationsEnabled(panel, enabled) {
+    panel.querySelectorAll('.op-check, .op-scope, .op-limit').forEach(el => {
+       if(!enabled) {
+            el.disabled = true;
+        } else {
+            if(el.classList.contains('op-check')) {
+                el.disabled = false;
+            } else {
+                const row = el.closest('tr');
+                const rowChecked = row.querySelector('.op-check').checked;
+                el.disabled = !rowChecked;
+            }
+        }
+    });
+    const table = panel.querySelector('#opsTable');
+    if (table) {
+        table.classList.toggle('opacity-50', !enabled);
+        table.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
+    const copyBtn = panel.querySelector('#copySettingsBtn');
+    if(copyBtn) copyBtn.disabled = !enabled;
+  }
+
+  function onAdminAccessChange(event) {
+    const panel = document.getElementById('sectionDetailPanel');
+    const isAdmin = !!event.target.checked;
+    if (activeIndex > -1 && configured[activeIndex]) {
+        configured[activeIndex].adminAccess = isAdmin;
+        if(isAdmin) {
+            configured[activeIndex].operations = [];
+            panel.querySelectorAll('.op-check').forEach(c => c.checked = false);
+        }
+    }
+    setOperationsEnabled(panel, !isAdmin);
+    renderSidebar();
+  }
+
+  function bindDetailEvents(panel) {
+    const adminCheckbox = panel.querySelector('#adminAccess');
+    if (adminCheckbox) adminCheckbox.addEventListener('change', onAdminAccessChange);
+  }
+
+  function renderSidebar() {
+     const list = document.getElementById('sectionsSidebarList');
+     list.innerHTML = '';
+     if(configured.length === 0) {
+        list.innerHTML = '<div class="text-center text-muted small p-4">No sections added yet.</div>';
+        document.getElementById('sectionDetailPanel').innerHTML = `<div class="h-100 d-flex flex-column align-items-center justify-content-center text-muted p-5"><div>Add a section to begin configuration.</div></div>`;
+        return;
+     }
+
+     configured.forEach((sec, idx) => {
+        const item = document.createElement('div');
+        item.className = `list-group-item list-group-item-action border-0 border-bottom py-3 px-3 cursor-pointer sidebar-item ${idx === activeIndex ? 'bg-primary-subtle text-primary border-primary-subtle' : ''}`;
+        
+        const sys = systemSections.find(s => s.id === sec.sectionId);
+        const name = sys ? sys.name : sec.sectionId;
+        const opCount = (sec.operations || []).length;
+        const isAdmin = sec.adminAccess === true;
+
+        item.innerHTML = `
+           <div class="d-flex w-100 justify-content-between align-items-center">
+              <span class="fw-bold text-truncate" style="max-width: 180px;">${name}</span>
+              ${idx === activeIndex ? '<i class="bi bi-chevron-right small"></i>' : ''}
+           </div>
+           <div class="d-flex justify-content-between align-items-center mt-1">
+              <small class="text-muted" style="font-size: 0.75rem;">ID: ${sec.sectionId}</small>
+              <div>
+                ${isAdmin ? '<span class="badge bg-danger text-white border shadow-sm">ADMIN</span>' : `<span class="badge bg-white text-secondary border shadow-sm" style="font-weight:normal;">${opCount} Ops</span>`}
+              </div>
+           </div>
+        `;
+        item.addEventListener('click', () => { activeIndex = idx; renderSidebar(); renderDetail(); });
+        list.appendChild(item);
+     });
+     const term = document.getElementById('sectionSearch').value.toLowerCase();
+     if(term) applySidebarFilter(term);
+  }
+
+  function renderDetail() {
+     const panel = document.getElementById('sectionDetailPanel');
+     if (activeIndex === -1 || !configured[activeIndex]) return;
+
+     const sec = configured[activeIndex];
+     const sys = systemSections.find(s => s.id === sec.sectionId);
+     const name = sys ? sys.name : sec.sectionId;
+     const desc = sys ? sys.description : '';
+     const availableOps = (sys && sys.operations && sys.operations.length > 0) ? sys.operations.map(ref => systemOps.find(o => o.id === ref.id)).filter(Boolean) : [];
+     const configOpsMap = new Map();
+     (sec.operations || []).forEach(o => configOpsMap.set(o.operationId, o));
+     const isAdminState = sec.adminAccess === true;
+
+     let html = `
+        <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
+            <div>
+               <h5 class="fw-bold text-dark m-0 mb-1">${name}</h5>
+               <div class="small text-muted">${desc}</div>
+               <div class="mt-2">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input admin-check cursor-pointer" type="checkbox" id="adminAccess" name="adminAccess" value="true" ${isAdminState ? 'checked' : ''}>
+                    <label class="form-check-label fw-bold small text-danger" for="adminAccess">GRANT ADMIN ACCESS</label>
+                  </div>
+               </div>
+            </div>
+           <div class="d-flex gap-2 align-items-center">
+            <div>
+             <button type="button" class="btn btn-sm btn-outline-secondary btn-filled" id="copySettingsBtn" title="Apply settings to all"><i class="bi bi-copy me-1"></i> Copy to All</button>
+             <button type="button" class="btn btn-sm btn-outline-danger btn-filled" id="removeSecBtn"><i class="bi bi-trash me-1"></i> Remove</button>
+            </div>
+           </div>
+        </div>
+        <div class="p-0 overflow-auto" style="height: calc(100% - 110px);">
+           ${availableOps.length === 0 ? '<div class="p-4 text-center text-muted">No operations defined for this section.</div>' : ''}
+           <table class="table table-hover mb-0 align-middle table-bordered border-light" id="opsTable">
+              <thead class="table-light sticky-top" style="z-index:1;">
+                 <tr>
+                    <th style="width: 50px;" class="text-center">Active</th>
+                    <th style="width: 200px;">Operation</th>
+                    <th style="width: 200px;">Scope</th>
+                    <th style="width: 100px;">Attempts</th>
+                    <th style="width: 100px;">Time (m)</th>
+                    <th style="width: 100px;">Vol (KB)</th>
+                 </tr>
+              </thead>
+              <tbody>
+     `;
+     availableOps.forEach(op => {
+        const confOp = configOpsMap.get(op.id);
+        const isChecked = !!confOp;
+        const currentScope = confOp ? confOp.scopeId : '';
+        const att = confOp ? (confOp.maxAttemptsPerSession ?? '') : '';
+        const dur = confOp ? (confOp.maxSessionDurationMinutes ?? '') : '';
+        const vol = confOp ? (confOp.maxFetchUploadVolumeKB ?? '') : '';
+
+        html += `
+           <tr class="${isChecked ? 'bg-white' : 'bg-light opacity-75'}" data-op="${op.id}">
+              <td class="text-center">
+                 <input class="form-check-input op-check cursor-pointer" type="checkbox" value="${op.id}" ${isChecked ? 'checked' : ''}>
+              </td>
+              <td><div class="fw-bold ${isChecked ? 'text-primary' : 'text-muted'} op-name">${op.name}</div><div class="x-small text-muted">ID: ${op.id}</div></td>
+              <td>
+                <select class="form-select form-select-sm op-scope" data-op="${op.id}" ${!isChecked ? 'disabled' : ''}>
+                  <option value="" disabled ${!currentScope ? 'selected' : ''}>Select...</option>
+                  ${systemScopes.map(sc => `<option value="${sc.id}" ${currentScope === sc.id ? 'selected' : ''}>${sc.name}</option>`).join('')}
+                </select>
+                <div class="x-small text-muted mt-1 scope-hint">${summarizeScope(currentScope)}</div>
+              </td>
+              <td><input type="number" class="form-control form-control-sm op-limit" data-op="${op.id}" data-field="maxAttemptsPerSession" placeholder="∞" value="${att}" ${!isChecked ? 'disabled' : ''}></td>
+              <td><input type="number" class="form-control form-control-sm op-limit" data-op="${op.id}" data-field="maxSessionDurationMinutes" placeholder="∞" value="${dur}" ${!isChecked ? 'disabled' : ''}></td>
+              <td><input type="number" class="form-control form-control-sm op-limit" data-op="${op.id}" data-field="maxFetchUploadVolumeKB" placeholder="∞" value="${vol}" ${!isChecked ? 'disabled' : ''}></td>
+           </tr>`;
+     });
+     html += `</tbody></table></div>`;
+     panel.innerHTML = html;
+
+     // Bind Detail Events
+     document.getElementById('copySettingsBtn').addEventListener('click', async () => {
+         const rows = document.querySelectorAll('#opsTable tbody tr');
+         let sourceData = null;
+         for (let tr of rows) {
+             if (tr.querySelector('.op-check').checked) {
+                 sourceData = { scope: tr.querySelector('.op-scope').value, limits: Array.from(tr.querySelectorAll('.op-limit')).map(i => i.value) };
+                 break;
+             }
+         }
+         if (!sourceData) {
+            await showMessageModal({ title: 'Select one Row', message: `Configure one row first.`, icon: 'warning', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+            return;
+         }
+         rows.forEach(tr => {
+             const check = tr.querySelector('.op-check');
+             check.checked = true; 
+             if (check.checked) {
+                 const scopeSel = tr.querySelector('.op-scope');
+                 scopeSel.value = sourceData.scope;
+                 scopeSel.dispatchEvent(new Event('change'));
+                 const limitInputs = tr.querySelectorAll('.op-limit');
+                 limitInputs.forEach((inp, idx) => { inp.value = sourceData.limits[idx]; inp.dispatchEvent(new Event('input')); });
+             }
+         });
+     });
+
+     document.getElementById('removeSecBtn').addEventListener('click', async () => {
+        const result = await showMessageModal({ title: 'Remove Section?', message: `Remove <b>${name}</b>?`, icon: 'warning', buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: 'Remove', class: 'btn-danger' }] });
+        if (result === 'Remove') { configured.splice(activeIndex, 1); activeIndex = -1; renderSidebar(); }
+     });
+
+     panel.querySelectorAll('.op-check').forEach(chk => {
+        chk.addEventListener('change', (e) => {
+           const opId = e.target.value;
+           const tr = e.target.closest('tr');
+           const inputs = tr.querySelectorAll('select, input[type="number"]');
+           const opNameDiv = tr.querySelector('.op-name');
+           if (e.target.checked) {
+              inputs.forEach(i => i.disabled = false);
+              tr.classList.remove('bg-light', 'opacity-75'); tr.classList.add('bg-white');
+              opNameDiv.classList.replace('text-muted', 'text-primary');
+              if (!configured[activeIndex].operations) configured[activeIndex].operations = [];
+              configured[activeIndex].operations.push({ operationId: opId, scopeId: '', maxAttemptsPerSession: null, maxSessionDurationMinutes: null, maxFetchUploadVolumeKB: null });
+           } else {
+              inputs.forEach(i => { i.disabled = true; i.value = ''; });
+              tr.classList.add('bg-light', 'opacity-75'); tr.classList.remove('bg-white');
+              opNameDiv.classList.replace('text-primary', 'text-muted');
+              configured[activeIndex].operations = configured[activeIndex].operations.filter(o => o.operationId !== opId);
+           }
+           renderSidebar();
+        });
+     });
+
+     panel.querySelectorAll('.op-scope').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+           const opId = e.target.dataset.op;
+           const op = configured[activeIndex].operations.find(o => o.operationId === opId);
+           if(op) op.scopeId = e.target.value;
+           updateScopeHint(e.target);
+        });
+        updateScopeHint(sel);
+     });
+
+     panel.querySelectorAll('.op-limit').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+           const opId = e.target.dataset.op;
+           const field = e.target.dataset.field;
+           const op = configured[activeIndex].operations.find(o => o.operationId === opId);
+           if(op) { const val = parseInt(e.target.value); op[field] = isNaN(val) ? null : val; }
+        });
+     });
+
+     bindDetailEvents(panel);
+     setOperationsEnabled(panel, !isAdminState);
+  }
+
+  // Copy Profile & Add Section logic (Unchanged generic pickers)
+  document.getElementById('copyProfileBtn').addEventListener('click', () => {
+      GenericPicker.open(GenericPickerPresets.accessProfile({
+          title: 'Copy Access Profile',
+          icon: 'bi-box-arrow-in-down',
+          placeholder: 'Search profiles...',
+          context: GenericPickerContexts.allAccessProfiles(),
+          onSelect: async (item) => {
+             const confirmReplace = await showMessageModal({ title: 'Overwrite?', message: `Replace all sections?`, icon: 'warning', buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: 'Overwrite', class: 'btn-danger' }] });
+             if (confirmReplace === 'Overwrite') {
+                 configured = JSON.parse(JSON.stringify(item.sections || []));
+                 activeIndex = -1; renderSidebar();
+                 document.getElementById('sectionDetailPanel').innerHTML = `<div class="h-100 d-flex flex-column align-items-center justify-content-center text-muted p-5"><div>Profile imported. Select a section.</div></div>`;
+             }
+          }
+      }));
+  });
+
+  function addSectionsToConfigured(items) {
+      const list = Array.isArray(items) ? items : [items];
+      let addedCount = 0;
+      let duplicateCount = 0;
+      let lastAddedIndex = -1;
+
+      list.forEach((item) => {
+          const id = String(item?.id || '').trim();
+          if (!id) return;
+          if (configured.find((s) => String(s?.sectionId || '').trim() === id)) {
+              duplicateCount += 1;
+              return;
+          }
+          configured.push({
+              sectionId: id,
+              sectionName: String(item?.name || id).trim(),
+              operations: [],
+              adminAccess: false
+          });
+          addedCount += 1;
+          lastAddedIndex = configured.length - 1;
+      });
+
+      if (addedCount > 0) {
+          activeIndex = lastAddedIndex;
+          renderSidebar();
+          renderDetail();
+      }
+
+      if (duplicateCount > 0) {
+          showMessageModal({
+              title: 'Some Sections Skipped',
+              icon: 'info',
+              message: `${duplicateCount} section(s) were already added and were skipped.`,
+              buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+      }
+  }
+
+  document.getElementById('addSectionBtn').addEventListener('click', () => {
+      GenericPicker.open(GenericPickerPresets.section({
+          title: 'Add Sections',
+          context: GenericPickerContexts.allRegisteredSections(),
+          multiselect: true,
+          placeholder: 'Search sections, select multiple, then Add Selected...',
+          onSelect: (items) => addSectionsToConfigured(items)
+      }));
+  });
+
+  function applySidebarFilter(term) {
+      document.querySelectorAll('.sidebar-item').forEach(item => {
+          const text = item.innerText.toLowerCase();
+          item.style.display = text.includes(term) ? '' : 'none';
+      });
+  }
+  document.getElementById('sectionSearch').addEventListener('input', (e) => applySidebarFilter(e.target.value.toLowerCase()));
+
+  // 8. Submit
+  accessFormEl.addEventListener('submit', async (e) => {
+     e.preventDefault();
+     if (isFormBusy) return;
+     isFormBusy = true;
+     setButtonBusy(saveActionBtn, 'Saving...');
+     if (cancelActionBtn) cancelActionBtn.disabled = true;
+     document.getElementById('sectionsHidden').value = JSON.stringify(configured);
+     
+     // --- ADMIN VERIFICATION LOGIC ---
+     const isGlobalAdmin = document.getElementById('fullAdminCheck').checked;
+     const hasCategories = document.querySelectorAll('#adminCategoriesHidden input[name="adminCategories"]').length > 0;
+     const hasSectionAdmin = configured.some(s => s.adminAccess === true);
+     let submitSucceeded = false;
+
+     const performSubmit = async () => {
+         const fd = new FormData(e.target);
+         if(document.getElementById('activeCheck')) fd.set('active', document.getElementById('activeCheck').checked ? 'true' : 'false');
+         try {
+            const resp = await fetch(e.target.action, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' }, body: new URLSearchParams(fd).toString() });
+            const res = await resp.json();
+            if (res.status === 'success') {
+              submitSucceeded = true;
+              await showMessageModal({ title: 'Success', icon: 'success', message: 'Saved.', buttons: [{text:'OK', class:'btn-success'}] });
+              window.location.href = '/accesses';
+            } 
+            else { await showMessageModal({ title: 'Error', icon: 'error', message: res.message, buttons: [{text:'OK', class:'btn-danger'}] }); }
+         } catch(err) { console.error(err); await showMessageModal({ title: 'Error', icon: 'error', message: 'Unexpected error.', buttons: [{text:'OK', class:'btn-danger'}] }); }
+     };
+
+     try {
+       if (isGlobalAdmin || hasCategories || hasSectionAdmin) {
+          if (typeof window.requestProtectedAction === 'function') {
+              await window.requestProtectedAction();
+              await performSubmit(); 
+          } else {
+              console.warn('Admin Verification System not loaded.');
+              await performSubmit();
+          }
+      } else {
+          await performSubmit();
+      }
+     } finally {
+       if (!submitSucceeded) restoreFormActionButtons();
+     }
+  });
+
+  renderSidebar();
+});
+</script>
+<style>
+  .cursor-pointer { cursor: pointer; }
+  .list-group-item.active { background-color: var(--bs-primary-bg-subtle) !important; color: var(--bs-primary-text-emphasis) !important; border-color: var(--bs-primary-border-subtle) !important; }
+  #sectionsSidebarList::-webkit-scrollbar { width: 5px; }
+  #sectionsSidebarList::-webkit-scrollbar-track { background: #f1f1f1; }
+  #sectionsSidebarList::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+</style>

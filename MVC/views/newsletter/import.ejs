@@ -1,0 +1,184 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0">Import Subscribers</h1>
+      <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Bulk Action</span>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="importForm" action="/newsletter/admin/import" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom-0">
+           <h6 class="fw-bold text-dark m-0"><i class="bi bi-collection-fill me-2"></i>Target Group</h6>
+        </div>
+        <div class="card-body pt-0">
+            <div class="mb-3">
+                <label class="form-label">Select Group <span class="text-danger">*</span></label>
+                
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-collection text-primary"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-0" id="groupNameDisplay" 
+                           placeholder="Click to search groups..." readonly style="cursor: pointer; background-color: #fff;">
+                    <button class="btn btn-outline-primary" type="button" id="btnGroupPicker">
+                        <i class="bi bi-search me-1"></i>Search
+                    </button>
+                </div>
+                <input type="hidden" name="groupId" id="groupIdInput" required>
+                
+                <div class="form-text">All imported emails will be assigned to this group. Existing subscriptions will be moved to this group.</div>
+            </div>
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom-0">
+           <h6 class="fw-bold text-dark m-0"><i class="bi bi-keyboard me-2"></i>Manual Entry</h6>
+        </div>
+        <div class="card-body pt-0">
+            <div class="mb-3">
+                <label class="form-label">Paste Emails</label>
+                <textarea name="manualEmails" class="form-control font-monospace size-sm" rows="5" placeholder="user1@example.com&#10;user2@example.com, user3@test.com"></textarea>
+                <div class="form-text">Enter emails separated by newlines or commas.</div>
+            </div>
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom-0">
+           <h6 class="fw-bold text-dark m-0"><i class="bi bi-file-earmark-arrow-up me-2"></i>File Upload</h6>
+        </div>
+        <div class="card-body pt-0">
+            <div class="mb-3">
+                <label class="form-label">CSV or JSON File</label>
+                <input class="form-control" type="file" name="importFile" accept=".csv, .json, .txt">
+                <div class="form-text">
+                    <strong>CSV:</strong> Emails should be in the first column.<br>
+                    <strong>JSON:</strong> Array of strings <code>["a@b.com"]</code> or objects <code>[{"email":"a@b.com"}]</code>.
+                </div>
+            </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2 mt-4">
+          <a href="/newsletter/admin" class="btn btn-secondary btn-filled btn-md" id="btnCancelAction">Cancel</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-cloud-upload me-2"></i>Start Import
+          </button>
+      </div>
+   </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('importForm');
+  const groupInput = document.getElementById('groupNameDisplay');
+  const groupPickerBtn = document.getElementById('btnGroupPicker');
+
+  // --- PICKER LOGIC ---
+  const openGroupPicker = () => {
+     if (typeof GenericPicker === 'undefined') {
+         console.error('GenericPicker not loaded');
+         return;
+     }
+
+     GenericPicker.open(GenericPickerPresets.group({
+        title: 'Select Subscription Group',
+        placeholder: 'Search groups by name...',
+        renderer: (item) => {
+            return `
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded bg-white border d-flex align-items-center justify-content-center shadow-sm text-primary" style="width: 40px; height: 40px;">
+                             <i class="bi bi-collection-fill fs-5"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark">${item.name}</div>
+                            <div class="text-muted small text-truncate" style="max-width:250px;">${item.description || ''}</div>
+                        </div>
+                    </div>
+                    <div class="badge bg-light text-secondary border font-monospace">ID: ${item.id}</div>
+                </div>
+            `;
+        },
+        onSelect: (item) => {
+            document.getElementById('groupIdInput').value = item.id;
+            document.getElementById('groupNameDisplay').value = item.name;
+        }
+     }));
+  };
+
+  if (groupPickerBtn) groupPickerBtn.addEventListener('click', openGroupPicker);
+  if (groupInput) groupInput.addEventListener('click', openGroupPicker);
+
+  // --- FORM SUBMISSION LOGIC ---
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+          submitBtn.disabled = true;
+          const originalText = submitBtn.innerHTML;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Importing...';
+      }
+
+      const formData = new FormData(form);
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'X-AJAX-Request': 'true' },
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          let msg = result.message;
+          if (result.details && result.details.errors && result.details.errors.length > 0) {
+              msg += '<br><br><strong>Errors (First 10):</strong><br>' + result.details.errors.join('<br>');
+          }
+
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Import Complete', icon: 'success', message: msg,
+              buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+            });
+          }
+          window.location.href = '/newsletter/admin';
+        } else {
+          // Logic Error
+          if (submitBtn) {
+             submitBtn.disabled = false;
+             submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>Start Import'; 
+          }
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Import Failed', icon: 'error', message: result.message || 'Unknown error.',
+              buttons: [{ text: 'OK', class: 'btn-danger btn-md' }]
+            });
+          } else { 
+            alert(result.message);
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        if (submitBtn) {
+             submitBtn.disabled = false;
+             submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>Start Import';
+        }
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Network Error', icon: 'error', message: 'Unexpected network error occurred.',
+            buttons: [{ text: 'OK', class: 'btn-danger btn-md' }]
+          });
+        }
+      }
+    });
+  }
+});
+</script>

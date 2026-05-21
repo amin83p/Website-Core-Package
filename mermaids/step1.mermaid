@@ -1,0 +1,37 @@
+flowchart TD
+    A[Start: Raw Input String] --> B[Normalize Text]
+    
+    subgraph Normalization
+    B --> B1[NFKC Unicode Clean]
+    B1 --> B2[Standardize Newlines to \n]
+    B2 --> B3[Unwrap Hard Line Breaks]
+    end
+    
+    B3 --> C[Structure Detection]
+    
+    subgraph Segmentation
+    C --> C1[Split Paragraphs]
+    C1 -- Store offsets --> P_List[Paragraph List]
+    
+    C --> C2[Split Sentences]
+    C2 -- Use Intl.Segmenter --> S_Raw[Raw Sentence Spans]
+    end
+    
+    S_Raw --> D[Refinement Loop]
+    
+    subgraph "Learner Error Handling"
+    D --> D1{Is there a Period + Lowercase?}
+    D1 -- Yes --> D2[Perform 'Virtual Split']
+    D2 --> D3[Flag: 'lowercase_after_period']
+    D1 -- No --> D4[Keep Standard Split]
+    end
+    
+    D3 --> E[Mapping]
+    D4 --> E
+    
+    E --> E1[Map Sentences to Paragraph IDs]
+    E --> E2[Calculate Word/Char Counts]
+    
+    E2 --> F[Output: Frozen Essay Object]
+
+

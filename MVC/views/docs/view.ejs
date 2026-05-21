@@ -1,0 +1,47 @@
+<%
+  const item = doc || {};
+  const filePath = String(item.relativePath || '');
+%>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="page-heading size-md text-start m-0">Document Viewer</h1>
+    <div class="small text-muted mt-1 font-monospace"><%= filePath %></div>
+  </div>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <a href="/docs" class="btn btn-filled btn-secondary btn-md">
+      <i class="bi bi-arrow-left me-1"></i> Back to Docs
+    </a>
+    <a href="/docs/download?path=<%= encodeURIComponent(filePath) %>" class="btn btn-outline-secondary btn-md">
+      <i class="bi bi-download me-1"></i> Download
+    </a>
+  </div>
+</div>
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <span class="badge bg-light text-dark border"><%= item.ext || '-' %></span>
+  <span class="badge bg-light text-dark border"><%= item.sizeLabel || '-' %></span>
+  <span class="badge bg-light text-dark border"><%= item.updatedAtLabel || '-' %></span>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <pre class="doc-view-pre mb-0"><code><%= content %></code></pre>
+  </div>
+</div>
+
+<style>
+.doc-view-pre {
+  padding: 1rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 0.75rem;
+  max-height: 75vh;
+  overflow: auto;
+  line-height: 1.45;
+  font-size: 0.88rem;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+</style>

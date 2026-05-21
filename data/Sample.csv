@@ -1,0 +1,101 @@
+name,description,active,minimumAccessRequirement
+MAIN_OFFICE,Headquarters access,true,5
+HR_DEPARTMENT,Human Resources personnel only,true,4
+IT_OPERATIONS,Server room and IT infrastructure,true,5
+WAREHOUSE_NORTH,North wing storage facility,true,1
+WAREHOUSE_SOUTH,South wing storage facility,true,1
+LOGISTICS_HUB,Shipping and receiving dock,true,2
+QUALITY_CONTROL,Product testing area,true,3
+ASSEMBLY_LINE,General assembly floor,true,1
+PACKAGING_ZONE,Final packaging department,true,1
+SECURITY_ROOM,Security monitoring station,true,5
+CAFETERIA_STAFF,Kitchen and food prep area,true,1
+MAINTENANCE_BAY,Equipment repair station,true,2
+CLEANING_SUPPLY,Janitorial supplies closet,true,1
+MEETING_ROOM_A,Conference room Alpha,true,1
+MEETING_ROOM_B,Conference room Beta,true,1
+MEETING_ROOM_C,Conference room Gamma,true,1
+EXECUTIVE_SUITE,C-Level executive offices,true,5
+VISITOR_LOBBY,Public waiting area,true,0
+PARKING_LOT_A,Employee parking,true,0
+PARKING_LOT_B,Executive parking,true,1
+DATA_ARCHIVE,Physical records storage,false,4
+SERVER_FARM,Cloud infrastructure backup,true,5
+RESEARCH_LAB_A,R&D restricted area,true,4
+RESEARCH_LAB_B,Chemical testing facility,true,4
+TRAINING_ROOM,New hire orientation room,true,1
+FIRST_AID_STATION,Medical emergency room,true,2
+LOADING_DOCK_A,Heavy freight delivery,true,2
+LOADING_DOCK_B,Express courier delivery,true,2
+DISPATCH_CENTER,Fleet management office,true,3
+CUSTOMER_SERVICE,Call center operations,true,1
+SALES_FLOOR,Sales team workspace,true,1
+MARKETING_DEPT,Creative team studio,true,1
+FINANCE_OFFICE,Payroll and accounting,true,4
+LEGAL_ARCHIVES,Contract storage,true,5
+AUDIT_ROOM,External auditor workspace,false,4
+SILENT_ZONE,Quiet work area,true,1
+COLLABORATION_HUB,Open space for teams,true,1
+REMOTE_ACCESS,VPN user group,true,3
+GUEST_WIFI,Public internet access zone,true,0
+SECURE_VAULT,High value asset storage,true,5
+TEST_SECTION_AA,Automated Import Test AA,true,1
+TEST_SECTION_AB,Automated Import Test AB,true,1
+TEST_SECTION_AC,Automated Import Test AC,true,1
+TEST_SECTION_AD,Automated Import Test AD,true,1
+TEST_SECTION_AE,Automated Import Test AE,true,1
+TEST_SECTION_AF,Automated Import Test AF,true,1
+TEST_SECTION_AG,Automated Import Test AG,true,1
+TEST_SECTION_AH,Automated Import Test AH,true,1
+TEST_SECTION_AI,Automated Import Test AI,true,1
+TEST_SECTION_AJ,Automated Import Test AJ,true,1
+TEST_SECTION_AK,Automated Import Test AK,true,1
+TEST_SECTION_AL,Automated Import Test AL,true,1
+TEST_SECTION_AM,Automated Import Test AM,true,1
+TEST_SECTION_AN,Automated Import Test AN,true,1
+TEST_SECTION_AO,Automated Import Test AO,true,1
+TEST_SECTION_AP,Automated Import Test AP,true,1
+TEST_SECTION_AQ,Automated Import Test AQ,true,1
+TEST_SECTION_AR,Automated Import Test AR,true,1
+TEST_SECTION_AS,Automated Import Test AS,true,1
+TEST_SECTION_AT,Automated Import Test AT,true,1
+TEST_SECTION_AU,Automated Import Test AU,true,1
+TEST_SECTION_AV,Automated Import Test AV,true,1
+TEST_SECTION_AW,Automated Import Test AW,true,1
+TEST_SECTION_AX,Automated Import Test AX,true,1
+TEST_SECTION_AY,Automated Import Test AY,true,1
+TEST_SECTION_AZ,Automated Import Test AZ,true,1
+TEST_SECTION_BA,Automated Import Test BA,true,1
+TEST_SECTION_BB,Automated Import Test BB,true,1
+TEST_SECTION_BC,Automated Import Test BC,true,1
+TEST_SECTION_BD,Automated Import Test BD,true,1
+TEST_SECTION_BE,Automated Import Test BE,true,1
+TEST_SECTION_BF,Automated Import Test BF,true,1
+TEST_SECTION_BG,Automated Import Test BG,true,1
+TEST_SECTION_BH,Automated Import Test BH,true,1
+TEST_SECTION_BI,Automated Import Test BI,true,1
+TEST_SECTION_BJ,Automated Import Test BJ,true,1
+TEST_SECTION_BK,Automated Import Test BK,true,1
+TEST_SECTION_BL,Automated Import Test BL,true,1
+TEST_SECTION_BM,Automated Import Test BM,true,1
+TEST_SECTION_BN,Automated Import Test BN,true,1
+TEST_SECTION_BO,Automated Import Test BO,true,1
+TEST_SECTION_BP,Automated Import Test BP,true,1
+TEST_SECTION_BQ,Automated Import Test BQ,true,1
+TEST_SECTION_BR,Automated Import Test BR,true,1
+TEST_SECTION_BS,Automated Import Test BS,true,1
+TEST_SECTION_BT,Automated Import Test BT,true,1
+TEST_SECTION_BU,Automated Import Test BU,true,1
+TEST_SECTION_BV,Automated Import Test BV,true,1
+TEST_SECTION_BW,Automated Import Test BW,true,1
+TEST_SECTION_BX,Automated Import Test BX,true,1
+TEST_SECTION_BY,Automated Import Test BY,true,1
+TEST_SECTION_BZ,Automated Import Test BZ,true,1
+TEST_SECTION_CA,Automated Import Test CA,true,1
+TEST_SECTION_CB,Automated Import Test CB,true,1
+TEST_SECTION_CC,Automated Import Test CC,true,1
+TEST_SECTION_CD,Automated Import Test CD,true,1
+TEST_SECTION_CE,Automated Import Test CE,true,1
+TEST_SECTION_CF,Automated Import Test CF,true,1
+TEST_SECTION_CG,Automated Import Test CG,true,1
+TEST_SECTION_CH,Automated Import Test CH,true,1

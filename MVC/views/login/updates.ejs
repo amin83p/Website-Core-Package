@@ -1,0 +1,294 @@
+<%
+  // --- MOCK DATA SIMULATION (Since backend isn't ready) ---
+  // In the future, these will come from the controller via res.render
+  
+  const systemUpdates = [
+    { type: 'maintenance', title: 'Scheduled Maintenance', date: '2025-10-25', message: 'The system will be offline for updates on Saturday night.' },
+    { type: 'feature', title: 'New Dashboard Released', date: '2025-10-20', message: 'Check out the new dark mode and drag-and-drop widgets.' },
+    { type: 'maintenance', title: 'Scheduled Maintenance', date: '2025-10-25', message: 'The system will be offline for updates on Saturday night.' },
+    { type: 'feature', title: 'New Dashboard Released', date: '2025-10-20', message: 'Check out the new dark mode and drag-and-drop widgets.' },
+    { type: 'maintenance', title: 'Scheduled Maintenance', date: '2025-10-25', message: 'The system will be offline for updates on Saturday night.' },
+    { type: 'feature', title: 'New Dashboard Released', date: '2025-10-20', message: 'Check out the new dark mode and drag-and-drop widgets.' }
+  ];
+
+  const orgUpdates = {
+     // Mocking data for Org IDs found in user.allowedOrgs
+     'default': [
+        { author: 'Admin Team', date: '2h ago', content: 'Welcome to the organization! Please complete your onboarding checklist.', icon: 'bi-stars' }
+     ]
+  };
+
+  const myTasks = [
+     { id: 1, title: 'Review Q3 Financials', due: 'Today', status: 'urgent' },
+     { id: 2, title: 'Approve new user requests', due: 'Tomorrow', status: 'pending' },
+     { id: 3, title: 'Update security profile', due: 'Oct 30', status: 'done' }
+  ];
+
+  const myMessages = [
+     { from: 'Sarah Jenkins', subject: 'Project Alpha', time: '10:30 AM', avatar: 'SJ' },
+     { from: 'IT Support', subject: 'Ticket #992 Resolved', time: 'Yesterday', avatar: 'IT' }
+  ];
+
+  const myMeetings = [
+     { title: 'Weekly Sync', time: '2:00 PM - 3:00 PM', location: 'Zoom' },
+     { title: 'Client Onboarding', time: '4:30 PM', location: 'Room 304' }
+  ];
+
+  // Helper to safely get user orgs
+  const userOrgs = (typeof user !== 'undefined' && user.allowedOrgs) ? user.allowedOrgs : [];
+%>
+
+<div class="sections-page">
+  
+  <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
+    <div>
+      <h1 class="page-heading size-md m-0">Action Center</h1>
+      <div class="text-muted small">
+        <i class="bi bi-calendar-event me-1"></i> <%= new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %>
+      </div>
+    </div>
+    
+    <div class="d-flex gap-2">
+      <button class="btn btn-white border shadow-sm btn-sm text-secondary" onclick="window.location.reload()">
+        <i class="bi bi-arrow-clockwise"></i> Refresh
+      </button>
+      <a href="/dashboard" class="btn btn-filled btn-primary btn-sm">
+        Go to Dashboard <i class="bi bi-arrow-right ms-1"></i>
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <div class="col-lg-8">
+      
+      <% if (systemUpdates.length > 0) { %>
+      <div class="card border-0 shadow-sm mb-4 overflow-hidden">
+        <div class="card-header bg-primary-subtle text-primary fw-bold border-0 py-3">
+          <i class="bi bi-broadcast me-2"></i> System Announcements
+        </div>
+        <div class="list-group list-group-flush">
+          <% systemUpdates.forEach(item => { %>
+            <div class="list-group-item p-3 border-0 border-bottom">
+              <div class="d-flex w-100 justify-content-between align-items-center mb-1">
+                <strong class="text-dark">
+                    <span class="badge <%= item.type === 'maintenance' ? 'bg-warning text-dark' : 'bg-info' %> me-2"><%= item.type.toUpperCase() %></span>
+                    <%= item.title %>
+                </strong>
+                <small class="text-muted"><%= item.date %></small>
+              </div>
+              <p class="mb-0 text-secondary small ps-1"><%= item.message %></p>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+      <% } %>
+
+      <div class="card border-0 shadow-sm" style="min-height: 400px;">
+        <div class="card-header bg-white border-bottom py-3 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+            <div class="d-flex align-items-center">
+                <div class="rounded-circle bg-light text-secondary d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                    <i class="bi bi-building"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">Organization Feed</h6>
+                    <div class="small text-muted">News, Policy Changes & Announcements</div>
+                </div>
+            </div>
+
+            <div class="input-group input-group-sm" style="max-width: 250px;">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-filter"></i></span>
+                <select id="orgUpdateFilter" class="form-select border-start-0 bg-light fw-bold text-secondary">
+                    <% if (userOrgs.length === 0) { %>
+                        <option value="none">No Organizations</option>
+                    <% } else { %>
+                        <% userOrgs.forEach((o, idx) => { %>
+                            <option value="<%= o.orgId %>" <%= idx===0 ? 'selected' : '' %>><%= o.name || ('Org #' + o.orgId) %></option>
+                        <% }) %>
+                    <% } %>
+                </select>
+            </div>
+        </div>
+
+        <div class="card-body p-0 bg-light">
+            <div id="orgFeedContent" class="p-4">
+                <div class="text-center py-5 text-muted">
+                    <div class="spinner-border text-secondary mb-2" role="status"></div>
+                    <p class="small">Loading updates for selected organization...</p>
+                </div>
+            </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-lg-4">
+        
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white fw-bold py-3 d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-check2-square text-success me-2"></i> My Tasks</span>
+                <span class="badge bg-secondary-subtle text-secondary rounded-pill"><%= myTasks.length %></span>
+            </div>
+            <div class="list-group list-group-flush">
+                <% if(myTasks.length === 0) { %>
+                    <div class="p-4 text-center text-muted small">No pending tasks.</div>
+                <% } else { %>
+                    <% myTasks.forEach(task => { %>
+                        <label class="list-group-item d-flex gap-3 bg-transparent border-0 border-bottom py-3">
+                            <input class="form-check-input flex-shrink-0" type="checkbox" <%= task.status === 'done' ? 'checked' : '' %> style="border-radius: 50%;">
+                            <span class="pt-1 form-checked-content">
+                                <strong class="<%= task.status === 'done' ? 'text-decoration-line-through text-muted' : '' %>"><%= task.title %></strong>
+                                <small class="d-block text-muted">
+                                    <% if(task.status === 'urgent') { %> <i class="bi bi-exclamation-circle-fill text-danger me-1"></i> <% } %>
+                                    Due: <%= task.due %>
+                                </small>
+                            </span>
+                        </label>
+                    <% }) %>
+                <% } %>
+            </div>
+            <div class="card-footer bg-white border-0 text-center">
+                <a href="#" class="text-decoration-none small fw-bold text-primary">View All Tasks</a>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4 bg-primary text-white">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-clock me-2"></i> Upcoming Meetings</h6>
+                    <button class="btn btn-sm btn-white bg-white bg-opacity-25 text-white border-0"><i class="bi bi-plus"></i></button>
+                </div>
+                
+                <% if(myMeetings.length === 0) { %>
+                    <p class="opacity-75 small">No meetings scheduled for today.</p>
+                <% } else { %>
+                    <div class="d-flex flex-column gap-3">
+                        <% myMeetings.forEach(meet => { %>
+                            <div class="d-flex bg-white bg-opacity-10 p-2 rounded align-items-center">
+                                <div class="me-3 text-center lh-1">
+                                    <div class="fw-bold fs-5"><%= meet.time.split(' ')[0] %></div>
+                                    <div style="font-size: 0.6rem; opacity: 0.8;"><%= meet.time.split(' ')[1] %></div>
+                                </div>
+                                <div class="vr bg-white opacity-50 me-3"></div>
+                                <div>
+                                    <div class="fw-bold small"><%= meet.title %></div>
+                                    <div class="x-small opacity-75"><i class="bi bi-geo-alt me-1"></i><%= meet.location %></div>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-bold py-3">
+                <i class="bi bi-envelope me-2 text-info"></i> Recent Messages
+            </div>
+            <div class="list-group list-group-flush">
+                <% myMessages.forEach(msg => { %>
+                    <a href="#" class="list-group-item list-group-item-action d-flex gap-3 py-3 border-0 border-bottom" aria-current="true">
+                        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                            <%= msg.avatar %>
+                        </div>
+                        <div class="d-flex w-100 justify-content-between">
+                        <div>
+                            <h6 class="mb-0 small fw-bold"><%= msg.from %></h6>
+                            <p class="mb-0 opacity-75 small text-truncate" style="max-width: 150px;"><%= msg.subject %></p>
+                        </div>
+                        <small class="opacity-50 text-nowrap" style="font-size: 0.7rem;"><%= msg.time %></small>
+                        </div>
+                    </a>
+                <% }) %>
+            </div>
+             <div class="card-footer bg-white border-0 text-center">
+                <a href="#" class="text-decoration-none small fw-bold text-primary">Go to Inbox</a>
+            </div>
+        </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // --- MOCK DATA FOR ORG FEED ---
+    // In production, this would fetch from an API endpoint: /organizations/:id/updates
+    const mockOrgData = {
+        'default': [
+            { icon: 'bi-stars', color: 'text-warning', title: 'Getting Started', date: 'Just now', body: 'Welcome to your new workspace. Select an organization above to see specific updates.' }
+        ],
+        // Generate random data for demo purposes based on User's Orgs
+        'generate': (orgId, orgName) => [
+            { icon: 'bi-file-earmark-text', color: 'text-primary', title: 'New Policy Document', date: '4 hours ago', body: `A new HR policy has been uploaded for <strong>${orgName}</strong>. Please review it in the Documents section.` },
+            { icon: 'bi-people', color: 'text-success', title: 'Member Joined', date: 'Yesterday', body: `New member <strong>Alex Doe</strong> has joined the Engineering team at ${orgName}.` },
+            { icon: 'bi-trophy', color: 'text-warning', title: 'Q3 Goals Achieved', date: '2 days ago', body: `Congratulations to the team! ${orgName} hit 105% of the quarterly target.` }
+        ]
+    };
+
+    const orgSelect = document.getElementById('orgUpdateFilter');
+    const feedContainer = document.getElementById('orgFeedContent');
+
+    function renderFeed(orgId, orgName) {
+        // Clear current
+        feedContainer.innerHTML = '';
+        feedContainer.style.opacity = '0.5';
+
+        // Simulate Network Delay
+        setTimeout(() => {
+            let items = [];
+            if (orgId === 'none') {
+                items = mockOrgData['default'];
+            } else {
+                items = mockOrgData.generate(orgId, orgName);
+            }
+
+            let html = '';
+            if(items.length === 0) {
+                 html = `<div class="text-center py-5"><i class="bi bi-inbox fs-1 text-muted opacity-25"></i><p class="text-muted mt-3">No recent updates for this organization.</p></div>`;
+            } else {
+                items.forEach(item => {
+                    html += `
+                    <div class="d-flex gap-3 mb-4">
+                        <div class="d-flex flex-column align-items-center">
+                            <div class="rounded-circle bg-white border shadow-sm d-flex align-items-center justify-content-center ${item.color}" style="width: 40px; height: 40px; z-index: 2;">
+                                <i class="bi ${item.icon} fs-5"></i>
+                            </div>
+                            <div class="h-100 border-start border-2 opacity-25 mt-2" style="min-height: 20px;"></div>
+                        </div>
+                        <div class="pb-3 w-100">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <h6 class="fw-bold text-dark mb-0">${item.title}</h6>
+                                <small class="text-muted" style="font-size: 0.75rem;">${item.date}</small>
+                            </div>
+                            <div class="card p-3 border-0 shadow-sm bg-white rounded-3">
+                                <p class="mb-0 small text-secondary">${item.body}</p>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                // "End of feed" marker
+                html += `<div class="text-center py-2"><small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">End of Updates</small></div>`;
+            }
+
+            feedContainer.innerHTML = html;
+            feedContainer.style.opacity = '1';
+        }, 300);
+    }
+
+    // Init
+    if (orgSelect.options.length > 0) {
+        renderFeed(orgSelect.value, orgSelect.options[orgSelect.selectedIndex].text);
+    } else {
+        renderFeed('none', '');
+    }
+
+    // Change Listener
+    orgSelect.addEventListener('change', (e) => {
+        const orgId = e.target.value;
+        const orgName = e.target.options[e.target.selectedIndex].text;
+        renderFeed(orgId, orgName);
+    });
+});
+</script>

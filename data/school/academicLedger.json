@@ -1,0 +1,132 @@
+[
+  {
+    "orgId": "900000",
+    "studentId": "STU50124",
+    "personId": "146788",
+    "programId": "232974",
+    "termId": "",
+    "classId": "609077",
+    "subjectId": "152104",
+    "entryType": "class_enrolled",
+    "status": "posted",
+    "effectiveDate": "2026-01-30",
+    "postedAt": "2026-04-07T17:06:22.272Z",
+    "quantities": {
+      "creditsAttempted": null
+    },
+    "academic": {
+      "subjectType": "",
+      "standing": "active"
+    },
+    "ruleSnapshot": {},
+    "source": {
+      "module": "school_class_enrollment",
+      "eventType": "class_enrolled",
+      "eventId": "CEP-118605-rolling",
+      "idempotencyKey": "rolling|cep|118605|class_enrolled"
+    },
+    "memo": "Class enrolled: EAL-M/I-CLB 5-6",
+    "note": "Draft rolling enrollment for class 609077.",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-07T17:06:22.272Z"
+    },
+    "id": "361605"
+  },
+  {
+    "orgId": "900000",
+    "studentId": "STU50124",
+    "personId": "146788",
+    "programId": "232974",
+    "termId": "",
+    "classId": "609077",
+    "subjectId": "152104",
+    "entryType": "class_enrolled",
+    "status": "posted",
+    "effectiveDate": "2026-01-30",
+    "postedAt": "2026-04-01T16:06:09.390Z",
+    "quantities": {
+      "creditsAttempted": null
+    },
+    "academic": {
+      "subjectType": "",
+      "standing": "active"
+    },
+    "ruleSnapshot": {},
+    "source": {
+      "module": "school_class_enrollment",
+      "eventType": "class_enrolled",
+      "eventId": "CEP-118605-rolling",
+      "idempotencyKey": "rolling|cep|118605|class_enrolled"
+    },
+    "memo": "Class enrolled: EAL-M/I-CLB 5-6",
+    "note": "Draft rolling enrollment for class 609077.",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-01T16:06:09.390Z"
+    },
+    "id": "709642"
+  },
+  {
+    "orgId": "900000",
+    "studentId": "STU52105",
+    "personId": "144922",
+    "programId": "232974",
+    "termId": "",
+    "classId": "",
+    "subjectId": "",
+    "entryType": "program_registered",
+    "status": "void",
+    "effectiveDate": "2026-04-01",
+    "postedAt": "2026-04-01T16:32:19.204Z",
+    "quantities": {},
+    "academic": {
+      "standing": "active"
+    },
+    "ruleSnapshot": {},
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "program_registered",
+      "eventId": "SPR-845201",
+      "idempotencyKey": "SPR|845201|academic"
+    },
+    "memo": "Program registered: English as an Additional Language Program",
+    "note": "Manual rollback from Program Registration details",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-01T16:32:19.204Z"
+    },
+    "id": "873821"
+  },
+  {
+    "orgId": "900000",
+    "studentId": "STU50124",
+    "personId": "146788",
+    "programId": "232974",
+    "termId": "",
+    "classId": "",
+    "subjectId": "",
+    "entryType": "program_registered",
+    "status": "posted",
+    "effectiveDate": "2026-04-01",
+    "postedAt": "2026-04-01T07:59:25.000Z",
+    "quantities": {},
+    "academic": {
+      "standing": "active"
+    },
+    "ruleSnapshot": {},
+    "source": {
+      "module": "school_program_registration",
+      "eventType": "program_registered",
+      "eventId": "SPR-534551",
+      "idempotencyKey": "SPR|534551|academic"
+    },
+    "memo": "Program registered: English as an Additional Language Program",
+    "note": "Approved from Student Program Registration page",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-01T07:59:25.000Z"
+    },
+    "id": "997412"
+  }
+]

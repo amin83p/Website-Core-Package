@@ -1,0 +1,196 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  user,
+  tableName,
+  print,
+  btn_new: false,
+  btn_export: false,
+  headerManageBtns: ['<a href="/dashboard/section-nav/EMAIL_MANAGEMENT" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-speedometer2 me-1"></i> Email Dashboard</a>'],
+  manageBtns: ['<a href="/email-management/templates" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-envelope-paper me-1"></i> Email Templates</a>']
+}) %>
+
+<%
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const selectedStatusFilter = String(stateFilters?.status__eq || '').toLowerCase();
+  const selectedProviderFilter = String(stateFilters?.provider__eq || '').toLowerCase();
+  const selectedEventKeyFilter = String(stateFilters?.eventKey__eq || '').toUpperCase();
+  const selectedSectionFilter = String(stateFilters?.sectionId__eq || '').toUpperCase();
+  const selectedOperationFilter = String(stateFilters?.operationId__eq || '').toUpperCase();
+  const hasEmailLedgerFiltersApplied = Boolean(
+    String(stateFilters?.status__eq || '').trim()
+    || String(stateFilters?.provider__eq || '').trim()
+    || String(stateFilters?.eventKey__eq || '').trim()
+    || String(stateFilters?.sectionId__eq || '').trim()
+    || String(stateFilters?.operationId__eq || '').trim()
+    || String(stateFilters?.startDate || '').trim()
+    || String(stateFilters?.endDate || '').trim()
+  );
+%>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Email Ledger</div>
+    <button
+      id="emailLedgerFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#emailLedgerFilterCollapse"
+      aria-expanded="<%= hasEmailLedgerFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="emailLedgerFilterCollapse"
+      aria-label="<%= hasEmailLedgerFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="emailLedgerFilterToggleIcon" class="bi <%= hasEmailLedgerFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasEmailLedgerFiltersApplied ? ' show' : '' %>" id="emailLedgerFilterCollapse">
+    <form method="GET" action="/email-management/ledger" id="emailLedgerFilterForm" class="card-body p-3">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label mb-1">Status</label>
+          <select class="form-select size-md" name="status__eq">
+            <option value="">All</option>
+            <option value="accepted" <%= selectedStatusFilter === 'accepted' ? 'selected' : '' %>>Accepted</option>
+            <option value="failed" <%= selectedStatusFilter === 'failed' ? 'selected' : '' %>>Failed</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Provider</label>
+          <select class="form-select size-md" name="provider__eq">
+            <option value="">All</option>
+            <option value="resend" <%= selectedProviderFilter === 'resend' ? 'selected' : '' %>>Resend</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Event Key</label>
+          <input type="text" class="form-control size-md font-monospace" name="eventKey__eq" value="<%= selectedEventKeyFilter %>" placeholder="AUTH_PASSWORD_RESET_CODE">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Section ID</label>
+          <input type="text" class="form-control size-md font-monospace" name="sectionId__eq" value="<%= selectedSectionFilter %>" placeholder="USERS">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Operation ID</label>
+          <input type="text" class="form-control size-md font-monospace" name="operationId__eq" value="<%= selectedOperationFilter %>" placeholder="UPDATE">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Start Date</label>
+          <input type="date" class="form-control size-md" name="startDate" value="<%= stateFilters?.startDate || '' %>">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">End Date</label>
+          <input type="date" class="form-control size-md" name="endDate" value="<%= stateFilters?.endDate || '' %>">
+        </div>
+        <div class="col-md-3 d-flex gap-2 justify-content-md-end">
+          <a href="/email-management/ledger" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search id, recipient, sender, subject, event key...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="dateTime">Date/Time <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="eventKey">Event <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="sender">Sender <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="recipientsCount">Recipients <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="subject">Subject <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="providerMessageId">Provider Message ID <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr>
+          <td colspan="9" class="text-center text-muted py-4">No email ledger entries found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <tr>
+          <td class="font-monospace"><%= row.id %></td>
+          <td><%= row.dateTime ? new Date(row.dateTime).toLocaleString() : '-' %></td>
+          <td>
+            <% if (String(row.status || '').toLowerCase() === 'accepted') { %>
+              <span class="badge bg-success-subtle text-success border">Accepted</span>
+            <% } else { %>
+              <span class="badge bg-danger-subtle text-danger border">Failed</span>
+            <% } %>
+          </td>
+          <td>
+            <div class="fw-semibold font-monospace"><%= row.eventKey || '-' %></div>
+            <div class="small text-muted font-monospace"><%= (row.sectionId || '-') + '::' + (row.operationId || '-') %></div>
+          </td>
+          <td class="font-monospace text-truncate" style="max-width: 220px;"><%= row.sender || '-' %></td>
+          <td>
+            <div class="fw-semibold"><%= Number(row.recipientsCount || 0) %></div>
+            <div class="small text-muted text-truncate font-monospace" style="max-width: 220px;"><%= row.recipientsPreview || '-' %></div>
+          </td>
+          <td class="text-truncate" style="max-width: 300px;"><%= row.subject || '-' %></td>
+          <td class="font-monospace text-truncate" style="max-width: 220px;"><%= row.providerMessageId || '-' %></td>
+          <td class="table-actions text-end pe-4">
+            <a href="/email-management/ledger/<%= row.id %>" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-eye me-1"></i> View
+            </a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: 'email-management/ledger'
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<script>
+  (function () {
+    function initCollapseToggleIcon(options = {}) {
+      const collapseEl = document.getElementById(String(options.collapseId || ''));
+      const buttonEl = document.getElementById(String(options.buttonId || ''));
+      const iconEl = document.getElementById(String(options.iconId || ''));
+      if (!collapseEl || !buttonEl || !iconEl) return;
+
+      const openIcon = String(options.openIcon || 'bi-chevron-down');
+      const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+      const openLabel = String(options.openLabel || 'Open filters');
+      const closeLabel = String(options.closeLabel || 'Close filters');
+
+      const setState = (expanded) => {
+        iconEl.classList.remove(openIcon, closeIcon);
+        iconEl.classList.add(expanded ? closeIcon : openIcon);
+        buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+      };
+
+      setState(collapseEl.classList.contains('show'));
+      collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+      collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+
+    initCollapseToggleIcon({
+      collapseId: 'emailLedgerFilterCollapse',
+      buttonId: 'emailLedgerFilterToggleBtn',
+      iconId: 'emailLedgerFilterToggleIcon',
+      openIcon: 'bi-chevron-down',
+      closeIcon: 'bi-chevron-up',
+      openLabel: 'Open filters',
+      closeLabel: 'Close filters'
+    });
+  })();
+</script>

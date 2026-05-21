@@ -1,0 +1,278 @@
+<%
+  const u = user || {}; 
+  // Access Defs for lookup (for displaying profile names)
+  const accessDefs = typeof accessDefinitions !== 'undefined' ? accessDefinitions : [];
+  
+  // Person Data (Safe Access)
+  const pData = (typeof person !== 'undefined' ? person : null) || { id: u.personId || '', name: { first: 'N/A', last: '' } };
+
+  // Helper to find profile name
+  const getProfileName = (id) => {
+      const found = accessDefs.find(a => String(a.id) === String(id));
+      return found ? found.name : id;
+  };
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0">My Profile</h1>
+    <span class="badge bg-secondary border">User ID: <%= u.id %></span>
+  </div>
+
+  <div class="form-container wide" style="width: 100%; max-width: 1400px;">
+    
+    <form id="profileForm" action="/profile" method="POST" novalidate>
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <script type="application/json" id="initUserOrgs"><%- JSON.stringify(u.organizations || []) %></script>
+      <script type="application/json" id="initPersonOrgs"><%- JSON.stringify(pData.organizations || []) %></script>
+      <script type="application/json" id="initAccessDefs"><%- JSON.stringify(accessDefs) %></script>
+
+      <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-account" type="button">
+                <i class="bi bi-person-gear me-1"></i> Account Settings
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-orgs" type="button">
+                <i class="bi bi-building me-1"></i> Organizations
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-status" type="button">
+                <i class="bi bi-info-circle me-1"></i> Status
+            </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        
+        <div class="tab-pane fade show active" id="tab-account">
+          <div class="card border-0 bg-light p-3 mb-3">
+              <div class="row g-3">
+                <div class="col-md-7">
+                  <label class="form-label fw-bold">Email Address</label>
+                  <input type="email" name="email" class="form-control size-md" value="<%= u.email || '' %>" required>
+                  <div class="form-text">This email is used for login and system notifications.</div>
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label fw-bold">Username</label>
+                  <input type="text" name="username" class="form-control size-md" value="<%= u.username || '' %>">
+                </div>
+              </div>
+          </div>
+
+          <div class="card border-0 bg-light p-3 mb-3">
+              <label class="form-label fw-bold">Change Password</label>
+              <div class="input-group">
+                  <span class="input-group-text bg-white border-end-0"><i class="bi bi-key"></i></span>
+                  <input type="password" name="password" class="form-control size-md border-start-0" autocomplete="new-password" placeholder="Leave empty to keep current password">
+              </div>
+              <div class="form-text">Enter a new value only if you want to change your password.</div>
+          </div>
+
+          <% if (u.systemAccessProfileId) { %>
+            <hr class="my-4">
+            <div class="d-flex align-items-center p-3 border border-warning rounded bg-warning-subtle">
+                <i class="bi bi-shield-lock-fill text-warning-emphasis fs-2 me-3"></i>
+                <div>
+                    <div class="fw-bold text-dark">System Access Profile</div>
+                    <div class="text-dark small"><%= getProfileName(u.systemAccessProfileId) %></div>
+                </div>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="tab-pane fade" id="tab-orgs">
+          <div class="mb-4">
+            <label class="form-label text-muted small fw-bold">Linked Identity</label>
+            <% 
+               let initialPersonName = 'N/A';
+               if(pData && pData.name) {
+                   initialPersonName = (pData.name.first || '') + ' ' + (pData.name.last || '');
+               }
+               if(u.personId) initialPersonName += ` (ID: ${u.personId})`;
+            %>
+            <input type="text" class="form-control bg-white" readonly value="<%= initialPersonName %>">
+          </div>
+
+          <label class="form-label mb-2 fw-bold text-primary">Your Memberships</label>
+          <div class="table-responsive border rounded bg-white mb-4">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Organization</th>
+                        <th>Role / Status</th>
+                        <th>Assigned Profile</th>
+                    </tr>
+                </thead>
+                <tbody id="orgConfigBody">
+                   </tbody>
+            </table>
+          </div>
+
+          <div class="card bg-light border-0 p-3">
+            <label class="form-label fw-bold">Default Dashboard Context</label>
+            <select name="primaryOrgId" id="primaryOrgSelect" class="form-select size-md">
+               <option value="">Auto / First Organization</option>
+            </select>
+            <div class="form-text">Select which organization loads automatically when you log in.</div>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-status">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label text-muted small">Current Status</label>
+              <input type="text" class="form-control" disabled value="<%= (u.status || 'Pending').toUpperCase() %>">
+            </div>
+            <div class="col-md-6">
+               <label class="form-label text-muted small">Access Level</label>
+               <input type="text" class="form-control" disabled value="<%= u.accessLevel ?? 1 %>">
+            </div>
+          </div>
+          <div class="row g-3">
+             <div class="col-md-6">
+                <div class="card p-3 h-100 bg-light border-0">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" disabled <%= u.active ? 'checked' : '' %>>
+                        <label class="form-check-label fw-bold">Account Active</label>
+                    </div>
+                </div>
+             </div>
+             <div class="col-md-6">
+                <div class="card p-3 h-100 bg-light border-0">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" disabled <%= u.isEmailVerified ? 'checked' : '' %>>
+                        <label class="form-check-label fw-bold">Email Verified</label>
+                    </div>
+                </div>
+             </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-save me-1"></i> Update Profile</button>
+        <a href="/dashboard" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // DATA INIT
+  const userOrgs = JSON.parse(document.getElementById('initUserOrgs').textContent || '[]');
+  const personOrgs = JSON.parse(document.getElementById('initPersonOrgs').textContent || '[]'); 
+  const accessDefs = JSON.parse(document.getElementById('initAccessDefs').textContent || '[]');
+  const accessMap = new Map(accessDefs.map(a => [a.id, a]));
+
+  // Merge Data (Read-Only Logic)
+  let currentOrgsState = personOrgs.map(pOrg => {
+      const existingConfig = userOrgs.find(u => Number(u.orgId) === Number(pOrg.orgId));
+      return {
+          orgId: pOrg.orgId,
+          name: pOrg.name || ('Org ' + pOrg.orgId),
+          roles: (Array.isArray(pOrg.roles) && pOrg.roles.length ? pOrg.roles : [pOrg.role || 'member']),
+          role: (Array.isArray(pOrg.roles) && pOrg.roles.length ? pOrg.roles[0] : (pOrg.role || 'member')),
+          memberStatus: pOrg.memberStatus || 'active',
+          accessProfileIds: existingConfig ? (existingConfig.accessProfileIds || []) : []
+      };
+  });
+
+  // Render Org Table (View Only - No Buttons)
+  const orgTableBody = document.getElementById('orgConfigBody');
+  const primarySelect = document.getElementById('primaryOrgSelect');
+  const currentPrimary = "<%= u.primaryOrgId || '' %>";
+
+  function renderOrgTable() {
+      orgTableBody.innerHTML = '';
+      primarySelect.innerHTML = '<option value="">Auto / First Organization</option>';
+      
+      if (currentOrgsState.length === 0) {
+          orgTableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">No organizations found.</td></tr>';
+          return;
+      }
+
+      currentOrgsState.forEach((org) => {
+          // Update Select
+          const opt = document.createElement('option');
+          opt.value = org.orgId;
+          opt.textContent = `${org.name} (#${org.orgId})`;
+          if(String(org.orgId) === String(currentPrimary)) opt.selected = true;
+          primarySelect.appendChild(opt);
+
+          // Render Row
+          const tr = document.createElement('tr');
+          
+          let profilesHtml = '<span class="text-muted small">None</span>';
+          if (org.accessProfileIds && org.accessProfileIds.length > 0) {
+             profilesHtml = org.accessProfileIds.map((pid) => {
+                 const profile = accessMap.get(pid);
+                 if (profile) {
+                     return `<span class="badge bg-info text-dark me-1"><i class="bi bi-shield-lock me-1"></i>${profile.name}</span>`;
+                 }
+                 return `<span class="badge bg-secondary me-1">${pid}</span>`;
+             }).join('');
+          }
+
+          tr.innerHTML = `
+             <td>
+                <div class="fw-bold text-dark">${org.name}</div>
+                <div class="text-muted x-small">ID: ${org.orgId}</div>
+             </td>
+             <td>
+                <div class="small">${(Array.isArray(org.roles) && org.roles.length ? org.roles : [org.role || 'member']).map((role) => `<span class="badge bg-light text-dark border me-1">${role}</span>`).join('')}</div>
+                <span class="badge bg-light text-secondary border">${org.memberStatus}</span>
+             </td>
+             <td>${profilesHtml}</td>
+          `;
+          orgTableBody.appendChild(tr);
+      });
+  }
+  
+  renderOrgTable();
+
+  // Form Submit
+  const form = document.getElementById('profileForm');
+  form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      // Basic UI Feedback
+      const btn = form.querySelector('button[type="submit"]');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+      btn.disabled = true;
+
+      try {
+        const formData = new FormData(form);
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+          body: new URLSearchParams(formData).toString()
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          if(typeof showMessageModal === 'function') {
+             await showMessageModal({ title: 'Profile Updated', icon: 'success', message: result.message, buttons: [{ text: 'OK', class: 'btn-success' }] });
+          } else { alert('Saved!'); }
+          window.location ='/dashboard';//.reload();
+        } else {
+           if(typeof showMessageModal === 'function') {
+             await showMessageModal({ title: 'Error', icon: 'error', message: result.message, buttons: [{ text: 'OK', class: 'btn-danger' }] });
+          } else { alert(result.message); }
+        }
+      } catch (error) {
+        console.error(error);
+        alert('An error occurred.');
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+  });
+});
+</script>

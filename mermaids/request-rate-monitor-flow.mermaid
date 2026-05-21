@@ -1,0 +1,171 @@
+flowchart TD
+    A["HTTP Request
+    - method/path/query/headers/cookies arrive
+    - Express starts middleware chain"] --> B["app.js global middleware stack
+    - logger
+    - softAuth
+    - site policy enforcement
+    - requestRatePhaseOne"]
+
+    B --> C["softAuth (authMiddleware.js)
+    - read cookie auth_token
+    - validate token via authService
+    - hydrate req.user from token if valid
+    - on failure -> req.user = null (guest)"]
+
+    C --> D["siteStateMiddleware
+    - load website policy from dataService
+    - attach req.websitePolicy + res.locals.websitePolicy
+    - enforce bans/maintenance/schedule/public/api gates
+    - may block early or call next()"]
+
+    D --> E["requestRatePhaseOne entry
+    - runs after user/policy context is available
+    - executes internal limiter pipeline"]
+
+    subgraph RRM["requestRatePhaseOne internal pipeline (ordered)"]
+        E --> RS["1) routeSpecificLimiter
+        - compute effective config + route context
+        - if a route-specific policy exists, apply it first"]
+        RS --> G1["2) auth limiter"]
+        G1 --> G2["3) heavy limiter"]
+        G2 --> G3["4) write limiter"]
+        G3 --> G4["5) picker limiter"]
+        G4 --> G5["6) global limiter"]
+        G5 --> NX["next() -> route handlers"]
+    end
+
+    RS --> CFG["getConfig(req)
+    - start with DEFAULT_CONFIG
+    - merge website requestControl
+    - merge org custom routes only
+    - resolve groups/phase flags/route settings"]
+
+    CFG --> W["Website policy source
+    - req.websitePolicy.requestControl
+    - includes groups, phases, catalog overrides, temporary overrides"]
+
+    CFG --> O["Org policy source
+    - req.user.activeOrgPolicy.requestControl
+    - only customRoutes/routeOverrides considered"]
+
+    O --> O1["Org custom route normalization
+    - validate method/matchType/group/keyMode
+    - normalize path/lifecycle/priority"]
+
+    O1 --> CF["Conflict filter against website rules
+    - if org rule overlaps website rule (method+path scope)
+    - org rule is dropped (website remains authoritative)"]
+
+    W --> M1["Effective policy object produced
+    - defaults + website + filtered org custom rules
+    - adds policyScope marker for logging"]
+    CF --> M1
+
+    M1 --> RC["resolveRequestRateContext(req,cfg)
+    - set req._requestRateContext cache
+    - determine group + matched route + matched override"]
+
+    RC --> EX{"Excluded request?"}
+    EX -- "Yes" --> EXN["Excluded path/method
+    - OPTIONS or configured excludePaths
+    - skip limiter behavior"]
+    EX -- "No" --> P3{"phase3 enabled?"}
+
+    P3 -- "No" --> HCL["Fallback classifier
+    - auth: /login /force-login /captcha
+    - heavy: export/import/generate/download/sample-data
+    - write: POST/PUT/PATCH/DELETE
+    - picker: GET + query q + ajax/api/search patterns
+    - else global"]
+
+    P3 -- "Yes" --> CAT["Route catalog matching
+    - buildEffectiveRouteCatalog()
+    - apply enabled/disabled/group overrides
+    - find best matching rule by type + path length"]
+
+    CAT --> OVR["Active route override matching
+    - normalize override list
+    - filter enabled + active time window
+    - method + path match
+    - pick highest priority + most specific"]
+
+    OVR --> GRP["Final group selection
+    - override.group if set
+    - else catalog.group
+    - else fallback classified group"]
+    HCL --> GRP
+
+    GRP --> SPEC["getEffectiveRouteSpecificConfig
+    - prefer matched override config
+    - else use matched catalog routeSetting
+    - resolve windowMs/max/keyMode/mode/enforce"]
+
+    SPEC --> SPECQ{"Route-specific config found?"}
+
+    SPECQ -- "No" --> RSKIP["No route-specific limiter
+    - continue to group limiters"]
+
+    SPECQ -- "Yes" --> LIM["getSpecificLimiter(cache)
+    - cache key includes source/route/window/max/key/mode/enforce
+    - create limiter instance if cache miss"]
+
+    LIM --> LIME{"Specific limit exceeded?"}
+    LIME -- "No" --> RSNEXT["Pass to next limiter"]
+    LIME -- "Yes" --> LOG1["Specific exceed handling
+    - apply cooldown guard (shouldLog)
+    - logger._push with group, route, key, counts, resetTime
+    - mark monitorOnly/enforce info in log payload"]
+
+    LOG1 --> ENF1{"Specific enforce decision"}
+    ENF1 -- "Monitor only" --> RSNEXT
+    ENF1 -- "Enforce" --> R429["Return 429
+    - set Retry-After if reset time exists
+    - JSON response for ajax/api
+    - error view for browser requests"]
+
+    RSNEXT --> GPATH["Group limiter stage"]
+    RSKIP --> GPATH
+    EXN --> GPATH
+
+    GPATH --> GSKIP{"Skip this group limiter?"}
+    GSKIP -- "Yes if:
+    cfg disabled
+    OR handled by specific limiter
+    OR context.group != limiter group" --> GNEXT["Continue to next group limiter"]
+
+    GSKIP -- "No" --> GLIM["Run group limiter
+    - dynamic limit from cfg.groups[group].max
+    - dynamic key mode from cfg.groups[group].keyMode
+    - windowMs from limiter instance defaults"]
+
+    GLIM --> GLIME{"Group limit exceeded?"}
+    GLIME -- "No" --> GNEXT
+    GLIME -- "Yes" --> LOG2["Group exceed handling
+    - cooldown log guard
+    - logger._push with group/path/key and counters"]
+
+    LOG2 --> ENF2{"Group enforce decision
+    shouldEnforceForGroup()"}
+    ENF2 -- "Monitor only" --> GNEXT
+    ENF2 -- "Enforce" --> G429["Return 429
+    - Retry-After when available
+    - JSON for ajax/api, error view otherwise"]
+
+    subgraph KEY["Client key generation (buildClientKey)"]
+        K1["keyMode=ip
+        - key: ip:<hashed_ip>"]
+        K2["keyMode=username_ip
+        - username from body/query/user
+        - key: u:<username>|ip:<hashed_ip>"]
+        K3["keyMode=user_or_ip
+        - if req.user.id exists -> uid:<id>
+        - else ip:<hashed_ip>"]
+    end
+
+    M1 --> KEY
+
+    classDef soft fill:#f5f8ff,stroke:#4a6ee0,stroke-width:1px,color:#111;
+    classDef warn fill:#fff8e8,stroke:#c98a00,stroke-width:1px,color:#111;
+    class A,B,C,D,E,RRM,KEY soft;
+    class R429,G429 warn;

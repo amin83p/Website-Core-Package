@@ -1,0 +1,851 @@
+<%
+  const bioContact = (typeof appContact !== 'undefined' && appContact && typeof appContact === 'object') ? appContact : {};
+  const cleanBioRows = (rows, valueKey, legacyRows = []) => {
+    const source = Array.isArray(rows) ? rows : legacyRows;
+    return source
+      .map((row) => {
+        const item = row && typeof row === 'object' ? row : {};
+        const title = String(item.title || item.label || '').trim();
+        const value = String(item[valueKey] || item.value || '').trim();
+        return value ? { title, value } : null;
+      })
+      .filter(Boolean);
+  };
+  const bioEmails = cleanBioRows(bioContact.emails, 'email', bioContact.email ? [{ title: 'Email', email: bioContact.email }] : []);
+  const bioPhones = cleanBioRows(bioContact.phones, 'number', bioContact.phone ? [{ title: 'Phone', number: bioContact.phone }] : []);
+  const bioFaxes = cleanBioRows(bioContact.faxes, 'number', bioContact.fax ? [{ title: 'Fax', number: bioContact.fax }] : []);
+  const bioAddresses = cleanBioRows(bioContact.addresses, 'address', bioContact.address ? [{ title: 'Address', address: bioContact.address }] : []);
+  const bioEmail = bioEmails[0]?.value || '';
+  const bioAddress = bioAddresses[0]?.value || '';
+  const bioEmailHref = bioEmail ? `mailto:${encodeURIComponent(bioEmail)}` : '#';
+  const bioContactRows = [
+    ...bioEmails.map((row) => ({ label: row.title || 'Email', value: row.value })),
+    ...bioPhones.map((row) => ({ label: row.title || 'Phone', value: row.value })),
+    ...bioFaxes.map((row) => ({ label: row.title || 'Fax', value: row.value })),
+    ...bioAddresses.map((row) => ({ label: row.title || 'Address', value: row.value }))
+  ];
+%>
+<section class="pte-public-page biography-portfolio">
+  <div class="home-hero reveal">
+    <div class="pte-hero-orbit" aria-hidden="true">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-8">
+        <div class="home-kicker">Professional Portfolio</div>
+        <h1 class="home-title">Amin Paknejad</h1>
+        <p class="home-subtitle">
+          PhD-level Mechanical Engineer, Software Developer, and Technical Instructor focused on integrated
+          industrial systems, engineering methods, and AI-assisted software workflows.
+        </p>
+
+        <div class="d-flex flex-wrap gap-2 mb-4">
+          <% if (bioEmail) { %>
+            <a href="<%= bioEmailHref %>" class="btn btn-primary home-btn-main">Email Me</a>
+          <% } %>
+          <a href="https://www.linkedin.com/in/amin-paknejad" target="_blank" rel="noopener" class="btn btn-outline-primary home-btn-ghost">LinkedIn</a>
+          <a href="https://scholar.google.com/citations?user=U3BbnWwAAAAJ&hl=en" target="_blank" rel="noopener" class="btn btn-outline-primary home-btn-ghost">Google Scholar</a>
+        </div>
+
+        <div class="home-stat-row">
+          <div class="home-stat-chip">
+            <span class="home-stat-value"><%= bioAddress || 'Not configured' %></span>
+            <span class="home-stat-label">Base Location</span>
+          </div>
+          <div class="home-stat-chip">
+            <span class="home-stat-value">Manufacturing + Software</span>
+            <span class="home-stat-label">Domain Strength</span>
+          </div>
+          <div class="home-stat-chip">
+            <span class="home-stat-value">Python, C#, SQL</span>
+            <span class="home-stat-label">Core Stack</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="home-card home-card-emphasis h-100">
+          <h2 class="home-section-title mb-2">Professional Summary</h2>
+          <p class="text-muted mb-3">
+            Engineering methods, manufacturing execution, software automation, and technical instruction.
+          </p>
+          <div class="home-tag-grid">
+            <span>Methods Engineering</span>
+            <span>Industrial Automation</span>
+            <span>Mechanical Design</span>
+            <span>Technical Training</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-8 reveal delay-1">
+      <div class="home-panel h-100">
+        <h2 class="home-section-title">Highlights of Qualifications</h2>
+        <p class="mb-3 text-muted">
+          Expert in CATIA V5 and PLM-based engineering methods, with strong experience producing Engineering Masters (EM),
+          Work Instructions (WI), and assembly documentation that connect design intent to shop-floor execution.
+          Combines root-cause analysis and computational tooling to optimize manufacturing and operations.
+        </p>
+
+        <div class="home-step-list">
+          <div class="home-step-item">
+            <div class="home-step-no">01</div>
+            <div>
+              <h4>Methods and Production Documentation</h4>
+              <p>Structured EM/WI assets, MBOM control, and execution-ready assembly guidance.</p>
+            </div>
+          </div>
+          <div class="home-step-item">
+            <div class="home-step-no">02</div>
+            <div>
+              <h4>Computational Acceleration</h4>
+              <p>Python/C# automation for simulation flow, sequencing, and quality improvements.</p>
+            </div>
+          </div>
+          <div class="home-step-item">
+            <div class="home-step-no">03</div>
+            <div>
+              <h4>Cross-Functional Delivery</h4>
+              <p>Alignment across production, quality, procurement, and technical leadership teams.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4 reveal delay-2">
+      <div class="home-card home-card-emphasis h-100">
+        <h2 class="home-section-title">Contact</h2>
+        <div class="bio-fact-list">
+          <% if (bioContactRows.length) { %>
+            <% bioContactRows.forEach((row) => { %>
+              <div class="bio-fact-row">
+                <span class="bio-fact-label"><%= row.label %></span>
+                <span class="bio-fact-value"><%= row.value %></span>
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div class="text-muted small">Contact information is not configured.</div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-4 reveal delay-1">
+      <div class="home-card h-100">
+        <div class="home-icon primary"><i class="bi bi-tools"></i></div>
+        <h3>Manufacturing Systems</h3>
+        <p>CATIA V5, SolidWorks, PLM (Enovia/SmarTeam), AutoCAD, MBOM control, and tooling methods.</p>
+      </div>
+    </div>
+    <div class="col-md-4 reveal delay-2">
+      <div class="home-card h-100">
+        <div class="home-icon success"><i class="bi bi-cpu"></i></div>
+        <h3>Automation and Software</h3>
+        <p>Python, C#, C/C++, Fortran, SQL, TensorFlow, and parallel processing with MPI/OpenMP.</p>
+      </div>
+    </div>
+    <div class="col-md-4 reveal delay-3">
+      <div class="home-card h-100">
+        <div class="home-icon danger"><i class="bi bi-graph-up-arrow"></i></div>
+        <h3>Engineering Analysis</h3>
+        <p>RCA, CFD (Ansys Fluent), fluid-structure interaction, feasibility and cost-impact analysis.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-12 reveal delay-1">
+      <div class="home-panel">
+        <h2 class="home-section-title">Work Experience Portfolio</h2>
+        <p class="text-muted mb-0">Each role includes implementation highlights and measurable contributions.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-12 reveal delay-1">
+      <div class="home-card bio-role-card">
+        <div class="bio-role-head">
+          <div>
+            <h3 class="mb-1">Technical Instructor (Industrial Automation and Systems Logic)</h3>
+            <div class="bio-role-meta">Robertson College | Apr 2024 - Present</div>
+          </div>
+          <span class="bio-role-badge">Teaching + Industry Logic</span>
+        </div>
+        <ul class="bio-bullet-list">
+          <li>Instruct advanced program logic and Python automation for industrial workflow scenarios.</li>
+          <li>Built information management curriculum modeled on PLM/ERP hierarchy and data integrity principles.</li>
+          <li>Mentored engineering capstone teams on technical documentation and structured build sequencing.</li>
+          <li>Translated high-level engineering concepts into executable, operationally useful instructions.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-12 reveal delay-2">
+      <div class="home-card bio-role-card">
+        <div class="bio-role-head">
+          <div>
+            <h3 class="mb-1">Intermediate Methods and Mechanical Engineer</h3>
+            <div class="bio-role-meta">Pak Shareh Sepahan Co. | 2020 - 2024</div>
+          </div>
+          <span class="bio-role-badge">Methods + Production</span>
+        </div>
+        <ul class="bio-bullet-list">
+          <li>Developed and maintained EM and WI documents for manufacturing process and assembly execution.</li>
+          <li>Led root-cause analysis of production non-conformances and deployed corrective actions.</li>
+          <li>Managed MBOM and material equipment lists under strict configuration control requirements.</li>
+          <li>Performed technical feasibility and make-vs-buy analysis for design change decisions.</li>
+          <li>Collaborated with production, quality, and procurement to integrate product updates smoothly.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-12 reveal delay-3">
+      <div class="home-card bio-role-card">
+        <div class="bio-role-head">
+          <div>
+            <h3 class="mb-1">Mechanical and Manufacturing Design Engineer</h3>
+            <div class="bio-role-meta">Pak Shareh Sepahan Co. | 2018 - 2020</div>
+          </div>
+          <span class="bio-role-badge">Design + Simulation</span>
+        </div>
+        <ul class="bio-bullet-list">
+          <li>Designed complex structural sub-assemblies with CATIA V5 and SolidWorks.</li>
+          <li>Optimized assembly sequencing through simulation, improving performance efficiency by 15%.</li>
+          <li>Produced graphic assembly manuals and planning documents for shop-floor teams.</li>
+          <li>Authored engineering change requests for tooling and method refinement.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-12 reveal delay-1">
+      <div class="home-card bio-role-card">
+        <div class="bio-role-head">
+          <div>
+            <h3 class="mb-1">Technical Lead and University Lecturer</h3>
+            <div class="bio-role-meta">IUT | 2012 - 2018</div>
+          </div>
+          <span class="bio-role-badge">Leadership + Research</span>
+        </div>
+        <ul class="bio-bullet-list">
+          <li>Taught mechanical engineering and computer science with applied computational focus.</li>
+          <li>Led training and mentorship programs for junior engineers and co-op students.</li>
+          <li>Directed research on fluid-rigid-elastic structure interaction and vibration integrity problems.</li>
+          <li>Connected theoretical research with practical engineering implementation.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-5">
+    <div class="col-12 reveal delay-2">
+      <div class="home-card bio-role-card">
+        <div class="bio-role-head">
+          <div>
+            <h3 class="mb-1">Industrial Software Developer</h3>
+            <div class="bio-role-meta">Rayan Tahlil Sepahan Company | 2010 - 2012</div>
+          </div>
+          <span class="bio-role-badge">Software + QA</span>
+        </div>
+        <ul class="bio-bullet-list">
+          <li>Built industrial software to automate mechanical design and simulation tasks.</li>
+          <li>Applied systems logic and QA protocols for reliability in production software contexts.</li>
+          <li>Adapted software behavior to evolving project-specific requirements.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6 reveal delay-1">
+      <div class="home-card h-100">
+        <h2 class="home-section-title">Education</h2>
+        <div class="home-step-list">
+          <div class="home-step-item">
+            <div class="home-step-no">PhD</div>
+            <div>
+              <h4>Mechanical Engineering - University of Tehran</h4>
+              <p>Advanced fluid-rigid-elastic interaction and numerical strategy development.</p>
+            </div>
+          </div>
+          <div class="home-step-item">
+            <div class="home-step-no">MSc</div>
+            <div>
+              <h4>Mechanical Engineering - IUT / MUT</h4>
+              <p>Applied engineering analysis and advanced manufacturing disciplines.</p>
+            </div>
+          </div>
+          <div class="home-step-item">
+            <div class="home-step-no">BSc</div>
+            <div>
+              <h4>Computer Software Engineering - University of Shiraz</h4>
+              <p>Digital systems logic and software-oriented engineering perspective.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6 reveal delay-2">
+      <div class="home-card h-100">
+        <h2 class="home-section-title">Certificates and Credentials</h2>
+        <div class="home-tag-grid mb-3">
+          <span>APEGA Licensee Academic Qualification</span>
+          <span>Machine Learning - Stanford</span>
+          <span>Advanced Parallel Programming - IUT</span>
+          <span>Modern Web Development and UI - Johns Hopkins</span>
+        </div>
+        <div class="home-note-card">
+          <div class="home-note-title">Professional Direction</div>
+          <p class="mb-0 text-muted small">
+            Combining engineering depth, software architecture, and instructional leadership for practical industrial and educational outcomes.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-5">
+    <div class="col-lg-7 reveal delay-2">
+      <div class="home-card h-100">
+        <h2 class="home-section-title">Recent Project Highlights</h2>
+        <ul class="bio-bullet-list mb-0">
+          <li>Developed Engineering Masters and Work Instructions for transitioning PAKSHAR 3000 from concept to high-volume manufacturing.</li>
+          <li>Designed structural bodies and frames in CATIA V5, optimized for digital manufacturing feasibility.</li>
+          <li>Improved assembly build sequencing and reduced bottlenecks through mechanical analysis.</li>
+          <li>Architected ML-based sorting for industrial inspection workflows using Python and deep learning libraries.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="col-lg-5 reveal delay-3">
+      <div class="home-card h-100">
+        <h2 class="home-section-title">Publications and Research</h2>
+        <p class="text-muted mb-3">Selected research in fluid dynamics and numerical simulation with practical engineering impact.</p>
+        <div class="home-tag-grid mb-3">
+          <span>Laminar Flow and Lorentz Force Study</span>
+          <span>Fluid-Rigid-Elastic Interaction Methods</span>
+          <span>Numerical Simulation Strategy</span>
+          <span>Engineering Computation</span>
+        </div>
+        <a class="btn btn-outline-primary home-btn-ghost" href="https://scholar.google.com/citations?user=U3BbnWwAAAAJ&hl=en" target="_blank" rel="noopener">View Scholar Profile</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-cta reveal delay-3">
+    <div>
+      <h2>Engineering depth with practical software execution</h2>
+      <p>Open for industrial, educational, and automation collaborations.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/contact" class="btn btn-light text-primary fw-semibold">Start a Conversation</a>
+      <a href="/whatIOffer" class="btn btn-outline-light">Explore Services</a>
+      <% if (typeof user !== 'undefined' && user) { %>
+        <a href="/dashboard" class="btn btn-outline-light">Dashboard</a>
+      <% } %>
+    </div>
+  </div>
+</section>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+html.pte-public-root,
+html.pte-public-root body.pte-public-body {
+  background:
+    radial-gradient(circle at 8% 5%, rgba(29, 95, 184, 0.16), transparent 28%),
+    radial-gradient(circle at 92% 4%, rgba(8, 127, 140, 0.16), transparent 26%),
+    radial-gradient(circle at 9% 44%, rgba(29, 95, 184, 0.08), transparent 24%),
+    radial-gradient(circle at 91% 72%, rgba(8, 127, 140, 0.1), transparent 28%),
+    linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
+  min-height: 100%;
+}
+
+body.pte-public-body {
+  background-attachment: fixed;
+}
+
+main.pte-public-main {
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-bottom: clamp(2.4rem, 4vw, 4rem);
+  padding-top: 0;
+  position: relative;
+}
+
+.biography-portfolio {
+  --bio-ink: #13222c;
+  --bio-muted: #53636f;
+  --bio-line: #d7e1e7;
+  --bio-surface: #ffffff;
+  --bio-soft: #f5f8fa;
+  --bio-blue: #1d5fb8;
+  --bio-teal: #087f8c;
+  --bio-shadow: 0 18px 44px rgba(13, 41, 64, 0.14);
+  color: var(--bio-ink);
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  padding-top: clamp(1.2rem, 3vw, 2rem);
+  position: relative;
+}
+
+.biography-portfolio::before {
+  background:
+    linear-gradient(115deg, rgba(255,255,255,0.82), rgba(255,255,255,0.26)),
+    radial-gradient(circle at 12% 18%, rgba(29, 95, 184, 0.12), transparent 25%),
+    radial-gradient(circle at 86% 22%, rgba(8, 127, 140, 0.12), transparent 27%);
+  content: "";
+  inset: -2rem calc(50% - 50vw) -4rem;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.biography-portfolio .reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: bioFadeUp 0.52s ease forwards;
+}
+
+.biography-portfolio .delay-1 { animation-delay: 0.1s; }
+.biography-portfolio .delay-2 { animation-delay: 0.2s; }
+.biography-portfolio .delay-3 { animation-delay: 0.3s; }
+
+.biography-portfolio .home-hero {
+  background:
+    linear-gradient(140deg, rgba(255,255,255,0.9), rgba(255,255,255,0.78));
+  border: 1px solid rgba(202, 219, 232, 0.92);
+  border-radius: 18px;
+  box-shadow: var(--bio-shadow);
+  margin-bottom: 1.2rem;
+  overflow: hidden;
+  padding: clamp(1.15rem, 3vw, 1.9rem);
+  position: relative;
+}
+
+.biography-portfolio .pte-hero-orbit {
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+}
+
+.biography-portfolio .pte-hero-orbit span {
+  border-radius: 999px;
+  position: absolute;
+}
+
+.biography-portfolio .pte-hero-orbit span:nth-child(1) {
+  background: rgba(29, 95, 184, 0.12);
+  height: 240px;
+  right: -90px;
+  top: -86px;
+  width: 240px;
+}
+
+.biography-portfolio .pte-hero-orbit span:nth-child(2) {
+  border: 1px solid rgba(8, 127, 140, 0.22);
+  height: 160px;
+  left: -56px;
+  top: 52%;
+  width: 160px;
+}
+
+.biography-portfolio .pte-hero-orbit span:nth-child(3) {
+  background: radial-gradient(circle, rgba(29, 95, 184, 0.18) 1px, transparent 2px);
+  background-size: 18px 18px;
+  border-radius: 0;
+  height: 120px;
+  right: 14%;
+  top: 16%;
+  width: 170px;
+}
+
+.biography-portfolio .home-hero .row {
+  position: relative;
+  z-index: 2;
+}
+
+.biography-portfolio .home-kicker {
+  align-items: center;
+  background: rgba(8, 127, 140, 0.08);
+  border: 1px solid rgba(8, 127, 140, 0.2);
+  border-radius: 999px;
+  color: var(--bio-teal);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  margin-bottom: 0.95rem;
+  padding: 0.43rem 0.84rem;
+  text-transform: uppercase;
+}
+
+.biography-portfolio .home-title {
+  color: #083253;
+  font-size: clamp(2.15rem, 5vw, 4.2rem);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+  margin-bottom: 0.8rem;
+}
+
+.biography-portfolio .home-subtitle {
+  color: #365568;
+  font-size: clamp(0.98rem, 1.75vw, 1.15rem);
+  line-height: 1.72;
+  margin-bottom: 1rem;
+}
+
+.biography-portfolio .home-btn-main,
+.biography-portfolio .home-btn-ghost {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  font-weight: 760;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.62rem 1rem;
+}
+
+.biography-portfolio .home-btn-main {
+  background: #f0b84e;
+  border: 1px solid #f0b84e;
+  color: #16232c;
+}
+
+.biography-portfolio .home-btn-main:hover,
+.biography-portfolio .home-btn-main:focus {
+  background: #d99b23;
+  border-color: #d99b23;
+  color: #16232c;
+}
+
+.biography-portfolio .home-btn-ghost {
+  background: #ffffff;
+  border: 1px solid #c9dce9;
+  color: #163445;
+}
+
+.biography-portfolio .home-btn-ghost:hover,
+.biography-portfolio .home-btn-ghost:focus {
+  background: #e9f4fb;
+  border-color: #9cc6df;
+  color: #16232c;
+}
+
+.biography-portfolio .home-stat-row {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.biography-portfolio .home-stat-chip {
+  background: rgba(255,255,255,0.78);
+  border: 1px solid rgba(202, 219, 232, 0.92);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(17, 54, 78, 0.07);
+  min-height: 76px;
+  padding: 0.78rem 0.85rem;
+}
+
+.biography-portfolio .home-stat-value {
+  color: #0d4fa9;
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 760;
+  margin-bottom: 0.24rem;
+}
+
+.biography-portfolio .home-stat-label {
+  color: #456071;
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.biography-portfolio .home-panel,
+.biography-portfolio .home-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.biography-portfolio .home-card-emphasis,
+.biography-portfolio .home-panel-emphasis {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--bio-line);
+  border-radius: 14px;
+  box-shadow: 0 14px 36px rgba(13, 41, 64, 0.09);
+  padding: 1rem;
+}
+
+.biography-portfolio .home-section-title {
+  color: var(--bio-ink);
+  font-weight: 820;
+  margin-bottom: 0.78rem;
+}
+
+.biography-portfolio .home-card h3 {
+  color: #1f3c4f;
+  font-size: 1.08rem;
+  font-weight: 780;
+  margin-bottom: 0.36rem;
+}
+
+.biography-portfolio .home-card p {
+  color: var(--bio-muted);
+  line-height: 1.62;
+}
+
+.biography-portfolio .home-icon {
+  align-items: center;
+  border-radius: 10px;
+  display: inline-flex;
+  font-size: 1.15rem;
+  height: 44px;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  width: 44px;
+}
+
+.biography-portfolio .home-icon.primary { background: rgba(29, 95, 184, 0.12); color: #1d5fb8; }
+.biography-portfolio .home-icon.success { background: rgba(8, 127, 140, 0.12); color: #087f8c; }
+.biography-portfolio .home-icon.danger { background: rgba(194, 79, 57, 0.13); color: #c24f39; }
+
+.biography-portfolio .home-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.72rem;
+}
+
+.biography-portfolio .home-step-item {
+  background: transparent;
+  border: 0;
+  border-left: 3px solid rgba(29, 95, 184, 0.24);
+  border-radius: 0;
+  display: flex;
+  gap: 0.72rem;
+  padding: 0.22rem 0 0.22rem 0.82rem;
+}
+
+.biography-portfolio .home-step-no {
+  align-items: center;
+  background: rgba(29, 95, 184, 0.12);
+  border-radius: 10px;
+  color: var(--bio-blue);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 760;
+  height: 38px;
+  justify-content: center;
+  min-width: 56px;
+}
+
+.biography-portfolio .home-step-item h4 {
+  color: #1f3c4f;
+  font-size: 0.96rem;
+  font-weight: 760;
+  margin: 0 0 0.18rem;
+}
+
+.biography-portfolio .home-step-item p {
+  color: var(--bio-muted);
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.biography-portfolio .home-tag-grid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.biography-portfolio .home-tag-grid span {
+  align-items: center;
+  background: transparent;
+  border: 1px dashed #c8d7e4;
+  border-radius: 999px;
+  color: #2e4668;
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 650;
+  justify-content: flex-start;
+  padding: 0.28rem 0.6rem;
+  text-align: left;
+}
+
+.biography-portfolio .home-note-card {
+  background: linear-gradient(140deg, #f8fbff, #eef5fc);
+  border: 1px solid #dbe7f4;
+  border-radius: 12px;
+  padding: 0.75rem 0.82rem;
+}
+
+.biography-portfolio .home-note-title {
+  color: var(--bio-teal);
+  font-size: 0.79rem;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+}
+
+.biography-portfolio .bio-fact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.58rem;
+}
+
+.biography-portfolio .bio-fact-row {
+  border-bottom: 1px dashed #d5e0ef;
+  display: grid;
+  gap: 0.52rem;
+  grid-template-columns: 122px 1fr;
+  padding-bottom: 0.42rem;
+}
+
+.biography-portfolio .bio-fact-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.biography-portfolio .bio-fact-label {
+  color: #5d708d;
+  font-size: 0.79rem;
+  font-weight: 760;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.biography-portfolio .bio-fact-value {
+  color: #17223b;
+  font-size: 0.9rem;
+  font-weight: 640;
+  word-break: break-word;
+}
+
+.biography-portfolio .bio-role-card {
+  background: transparent;
+  border: 0;
+  border-left: 3px solid rgba(29, 95, 184, 0.24);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0.25rem 0 0.25rem 0.85rem;
+}
+
+.biography-portfolio .bio-role-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.85rem;
+  justify-content: space-between;
+  margin-bottom: 0.62rem;
+}
+
+.biography-portfolio .bio-role-meta {
+  color: #5f7494;
+  font-size: 0.86rem;
+  font-weight: 620;
+}
+
+.biography-portfolio .bio-role-badge {
+  background: #f4f8fc;
+  border: 1px solid #d3e1f2;
+  border-radius: 999px;
+  color: #2a4f77;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.3rem 0.6rem;
+  white-space: nowrap;
+}
+
+.biography-portfolio .bio-bullet-list {
+  color: #425e82;
+  line-height: 1.62;
+  margin: 0;
+  padding-left: 1rem;
+}
+
+.biography-portfolio .home-cta {
+  align-items: center;
+  background: linear-gradient(135deg, #0f3052, #0a5ca8);
+  border-radius: 18px;
+  box-shadow: 0 16px 36px rgba(10, 49, 88, 0.24);
+  color: #ffffff;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.95rem;
+  justify-content: space-between;
+  padding: 1.25rem 1.2rem;
+}
+
+.biography-portfolio .home-cta h2 {
+  font-size: clamp(1.15rem, 2.5vw, 1.65rem);
+  font-weight: 780;
+  margin: 0 0 0.22rem;
+}
+
+.biography-portfolio .home-cta p {
+  color: rgba(255, 255, 255, 0.88);
+  margin: 0;
+}
+
+.biography-portfolio .home-cta .btn {
+  border-radius: 8px;
+  font-weight: 700;
+  min-height: 42px;
+}
+
+@keyframes bioFadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 991.98px) {
+  .biography-portfolio .home-hero {
+    padding: 1.2rem;
+  }
+
+  .biography-portfolio .home-stat-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .biography-portfolio .home-card-emphasis,
+  .biography-portfolio .home-panel-emphasis {
+    border-radius: 12px;
+    padding: 0.9rem;
+  }
+
+  .biography-portfolio .home-tag-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .biography-portfolio .bio-role-head {
+    flex-direction: column;
+  }
+
+  .biography-portfolio .bio-fact-row {
+    gap: 0.18rem;
+    grid-template-columns: 1fr;
+  }
+}
+</style>

@@ -1,0 +1,115 @@
+<div class="sections-page">
+  <% const pkg = packageView || {}; %>
+  <% const learner = pkg.learnerTaskSheet || {}; %>
+  <% const assessment = pkg.teacherAssessmentSheet || {}; %>
+  <% const pbla = pkg.pblaEvidenceRecord || {}; %>
+  <% const showOverview = packageType === 'overview'; %>
+  <% const showLearner = packageType === 'learner' || showOverview; %>
+  <% const showAssessment = packageType === 'assessment' || showOverview; %>
+  <% const showPbla = packageType === 'pbla-record' || showOverview; %>
+
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0">Task Package - <%= pkg.title || pkg.taskId %></h1>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="/benchpath/tasks/view/<%= pkg.taskId %>" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-arrow-left me-1"></i> Task
+      </a>
+      <a href="/benchpath/tasks/package/<%= pkg.taskId %>?refresh=1" class="btn btn-outline-primary btn-md">
+        <i class="bi bi-arrow-repeat me-1"></i> Refresh Package
+      </a>
+      <button type="button" class="btn btn-filled btn-primary btn-md" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i> Print
+      </button>
+    </div>
+  </div>
+
+  <% if (persisted) { %>
+    <div class="alert alert-success">Package output refreshed and saved.</div>
+  <% } %>
+
+  <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
+    <a href="/benchpath/tasks/package/<%= pkg.taskId %>" class="btn btn-sm <%= showOverview ? 'btn-primary' : 'btn-outline-primary' %>">Overview</a>
+    <a href="/benchpath/tasks/package/<%= pkg.taskId %>/learner" class="btn btn-sm <%= packageType === 'learner' ? 'btn-primary' : 'btn-outline-primary' %>">Learner Task Sheet</a>
+    <a href="/benchpath/tasks/package/<%= pkg.taskId %>/assessment" class="btn btn-sm <%= packageType === 'assessment' ? 'btn-primary' : 'btn-outline-primary' %>">Teacher Assessment Sheet</a>
+    <a href="/benchpath/tasks/package/<%= pkg.taskId %>/pbla-record" class="btn btn-sm <%= packageType === 'pbla-record' ? 'btn-primary' : 'btn-outline-primary' %>">PBLA Evidence Record</a>
+  </div>
+
+  <% if (showOverview) { %>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold d-flex align-items-center justify-content-between">
+        <span>Readiness</span>
+        <span class="badge <%= pkg.readiness?.isReady ? 'bg-success' : 'bg-warning text-dark' %>"><%= pkg.readiness?.isReady ? 'Ready' : 'Needs Items' %></span>
+      </div>
+      <div class="card-body">
+        <ul class="mb-0 ps-3">
+          <% (pkg.readiness?.missingItems || []).forEach((item) => { %>
+            <li><%= item %></li>
+          <% }) %>
+          <% if (!(pkg.readiness?.missingItems || []).length) { %>
+            <li>No missing items.</li>
+          <% } %>
+        </ul>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (showLearner) { %>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Learner Task Sheet</div>
+      <div class="card-body">
+        <div><strong>Task Title:</strong> <%= learner.title || '-' %></div>
+        <div class="mt-2"><strong>Scenario:</strong> <%= learner.learnerScenario || '-' %></div>
+        <div class="mt-2"><strong>Instructions:</strong> <%= learner.learnerInstructions || '-' %></div>
+        <div class="mt-2"><strong>Allowed Supports:</strong> <%= learner.allowedSupports || '-' %></div>
+        <div class="mt-2"><strong>Time:</strong> <%= learner.timeEstimateMinutes || '-' %> min</div>
+        <div class="mt-2"><strong>Materials:</strong> <%= (learner.materialsResources || []).join(', ') || '-' %></div>
+        <div class="mt-2"><strong>Expected Output:</strong> <%= learner.expectedOutputArtifact || '-' %></div>
+        <div class="mt-2"><strong>Success Reminder:</strong> <%= learner.successReminder || '-' %></div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (showAssessment) { %>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Teacher Assessment Sheet</div>
+      <div class="card-body">
+        <div><strong>Skill:</strong> <%= assessment.skill || '-' %></div>
+        <div class="mt-2"><strong>Benchmark:</strong> <%= assessment.benchmark || '-' %></div>
+        <div class="mt-2"><strong>Competencies:</strong> <%= (assessment.competencies || []).map((row) => row.title || row.id).join(', ') || '-' %></div>
+        <div class="mt-2"><strong>Indicators:</strong> <%= (assessment.indicators || []).map((row) => row.title || row.id).join(', ') || '-' %></div>
+        <div class="mt-2"><strong>Features:</strong> <%= (assessment.featuresOfCommunication || []).map((row) => row.title || row.id).join(', ') || '-' %></div>
+        <div class="mt-2"><strong>Observable Evidence Checklist:</strong></div>
+        <ul class="mb-2 ps-3">
+          <% (assessment.observableEvidenceChecklist || []).forEach((row) => { %>
+            <li><%= row %></li>
+          <% }) %>
+        </ul>
+        <div><strong>Criteria:</strong></div>
+        <ul class="mb-2 ps-3">
+          <% (assessment.criteriaForSuccess || []).forEach((row) => { %>
+            <li><%= row %></li>
+          <% }) %>
+        </ul>
+        <div class="mt-2"><strong>Decision Options:</strong> <%= (assessment.overallDecisionOptions || []).join(', ') || '-' %></div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (showPbla) { %>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">PBLA Evidence Record</div>
+      <div class="card-body">
+        <div><strong>Task Title:</strong> <%= pbla.title || '-' %></div>
+        <div class="mt-2"><strong>Date:</strong> <%= pbla.datePlaceholder || 'YYYY-MM-DD' %></div>
+        <div class="mt-2"><strong>Class / Unit / Theme:</strong> <%= pbla.classUnitTheme || '-' %></div>
+        <div class="mt-2"><strong>Skill:</strong> <%= pbla.skill || '-' %></div>
+        <div class="mt-2"><strong>Benchmark:</strong> <%= pbla.benchmark || '-' %></div>
+        <div class="mt-2"><strong>Artifact Type:</strong> <%= pbla.artifactType || '-' %></div>
+        <div class="mt-2"><strong>Portfolio Fit:</strong> <%= pbla.portfolioFitSummary?.classification || '-' %></div>
+        <div class="mt-2"><strong>Validation:</strong> <%= pbla.validationSummary?.isValid ? 'Valid' : 'Needs Review' %></div>
+        <div class="mt-2"><strong>Feedback Placeholder:</strong> <%= pbla.feedbackSummaryPlaceholder || '-' %></div>
+      </div>
+    </div>
+  <% } %>
+</div>
+

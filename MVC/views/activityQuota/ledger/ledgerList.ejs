@@ -1,0 +1,933 @@
+<%
+  const ui = accessUi || {};
+  const canDelete = ui.canDelete === true;
+  const stateFilters = (filterState && typeof filterState === 'object')
+    ? filterState
+    : ((filters && typeof filters === 'object') ? filters : {});
+  const stateStats = (stats && typeof stats === 'object') ? stats : {};
+  const DEFAULT_LEDGER_MAX_ROWS = 5000;
+
+  function formatDateTime(value) {
+    const token = String(value || '').trim();
+    if (!token) return '-';
+    const date = new Date(token);
+    if (Number.isNaN(date.getTime())) return token;
+    return date.toLocaleString();
+  }
+
+  function formatMetric(value) {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return '0';
+    return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 });
+  }
+
+  function toCsv(input) {
+    if (Array.isArray(input)) return input.map((item) => String(item || '').trim()).filter(Boolean).join(',');
+    return String(input || '').trim();
+  }
+
+  function toList(input) {
+    if (Array.isArray(input)) return input.map((item) => String(item || '').trim()).filter(Boolean);
+    const token = String(input || '').trim();
+    if (!token) return [];
+    return token.split(',').map((item) => String(item || '').trim()).filter(Boolean);
+  }
+
+  const hasCustomMaxRows = (() => {
+    const raw = String(stateFilters.maxRows ?? '').trim();
+    if (!raw) return false;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 && parsed !== DEFAULT_LEDGER_MAX_ROWS;
+  })();
+
+  const hasLedgerFiltersApplied = Boolean(
+    String(stateFilters.fromDate || '').trim()
+    || String(stateFilters.toDate || '').trim()
+    || String(stateFilters.entryType || '').trim()
+    || toList(stateFilters.userIds || stateFilters.userId).length
+    || toList(stateFilters.sectionIds || stateFilters.section).length
+    || toList(stateFilters.operationIds || stateFilters.operation).length
+    || toList(stateFilters.creatorUserIds || stateFilters.creatorUserId).length
+    || toList(stateFilters.sourceEventTypes || stateFilters.sourceEventType).length
+    || toList(stateFilters.sourceEventIds || stateFilters.sourceEventId).length
+    || hasCustomMaxRows
+  );
+%>
+
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  manageBtns: Array.isArray(manageBtns) ? manageBtns : []
+}) %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Ledger</div>
+    <button
+      id="aqLedgerFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#aqLedgerFilterCollapse"
+      aria-expanded="<%= hasLedgerFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="aqLedgerFilterCollapse"
+      aria-label="<%= hasLedgerFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="aqLedgerFilterToggleIcon" class="bi <%= hasLedgerFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasLedgerFiltersApplied ? ' show' : '' %>" id="aqLedgerFilterCollapse">
+    <form method="GET" action="/activity-quota/ledger" class="card-body p-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-6 col-xl-3">
+        <label class="form-label">From Date</label>
+        <input type="date" name="fromDate" class="form-control size-md" value="<%= stateFilters.fromDate || '' %>">
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <label class="form-label">To Date</label>
+        <input type="date" name="toDate" class="form-control size-md" value="<%= stateFilters.toDate || '' %>">
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <label class="form-label">Entry Type</label>
+        <select name="entryType" class="form-select size-md">
+          <option value="" <%= !stateFilters.entryType ? 'selected' : '' %>>All</option>
+          <option value="credit" <%= stateFilters.entryType === 'credit' ? 'selected' : '' %>>Credit</option>
+          <option value="consumption" <%= stateFilters.entryType === 'consumption' ? 'selected' : '' %>>Consumption</option>
+          <option value="adjustment" <%= stateFilters.entryType === 'adjustment' ? 'selected' : '' %>>Adjustment</option>
+        </select>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <label class="form-label">Max Rows</label>
+        <input type="number" name="maxRows" class="form-control size-md" value="<%= Number(stateFilters.maxRows || 5000) %>" min="100" max="50000" step="100">
+      </div>
+    </div>
+
+    <div class="row g-3 align-items-start mt-1">
+      <div class="col-12 col-xl-4">
+        <label class="form-label">Target Users</label>
+        <div class="input-group">
+          <input type="text" id="aqLedgerUserSummary" class="form-control size-md bg-light" value="" readonly placeholder="No users selected">
+          <button type="button" class="btn btn-outline-primary" id="aqLedgerPickUserBtn"><i class="bi bi-search me-1"></i>Pick</button>
+          <button type="button" class="btn btn-outline-secondary" id="aqLedgerClearUserBtn">Clear</button>
+        </div>
+        <input type="hidden" name="userId" id="aqLedgerUserInput" value="<%= toCsv(stateFilters.userIds || stateFilters.userId) %>">
+        <div id="aqLedgerUserList" class="border rounded bg-light-subtle mt-2 p-2"></div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <label class="form-label">Sections</label>
+        <div class="input-group">
+          <input type="text" id="aqLedgerSectionSummary" class="form-control size-md bg-light" value="" readonly placeholder="No sections selected">
+          <button type="button" class="btn btn-outline-primary" id="aqLedgerPickSectionBtn"><i class="bi bi-search me-1"></i>Pick</button>
+          <button type="button" class="btn btn-outline-secondary" id="aqLedgerClearSectionBtn">Clear</button>
+        </div>
+        <input type="hidden" name="section" id="aqLedgerSectionInput" value="<%= toCsv(stateFilters.sectionIds || stateFilters.section) %>">
+        <div id="aqLedgerSectionList" class="border rounded bg-light-subtle mt-2 p-2"></div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <label class="form-label">Operations</label>
+        <div class="input-group">
+          <input type="text" id="aqLedgerOperationSummary" class="form-control size-md bg-light" value="" readonly placeholder="No operations selected">
+          <button type="button" class="btn btn-outline-primary" id="aqLedgerPickOperationBtn"><i class="bi bi-search me-1"></i>Pick</button>
+          <button type="button" class="btn btn-outline-secondary" id="aqLedgerClearOperationBtn">Clear</button>
+        </div>
+        <input type="hidden" name="operation" id="aqLedgerOperationInput" value="<%= toCsv(stateFilters.operationIds || stateFilters.operation) %>">
+        <div id="aqLedgerOperationList" class="border rounded bg-light-subtle mt-2 p-2"></div>
+      </div>
+    </div>
+
+    <div class="row g-3 align-items-start mt-1">
+      <div class="col-12 col-xl-4">
+        <label class="form-label">Creator Users</label>
+        <div class="input-group">
+          <input type="text" id="aqLedgerCreatorSummary" class="form-control size-md bg-light" value="" readonly placeholder="No creators selected">
+          <button type="button" class="btn btn-outline-primary" id="aqLedgerPickCreatorBtn"><i class="bi bi-search me-1"></i>Pick</button>
+          <button type="button" class="btn btn-outline-secondary" id="aqLedgerClearCreatorBtn">Clear</button>
+        </div>
+        <input type="hidden" name="creatorUserId" id="aqLedgerCreatorInput" value="<%= toCsv(stateFilters.creatorUserIds || stateFilters.creatorUserId) %>">
+        <div id="aqLedgerCreatorList" class="border rounded bg-light-subtle mt-2 p-2"></div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <label class="form-label">Source Event Types</label>
+        <input
+          type="text"
+          name="sourceEventType"
+          class="form-control size-md"
+          value="<%= toCsv(stateFilters.sourceEventTypes || stateFilters.sourceEventType) %>"
+          placeholder="e.g. practice_attempt, package_credit">
+        <div class="form-text">Use comma-separated values for multiple types.</div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <label class="form-label">Source Event IDs</label>
+        <input
+          type="text"
+          name="sourceEventId"
+          class="form-control size-md"
+          value="<%= toCsv(stateFilters.sourceEventIds || stateFilters.sourceEventId) %>"
+          placeholder="e.g. ATTEMPT-2026-001, AQL-EVT-12345">
+        <div class="form-text">Use comma-separated values for multiple IDs.</div>
+      </div>
+    </div>
+
+    <div class="row g-3 align-items-start mt-1">
+      <div class="col-12 d-flex justify-content-xl-end gap-2 pt-xl-2">
+        <a href="/activity-quota/ledger" class="btn btn-outline-secondary btn-md">Reset</a>
+        <button type="submit" class="btn btn-filled btn-primary btn-md">
+          <i class="bi bi-funnel me-1"></i> Apply
+        </button>
+      </div>
+    </div>
+    </form>
+  </div>
+</div>
+
+<% if (stateStats.truncated) { %>
+  <div class="alert alert-warning border shadow-sm mb-3">
+    Results are capped at <b><%= Number(stateStats.maxRows || 0).toLocaleString() %></b> rows. Apply narrower filters for full precision.
+  </div>
+<% } %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="small text-muted">
+      Matched rows: <span class="fw-bold text-dark"><%= Number(stateStats.totalRows || 0).toLocaleString() %></span>
+    </div>
+    <div class="small text-muted">
+      Row cap: <span class="fw-bold text-dark"><%= Number(stateStats.maxRows || 0).toLocaleString() %></span>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search ledger by id, user, section, operation, source, or creator...',
+  fields: searchableFields || []
+}) %>
+
+<% if (canDelete) { %>
+  <div id="aqLedgerBulkToolbar" class="alert alert-info d-flex justify-content-between align-items-center mb-3 d-none">
+    <div>
+      <i class="bi bi-check-square-fill me-2"></i>
+      <span class="fw-bold" id="aqLedgerBulkSelectedCount">0</span> ledger entries selected
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <button id="aqLedgerBulkDeleteBtn" type="button" class="btn btn-danger btn-sm fw-bold">
+        <i class="bi bi-trash me-1"></i>Delete Selected
+      </button>
+    </div>
+  </div>
+<% } %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <% if (canDelete) { %>
+          <th id="aqLedgerSelectAllHeader" style="width: 92px;" class="text-center ps-4" data-column="select" title="Select all / Deselect all" role="button" tabindex="0">
+            <label class="d-flex align-items-center justify-content-center gap-1 mb-0" for="aqLedgerSelectAll" style="cursor:pointer;">
+              <input type="checkbox" class="form-check-input" id="aqLedgerSelectAll">
+              <span class="small text-muted">Select</span>
+            </label>
+          </th>
+        <% } %>
+        <th class="ps-4">Date / Ledger ID</th>
+        <th>Entry Type</th>
+        <th>Target User</th>
+        <th>Organization</th>
+        <th>Section / Operation</th>
+        <th>Usage</th>
+        <th>Source</th>
+        <th>Creator</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr id="aqLedgerEmptyRow">
+          <td colspan="<%= canDelete ? 9 : 8 %>" class="text-center py-4 text-muted">No ledger entries found for these filters.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const display = item.display || {}; %>
+        <% const source = item.source || {}; %>
+        <tr
+          data-ledger-row="1"
+          data-ledger-id="<%= item.id || '' %>"
+          data-ledger-datetime="<%= item.dateTime || '' %>"
+          data-ledger-entry-type="<%= item.entryType || '' %>"
+          data-ledger-org-id="<%= item.orgId || '' %>"
+          data-ledger-user-id="<%= item.userId || '' %>"
+          data-ledger-user-name="<%= display.userName || '' %>"
+          data-ledger-section-id="<%= item.section || '' %>"
+          data-ledger-section-name="<%= display.sectionName || '' %>"
+          data-ledger-operation-id="<%= item.operation || '' %>"
+          data-ledger-operation-name="<%= display.operationName || '' %>"
+          data-ledger-call="<%= item.call || 0 %>"
+          data-ledger-amount="<%= item.amount || 0 %>"
+          data-ledger-token="<%= item.token || 0 %>"
+          data-ledger-volume="<%= item.volume || 0 %>"
+          data-ledger-source-module="<%= source.module || '' %>"
+          data-ledger-source-event-type="<%= source.eventType || '' %>"
+          data-ledger-source-event-id="<%= source.eventId || '' %>"
+          data-ledger-source-idempotency-key="<%= source.idempotencyKey || '' %>"
+          data-ledger-creator-name="<%= display.creatorName || '' %>"
+          data-ledger-creator-id="<%= (item.creator && item.creator.userId) ? item.creator.userId : ((item.creator && item.creator.type === 'system') ? 'System' : '-') %>"
+          style="cursor: pointer;">
+          <% if (canDelete) { %>
+            <td class="text-center ps-4">
+              <input type="checkbox" class="form-check-input aq-ledger-row-select session-checkbox" value="<%= item.id %>" aria-label="Select ledger entry <%= item.id || '-' %>">
+            </td>
+          <% } %>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= formatDateTime(item.dateTime) %></div>
+            <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
+          </td>
+          <td>
+            <span class="badge <%= item.entryType === 'credit' ? 'text-bg-success' : (item.entryType === 'consumption' ? 'text-bg-warning' : 'text-bg-info') %>">
+              <%= item.entryType || '-' %>
+            </span>
+          </td>
+          <td>
+            <div class="fw-bold text-dark"><%= display.userName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.userId || '-' %></div>
+          </td>
+          <td>
+            <div class="small text-dark font-monospace"><%= item.orgId || '-' %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= display.sectionName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.section || '-' %></div>
+            <div class="small fw-bold text-dark mt-1"><%= display.operationName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.operation || '-' %></div>
+          </td>
+          <td>
+            <div class="small text-dark">Call: <span class="fw-bold"><%= formatMetric(item.call) %></span></div>
+            <div class="x-small text-muted">Amount: <%= formatMetric(item.amount) %></div>
+            <div class="x-small text-muted">Token: <%= formatMetric(item.token) %></div>
+            <div class="x-small text-muted">Volume: <%= formatMetric(item.volume) %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= source.eventType || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= source.eventId || '-' %></div>
+            <div class="x-small text-muted"><%= source.module || '-' %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= display.creatorName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.creator && item.creator.userId ? item.creator.userId : (item.creator && item.creator.type === 'system' ? 'System' : '-') %></div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<div class="modal fade" id="aqLedgerRowDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-sm">
+      <div class="modal-header">
+        <h5 class="modal-title">Ledger Entry Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <div class="small text-muted">Date / Time</div>
+            <div class="fw-bold" id="aqLedgerDetailDateTime">-</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="small text-muted">Entry ID</div>
+            <div class="fw-bold font-monospace" id="aqLedgerDetailId">-</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="small text-muted">Entry Type</div>
+            <div class="fw-bold" id="aqLedgerDetailEntryType">-</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="small text-muted">Organization</div>
+            <div class="fw-bold font-monospace" id="aqLedgerDetailOrgId">-</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="small text-muted">Target User</div>
+            <div class="fw-bold" id="aqLedgerDetailUserName">-</div>
+            <div class="x-small text-muted font-monospace" id="aqLedgerDetailUserId">-</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="small text-muted">Creator</div>
+            <div class="fw-bold" id="aqLedgerDetailCreatorName">-</div>
+            <div class="x-small text-muted font-monospace" id="aqLedgerDetailCreatorId">-</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="small text-muted">Section</div>
+            <div class="fw-bold" id="aqLedgerDetailSectionName">-</div>
+            <div class="x-small text-muted font-monospace" id="aqLedgerDetailSectionId">-</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="small text-muted">Operation</div>
+            <div class="fw-bold" id="aqLedgerDetailOperationName">-</div>
+            <div class="x-small text-muted font-monospace" id="aqLedgerDetailOperationId">-</div>
+          </div>
+          <div class="col-12">
+            <hr class="my-1">
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="small text-muted">Call</div>
+            <div class="fw-bold" id="aqLedgerDetailCall">0</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="small text-muted">Amount</div>
+            <div class="fw-bold" id="aqLedgerDetailAmount">0</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="small text-muted">Token</div>
+            <div class="fw-bold" id="aqLedgerDetailToken">0</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="small text-muted">Volume</div>
+            <div class="fw-bold" id="aqLedgerDetailVolume">0</div>
+          </div>
+          <div class="col-12">
+            <hr class="my-1">
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="small text-muted">Source Type</div>
+            <div class="fw-bold" id="aqLedgerDetailSourceType">-</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="small text-muted">Source Event ID</div>
+            <div class="fw-bold font-monospace" id="aqLedgerDetailSourceEventId">-</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="small text-muted">Source Module</div>
+            <div class="fw-bold" id="aqLedgerDetailSourceModule">-</div>
+          </div>
+          <div class="col-12">
+            <div class="small text-muted">Idempotency Key</div>
+            <div class="fw-bold font-monospace text-break" id="aqLedgerDetailIdempotencyKey">-</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="aqLedgerFilterState"><%- JSON.stringify(stateFilters || {}).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029').replace(/&/g, '\\u0026') %></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const actionStateRef = document.getElementById('actionStateIdRef');
+  const actionStateId = actionStateRef ? String(actionStateRef.getAttribute('data-id') || '').trim() : '';
+  const selectAllNode = document.getElementById('aqLedgerSelectAll');
+  const selectAllHeader = document.getElementById('aqLedgerSelectAllHeader');
+  const rowCheckboxes = Array.from(document.querySelectorAll('.aq-ledger-row-select'));
+  const bulkToolbar = document.getElementById('aqLedgerBulkToolbar');
+  const bulkSelectedCount = document.getElementById('aqLedgerBulkSelectedCount');
+  const bulkDeleteBtn = document.getElementById('aqLedgerBulkDeleteBtn');
+  const tableBody = document.querySelector('#first-table tbody');
+  const ledgerTableColumnCount = <%= canDelete ? 9 : 8 %>;
+
+  function initCollapseToggleIcon(options = {}) {
+    const collapseEl = document.getElementById(String(options.collapseId || ''));
+    const buttonEl = document.getElementById(String(options.buttonId || ''));
+    const iconEl = document.getElementById(String(options.iconId || ''));
+    if (!collapseEl || !buttonEl || !iconEl) return;
+
+    const openIcon = String(options.openIcon || 'bi-chevron-down');
+    const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+
+    const setState = (expanded) => {
+      iconEl.classList.remove(openIcon, closeIcon);
+      iconEl.classList.add(expanded ? closeIcon : openIcon);
+      buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', expanded ? 'Close filters' : 'Open filters');
+    };
+
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+    collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+  }
+
+  initCollapseToggleIcon({
+    collapseId: 'aqLedgerFilterCollapse',
+    buttonId: 'aqLedgerFilterToggleBtn',
+    iconId: 'aqLedgerFilterToggleIcon',
+    openIcon: 'bi-chevron-down',
+    closeIcon: 'bi-chevron-up'
+  });
+
+  async function showMessage(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+      return;
+    }
+    window.alert([title, message].filter(Boolean).join('\n\n'));
+  }
+
+  async function showConfirm(title, message, confirmText = 'Delete', confirmClass = 'btn-danger') {
+    if (typeof window.showMessageModal === 'function') {
+      const decision = await window.showMessageModal({
+        title,
+        message,
+        icon: 'warning',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: confirmText, class: confirmClass }
+        ]
+      });
+      return String(decision || '').trim().toLowerCase() === String(confirmText || '').trim().toLowerCase();
+    }
+    return window.confirm(message || title || 'Are you sure?');
+  }
+
+  function setButtonBusy(button, isBusy, busyLabel = 'Working...') {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) {
+      button.dataset.defaultHtml = button.innerHTML;
+    }
+    if (isBusy) {
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + String(busyLabel || 'Working...');
+      return;
+    }
+    button.disabled = false;
+    button.innerHTML = button.dataset.defaultHtml || button.innerHTML;
+  }
+
+  function getSelectedLedgerIds() {
+    return rowCheckboxes
+      .filter((checkbox) => checkbox && checkbox.checked)
+      .map((checkbox) => String(checkbox.value || '').trim())
+      .filter(Boolean);
+  }
+
+  function syncSelectionToolbar() {
+    const selectedCount = getSelectedLedgerIds().length;
+    if (bulkSelectedCount) bulkSelectedCount.textContent = String(selectedCount);
+    if (bulkToolbar) {
+      bulkToolbar.classList.toggle('d-none', selectedCount <= 0);
+    }
+    if (selectAllNode) {
+      const totalCount = rowCheckboxes.length;
+      selectAllNode.checked = totalCount > 0 && selectedCount === totalCount;
+      selectAllNode.indeterminate = selectedCount > 0 && selectedCount < totalCount;
+    }
+  }
+
+  function clearSelection() {
+    rowCheckboxes.forEach((checkbox) => {
+      checkbox.checked = false;
+    });
+    syncSelectionToolbar();
+  }
+
+  function bindRowCheckboxListeners() {
+    rowCheckboxes.forEach((checkbox) => {
+      if (!checkbox || checkbox.dataset.aqLedgerBound === '1') return;
+      checkbox.dataset.aqLedgerBound = '1';
+      checkbox.addEventListener('change', syncSelectionToolbar);
+    });
+  }
+
+  function ensureEmptyRowIfNeeded() {
+    const realRows = Array.from(document.querySelectorAll('#first-table tbody tr[data-ledger-row="1"]'));
+    const existingEmpty = document.getElementById('aqLedgerEmptyRow');
+    if (realRows.length > 0) {
+      if (existingEmpty) existingEmpty.remove();
+      return;
+    }
+    if (existingEmpty || !tableBody) return;
+    const tr = document.createElement('tr');
+    tr.id = 'aqLedgerEmptyRow';
+    tr.innerHTML = '<td colspan="' + ledgerTableColumnCount + '" class="text-center py-4 text-muted">No ledger entries found for these filters.</td>';
+    tableBody.appendChild(tr);
+  }
+
+  function getDatasetValue(row, key, fallback = '-') {
+    if (!row || !row.dataset) return fallback;
+    const value = String(row.dataset[key] || '').trim();
+    return value || fallback;
+  }
+
+  function formatDetailNumber(value) {
+    const numeric = Number(value || 0);
+    if (!Number.isFinite(numeric)) return '0';
+    return numeric.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 });
+  }
+
+  function setTextById(id, value) {
+    const node = document.getElementById(id);
+    if (!node) return;
+    node.textContent = String(value == null ? '' : value);
+  }
+
+  function initRowDetailModal() {
+    const modalEl = document.getElementById('aqLedgerRowDetailModal');
+    const tableEl = document.getElementById('first-table');
+    if (!modalEl || !tableEl || !window.bootstrap) return;
+    // Move modal to <body> to avoid stacking-context issues that can hide it behind backdrop.
+    if (modalEl.parentElement !== document.body) {
+      document.body.appendChild(modalEl);
+    }
+    const modal = new window.bootstrap.Modal(modalEl);
+
+    tableEl.querySelectorAll('tbody tr[data-ledger-row="1"]').forEach((row) => {
+      row.setAttribute('tabindex', '0');
+      row.setAttribute('role', 'button');
+      row.setAttribute('title', 'Click to view details');
+
+      const open = () => {
+        setTextById('aqLedgerDetailDateTime', getDatasetValue(row, 'ledgerDatetime'));
+        setTextById('aqLedgerDetailId', getDatasetValue(row, 'ledgerId'));
+        setTextById('aqLedgerDetailEntryType', getDatasetValue(row, 'ledgerEntryType'));
+        setTextById('aqLedgerDetailOrgId', getDatasetValue(row, 'ledgerOrgId'));
+        setTextById('aqLedgerDetailUserName', getDatasetValue(row, 'ledgerUserName'));
+        setTextById('aqLedgerDetailUserId', getDatasetValue(row, 'ledgerUserId'));
+        setTextById('aqLedgerDetailCreatorName', getDatasetValue(row, 'ledgerCreatorName'));
+        setTextById('aqLedgerDetailCreatorId', getDatasetValue(row, 'ledgerCreatorId'));
+        setTextById('aqLedgerDetailSectionName', getDatasetValue(row, 'ledgerSectionName'));
+        setTextById('aqLedgerDetailSectionId', getDatasetValue(row, 'ledgerSectionId'));
+        setTextById('aqLedgerDetailOperationName', getDatasetValue(row, 'ledgerOperationName'));
+        setTextById('aqLedgerDetailOperationId', getDatasetValue(row, 'ledgerOperationId'));
+        setTextById('aqLedgerDetailCall', formatDetailNumber(getDatasetValue(row, 'ledgerCall', '0')));
+        setTextById('aqLedgerDetailAmount', formatDetailNumber(getDatasetValue(row, 'ledgerAmount', '0')));
+        setTextById('aqLedgerDetailToken', formatDetailNumber(getDatasetValue(row, 'ledgerToken', '0')));
+        setTextById('aqLedgerDetailVolume', formatDetailNumber(getDatasetValue(row, 'ledgerVolume', '0')));
+        setTextById('aqLedgerDetailSourceType', getDatasetValue(row, 'ledgerSourceEventType'));
+        setTextById('aqLedgerDetailSourceEventId', getDatasetValue(row, 'ledgerSourceEventId'));
+        setTextById('aqLedgerDetailSourceModule', getDatasetValue(row, 'ledgerSourceModule'));
+        setTextById('aqLedgerDetailIdempotencyKey', getDatasetValue(row, 'ledgerSourceIdempotencyKey'));
+        modal.show();
+      };
+
+      row.addEventListener('click', (event) => {
+        if (event.target.closest('button, a, input, select, textarea, label')) return;
+        open();
+      });
+      row.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          open();
+        }
+      });
+    });
+  }
+
+  initRowDetailModal();
+
+  bindRowCheckboxListeners();
+
+  if (selectAllHeader) {
+    selectAllHeader.addEventListener('click', (event) => {
+      if (event.target.closest('input, label')) return;
+      if (!selectAllNode) return;
+      const nextState = !selectAllNode.checked || selectAllNode.indeterminate;
+      selectAllNode.checked = nextState;
+      selectAllNode.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    selectAllHeader.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      if (!selectAllNode) return;
+      const nextState = !selectAllNode.checked || selectAllNode.indeterminate;
+      selectAllNode.checked = nextState;
+      selectAllNode.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+
+  if (selectAllNode) {
+    selectAllNode.addEventListener('change', () => {
+      const checked = Boolean(selectAllNode.checked);
+      rowCheckboxes.forEach((checkbox) => {
+        checkbox.checked = checked;
+      });
+      syncSelectionToolbar();
+    });
+  }
+
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const ids = getSelectedLedgerIds();
+      if (!ids.length) {
+        await showMessage('No Selection', 'Select at least one ledger entry first.', 'warning');
+        return;
+      }
+
+      const confirmed = await showConfirm(
+        'Delete Selected Ledger Entries',
+        'Delete ' + ids.length + ' selected ledger entr' + (ids.length === 1 ? 'y' : 'ies') + '? This action cannot be undone.',
+        'Delete',
+        'btn-danger'
+      );
+      if (!confirmed) return;
+
+      const endpoint = '/activity-quota/ledger/bulk-delete?actionStateId=' + encodeURIComponent(actionStateId || '');
+      setButtonBusy(bulkDeleteBtn, true, 'Deleting...');
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Ajax-Request': 'true',
+            Accept: 'application/json'
+          },
+          body: JSON.stringify({ ids })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.status !== 'success') {
+          throw new Error(payload.message || 'Bulk delete failed.');
+        }
+
+        const removedIds = Array.isArray(payload?.results?.removedIds) ? payload.results.removedIds : ids;
+        const removeSet = new Set(removedIds.map((id) => String(id || '').trim()).filter(Boolean));
+        rowCheckboxes.forEach((checkbox) => {
+          const id = String(checkbox.value || '').trim();
+          if (!id || !removeSet.has(id)) return;
+          const row = checkbox.closest('tr[data-ledger-row="1"]');
+          if (row) row.remove();
+        });
+
+        rowCheckboxes.splice(0, rowCheckboxes.length, ...Array.from(document.querySelectorAll('.aq-ledger-row-select')));
+        bindRowCheckboxListeners();
+        clearSelection();
+        ensureEmptyRowIfNeeded();
+        await showMessage('Deleted', payload.message || 'Selected ledger entries were deleted successfully.', 'success');
+      } catch (error) {
+        await showMessage('Delete Failed', error.message || 'Failed to delete selected ledger entries.', 'error');
+      } finally {
+        setButtonBusy(bulkDeleteBtn, false);
+      }
+    });
+  }
+
+  syncSelectionToolbar();
+
+  if (!window.GenericPicker) return;
+
+  function parseJsonScript(id, fallback) {
+    try {
+      const node = document.getElementById(id);
+      if (!node) return fallback;
+      return JSON.parse(node.textContent || '{}');
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function toList(raw) {
+    if (Array.isArray(raw)) return raw.map((item) => String(item || '').trim()).filter(Boolean);
+    const token = String(raw || '').trim();
+    if (!token) return [];
+    return token.split(',').map((item) => String(item || '').trim()).filter(Boolean);
+  }
+
+  const filterState = parseJsonScript('aqLedgerFilterState', {});
+  const contexts = window.GenericPickerContexts || {};
+  const activeOrgContext = (typeof contexts.activeOrganizationScope === 'function')
+    ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+    : null;
+
+  const fieldConfig = {
+    users: {
+      key: 'userIds',
+      fallback: 'userId',
+      inputId: 'aqLedgerUserInput',
+      summaryId: 'aqLedgerUserSummary',
+      listId: 'aqLedgerUserList',
+      pickBtnId: 'aqLedgerPickUserBtn',
+      clearBtnId: 'aqLedgerClearUserBtn',
+      placeholder: 'No users selected',
+      picker: () => window.GenericPickerPresets.user({
+        title: 'Select Target Users',
+        icon: 'bi-people',
+        apiEndpoint: '/activity-quota/ledger/picker/users',
+        searchFields: 'id,username,email,name',
+        placeholder: 'Search users by id, username, or email...',
+        multiselect: true,
+        context: activeOrgContext
+      })
+    },
+    sections: {
+      key: 'sectionIds',
+      fallback: 'section',
+      inputId: 'aqLedgerSectionInput',
+      summaryId: 'aqLedgerSectionSummary',
+      listId: 'aqLedgerSectionList',
+      pickBtnId: 'aqLedgerPickSectionBtn',
+      clearBtnId: 'aqLedgerClearSectionBtn',
+      placeholder: 'No sections selected',
+      picker: () => window.GenericPickerPresets.section({
+        title: 'Select Sections',
+        icon: 'bi-collection',
+        apiEndpoint: '/activity-quota/ledger/picker/sections',
+        searchFields: 'id,name,description,category',
+        placeholder: 'Search sections...',
+        multiselect: true,
+        context: activeOrgContext
+      })
+    },
+    operations: {
+      key: 'operationIds',
+      fallback: 'operation',
+      inputId: 'aqLedgerOperationInput',
+      summaryId: 'aqLedgerOperationSummary',
+      listId: 'aqLedgerOperationList',
+      pickBtnId: 'aqLedgerPickOperationBtn',
+      clearBtnId: 'aqLedgerClearOperationBtn',
+      placeholder: 'No operations selected',
+      picker: () => window.GenericPickerPresets.operation({
+        title: 'Select Operations',
+        icon: 'bi-gear',
+        apiEndpoint: '/activity-quota/ledger/picker/operations',
+        searchFields: 'id,name,description',
+        placeholder: 'Search operations...',
+        multiselect: true,
+        context: activeOrgContext
+      })
+    },
+    creators: {
+      key: 'creatorUserIds',
+      fallback: 'creatorUserId',
+      inputId: 'aqLedgerCreatorInput',
+      summaryId: 'aqLedgerCreatorSummary',
+      listId: 'aqLedgerCreatorList',
+      pickBtnId: 'aqLedgerPickCreatorBtn',
+      clearBtnId: 'aqLedgerClearCreatorBtn',
+      placeholder: 'No creators selected',
+      picker: () => window.GenericPickerPresets.user({
+        title: 'Select Creator Users',
+        icon: 'bi-person-badge',
+        apiEndpoint: '/activity-quota/ledger/picker/users',
+        searchFields: 'id,username,email,name',
+        placeholder: 'Search creator users...',
+        multiselect: true,
+        context: activeOrgContext
+      })
+    }
+  };
+
+  const state = {};
+
+  Object.keys(fieldConfig).forEach((fieldName) => {
+    const cfg = fieldConfig[fieldName];
+    const initial = toList(filterState[cfg.key]).concat(toList(filterState[cfg.fallback]));
+    const unique = Array.from(new Set(initial));
+    state[fieldName] = unique.map((id) => ({ id, name: id }));
+  });
+
+  function renderField(fieldName) {
+    const cfg = fieldConfig[fieldName];
+    const inputEl = document.getElementById(cfg.inputId);
+    const summaryEl = document.getElementById(cfg.summaryId);
+    const listEl = document.getElementById(cfg.listId);
+    if (!inputEl || !summaryEl || !listEl) return;
+
+    const selected = Array.isArray(state[fieldName]) ? state[fieldName] : [];
+    inputEl.value = selected.map((item) => String(item.id || '').trim()).filter(Boolean).join(',');
+    summaryEl.value = selected.length ? (selected.length + ' selected') : '';
+    summaryEl.placeholder = cfg.placeholder;
+
+    if (!selected.length) {
+      listEl.innerHTML = '<div class="text-muted small py-1">' + escapeHtml(cfg.placeholder) + '</div>';
+      return;
+    }
+
+    listEl.innerHTML = selected.map((item) => {
+      const id = String(item.id || '').trim();
+      const name = String(item.name || id).trim() || id;
+      return ''
+        + '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-2 py-1 mb-1">'
+        + '  <div class="overflow-hidden">'
+        + '    <div class="small fw-bold text-truncate">' + escapeHtml(name) + '</div>'
+        + '    <div class="x-small text-muted font-monospace text-truncate">' + escapeHtml(id) + '</div>'
+        + '  </div>'
+        + '  <button type="button" class="btn btn-outline-danger btn-sm" data-ledger-remove="' + escapeHtml(fieldName) + '" data-ledger-remove-id="' + escapeHtml(id) + '"><i class="bi bi-x-lg"></i></button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function upsertFieldItems(fieldName, items) {
+    const list = Array.isArray(items) ? items : [items];
+    const current = Array.isArray(state[fieldName]) ? state[fieldName] : [];
+    const byId = new Map(current.map((item) => [String(item.id || '').trim(), item]));
+    list.forEach((raw) => {
+      const item = raw && typeof raw === 'object' ? raw : { id: raw };
+      const id = String(item.id || '').trim();
+      if (!id) return;
+      byId.set(id, {
+        id,
+        name: String(item.name || item.label || item.title || id).trim() || id
+      });
+    });
+    state[fieldName] = Array.from(byId.values());
+    renderField(fieldName);
+  }
+
+  function clearField(fieldName) {
+    state[fieldName] = [];
+    renderField(fieldName);
+  }
+
+  function removeFieldItem(fieldName, id) {
+    const token = String(id || '').trim();
+    state[fieldName] = (Array.isArray(state[fieldName]) ? state[fieldName] : [])
+      .filter((item) => String(item.id || '').trim() !== token);
+    renderField(fieldName);
+  }
+
+  function openPicker(fieldName) {
+    const cfg = fieldConfig[fieldName];
+    if (!cfg) return;
+    const pickerConfig = cfg.picker();
+    pickerConfig.multiselect = true;
+    pickerConfig.onSelect = (items) => {
+      upsertFieldItems(fieldName, items);
+    };
+    window.GenericPicker.open(pickerConfig);
+  }
+
+  Object.keys(fieldConfig).forEach((fieldName) => {
+    renderField(fieldName);
+    const cfg = fieldConfig[fieldName];
+    const pickBtn = document.getElementById(cfg.pickBtnId);
+    const clearBtn = document.getElementById(cfg.clearBtnId);
+    if (pickBtn) pickBtn.addEventListener('click', () => openPicker(fieldName));
+    if (clearBtn) clearBtn.addEventListener('click', () => clearField(fieldName));
+  });
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-ledger-remove]');
+    if (!button) return;
+    const fieldName = String(button.getAttribute('data-ledger-remove') || '').trim();
+    const id = String(button.getAttribute('data-ledger-remove-id') || '').trim();
+    if (!fieldName || !id) return;
+    removeFieldItem(fieldName, id);
+  });
+});
+</script>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('../../partials/tablePages-end') %>
+<%- include('../../partials/modal_GenericPicker') %>

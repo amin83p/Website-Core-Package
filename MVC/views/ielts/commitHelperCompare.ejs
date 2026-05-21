@@ -1,0 +1,340 @@
+<div class="sections-page">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="page-heading size-md m-0">Commit History Compare</h2>
+            <div class="text-muted small mt-1">Compare saved tweak records and inspect what changed at each step.</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="/ielts/commit-helper" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back to Commit Helper
+            </a>
+            <a href="<%= ieltsSectionDashboardHref %>" class="ielts-navigator-dashboard btn btn-outline-secondary btn-sm">
+                <i class="bi bi-speedometer2 me-1"></i> IELTS Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="alert alert-light border shadow-sm mb-3 small">
+        <span class="fw-bold">History file:</span> <code><%= historyPath %></code>
+    </div>
+
+    <% if (!entries || entries.length === 0) { %>
+        <div class="alert alert-warning shadow-sm">
+            No saved commit-history entries found yet. Run Step 4 in Commit Helper to generate records.
+        </div>
+    <% } else { %>
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-sliders me-2"></i>Comparison Inputs</h6>
+                        <label class="form-label small fw-bold">Baseline Entry (Older)</label>
+                        <select id="leftEntrySelect" class="form-select mb-3"></select>
+
+                        <label class="form-label small fw-bold">Current Entry (Newer)</label>
+                        <select id="rightEntrySelect" class="form-select mb-3"></select>
+
+                        <button id="btnCompare" class="btn btn-primary w-100 fw-bold">
+                            <i class="bi bi-diagram-3-fill me-1"></i> Compare
+                        </button>
+
+                        <div class="border rounded p-2 mt-3 bg-light small">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Total records</span>
+                                <span class="fw-bold" id="totalRecordsCount">0</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Compared pair</span>
+                                <span class="fw-bold" id="pairLabel">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-arrow-left-right me-2"></i>Diff Summary</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="fw-bold text-success small mb-2">Files Added</div>
+                                    <ul id="filesAddedList" class="small m-0 ps-3"></ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="fw-bold text-danger small mb-2">Files Removed</div>
+                                    <ul id="filesRemovedList" class="small m-0 ps-3"></ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="fw-bold text-primary small mb-2">Validation Added</div>
+                                    <ul id="validationAddedList" class="small m-0 ps-3"></ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="fw-bold text-secondary small mb-2">Validation Removed</div>
+                                    <ul id="validationRemovedList" class="small m-0 ps-3"></ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 border rounded p-3 bg-light small">
+                            <div><span class="fw-bold">Reason Changed:</span> <span id="reasonChangedFlag">-</span></div>
+                            <div><span class="fw-bold">Commit Subject Changed:</span> <span id="subjectChangedFlag">-</span></div>
+                            <div><span class="fw-bold">Dissertation Impact Changed:</span> <span id="impactChangedFlag">-</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mt-1">
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white fw-bold small text-muted">Baseline Entry (Step Trace)</div>
+                    <div class="card-body">
+                        <div id="leftEntryDetails"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white fw-bold small text-muted">Current Entry (Step Trace)</div>
+                    <div class="card-body">
+                        <div id="rightEntryDetails"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-white fw-bold small text-muted">Saved History Timeline</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover m-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date (UTC)</th>
+                                <th>Tweak ID</th>
+                                <th>Type</th>
+                                <th>Summary</th>
+                                <th>Branch</th>
+                                <th>HEAD</th>
+                            </tr>
+                        </thead>
+                        <tbody id="timelineTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    <% } %>
+</div>
+
+<% if (entries && entries.length > 0) { %>
+<script type="application/json" id="historyEntriesData"><%- JSON.stringify(entries).replace(/</g, '\\u003c') %></script>
+<script>
+    const allEntries = JSON.parse(document.getElementById('historyEntriesData').textContent || '[]');
+    const leftSelect = document.getElementById('leftEntrySelect');
+    const rightSelect = document.getElementById('rightEntrySelect');
+    const btnCompare = document.getElementById('btnCompare');
+
+    const totalRecordsCountEl = document.getElementById('totalRecordsCount');
+    const pairLabelEl = document.getElementById('pairLabel');
+    const timelineTableBodyEl = document.getElementById('timelineTableBody');
+
+    const leftEntryDetailsEl = document.getElementById('leftEntryDetails');
+    const rightEntryDetailsEl = document.getElementById('rightEntryDetails');
+
+    const filesAddedListEl = document.getElementById('filesAddedList');
+    const filesRemovedListEl = document.getElementById('filesRemovedList');
+    const validationAddedListEl = document.getElementById('validationAddedList');
+    const validationRemovedListEl = document.getElementById('validationRemovedList');
+    const reasonChangedFlagEl = document.getElementById('reasonChangedFlag');
+    const subjectChangedFlagEl = document.getElementById('subjectChangedFlag');
+    const impactChangedFlagEl = document.getElementById('impactChangedFlag');
+
+    function normalizeList(list) {
+        return Array.isArray(list) ? list.map((x) => String(x || '').trim()).filter(Boolean) : [];
+    }
+
+    function uniqueDiff(baseList, compareList) {
+        const baseSet = new Set(normalizeList(baseList));
+        const compareSet = new Set(normalizeList(compareList));
+        const added = [...compareSet].filter((item) => !baseSet.has(item));
+        const removed = [...baseSet].filter((item) => !compareSet.has(item));
+        return { added, removed };
+    }
+
+    function entryLabel(entry) {
+        return `${entry.timestamp} | ${entry.tweakId} | ${entry.summary || 'No summary'}`;
+    }
+
+    function getEntryById(id) {
+        return allEntries.find((entry) => entry.id === id) || null;
+    }
+
+    function renderOptions() {
+        leftSelect.innerHTML = '';
+        rightSelect.innerHTML = '';
+        allEntries.forEach((entry) => {
+            const leftOpt = document.createElement('option');
+            leftOpt.value = entry.id;
+            leftOpt.textContent = entryLabel(entry);
+            leftSelect.appendChild(leftOpt);
+
+            const rightOpt = document.createElement('option');
+            rightOpt.value = entry.id;
+            rightOpt.textContent = entryLabel(entry);
+            rightSelect.appendChild(rightOpt);
+        });
+
+        if (allEntries.length >= 2) {
+            leftSelect.selectedIndex = 1;
+            rightSelect.selectedIndex = 0;
+        } else {
+            leftSelect.selectedIndex = 0;
+            rightSelect.selectedIndex = 0;
+        }
+
+        totalRecordsCountEl.textContent = String(allEntries.length);
+    }
+
+    function renderList(targetEl, values, emptyText = '(none)') {
+        targetEl.innerHTML = '';
+        const list = normalizeList(values);
+        if (list.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'text-muted';
+            li.textContent = emptyText;
+            targetEl.appendChild(li);
+            return;
+        }
+        list.forEach((value) => {
+            const li = document.createElement('li');
+            li.textContent = value;
+            targetEl.appendChild(li);
+        });
+    }
+
+    function renderEntryDetails(targetEl, entry) {
+        if (!entry) {
+            targetEl.innerHTML = '<div class="text-muted small">Entry not found.</div>';
+            return;
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'small';
+
+        const meta = document.createElement('div');
+        meta.className = 'border rounded p-2 bg-light mb-2';
+        const metaLine1 = document.createElement('div');
+        metaLine1.textContent = `Step 1 - Context: ${entry.timestamp || ''} | ${entry.tweakId || ''}`;
+        const metaLine2 = document.createElement('div');
+        metaLine2.textContent = `Branch: ${entry.branch || ''} | HEAD: ${entry.head || ''}`;
+        const metaLine3 = document.createElement('div');
+        metaLine3.textContent = `Type: ${entry.type || ''} | Scope: ${entry.scope || ''}`;
+        meta.appendChild(metaLine1);
+        meta.appendChild(metaLine2);
+        meta.appendChild(metaLine3);
+
+        const intent = document.createElement('div');
+        intent.className = 'border rounded p-2 mb-2';
+        const intentTitle = document.createElement('div');
+        intentTitle.className = 'fw-bold mb-1';
+        intentTitle.textContent = 'Step 2 - Intent';
+        const intentSummary = document.createElement('div');
+        intentSummary.textContent = `Summary: ${entry.summary || ''}`;
+        const intentReason = document.createElement('div');
+        intentReason.textContent = `Reason: ${entry.reason || ''}`;
+        const intentImpact = document.createElement('div');
+        intentImpact.textContent = `Impact: ${entry.dissertationImpact || ''}`;
+        intent.appendChild(intentTitle);
+        intent.appendChild(intentSummary);
+        intent.appendChild(intentReason);
+        intent.appendChild(intentImpact);
+
+        const scope = document.createElement('div');
+        scope.className = 'border rounded p-2 mb-2';
+        scope.innerHTML = '<div class="fw-bold mb-1">Step 3 - Scope (Files)</div>';
+        const filesList = document.createElement('ul');
+        filesList.className = 'm-0 ps-3';
+        renderList(filesList, entry.files, '(none)');
+        scope.appendChild(filesList);
+
+        const validation = document.createElement('div');
+        validation.className = 'border rounded p-2 mb-2';
+        validation.innerHTML = '<div class="fw-bold mb-1">Step 4 - Validation</div>';
+        const validationList = document.createElement('ul');
+        validationList.className = 'm-0 ps-3';
+        renderList(validationList, entry.validation, '(none)');
+        validation.appendChild(validationList);
+
+        const output = document.createElement('div');
+        output.className = 'border rounded p-2';
+        output.innerHTML = '<div class="fw-bold mb-1">Step 5 - Commit Output</div>';
+        const pre = document.createElement('pre');
+        pre.className = 'm-0 p-2 bg-light border rounded small';
+        pre.style.whiteSpace = 'pre-wrap';
+        pre.textContent = entry.commitMessage || '(empty)';
+        output.appendChild(pre);
+
+        wrapper.appendChild(meta);
+        wrapper.appendChild(intent);
+        wrapper.appendChild(scope);
+        wrapper.appendChild(validation);
+        wrapper.appendChild(output);
+        targetEl.innerHTML = '';
+        targetEl.appendChild(wrapper);
+    }
+
+    function renderTimeline() {
+        timelineTableBodyEl.innerHTML = '';
+        allEntries.forEach((entry) => {
+            const tr = document.createElement('tr');
+            [entry.timestamp, entry.tweakId, entry.type, entry.summary, entry.branch, entry.head].forEach((value) => {
+                const td = document.createElement('td');
+                td.textContent = String(value || '');
+                tr.appendChild(td);
+            });
+            timelineTableBodyEl.appendChild(tr);
+        });
+    }
+
+    function compareSelectedEntries() {
+        const left = getEntryById(leftSelect.value);
+        const right = getEntryById(rightSelect.value);
+        if (!left || !right) return;
+
+        pairLabelEl.textContent = `${left.tweakId} -> ${right.tweakId}`;
+
+        renderEntryDetails(leftEntryDetailsEl, left);
+        renderEntryDetails(rightEntryDetailsEl, right);
+
+        const fileDiff = uniqueDiff(left.files, right.files);
+        renderList(filesAddedListEl, fileDiff.added, '(none)');
+        renderList(filesRemovedListEl, fileDiff.removed, '(none)');
+
+        const validationDiff = uniqueDiff(left.validation, right.validation);
+        renderList(validationAddedListEl, validationDiff.added, '(none)');
+        renderList(validationRemovedListEl, validationDiff.removed, '(none)');
+
+        reasonChangedFlagEl.textContent = left.reason === right.reason ? 'No' : 'Yes';
+        subjectChangedFlagEl.textContent = left.commitSubject === right.commitSubject ? 'No' : 'Yes';
+        impactChangedFlagEl.textContent = left.dissertationImpact === right.dissertationImpact ? 'No' : 'Yes';
+    }
+
+    renderOptions();
+    renderTimeline();
+    compareSelectedEntries();
+
+    btnCompare.addEventListener('click', compareSelectedEntries);
+    leftSelect.addEventListener('change', compareSelectedEntries);
+    rightSelect.addEventListener('change', compareSelectedEntries);
+</script>
+<% } %>

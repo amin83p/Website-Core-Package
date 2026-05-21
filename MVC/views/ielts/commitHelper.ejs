@@ -1,0 +1,691 @@
+<div class="sections-page">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="page-heading size-md m-0">Commit Helper Pipeline</h2>
+            <div class="text-muted small mt-1">Run tweak documentation in steps: context, prompt, AI JSON, and history save.</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <button id="btnRunAllTop" class="btn btn-dark btn-sm">
+                <i class="bi bi-stars me-1"></i> Auto Run All Steps
+            </button>
+            <a href="/ielts/commit-helper/compare" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-diagram-3 me-1"></i> Compare Saved Tweaks
+            </a>
+            <a href="<%= ieltsSectionDashboardHref %>" class="ielts-navigator-dashboard btn btn-outline-secondary btn-sm">
+                <i class="bi bi-speedometer2 me-1"></i> IELTS Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="alert alert-light border shadow-sm mb-3 small">
+        <div><span class="fw-bold">Prompt file:</span> <code><%= promptPath %></code></div>
+        <div><span class="fw-bold">History file:</span> <code><%= historyPath %></code></div>
+    </div>
+
+    <div id="timingBar" class="d-flex flex-wrap gap-2 align-items-center mt-2 mb-3">
+        <span class="badge bg-dark">Total: <span id="timerTotal">-</span></span>
+        <span class="badge bg-light text-dark border">S1: <span id="timerStep1">-</span></span>
+        <span class="badge bg-light text-dark border">S2: <span id="timerStep2">-</span></span>
+        <span class="badge bg-light text-dark border">S3: <span id="timerStep3">-</span></span>
+        <span class="badge bg-light text-dark border">S4: <span id="timerStep4">-</span></span>
+        <span id="timerRunningBadge" class="badge bg-warning text-dark d-none">
+            Running: <span id="timerRunningLabel">-</span> (<span id="timerRunningValue">0.00s</span>)
+        </span>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-0">
+            <div class="d-flex justify-content-between text-center flex-wrap" id="stepperContainer">
+                <button type="button" class="step-item flex-fill p-3 border-bottom active" data-step="1">
+                    <div class="fw-bold">Step 1</div>
+                    <div class="small opacity-75">Context Setup</div>
+                </button>
+                <button type="button" class="step-item flex-fill p-3 border-bottom" data-step="2">
+                    <div class="fw-bold">Step 2</div>
+                    <div class="small opacity-75">Generate Prompt</div>
+                </button>
+                <button type="button" class="step-item flex-fill p-3 border-bottom" data-step="3">
+                    <div class="fw-bold">Step 3</div>
+                    <div class="small opacity-75">Generate AI JSON</div>
+                </button>
+                <button type="button" class="step-item flex-fill p-3 border-bottom" data-step="4">
+                    <div class="fw-bold">Step 4</div>
+                    <div class="small opacity-75">Save + Commit Text</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-content" id="pipelineStepsContent">
+        <div class="tab-pane fade show active" id="step1Pane">
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <h6 class="fw-bold mb-3"><i class="bi bi-sliders me-2"></i>Run Configuration</h6>
+
+                            <label for="modelSelect" class="form-label small fw-bold">AI Model</label>
+                            <select id="modelSelect" class="form-select mb-3">
+                                <% if (typeof aiModels !== 'undefined' && aiModels.length > 0) { %>
+                                    <% aiModels.forEach(m => { %>
+                                        <option value="<%= m.id %>" <%= m.id.includes('flash') ? 'selected' : '' %>><%= m.name || m.id %></option>
+                                    <% }) %>
+                                <% } else { %>
+                                    <option value="">Auto Select</option>
+                                <% } %>
+                            </select>
+
+                            <button id="btnConfirmContext" class="btn btn-primary w-100 fw-bold">
+                                <i class="bi bi-check2-circle me-1"></i> Confirm Context
+                            </button>
+                            <button id="btnRunAllInline" class="btn btn-outline-dark w-100 mt-2">
+                                <i class="bi bi-stars me-1"></i> Auto Run All Steps
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white fw-bold small text-muted">Research Context / Why</div>
+                        <div class="card-body">
+                            <textarea id="researchContext" class="form-control font-monospace" rows="12" placeholder="Example: Lock finished pipeline steps and prevent edits after reopening completed sessions."></textarea>
+                            <div class="small text-muted mt-2">This goes directly into Step 1 of your commit-prompt evidence.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="step2Pane">
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <h6 class="fw-bold mb-3"><i class="bi bi-file-earmark-text me-2"></i>Prompt Generation</h6>
+                            <p class="small text-muted">Builds `last_commit_prompt.md` from your context and current git changes.</p>
+                            <button id="btnGeneratePrompt" class="btn btn-primary w-100 fw-bold">
+                                <i class="bi bi-play-fill me-1"></i> Run Step 2
+                            </button>
+                            <button id="btnCopyPrompt" class="btn btn-outline-primary w-100 mt-2" disabled>
+                                <i class="bi bi-clipboard me-1"></i> Copy Prompt
+                            </button>
+                            <div class="d-flex justify-content-between mt-3">
+                                <button class="btn btn-outline-secondary btn-sm" data-nav-step="1">
+                                    <i class="bi bi-arrow-left me-1"></i> Step 1
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" data-nav-step="3">
+                                    Step 3 <i class="bi bi-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white fw-bold small text-muted">Generated Prompt (Readonly)</div>
+                        <div class="card-body">
+                            <textarea id="promptOutput" class="form-control font-monospace bg-light" rows="16" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="step3Pane">
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <h6 class="fw-bold mb-3"><i class="bi bi-cpu me-2"></i>AI JSON Generation</h6>
+                            <p class="small text-muted">Sends prompt to model and expects strict JSON output for commit logging.</p>
+                            <button id="btnGenerateAiJson" class="btn btn-success w-100 fw-bold">
+                                <i class="bi bi-lightning-charge-fill me-1"></i> Run Step 3
+                            </button>
+                            <div class="d-flex justify-content-between mt-3">
+                                <button class="btn btn-outline-secondary btn-sm" data-nav-step="2">
+                                    <i class="bi bi-arrow-left me-1"></i> Step 2
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" data-nav-step="4">
+                                    Step 4 <i class="bi bi-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-white fw-bold small text-muted">AI Work Details</div>
+                        <div class="card-body">
+                            <div id="aiWorkBox" class="d-flex align-items-start gap-2 d-none">
+                                <div class="spinner-border spinner-border-sm text-primary mt-1" role="status"></div>
+                                <div>
+                                    <div id="aiWorkMessage" class="fw-bold small">Running...</div>
+                                    <div id="aiWorkSubMessage" class="small text-muted"></div>
+                                </div>
+                            </div>
+                            <div id="aiModelUsed" class="small text-muted"></div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white fw-bold small text-muted">Model JSON Output</div>
+                        <div class="card-body">
+                            <textarea id="modelJsonInput" class="form-control font-monospace bg-light" rows="12"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="step4Pane">
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <h6 class="fw-bold mb-3"><i class="bi bi-journal-check me-2"></i>Save History + Commit</h6>
+                            <p class="small text-muted">Appends data to history file and builds final commit message text.</p>
+                            <button id="btnIngestJson" class="btn btn-primary w-100 fw-bold">
+                                <i class="bi bi-cloud-upload me-1"></i> Run Step 4
+                            </button>
+                            <button id="btnCopyCommit" class="btn btn-outline-success w-100 mt-2" disabled>
+                                <i class="bi bi-clipboard me-1"></i> Copy Commit Message
+                            </button>
+                            <a href="/ielts/commit-helper/compare" class="btn btn-outline-primary w-100 mt-2">
+                                <i class="bi bi-diagram-3 me-1"></i> Open Compare Page
+                            </a>
+                            <div class="d-flex justify-content-between mt-3">
+                                <button class="btn btn-outline-secondary btn-sm" data-nav-step="3">
+                                    <i class="bi bi-arrow-left me-1"></i> Step 3
+                                </button>
+                                <button class="btn btn-outline-dark btn-sm" id="btnRunAllFinal">
+                                    Run All Again <i class="bi bi-arrow-repeat ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white fw-bold small text-muted">Commit Message Output</div>
+                        <div class="card-body">
+                            <textarea id="commitOutput" class="form-control font-monospace bg-light" rows="14" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusBox" class="alert alert-secondary mt-4 mb-0 d-none" role="alert"></div>
+
+    <div class="card border-0 shadow-sm mt-3">
+        <div class="card-header bg-white fw-bold small text-muted">Operation Details</div>
+        <div class="card-body">
+            <ul id="operationLog" class="list-unstyled small m-0"></ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    const statusBox = document.getElementById('statusBox');
+    const operationLogEl = document.getElementById('operationLog');
+    const modelSelectEl = document.getElementById('modelSelect');
+    const researchContextEl = document.getElementById('researchContext');
+    const promptOutputEl = document.getElementById('promptOutput');
+    const modelJsonInputEl = document.getElementById('modelJsonInput');
+    const commitOutputEl = document.getElementById('commitOutput');
+    const aiWorkBoxEl = document.getElementById('aiWorkBox');
+    const aiWorkMessageEl = document.getElementById('aiWorkMessage');
+    const aiWorkSubMessageEl = document.getElementById('aiWorkSubMessage');
+    const aiModelUsedEl = document.getElementById('aiModelUsed');
+
+    const stepItems = Array.from(document.querySelectorAll('.step-item'));
+    const paneMap = {
+        1: document.getElementById('step1Pane'),
+        2: document.getElementById('step2Pane'),
+        3: document.getElementById('step3Pane'),
+        4: document.getElementById('step4Pane')
+    };
+
+    const btnConfirmContext = document.getElementById('btnConfirmContext');
+    const btnGeneratePrompt = document.getElementById('btnGeneratePrompt');
+    const btnGenerateAiJson = document.getElementById('btnGenerateAiJson');
+    const btnIngestJson = document.getElementById('btnIngestJson');
+    const btnRunAllTop = document.getElementById('btnRunAllTop');
+    const btnRunAllInline = document.getElementById('btnRunAllInline');
+    const btnRunAllFinal = document.getElementById('btnRunAllFinal');
+    const btnCopyPrompt = document.getElementById('btnCopyPrompt');
+    const btnCopyCommit = document.getElementById('btnCopyCommit');
+
+    const timerTotalEl = document.getElementById('timerTotal');
+    const timerStep1El = document.getElementById('timerStep1');
+    const timerStep2El = document.getElementById('timerStep2');
+    const timerStep3El = document.getElementById('timerStep3');
+    const timerStep4El = document.getElementById('timerStep4');
+    const timerRunningBadgeEl = document.getElementById('timerRunningBadge');
+    const timerRunningLabelEl = document.getElementById('timerRunningLabel');
+    const timerRunningValueEl = document.getElementById('timerRunningValue');
+
+    const state = {
+        currentStep: 1,
+        stepStatus: { 1: 'pending', 2: 'pending', 3: 'pending', 4: 'pending' },
+        researchContext: '',
+        modelId: '',
+        promptText: '',
+        modelJsonText: '',
+        commitMessage: '',
+        timings: { 1: null, 2: null, 3: null, 4: null },
+        stepStartTs: null,
+        stepLabel: '',
+        totalStartTs: null
+    };
+
+    let runningTick = null;
+    let aiHintTick = null;
+
+    function formatSeconds(ms) {
+        return `${(ms / 1000).toFixed(2)}s`;
+    }
+
+    function setStatus(type, message) {
+        statusBox.className = 'alert mt-4 mb-0';
+        statusBox.classList.remove('d-none');
+        if (type === 'success') statusBox.classList.add('alert-success');
+        else if (type === 'error') statusBox.classList.add('alert-danger');
+        else statusBox.classList.add('alert-secondary');
+        statusBox.textContent = message;
+    }
+
+    function logOperation(text, tone = 'muted') {
+        const item = document.createElement('li');
+        const now = new Date();
+        const ts = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        item.className = `mb-2 text-${tone}`;
+        item.textContent = `[${ts}] ${text}`;
+        operationLogEl.prepend(item);
+    }
+
+    function updateTimingBar() {
+        timerStep1El.textContent = state.timings[1] ? formatSeconds(state.timings[1]) : '-';
+        timerStep2El.textContent = state.timings[2] ? formatSeconds(state.timings[2]) : '-';
+        timerStep3El.textContent = state.timings[3] ? formatSeconds(state.timings[3]) : '-';
+        timerStep4El.textContent = state.timings[4] ? formatSeconds(state.timings[4]) : '-';
+
+        const total = [1, 2, 3, 4].reduce((sum, stepNo) => sum + (state.timings[stepNo] || 0), 0);
+        timerTotalEl.textContent = total > 0 ? formatSeconds(total) : '-';
+    }
+
+    function startStepTiming(stepNo, label) {
+        if (!state.totalStartTs) state.totalStartTs = Date.now();
+        state.stepStartTs = Date.now();
+        state.stepLabel = label;
+        timerRunningLabelEl.textContent = `S${stepNo} ${label}`;
+        timerRunningBadgeEl.classList.remove('d-none');
+
+        if (runningTick) clearInterval(runningTick);
+        runningTick = setInterval(() => {
+            if (!state.stepStartTs) return;
+            const elapsed = Date.now() - state.stepStartTs;
+            timerRunningValueEl.textContent = formatSeconds(elapsed);
+        }, 200);
+    }
+
+    function stopStepTiming(stepNo) {
+        if (!state.stepStartTs) return;
+        state.timings[stepNo] = Date.now() - state.stepStartTs;
+        state.stepStartTs = null;
+        state.stepLabel = '';
+        if (runningTick) clearInterval(runningTick);
+        runningTick = null;
+        timerRunningBadgeEl.classList.add('d-none');
+        updateTimingBar();
+    }
+
+    function setStepStatus(stepNo, status) {
+        state.stepStatus[stepNo] = status;
+        renderStepper();
+    }
+
+    function renderStepper() {
+        stepItems.forEach((item) => {
+            const stepNo = Number(item.dataset.step);
+            const status = state.stepStatus[stepNo];
+            item.classList.remove('active', 'step-pending', 'step-running', 'step-done', 'step-error');
+            if (status === 'running') item.classList.add('step-running');
+            else if (status === 'done') item.classList.add('step-done');
+            else if (status === 'error') item.classList.add('step-error');
+            else item.classList.add('step-pending');
+
+            if (stepNo === state.currentStep) item.classList.add('active');
+        });
+    }
+
+    function activateStep(stepNo) {
+        state.currentStep = stepNo;
+        Object.keys(paneMap).forEach((k) => {
+            const key = Number(k);
+            const pane = paneMap[key];
+            if (!pane) return;
+            if (key === stepNo) pane.classList.add('show', 'active');
+            else pane.classList.remove('show', 'active');
+        });
+        renderStepper();
+    }
+
+    async function postJson(url, payload) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        let body = {};
+        try {
+            body = await res.json();
+        } catch (e) {
+            throw new Error('Server returned non-JSON response.');
+        }
+
+        if (!res.ok || body.status === 'error') {
+            const base = body.message || `Request failed with status ${res.status}`;
+            const details = body.details ? `\n${body.details}` : '';
+            throw new Error(`${base}${details}`);
+        }
+        return body;
+    }
+
+    function getContextPayload() {
+        return {
+            researchContext: researchContextEl.value.trim(),
+            modelId: (modelSelectEl.value || '').trim()
+        };
+    }
+
+    function validateContext() {
+        const payload = getContextPayload();
+        if (!payload.researchContext) {
+            researchContextEl.focus();
+            throw new Error('Please write the research context first.');
+        }
+        state.researchContext = payload.researchContext;
+        state.modelId = payload.modelId;
+        return payload;
+    }
+
+    function setButtonsBusy(isBusy) {
+        [btnConfirmContext, btnGeneratePrompt, btnGenerateAiJson, btnIngestJson, btnRunAllTop, btnRunAllInline, btnRunAllFinal]
+            .forEach((btn) => { if (btn) btn.disabled = isBusy; });
+    }
+
+    async function runStep1(activateNext = true) {
+        try {
+            setStepStatus(1, 'running');
+            startStepTiming(1, 'Context Setup');
+            validateContext();
+            stopStepTiming(1);
+            setStepStatus(1, 'done');
+            setStatus('success', 'Step 1 complete. Context captured.');
+            logOperation('Step 1 complete: context and model confirmed.', 'success');
+            if (activateNext) activateStep(2);
+        } catch (error) {
+            stopStepTiming(1);
+            setStepStatus(1, 'error');
+            setStatus('error', error.message);
+            logOperation(`Step 1 failed: ${error.message}`, 'danger');
+            throw error;
+        }
+    }
+
+    async function runStep2(activateNext = true) {
+        try {
+            validateContext();
+            setStepStatus(2, 'running');
+            startStepTiming(2, 'Generate Prompt');
+            setStatus('info', 'Step 2 running: generating prompt...');
+            logOperation('Step 2 started: generating prompt file.', 'primary');
+
+            const result = await postJson('/ielts/commit-helper/generate', { researchContext: state.researchContext });
+            state.promptText = String(result.promptText || '');
+            promptOutputEl.value = state.promptText;
+            btnCopyPrompt.disabled = !state.promptText.trim();
+
+            stopStepTiming(2);
+            setStepStatus(2, 'done');
+            setStatus('success', `Step 2 complete. Prompt saved in ${result.promptPath}`);
+            logOperation('Step 2 complete: prompt generated.', 'success');
+            if (activateNext) activateStep(3);
+        } catch (error) {
+            stopStepTiming(2);
+            setStepStatus(2, 'error');
+            setStatus('error', error.message);
+            logOperation(`Step 2 failed: ${error.message}`, 'danger');
+            throw error;
+        }
+    }
+
+    function startAiHints() {
+        const hints = [
+            'Sending prompt to model...',
+            'AI is reasoning over commit template and git context...',
+            'Waiting for JSON response...',
+            'Validating and parsing model JSON...'
+        ];
+        let idx = 0;
+        aiWorkBoxEl.classList.remove('d-none');
+        aiWorkMessageEl.textContent = 'AI request in progress';
+        aiWorkSubMessageEl.textContent = hints[idx];
+        if (aiHintTick) clearInterval(aiHintTick);
+        aiHintTick = setInterval(() => {
+            idx = (idx + 1) % hints.length;
+            aiWorkSubMessageEl.textContent = hints[idx];
+        }, 1400);
+    }
+
+    function stopAiHints(finalMessage = '') {
+        if (aiHintTick) clearInterval(aiHintTick);
+        aiHintTick = null;
+        aiWorkSubMessageEl.textContent = finalMessage;
+    }
+
+    async function runStep3(activateNext = true) {
+        try {
+            if (!state.promptText.trim()) {
+                throw new Error('Step 2 output missing. Generate prompt first.');
+            }
+
+            setStepStatus(3, 'running');
+            startStepTiming(3, 'Generate AI JSON');
+            startAiHints();
+            setStatus('info', 'Step 3 running: waiting for AI JSON...');
+            logOperation('Step 3 started: calling AI for strict JSON output.', 'primary');
+
+            const result = await postJson('/ielts/commit-helper/ai-json', {
+                promptText: state.promptText,
+                modelId: state.modelId
+            });
+
+            const modelJsonText = result.modelJson ? JSON.stringify(result.modelJson, null, 2) : String(result.modelRawText || '');
+            state.modelJsonText = modelJsonText;
+            modelJsonInputEl.value = modelJsonText;
+            aiModelUsedEl.textContent = result.modelUsed ? `Model used: ${result.modelUsed}` : '';
+
+            stopStepTiming(3);
+            stopAiHints('AI response received and parsed.');
+            setStepStatus(3, 'done');
+            setStatus('success', 'Step 3 complete. AI JSON generated.');
+            logOperation('Step 3 complete: model response parsed to JSON.', 'success');
+            if (activateNext) activateStep(4);
+        } catch (error) {
+            stopStepTiming(3);
+            stopAiHints('AI step stopped with error.');
+            setStepStatus(3, 'error');
+            setStatus('error', error.message);
+            logOperation(`Step 3 failed: ${error.message}`, 'danger');
+            throw error;
+        }
+    }
+
+    async function runStep4() {
+        try {
+            state.modelJsonText = String(modelJsonInputEl.value || '').trim();
+            if (!state.modelJsonText) {
+                throw new Error('Step 3 output missing. Generate AI JSON first.');
+            }
+
+            try {
+                JSON.parse(state.modelJsonText);
+            } catch (jsonErr) {
+                throw new Error(`Model JSON is invalid: ${jsonErr.message}`);
+            }
+
+            setStepStatus(4, 'running');
+            startStepTiming(4, 'Save History');
+            setStatus('info', 'Step 4 running: appending history and building commit message...');
+            logOperation('Step 4 started: ingesting JSON and updating history file.', 'primary');
+
+            const result = await postJson('/ielts/commit-helper/ingest', { modelJson: state.modelJsonText });
+            state.commitMessage = String(result.commitMessage || '');
+            commitOutputEl.value = state.commitMessage;
+            btnCopyCommit.disabled = !state.commitMessage.trim();
+
+            stopStepTiming(4);
+            setStepStatus(4, 'done');
+            setStatus('success', `Step 4 complete. History updated in ${result.historyPath}`);
+            logOperation('Step 4 complete: commit message generated and saved in history.', 'success');
+        } catch (error) {
+            stopStepTiming(4);
+            setStepStatus(4, 'error');
+            setStatus('error', error.message);
+            logOperation(`Step 4 failed: ${error.message}`, 'danger');
+            throw error;
+        }
+    }
+
+    async function runAllSteps() {
+        try {
+            setButtonsBusy(true);
+            await runStep1(false);
+            activateStep(2);
+            await runStep2(false);
+            activateStep(3);
+            await runStep3(false);
+            activateStep(4);
+            await runStep4();
+            setStatus('success', 'All steps completed successfully.');
+            logOperation('Pipeline complete: all four steps finished.', 'success');
+        } catch (error) {
+            setStatus('error', error.message);
+        } finally {
+            setButtonsBusy(false);
+        }
+    }
+
+    async function copyText(value, successMessage) {
+        if (!value || !value.trim()) return;
+        try {
+            await navigator.clipboard.writeText(value);
+            setStatus('success', successMessage);
+        } catch (e) {
+            setStatus('error', `Copy failed: ${e.message}`);
+        }
+    }
+
+    stepItems.forEach((item) => {
+        item.addEventListener('click', () => activateStep(Number(item.dataset.step)));
+    });
+
+    document.querySelectorAll('[data-nav-step]').forEach((btn) => {
+        btn.addEventListener('click', () => activateStep(Number(btn.dataset.navStep)));
+    });
+
+    btnConfirmContext.addEventListener('click', async () => {
+        setButtonsBusy(true);
+        try {
+            await runStep1(true);
+        } finally {
+            setButtonsBusy(false);
+        }
+    });
+
+    btnGeneratePrompt.addEventListener('click', async () => {
+        setButtonsBusy(true);
+        try {
+            await runStep2(true);
+        } finally {
+            setButtonsBusy(false);
+        }
+    });
+
+    btnGenerateAiJson.addEventListener('click', async () => {
+        setButtonsBusy(true);
+        try {
+            await runStep3(true);
+        } finally {
+            setButtonsBusy(false);
+        }
+    });
+
+    btnIngestJson.addEventListener('click', async () => {
+        setButtonsBusy(true);
+        try {
+            await runStep4();
+        } finally {
+            setButtonsBusy(false);
+        }
+    });
+
+    btnRunAllTop.addEventListener('click', runAllSteps);
+    btnRunAllInline.addEventListener('click', runAllSteps);
+    btnRunAllFinal.addEventListener('click', runAllSteps);
+
+    btnCopyPrompt.addEventListener('click', async () => {
+        await copyText(promptOutputEl.value, 'Prompt copied to clipboard.');
+    });
+
+    btnCopyCommit.addEventListener('click', async () => {
+        await copyText(commitOutputEl.value, 'Commit message copied to clipboard.');
+    });
+
+    activateStep(1);
+    updateTimingBar();
+    renderStepper();
+    logOperation('Commit Helper page loaded. Waiting for Step 1.', 'muted');
+</script>
+
+<style>
+    .step-item {
+        background: #fff;
+        border: none;
+        cursor: pointer;
+        min-width: 180px;
+    }
+    .step-item.active {
+        border-bottom: 3px solid #0d6efd !important;
+        background-color: #f8fbff;
+    }
+    .step-item.step-pending {
+        color: #6c757d;
+    }
+    .step-item.step-running {
+        color: #0d6efd;
+        background-color: #ecf3ff;
+    }
+    .step-item.step-done {
+        color: #198754;
+        background-color: #edf9f1;
+    }
+    .step-item.step-error {
+        color: #dc3545;
+        background-color: #fff1f2;
+    }
+    .tab-pane {
+        display: none;
+    }
+    .tab-pane.show.active {
+        display: block;
+    }
+</style>

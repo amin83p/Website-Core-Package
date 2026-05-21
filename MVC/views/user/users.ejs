@@ -1,0 +1,296 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  print,
+  btn_export: true
+}) %>
+
+  <%- include('../partials/tablePages-search', {
+    placeholder: 'Search users...',
+    fields: []
+  }) %>
+
+  <div class="table-scroll-wrapper" data-floating-row-actions="true">
+    <table class="table-responsive size-md" id="first-table">
+      <thead>
+      <tr>
+        <th class="draggable" data-column="email">Email <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="personId">Person <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="accessLevel">Access Level <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="primaryOrgId">Active Org <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="organizations">Organizations <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="active">Active <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="isEmailVerified">Email Verified <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastLoginAt">Last Login <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="createDateTime">Created <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% if (users && users.length) { %>
+        <% users.forEach(u => { %>
+          <%
+            // 1. Find Linked Person
+            const person = (persons || []).find(p => String(p.id) === String(u.personId));
+            
+            // 2. Derive Organizations from Person (Source of Truth)
+            const personOrgs = person ? (person.organizations || []) : [];
+            
+            // 3. Format Organization Names for display
+            const orgNamesStr = personOrgs
+              .map(o => o.displayLabel || (o.orgId ? (o.name ? `${o.name} (${o.orgId})` : `Org #${o.orgId}`) : o.name))
+              .filter(Boolean)
+              .join(', ');
+
+            // 4. Resolve Active Org Name
+            let activeOrgName = '—';
+            if (u.primaryOrgId) {
+                const active = personOrgs.find(o => String(o.orgId) === String(u.primaryOrgId));
+                activeOrgName = active ? (active.displayLabel || (active.name ? `${active.name} (${active.orgId})` : active.orgId)) : u.primaryOrgId;
+            }
+
+            // 5. Audit Info
+
+            const audit = u.audit || {};
+            const createDateTime = audit.createDateTime || u.createDateTime;
+            const lastUpdateDateTime = audit.lastUpdateDateTime || u.lastUpdateDateTime;
+            const createUser = audit.createUser || u.createUser;
+            const lastUpdateUser = audit.lastUpdateUser || u.lastUpdateUser;
+          %>
+
+          <tr>
+            <td>
+                <%= u.email || '—' %>
+                <% if (u.username) { %>
+                    <div class="text-muted small"><%= u.username %></div>
+                <% } %>
+            </td>
+
+            <td>
+              <% if (person) { %>
+                <%= [person.name?.first, person.name?.last].filter(Boolean).join(' ') %>
+                <div class="text-muted small">#<%= u.personId %></div>
+              <% } else { %>
+                <span class="text-danger">Unlinked (#<%= u.personId %>)</span>
+              <% } %>
+            </td>
+
+            <td><%= u.accessLevel ?? '—' %></td>
+
+            <td>
+                <%= activeOrgName %>
+                <% if (u.primaryOrgId) { %>
+                    <small class="text-muted d-block">#<%= u.primaryOrgId %></small>
+                <% } %>
+            </td>
+
+            <td>
+                <% if (orgNamesStr) { %>
+                    <%= orgNamesStr %>
+                <% } else { %>
+                    <span class="text-muted small">None</span>
+                <% } %>
+            </td>
+
+            <td>
+                <% if (u.status === 'active') { %>
+                    <span class="badge bg-success">Active</span>
+                <% } else if (u.status === 'pending') { %>
+                    <span class="badge bg-warning text-dark">Pending</span>
+                <% } else if (u.status === 'suspended') { %>
+                    <span class="badge bg-danger">suspended</span>
+                <% } else { %>
+                    <span class="badge bg-secondary"><%= u.status %></span>
+                <% } %>
+            </td>
+
+            <td><%= u.active ? 'Yes' : 'No' %></td>
+
+            <td><%= u.isEmailVerified ? 'Yes' : 'No' %></td>
+
+            <td>
+              <% if (u.lastLoginAt) { %>
+                <%= new Date(u.lastLoginAt).toLocaleString() %>
+              <% } else { %>
+                <span class="text-muted">—</span>
+              <% } %>
+            </td>
+
+
+            <td>
+              <% if (createDateTime) { %>
+                <%= new Date(createDateTime).toLocaleString() %>
+                <% if (createUser) { %>
+                  <br><span class="text-muted small">by <%= createUser %></span>
+                <% } %>
+              <% } else { %>
+                —
+              <% } %>
+            </td>
+            <td>
+              <% if (lastUpdateDateTime) { %>
+                <%= new Date(lastUpdateDateTime).toLocaleString() %>
+                <% if (lastUpdateUser) { %>
+                  <br><span class="text-muted small">by <%= lastUpdateUser %></span>
+                <% } %>
+              <% } else { %>
+                —
+              <% } %>
+            </td>
+  
+            <td class="table-actions text-end pe-4">
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= u.id %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= u.id %>">
+                  <a href="/users/edit/<%= u.id %>" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil-square me-2"></i>Edit
+                  </a>
+                  <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= u.id %>">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </button>
+                </div>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      <% } else { %>
+        <tr>
+          <td colspan="12" class="text-center text-muted py-3">No users found.</td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: null, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<!-- <script>
+  // public/scripts/users.js
+document.addEventListener('DOMContentLoaded', () => {
+  const table = document.getElementById('users-table');
+  const headers = table.querySelectorAll('th.draggable');
+  let draggedColumn = null;
+
+  // Sorting
+  headers.forEach(header => {
+    header.addEventListener('click', () => {
+      const column = header.dataset.column;
+      const sortOrder = header.classList.contains('sort-asc') ? 'desc' : 'asc';
+      
+      // Reset other headers
+      headers.forEach(h => {
+        h.classList.remove('sort-asc', 'sort-desc');
+        h.querySelector('.sort-icon').innerHTML = '';
+      });
+      
+      // Apply sort
+      header.classList.add(`sort-${sortOrder}`);
+      header.querySelector('.sort-icon').innerHTML = sortOrder === 'asc' ? '▲' : '▼';
+      
+      sortTable(column, sortOrder);
+    });
+  });
+
+  function sortTable(column, order) {
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    rows.sort((a, b) => {
+      const aValue = a.querySelector(`td:nth-child(${getColumnIndex(column) + 1})`).textContent.toLowerCase();
+      const bValue = b.querySelector(`td:nth-child(${getColumnIndex(column) + 1})`).textContent.toLowerCase();
+      return order === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+    });
+    
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  function getColumnIndex(column) {
+    return Array.from(headers).findIndex(h => h.dataset.column === column);
+  }
+
+  // Dragging
+  headers.forEach(header => {
+    header.draggable = true;
+    
+    header.addEventListener('dragstart', e => {
+      draggedColumn = header;
+      e.dataTransfer.setData('text/plain', header.dataset.column);
+      header.style.opacity = '0.5';
+    });
+    
+    header.addEventListener('dragend', () => {
+      header.style.opacity = '1';
+      draggedColumn = null;
+    });
+    
+    header.addEventListener('dragover', e => {
+      e.preventDefault();
+    });
+    
+    header.addEventListener('drop', e => {
+      e.preventDefault();
+      const targetColumn = header.dataset.column;
+      const sourceColumn = e.dataTransfer.getData('text/plain');
+      reorderColumns(sourceColumn, targetColumn);
+    });
+  });
+
+  function reorderColumns(sourceColumn, targetColumn) {
+    const headerRow = table.querySelector('thead tr');
+    const bodyRows = table.querySelectorAll('tbody tr');
+    const sourceIndex = Array.from(headers).findIndex(h => h.dataset.column === sourceColumn);
+    const targetIndex = Array.from(headers).findIndex(h => h.dataset.column === targetColumn);
+    
+    if (sourceIndex === targetIndex) return;
+    
+    // Reorder headers
+    const headersArray = Array.from(headerRow.children);
+    headerRow.insertBefore(headersArray[sourceIndex], headersArray[targetIndex > sourceIndex ? targetIndex + 1 : targetIndex]);
+    
+    // Reorder data cells
+    bodyRows.forEach(row => {
+      const cells = Array.from(row.children);
+      row.insertBefore(cells[sourceIndex], cells[targetIndex > sourceIndex ? targetIndex + 1 : targetIndex]);
+    });
+  }
+
+  // Delete Modal
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      showMessageModal({
+        title: 'Confirm Delete',
+        icon: 'warning',
+        message: 'Are you sure you want to delete this user?',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Delete', class: 'btn-delete btn-md' }
+        ]
+      }).then(result => {
+        if (result === 'Delete') {
+          window.location.href = `/users/${id}/delete`;
+        }
+      });
+    });
+  });
+});
+</script> -->

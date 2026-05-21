@@ -1,0 +1,201 @@
+<div class="sections-page">
+    
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="page-heading size-md m-0">Footer Styler</h2>
+        <p class="text-muted mb-0">Customize the site-wide footer appearance.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/styles" class="btn btn-outline-secondary btn-sm">Back</a>
+        <button type="submit" form="footerForm" class="btn btn-primary btn-sm btn-filled">
+            <i class="bi bi-save-fill me-1"></i> Save Changes
+        </button>
+    </div>
+  </div>
+
+  <div class="row g-4">
+      
+      <div class="col-lg-4">
+          <div class="card border-0 shadow-lg sticky-top" style="top: 20px;">
+              <div class="card-header bg-dark text-white fw-bold">
+                  Footer Design
+              </div>
+              <div class="card-body bg-light">
+                  <form id="footerForm" action="/styles/footer/save" method="POST">
+                      
+                      <h6 class="fw-bold text-primary mb-3">Colors & Background</h6>
+                      
+                      <div class="mb-3">
+                          <label class="form-label small fw-bold text-muted">Background Color</label>
+                          <div class="input-group input-group-sm">
+                              <input type="color" class="form-control form-control-color" value="<%= footerVars.bg %>" oninput="updatePreview('--footer-bg', this.value)">
+                              <input type="text" name="--footer-bg" id="val_bg" class="form-control font-monospace" value="<%= footerVars.bg %>">
+                          </div>
+                      </div>
+
+                      <div class="mb-3">
+                          <label class="form-label small fw-bold text-muted">Primary Text Color</label>
+                          <div class="input-group input-group-sm">
+                              <input type="color" class="form-control form-control-color" value="<%= footerVars.text %>" oninput="updatePreview('--footer-text', this.value)">
+                              <input type="text" name="--footer-text" id="val_text" class="form-control font-monospace" value="<%= footerVars.text %>">
+                          </div>
+                      </div>
+
+                      <div class="row g-2 mb-3">
+                          <div class="col-6">
+                              <label class="form-label small fw-bold text-muted">Links (Normal)</label>
+                              <div class="input-group input-group-sm">
+                                  <input type="color" class="form-control form-control-color" value="<%= footerVars.link %>" oninput="updatePreview('--footer-link', this.value)">
+                                  <input type="hidden" name="--footer-link" id="val_link" value="<%= footerVars.link %>">
+                              </div>
+                          </div>
+                          <div class="col-6">
+                              <label class="form-label small fw-bold text-muted">Links (Hover)</label>
+                              <div class="input-group input-group-sm">
+                                  <input type="color" class="form-control form-control-color" value="<%= footerVars.linkHover %>" oninput="updatePreview('--footer-link-hover', this.value)">
+                                  <input type="hidden" name="--footer-link-hover" id="val_linkHover" value="<%= footerVars.linkHover %>">
+                              </div>
+                          </div>
+                      </div>
+
+                      <hr class="text-muted opacity-25">
+
+                      <h6 class="fw-bold text-primary mb-3">Layout & Spacing</h6>
+                      
+                      <div class="mb-3">
+                          <label class="form-label small fw-bold text-muted d-flex justify-content-between">
+                              <span>Vertical Padding</span>
+                              <span id="padVal" class="text-primary"><%= footerVars.padding %></span>
+                          </label>
+                          <input type="range" class="form-range" min="10" max="100" step="5" 
+                                 value="<%= parseInt(footerVars.padding) %>"
+                                 oninput="updatePreview('--footer-padding', this.value + 'px'); document.getElementById('padVal').innerText = this.value + 'px'">
+                          <input type="hidden" name="--footer-padding" id="val_padding" value="<%= footerVars.padding %>">
+                      </div>
+
+                      <div class="mb-3">
+                          <label class="form-label small fw-bold text-muted">Input Field Background</label>
+                          <div class="input-group input-group-sm">
+                              <input type="color" class="form-control form-control-color" value="<%= footerVars.inputBg %>" oninput="updatePreview('--footer-input-bg', this.value)">
+                              <input type="text" name="--footer-input-bg" id="val_inputBg" class="form-control font-monospace" value="<%= footerVars.inputBg %>">
+                          </div>
+                      </div>
+
+                  </form>
+              </div>
+          </div>
+      </div>
+
+      <div class="col-lg-8">
+          <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white border-bottom-0 pt-3 fw-bold text-secondary d-flex justify-content-between align-items-center">
+                  <span>Live Preview</span>
+                  <span class="badge bg-light text-muted border">Real-time Render</span>
+              </div>
+              <div class="card-body p-0 bg-white d-flex flex-column">
+                  
+                  <div class="flex-grow-1 p-4 d-flex align-items-center justify-content-center bg-light border-bottom">
+                      <p class="text-muted small fst-italic">Scroll down to see the footer in context, or view the isolated block below.</p>
+                  </div>
+
+                  <div style="position: relative;">
+                      
+                      <footer style="margin: 0;">
+                          <div class="container-fluid px-5">
+                              <div class="row">
+                                  <div class="col-lg-4 mb-4 footer-column">
+                                      <h5>Company Name</h5>
+                                      <p class="small opacity-75">
+                                          Making the world a better place through constructed elegance and robust code.
+                                      </p>
+                                      <div class="social-icons mt-3">
+                                          <a href="#"><i class="bi bi-facebook"></i></a>
+                                          <a href="#"><i class="bi bi-twitter"></i></a>
+                                          <a href="#"><i class="bi bi-instagram"></i></a>
+                                          <a href="#"><i class="bi bi-linkedin"></i></a>
+                                      </div>
+                                  </div>
+
+                                  <div class="col-lg-2 col-md-6 mb-4 footer-column">
+                                      <h5>Product</h5>
+                                      <ul>
+                                          <li><a href="#">Features</a></li>
+                                          <li><a href="#">Pricing</a></li>
+                                          <li><a href="#">Documentation</a></li>
+                                          <li><a href="#">Releases</a></li>
+                                      </ul>
+                                  </div>
+
+                                  <div class="col-lg-2 col-md-6 mb-4 footer-column">
+                                      <h5>Company</h5>
+                                      <ul>
+                                          <li><a href="#">About</a></li>
+                                          <li><a href="#">Careers</a></li>
+                                          <li><a href="#">Contact</a></li>
+                                          <li><a href="#">Privacy</a></li>
+                                      </ul>
+                                  </div>
+
+                                  <div class="col-lg-4 mb-4 footer-column">
+                                      <h5>Newsletter</h5>
+                                      <p class="small opacity-75">Subscribe to get the latest news and updates.</p>
+                                      <div class="newsletter-form">
+                                          <input type="email" class="newsletter-input" placeholder="Email address">
+                                          <button class="newsletter-btn">Subscribe</button>
+                                      </div>
+                                  </div>
+                              </div>
+                              
+                              <div class="border-top border-white border-opacity-10 pt-4 mt-4 text-center small opacity-50">
+                                  &copy; <%= new Date().getFullYear() %> Company Name. All rights reserved.
+                              </div>
+                          </div>
+                      </footer>
+
+                  </div>
+
+              </div>
+          </div>
+      </div>
+
+  </div>
+</div>
+
+<script>
+    function updatePreview(varName, val) {
+        // Sync Inputs
+        const shortName = varName.replace('--footer-', '').replace(/-([a-z])/g, g => g[1].toUpperCase());
+        const inputId = 'val_' + shortName;
+        
+        const textInput = document.getElementById(inputId);
+        if(textInput) textInput.value = val;
+
+        // Apply Globally (updates real footer AND preview footer)
+        document.documentElement.style.setProperty(varName, val);
+    }
+
+    document.getElementById('footerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.querySelector('button[type="submit"]');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        btn.disabled = true;
+
+        try {
+            const fd = new FormData(e.target);
+            const data = Object.fromEntries(fd.entries());
+            const res = await fetch(e.target.action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' }, body: JSON.stringify(data) });
+            const result = await res.json();
+            if (result.status === 'success') {
+                if(typeof showMessageModal === 'function') await showMessageModal({ title: 'Saved', icon: 'success', message: 'Footer styles updated.', buttons: [{text:'OK', class:'btn-success'}]});
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            } else {
+                alert('Error: ' + result.message);
+                btn.disabled = false; btn.innerHTML = originalHtml;
+            }
+        } catch (err) {
+            console.error(err); alert('Network error.');
+            btn.disabled = false; btn.innerHTML = originalHtml;
+        }
+    });
+</script>

@@ -1,0 +1,241 @@
+<%
+  const isEdit = !!(role && role.id);
+  const isSystem = !!(role && role.system);
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Role' : 'New Role' %></h1>
+    <% if (isEdit) { %>
+      <span class="badge bg-primary border font-monospace">ID: <%= role.id %></span>
+    <% } %>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="roleForm" action="<%= isEdit ? '/roles/edit/' + role.id : '/roles/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+
+      <% if (isSystem) { %>
+        <div class="alert alert-warning py-2 mb-3 small">
+          <i class="bi bi-shield-lock-fill me-1"></i>
+          This is a <strong>system role</strong> and is read-only.
+        </div>
+      <% } %>
+
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Role Key</label>
+          <input
+            type="text"
+            name="key"
+            class="form-control size-md js-role-key"
+            value="<%= role ? role.key : '' %>"
+            placeholder="e.g. pte_student"
+            pattern="^[a-z][a-z0-9_-]*$"
+            <%= isSystem ? 'readonly' : 'required' %>>
+          <small class="form-text">Lowercase token (letters/numbers/underscore/dash).</small>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Label</label>
+          <input
+            type="text"
+            name="label"
+            class="form-control size-md"
+            value="<%= role ? role.label : '' %>"
+            placeholder="e.g. PTE Student"
+            <%= isSystem ? 'readonly' : 'required' %>>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Package Name</label>
+          <input
+            type="text"
+            name="packageName"
+            class="form-control size-md js-package-name"
+            value="<%= role ? role.packageName : 'CORE' %>"
+            placeholder="CORE / SCHOOL / PTE / CREDIT"
+            pattern="^[A-Z][A-Z0-9_]*$"
+            <%= isSystem ? 'readonly' : 'required' %>>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Domain</label>
+          <input
+            type="text"
+            name="domain"
+            class="form-control size-md js-domain-token"
+            value="<%= role ? role.domain : 'core' %>"
+            placeholder="core / school / pte / credit"
+            pattern="^[a-z][a-z0-9_-]*$"
+            <%= isSystem ? 'readonly' : 'required' %>>
+        </div>
+        <div class="col-md-8 mb-3">
+          <label class="form-label">Aliases</label>
+          <textarea
+            name="aliases"
+            class="form-control size-md js-aliases"
+            rows="3"
+            placeholder="One alias per line or comma-separated"
+            <%= isSystem ? 'readonly' : '' %>><%= role && Array.isArray(role.aliases) ? role.aliases.join('\n') : '' %></textarea>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea
+          name="description"
+          class="form-control size-md"
+          rows="3"
+          <%= isSystem ? 'readonly' : '' %>><%= role ? (role.description || '') : '' %></textarea>
+      </div>
+
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="activeCheck" name="active" <%= (!role || role.active !== false) ? 'checked' : '' %> <%= isSystem ? 'disabled' : '' %>>
+            <label class="form-check-label" for="activeCheck">Active</label>
+          </div>
+        </div>
+        <div class="col-md-4 mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="systemCheck" name="system" <%= (role && role.system) ? 'checked' : '' %> <%= isEdit ? 'disabled' : '' %>>
+            <label class="form-check-label" for="systemCheck">System Role</label>
+            <div class="form-text x-small text-muted mt-0">System roles become read-only after creation.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <% if (!isSystem) { %>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save</button>
+        <% } %>
+        <a href="/roles" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/roles">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('roleForm');
+  const keyInput = document.querySelector('.js-role-key');
+  const domainInput = document.querySelector('.js-domain-token');
+  const packageInput = document.querySelector('.js-package-name');
+  const aliasesInput = document.querySelector('.js-aliases');
+
+  function normalizeLowerToken(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_-]/g, '');
+  }
+
+  function normalizeUpperToken(value) {
+    return String(value || '')
+      .toUpperCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^A-Z0-9_]/g, '');
+  }
+
+  if (keyInput) {
+    keyInput.addEventListener('input', () => {
+      keyInput.value = normalizeLowerToken(keyInput.value);
+    });
+  }
+
+  if (domainInput) {
+    domainInput.addEventListener('input', () => {
+      domainInput.value = normalizeLowerToken(domainInput.value);
+    });
+  }
+
+  if (packageInput) {
+    packageInput.addEventListener('input', () => {
+      packageInput.value = normalizeUpperToken(packageInput.value);
+    });
+  }
+
+  if (aliasesInput) {
+    aliasesInput.addEventListener('blur', () => {
+      const rows = String(aliasesInput.value || '')
+        .split(/[\n,]/)
+        .map((row) => normalizeLowerToken(row.trim()))
+        .filter(Boolean);
+      aliasesInput.value = Array.from(new Set(rows)).join('\n');
+    });
+  }
+
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    }
+
+    const formData = new FormData(form);
+    formData.set('active', document.getElementById('activeCheck')?.checked ? 'true' : 'false');
+    if (!<%= isEdit ? 'true' : 'false' %>) {
+      formData.set('system', document.getElementById('systemCheck')?.checked ? 'true' : 'false');
+    }
+
+    const payload = new URLSearchParams(formData);
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true',
+          ...(formData.get('actionStateId') ? { 'X-Action-State-Id': String(formData.get('actionStateId')) } : {})
+        },
+        body: payload.toString()
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Success',
+            icon: 'success',
+            message: result.message || 'Role saved.',
+            buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+          });
+        }
+        window.location.href = '/roles';
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save';
+      }
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Error',
+          icon: 'error',
+          message: result.message || 'Failed to save role.',
+          buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+        });
+      } else {
+        alert(result.message || 'Failed to save role.');
+      }
+    } catch (error) {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save';
+      }
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Error',
+          icon: 'error',
+          message: 'Unexpected error occurred.',
+          buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+        });
+      } else {
+        alert('Unexpected error occurred.');
+      }
+    }
+  });
+});
+</script>

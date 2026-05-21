@@ -1,0 +1,36 @@
+{
+  "startedAt": "2026-04-30T05:21:41.424Z",
+  "finishedAt": "2026-04-30T05:21:46.790Z",
+  "mode": "apply",
+  "backendMode": "mongo",
+  "countsBefore": {
+    "activityQuotaLedger": 19,
+    "activityQuotaCreditGroups": 0,
+    "quotaCreditLots": 9,
+    "quotaBalanceSnapshots": 9
+  },
+  "countsAfter": {
+    "activityQuotaLedger": 0,
+    "activityQuotaCreditGroups": 0,
+    "quotaCreditLots": 0,
+    "quotaBalanceSnapshots": 0
+  },
+  "resetResult": {
+    "ledger": {
+      "removed": 19,
+      "remaining": 0
+    },
+    "groups": {
+      "removed": 0,
+      "remaining": 0
+    },
+    "lots": {
+      "removed": 9,
+      "remaining": 0
+    },
+    "snapshots": {
+      "removed": 9,
+      "remaining": 0
+    }
+  }
+}

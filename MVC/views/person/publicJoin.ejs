@@ -1,0 +1,328 @@
+<%
+  const resolvedJoinAction = (typeof formAction === 'string' && formAction.trim()) ? formAction.trim() : '/persons/join';
+  const resolvedJoinHeadingTitle = (typeof joinHeadingTitle === 'string' && joinHeadingTitle.trim()) ? joinHeadingTitle.trim() : 'Join Our Community';
+  const resolvedJoinHeadingSubtitle = (typeof joinHeadingSubtitle === 'string' && joinHeadingSubtitle.trim()) ? joinHeadingSubtitle.trim() : 'Create your profile to get started.';
+  const resolvedSubmitButtonLabel = (typeof submitButtonLabel === 'string' && submitButtonLabel.trim()) ? submitButtonLabel.trim() : 'Create Account';
+  const resolvedExistingUserJoin = (typeof existingUserJoin !== 'undefined' && existingUserJoin === true);
+  const resolvedExistingUserAlreadyJoined = (typeof existingUserAlreadyJoined !== 'undefined' && existingUserAlreadyJoined === true);
+  const resolvedExistingUserName = (typeof existingUserName === 'string' && existingUserName.trim()) ? existingUserName.trim() : 'your current account';
+  const resolvedExistingUserEmail = (typeof existingUserEmail === 'string' && existingUserEmail.trim()) ? existingUserEmail.trim() : '';
+  const resolvedExistingUserContinueHref = (typeof existingUserContinueHref === 'string' && existingUserContinueHref.trim()) ? existingUserContinueHref.trim() : '/pte';
+%>
+
+<div class="d-flex align-items-center justify-content-center  bg-light py-5">
+  
+  <div class="card border-0 shadow-lg" style="width: 100%; max-width: 950px; border-radius: 16px;">
+    
+    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 text-center">
+      <div class="d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary rounded-circle mb-3" style="width: 60px; height: 60px;">
+        <i class="bi bi-person-plus-fill fs-3"></i>
+      </div>
+      <h3 class="fw-bold text-dark"><%= resolvedJoinHeadingTitle %></h3>
+      <p class="text-muted small"><%= resolvedJoinHeadingSubtitle %></p>
+    </div>
+
+    <div class="card-body p-4 p-md-5">
+      
+      <form id="publicJoinForm" action="<%= resolvedJoinAction %>" method="POST" novalidate>
+        <% if (resolvedExistingUserJoin) { %>
+          <input type="hidden" name="existingUserJoin" value="true">
+
+          <div class="existing-join-panel p-4 p-md-5 rounded-4 border bg-light-subtle">
+            <div class="d-flex flex-column flex-md-row gap-4 align-items-md-center">
+              <div class="existing-join-icon flex-shrink-0">
+                <i class="bi <%= resolvedExistingUserAlreadyJoined ? 'bi-check-circle-fill' : 'bi-stars' %>"></i>
+              </div>
+              <div class="flex-grow-1">
+                <div class="text-uppercase text-primary fw-bold small mb-2"><%= resolvedExistingUserAlreadyJoined ? 'Access active' : 'Current account' %></div>
+                <h4 class="fw-bold text-dark mb-2">
+                  <%= resolvedExistingUserAlreadyJoined ? 'Public PTE access is already active.' : 'Join public PTE without creating another login.' %>
+                </h4>
+                <p class="text-muted mb-3">
+                  <% if (resolvedExistingUserAlreadyJoined) { %>
+                    <strong><%= resolvedExistingUserName %></strong><%= resolvedExistingUserEmail ? ' (' + resolvedExistingUserEmail + ')' : '' %> already has public PTE access.
+                    Your public packages can continue using this same account.
+                  <% } else { %>
+                    We will add public PTE access to <strong><%= resolvedExistingUserName %></strong><%= resolvedExistingUserEmail ? ' (' + resolvedExistingUserEmail + ')' : '' %>.
+                    Your existing roles stay active, and public PTE packages can be connected to this same account.
+                  <% } %>
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                  <span class="badge rounded-pill text-bg-primary">PTE Public Student</span>
+                  <span class="badge rounded-pill text-bg-success">Use Same Login</span>
+                  <span class="badge rounded-pill text-bg-info">Public Packages</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-grid gap-2 mt-5">
+            <% if (resolvedExistingUserAlreadyJoined) { %>
+              <a href="<%= resolvedExistingUserContinueHref %>" class="btn btn-primary btn-lg btn-filled shadow-sm fw-bold">
+                <%= resolvedSubmitButtonLabel %>
+              </a>
+            <% } else { %>
+              <button type="submit" class="btn btn-primary btn-lg btn-filled shadow-sm fw-bold">
+                <%= resolvedSubmitButtonLabel %>
+              </button>
+              <a href="/pte" class="btn btn-link text-decoration-none text-muted">Cancel</a>
+            <% } %>
+          </div>
+        <% } else { %>
+          <input type="hidden" id="emailsHidden" name="emails">
+          <input type="hidden" id="phonesHidden" name="phones">
+          <input type="hidden" id="addressesHidden" name="addresses">
+          <input type="hidden" name="active" value="true">
+
+          <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Personal Information</h6>
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <label class="form-label small fw-bold">First Name *</label>
+              <input type="text" name="firstName" class="form-control" placeholder="John" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold">Middle Name</label>
+              <input type="text" name="middleName" class="form-control" placeholder="">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold">Last Name *</label>
+              <input type="text" name="lastName" class="form-control" placeholder="Doe" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">Gender *</label>
+              <select name="gender" class="form-select" required>
+                <option value="" selected disabled>Select...</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="nonbinary">Non-binary</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">Date of Birth *</label>
+              <input type="date" name="dateOfBirth" class="form-control" required>
+            </div>
+          </div>
+
+          <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Contact Details</h6>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Primary Email *</label>
+            <div class="input-group">
+              <span class="input-group-text bg-light text-muted"><i class="bi bi-envelope"></i></span>
+              <input type="email" id="primaryEmailInput" class="form-control" placeholder="you@example.com" required>
+            </div>
+            <div class="form-text small">This will be your username for login.</div>
+          </div>
+
+          <div class="mb-2 d-flex justify-content-between align-items-center">
+            <label class="form-label small fw-bold m-0">Phone Numbers</label>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAddPhone">+ Add Phone</button>
+          </div>
+          <div id="phoneContainer" class="mb-4"></div>
+
+          <div class="mb-2 d-flex justify-content-between align-items-center">
+            <label class="form-label small fw-bold m-0">Addresses</label>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAddAddress">+ Add Address</button>
+          </div>
+          <div id="addressContainer" class="mb-4"></div>
+
+          <div class="d-grid gap-2 mt-5">
+            <button type="submit" class="btn btn-primary btn-lg btn-filled shadow-sm fw-bold">
+              <%= resolvedSubmitButtonLabel %>
+            </button>
+            <a href="/login" class="btn btn-link text-decoration-none text-muted">Cancel</a>
+          </div>
+        <% } %>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+  .existing-join-panel {
+    background:
+      linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(25, 135, 84, 0.08)),
+      #fff;
+  }
+
+  .existing-join-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: linear-gradient(135deg, #0d6efd, #20c997);
+    box-shadow: 0 16px 34px rgba(13, 110, 253, 0.22);
+    font-size: 2rem;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // --- STATE ---
+    let phones = [];
+    let addresses = [];
+
+    // --- DOM ---
+    const phoneContainer = document.getElementById('phoneContainer');
+    const addressContainer = document.getElementById('addressContainer');
+    const form = document.getElementById('publicJoinForm');
+    const existingUserJoinMode = <%- JSON.stringify(resolvedExistingUserJoin) %>;
+
+    // --- HELPERS ---
+    // Safe Modal Wrapper (Fallback to Alert if blocked)
+    async function safeShowModal(options) {
+        if (typeof showMessageModal === 'function') {
+            try { return await showMessageModal(options); } catch (e) { console.warn(e); }
+        }
+        alert(options.message.replace(/<br>/g, '\n').replace(/<\/?[^>]+(>|$)/g, ""));
+        return options.buttons && options.buttons[0] ? options.buttons[0].text : 'OK';
+    }
+
+    // --- PHONES LOGIC ---
+    function renderPhones() {
+        if (!phoneContainer) return;
+        phoneContainer.innerHTML = '';
+        phones.forEach((p, index) => {
+            const row = document.createElement('div');
+            row.className = 'input-group mb-2';
+            row.innerHTML = `
+                <select class="form-select" style="max-width:110px;" onchange="updatePhone(${index}, 'type', this.value)">
+                    <option value="mobile" ${p.type==='mobile'?'selected':''}>Mobile</option>
+                    <option value="home" ${p.type==='home'?'selected':''}>Home</option>
+                    <option value="work" ${p.type==='work'?'selected':''}>Work</option>
+                </select>
+                <input type="text" class="form-control" placeholder="+1 (555) 000-0000" value="${p.number||''}" oninput="updatePhone(${index}, 'number', this.value)">
+                <button type="button" class="btn btn-outline-danger" onclick="removePhone(${index})"><i class="bi bi-trash"></i></button>
+            `;
+            phoneContainer.appendChild(row);
+        });
+    }
+    window.updatePhone = (i, key, val) => { phones[i][key] = val; };
+    window.removePhone = (i) => { phones.splice(i, 1); renderPhones(); };
+    const btnAddPhone = document.getElementById('btnAddPhone');
+    if (!existingUserJoinMode && btnAddPhone) {
+        btnAddPhone.addEventListener('click', () => { phones.push({type:'mobile', number:''}); renderPhones(); });
+    }
+
+    // --- ADDRESS LOGIC ---
+    function renderAddresses() {
+        if (!addressContainer) return;
+        addressContainer.innerHTML = '';
+        addresses.forEach((a, index) => {
+            const row = document.createElement('div');
+            row.className = 'card bg-light border-0 p-3 mb-2 position-relative';
+            row.innerHTML = `
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-2" onclick="removeAddress(${index})"></button>
+                <div class="row g-2">
+                    <div class="col-4">
+                        <select class="form-select form-select-sm" onchange="updateAddr(${index}, 'type', this.value)">
+                            <option value="home" ${a.type==='home'?'selected':''}>Home</option>
+                            <option value="work" ${a.type==='work'?'selected':''}>Work</option>
+                        </select>
+                    </div>
+                    <div class="col-8">
+                        <input type="text" class="form-control form-select-sm" placeholder="Street Address" value="${a.line1||''}" oninput="updateAddr(${index}, 'line1', this.value)">
+                    </div>
+                    <div class="col-6">
+                        <input type="text" class="form-control form-select-sm" placeholder="City" value="${a.city||''}" oninput="updateAddr(${index}, 'city', this.value)">
+                    </div>
+                    <div class="col-6">
+                        <input type="text" class="form-control form-select-sm" placeholder="State/Prov" value="${a.provinceState||''}" oninput="updateAddr(${index}, 'provinceState', this.value)">
+                    </div>
+                </div>
+            `;
+            addressContainer.appendChild(row);
+        });
+    }
+    window.updateAddr = (i, key, val) => { addresses[i][key] = val; };
+    window.removeAddress = (i) => { addresses.splice(i, 1); renderAddresses(); };
+    const btnAddAddress = document.getElementById('btnAddAddress');
+    if (!existingUserJoinMode && btnAddAddress) {
+        btnAddAddress.addEventListener('click', () => { addresses.push({type:'home', line1:'', city:'', provinceState:''}); renderAddresses(); });
+    }
+
+    // --- SUBMIT ---
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        let emailVal = '';
+        if (!existingUserJoinMode) {
+            // 1. Prepare JSON Data
+            document.getElementById('phonesHidden').value = JSON.stringify(phones);
+            document.getElementById('addressesHidden').value = JSON.stringify(addresses);
+
+            // Email Structure (Simplified for Public Join)
+            emailVal = document.getElementById('primaryEmailInput').value;
+            const emailsArray = [{ type: 'primary', email: emailVal, isPrimary: true }];
+            document.getElementById('emailsHidden').value = JSON.stringify(emailsArray);
+
+            // 2. Validate Manually (Custom UI)
+            if(!form.checkValidity()) {
+                form.classList.add('was-validated');
+                return safeShowModal({ title: 'Missing Info', message: 'Please fill in all required fields marked with *.', icon: 'warning', buttons:[{text:'OK',class:'btn-warning'}] });
+            }
+        }
+
+        const fd = new FormData(form);
+
+        // 3. Submit
+        const btn = form.querySelector('button[type="submit"]');
+        const oldText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> ' + (existingUserJoinMode ? 'Joining...' : 'Creating...');
+
+        try {
+            const res = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+                body: new URLSearchParams(fd).toString()
+            });
+            
+            let result;
+            try { result = await res.json(); } catch(err) { throw new Error('Server returned invalid response.'); }
+
+            if(res.ok && result.status === 'success') {
+                if (result.tempPassword) {
+                    await safeShowModal({
+                        title: 'Welcome!',
+                        icon: 'success',
+                        message: `Your account has been created successfully.<br><br>
+                                  <strong>Username:</strong> ${emailVal}<br>
+                                  <strong>Password:</strong> <code class="fs-5 bg-light px-2 border rounded">${result.tempPassword}</code><br><br>
+                                  Please copy this password now.`,
+                        buttons: [{ text: 'Go to Login', class: 'btn-primary' }]
+                    });
+                    window.location.href = '/login';
+                    return;
+                }
+
+                await safeShowModal({
+                    title: result.existingUserAlreadyJoined ? 'Already Joined' : 'PTE Access Ready',
+                    icon: 'success',
+                    message: result.message || 'Public PTE access has been added to your account.',
+                    buttons: [{ text: 'Continue', class: 'btn-primary' }]
+                });
+                window.location.href = result.redirect || '/pte';
+            } else {
+                throw new Error(result.message || 'Registration failed.');
+            }
+
+        } catch (err) {
+            console.error(err);
+            await safeShowModal({ title: 'Error', message: err.message, icon: 'error', buttons:[{text:'Try Again',class:'btn-danger'}] });
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = oldText;
+        }
+    });
+
+});
+</script>

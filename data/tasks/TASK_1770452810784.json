@@ -1,0 +1,160 @@
+{
+  "id": "TASK_1770452810784",
+  "title": "Some other one",
+  "description": "<h6><strong>Eligibility for all selected plan(s)</strong></h6><p>Important eligibility information:</p><p><strong>Premium Protection Plan</strong>&nbsp;for Primary traveller</p><p>You are not eligible for this insurance if any of the following apply to you or anyone you want to cover:</p><ul><li class=\"ql-align-justify\">Over age 74</li><li class=\"ql-align-justify\">Do not reside in Canada</li><li class=\"ql-align-justify\">Travelling for more than 45 days</li><li class=\"ql-align-justify\">Not covered under a government health insurance plan (GHIP) for the entire duration of your trip</li><li class=\"ql-align-justify\">Made the initial payment for your trip travel arrangements more than 72 hours from the time of purchasing this plan</li></ul><p>If any of these statements apply to you or anyone you want to cover, you are not eligible for this insurance then remove any travellers who are not eligible for coverage.</p>",
+  "projectName": "Development",
+  "phaseName": "Planning",
+  "priority": "medium",
+  "status": "review",
+  "dates": {
+    "start": null,
+    "due": null
+  },
+  "assignments": [
+    {
+      "userId": "SYS_ROOT_001",
+      "name": "amin",
+      "role": "owner",
+      "status": "active",
+      "joinedAt": "2026-02-07T08:26:50.784Z"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "CP_1770452810784_0_426",
+      "title": "Step one - 01",
+      "weight": 70,
+      "criteria": "<h6><strong>Eligibility for all selected plan(s)</strong></h6><p>Important eligibility information:</p><p><strong>Premium Protection Plan</strong>&nbsp;for Primary traveller</p><p>You are not eligible for this insurance if any of the following apply to you or anyone you want to cover:</p><ul><li class=\"ql-align-justify\">Over age 74</li><li class=\"ql-align-justify\">Do not reside in Canada</li><li class=\"ql-align-justify\">Travelling for more than 45 days</li><li class=\"ql-align-justify\">Not covered under a government health insurance plan (GHIP) for the entire duration of your trip</li><li class=\"ql-align-justify\">Made the initial payment for your trip travel arrangements more than 72 hours from the time of purchasing this plan</li></ul><p>If any of these statements apply to you or anyone you want to cover, you are not eligible for this insurance then remove any travellers who are not eligible for coverage.</p>",
+      "lockStep": "",
+      "lockStatus": "completed",
+      "dates": {
+        "original": "2026-02-19",
+        "current": "2026-02-17"
+      },
+      "updates": [
+        {
+          "timestamp": "2026-02-07T08:27:34.559Z",
+          "userId": "SYS_ROOT_001",
+          "userName": "amin",
+          "note": "Eligibility for all selected plan(s)\r\nImportant eligibility information:\r\nPremium Protection Plan for Primary traveller\r\nYou are not eligible for this insurance if any of the following apply to you or anyone you want to cover:\r\nOver age 74\r\nDo not reside in Canada\r\nTravelling for more than 45 days\r\nNot covered under a government health insurance plan (GHIP) for the entire duration of your trip\r\nMade the initial payment for your trip travel arrangements more than 72 hours from the time of purchasing this plan\r\nIf any of these statements apply to you or anyone you want to cover, you are not eligible for this insurance then remove any travellers who are not eligible for coverage.",
+          "changes": {}
+        },
+        {
+          "timestamp": "2026-02-07T08:27:54.771Z",
+          "userId": "SYS_ROOT_001",
+          "userName": "amin",
+          "note": "Eligibility for all selected plan(s)\r\nImportant eligibility information:\r\nPremium Protection Plan for Primary traveller\r\nYou are not eligible for this insurance if any of the following apply to you or anyone you want to cover:\r\nOver age 74\r\nDo not reside in Canada\r\nTravelling for more than 45 days\r\nNot covered under a government health insurance plan (GHIP) for the entire duration of your trip\r\nMade the initial payment for your trip travel arrangements more than 72 hours from the time of purchasing this plan\r\nIf any of these statements apply to you or anyone you want to cover, you are not eligible for this insurance then remove any travellers who are not eligible for coverage.",
+          "changes": {
+            "newDate": "2026-02-17",
+            "newWeight": 70
+          }
+        }
+      ],
+      "deliverables": [],
+      "status": "completed"
+    },
+    {
+      "id": "CP_1770452810784_1_764",
+      "title": "Step Two - 02",
+      "weight": 20,
+      "criteria": "<h6><strong>Eligibility for all selected plan(s)</strong></h6><p>Important eligibility information:</p><p><strong>Premium Protection Plan</strong>&nbsp;for Primary traveller</p><p>You are not eligible for this insurance if any of the following apply to you or anyone you want to cover:</p><ul><li class=\"ql-align-justify\">Over age 74</li><li class=\"ql-align-justify\">Do not reside in Canada</li><li class=\"ql-align-justify\">Travelling for more than 45 days</li><li class=\"ql-align-justify\">Not covered under a government health insurance plan (GHIP) for the entire duration of your trip</li><li class=\"ql-align-justify\">Made the initial payment for your trip travel arrangements more than 72 hours from the time of purchasing this plan</li></ul><p>If any of these statements apply to you or anyone you want to cover, you are not eligible for this insurance then remove any travellers who are not eligible for coverage.</p>",
+      "lockStep": "1",
+      "lockStatus": "completed",
+      "dates": {
+        "original": "2026-02-15",
+        "current": "2026-02-15"
+      },
+      "updates": [],
+      "deliverables": [
+        {
+          "id": "DEL_1770499943001",
+          "filename": "P2uS2.jpg",
+          "url": "/uploads/GLOBAL/tasks/TASK_1770452810784/P2uS2_1770499942996.jpg",
+          "size": 133219,
+          "mimetype": "image/jpeg",
+          "description": "Managing the list of all possible operations in the software.",
+          "checkpointId": "CP_1770452810784_1_764",
+          "uploadedAt": "2026-02-07T21:32:23.001Z",
+          "uploadedBy": "SYS_ROOT_001"
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "id": "CP_1770452810784_2_393",
+      "title": "Step Three - 03",
+      "weight": 0,
+      "criteria": "<h6><strong>Eligibility for all selected plan(s)</strong></h6><p>Important eligibility information:</p><p><strong>Premium Protection Plan</strong>&nbsp;for Primary traveller</p><p>You are not eligible for this insurance if any of the following apply to you or anyone you want to cover:</p><ul><li class=\"ql-align-justify\">Over age 74</li><li class=\"ql-align-justify\">Do not reside in Canada</li><li class=\"ql-align-justify\">Travelling for more than 45 days</li><li class=\"ql-align-justify\">Not covered under a government health insurance plan (GHIP) for the entire duration of your trip</li><li class=\"ql-align-justify\">Made the initial payment for your trip travel arrangements more than 72 hours from the time of purchasing this plan</li></ul><p>If any of these statements apply to you or anyone you want to cover, you are not eligible for this insurance then remove any travellers who are not eligible for coverage.</p>",
+      "lockStep": "2",
+      "lockStatus": "completed",
+      "dates": {
+        "original": "2026-04-15",
+        "current": "2026-04-15"
+      },
+      "updates": [],
+      "deliverables": [],
+      "status": "active"
+    }
+  ],
+  "activityLog": [
+    {
+      "action": "created",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-07T08:26:50.784Z",
+      "details": "Task created"
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-07T08:26:50.828Z",
+      "details": "Uploaded file: Tes01.png",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770452810784/Tes01_1770452810824.png",
+        "filename": "Tes01.png"
+      }
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-07T08:26:50.843Z",
+      "details": "Uploaded file: Tes02.png",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770452810784/Tes02_1770452810842.png",
+        "filename": "Tes02.png"
+      }
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-07T08:26:50.860Z",
+      "details": "Uploaded file: rock-emoji.png",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770452810784/rock-emoji_1770452810858.png",
+        "filename": "rock-emoji.png"
+      }
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-07T09:01:47.751Z",
+      "details": "Uploaded file: 586z85g51u_WEB_258278.jpg",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770452810784/586z85g51u_WEB_258278_1770454907748.jpg",
+        "filename": "586z85g51u_WEB_258278.jpg"
+      }
+    },
+    {
+      "action": "upload",
+      "userId": "SYS_ROOT_001",
+      "timestamp": "2026-02-07T21:32:23.001Z",
+      "details": "Uploaded file: P2uS2.jpg",
+      "file": {
+        "url": "/uploads/GLOBAL/tasks/TASK_1770452810784/P2uS2_1770499942996.jpg",
+        "filename": "P2uS2.jpg"
+      }
+    }
+  ],
+  "progress": 78,
+  "updatedAt": "2026-02-07T21:32:23.001Z",
+  "createdAt": "2026-02-07T08:26:50.784Z"
+}

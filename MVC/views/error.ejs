@@ -1,0 +1,683 @@
+<!-- MVC/views/error.ejs -->
+<%
+  const pageTitle = String(typeof title !== 'undefined' && title ? title : 'Something went wrong');
+  const pageMessage = String(typeof message !== 'undefined' && message ? message : 'An unknown error occurred.');
+  const pageStatusCode = typeof statusCode !== 'undefined' ? statusCode : 500;
+  const accessData = (typeof accessRequest !== 'undefined' && accessRequest && typeof accessRequest === 'object') ? accessRequest : {};
+  const combinedAccessText = `${pageTitle} ${pageMessage} ${accessData.reason || ''}`;
+  const isAccessNeeded = Number(pageStatusCode) === 403
+    || /access\s+(denied|needed|required)|do not have access|permission/i.test(combinedAccessText);
+  const cleanAccessReason = String(accessData.reason || pageMessage || 'This area is protected.').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const requestedPath = String(accessData.path || '').trim();
+  const requestedSection = String(accessData.sectionId || (Array.isArray(accessData.sectionIds) ? accessData.sectionIds.join(', ') : '') || '').trim();
+  const requestedOperation = String(accessData.operationId || '').trim();
+  const contactInfo = (typeof appContact !== 'undefined' && appContact && typeof appContact === 'object') ? appContact : {};
+  const supportEmail = String(contactInfo.supportEmail || contactInfo.email || '').trim();
+  const requesterName = user ? String(user.preferredName || user.firstName || user.name || user.username || '').trim() : '';
+  const requesterEmail = user ? String(user.email || '').trim() : '';
+  const requesterId = user ? String(user.id || user.userId || '').trim() : '';
+  const accessEmailBody = [
+    'Hello,',
+    '',
+    'Could you please review my access for this area?',
+    '',
+    requesterName ? `Requester: ${requesterName}` : '',
+    requesterEmail ? `Email: ${requesterEmail}` : '',
+    requesterId ? `User ID: ${requesterId}` : '',
+    requestedPath ? `Page: ${requestedPath}` : '',
+    requestedSection ? `Section: ${requestedSection}` : '',
+    requestedOperation ? `Operation: ${requestedOperation}` : '',
+    cleanAccessReason ? `Message shown: ${cleanAccessReason}` : '',
+    '',
+    'Reason for request:',
+    '[Please add a short reason here.]',
+    '',
+    'Thank you.'
+  ].filter((line) => line !== '').join('\n');
+  const accessSubject = encodeURIComponent('Access request');
+  const accessBody = encodeURIComponent(accessEmailBody);
+  const supportHref = supportEmail ? `mailto:${supportEmail}?subject=${accessSubject}&body=${accessBody}` : '/contact';
+%>
+
+<% if (isAccessNeeded) { %>
+<div class="container py-5 access-needed-page">
+  <div class="access-needed-shell">
+    <div class="access-needed-hero">
+      <div class="access-needed-glow access-needed-glow-one"></div>
+      <div class="access-needed-glow access-needed-glow-two"></div>
+      <div class="access-needed-copy">
+        <div class="access-needed-kicker">
+          <i class="bi bi-shield-lock"></i>
+          Protected, not broken
+        </div>
+        <h1 class="page-heading size-lg mb-2">Access is needed for this page</h1>
+        <p class="text-muted mb-0 access-needed-lead">
+          No worries. Your account is working, but this area is limited to users with a matching access profile.
+          If you need this for your work, an administrator can add it to your profile.
+        </p>
+        <div class="access-needed-pills">
+          <span><i class="bi bi-check-circle"></i> Your sign-in is valid</span>
+          <span><i class="bi bi-lock"></i> This module is permission based</span>
+          <span><i class="bi bi-send"></i> Request details are ready below</span>
+        </div>
+      </div>
+      <div class="access-needed-status" aria-label="Access status code">
+        <div class="access-needed-lock">
+          <i class="bi bi-lock-fill"></i>
+        </div>
+        <span>403</span>
+        <small>Access Required</small>
+      </div>
+    </div>
+
+    <div class="row g-4 align-items-stretch">
+      <div class="col-lg-7">
+        <div class="module-card h-100 access-needed-card">
+          <div class="module-accent"></div>
+          <h2 class="h5 fw-bold mb-3">What happened?</h2>
+          <div class="access-needed-message mb-4">
+            <i class="bi bi-info-circle"></i>
+            <span><%= cleanAccessReason || 'This page is protected by your organization access settings.' %></span>
+          </div>
+
+          <div class="access-needed-request mb-4">
+            <div class="access-needed-section-header">
+              <div>
+                <div class="access-needed-request-title">Request context</div>
+                <div class="small text-muted">These details help your admin find the exact permission to add.</div>
+              </div>
+              <i class="bi bi-clipboard-data"></i>
+            </div>
+            <div class="row g-2">
+              <% if (requestedPath) { %>
+                <div class="col-12">
+                  <div class="access-needed-detail">
+                    <span>Page</span>
+                    <code><%= requestedPath %></code>
+                  </div>
+                </div>
+              <% } %>
+              <% if (requestedSection) { %>
+                <div class="col-md-6">
+                  <div class="access-needed-detail">
+                    <span>Section</span>
+                    <code><%= requestedSection %></code>
+                  </div>
+                </div>
+              <% } %>
+              <% if (requestedOperation) { %>
+                <div class="col-md-6">
+                  <div class="access-needed-detail">
+                    <span>Operation</span>
+                    <code><%= requestedOperation %></code>
+                  </div>
+                </div>
+              <% } %>
+              <% if (!requestedPath && !requestedSection && !requestedOperation) { %>
+                <div class="col-12">
+                  <div class="access-needed-detail">
+                    <span>Requested area</span>
+                    <code><%= pageTitle %></code>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="access-needed-draft">
+            <div class="access-needed-section-header mb-3">
+              <div>
+                <div class="access-needed-request-title">Email body for requesting access</div>
+                <div class="small text-muted">You can copy this into chat/email, or open a prepared email draft.</div>
+              </div>
+              <i class="bi bi-envelope-paper"></i>
+            </div>
+            <textarea id="accessRequestEmailBody" class="form-control access-needed-emailBody" rows="11" readonly><%= accessEmailBody %></textarea>
+            <div class="d-flex flex-wrap gap-2 justify-content-end mt-3">
+              <button type="button" id="copyAccessRequestBodyBtn" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-clipboard me-1"></i> Copy Email Body
+              </button>
+              <% if (supportEmail) { %>
+                <a href="<%= supportHref %>" class="btn btn-primary btn-filled btn-sm">
+                  <i class="bi bi-envelope me-1"></i> Open Email Draft
+                </a>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="module-card h-100 access-needed-card">
+          <div class="module-accent"></div>
+          <h2 class="h5 fw-bold mb-3">How to get access</h2>
+          <div class="access-needed-steps">
+            <div class="access-needed-step">
+              <div class="access-needed-stepIcon"><i class="bi bi-person-check"></i></div>
+              <div>
+                <div class="fw-semibold">Ask your administrator</div>
+                <div class="small text-muted">They can update your access profile for the current organization.</div>
+              </div>
+            </div>
+            <div class="access-needed-step">
+              <div class="access-needed-stepIcon"><i class="bi bi-envelope"></i></div>
+              <div>
+                <div class="fw-semibold">Contact support if needed</div>
+                <div class="small text-muted">Share the page and section shown on this screen so the request is clear.</div>
+              </div>
+            </div>
+            <div class="access-needed-step">
+              <div class="access-needed-stepIcon"><i class="bi bi-arrow-clockwise"></i></div>
+              <div>
+                <div class="fw-semibold">Try again after approval</div>
+                <div class="small text-muted">Once your profile is updated, refresh the page or sign in again.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="access-needed-actions">
+      <% if (user) { %>
+        <a href="/dashboard" class="btn btn-primary btn-filled btn-md">
+          <i class="bi bi-house-door me-1"></i> Go to Dashboard
+        </a>
+        <a href="<%= supportHref %>" class="btn btn-outline-primary btn-md">
+          <i class="bi bi-envelope me-1"></i> Request Access
+        </a>
+        <button type="button" onclick="history.back()" class="btn btn-outline-secondary btn-md">
+          Go Back
+        </button>
+      <% } else { %>
+        <a href="/login" class="btn btn-primary btn-filled btn-md">
+          <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+        </a>
+        <a href="/contact" class="btn btn-outline-primary btn-md">
+          Contact Support
+        </a>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<style>
+  .access-needed-page {
+    --access-ink: #182235;
+    --access-muted: #667085;
+    --access-line: #dbe5f2;
+    --access-soft: #f6f9fd;
+    --access-blue: #2563eb;
+    --access-deep: #12337c;
+    --access-aqua: #14b8a6;
+    --access-gold: #f59e0b;
+    --access-sky: #eaf2ff;
+  }
+
+  .access-needed-shell {
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+
+  .access-needed-hero {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 2.25rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgba(37, 99, 235, 0.16);
+    border-radius: 1.75rem;
+    background:
+      linear-gradient(125deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 255, 0.94)),
+      radial-gradient(circle at 12% 18%, rgba(20, 184, 166, 0.18), transparent 34%),
+      radial-gradient(circle at 92% 22%, rgba(37, 99, 235, 0.2), transparent 28%);
+    box-shadow: 0 26px 70px rgba(24, 34, 53, 0.1);
+  }
+
+  .access-needed-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.38;
+    background-image:
+      linear-gradient(rgba(37, 99, 235, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(37, 99, 235, 0.08) 1px, transparent 1px);
+    background-size: 28px 28px;
+    pointer-events: none;
+  }
+
+  .access-needed-hero > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .access-needed-glow {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(2px);
+    opacity: 0.36;
+    z-index: 0;
+  }
+
+  .access-needed-glow-one {
+    width: 180px;
+    height: 180px;
+    left: -70px;
+    bottom: -80px;
+    background: radial-gradient(circle, rgba(20, 184, 166, 0.38), transparent 68%);
+  }
+
+  .access-needed-glow-two {
+    width: 220px;
+    height: 220px;
+    right: -82px;
+    top: -88px;
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.34), transparent 68%);
+  }
+
+  .access-needed-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.82rem;
+    margin-bottom: 1rem;
+    border-radius: 999px;
+    color: #0f766e;
+    background: rgba(20, 184, 166, 0.12);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .access-needed-copy {
+    max-width: 760px;
+  }
+
+  .access-needed-lead {
+    font-size: 1.05rem;
+    line-height: 1.7;
+  }
+
+  .access-needed-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 1.2rem;
+  }
+
+  .access-needed-pills span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.52rem 0.7rem;
+    border: 1px solid rgba(37, 99, 235, 0.12);
+    border-radius: 999px;
+    color: #334155;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 8px 20px rgba(24, 34, 53, 0.06);
+    font-size: 0.84rem;
+    font-weight: 700;
+  }
+
+  .access-needed-pills i {
+    color: var(--access-blue);
+  }
+
+  .access-needed-status {
+    flex: 0 0 auto;
+    width: 156px;
+    min-height: 170px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    border-radius: 1.4rem;
+    border: 1px solid rgba(37, 99, 235, 0.18);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(239, 246, 255, 0.88));
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.85),
+      0 18px 35px rgba(37, 99, 235, 0.12);
+  }
+
+  .access-needed-lock {
+    width: 3rem;
+    height: 3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.65rem;
+    border-radius: 999px;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--access-blue), var(--access-aqua));
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.24);
+  }
+
+  .access-needed-status span {
+    color: var(--access-deep);
+    font-size: 3.25rem;
+    font-weight: 900;
+    letter-spacing: -0.08em;
+    line-height: 1;
+  }
+
+  .access-needed-status small {
+    margin-top: 0.5rem;
+    color: var(--access-muted);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .access-needed-card {
+    border-radius: 1.25rem;
+    box-shadow: 0 18px 45px rgba(24, 34, 53, 0.06);
+  }
+
+  .access-needed-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1.05rem;
+    border: 1px solid rgba(37, 99, 235, 0.16);
+    border-radius: 1rem;
+    color: #0f3a6b;
+    background:
+      linear-gradient(135deg, rgba(234, 242, 255, 0.96), rgba(240, 253, 250, 0.96));
+    font-weight: 700;
+    line-height: 1.55;
+  }
+
+  .access-needed-message i {
+    margin-top: 0.18rem;
+  }
+
+  .access-needed-request {
+    padding: 1rem;
+    border: 1px solid var(--access-line);
+    border-radius: 1rem;
+    background:
+      linear-gradient(180deg, #ffffff, var(--access-soft));
+  }
+
+  .access-needed-request-title {
+    color: var(--access-ink);
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+  }
+
+  .access-needed-section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .access-needed-section-header > i {
+    width: 2.4rem;
+    height: 2.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    color: var(--access-blue);
+    background: rgba(37, 99, 235, 0.09);
+  }
+
+  .access-needed-detail {
+    min-height: 100%;
+    padding: 0.86rem;
+    border: 1px solid #e7edf6;
+    border-radius: 0.85rem;
+    background: #ffffff;
+    box-shadow: 0 8px 18px rgba(24, 34, 53, 0.035);
+  }
+
+  .access-needed-detail span {
+    display: block;
+    color: var(--access-muted);
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+
+  .access-needed-detail code {
+    color: var(--access-ink);
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .access-needed-draft {
+    padding: 1rem;
+    border: 1px solid rgba(20, 184, 166, 0.22);
+    border-radius: 1rem;
+    background:
+      linear-gradient(180deg, #ffffff, #f6fffd);
+  }
+
+  .access-needed-emailBody {
+    min-height: 260px;
+    resize: vertical;
+    border-color: #d5e3f2;
+    border-radius: 0.95rem;
+    color: #102033;
+    background:
+      linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    box-shadow: inset 0 1px 2px rgba(24, 34, 53, 0.04);
+  }
+
+  .access-needed-emailBody:focus {
+    border-color: rgba(37, 99, 235, 0.5);
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.08);
+  }
+
+  .access-needed-steps {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .access-needed-step {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+    padding: 0.95rem;
+    border: 1px solid var(--access-line);
+    border-radius: 1rem;
+    background:
+      linear-gradient(135deg, #ffffff, #f9fbff);
+    transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  }
+
+  .access-needed-step:hover {
+    transform: translateY(-2px);
+    border-color: rgba(37, 99, 235, 0.22);
+    box-shadow: 0 10px 24px rgba(24, 34, 53, 0.07);
+  }
+
+  .access-needed-stepIcon {
+    width: 2.3rem;
+    height: 2.3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    color: var(--access-blue);
+    background: rgba(37, 99, 235, 0.1);
+  }
+
+  .access-needed-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+  }
+
+  @media (max-width: 767.98px) {
+    .access-needed-hero {
+      flex-direction: column;
+      padding: 1.35rem;
+    }
+
+    .access-needed-status {
+      width: 100%;
+      min-height: 110px;
+    }
+  }
+</style>
+<script>
+(() => {
+  const copyBtn = document.getElementById('copyAccessRequestBodyBtn');
+  const bodyEl = document.getElementById('accessRequestEmailBody');
+  if (!copyBtn || !bodyEl) return;
+
+  async function showAccessCopyMessage(title, message, icon, buttonClass) {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title,
+        icon,
+        message,
+        buttons: [{ text: 'OK', class: buttonClass || 'btn-primary' }]
+      });
+    }
+  }
+
+  copyBtn.addEventListener('click', async () => {
+    const text = bodyEl.value || '';
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+      } else {
+        bodyEl.focus();
+        bodyEl.select();
+        document.execCommand('copy');
+        bodyEl.setSelectionRange(0, 0);
+      }
+      await showAccessCopyMessage('Copied', 'The access request email body has been copied.', 'success', 'btn-success');
+    } catch (error) {
+      bodyEl.focus();
+      bodyEl.select();
+      await showAccessCopyMessage('Copy Manually', 'Copy was blocked by the browser. The text is selected so you can copy it manually.', 'info', 'btn-primary');
+    }
+  });
+})();
+</script>
+<% } else { %>
+<div class="container py-5">
+
+  <div class="dash-hero mb-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+      <h1 class="page-heading size-lg mb-1 text-danger">
+        <%= pageTitle %>
+      </h1>
+      <div class="text-muted" style="font-size:1.05rem;">
+        We hit an unexpected problem while processing your request.
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <% if (user) { %>
+        <a href="/dashboard" class="btn btn-primary btn-filled btn-md">
+          <i class="bi bi-house-door me-1"></i> Dashboard
+        </a>
+        <button onclick="history.back()" class="btn btn-outline-secondary btn-md">
+          Go Back
+        </button>
+      <% } else { %>
+        <a href="/login" class="btn btn-primary btn-filled btn-md">
+          <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+        </a>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-4">
+      <div class="module-card h-100 d-flex flex-column justify-content-center text-center p-5">
+        <div class="module-accent"></div>
+
+        <div class="mb-3 text-danger opacity-75">
+          <i class="bi bi-exclamation-octagon-fill" style="font-size: 4rem;"></i>
+        </div>
+
+        <h2 class="display-4 fw-bold text-danger mb-0">
+          <%= pageStatusCode %>
+        </h2>
+        <div class="text-muted text-uppercase fw-bold small letter-spacing-1">Server Error</div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="module-card h-100">
+        <div class="module-accent"></div>
+
+        <h4 class="fw-bold mb-3">What happened?</h4>
+
+        <div class="alert alert-danger border-0 bg-danger-subtle text-danger mb-4">
+          <i class="bi bi-info-circle-fill me-2"></i>
+          <strong><%- pageMessage %></strong>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light h-100">
+              <h6 class="fw-bold mb-2">Possible Causes</h6>
+              <ul class="small text-muted ps-3 mb-0">
+                <li>Temporary server glitch.</li>
+                <li>Invalid input data.</li>
+                <li>Missing permissions or admin verification.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light h-100">
+              <h6 class="fw-bold mb-2">Actions</h6>
+              <ul class="small text-muted ps-3 mb-0">
+                <li><a href="javascript:location.reload()">Refresh the page</a></li>
+                <li><a href="/dashboard">Return to Dashboard</a></li>
+                <li>Contact Support if persistent.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <% if ((typeof error !== 'undefined' && error) || (typeof details !== 'undefined' && details)) { %>
+          <hr class="my-4 opacity-10">
+
+          <details class="p-3 border rounded bg-light">
+            <summary class="fw-bold text-secondary cursor-pointer user-select-none d-flex align-items-center gap-2">
+              <i class="bi bi-code-square"></i> Technical Details (Debug)
+            </summary>
+
+            <div class="mt-3">
+              <% if (typeof error !== 'undefined' && error.stack) { %>
+                <div class="mb-2 small fw-bold text-muted text-uppercase">Stack Trace</div>
+                <pre class="p-3 bg-dark text-white rounded small overflow-auto" style="max-height: 300px; font-size: 0.8rem;"><%= error.stack %></pre>
+              <% } %>
+
+              <% if (typeof details !== 'undefined' && details) { %>
+                <div class="mb-2 small fw-bold text-muted text-uppercase">Additional Context</div>
+                <pre class="p-3 bg-white border rounded small text-muted"><%= typeof details === 'object' ? JSON.stringify(details, null, 2) : details %></pre>
+              <% } %>
+            </div>
+          </details>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>

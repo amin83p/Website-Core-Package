@@ -1,0 +1,382 @@
+<%
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+  const session = detail?.session || {};
+  const items = Array.isArray(detail?.items) ? detail.items : [];
+  const events = Array.isArray(detail?.events) ? detail.events : [];
+  const artifacts = Array.isArray(detail?.artifacts) ? detail.artifacts : [];
+  const lifecycle = detail?.lifecycle && typeof detail.lifecycle === 'object' ? detail.lifecycle : {};
+  const summary = lifecycle?.summary && typeof lifecycle.summary === 'object' ? lifecycle.summary : {};
+  const matrix = Array.isArray(lifecycle?.questionMatrix) ? lifecycle.questionMatrix : [];
+  const intervals = Array.isArray(lifecycle?.intervals) ? lifecycle.intervals : [];
+  const anomalies = Array.isArray(lifecycle?.anomalies) ? lifecycle.anomalies : [];
+  const scoringItems = items.filter((item) => item?.metadata && typeof item.metadata === 'object' && item.metadata.scoring && typeof item.metadata.scoring === 'object');
+  const sessionId = String(session?.id || '').trim();
+  const attemptSkill = String(session?.metadata?.practice?.skill || '').trim().toLowerCase();
+  const attemptStatus = String(session?.status || '').trim().toLowerCase();
+
+  function formatSeconds(value) {
+    const total = Number(value || 0);
+    if (!Number.isFinite(total) || total <= 0) return '0s';
+    const safe = Math.floor(total);
+    const hours = Math.floor(safe / 3600);
+    const minutes = Math.floor((safe % 3600) / 60);
+    const seconds = safe % 60;
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
+  }
+
+  function formatBytes(value) {
+    const bytes = Number(value || 0);
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let index = 0;
+    while (size >= 1024 && index < units.length - 1) {
+      size /= 1024;
+      index += 1;
+    }
+    return `${size.toFixed(index === 0 ? 0 : 2)} ${units[index]}`;
+  }
+
+  function formatJson(value) {
+    try {
+      return JSON.stringify(value == null ? null : value, null, 2);
+    } catch (_) {
+      return String(value == null ? '' : value);
+    }
+  }
+
+  function eventAtValue(value) {
+    if (!value) return 0;
+    const ms = Date.parse(value);
+    return Number.isFinite(ms) ? ms : 0;
+  }
+
+  const exportCsvHref = `/pte/practice/attempts/${encodeURIComponent(sessionId)}/details/export?format=csv`;
+  const exportJsonHref = `/pte/practice/attempts/${encodeURIComponent(sessionId)}/details/export?format=json`;
+  const feedbackHref = `/pte/practice/attempts/${encodeURIComponent(sessionId)}/feedback`;
+  const openSessionHref = `/pte/practice/session/${encodeURIComponent(sessionId)}`;
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-diagram-3 me-2"></i>Attempt Lifecycle Details</h1>
+      <div class="small text-muted mt-1">
+        Session <span class="font-monospace"><%= sessionId || '-' %></span>
+        <% if (attemptSkill) { %>| Skill: <span class="text-capitalize"><%= attemptSkill %></span><% } %>
+        | Status: <span class="text-capitalize"><%= attemptStatus || '-' %></span>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="<%= dashboardHref %>" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-speedometer2 me-1"></i> PTE Dashboard</a>
+      <a href="/pte/practice/attempts" class="btn btn-outline-secondary btn-md"><i class="bi bi-arrow-left me-1"></i> Back to Attempts</a>
+      <a href="<%= feedbackHref %>" class="btn btn-outline-primary btn-md"><i class="bi bi-chat-left-text me-1"></i> Feedback</a>
+      <a href="<%= openSessionHref %>" class="btn btn-outline-primary btn-md"><i class="bi bi-play-circle me-1"></i> Open Session</a>
+      <a href="<%= exportCsvHref %>" class="btn btn-outline-success btn-md"><i class="bi bi-download me-1"></i> Export CSV</a>
+      <a href="<%= exportJsonHref %>" class="btn btn-outline-secondary btn-md"><i class="bi bi-braces me-1"></i> Export JSON</a>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-md-6">
+      <div class="border rounded p-2 bg-light">
+        <div class="x-small text-muted">Session ID</div>
+        <div class="fw-bold font-monospace"><%= session?.id || '-' %></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="border rounded p-2 bg-light">
+        <div class="x-small text-muted">Started</div>
+        <div class="fw-bold"><%= session?.startedAt ? new Date(session.startedAt).toLocaleString() : '-' %></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="border rounded p-2 bg-light">
+        <div class="x-small text-muted">Finished</div>
+        <div class="fw-bold"><%= session?.finishedAt ? new Date(session.finishedAt).toLocaleString() : '-' %></div>
+      </div>
+    </div>
+  </div>
+
+  <h5 class="fw-bold mb-2">Lifecycle Summary</h5>
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="border rounded p-2 bg-light h-100"><div class="x-small text-muted">Questions</div><div class="fw-bold"><%= Number(summary.itemCount || 0) %></div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="border rounded p-2 bg-light h-100"><div class="x-small text-muted">Starts</div><div class="fw-bold"><%= Number(summary.startCount || 0) %></div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="border rounded p-2 bg-light h-100"><div class="x-small text-muted">Saves</div><div class="fw-bold"><%= Number(summary.saveCount || 0) %></div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="border rounded p-2 bg-light h-100"><div class="x-small text-muted">Submits</div><div class="fw-bold"><%= Number(summary.submitCount || 0) %></div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="border rounded p-2 bg-light h-100"><div class="x-small text-muted">Skips</div><div class="fw-bold"><%= Number(summary.skipCount || 0) %></div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="border rounded p-2 bg-light h-100"><div class="x-small text-muted">No-Save Starts</div><div class="fw-bold"><%= Number(summary.noSaveStartCount || 0) %></div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="border rounded p-2 bg-light h-100"><div class="x-small text-muted">Avg Start Duration</div><div class="fw-bold"><%= formatSeconds(summary.avgStartDurationSeconds || 0) %></div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="border rounded p-2 bg-light h-100"><div class="x-small text-muted">Total Active Time</div><div class="fw-bold"><%= formatSeconds(summary.totalActiveSeconds || 0) %></div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="border rounded p-2 bg-light h-100"><div class="x-small text-muted">Anomalies</div><div class="fw-bold <%= Number(summary.anomalyCount || 0) > 0 ? 'text-danger' : '' %>"><%= Number(summary.anomalyCount || 0) %></div></div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white border-0 pb-0">
+      <h5 class="fw-bold m-0">Question Lifecycle Matrix</h5>
+    </div>
+    <div class="card-body pt-3">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Question</th>
+              <th>Starts</th>
+              <th>Saves</th>
+              <th>Submits</th>
+              <th>Auto</th>
+              <th>Skips</th>
+              <th>No-Save Starts</th>
+              <th>Avg Duration</th>
+              <th>Total Active</th>
+              <th>Anomalies</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!matrix.length) { %>
+              <tr><td colspan="11" class="text-center text-muted py-3">No lifecycle rows available.</td></tr>
+            <% } %>
+            <% matrix.forEach((row) => { %>
+              <tr>
+                <td><%= Number(row?.questionOrder || 0) %></td>
+                <td>
+                  <div class="small fw-bold"><%= row?.questionTitle || row?.questionVersionId || '-' %></div>
+                  <div class="x-small text-muted text-capitalize"><%= row?.skill || '-' %> / <%= String(row?.questionType || '-').replace(/_/g, ' ') %></div>
+                  <div class="x-small text-muted font-monospace"><%= row?.itemId || '-' %></div>
+                </td>
+                <td><%= Number(row?.startCount || 0) %></td>
+                <td><%= Number(row?.saveCount || 0) %></td>
+                <td><%= Number(row?.submitCount || 0) %></td>
+                <td><%= Number(row?.autoSubmitCount || 0) %></td>
+                <td><%= Number(row?.skipCount || 0) %></td>
+                <td><%= Number(row?.noSaveStartCount || 0) %></td>
+                <td><%= formatSeconds(row?.avgStartDurationSeconds || 0) %></td>
+                <td><%= formatSeconds(row?.totalActiveSeconds || 0) %></td>
+                <td>
+                  <% if (Number(row?.anomalyCount || 0) > 0) { %>
+                    <span class="badge bg-danger"><%= Number(row?.anomalyCount || 0) %></span>
+                  <% } else { %>
+                    <span class="badge bg-success">0</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white border-0 pb-0">
+      <h5 class="fw-bold m-0">Start Intervals</h5>
+    </div>
+    <div class="card-body pt-3">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Question</th>
+              <th>Start No</th>
+              <th>Started</th>
+              <th>Ended</th>
+              <th>Reason</th>
+              <th>Duration</th>
+              <th>Saves In Interval</th>
+              <th>Submit</th>
+              <th>View ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!intervals.length) { %>
+              <tr><td colspan="10" class="text-center text-muted py-3">No start intervals recorded.</td></tr>
+            <% } %>
+            <% intervals.slice().sort((a, b) => eventAtValue(a?.startedAt) - eventAtValue(b?.startedAt)).forEach((row) => { %>
+              <tr>
+                <td><%= Number(row?.questionOrder || 0) %></td>
+                <td>
+                  <div class="small fw-bold"><%= row?.questionTitle || row?.questionVersionId || '-' %></div>
+                  <div class="x-small text-muted font-monospace"><%= row?.itemId || '-' %></div>
+                </td>
+                <td><%= Number(row?.startNo || 0) %></td>
+                <td class="small"><%= row?.startedAt ? new Date(row.startedAt).toLocaleString() : '-' %></td>
+                <td class="small"><%= row?.endedAt ? new Date(row.endedAt).toLocaleString() : '-' %></td>
+                <td><span class="badge bg-secondary"><%= row?.endReason || '-' %></span></td>
+                <td><%= formatSeconds(row?.durationSeconds || 0) %></td>
+                <td><%= Number(row?.saveCountInInterval || 0) %></td>
+                <td><%= row?.submitOccurred ? 'Yes' : 'No' %></td>
+                <td class="x-small font-monospace"><%= row?.viewInstanceId || '-' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white border-0 pb-0">
+      <h5 class="fw-bold m-0">Anomalies</h5>
+    </div>
+    <div class="card-body pt-3">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Question</th>
+              <th>Event At</th>
+              <th>Event</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!anomalies.length) { %>
+              <tr><td colspan="5" class="text-center text-muted py-3">No anomalies detected.</td></tr>
+            <% } %>
+            <% anomalies.forEach((row) => { %>
+              <tr>
+                <td><span class="badge bg-danger"><%= row?.type || '-' %></span></td>
+                <td>
+                  <div class="small fw-bold"><%= row?.questionTitle || row?.questionVersionId || row?.itemId || '-' %></div>
+                  <div class="x-small text-muted font-monospace"><%= row?.itemId || '-' %></div>
+                </td>
+                <td class="small"><%= row?.eventAt ? new Date(row.eventAt).toLocaleString() : '-' %></td>
+                <td class="x-small font-monospace"><%= row?.eventType || '-' %> / <%= row?.eventId || '-' %></td>
+                <td class="small"><%= row?.message || '-' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <% if (scoringItems.length) { %>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white border-0 pb-0">
+        <h5 class="fw-bold m-0">Scoring Evidence</h5>
+      </div>
+      <div class="card-body pt-3">
+        <div class="row g-3">
+          <% scoringItems.forEach((item) => { %>
+            <% const scoring = item?.metadata?.scoring || {}; %>
+            <% const draft = scoring?.feedbackDraft && typeof scoring.feedbackDraft === 'object' ? scoring.feedbackDraft : null; %>
+            <div class="col-lg-6">
+              <div class="border rounded p-3 bg-light-subtle h-100">
+                <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                  <div>
+                    <div class="fw-bold"><%= item?.metadata?.questionTitle || item?.questionVersionId || '-' %></div>
+                    <div class="x-small text-muted text-capitalize"><%= String(item?.questionType || '-').replace(/_/g, ' ') %> | <span class="font-monospace"><%= item?.id || '-' %></span></div>
+                  </div>
+                  <span class="badge <%= scoring.status === 'scored' ? 'bg-success' : (scoring.status === 'needs_evidence' ? 'bg-warning text-dark' : 'bg-danger') %> text-capitalize"><%= String(scoring.status || '-').replace(/_/g, ' ') %></span>
+                </div>
+                <div class="row g-2 small mb-2">
+                  <div class="col-6"><strong>Score:</strong> <%= Number(item?.scoreFinal || 0).toFixed(2) %> / <%= Number(item?.maxScore || 0).toFixed(2) %></div>
+                  <div class="col-6"><strong>Content:</strong> <%= Number(item?.traitScores?.content || 0) %> / <%= Number(scoring?.alignment?.contentMax || scoring?.sourceWordCount || 0) %></div>
+                  <div class="col-6"><strong>Pronunciation:</strong> <%= Number(item?.traitScores?.pronunciation || 0) %> / 5</div>
+                  <div class="col-6"><strong>Fluency:</strong> <%= Number(item?.traitScores?.fluency || 0) %> / 5</div>
+                  <div class="col-6"><strong>Errors:</strong> <%= Number(scoring?.alignment?.errorCount || 0) %></div>
+                  <div class="col-6"><strong>WPM:</strong> <%= Number(scoring?.speechMetrics?.estimatedWpm || 0).toFixed(2) %></div>
+                </div>
+                <% if (draft) { %>
+                  <div class="small fw-bold mb-1">Feedback Draft</div>
+                  <div class="small mb-1"><%= draft.summary || '-' %></div>
+                  <% if (Array.isArray(draft.improvements) && draft.improvements.length) { %>
+                    <ul class="small mb-2 ps-3">
+                      <% draft.improvements.slice(0, 3).forEach((row) => { %>
+                        <li><%= row %></li>
+                      <% }) %>
+                    </ul>
+                  <% } %>
+                <% } %>
+                <details>
+                  <summary class="small fw-bold">Raw Scoring Metadata</summary>
+                  <pre class="small border rounded p-2 bg-white mt-2 mb-0"><%= formatJson(scoring) %></pre>
+                </details>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <details class="card border-0 shadow-sm mb-3">
+    <summary class="card-header bg-white border-0 fw-bold">Diagnostics</summary>
+    <div class="card-body pt-3">
+      <h6 class="fw-bold mb-2">Items: <%= items.length %></h6>
+      <pre class="small border rounded p-2 bg-light-subtle"><%= formatJson(items) %></pre>
+      <h6 class="fw-bold mb-2 mt-3">Events: <%= events.length %></h6>
+      <pre class="small border rounded p-2 bg-light-subtle"><%= formatJson(events) %></pre>
+      <h6 class="fw-bold mb-2 mt-3">Artifacts: <%= artifacts.length %></h6>
+      <pre class="small border rounded p-2 bg-light-subtle"><%= formatJson(artifacts) %></pre>
+      <h6 class="fw-bold mb-2 mt-3">Lifecycle</h6>
+      <pre class="small border rounded p-2 bg-light-subtle"><%= formatJson(lifecycle) %></pre>
+    </div>
+  </details>
+
+  <details class="card border-0 shadow-sm">
+    <summary class="card-header bg-white border-0 fw-bold">Artifacts Table</summary>
+    <div class="card-body pt-3">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Created</th>
+              <th>Item</th>
+              <th>Type</th>
+              <th>Name</th>
+              <th>MIME</th>
+              <th>Size</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!artifacts.length) { %>
+              <tr><td colspan="7" class="text-center text-muted py-3">No artifacts recorded.</td></tr>
+            <% } %>
+            <% artifacts.forEach((artifact) => { %>
+              <tr>
+                <td class="small"><%= artifact.createdAt ? new Date(artifact.createdAt).toLocaleString() : '-' %></td>
+                <td class="x-small font-monospace"><%= artifact.attemptItemId || '-' %></td>
+                <td><span class="badge bg-secondary text-capitalize"><%= artifact.artifactType || '-' %></span></td>
+                <td>
+                  <div class="small fw-bold"><%= artifact.name || '-' %></div>
+                  <div class="x-small text-muted font-monospace"><%= artifact.id || '-' %></div>
+                </td>
+                <td class="x-small font-monospace"><%= artifact.mimeType || '-' %></td>
+                <td class="small"><%= formatBytes(artifact.sizeBytes) %></td>
+                <td class="small"><%= Number(artifact.durationSeconds || 0).toFixed(2) %> sec</td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>

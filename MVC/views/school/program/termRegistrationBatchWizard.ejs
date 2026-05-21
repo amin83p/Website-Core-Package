@@ -1,0 +1,915 @@
+<div class="sections-page term-registration-batch-page">
+  <style>
+    .term-registration-batch-page .wizard-step {
+      display: none;
+      border: 1px solid rgba(23, 50, 77, 0.12);
+      border-radius: 0.85rem;
+      background: #f8fbff;
+      padding: 1rem;
+    }
+    .term-registration-batch-page .wizard-step.active { display: block; }
+    .term-registration-batch-page .wizard-rail .btn {
+      border-radius: 999px;
+      font-size: 0.82rem;
+    }
+    .term-registration-batch-page .wizard-rail .btn.active {
+      background: #17324d;
+      color: #fff;
+      border-color: #17324d;
+    }
+    .term-registration-batch-page .mini-card {
+      border: 1px solid rgba(23, 50, 77, 0.1);
+      border-radius: 0.75rem;
+      background: #fff;
+      padding: 0.7rem;
+    }
+    .term-registration-batch-page .mini-card .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #66798c;
+    }
+    .term-registration-batch-page .mini-card .value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #17324d;
+    }
+    .term-registration-batch-page .table td,
+    .term-registration-batch-page .table th {
+      vertical-align: top;
+    }
+    .term-registration-batch-page .eligibility-box {
+      border: 1px dashed rgba(23, 50, 77, 0.22);
+      border-radius: 0.7rem;
+      background: #fff;
+      padding: 0.75rem;
+    }
+    .term-registration-batch-page .eligibility-box.is-error {
+      border-color: rgba(176, 42, 55, 0.45);
+      background: #fff5f5;
+    }
+    .term-registration-batch-page .eligibility-box.is-ok {
+      border-color: rgba(25, 135, 84, 0.35);
+      background: #f2fbf6;
+    }
+    .term-registration-batch-page .eligibility-box.is-pending {
+      border-color: rgba(255, 193, 7, 0.45);
+      background: #fff9ea;
+    }
+  </style>
+
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-diagram-3-fill me-2"></i><%= title %></h1>
+    <div class="d-flex gap-2">
+      <a href="/school/programs/register-terms" class="btn btn-outline-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Single Registration</a>
+      <a href="/school/programs/term-registrations" class="btn btn-outline-secondary btn-sm"><i class="bi bi-card-list me-1"></i>Registration Records</a>
+      <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i>Back to Dashboard</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width:1450px;">
+    <form id="termBatchWizardForm" class="card border-0 shadow-sm" onsubmit="return false;">
+      <input type="hidden" id="hid_actionStateId" value="<%= actionStateId || '' %>">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div>
+            <div class="fw-bold text-primary">Batch Flow</div>
+            <div class="small text-muted">Effective Date -> Program/Term -> Students -> Classes -> Preview & Save Draft</div>
+          </div>
+          <span class="badge bg-light text-dark border" id="stepBadge">Step 1 of 5</span>
+        </div>
+
+        <div class="wizard-rail d-flex flex-wrap gap-2 mb-3" id="wizardRail"></div>
+
+        <div class="wizard-step active" data-step="1">
+          <div class="fw-bold mb-2">Step 1: Effective Date & External Ref</div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Effective Date *</label>
+              <input type="date" id="effectiveDate" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">External Ref</label>
+              <input type="text" id="externalReference" class="form-control" placeholder="Optional">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Note</label>
+              <input type="text" id="note" class="form-control" placeholder="Optional note saved on drafts">
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-step" data-step="2">
+          <div class="fw-bold mb-2">Step 2: Program & Term</div>
+          <div class="row g-3">
+            <div class="col-lg-6">
+              <label class="form-label fw-bold">Program *</label>
+              <div class="input-group">
+                <input id="programLabel" class="form-control bg-white" placeholder="Select program..." readonly>
+                <button type="button" class="btn btn-outline-primary" id="pickProgramBtn"><i class="bi bi-search"></i></button>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <label class="form-label fw-bold">Term *</label>
+              <select class="form-select" id="termId">
+                <option value="">Select term...</option>
+              </select>
+              <div class="small text-muted mt-1" id="termHint">Select program to load terms (Active or Started).</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-step" data-step="3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div>
+              <div class="fw-bold">Step 3: Select Students (Multi Select Picker)</div>
+              <div class="small text-muted">Only students registered in selected program are shown. Already-registered-in-term rows are shown but not added.</div>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="pickStudentsBtn"><i class="bi bi-people me-1"></i>Add Students</button>
+          </div>
+          <div class="mini-card mb-2">
+            <div class="label">Selected Students</div>
+            <div class="value" id="selectedStudentCount">0</div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Program Registration</th>
+                  <th>Fee Category</th>
+                  <th>Account</th>
+                  <th class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody id="selectedStudentsTbody">
+                <tr><td colspan="5" class="text-center text-muted py-4">No students selected yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="wizard-step" data-step="4">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div>
+              <div class="fw-bold">Step 4: Add Courses One by One</div>
+              <div class="small text-muted">Each added class is validated immediately for seats, prerequisites, prior completion, and related rules for all selected students.</div>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="pickClassBtn"><i class="bi bi-plus-circle me-1"></i>Add Course</button>
+          </div>
+          <div class="mini-card mb-2">
+            <div class="label">Selected Courses</div>
+            <div class="value" id="selectedClassCount">0</div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Class</th>
+                  <th>Credits</th>
+                  <th>Department</th>
+                  <th>Subjects</th>
+                  <th>Roster</th>
+                  <th class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody id="selectedClassesTbody">
+                <tr><td colspan="6" class="text-center text-muted py-4">No courses selected yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="eligibility-box mt-2" id="step4EligibilityBox">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div class="fw-bold">Step 4 Eligibility Check</div>
+              <span class="badge bg-light text-dark border" id="step4EligibilityBadge">Pending</span>
+            </div>
+            <div class="small text-muted mt-1" id="step4EligibilitySummary">Add classes and students to run automatic validation.</div>
+            <div id="step4EligibilityErrors" class="mt-2"></div>
+          </div>
+        </div>
+
+        <div class="wizard-step" data-step="5">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div>
+              <div class="fw-bold">Step 5: Preview & Save Draft</div>
+              <div class="small text-muted">Preview validates all selected students against all selected classes and term constraints.</div>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="runPreview"><i class="bi bi-eye me-1"></i>Preview</button>
+              <button type="button" class="btn btn-primary btn-sm" id="saveDraft" disabled><i class="bi bi-save me-1"></i>Save Draft</button>
+            </div>
+          </div>
+
+          <div class="row g-2 mb-2">
+            <div class="col-md-3"><div class="mini-card"><div class="label">Rows</div><div class="value" id="pRows">0</div></div></div>
+            <div class="col-md-3"><div class="mini-card"><div class="label">Ready</div><div class="value" id="pReady">0</div></div></div>
+            <div class="col-md-3"><div class="mini-card"><div class="label">Errors</div><div class="value" id="pErrors">0</div></div></div>
+            <div class="col-md-3"><div class="mini-card"><div class="label">Total</div><div class="value" id="pAmount">0.00</div></div></div>
+          </div>
+
+          <div id="previewAlert"></div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Status</th>
+                  <th>Classes / Credits</th>
+                  <th>Total</th>
+                  <th>Issues / Warnings</th>
+                </tr>
+              </thead>
+              <tbody id="previewTbody">
+                <tr><td colspan="5" class="text-center text-muted py-4">Run preview.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="prevStep" disabled><i class="bi bi-arrow-left me-1"></i>Previous</button>
+          <div class="small text-muted" id="stepTitle">Step 1: Effective Date & External Ref</div>
+          <button type="button" class="btn btn-primary btn-sm" id="nextStep">Next<i class="bi bi-arrow-right ms-1"></i></button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const userDataInfo = <%- JSON.stringify(user || {}) %>;
+  const state = {
+    step: 1,
+    program: null,
+    termId: '',
+    selectedStudents: [],
+    selectedClasses: [],
+    preview: null,
+    classGate: {
+      status: 'idle', // idle | checking | ok | error
+      checkedSignature: '',
+      issues: [],
+      summary: ''
+    }
+  };
+  const actionStateId = String(document.getElementById('hid_actionStateId')?.value || '').trim();
+  const stepTitles = ['Effective Date & External Ref', 'Program & Term', 'Students', 'Classes', 'Preview & Save'];
+
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  const money = (v) => Number(v || 0).toFixed(2);
+
+  const showMsg = (o) => (typeof showMessageModal === 'function' ? showMessageModal(o) : Promise.resolve(alert(o?.message || 'Done')));
+  const showWait = (l) => { if (typeof showLoading === 'function') showLoading(l || 'Working...'); };
+  const hideWait = () => { if (typeof hideLoading === 'function') hideLoading(); };
+
+  async function readJsonResponse(response, fallbackMessage) {
+    const raw = await response.text();
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch (parseError) {
+      const trimmed = String(raw || '').trim();
+      const compact = trimmed.replace(/\s+/g, ' ').slice(0, 280);
+      throw new Error(compact || fallbackMessage || 'Request failed.');
+    }
+    if (typeof window.applyGuardedApiResult === 'function' && data?.idempotency?.state) {
+      const guarded = await window.applyGuardedApiResult(data, {
+        busyTitle: 'Operation In Progress',
+        replayTitle: 'Operation Already Processed'
+      });
+      if (guarded.stop) {
+        return { status: 'busy', _guardStop: true };
+      }
+    }
+    if (!response.ok || data?.status === 'error') {
+      throw new Error(String(data?.message || fallbackMessage || 'Request failed.'));
+    }
+    return data || {};
+  }
+
+  function getActiveOrgContext() {
+    const activeOrgId = String(userDataInfo?.activeOrgId || '').trim();
+    const allowed = Array.isArray(userDataInfo?.allowedOrgs) ? userDataInfo.allowedOrgs : [];
+    const orgRow = allowed.find((row) => String(row?.orgId || '').trim() === activeOrgId) || null;
+    const orgName = String(orgRow?.name || orgRow?.displayName || '').trim();
+    return {
+      label: 'Active Org',
+      value: orgName || activeOrgId || 'System / Global',
+      icon: 'bi-building'
+    };
+  }
+
+  function selectedTerm() {
+    return (Array.isArray(state.program?.termOptions) ? state.program.termOptions : []).find((t) => String(t.termId) === String(state.termId)) || null;
+  }
+
+  function effectiveDateOutOfRange() {
+    const date = String(document.getElementById('effectiveDate').value || '').trim();
+    const term = selectedTerm();
+    if (!date || !term?.startDate || !term?.endDate) return '';
+    if (date < term.startDate || date > term.endDate) {
+      return 'Effective Date is outside selected term range (' + term.startDate + ' to ' + term.endDate + ').';
+    }
+    return '';
+  }
+
+  function renderStepRail() {
+    const rail = document.getElementById('wizardRail');
+    rail.innerHTML = stepTitles.map((title, i) => '<button type="button" class="btn btn-outline-secondary btn-sm ' + ((i + 1) === state.step ? 'active' : '') + '" data-step="' + (i + 1) + '">' + (i + 1) + '. ' + esc(title) + '</button>').join('');
+    rail.querySelectorAll('[data-step]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const target = Number(btn.getAttribute('data-step'));
+        if (target > state.step) {
+          for (let s = state.step; s < target; s += 1) {
+            const issue = validateStep(s);
+            if (issue) return showMsg({ title: 'Step Validation', message: issue, type: 'warning' });
+          }
+        }
+        state.step = target;
+        renderWizard();
+      });
+    });
+  }
+
+  function renderWizard() {
+    document.querySelectorAll('.wizard-step').forEach((panel) => panel.classList.toggle('active', Number(panel.getAttribute('data-step')) === state.step));
+    document.getElementById('stepBadge').textContent = 'Step ' + state.step + ' of 5';
+    document.getElementById('stepTitle').textContent = 'Step ' + state.step + ': ' + stepTitles[state.step - 1];
+    document.getElementById('prevStep').disabled = state.step <= 1;
+    renderStepRail();
+  }
+
+  function validateStep(step) {
+    if (step === 1 && !String(document.getElementById('effectiveDate').value || '').trim()) return 'Effective Date is required.';
+    if (step === 2) {
+      if (!state.program?.programId) return 'Program is required.';
+      if (!state.termId) return 'Term is required.';
+      const rangeIssue = effectiveDateOutOfRange();
+      if (rangeIssue) return rangeIssue;
+    }
+    if (step === 3 && state.selectedStudents.length === 0) return 'Select at least one student.';
+    if (step === 4) {
+      if (state.selectedClasses.length === 0) return 'Add at least one course.';
+      if (state.selectedStudents.length === 0) return 'Select at least one student.';
+      if (state.classGate.status === 'checking') return 'Eligibility validation is still running. Please wait.';
+      if (!state.classGate.checkedSignature || state.classGate.checkedSignature !== buildClassGateSignature() || state.classGate.status === 'idle') {
+        return 'Step 4 validation is pending. Wait for automatic validation to finish before moving on.';
+      }
+      if (state.classGate.status === 'error') {
+        return 'Resolve the Step 4 eligibility issues listed at the bottom before moving to Step 5.';
+      }
+    }
+    return '';
+  }
+
+  function payload() {
+    return new URLSearchParams({
+      actionStateId,
+      programId: String(state.program?.programId || ''),
+      termId: String(state.termId || ''),
+      effectiveDate: String(document.getElementById('effectiveDate').value || '').trim(),
+      externalReference: String(document.getElementById('externalReference').value || '').trim(),
+      note: String(document.getElementById('note').value || '').trim(),
+      programRegistrationIds: JSON.stringify(state.selectedStudents.map((s) => s.programRegistrationId)),
+      classIds: JSON.stringify(state.selectedClasses.map((c) => c.id))
+    });
+  }
+
+  function buildClassGateSignature() {
+    return JSON.stringify({
+      programId: String(state.program?.programId || ''),
+      termId: String(state.termId || ''),
+      effectiveDate: String(document.getElementById('effectiveDate').value || '').trim(),
+      programRegistrationIds: state.selectedStudents.map((s) => String(s.programRegistrationId || '')).filter(Boolean).sort(),
+      classIds: state.selectedClasses.map((c) => String(c.id || '')).filter(Boolean).sort()
+    });
+  }
+
+  function dedupeStrings(values) {
+    return Array.from(new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean)));
+  }
+
+  function resetClassGate(summaryText) {
+    state.classGate.status = 'idle';
+    state.classGate.checkedSignature = '';
+    state.classGate.issues = [];
+    state.classGate.summary = String(summaryText || 'Add classes and students to run automatic validation.');
+    renderClassGate();
+  }
+
+  function collectClassGateIssues(preview) {
+    const issues = [];
+    if (String(preview?.effectiveDateIssue || '').trim()) {
+      issues.push(String(preview.effectiveDateIssue).trim());
+    }
+    if (Array.isArray(preview?.aggregateIssues)) {
+      preview.aggregateIssues.forEach((issue) => {
+        const clean = String(issue || '').trim();
+        if (clean) issues.push(clean);
+      });
+    }
+    (Array.isArray(preview?.rows) ? preview.rows : []).forEach((row) => {
+      if (String(row?.status || '').toLowerCase() !== 'error') return;
+      const studentLabel = String(row?.studentName || row?.studentId || row?.programRegistrationId || 'Student').trim();
+      const rowIssues = Array.isArray(row?.issues) ? row.issues : [];
+      if (!rowIssues.length) {
+        issues.push(studentLabel + ': validation failed.');
+        return;
+      }
+      rowIssues.forEach((issue) => {
+        const clean = String(issue || '').trim();
+        if (!clean) return;
+        issues.push(studentLabel + ': ' + clean);
+      });
+    });
+    return dedupeStrings(issues);
+  }
+
+  function renderClassGate() {
+    const box = document.getElementById('step4EligibilityBox');
+    const badge = document.getElementById('step4EligibilityBadge');
+    const summary = document.getElementById('step4EligibilitySummary');
+    const errors = document.getElementById('step4EligibilityErrors');
+    if (!box || !badge || !summary || !errors) return;
+
+    const hasClasses = state.selectedClasses.length > 0;
+    const hasStudents = state.selectedStudents.length > 0;
+    const isStale = state.classGate.checkedSignature && state.classGate.checkedSignature !== buildClassGateSignature();
+
+    box.classList.remove('is-error', 'is-ok', 'is-pending');
+    errors.innerHTML = '';
+
+    if (!hasClasses) {
+      badge.textContent = 'Pending';
+      summary.textContent = 'Add at least one class to start eligibility validation.';
+      box.classList.add('is-pending');
+      return;
+    }
+    if (!hasStudents) {
+      badge.textContent = 'Pending';
+      summary.textContent = 'Add at least one student to run class eligibility validation.';
+      box.classList.add('is-pending');
+      return;
+    }
+    if (state.classGate.status === 'checking') {
+      badge.textContent = 'Checking...';
+      summary.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Validating selected classes against all selected students...';
+      box.classList.add('is-pending');
+      return;
+    }
+    if (!state.classGate.checkedSignature || isStale || state.classGate.status === 'idle') {
+      badge.textContent = 'Pending';
+      summary.textContent = state.classGate.summary || 'Validation is required before moving to Step 5.';
+      box.classList.add('is-pending');
+      return;
+    }
+    if (state.classGate.status === 'error') {
+      badge.textContent = 'Blocked';
+      summary.textContent = state.classGate.summary || 'Fix the issues below before moving to Step 5.';
+      box.classList.add('is-error');
+      errors.innerHTML = '<ul class="mb-0 ps-3">' + state.classGate.issues.map((issue) => '<li class="small text-danger">' + esc(issue) + '</li>').join('') + '</ul>';
+      return;
+    }
+    badge.textContent = 'Passed';
+    summary.textContent = state.classGate.summary || 'All selected classes are currently eligible for selected students.';
+    box.classList.add('is-ok');
+  }
+
+  async function runStep4EligibilityCheck() {
+    const hasClasses = state.selectedClasses.length > 0;
+    const hasStudents = state.selectedStudents.length > 0;
+    if (!state.program?.programId || !state.termId || !hasClasses || !hasStudents) {
+      resetClassGate('Complete Program, Term, Students, and Classes to run validation.');
+      return;
+    }
+
+    state.classGate.status = 'checking';
+    state.classGate.issues = [];
+    state.classGate.summary = 'Validating selected classes...';
+    renderClassGate();
+
+    try {
+      const response = await fetch('/school/programs/register-terms-batch/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        credentials: 'same-origin',
+        body: payload().toString()
+      });
+      const result = await readJsonResponse(response, 'Eligibility validation failed.');
+      if (result?._guardStop) return;
+      const preview = result.preview || null;
+      const issues = collectClassGateIssues(preview);
+
+      state.classGate.checkedSignature = buildClassGateSignature();
+      state.classGate.issues = issues;
+      state.classGate.status = issues.length ? 'error' : 'ok';
+      state.classGate.summary = issues.length
+        ? ('Resolve ' + issues.length + ' issue(s) before moving to Step 5.')
+        : ('Eligibility check passed for ' + state.selectedStudents.length + ' student(s) across ' + state.selectedClasses.length + ' class(es).');
+      state.preview = preview;
+      renderClassGate();
+      renderPreview();
+    } catch (error) {
+      state.classGate.checkedSignature = buildClassGateSignature();
+      state.classGate.status = 'error';
+      state.classGate.issues = [String(error?.message || 'Eligibility validation failed.')];
+      state.classGate.summary = 'Validation failed. Fix request errors and retry.';
+      renderClassGate();
+    }
+  }
+
+  function renderProgramSelection() {
+    const label = state.program
+      ? [state.program.programCode, state.program.programName].filter(Boolean).join(' - ') || state.program.programId
+      : '';
+    document.getElementById('programLabel').value = label;
+
+    const termSelect = document.getElementById('termId');
+    const terms = Array.isArray(state.program?.termOptions) ? state.program.termOptions : [];
+    termSelect.innerHTML = '<option value="">Select term...</option>' + terms.map((t) => {
+      const display = [t.termCode, t.termName].filter(Boolean).join(' - ') || t.termId;
+      const suffix = t.startDate && t.endDate ? (' (' + t.startDate + ' to ' + t.endDate + ')') : '';
+      return '<option value="' + esc(t.termId) + '">' + esc(display + suffix) + '</option>';
+    }).join('');
+
+    if (!terms.some((t) => String(t.termId) === String(state.termId))) state.termId = '';
+    termSelect.value = state.termId;
+
+    document.getElementById('termHint').textContent = state.program
+      ? 'Eligible terms are Active/Started and included in selected program.'
+      : 'Select program to load terms (Active or Started).';
+  }
+
+  function renderStudents() {
+    const tbody = document.getElementById('selectedStudentsTbody');
+    if (!state.selectedStudents.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No students selected yet.</td></tr>';
+    } else {
+      tbody.innerHTML = state.selectedStudents.map((row, index) => {
+        return '<tr>' +
+          '<td><div class="fw-bold">' + esc(row.studentName || row.studentId) + '</div><div class="small text-muted font-monospace">' + esc(row.studentId || '') + '</div></td>' +
+          '<td><span class="font-monospace">' + esc(row.programRegistrationId || '') + '</span></td>' +
+          '<td>' + esc(row.feeCategory || '-') + '</td>' +
+          '<td><span class="font-monospace">' + esc(row.studentAccountId || '-') + '</span></td>' +
+          '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-del-student="' + index + '"><i class="bi bi-trash"></i></button></td>' +
+        '</tr>';
+      }).join('');
+      tbody.querySelectorAll('[data-del-student]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const index = Number(btn.getAttribute('data-del-student'));
+          if (!Number.isInteger(index) || index < 0 || index >= state.selectedStudents.length) return;
+          state.selectedStudents.splice(index, 1);
+          state.preview = null;
+          resetClassGate('Student selection changed. Revalidation is required.');
+          renderStudents();
+          renderPreview();
+          if (state.selectedClasses.length > 0) runStep4EligibilityCheck();
+        });
+      });
+    }
+    document.getElementById('selectedStudentCount').textContent = String(state.selectedStudents.length);
+  }
+
+  function renderClasses() {
+    const tbody = document.getElementById('selectedClassesTbody');
+    if (!state.selectedClasses.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No courses selected yet.</td></tr>';
+    } else {
+      tbody.innerHTML = state.selectedClasses.map((row, index) => {
+        return '<tr>' +
+          '<td><div class="fw-bold">' + esc(row.title || row.id) + '</div><div class="small text-muted font-monospace">' + esc(row.id || '') + '</div></td>' +
+          '<td>' + esc(row.credits == null ? '-' : Number(row.credits).toFixed(2)) + '</td>' +
+          '<td>' + esc(row.deliveryDepartmentName || '-') + '</td>' +
+          '<td class="small">' + esc((Array.isArray(row.curriculumSubjects) ? row.curriculumSubjects : []).map((s) => ([s.code, s.name].filter(Boolean).join(' - ') || s.subjectId)).join(', ') || '-') + '</td>' +
+          '<td>' + esc(Number(row.enrolledCount || 0) + ' / ' + (Number(row.maxCapacity || 0) > 0 ? Number(row.maxCapacity) : 'No Cap')) + '</td>' +
+          '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-del-class="' + index + '"><i class="bi bi-trash"></i></button></td>' +
+        '</tr>';
+      }).join('');
+      tbody.querySelectorAll('[data-del-class]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const index = Number(btn.getAttribute('data-del-class'));
+          if (!Number.isInteger(index) || index < 0 || index >= state.selectedClasses.length) return;
+          state.selectedClasses.splice(index, 1);
+          state.preview = null;
+          resetClassGate('Class selection changed. Revalidation is required.');
+          renderClasses();
+          renderPreview();
+          if (state.selectedClasses.length > 0) runStep4EligibilityCheck();
+        });
+      });
+    }
+    document.getElementById('selectedClassCount').textContent = String(state.selectedClasses.length);
+  }
+
+  function renderPreview() {
+    const p = state.preview;
+    const tbody = document.getElementById('previewTbody');
+    const alertBox = document.getElementById('previewAlert');
+
+    if (!p?.rows?.length) {
+      document.getElementById('pRows').textContent = '0';
+      document.getElementById('pReady').textContent = '0';
+      document.getElementById('pErrors').textContent = '0';
+      document.getElementById('pAmount').textContent = '0.00';
+      document.getElementById('saveDraft').disabled = true;
+      alertBox.innerHTML = '';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Run preview.</td></tr>';
+      return;
+    }
+
+    document.getElementById('pRows').textContent = String(Number(p.summary?.totalRows || 0));
+    document.getElementById('pReady').textContent = String(Number(p.summary?.readyRows || 0));
+    document.getElementById('pErrors').textContent = String(Number(p.summary?.errorRows || 0));
+    document.getElementById('pAmount').textContent = money(p.summary?.totalAmount || 0);
+    document.getElementById('saveDraft').disabled = Number(p.summary?.readyRows || 0) <= 0;
+
+    alertBox.innerHTML = p.effectiveDateIssue
+      ? '<div class="alert alert-warning py-2 mb-2"><strong>Date Check:</strong> ' + esc(p.effectiveDateIssue) + '</div>'
+      : '';
+
+    tbody.innerHTML = p.rows.map((row) => {
+      const status = String(row.status || '').toLowerCase();
+      const badgeClass = status === 'error' ? 'bg-danger' : (status === 'warning' ? 'bg-warning text-dark' : 'bg-success');
+      const messages = [].concat(row.issues || []).concat(row.warnings || []);
+      const detail = messages.length
+        ? ('<ul class="mb-0 ps-3">' + messages.map((m) => '<li class="small">' + esc(m) + '</li>').join('') + '</ul>')
+        : '<span class="text-muted">None</span>';
+
+      return '<tr>' +
+        '<td><div class="fw-bold">' + esc(row.studentName || row.studentId) + '</div><div class="small text-muted font-monospace">' + esc(row.studentId || '') + '</div></td>' +
+        '<td><span class="badge ' + badgeClass + '">' + esc(status || 'unknown') + '</span></td>' +
+        '<td>' + esc(String(Number(row.classCount || 0))) + ' / ' + esc(Number(row.selectedCredits || 0).toFixed(2)) + '</td>' +
+        '<td>' + esc(money(row.totalAmount || 0)) + '</td>' +
+        '<td>' + detail + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function addStudentsFromPicker(items) {
+    const rows = Array.isArray(items) ? items : [items];
+    let skippedAlreadyRegistered = 0;
+    rows.forEach((item) => {
+      const regId = String(item?.programRegistrationId || '').trim();
+      if (!regId) return;
+      if (Boolean(item?.alreadyRegisteredInTerm)) {
+        skippedAlreadyRegistered += 1;
+        return;
+      }
+      if (state.selectedStudents.some((row) => String(row.programRegistrationId) === regId)) return;
+      state.selectedStudents.push({
+        programRegistrationId: regId,
+        studentId: String(item?.studentId || '').trim(),
+        studentName: String(item?.studentName || '').trim(),
+        feeCategory: String(item?.feeCategory || '').trim(),
+        studentAccountId: String(item?.studentAccountId || '').trim()
+      });
+    });
+    state.preview = null;
+    resetClassGate('Student selection changed. Revalidation is required.');
+    renderStudents();
+    renderPreview();
+    if (skippedAlreadyRegistered > 0) {
+      showMsg({
+        title: 'Some Rows Skipped',
+        message: skippedAlreadyRegistered + ' student(s) were skipped because they are already registered in this term.',
+        type: 'warning'
+      });
+    }
+    if (state.selectedClasses.length > 0) runStep4EligibilityCheck();
+  }
+
+  function addClassFromPicker(item) {
+    const id = String(item?.id || '').trim();
+    if (!id) return;
+    if (state.selectedClasses.some((row) => String(row.id) === id)) return;
+    state.selectedClasses.push({
+      id,
+      title: String(item?.title || '').trim(),
+      credits: item?.credits,
+      deliveryDepartmentName: String(item?.deliveryDepartmentName || '').trim(),
+      curriculumSubjects: Array.isArray(item?.curriculumSubjects) ? item.curriculumSubjects : [],
+      enrolledCount: Number(item?.enrolledCount || 0),
+      maxCapacity: Number(item?.maxCapacity || 0)
+    });
+    state.preview = null;
+    resetClassGate('Class selection changed. Revalidation is required.');
+    renderClasses();
+    renderPreview();
+    runStep4EligibilityCheck();
+  }
+
+  function openProgramPicker() {
+    GenericPicker.open({
+      title: 'Select Program',
+      icon: 'bi-journal-bookmark-fill',
+      context: getActiveOrgContext(),
+      apiEndpoint: '/school/programs/register-terms-batch/program-options',
+      placeholder: 'Search programs...',
+      renderer: function (item) {
+        const title = [item?.programCode, item?.programName].filter(Boolean).join(' - ') || item?.programId || 'Program';
+        const terms = Array.isArray(item?.termOptions) ? item.termOptions.length : 0;
+        return '<div><div class="fw-bold">' + esc(title) + '</div><div class="small text-muted">' + esc(item?.registrationCount || 0) + ' registrations | ' + terms + ' eligible terms</div></div>';
+      },
+      onSelect: function (item) {
+        state.program = item || null;
+        state.termId = '';
+        state.selectedStudents = [];
+        state.selectedClasses = [];
+        state.preview = null;
+        resetClassGate('Program changed. Revalidation is required after selecting students and classes.');
+        renderProgramSelection();
+        renderStudents();
+        renderClasses();
+        renderPreview();
+      }
+    });
+  }
+
+  function openStudentPicker() {
+    if (!state.program?.programId) {
+      return showMsg({ title: 'Select Program', message: 'Select a program first.', type: 'warning' });
+    }
+    if (!state.termId) {
+      return showMsg({ title: 'Select Term', message: 'Select a term first.', type: 'warning' });
+    }
+
+    GenericPicker.open({
+      title: 'Select Eligible Students',
+      icon: 'bi-people-fill',
+      context: getActiveOrgContext(),
+      apiEndpoint: '/school/programs/register-terms-batch/students?programId=' + encodeURIComponent(state.program.programId) + '&termId=' + encodeURIComponent(state.termId),
+      placeholder: 'Search students...',
+      multiselect: true,
+      renderer: function (item) {
+        const statusBadge = item?.alreadyRegisteredInTerm
+          ? '<span class="badge bg-warning text-dark">Already Registered</span>'
+          : '<span class="badge bg-success">Eligible</span>';
+        return '<div>' +
+          '<div class="fw-bold">' + esc(item?.studentName || item?.studentId || '-') + '</div>' +
+          '<div class="small text-muted font-monospace">Student: ' + esc(item?.studentId || '-') + ' | Reg: ' + esc(item?.programRegistrationId || '-') + '</div>' +
+          '<div class="small text-muted">' + esc(item?.feeCategory || '-') + ' | Account: ' + esc(item?.studentAccountId || '-') + '</div>' +
+          '<div class="small mt-1">' + statusBadge + '</div>' +
+        '</div>';
+      },
+      onSelect: addStudentsFromPicker
+    });
+  }
+
+  function openClassPicker() {
+    if (!state.program?.programId) {
+      return showMsg({ title: 'Select Program', message: 'Select a program first.', type: 'warning' });
+    }
+    if (!state.termId) {
+      return showMsg({ title: 'Select Term', message: 'Select a term first.', type: 'warning' });
+    }
+
+    GenericPicker.open({
+      title: 'Add Course',
+      icon: 'bi-easel-fill',
+      context: getActiveOrgContext(),
+      apiEndpoint: '/school/programs/register-terms-batch/classes?programId=' + encodeURIComponent(state.program.programId) + '&termId=' + encodeURIComponent(state.termId),
+      placeholder: 'Search classes...',
+      renderer: function (item) {
+        const roster = Number(item?.enrolledCount || 0) + ' / ' + (Number(item?.maxCapacity || 0) > 0 ? Number(item.maxCapacity) : 'No Cap');
+        return '<div>' +
+          '<div class="fw-bold">' + esc(item?.title || item?.id || '-') + '</div>' +
+          '<div class="small text-muted">Credits: ' + esc(item?.credits == null ? '-' : Number(item.credits).toFixed(2)) + ' | Roster: ' + esc(roster) + '</div>' +
+          '<div class="small text-muted">Department: ' + esc(item?.deliveryDepartmentName || '-') + '</div>' +
+        '</div>';
+      },
+      onSelect: addClassFromPicker
+    });
+  }
+
+  async function runPreview() {
+    for (let s = 1; s <= 4; s += 1) {
+      const issue = validateStep(s);
+      if (issue) {
+        state.step = s;
+        renderWizard();
+        return showMsg({ title: 'Step Validation', message: issue, type: 'warning' });
+      }
+    }
+
+    showWait('Building preview...');
+    try {
+      const response = await fetch('/school/programs/register-terms-batch/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        credentials: 'same-origin',
+        body: payload().toString()
+      });
+      const result = await readJsonResponse(response, 'Preview failed.');
+      if (result?._guardStop) return;
+
+      state.preview = result.preview || null;
+      renderPreview();
+      hideWait();
+      return showMsg({
+        title: 'Preview Ready',
+        message: 'Ready: ' + Number(state.preview?.summary?.readyRows || 0) + ' / ' + Number(state.preview?.summary?.totalRows || 0),
+        type: result.status === 'warning' ? 'warning' : 'success'
+      });
+    } catch (error) {
+      state.preview = null;
+      renderPreview();
+      hideWait();
+      return showMsg({ title: 'Preview Failed', message: error.message || 'Preview failed.', type: 'error' });
+    }
+  }
+
+  async function saveDraft() {
+    if (!state.preview) {
+      return showMsg({ title: 'Save Blocked', message: 'Run preview first.', type: 'warning' });
+    }
+    if (Number(state.preview?.summary?.readyRows || 0) <= 0) {
+      return showMsg({ title: 'Save Blocked', message: 'No ready rows to save.', type: 'warning' });
+    }
+
+    showWait('Saving draft registrations...');
+    try {
+      const response = await fetch('/school/programs/register-terms-batch/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        credentials: 'same-origin',
+        body: payload().toString()
+      });
+      const result = await readJsonResponse(response, 'Draft save failed.');
+      if (result?._guardStop) return;
+
+      hideWait();
+      await showMsg({ title: 'Draft Save Complete', message: result.message || 'Drafts saved.', type: result.status === 'warning' ? 'warning' : 'success' });
+
+      state.selectedStudents = [];
+      state.selectedClasses = [];
+      state.preview = null;
+      resetClassGate('Add classes and students to run automatic validation.');
+      state.step = 1;
+      renderStudents();
+      renderClasses();
+      renderPreview();
+      renderWizard();
+    } catch (error) {
+      hideWait();
+      return showMsg({ title: 'Save Failed', message: error.message || 'Draft save failed.', type: 'error' });
+    }
+  }
+
+  document.getElementById('prevStep').addEventListener('click', () => {
+    if (state.step > 1) {
+      state.step -= 1;
+      renderWizard();
+    }
+  });
+
+  document.getElementById('nextStep').addEventListener('click', async () => {
+    if (state.step >= 5) return;
+    if (state.step === 4) {
+      const needsCheck = !state.classGate.checkedSignature
+        || state.classGate.checkedSignature !== buildClassGateSignature()
+        || state.classGate.status === 'idle';
+      if (needsCheck) {
+        await runStep4EligibilityCheck();
+      }
+    }
+    const issue = validateStep(state.step);
+    if (issue) return showMsg({ title: 'Step Validation', message: issue, type: 'warning' });
+    state.step += 1;
+    renderWizard();
+  });
+
+  document.getElementById('pickProgramBtn').addEventListener('click', openProgramPicker);
+  document.getElementById('pickStudentsBtn').addEventListener('click', openStudentPicker);
+  document.getElementById('pickClassBtn').addEventListener('click', openClassPicker);
+  document.getElementById('runPreview').addEventListener('click', runPreview);
+  document.getElementById('saveDraft').addEventListener('click', saveDraft);
+
+  document.getElementById('termId').addEventListener('change', function () {
+    state.termId = String(this.value || '').trim();
+    state.selectedStudents = [];
+    state.selectedClasses = [];
+    state.preview = null;
+    resetClassGate('Term changed. Revalidation is required after selecting students and classes.');
+    renderStudents();
+    renderClasses();
+    renderPreview();
+  });
+
+  document.getElementById('effectiveDate').addEventListener('change', function () {
+    resetClassGate('Effective date changed. Revalidation is required.');
+    if (state.selectedStudents.length > 0 && state.selectedClasses.length > 0) runStep4EligibilityCheck();
+    renderPreview();
+  });
+
+  renderWizard();
+  renderProgramSelection();
+  renderStudents();
+  renderClasses();
+  renderPreview();
+  renderClassGate();
+})();
+</script>

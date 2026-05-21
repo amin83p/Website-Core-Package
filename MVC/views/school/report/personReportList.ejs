@@ -1,0 +1,293 @@
+<%
+  const selectedScopeSafe = String(selectedScope || '').trim().toLowerCase();
+  const selectedPersonIdSafe = String(selectedPersonId || '').trim();
+  const selectedPersonLabelSafe = String(selectedPersonLabel || '').trim();
+  const viewerRoleLabels = (Array.isArray(viewerRoles) ? viewerRoles : []).map((role) => String(role || '').trim()).filter(Boolean);
+  const personReportStateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const hasPersonReportFiltersApplied = Boolean(
+    String(personReportStateFilters?.scope || '').trim()
+    || String(personReportStateFilters?.personId || '').trim()
+    || String(personReportStateFilters?.q || '').trim()
+  );
+  const totalMatchedRows = Number(pagination?.totalItems ?? (Array.isArray(data) ? data.length : 0));
+%>
+
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  headerManageBtns: [
+    `<a href="/school/reports" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house me-1"></i>Report Home</a>`
+  ]
+}) %>
+
+<% if (isAdminViewer) { %>
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Assigned Reports by Person</div>
+      <button
+        id="personReportFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#personReportFilterCollapse"
+        aria-expanded="<%= hasPersonReportFiltersApplied ? 'true' : 'false' %>"
+        aria-controls="personReportFilterCollapse"
+        aria-label="<%= hasPersonReportFiltersApplied ? 'Close filters' : 'Open filters' %>">
+        <i id="personReportFilterToggleIcon" class="bi <%= hasPersonReportFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+      </button>
+    </div>
+    <div class="collapse<%= hasPersonReportFiltersApplied ? ' show' : '' %>" id="personReportFilterCollapse">
+      <form method="GET" action="/school/reports/person-reports" id="personReportFilterForm" class="card-body p-3">
+        <input type="hidden" name="q" value="<%= filters?.q || '' %>">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4 col-xl-3">
+            <label class="form-label">Role Type</label>
+            <select class="form-select" name="scope" id="roleScopeInput">
+              <option value="">Any</option>
+              <option value="teacher" <%= selectedScopeSafe === 'teacher' ? 'selected' : '' %>>Teacher</option>
+              <option value="staff" <%= selectedScopeSafe === 'staff' ? 'selected' : '' %>>Staff</option>
+              <option value="student" <%= selectedScopeSafe === 'student' ? 'selected' : '' %>>Student</option>
+            </select>
+          </div>
+          <div class="col-md-8 col-xl-6">
+            <label class="form-label">Person</label>
+            <div class="input-group">
+              <input type="hidden" name="personId" id="personIdInput" value="<%= selectedPersonIdSafe %>">
+              <input type="text" class="form-control bg-white" id="personLabelInput" value="<%= selectedPersonLabelSafe %>" placeholder="Pick teacher/staff/student..." readonly>
+              <button type="button" class="btn btn-outline-primary" id="btnPickPerson"><i class="bi bi-search"></i></button>
+              <button type="button" class="btn btn-outline-secondary" id="btnClearPerson"><i class="bi bi-x-lg"></i></button>
+            </div>
+          </div>
+          <div class="col-md-12 col-xl-3 d-flex justify-content-xl-end gap-2 pt-xl-4">
+            <button class="btn btn-filled btn-primary btn-md" type="submit"><i class="bi bi-funnel me-1"></i> Apply</button>
+            <a href="/school/reports/person-reports" class="btn btn-outline-secondary btn-md">Reset</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+<% } else { %>
+  <div class="alert alert-light border mb-3">
+    <div class="fw-bold">Your Assigned Reports</div>
+    <div class="small text-muted">
+      <% if (viewerRoleLabels.length) { %>
+        Showing reports assigned to your profile as:
+        <% viewerRoleLabels.forEach((role, idx) => { %><span class="badge bg-light text-dark border"><%= role %></span><%= idx < viewerRoleLabels.length - 1 ? ', ' : '' %><% }); %>
+      <% } else { %>
+        No teacher/staff/student role was detected for your active organization.
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="small text-muted">
+      Matched rows: <span class="fw-bold text-dark"><%= totalMatchedRows.toLocaleString() %></span>
+    </div>
+    <div class="small text-muted">
+      Showing page: <span class="fw-bold text-dark"><%= Number(pagination?.currentPage || 1) %> / <%= Number(pagination?.totalPages || 1) %></span>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search assigned reports...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Instance</th>
+        <th>Class</th>
+        <th>Session Date</th>
+        <th>Template</th>
+        <th>Teacher</th>
+        <th>Student</th>
+        <th>Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr><td colspan="8" class="text-center py-4 text-muted">No assigned reports found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <% const lifecycleMode = String(row?.classLifecycle?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based'; %>
+        <% const lifecycleCycleNo = Number(row?.classLifecycle?.cycleNo || 1) > 0 ? Number(row?.classLifecycle?.cycleNo || 1) : 1; %>
+        <% const lifecycleClosed = row?.classLifecycle?.isClosedForNewEnrollment === true || String(row?.classLifecycle?.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true'; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark font-monospace"><%= row.id %></div>
+            <div class="x-small text-muted">Assignment: <%= row.assignmentId || '-' %></div>
+          </td>
+          <td>
+            <div class="fw-bold"><%= row.classTitle || row.classId || '-' %></div>
+            <% if (lifecycleMode === 'rolling') { %>
+              <div class="d-flex flex-wrap gap-1 mt-1">
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Rolling</span>
+                <span class="badge bg-light text-dark border">Cycle #<%= lifecycleCycleNo %></span>
+                <% if (lifecycleClosed) { %>
+                  <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed Enrollment</span>
+                <% } %>
+              </div>
+              <div class="x-small text-muted mt-1">Cycle Window: <%= row?.classLifecycle?.cycleStartDate || '?' %> -> <%= row?.classLifecycle?.cycleEndDate || 'Open' %></div>
+            <% } else { %>
+              <div class="mt-1"><span class="badge bg-light text-dark border">Term-Based</span></div>
+            <% } %>
+          </td>
+          <td><%= row.sessionDate || '-' %></td>
+          <td>
+            <div class="fw-bold text-dark"><%= row.templateTitle || row.templateId || '-' %></div>
+            <div class="x-small text-muted">v<%= Number(row.templateVersion || 1) %></div>
+          </td>
+          <td>
+            <div><%= row.teacherName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= row.teacherId || '-' %></div>
+          </td>
+          <td>
+            <div><%= row.studentName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= row.studentId || '-' %></div>
+          </td>
+          <td>
+            <% const status = String(row.status || '').toLowerCase(); %>
+            <span class="badge <%= status === 'submitted' ? 'bg-success' : (status === 'locked' ? 'bg-dark' : 'bg-warning text-dark') %>"><%= status || '-' %></span>
+          </td>
+          <td class="table-actions pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Assigned Report Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <% if (row.classId) { %>
+                  <a href="/school/classes/edit-wizard/<%= encodeURIComponent(row.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-2"></i>Lifecycle</a>
+                <% } %>
+                <a href="/school/reports/instances/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right me-2"></i>Open</a>
+                <a href="/school/reports/instances/export/<%= row.id %>?download=1" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-2"></i>Export</a>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="<%= newUrl %>" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
+<%- include('../../partials/tablePages-end') %>
+
+<% if (isAdminViewer) { %>
+  <%- include('../../partials/modal_GenericPicker') %>
+  <script>
+    (function () {
+      const scopeInput = document.getElementById('roleScopeInput');
+      const personIdInput = document.getElementById('personIdInput');
+      const personLabelInput = document.getElementById('personLabelInput');
+      const btnPickPerson = document.getElementById('btnPickPerson');
+      const btnClearPerson = document.getElementById('btnClearPerson');
+
+      function cleanScope() {
+        return String(scopeInput?.value || '').trim().toLowerCase();
+      }
+
+      function showWarn(message) {
+        if (typeof showMessageModal === 'function') {
+          showMessageModal({
+            title: 'Selection Required',
+            icon: 'warning',
+            message,
+            buttons: [{ text: 'OK', class: 'btn-secondary' }]
+          });
+        }
+      }
+
+      function openPickerByScope(scope) {
+        if (!window.GenericPicker || !window.GenericPickerPresets) return null;
+        if (scope === 'teacher') return GenericPickerPresets.teacher({ title: 'Select Teacher', placeholder: 'Search teachers...' });
+        if (scope === 'staff') return GenericPickerPresets.staff({ title: 'Select Staff', placeholder: 'Search staff...' });
+        if (scope === 'student') return GenericPickerPresets.student({ title: 'Select Student', placeholder: 'Search students...' });
+        return null;
+      }
+
+      btnPickPerson?.addEventListener('click', function () {
+        const scope = cleanScope();
+        if (!scope) {
+          showWarn('Select role type first (Teacher, Staff, or Student).');
+          return;
+        }
+        const preset = openPickerByScope(scope);
+        if (!preset) return;
+        GenericPicker.open(Object.assign({}, preset, {
+          onSelect: function (item) {
+            const personId = String(item?.personId || item?.id || '').trim();
+            if (!personId) return;
+            const name = String(
+              item?.name
+              || item?.title
+              || item?.displayName
+              || (`${item?.firstName || ''} ${item?.lastName || ''}`.trim())
+              || personId
+            ).trim();
+            personIdInput.value = personId;
+            personLabelInput.value = name;
+          }
+        }));
+      });
+
+      btnClearPerson?.addEventListener('click', function () {
+        personIdInput.value = '';
+        personLabelInput.value = '';
+      });
+
+      scopeInput?.addEventListener('change', function () {
+        personIdInput.value = '';
+        personLabelInput.value = '';
+      });
+
+      function initCollapseToggleIcon(options = {}) {
+        const collapseEl = document.getElementById(String(options.collapseId || ''));
+        const buttonEl = document.getElementById(String(options.buttonId || ''));
+        const iconEl = document.getElementById(String(options.iconId || ''));
+        if (!collapseEl || !buttonEl || !iconEl) return;
+
+        const openIcon = String(options.openIcon || 'bi-chevron-down');
+        const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+        const openLabel = String(options.openLabel || 'Open filters');
+        const closeLabel = String(options.closeLabel || 'Close filters');
+
+        const setState = (expanded) => {
+          iconEl.classList.remove(openIcon, closeIcon);
+          iconEl.classList.add(expanded ? closeIcon : openIcon);
+          buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+          buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+        };
+
+        setState(collapseEl.classList.contains('show'));
+        collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+        collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+      }
+
+      initCollapseToggleIcon({
+        collapseId: 'personReportFilterCollapse',
+        buttonId: 'personReportFilterToggleBtn',
+        iconId: 'personReportFilterToggleIcon',
+        openIcon: 'bi-chevron-down',
+        closeIcon: 'bi-chevron-up',
+        openLabel: 'Open filters',
+        closeLabel: 'Close filters'
+      });
+    })();
+  </script>
+<% } %>

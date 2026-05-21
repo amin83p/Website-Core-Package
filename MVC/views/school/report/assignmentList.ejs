@@ -1,0 +1,261 @@
+<%
+  const selectedClassIdSafe = String(((typeof selectedClassId !== 'undefined' ? selectedClassId : (filters?.classId || '')) || '')).trim();
+  const selectedClassLabelSafe = String(((typeof selectedClassTitle !== 'undefined' ? selectedClassTitle : selectedClassIdSafe) || '')).trim();
+  const assignmentStateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const hasAssignmentFiltersApplied = Boolean(
+    String(assignmentStateFilters?.classId || '').trim()
+    || String(assignmentStateFilters?.q || '').trim()
+  );
+  const totalMatchedRows = Number(pagination?.totalItems ?? (Array.isArray(data) ? data.length : 0));
+%>
+
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  headerManageBtns: [
+    `<a href="/school/reports" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house me-1"></i>Report Home</a>`,
+  ]
+}) %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Report Assignments</div>
+    <button
+      id="reportAssignmentFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#reportAssignmentFilterCollapse"
+      aria-expanded="<%= hasAssignmentFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="reportAssignmentFilterCollapse"
+      aria-label="<%= hasAssignmentFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="reportAssignmentFilterToggleIcon" class="bi <%= hasAssignmentFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasAssignmentFiltersApplied ? ' show' : '' %>" id="reportAssignmentFilterCollapse">
+    <form method="GET" action="/school/reports/assignments" id="reportAssignmentFilterForm" class="card-body p-3">
+      <input type="hidden" name="q" value="<%= filters?.q || '' %>">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-8 col-xl-6">
+          <label class="form-label">Class</label>
+          <div class="input-group">
+            <input type="hidden" name="classId" id="classIdFilterInput" value="<%= selectedClassIdSafe %>">
+            <input type="text" class="form-control bg-white" id="classTitleFilterInput" value="<%= selectedClassLabelSafe %>" placeholder="All Classes" readonly>
+            <button type="button" class="btn btn-outline-primary" id="btnPickClassFilter" title="Pick Class">
+              <i class="bi bi-search"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="btnClearClassFilter" title="Clear Class Filter">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-md-4 col-xl-6 d-flex justify-content-xl-end gap-2 pt-xl-4">
+          <button class="btn btn-filled btn-primary btn-md" type="submit"><i class="bi bi-funnel me-1"></i> Apply</button>
+          <a href="/school/reports/assignments" class="btn btn-outline-secondary btn-md">Reset</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="small text-muted">
+      Matched rows: <span class="fw-bold text-dark"><%= totalMatchedRows.toLocaleString() %></span>
+    </div>
+    <div class="small text-muted">
+      Showing page: <span class="fw-bold text-dark"><%= Number(pagination?.currentPage || 1) %> / <%= Number(pagination?.totalPages || 1) %></span>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search assignments...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Assignment</th>
+        <th>Class</th>
+        <th>Target</th>
+        <th>Task Time</th>
+        <th>Scope</th>
+        <th>Template</th>
+        <th>Teachers</th>
+        <th>Report Period</th>
+        <th>Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr><td colspan="10" class="text-center py-4 text-muted">No assignments found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <% const lifecycleMode = String(row?.classLifecycle?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based'; %>
+        <% const lifecycleCycleNo = Number(row?.classLifecycle?.cycleNo || 1) > 0 ? Number(row?.classLifecycle?.cycleNo || 1) : 1; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark font-monospace"><%= row.id %></div>
+            <div class="x-small text-muted"><%= row.targetType === 'date' ? 'Date Target' : 'Session Target' %></div>
+          </td>
+          <td>
+            <div class="fw-bold"><%= row.classTitle %></div>
+            <% if (lifecycleMode === 'rolling') { %>
+              <div class="d-flex flex-wrap gap-1 mt-1">
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Rolling</span>
+                <span class="badge bg-light text-dark border">Cycle #<%= lifecycleCycleNo %></span>
+                <% if (row?.classLifecycle?.isClosedForNewEnrollment) { %>
+                  <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed Enrollment</span>
+                <% } %>
+              </div>
+              <div class="x-small text-muted mt-1">Cycle Window: <%= row?.classLifecycle?.cycleStartDate || '?' %> -> <%= row?.classLifecycle?.cycleEndDate || 'Open' %></div>
+            <% } else { %>
+              <div class="mt-1"><span class="badge bg-light text-dark border">Term-Based</span></div>
+            <% } %>
+          </td>
+          <td>
+            <div><%= row.targetDate || row.sessionDate || '-' %></div>
+            <% if (String(row.targetType || '').toLowerCase() !== 'date') { %>
+              <div class="x-small text-muted font-monospace"><%= row.sessionId || '-' %></div>
+            <% } %>
+            <% if (row.conflictPermitted) { %>
+              <div class="x-small mt-1"><span class="badge bg-warning-subtle text-warning-emphasis border">Intentional overlap permitted</span></div>
+            <% } %>
+          </td>
+          <td><%= row.taskTimeRange || '-' %></td>
+          <td>
+            <% const scope = String(row.reportScope || 'class').toLowerCase(); %>
+            <% if (scope === 'each_student') { %>
+              <span class="badge bg-info-subtle text-info-emphasis border">Each Student</span>
+            <% } else if (scope === 'selected_students') { %>
+              <span class="badge bg-warning-subtle text-warning-emphasis border">Specific Students (<%= Number(row.targetStudentCount || 0) %>)</span>
+            <% } else { %>
+              <span class="badge bg-light text-secondary border">Whole Class</span>
+            <% } %>
+          </td>
+          <td>
+            <div class="fw-bold text-dark"><%= row.templateTitle %></div>
+            <div class="x-small text-muted">v<%= Number(row.templateVersion || 1) %></div>
+          </td>
+          <td class="small"><%= (row.teacherIds || []).join(', ') %></td>
+          <td>
+            <% if (row.reportStartDate || row.reportDueDate) { %>
+              <div><%= row.reportStartDate || '-' %> to <%= row.reportDueDate || '-' %></div>
+            <% } else { %>
+              <%= row.dueDate || '-' %>
+            <% } %>
+          </td>
+          <td>
+            <span class="badge <%= String(row.status || '') === 'active' ? 'bg-success' : 'bg-secondary' %>"><%= row.status || '-' %></span>
+          </td>
+          <td class="table-actions pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Assignment Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <% if (row.classId) { %>
+                  <a href="/school/classes/edit-wizard/<%= encodeURIComponent(row.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-2"></i>Lifecycle</a>
+                <% } %>
+                <a href="/school/reports/assignments/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <a href="/school/reports/instances/start/<%= row.id %>?teacherId=<%= encodeURIComponent((row.teacherIds || [])[0] || '') %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-play-circle me-2"></i>Start</a>
+                <a href="/school/reports/assignments/delete/<%= row.id %>" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-2"></i>Delete</a>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="<%= newUrl %>" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
+<%- include('../../partials/tablePages-end') %>
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+  (function () {
+    const classIdInput = document.getElementById('classIdFilterInput');
+    const classTitleInput = document.getElementById('classTitleFilterInput');
+    const btnPickClass = document.getElementById('btnPickClassFilter');
+    const btnClearClass = document.getElementById('btnClearClassFilter');
+
+    function showPickerUnavailable() {
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({
+          title: 'Picker Unavailable',
+          icon: 'warning',
+          message: 'Class picker is not available on this page.',
+          buttons: [{ text: 'OK', class: 'btn-secondary' }]
+        });
+      }
+    }
+
+    btnPickClass?.addEventListener('click', function () {
+      if (!window.GenericPicker || !window.GenericPickerPresets) {
+        showPickerUnavailable();
+        return;
+      }
+      GenericPicker.open(GenericPickerPresets.class({
+        onSelect: function (item) {
+          const id = String(item?.id || '').trim();
+          if (!id) return;
+          classIdInput.value = id;
+          classTitleInput.value = String(item?.title || item?.name || id);
+        }
+      }));
+    });
+
+    btnClearClass?.addEventListener('click', function () {
+      classIdInput.value = '';
+      classTitleInput.value = '';
+    });
+
+    function initCollapseToggleIcon(options = {}) {
+      const collapseEl = document.getElementById(String(options.collapseId || ''));
+      const buttonEl = document.getElementById(String(options.buttonId || ''));
+      const iconEl = document.getElementById(String(options.iconId || ''));
+      if (!collapseEl || !buttonEl || !iconEl) return;
+
+      const openIcon = String(options.openIcon || 'bi-chevron-down');
+      const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+      const openLabel = String(options.openLabel || 'Open filters');
+      const closeLabel = String(options.closeLabel || 'Close filters');
+
+      const setState = (expanded) => {
+        iconEl.classList.remove(openIcon, closeIcon);
+        iconEl.classList.add(expanded ? closeIcon : openIcon);
+        buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+      };
+
+      setState(collapseEl.classList.contains('show'));
+      collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+      collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+
+    initCollapseToggleIcon({
+      collapseId: 'reportAssignmentFilterCollapse',
+      buttonId: 'reportAssignmentFilterToggleBtn',
+      iconId: 'reportAssignmentFilterToggleIcon',
+      openIcon: 'bi-chevron-down',
+      closeIcon: 'bi-chevron-up',
+      openLabel: 'Open filters',
+      closeLabel: 'Close filters'
+    });
+  })();
+</script>

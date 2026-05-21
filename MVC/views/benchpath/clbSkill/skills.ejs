@@ -1,0 +1,71 @@
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  manageBtns: [
+    `<a href="/benchpath" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>`
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', { placeholder: 'Search CLB skills...', fields: [] }) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="title">Title <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="code">Code <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="modality">Modality <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="frameworkId">Framework <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="benchmarkCount">Benchmarks <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="reviewStatus">Review <span class="sort-icon"></span></th>
+        <th>Flags</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if ((data || []).length === 0) { %>
+        <tr><td colspan="10" class="text-center py-4 text-muted">No skill records found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <td class="font-monospace small"><%= item.id %></td>
+          <td>
+            <div class="fw-bold"><%= item.title %></div>
+            <div class="small text-muted"><%= item.slug %></div>
+          </td>
+          <td><span class="badge bg-light text-dark border"><%= item.code %></span></td>
+          <td><span class="badge <%= item.modality === 'productive' ? 'bg-warning text-dark' : 'bg-info text-dark' %>"><%= item.modality %></span></td>
+          <td><span class="badge bg-secondary"><%= item.frameworkId %></span></td>
+          <td>
+            <span class="badge bg-primary me-1"><%= item.benchmarkCount || 0 %> BM</span>
+            <span class="badge bg-light text-dark border"><%= item.competencyAreaCount || 0 %> CA</span>
+          </td>
+          <td><span class="badge bg-primary"><%= item.status %></span></td>
+          <td><span class="badge bg-light text-dark border"><%= item.reviewStatus %></span></td>
+          <td>
+            <span class="badge <%= item.isActive ? 'bg-success' : 'bg-danger' %>"><%= item.isActive ? 'Active' : 'Inactive' %></span>
+            <span class="badge <%= item.isSystem ? 'bg-dark' : 'bg-light text-dark border' %>"><%= item.isSystem ? 'System' : 'Custom' %></span>
+            <span class="badge <%= item.isLocked ? 'bg-warning text-dark' : 'bg-light text-dark border' %>"><%= item.isLocked ? 'Locked' : 'Editable' %></span>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <a href="/benchpath/clb-skills/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit me-1">Edit</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="benchpath/clb-skills" hidden></span>
+
+<%- include('../../partials/pagination', { pagination: pagination, filters: filters, baseUrlPath: newUrl }) %>
+
+<%- include('../../partials/tablePages-end') %>

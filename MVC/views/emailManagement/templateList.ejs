@@ -1,0 +1,260 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  print,
+  btn_export: false,
+  headerManageBtns: ['<a href="/dashboard/section-nav/EMAIL_MANAGEMENT" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-speedometer2 me-1"></i> Email Dashboard</a>'],
+  manageBtns: ['<a href="/email-management/ledger" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-journal-check me-1"></i> Email Ledger</a>']
+}) %>
+
+<%
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const safeEventCatalog = Array.isArray(eventCatalog) ? eventCatalog : [];
+  const selectedEventFilter = String(stateFilters?.eventKey__eq || '').toUpperCase();
+  const selectedStatusFilter = String(stateFilters?.isActive__eq || '').toLowerCase();
+  const hasEmailManagementFiltersApplied = Boolean(
+    String(stateFilters?.eventKey__eq || '').trim()
+    || String(stateFilters?.isActive__eq || '').trim()
+  );
+%>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Email Templates</div>
+    <button
+      id="emailManagementFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#emailManagementFilterCollapse"
+      aria-expanded="<%= hasEmailManagementFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="emailManagementFilterCollapse"
+      aria-label="<%= hasEmailManagementFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="emailManagementFilterToggleIcon" class="bi <%= hasEmailManagementFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasEmailManagementFiltersApplied ? ' show' : '' %>" id="emailManagementFilterCollapse">
+    <form method="GET" action="/email-management/templates" id="emailManagementFilterForm" class="card-body p-3">
+      <% if (stateFilters?.q) { %><input type="hidden" name="q" value="<%= stateFilters.q %>"><% } %>
+      <% if (stateFilters?.type) { %><input type="hidden" name="type" value="<%= stateFilters.type %>"><% } %>
+      <% if (stateFilters?.searchFields) { %><input type="hidden" name="searchFields" value="<%= stateFilters.searchFields %>"><% } %>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-6">
+          <label class="form-label mb-1">Email Event</label>
+          <select class="form-select size-md" name="eventKey__eq">
+            <option value="">All supported events</option>
+            <% safeEventCatalog.forEach((event) => { %>
+              <option value="<%= event.eventKey %>" <%= String(event.eventKey || '').toUpperCase() === selectedEventFilter ? 'selected' : '' %>>
+                <%= event.label || event.eventKey %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-1">Status</label>
+          <select class="form-select size-md" name="isActive__eq">
+            <option value="">All</option>
+            <option value="true" <%= selectedStatusFilter === 'true' ? 'selected' : '' %>>Active</option>
+            <option value="false" <%= selectedStatusFilter === 'false' ? 'selected' : '' %>>Inactive</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2 justify-content-md-end">
+          <a href="/email-management/templates" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search event, sender, recipient, subject...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="id">ID <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="eventLabel">Email Event <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="senderTemplate">Sender <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="recipientTemplate">Recipient <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="subjectTemplate">Subject <span class="sort-icon"></span></th>
+        <th class="draggable text-center" data-column="isActive">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="updatedAt">Updated <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr>
+          <td colspan="8" class="text-center text-muted py-4">No email templates found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <tr>
+          <td class="font-monospace"><%= row.id %></td>
+          <td>
+            <div class="fw-semibold"><%= row.eventLabel || row.eventKey || '-' %></div>
+            <% if (row.sectionId || row.operationId) { %>
+              <div class="small text-muted font-monospace"><%= (row.sectionId || '-') + '::' + (row.operationId || '-') %></div>
+            <% } %>
+          </td>
+          <td class="font-monospace text-truncate" style="max-width: 220px;"><%= row.senderTemplate || '-' %></td>
+          <td class="font-monospace text-truncate" style="max-width: 260px;"><%= row.recipientTemplate || '-' %></td>
+          <td class="text-truncate" style="max-width: 340px;"><%= row.subjectTemplate || '-' %></td>
+          <td class="text-center">
+            <% if (row.isActive) { %>
+              <span class="badge bg-success-subtle text-success border">Active</span>
+            <% } else { %>
+              <span class="badge bg-secondary-subtle text-secondary border">Inactive</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (row.updatedAt) { %>
+              <%= new Date(row.updatedAt).toLocaleString() %>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <a href="/email-management/templates/<%= row.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button
+                  type="button"
+                  class="btn btn-outline-danger btn-sm email-template-delete-btn"
+                  data-id="<%= row.id %>"
+                  data-action-state-id="<%= actionStateId || '' %>"
+                >
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: 'email-management/templates'
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+
+<script>
+  (function () {
+    async function showModalMessage(config = {}) {
+      if (typeof showMessageModal === 'function') {
+        return showMessageModal(config);
+      }
+      console.error('showMessageModal is unavailable.', config);
+      return null;
+    }
+
+    function initCollapseToggleIcon(options = {}) {
+      const collapseEl = document.getElementById(String(options.collapseId || ''));
+      const buttonEl = document.getElementById(String(options.buttonId || ''));
+      const iconEl = document.getElementById(String(options.iconId || ''));
+      if (!collapseEl || !buttonEl || !iconEl) return;
+
+      const openIcon = String(options.openIcon || 'bi-chevron-down');
+      const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+      const openLabel = String(options.openLabel || 'Open filters');
+      const closeLabel = String(options.closeLabel || 'Close filters');
+
+      const setState = (expanded) => {
+        iconEl.classList.remove(openIcon, closeIcon);
+        iconEl.classList.add(expanded ? closeIcon : openIcon);
+        buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+      };
+
+      setState(collapseEl.classList.contains('show'));
+      collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+      collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    }
+
+    initCollapseToggleIcon({
+      collapseId: 'emailManagementFilterCollapse',
+      buttonId: 'emailManagementFilterToggleBtn',
+      iconId: 'emailManagementFilterToggleIcon',
+      openIcon: 'bi-chevron-down',
+      closeIcon: 'bi-chevron-up',
+      openLabel: 'Open filters',
+      closeLabel: 'Close filters'
+    });
+
+    async function confirmDelete(id, actionStateId) {
+      if (!id) return;
+      const message = 'Delete this email template?';
+      const result = await showModalMessage({
+        title: 'Confirm Delete',
+        icon: 'warning',
+        message,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: 'cancel' },
+          { text: 'Delete', class: 'btn-danger', value: 'delete' }
+        ]
+      });
+      if (result !== 'delete') {
+        return;
+      }
+
+      const payload = new URLSearchParams();
+      if (actionStateId) payload.set('actionStateId', actionStateId);
+      const response = await fetch('/email-management/templates/' + encodeURIComponent(id) + '/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-ajax-request': 'true' },
+        body: payload.toString()
+      });
+      let result = null;
+      try {
+        result = await response.json();
+      } catch (_) {
+        result = { status: 'error', message: 'Unexpected response while deleting template.' };
+      }
+      if (!response.ok || result.status !== 'success') {
+        const msg = result.message || 'Failed to delete template.';
+        await showModalMessage({
+          title: 'Delete Failed',
+          icon: 'error',
+          message: msg,
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        return;
+      }
+      window.location.reload();
+    }
+
+    document.querySelectorAll('.email-template-delete-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await confirmDelete(btn.dataset.id || '', btn.dataset.actionStateId || '');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  })();
+</script>

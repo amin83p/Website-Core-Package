@@ -1,0 +1,315 @@
+<%
+  const a = (entry && typeof entry === 'object') ? entry : {};
+  const isEdit = Boolean(a.id);
+  const routeId = String(a.id || '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const actionUrl = isEdit
+    ? ('/activity-quota/package-manager/edit/' + encodeURIComponent(routeId))
+    : '/activity-quota/package-manager/new';
+  const initialPackageRoles = Array.isArray(a?.eligibleRoles) ? a.eligibleRoles : [];
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= title %></h1>
+    <div class="d-flex flex-column align-items-end gap-1">
+      <% if (isEdit) { %><span class="badge bg-primary border font-monospace">ID: <%= a.id %></span><% } %>
+      <a href="/activity-quota/package-manager" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to List
+      </a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="aqPackageManagerForm" action="<%= actionUrl %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+      <input type="hidden" name="assignmentPlan" id="aqPackageManagerPlanInput">
+
+      <script type="application/json" id="aqPackageManagerInitial"><%- JSON.stringify(a || {}) %></script>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary m-0 mb-3">Assignment</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Package *</label>
+              <div class="input-group">
+                <input type="hidden" id="aqpmPackageIdInput" value="<%= a.packageId || '' %>">
+                <input type="text" id="aqpmPackageNameInput" class="form-control size-md bg-white border-primary fw-bold" value="<%= a.packageName || '' %>" placeholder="Select package..." readonly <%= isEdit ? '' : 'required' %>>
+                <button type="button" class="btn btn-primary" id="aqpmPickPackageBtn" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
+              </div>
+              <div class="form-text">Select package first. User list will be filtered by package eligible roles.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Target User *</label>
+              <div class="input-group">
+                <input type="hidden" id="aqpmTargetUserIdInput" value="<%= a.targetUserId || '' %>">
+                <input type="text" id="aqpmTargetUserNameInput" class="form-control size-md bg-white border-primary fw-bold" value="<%= a.targetUserName || '' %>" placeholder="Select user..." readonly <%= isEdit ? '' : 'required' %>>
+                <button type="button" class="btn btn-primary" id="aqpmPickTargetUserBtn" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
+              </div>
+              <div class="form-text">User must contain all eligible package roles in active organization.</div>
+            </div>
+          </div>
+          <div class="mt-3 border rounded p-3 bg-light-subtle">
+            <div class="small text-muted mb-1">Eligible Roles</div>
+            <div id="aqpmEligibleRolesText" class="fw-semibold">
+              <% if (initialPackageRoles.length) { %>
+                <%= initialPackageRoles.join(', ') %>
+              <% } else { %>
+                Unrestricted package
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary m-0 mb-3">Metadata</h6>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Status</label>
+              <select id="aqpmStatusInput" class="form-select size-md">
+                <option value="active" <%= String(a.status || 'active').toLowerCase() === 'active' ? 'selected' : '' %>>active</option>
+                <option value="paused" <%= String(a.status || '').toLowerCase() === 'paused' ? 'selected' : '' %>>paused</option>
+                <option value="removed" <%= String(a.status || '').toLowerCase() === 'removed' ? 'selected' : '' %>>removed</option>
+              </select>
+              <div class="form-text"><%= isEdit ? 'Metadata only. Package/target user cannot be changed.' : 'Initial status defaults to active.' %></div>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Notes</label>
+              <textarea id="aqpmNotesInput" class="form-control size-md" rows="3" maxlength="3000" placeholder="Optional assignment notes..."><%= a.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" id="aqpmSaveBtn" class="btn btn-filled btn-primary btn-md"><%= isEdit ? 'Update Metadata' : 'Create Assignment' %></button>
+        <a href="/activity-quota/package-manager" class="btn btn-filled btn-secondary btn-md" id="aqpmCancelBtn">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('aqPackageManagerForm');
+  if (!form) return;
+
+  const isEdit = <%= isEdit ? 'true' : 'false' %>;
+  const planInput = document.getElementById('aqPackageManagerPlanInput');
+  const packageIdInput = document.getElementById('aqpmPackageIdInput');
+  const packageNameInput = document.getElementById('aqpmPackageNameInput');
+  const targetUserIdInput = document.getElementById('aqpmTargetUserIdInput');
+  const targetUserNameInput = document.getElementById('aqpmTargetUserNameInput');
+  const eligibleRolesText = document.getElementById('aqpmEligibleRolesText');
+  const statusInput = document.getElementById('aqpmStatusInput');
+  const notesInput = document.getElementById('aqpmNotesInput');
+  const pickPackageBtn = document.getElementById('aqpmPickPackageBtn');
+  const pickTargetUserBtn = document.getElementById('aqpmPickTargetUserBtn');
+  const saveBtn = document.getElementById('aqpmSaveBtn');
+  const cancelBtn = document.getElementById('aqpmCancelBtn');
+
+  function parseJsonScript(scriptId) {
+    try {
+      const node = document.getElementById(scriptId);
+      return JSON.parse((node && node.textContent) || '{}');
+    } catch (_) {
+      return {};
+    }
+  }
+
+  const initial = parseJsonScript('aqPackageManagerInitial');
+  const state = {
+    package: {
+      id: String(initial.packageId || '').trim(),
+      name: String(initial.packageName || '').trim(),
+      eligibleRoles: Array.isArray(initial.eligibleRoles) ? initial.eligibleRoles.map((r) => String(r || '').trim()).filter(Boolean) : []
+    },
+    targetUser: {
+      id: String(initial.targetUserId || '').trim(),
+      name: String(initial.targetUserName || '').trim()
+    }
+  };
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async function showNotice(title, message, icon) {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title: title,
+        message: message,
+        icon: icon || 'warning',
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+    alert(title + ': ' + message);
+  }
+
+  function renderPackageState() {
+    packageIdInput.value = state.package.id || '';
+    packageNameInput.value = state.package.name || '';
+    if (!state.package.eligibleRoles.length) {
+      eligibleRolesText.textContent = 'Unrestricted package';
+    } else {
+      eligibleRolesText.textContent = state.package.eligibleRoles.join(', ');
+    }
+  }
+
+  function renderTargetUserState() {
+    targetUserIdInput.value = state.targetUser.id || '';
+    targetUserNameInput.value = state.targetUser.name || '';
+  }
+
+  function setPackage(item) {
+    const row = (item && typeof item === 'object') ? item : {};
+    state.package = {
+      id: String(row.id || '').trim(),
+      name: String(row.name || row.id || '').trim(),
+      eligibleRoles: Array.isArray(row.eligibleRoles)
+        ? row.eligibleRoles.map((role) => String(role || '').trim()).filter(Boolean)
+        : []
+    };
+    state.targetUser = { id: '', name: '' };
+    renderPackageState();
+    renderTargetUserState();
+  }
+
+  function setTargetUser(item) {
+    const row = (item && typeof item === 'object') ? item : {};
+    state.targetUser = {
+      id: String(row.id || '').trim(),
+      name: String(row.name || row.username || row.email || row.id || '').trim()
+    };
+    renderTargetUserState();
+  }
+
+  function openPackagePicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    window.GenericPicker.open(window.GenericPickerPresets.section({
+      title: 'Select Package',
+      icon: 'bi-box-seam',
+      apiEndpoint: '/activity-quota/package-manager/picker/packages',
+      searchFields: 'id,name,category',
+      placeholder: 'Search packages...',
+      multiselect: false,
+      onSelect: (item) => setPackage(item)
+    }));
+  }
+
+  function openTargetUserPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    if (!state.package.id) {
+      showNotice('Validation', 'Select package first.', 'warning');
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.user({
+      title: 'Select Target User',
+      icon: 'bi-person',
+      apiEndpoint: '/activity-quota/package-manager/picker/users?packageId=' + encodeURIComponent(state.package.id),
+      searchFields: 'id,name,username,email,roles',
+      placeholder: 'Search eligible users...',
+      multiselect: false,
+      onSelect: (item) => setTargetUser(item)
+    }));
+  }
+
+  function buildPayload() {
+    if (isEdit) {
+      return {
+        status: String((statusInput && statusInput.value) || 'active').trim().toLowerCase(),
+        notes: String((notesInput && notesInput.value) || '').trim()
+      };
+    }
+    return {
+      packageId: state.package.id,
+      targetUserId: state.targetUser.id,
+      notes: String((notesInput && notesInput.value) || '').trim()
+    };
+  }
+
+  async function validateBeforeSubmit() {
+    if (isEdit) return true;
+    if (!state.package.id) {
+      await showNotice('Validation', 'Package is required.', 'warning');
+      return false;
+    }
+    if (!state.targetUser.id) {
+      await showNotice('Validation', 'Target user is required.', 'warning');
+      return false;
+    }
+    return true;
+  }
+
+  function cacheButtonHtml(button) {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+  }
+
+  function setButtonBusy(button, label) {
+    if (!button) return;
+    cacheButtonHtml(button);
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + escapeHtml(label);
+  }
+
+  function restoreButton(button) {
+    if (!button) return;
+    if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+    button.disabled = false;
+  }
+
+  pickPackageBtn.addEventListener('click', openPackagePicker);
+  pickTargetUserBtn.addEventListener('click', openTargetUserPicker);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const valid = await validateBeforeSubmit();
+    if (!valid) return;
+
+    setButtonBusy(saveBtn, 'Saving...');
+    if (cancelBtn) cancelBtn.disabled = true;
+
+    planInput.value = JSON.stringify(buildPayload());
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        body: new URLSearchParams(new FormData(form)).toString()
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data || data.status !== 'success') {
+        throw new Error((data && data.message) || ('Request failed with status ' + response.status + '.'));
+      }
+      await showNotice('Success', data.message || 'Saved successfully.', 'success');
+      window.location.href = '/activity-quota/package-manager';
+    } catch (error) {
+      await showNotice('Save Failed', error.message || 'Unexpected save error.', 'error');
+      restoreButton(saveBtn);
+      if (cancelBtn) cancelBtn.disabled = false;
+    }
+  });
+
+  cacheButtonHtml(saveBtn);
+  renderPackageState();
+  renderTargetUserState();
+});
+</script>
+

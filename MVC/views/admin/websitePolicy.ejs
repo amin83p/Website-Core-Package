@@ -1,0 +1,1220 @@
+<%
+  const p = policy || {};
+  const network = p.network || { ipWhitelist: [], ipBlacklist: [] };
+  const schedule = p.globalSchedule || { weekdays: {} };
+  const sections = p.sections || [];
+  const bannedUsers = p.bannedUsers || [];
+  // ✅ NEW: Session Defaults
+  const sess = p.sessionControl || { maxSessions: 10, maxDuration: 720, idleTimeout: 60 };
+  const reqCtrl = p.requestControl || {
+    enabled: true,
+    mode: 'monitor',
+    logCooldownMs: 60000,
+    excludePaths: ['/health', '/favicon.ico'],
+    phase2: {
+      enabled: false,
+      enforceGroups: ['auth', 'heavy']
+    },
+    phase3: {
+      enabled: true
+    },
+    routeCatalog: {
+      disabledRouteIds: [],
+      groupOverrides: {},
+      routeSettings: {}
+    },
+    routeOverrides: [],
+    groups: {
+      auth: { windowMs: 900000, max: 30, keyMode: 'username_ip' },
+      picker: { windowMs: 60000, max: 120, keyMode: 'user_or_ip' },
+      write: { windowMs: 60000, max: 80, keyMode: 'user_or_ip' },
+      heavy: { windowMs: 600000, max: 20, keyMode: 'user_or_ip' },
+      global: { windowMs: 60000, max: 300, keyMode: 'user_or_ip' }
+    }
+  };
+  const routeRows = (typeof routeCatalogRows !== 'undefined' && Array.isArray(routeCatalogRows)) ? routeCatalogRows : [];
+  const routeOverrides = Array.isArray(reqCtrl.routeOverrides) ? reqCtrl.routeOverrides : [];
+%>
+
+<div class="sections-page">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0">Website Governance</h1>
+      <span class="badge bg-primary border">Editing: WEBSITE POLICY</span>
+    </div>
+
+  <div class="form-container" style="width: 100%; max-width: 100%;">
+    
+    <form id="websitePolicyForm" action="/websitePolicy" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+      
+      <input type="hidden" id="networkHidden" name="network">
+      <input type="hidden" id="scheduleHidden" name="globalSchedule">
+      <input type="hidden" id="sectionsHidden" name="sections">
+      <input type="hidden" id="bannedUsersHidden" name="bannedUsers">
+
+      <script type="application/json" id="initNetwork"><%- JSON.stringify(network) %></script>
+      <script type="application/json" id="initSchedule"><%- JSON.stringify(schedule) %></script>
+      <script type="application/json" id="initSections"><%- JSON.stringify(sections) %></script>
+      <script type="application/json" id="initBannedUsers"><%- JSON.stringify(bannedUsers) %></script>
+
+      <ul class="nav nav-tabs mb-4">
+        <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-governance" type="button">Governance</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-session" type="button">Session Control</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-rate-control" type="button">Request Control</button></li>
+        
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sections" type="button">Sections & Scope</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-schedule" type="button">Global Schedule</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-security" type="button">Network Security</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-banned" type="button">Banned Users</button></li>
+      </ul>
+
+      <div class="tab-content">
+        
+        <div class="tab-pane fade show active" id="tab-governance">
+            <div class="card border-danger mb-4 shadow-sm">
+                <div class="card-header bg-danger text-white fw-bold"><i class="bi bi-cone-striped me-2"></i> Maintenance Mode</div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="maintCheck" name="maintenance_enabled" value="true" <%= p.maintenance.enabled ? 'checked' : '' %>>
+                        <label class="form-check-label fw-bold" for="maintCheck">Enable Maintenance Mode</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Public Message</label>
+                        <input type="text" name="maintenance_message" class="form-control" value="<%= p.maintenance.message %>">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label small">Bypass Access Profile IDs (CSV)</label>
+                            <input type="text" name="maintenance_roles" class="form-control" value="<%= (p.maintenance.allowedRoles || []).join(', ') %>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Bypass IPs (CSV)</label>
+                            <input type="text" name="maintenance_ips" class="form-control" value="<%= (p.maintenance.allowedIps || []).join(', ') %>">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">System Features</h6>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="card p-3 h-100 bg-light border-0">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="feat_registration" value="true" <%= p.features.registration ? 'checked' : '' %>>
+                            <label class="form-check-label fw-bold">User Registration</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-3 h-100 bg-light border-0">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="feat_publicAccess" value="true" <%= p.features.publicAccess ? 'checked' : '' %>>
+                            <label class="form-check-label fw-bold">Public Access</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-3 h-100 bg-light border-0">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="feat_apiAccess" value="true" <%= p.features.apiAccess ? 'checked' : '' %>>
+                            <label class="form-check-label fw-bold">API Access</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-3 h-100 bg-light border-0">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="feat_backgroundJobs" value="true" <%= p.features.backgroundJobs ? 'checked' : '' %>>
+                            <label class="form-check-label fw-bold">Background Jobs</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-session">
+            <div class="alert alert-info py-2 mb-4 small">
+                <i class="bi bi-info-circle me-1"></i> These settings are the <strong>global hard guardrail</strong>. Organization and User policies can only make limits stricter, not looser.
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <div class="mb-3 text-primary"><i class="bi bi-pc-display fs-1"></i></div>
+                            <h6 class="fw-bold">Max Active Devices</h6>
+                            <p class="text-muted small">The maximum number of concurrent sessions (devices) allowed per user. Set 0 to block all sessions.</p>
+                            <input type="number" name="sess_maxSessions" class="form-control text-center fw-bold fs-5" value="<%= sess.maxSessions %>" min="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <div class="mb-3 text-success"><i class="bi bi-hourglass-split fs-1"></i></div>
+                            <h6 class="fw-bold">Absolute Timeout</h6>
+                            <p class="text-muted small">Max session duration in minutes (Hard Logout). Default: 720 (12h).</p>
+                            <input type="number" name="sess_maxDuration" class="form-control text-center fw-bold fs-5" value="<%= sess.maxDuration %>" min="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <div class="mb-3 text-warning"><i class="bi bi-moon-stars fs-1"></i></div>
+                            <h6 class="fw-bold">Idle Timeout</h6>
+                            <p class="text-muted small">Inactivity limit in minutes before auto-logout. Default: 60 (1h).</p>
+                            <input type="number" name="sess_idleTimeout" class="form-control text-center fw-bold fs-5" value="<%= sess.idleTimeout %>" min="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-rate-control">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body py-3">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h6 class="fw-bold mb-0 text-primary">3-Phase Request Control Plan</h6>
+                <span class="badge bg-light text-dark border">Top to Bottom Rollout</span>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <div class="border rounded-3 p-3 h-100 phase-overview phase-overview-1">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="badge bg-primary">Phase 1</span>
+                      <span class="badge <%= reqCtrl.enabled !== false ? 'bg-success' : 'bg-secondary' %>" id="reqPhase1StatusBadge"><%= reqCtrl.enabled !== false ? 'Enabled' : 'Disabled' %></span>
+                    </div>
+                    <div class="fw-bold mb-1">Baseline Monitoring</div>
+                    <div class="small text-muted">Defines global/group limits and logs excessive requests. Start with monitor mode.</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="border rounded-3 p-3 h-100 phase-overview phase-overview-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="badge bg-warning text-dark">Phase 2</span>
+                      <span class="badge <%= reqCtrl.phase2?.enabled === true ? 'bg-success' : 'bg-secondary' %>" id="reqPhase2StatusBadge"><%= reqCtrl.phase2?.enabled === true ? 'Enabled' : 'Disabled' %></span>
+                    </div>
+                    <div class="fw-bold mb-1">Selective Enforcement</div>
+                    <div class="small text-muted">Only chosen groups are blocked while all other groups remain monitor-only.</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="border rounded-3 p-3 h-100 phase-overview phase-overview-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="badge bg-info text-dark">Phase 3</span>
+                      <span class="badge <%= reqCtrl.phase3?.enabled !== false ? 'bg-success' : 'bg-secondary' %>" id="reqPhase3StatusBadge"><%= reqCtrl.phase3?.enabled !== false ? 'Enabled' : 'Disabled' %></span>
+                    </div>
+                    <div class="fw-bold mb-1">Route-Level Overrides</div>
+                    <div class="small text-muted">Activates route catalog and temporary route overrides for focused throttling.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-light fw-bold">Phase 1: Baseline Monitor and Group Limits</div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-md-3">
+                  <label class="form-label small fw-bold">Phase 1 Enabled</label>
+                  <select class="form-select" name="req_enabled">
+                    <option value="true" <%= reqCtrl.enabled !== false ? 'selected' : '' %>>Enabled</option>
+                    <option value="false" <%= reqCtrl.enabled === false ? 'selected' : '' %>>Disabled</option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small fw-bold">Default Mode</label>
+                  <select class="form-select" name="req_mode">
+                    <option value="monitor" <%= String(reqCtrl.mode || 'monitor') === 'monitor' ? 'selected' : '' %>>Monitor</option>
+                    <option value="enforce" <%= String(reqCtrl.mode || '') === 'enforce' ? 'selected' : '' %>>Enforce</option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small fw-bold">Log Cooldown (ms)</label>
+                  <input type="number" class="form-control" name="req_logCooldownMs" min="1000" step="1000" value="<%= reqCtrl.logCooldownMs || 60000 %>">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small fw-bold">Excluded Paths (CSV)</label>
+                  <input type="text" class="form-control" name="req_excludePaths" value="<%= (reqCtrl.excludePaths || []).join(', ') %>" placeholder="/health, /favicon.ico">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-light fw-bold">Phase 2: Selective Group Enforcement</div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-md-3">
+                  <label class="form-label small fw-bold">Phase 2 Enabled</label>
+                  <select class="form-select" name="req_phase2_enabled">
+                    <option value="false" <%= reqCtrl.phase2?.enabled === true ? '' : 'selected' %>>Disabled</option>
+                    <option value="true" <%= reqCtrl.phase2?.enabled === true ? 'selected' : '' %>>Enabled</option>
+                  </select>
+                </div>
+                <div class="col-md-9">
+                  <label class="form-label small fw-bold">Phase 2 Enforce Groups (CSV)</label>
+                  <input type="text" class="form-control" name="req_phase2_groups" value="<%= (reqCtrl.phase2?.enforceGroups || ['auth', 'heavy']).join(', ') %>" placeholder="auth, heavy">
+                  <div class="form-text">When enabled, only listed groups are blocked while others stay monitor-only.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-light fw-bold">Phase 3: Route-Level Controls</div>
+            <div class="card-body">
+              <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                  <label class="form-label small fw-bold">Phase 3 Enabled</label>
+                  <select class="form-select" name="req_phase3_enabled" id="reqPhase3Enabled">
+                    <option value="false" <%= reqCtrl.phase3?.enabled !== false ? '' : 'selected' %>>Disabled</option>
+                    <option value="true" <%= reqCtrl.phase3?.enabled !== false ? 'selected' : '' %>>Enabled</option>
+                  </select>
+                </div>
+                <div class="col-md-9">
+                  <div class="small text-muted border rounded p-2 bg-light">
+                    Phase 3 turns on the route catalog and temporary route override engine. Keep it disabled until Phase 1-2 thresholds are stable in logs.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light fw-bold">Rate Groups</div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Group</th>
+                      <th>Window (ms)</th>
+                      <th>Max Requests</th>
+                      <th>Key Mode</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="fw-bold">Auth</td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_auth_windowMs" min="1000" step="1000" value="<%= reqCtrl.groups?.auth?.windowMs || 900000 %>"></td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_auth_max" min="1" value="<%= reqCtrl.groups?.auth?.max || 30 %>"></td>
+                      <td>
+                        <select class="form-select form-select-sm" name="req_auth_keyMode">
+                          <option value="username_ip" <%= String(reqCtrl.groups?.auth?.keyMode || 'username_ip') === 'username_ip' ? 'selected' : '' %>>username + ip</option>
+                          <option value="user_or_ip" <%= String(reqCtrl.groups?.auth?.keyMode || '') === 'user_or_ip' ? 'selected' : '' %>>user or ip</option>
+                          <option value="ip" <%= String(reqCtrl.groups?.auth?.keyMode || '') === 'ip' ? 'selected' : '' %>>ip only</option>
+                        </select>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="fw-bold">Picker</td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_picker_windowMs" min="1000" step="1000" value="<%= reqCtrl.groups?.picker?.windowMs || 60000 %>"></td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_picker_max" min="1" value="<%= reqCtrl.groups?.picker?.max || 120 %>"></td>
+                      <td>
+                        <select class="form-select form-select-sm" name="req_picker_keyMode">
+                          <option value="user_or_ip" <%= String(reqCtrl.groups?.picker?.keyMode || 'user_or_ip') === 'user_or_ip' ? 'selected' : '' %>>user or ip</option>
+                          <option value="ip" <%= String(reqCtrl.groups?.picker?.keyMode || '') === 'ip' ? 'selected' : '' %>>ip only</option>
+                          <option value="username_ip" <%= String(reqCtrl.groups?.picker?.keyMode || '') === 'username_ip' ? 'selected' : '' %>>username + ip</option>
+                        </select>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="fw-bold">Write</td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_write_windowMs" min="1000" step="1000" value="<%= reqCtrl.groups?.write?.windowMs || 60000 %>"></td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_write_max" min="1" value="<%= reqCtrl.groups?.write?.max || 80 %>"></td>
+                      <td>
+                        <select class="form-select form-select-sm" name="req_write_keyMode">
+                          <option value="user_or_ip" <%= String(reqCtrl.groups?.write?.keyMode || 'user_or_ip') === 'user_or_ip' ? 'selected' : '' %>>user or ip</option>
+                          <option value="ip" <%= String(reqCtrl.groups?.write?.keyMode || '') === 'ip' ? 'selected' : '' %>>ip only</option>
+                          <option value="username_ip" <%= String(reqCtrl.groups?.write?.keyMode || '') === 'username_ip' ? 'selected' : '' %>>username + ip</option>
+                        </select>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="fw-bold">Heavy</td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_heavy_windowMs" min="1000" step="1000" value="<%= reqCtrl.groups?.heavy?.windowMs || 600000 %>"></td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_heavy_max" min="1" value="<%= reqCtrl.groups?.heavy?.max || 20 %>"></td>
+                      <td>
+                        <select class="form-select form-select-sm" name="req_heavy_keyMode">
+                          <option value="user_or_ip" <%= String(reqCtrl.groups?.heavy?.keyMode || 'user_or_ip') === 'user_or_ip' ? 'selected' : '' %>>user or ip</option>
+                          <option value="ip" <%= String(reqCtrl.groups?.heavy?.keyMode || '') === 'ip' ? 'selected' : '' %>>ip only</option>
+                          <option value="username_ip" <%= String(reqCtrl.groups?.heavy?.keyMode || '') === 'username_ip' ? 'selected' : '' %>>username + ip</option>
+                        </select>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="fw-bold">Global</td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_global_windowMs" min="1000" step="1000" value="<%= reqCtrl.groups?.global?.windowMs || 60000 %>"></td>
+                      <td><input type="number" class="form-control form-control-sm" name="req_global_max" min="1" value="<%= reqCtrl.groups?.global?.max || 300 %>"></td>
+                      <td>
+                        <select class="form-select form-select-sm" name="req_global_keyMode">
+                          <option value="user_or_ip" <%= String(reqCtrl.groups?.global?.keyMode || 'user_or_ip') === 'user_or_ip' ? 'selected' : '' %>>user or ip</option>
+                          <option value="ip" <%= String(reqCtrl.groups?.global?.keyMode || '') === 'ip' ? 'selected' : '' %>>ip only</option>
+                          <option value="username_ip" <%= String(reqCtrl.groups?.global?.keyMode || '') === 'username_ip' ? 'selected' : '' %>>username + ip</option>
+                        </select>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mt-3" id="reqRouteCatalogCard">
+            <div class="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
+              <span>Managed Route Catalog</span>
+              <span class="small text-muted">Check/uncheck and re-group routes</span>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive" style="max-height: 340px;">
+                <table class="table table-sm align-middle mb-0" id="reqRouteCatalogTable">
+                  <thead class="table-light position-sticky top-0">
+                    <tr>
+                      <th style="width:80px;">Use</th>
+                      <th style="width:120px;">Method</th>
+                      <th>Route</th>
+                      <th style="width:180px;">Group</th>
+                      <th style="width:80px;">Specific</th>
+                      <th style="width:130px;">Window</th>
+                      <th style="width:100px;">Max</th>
+                      <th style="width:130px;">Key</th>
+                      <th style="width:130px;">Mode</th>
+                      <th style="width:110px;">State</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% routeRows.forEach((row) => { %>
+                      <tr data-route-id="<%= row.id %>" data-default-group="<%= row.defaultGroup %>" data-locked="<%= row.locked ? 'true' : 'false' %>">
+                        <td>
+                          <input type="checkbox" class="form-check-input req-route-enabled" <%= row.enabled ? 'checked' : '' %> <%= row.locked ? 'disabled' : '' %>>
+                        </td>
+                        <td>
+                          <span class="badge bg-light text-dark border"><%= row.method %></span>
+                        </td>
+                        <td>
+                          <div class="fw-bold"><%= row.label %></div>
+                          <code><%= row.path %></code>
+                          <small class="text-muted ms-1">(<%= row.matchType %>)</small>
+                        </td>
+                        <td>
+                          <select class="form-select form-select-sm req-route-group" <%= row.locked ? 'disabled' : '' %>>
+                            <option value="auth" <%= row.group === 'auth' ? 'selected' : '' %>>auth</option>
+                            <option value="picker" <%= row.group === 'picker' ? 'selected' : '' %>>picker</option>
+                            <option value="write" <%= row.group === 'write' ? 'selected' : '' %>>write</option>
+                            <option value="heavy" <%= row.group === 'heavy' ? 'selected' : '' %>>heavy</option>
+                            <option value="global" <%= row.group === 'global' ? 'selected' : '' %>>global</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input type="checkbox" class="form-check-input req-route-specific-enabled" <%= row.routeSetting?.enabled ? 'checked' : '' %>>
+                        </td>
+                        <td>
+                          <input type="number" class="form-control form-control-sm req-route-window" min="1000" step="1000" value="<%= row.routeSetting?.windowMs || '' %>" placeholder="inherit">
+                        </td>
+                        <td>
+                          <input type="number" class="form-control form-control-sm req-route-max" min="1" value="<%= row.routeSetting?.max || '' %>" placeholder="inherit">
+                        </td>
+                        <td>
+                          <select class="form-select form-select-sm req-route-keymode">
+                            <option value="" <%= !row.routeSetting?.keyMode ? 'selected' : '' %>>inherit</option>
+                            <option value="user_or_ip" <%= row.routeSetting?.keyMode === 'user_or_ip' ? 'selected' : '' %>>user/ip</option>
+                            <option value="ip" <%= row.routeSetting?.keyMode === 'ip' ? 'selected' : '' %>>ip</option>
+                            <option value="username_ip" <%= row.routeSetting?.keyMode === 'username_ip' ? 'selected' : '' %>>username/ip</option>
+                          </select>
+                        </td>
+                        <td>
+                          <select class="form-select form-select-sm req-route-mode">
+                            <option value="inherit" <%= !row.routeSetting?.mode || row.routeSetting?.mode === 'inherit' ? 'selected' : '' %>>inherit</option>
+                            <option value="monitor" <%= row.routeSetting?.mode === 'monitor' ? 'selected' : '' %>>monitor</option>
+                            <option value="enforce" <%= row.routeSetting?.mode === 'enforce' ? 'selected' : '' %>>enforce</option>
+                          </select>
+                        </td>
+                        <td>
+                          <% if (row.locked) { %>
+                            <span class="badge bg-secondary">locked</span>
+                          <% } else { %>
+                            <span class="badge bg-success">custom</span>
+                          <% } %>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mt-3" id="reqRouteOverridesCard">
+            <div class="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
+              <span>Temporary Route Overrides</span>
+              <button type="button" class="btn btn-sm btn-outline-primary btn-filled" id="addReqRouteOverrideBtn">
+                <i class="bi bi-plus-circle me-1"></i> Add Override
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive" style="max-height: 360px;">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light position-sticky top-0">
+                    <tr>
+                      <th style="width:70px;">On</th>
+                      <th style="min-width:260px;">Route</th>
+                      <th style="min-width:220px;">Active Span</th>
+                      <th style="min-width:200px;">Limits</th>
+                      <th style="min-width:170px;">Scope</th>
+                      <th style="width:150px;" class="text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reqRouteOverridesBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal fade" id="reqRouteOverrideModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title fw-bold" id="reqRouteOverrideModalTitle">Route Override</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <input type="hidden" id="roModalIndex" value="">
+                  <input type="hidden" id="roModalId" value="">
+                  <div class="row g-3">
+                    <div class="col-md-2">
+                      <label class="form-label small fw-bold">Enabled</label>
+                      <div class="form-check mt-2">
+                        <input type="checkbox" class="form-check-input" id="roEnabled">
+                        <label class="form-check-label" for="roEnabled">Active</label>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Method</label>
+                      <select class="form-select" id="roMethod">
+                        <option value="*">*</option>
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="DELETE">DELETE</option>
+                      </select>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Match Type</label>
+                      <select class="form-select" id="roMatchType">
+                        <option value="exact">exact</option>
+                        <option value="prefix">prefix</option>
+                        <option value="contains">contains</option>
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label small fw-bold">Route Path</label>
+                      <input type="text" class="form-control" id="roPath" placeholder="/school/classes/new">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-bold">Start</label>
+                      <input type="datetime-local" class="form-control" id="roStartAt">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-bold">End</label>
+                      <input type="datetime-local" class="form-control" id="roEndAt">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Window (ms)</label>
+                      <input type="number" class="form-control" id="roWindowMs" min="1000" step="1000" placeholder="inherit">
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small fw-bold">Max</label>
+                      <input type="number" class="form-control" id="roMax" min="1" placeholder="inherit">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Key Mode</label>
+                      <select class="form-select" id="roKeyMode">
+                        <option value="">inherit</option>
+                        <option value="user_or_ip">user/ip</option>
+                        <option value="ip">ip</option>
+                        <option value="username_ip">username/ip</option>
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small fw-bold">Mode</label>
+                      <select class="form-select" id="roMode">
+                        <option value="inherit">inherit</option>
+                        <option value="monitor">monitor</option>
+                        <option value="enforce">enforce</option>
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small fw-bold">Group</label>
+                      <select class="form-select" id="roGroup">
+                        <option value="">inherit</option>
+                        <option value="auth">auth</option>
+                        <option value="picker">picker</option>
+                        <option value="write">write</option>
+                        <option value="heavy">heavy</option>
+                        <option value="global">global</option>
+                      </select>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small fw-bold">Priority</label>
+                      <input type="number" class="form-control" id="roPriority" step="1" value="0">
+                    </div>
+                    <div class="col-md-9">
+                      <label class="form-label small fw-bold">Label</label>
+                      <input type="text" class="form-control" id="roLabel" placeholder="Temporary class new throttle">
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label small fw-bold">Notes</label>
+                      <textarea class="form-control" id="roNotes" rows="2" placeholder="Reason for this temporary override..."></textarea>
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-danger me-auto" id="roDeleteBtn"><i class="bi bi-trash me-1"></i>Delete</button>
+                  <button type="button" class="btn btn-secondary btn-filled" data-bs-dismiss="modal">Cancel</button>
+                  <button type="button" class="btn btn-primary btn-filled" id="roSaveBtn">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="small text-muted mt-2">
+            Monitor results are written to Activity Logs. Open <a href="/logs" target="_blank">/logs</a> and inspect Details JSON for <code>rateLimitGroup</code>, <code>used</code>, <code>limit</code>, and <code>path</code>.
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-sections">
+           <div class="row h-100">
+             <div class="col-md-3 border-end bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0 text-primary">Configured Sections</h6>
+                    <span class="badge bg-secondary" id="secCountBadge">0</span>
+                </div>
+                <input type="text" id="sectionSearch" class="form-control size-sm mb-2" placeholder="Filter list...">
+                <div class="list-group list-group-flush overflow-auto" id="sectionsSidebar" style="max-height: 600px; border: 1px solid #dee2e6; border-radius: 4px;"></div>
+             </div>
+             <div class="col-md-9 py-3">
+                <div class="card p-3 mb-4 bg-light border-0">
+                    <label class="form-label fw-bold">Global Section Control</label>
+                    <button type="button" class="btn btn-primary btn-filled w-100" id="addSectionConfigBtn"><i class="bi bi-search me-1"></i> Add Section from List</button>
+                </div>
+                <div id="sectionsContainer" class="accordion"></div>
+             </div>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-schedule">
+          <div class="alert alert-info py-2 small"><i class="bi bi-clock me-1"></i> Defines global site uptime. Outside these hours, the site is offline for EVERYONE (except Super Admins).</div>
+          <div class="row mb-3">
+             <div class="col-md-3">
+               <select id="scheduleDaySelect" class="form-select"><option value="Monday">Monday</option><option value="Tuesday">Tuesday</option><option value="Wednesday">Wednesday</option><option value="Thursday">Thursday</option><option value="Friday">Friday</option><option value="Saturday">Saturday</option><option value="Sunday">Sunday</option></select>
+             </div>
+             <div class="col-md-3"><input type="time" id="scheduleStart" class="form-control"></div>
+             <div class="col-md-3"><input type="time" id="scheduleEnd" class="form-control"></div>
+             <div class="col-md-3"><button type="button" class="btn btn-primary w-100 btn-filled" id="addScheduleBtn">Add Slot</button></div>
+          </div>
+          <div id="scheduleContainer" class="border rounded p-3 bg-light" style="min-height: 200px;"></div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-security">
+          <div class="row">
+            <div class="col-md-6 border-end">
+               <h6 class="fw-bold text-success">Whitelist IPs</h6>
+               <div class="input-group mb-2"><input type="text" id="inp_whitelist" class="form-control"><button type="button" class="btn btn-success btn-filled" id="btn_add_whitelist">Add</button></div>
+               <table class="table table-sm"><tbody id="table_whitelist"></tbody></table>
+            </div>
+            <div class="col-md-6 ps-4">
+               <h6 class="fw-bold text-danger">Blacklist IPs</h6>
+               <div class="input-group mb-2"><input type="text" id="inp_blacklist" class="form-control"><button type="button" class="btn btn-danger btn-filled" id="btn_add_blacklist">Block</button></div>
+               <table class="table table-sm"><tbody id="table_blacklist"></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-banned">
+           <div class="d-flex justify-content-between mb-3">
+              <h6 class="fw-bold text-danger">Global User Ban List</h6>
+              <button type="button" class="btn btn-danger btn-sm btn-filled" id="btnBanUser"><i class="bi bi-person-x-fill me-1"></i> Ban User</button>
+           </div>
+           <div class="table-responsive border rounded">
+              <table class="table table-striped align-middle mb-0">
+                 <thead class="table-light"><tr><th>User</th><th>Reason</th><th>Date Banned</th><th style="width:100px;">Action</th></tr></thead>
+                 <tbody id="bannedUsersBody"></tbody>
+              </table>
+           </div>
+        </div>
+
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Global Policy</button>
+        <a href="/debug" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/debug">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  // --- 1. INITIALIZATION ---
+  function readJson(id, fallback) { try { return JSON.parse(document.getElementById(id).textContent || ''); } catch { return fallback; } }
+  
+  let network = readJson('initNetwork', { ipWhitelist: [], ipBlacklist: [] });
+  let schedule = readJson('initSchedule', { weekdays: {} });
+  let configuredSections = readJson('initSections', []);
+  let bannedUsers = readJson('initBannedUsers', []);
+  let requestRouteOverrides = <%- JSON.stringify(routeOverrides || []) %>;
+  const form = document.getElementById('websitePolicyForm');
+  const reqEnabledSelect = document.querySelector('[name="req_enabled"]');
+  const reqPhase2Select = document.querySelector('[name="req_phase2_enabled"]');
+  const reqPhase3Select = document.querySelector('[name="req_phase3_enabled"]');
+  async function showMsg(title, message, icon='info', btn_class='btn-primary') {
+    if (typeof showMessageModal === 'function') {
+      return await showMessageModal({ title, message, icon, buttons: [{ text: 'OK', class: btn_class }] });
+    } else { alert(message); }
+  }
+
+  function setPhaseBadge(badgeId, enabled) {
+      const el = document.getElementById(badgeId);
+      if (!el) return;
+      el.textContent = enabled ? 'Enabled' : 'Disabled';
+      el.classList.remove('bg-success', 'bg-secondary');
+      el.classList.add(enabled ? 'bg-success' : 'bg-secondary');
+  }
+
+  function updateRequestPhaseUi() {
+      const phase1Enabled = !reqEnabledSelect || reqEnabledSelect.value !== 'false';
+      const phase2Enabled = !!reqPhase2Select && reqPhase2Select.value === 'true';
+      const phase3Enabled = !!reqPhase3Select && reqPhase3Select.value === 'true';
+
+      setPhaseBadge('reqPhase1StatusBadge', phase1Enabled);
+      setPhaseBadge('reqPhase2StatusBadge', phase2Enabled);
+      setPhaseBadge('reqPhase3StatusBadge', phase3Enabled);
+
+      const routeCatalogCard = document.getElementById('reqRouteCatalogCard');
+      const routeOverridesCard = document.getElementById('reqRouteOverridesCard');
+      const addOverrideBtn = document.getElementById('addReqRouteOverrideBtn');
+      if (routeCatalogCard) routeCatalogCard.classList.toggle('phase-disabled', !phase3Enabled);
+      if (routeOverridesCard) routeOverridesCard.classList.toggle('phase-disabled', !phase3Enabled);
+      if (addOverrideBtn) addOverrideBtn.disabled = !phase3Enabled;
+  }
+
+  function escapeHtml(value) {
+      return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+  }
+
+  function toDateTimeLocalValue(value) {
+      if (!value) return '';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      const yyyy = dt.getFullYear();
+      const mm = pad(dt.getMonth() + 1);
+      const dd = pad(dt.getDate());
+      const hh = pad(dt.getHours());
+      const mi = pad(dt.getMinutes());
+      return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  }
+
+  function toIsoFromLocalValue(value) {
+      const v = String(value || '').trim();
+      if (!v) return '';
+      const dt = new Date(v);
+      if (Number.isNaN(dt.getTime())) return '';
+      return dt.toISOString();
+  }
+
+  function createNewRouteOverride() {
+      const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      return {
+          id: `ROV_${uid}`,
+          enabled: true,
+          method: '*',
+          matchType: 'prefix',
+          path: '',
+          startAt: '',
+          endAt: '',
+          windowMs: '',
+          max: '',
+          keyMode: '',
+          mode: 'inherit',
+          group: '',
+          priority: 0,
+          label: '',
+          notes: ''
+      };
+  }
+
+  const reqRouteOverrideModalEl = document.getElementById('reqRouteOverrideModal');
+  const reqRouteOverrideModal = reqRouteOverrideModalEl ? new bootstrap.Modal(reqRouteOverrideModalEl) : null;
+
+  function formatDateTimeShort(value) {
+      if (!value) return 'Any';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return 'Any';
+      return dt.toLocaleString();
+  }
+
+  function renderRouteOverrides() {
+      const body = document.getElementById('reqRouteOverridesBody');
+      if (!body) return;
+      if (!Array.isArray(requestRouteOverrides)) requestRouteOverrides = [];
+
+      if (requestRouteOverrides.length === 0) {
+          body.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No route overrides configured.</td></tr>`;
+          return;
+      }
+
+      body.innerHTML = requestRouteOverrides.map((row, idx) => {
+          const enabled = row.enabled === true || String(row.enabled || '').toLowerCase() === 'true';
+          const method = String(row.method || '*').toUpperCase();
+          const matchType = String(row.matchType || 'prefix').toLowerCase();
+          const path = String(row.path || '').trim() || '/';
+          const label = String(row.label || '').trim() || 'No label';
+          const windowMs = row.windowMs ? `${row.windowMs} ms` : 'inherit';
+          const max = row.max ? `${row.max}` : 'inherit';
+          const keyMode = row.keyMode || 'inherit';
+          const mode = row.mode || 'inherit';
+          const group = row.group || 'inherit';
+          return `
+            <tr data-idx="${idx}">
+              <td>
+                <input type="checkbox" class="form-check-input ro-toggle-enabled" ${enabled ? 'checked' : ''} title="Enable/Disable">
+              </td>
+              <td>
+                <div class="fw-bold">${escapeHtml(label)}</div>
+                <div><code>${escapeHtml(method)}</code> <span class="text-muted">(${escapeHtml(matchType)})</span></div>
+                <div><code>${escapeHtml(path)}</code></div>
+              </td>
+              <td>
+                <div class="small"><strong>From:</strong> ${escapeHtml(formatDateTimeShort(row.startAt))}</div>
+                <div class="small"><strong>To:</strong> ${escapeHtml(formatDateTimeShort(row.endAt))}</div>
+              </td>
+              <td>
+                <div class="small"><strong>Window:</strong> ${escapeHtml(windowMs)}</div>
+                <div class="small"><strong>Max:</strong> ${escapeHtml(max)}</div>
+                <div class="small"><strong>Key:</strong> ${escapeHtml(keyMode)}</div>
+              </td>
+              <td>
+                <div class="small"><strong>Mode:</strong> ${escapeHtml(mode)}</div>
+                <div class="small"><strong>Group:</strong> ${escapeHtml(group)}</div>
+                <div class="small"><strong>Prio:</strong> ${escapeHtml(String(row.priority ?? 0))}</div>
+              </td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-primary ro-edit me-1"><i class="bi bi-pencil"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-danger ro-remove"><i class="bi bi-trash"></i></button>
+              </td>
+            </tr>
+          `;
+      }).join('');
+
+      body.querySelectorAll('tr[data-idx]').forEach((tr) => {
+          const idx = parseInt(tr.dataset.idx, 10);
+          if (!requestRouteOverrides[idx]) return;
+
+          tr.querySelector('.ro-toggle-enabled')?.addEventListener('change', (e) => {
+              requestRouteOverrides[idx].enabled = !!e.target.checked;
+          });
+          tr.querySelector('.ro-edit')?.addEventListener('click', () => openRouteOverrideModal(idx));
+          tr.querySelector('.ro-remove')?.addEventListener('click', () => {
+              requestRouteOverrides.splice(idx, 1);
+              renderRouteOverrides();
+          });
+      });
+  }
+
+  function openRouteOverrideModal(index = null) {
+      if (!reqRouteOverrideModalEl || !reqRouteOverrideModal) return;
+      if (reqPhase3Select && reqPhase3Select.value !== 'true') {
+          showMsg('Phase 3 Disabled', 'Enable Phase 3 first to add or edit route overrides.', 'info', 'btn-primary');
+          return;
+      }
+      const isEdit = Number.isInteger(index) && index >= 0 && index < requestRouteOverrides.length;
+      const row = isEdit ? requestRouteOverrides[index] : createNewRouteOverride();
+      const titleEl = document.getElementById('reqRouteOverrideModalTitle');
+      const deleteBtn = document.getElementById('roDeleteBtn');
+      if (titleEl) titleEl.textContent = isEdit ? 'Edit Route Override' : 'Add Route Override';
+      if (deleteBtn) deleteBtn.style.display = isEdit ? 'inline-block' : 'none';
+
+      document.getElementById('roModalIndex').value = isEdit ? String(index) : '';
+      document.getElementById('roModalId').value = String(row.id || '');
+      document.getElementById('roEnabled').checked = row.enabled === true || String(row.enabled || '').toLowerCase() === 'true';
+      document.getElementById('roMethod').value = String(row.method || '*').toUpperCase();
+      document.getElementById('roMatchType').value = String(row.matchType || 'prefix').toLowerCase();
+      document.getElementById('roPath').value = String(row.path || '');
+      document.getElementById('roStartAt').value = toDateTimeLocalValue(row.startAt);
+      document.getElementById('roEndAt').value = toDateTimeLocalValue(row.endAt);
+      document.getElementById('roWindowMs').value = row.windowMs || '';
+      document.getElementById('roMax').value = row.max || '';
+      document.getElementById('roKeyMode').value = String(row.keyMode || '').toLowerCase();
+      document.getElementById('roMode').value = String(row.mode || 'inherit').toLowerCase();
+      document.getElementById('roGroup').value = String(row.group || '').toLowerCase();
+      document.getElementById('roPriority').value = row.priority ?? 0;
+      document.getElementById('roLabel').value = String(row.label || '');
+      document.getElementById('roNotes').value = String(row.notes || '');
+
+      reqRouteOverrideModal.show();
+  }
+
+  function collectRouteOverrideFromModal() {
+      const id = String(document.getElementById('roModalId').value || '').trim() || createNewRouteOverride().id;
+      const pathRaw = String(document.getElementById('roPath').value || '').trim();
+      return {
+          id,
+          enabled: !!document.getElementById('roEnabled').checked,
+          method: String(document.getElementById('roMethod').value || '*').toUpperCase(),
+          matchType: String(document.getElementById('roMatchType').value || 'prefix').toLowerCase(),
+          path: pathRaw ? (pathRaw.startsWith('/') ? pathRaw : `/${pathRaw}`) : '',
+          startAt: toIsoFromLocalValue(document.getElementById('roStartAt').value),
+          endAt: toIsoFromLocalValue(document.getElementById('roEndAt').value),
+          windowMs: document.getElementById('roWindowMs').value,
+          max: document.getElementById('roMax').value,
+          keyMode: String(document.getElementById('roKeyMode').value || '').toLowerCase(),
+          mode: String(document.getElementById('roMode').value || 'inherit').toLowerCase(),
+          group: String(document.getElementById('roGroup').value || '').toLowerCase(),
+          priority: document.getElementById('roPriority').value,
+          label: String(document.getElementById('roLabel').value || '').trim(),
+          notes: String(document.getElementById('roNotes').value || '').trim()
+      };
+  }
+
+  // --- 2. REUSED LOGIC (Same as before) ---
+  // NETWORK
+  function renderIPTable(tableId, array, type) { 
+     const tbody = document.getElementById(tableId);
+     if (!tbody) return; tbody.innerHTML = '';
+     if (array.length === 0) { tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted small">No IPs configured</td></tr>`; return; }
+     array.forEach((ip, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td><code>${ip}</code></td><td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger remove-ip" data-idx="${index}"><i class="bi bi-trash"></i></button></td>`;
+        tbody.appendChild(row);
+     });
+     tbody.querySelectorAll('.remove-ip').forEach(btn => btn.addEventListener('click', () => { array.splice(parseInt(btn.dataset.idx), 1); renderIPTable(tableId, array, type); }));
+  }
+  document.getElementById('btn_add_whitelist').onclick = () => { const v=document.getElementById('inp_whitelist').value.trim(); if(v && !network.ipWhitelist.includes(v)) { network.ipWhitelist.push(v); renderIPTable('table_whitelist', network.ipWhitelist); document.getElementById('inp_whitelist').value=''; } };
+  document.getElementById('btn_add_blacklist').onclick = () => { const v=document.getElementById('inp_blacklist').value.trim(); if(v && !network.ipBlacklist.includes(v)) { network.ipBlacklist.push(v); renderIPTable('table_blacklist', network.ipBlacklist); document.getElementById('inp_blacklist').value=''; } };
+  renderIPTable('table_whitelist', network.ipWhitelist);
+  renderIPTable('table_blacklist', network.ipBlacklist);
+
+  // SCHEDULE
+  const scheduleContainer = document.getElementById('scheduleContainer');
+  function getMinutes(timeStr) { if(!timeStr) return 0; const [h, m] = timeStr.split(':').map(Number); return (h * 60) + m; }
+  function renderSchedule() {
+      scheduleContainer.innerHTML = '';
+      const days = Object.keys(schedule.weekdays || {});
+      if(days.length === 0) { scheduleContainer.innerHTML = '<div class="text-muted small text-center p-3">No schedule defined (24/7 Access).</div>'; return; }
+      days.forEach(day => {
+          const times = schedule.weekdays[day];
+          if(times.length === 0) return;
+          times.sort((a,b) => getMinutes(a.start) - getMinutes(b.start));
+          const row = document.createElement('div');
+          row.className = 'mb-2 p-2 border rounded bg-white shadow-sm';
+          let html = `<div class="fw-bold text-primary mb-1 border-bottom pb-1 small text-uppercase">${day}</div><div class="d-flex flex-wrap gap-2">`;
+          times.forEach((t, idx) => { html += `<span class="badge bg-light text-dark border d-flex align-items-center"><i class="bi bi-clock me-1 text-muted"></i> ${t.start} - ${t.end} <i class="bi bi-x-circle-fill text-danger ms-2 cursor-pointer remove-schedule-item" data-day="${day}" data-idx="${idx}" title="Remove"></i></span>`; });
+          html += `</div>`;
+          row.innerHTML = html;
+          scheduleContainer.appendChild(row);
+      });
+      scheduleContainer.querySelectorAll('.remove-schedule-item').forEach(btn => btn.addEventListener('click', e => { const d = e.target.dataset.day; const i = parseInt(e.target.dataset.idx); schedule.weekdays[d].splice(i, 1); if(schedule.weekdays[d].length === 0) delete schedule.weekdays[d]; renderSchedule(); }));
+  }
+  document.getElementById('addScheduleBtn').addEventListener('click', async () => {
+     const d = document.getElementById('scheduleDaySelect').value;
+     const s = document.getElementById('scheduleStart').value;
+     const e = document.getElementById('scheduleEnd').value;
+     if(!s || !e) return;
+     if(!schedule.weekdays) schedule.weekdays = {}; if(!schedule.weekdays[d]) schedule.weekdays[d] = [];
+     schedule.weekdays[d].push({start:s, end:e});
+     renderSchedule();
+  });
+  renderSchedule();
+
+  // BANNED USERS
+  const bannedBody = document.getElementById('bannedUsersBody');
+  function renderBannedUsers() {
+      bannedBody.innerHTML = '';
+      if(bannedUsers.length === 0) { bannedBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No users banned.</td></tr>'; return; }
+      bannedUsers.forEach((u, idx) => {
+          bannedBody.innerHTML += `<tr><td>${u.userName} <div class="small text-muted">${u.userId}</div></td><td><input type="text" class="form-control form-control-sm reason-input" data-idx="${idx}" value="${u.reason||''}"></td><td>${u.dateBanned ? new Date(u.dateBanned).toLocaleDateString() : 'N/A'}</td><td><button type="button" class="btn btn-sm btn-outline-danger rm-ban" data-idx="${idx}">Unban</button></td></tr>`;
+      });
+      bannedBody.querySelectorAll('.rm-ban').forEach(b => b.addEventListener('click', e => { bannedUsers.splice(e.target.dataset.idx, 1); renderBannedUsers(); }));
+      bannedBody.querySelectorAll('.reason-input').forEach(i => i.addEventListener('input', e => { bannedUsers[e.target.dataset.idx].reason = e.target.value; }));
+  }
+  document.getElementById('btnBanUser').addEventListener('click', () => {
+      GenericPicker.open(GenericPickerPresets.user({
+          title: 'Ban User',
+          icon: 'bi-person-x',
+          placeholder: 'Select user...',
+          onSelect: (item) => {
+              if(bannedUsers.find(u=>String(u.userId)===String(item.id))) return;
+              bannedUsers.push({ userId: item.id, userName: item.username || item.email, reason: 'Policy Violation', dateBanned: new Date().toISOString() });
+              renderBannedUsers();
+          }
+      }));
+  });
+  renderBannedUsers();
+
+  // SECTIONS (Shortened for brevity as it is largely unchanged logic)
+  const sectionsContainer = document.getElementById('sectionsContainer');
+  const sectionsSidebar = document.getElementById('sectionsSidebar');
+  const secCountBadge = document.getElementById('secCountBadge'); 
+  const addSectionConfigBtn = document.getElementById('addSectionConfigBtn');
+
+  function renderSections() {
+     const openItem = sectionsContainer.querySelector('.accordion-collapse.show');
+     const openIndex = openItem ? openItem.id.replace('collapseSec', '') : null;
+     sectionsContainer.innerHTML = ''; sectionsSidebar.innerHTML = ''; 
+     secCountBadge.textContent = configuredSections.length;
+     if (configuredSections.length === 0) { sectionsSidebar.innerHTML = '<div class="text-center text-muted small p-3">No sections added.</div>'; }
+
+     configuredSections.forEach((secPolicy, index) => {
+        const tl = secPolicy.timeLimits || {};
+        const st = secPolicy.accessState || {};
+        const ops = secPolicy.operations || [];
+        const accType = secPolicy.accessType === 'full_ban' ? 'full_ban' : 'custom'; 
+        const isBanned = (accType === 'full_ban');
+        const headerId = `headingSec${index}`; const collapseId = `collapseSec${index}`;
+
+        const sideItem = document.createElement('a');
+        sideItem.href = "#";
+        sideItem.className = "list-group-item list-group-item-action py-2 section-nav-item";
+        sideItem.innerHTML = `<div class="d-flex w-100 justify-content-between align-items-center"><span class="fw-bold text-truncate" style="max-width: 140px;">${secPolicy.sectionName || secPolicy.sectionId}</span><small class="badge ${isBanned ? 'bg-danger' : 'bg-success'}">${isBanned ? 'BANNED' : 'Active'}</small></div><small class="text-muted d-block text-truncate" style="font-size: 0.75rem;">ID: ${secPolicy.sectionId}</small>`;
+        sideItem.addEventListener('click', (e) => { e.preventDefault(); const el = document.getElementById(collapseId); if (!el) return; new bootstrap.Collapse(el, { toggle: false }).show(); setTimeout(() => el.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150); });
+        sectionsSidebar.appendChild(sideItem);
+
+        const item = document.createElement('div');
+        item.className = `accordion-item mb-2 border ${isBanned ? 'border-danger' : ''}`;
+        const isShow = (openIndex && openIndex == index) ? 'show' : '';
+        const isCollapsed = (openIndex && openIndex == index) ? '' : 'collapsed';
+        item.innerHTML = `<h2 class="accordion-header" id="${headerId}"><button class="accordion-button ${isCollapsed} py-2 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}"><strong>${secPolicy.sectionName || secPolicy.sectionId}</strong><span class="ms-auto badge ${isBanned ? 'bg-danger' : 'bg-success'} me-2">${isBanned ? 'BANNED (Unavailable)' : 'Active (Custom Settings)'}</span></button></h2><div id="${collapseId}" class="accordion-collapse collapse ${isShow}" data-bs-parent="#sectionsContainer"><div class="accordion-body bg-light"><div class="d-flex justify-content-between mb-3 border-bottom pb-2"><div class="d-flex align-items-center gap-2"><h6 class="${isBanned ? 'text-danger' : 'text-primary'} fw-bold m-0">Global Setting</h6><select class="form-select form-select-sm sec-acc-type fw-bold ${isBanned ? 'text-danger border-danger' : 'text-success border-success'}" style="width:auto;" data-index="${index}"><option value="custom" ${!isBanned?'selected':''}>Active (Apply Limits)</option><option value="full_ban" ${isBanned?'selected':''}>Ban Section (Maintenance)</option></select></div><button type="button" class="btn btn-sm btn-outline-danger remove-section btn-filled" data-index="${index}">Remove Section</button></div><div class="row g-2 mb-3"><div class="col-md-12"><label class="small fw-bold ${isBanned ? 'text-danger' : 'text-muted'}">Reason for Ban (Required if Banned)</label><input type="text" class="form-control size-sm sec-reason ${isBanned ? 'border-danger' : ''}" value="${st.reason||''}" data-index="${index}" ${!isBanned ? 'disabled' : ''}></div></div><div class="row g-2 mb-3 ${isBanned ? 'opacity-50' : ''}"><div class="col-md-12"><hr class="my-1"></div><div class="col-md-3"><label class="small fw-bold">Max Session (min)</label><input type="number" class="form-control size-sm sec-max-sess" value="${tl.maxSessionDurationMinutes||''}" data-index="${index}" ${isBanned ? 'disabled' : ''}></div><div class="col-md-3"><label class="small fw-bold">Max Attempts (Session)</label><input type="number" class="form-control size-sm sec-idle" value="${tl.maxAttemptsPerSession||''}" data-index="${index}" ${isBanned ? 'disabled' : ''}></div><div class="col-md-6"></div></div><div class="card p-2 border-0 shadow-sm mt-3 ${isBanned ? 'd-none' : ''}"><h6 class="fw-bold text-dark border-bottom pb-1 mb-2">Operation Overrides</h6><div class="row mb-3"><div class="col-md-12 d-flex gap-2"><button type="button" class="btn btn-sm btn-outline-primary w-100 add-op-btn btn-filled" data-index="${index}"><i class="bi bi-search me-1"></i> Add Operation</button><button type="button" class="btn btn-sm btn-outline-secondary w-100 add-all-op-btn btn-filled" data-index="${index}"><i class="bi bi-collection me-1"></i> Add All</button></div></div><div class="table-responsive"><table class="table table-sm table-bordered bg-white"><thead class="table-light"><tr><th>Operation</th><th style="width:140px;">Status</th><th>Attempts</th><th>Session</th><th style="width:50px"></th></tr></thead><tbody>${ops.length === 0 ? '<tr><td colspan="6" class="text-center text-muted small">No overrides configured</td></tr>' : ''}${ops.map((op, opIdx) => { const opAcc = op.accessType === 'full_ban' ? 'full_ban' : 'custom'; const isOpBanned = (opAcc === 'full_ban'); return `<tr><td><strong>${op.operationName || op.operationId}</strong></td><td><select class="form-select form-select-sm p-0 border-0 op-acc-type ${isOpBanned?'text-danger fw-bold':''}" data-sec="${index}" data-op="${opIdx}"><option value="custom" ${!isOpBanned?'selected':''}>Active</option><option value="full_ban" ${isOpBanned?'selected':''}>Ban</option></select></td><td><input type="number" class="form-control form-control-sm border-0 op-attempts" placeholder="Limit" value="${op.executionLimits?.maxAttemptsPerSession || ''}" data-sec="${index}" data-op="${opIdx}" ${isOpBanned ? 'disabled' : ''}></td><td><input type="number" class="form-control form-control-sm border-0 op-sess" placeholder="Mins" value="${op.timeLimits?.maxSessionDurationMinutes || ''}" data-sec="${index}" data-op="${opIdx}" ${isOpBanned ? 'disabled' : ''}></td><td><i class="bi bi-trash text-danger cursor-pointer remove-op" data-sec="${index}" data-op="${opIdx}"></i></td></tr>`; }).join('')}</tbody></table></div></div></div></div>`;
+        sectionsContainer.appendChild(item);
+     });
+     // Re-attach listeners... (This block is standard event binding)
+     document.querySelectorAll('.remove-section').forEach(btn => btn.addEventListener('click', e => { configuredSections.splice(parseInt(e.target.dataset.index), 1); renderSections(); }));
+     document.querySelectorAll('.add-op-btn').forEach(btn => btn.addEventListener('click', e => { e.preventDefault(); const idx = parseInt(e.target.dataset.index); GenericPicker.open(GenericPickerPresets.operation({ onSelect: async (item) => { if (configuredSections[idx].operations.find(o => o.operationId === item.id)) return; if(!configuredSections[idx].operations) configuredSections[idx].operations = []; configuredSections[idx].operations.push({ operationId: item.id, operationName: item.name, accessType: 'custom', accessState: { status: 'active' }, executionLimits: {}, timeLimits: {} }); renderSections(); } })); }));
+     document.querySelectorAll('.add-all-op-btn').forEach(btn => btn.addEventListener('click', async (e) => { e.preventDefault(); const idx = parseInt(e.target.dataset.index); const secId = configuredSections[idx].sectionId; const originalText = e.target.innerHTML; e.target.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...`; e.target.disabled = true; try { const resp = await fetch(`/sections?q=${secId}&type=exact_match&searchFields=id`, { headers: {'X-AJAX-Request': 'true'} }); const data = await resp.json(); const sectionDef = (data.results || []).find(s => String(s.id) === String(secId)); if (!sectionDef || !sectionDef.operations) return; let addedCount = 0; if(!configuredSections[idx].operations) configuredSections[idx].operations = []; sectionDef.operations.forEach(opRef => { if (!configuredSections[idx].operations.find(existing => existing.operationId === opRef.id)) { configuredSections[idx].operations.push({ operationId: opRef.id, operationName: opRef.name || opRef.id, accessType: 'custom', accessState: { status: 'active' }, executionLimits: { maxAttemptsPerSession: opRef.sessionAttempts }, timeLimits: { maxSessionDurationMinutes: opRef.sessionTime } }); addedCount++; } }); if(addedCount > 0) renderSections(); } catch (err) { console.error(err); } finally { e.target.innerHTML = originalText; e.target.disabled = false; } }));
+     document.querySelectorAll('.remove-op').forEach(btn => btn.addEventListener('click', e => { configuredSections[e.target.dataset.sec].operations.splice(e.target.dataset.op, 1); renderSections(); }));
+     const bindChange = (cls, fn) => document.querySelectorAll(cls).forEach(i => i.addEventListener('change', e => { fn(e); renderSections(); }));
+     bindChange('.sec-acc-type', e => configuredSections[parseInt(e.target.dataset.index)].accessType = e.target.value);
+     bindChange('.op-acc-type', e => configuredSections[parseInt(e.target.dataset.sec)].operations[e.target.dataset.op].accessType = e.target.value);
+     const bindSectionInput = (cls, pathFn) => document.querySelectorAll('.' + cls).forEach(i => i.addEventListener('input', e => { const idx = parseInt(e.target.dataset.index); let val = e.target.type === 'number' ? parseInt(e.target.value) : e.target.value; if (isNaN(val) && e.target.type === 'number') val = null; pathFn(configuredSections[idx], val); }));
+     bindSectionInput('sec-reason', (obj, v) => { if(!obj.accessState) obj.accessState={}; obj.accessState.reason = v; });
+     bindSectionInput('sec-max-sess', (obj, v) => { if(!obj.timeLimits) obj.timeLimits={}; obj.timeLimits.maxSessionDurationMinutes = v; });
+     bindSectionInput('sec-idle', (obj, v) => { if(!obj.timeLimits) obj.timeLimits={}; obj.timeLimits.maxAttemptsPerSession = v; });
+     const bindOpInput = (cls, pathFn) => document.querySelectorAll('.' + cls).forEach(i => i.addEventListener('input', e => { const op = configuredSections[e.target.dataset.sec].operations[e.target.dataset.op]; let val = parseInt(e.target.value); if(isNaN(val)) val = null; pathFn(op, val); }));
+     bindOpInput('op-attempts', (op, v) => { if(!op.executionLimits) op.executionLimits={}; op.executionLimits.maxAttemptsPerSession = v; });
+     bindOpInput('op-sess', (op, v) => { if(!op.timeLimits) op.timeLimits={}; op.timeLimits.maxSessionDurationMinutes = v; });
+  }
+  
+  if(addSectionConfigBtn) {
+      addSectionConfigBtn.addEventListener('click', () => {
+         GenericPicker.open(GenericPickerPresets.section({
+            onSelect: async (item) => {
+                 if (configuredSections.find(s => s.sectionId === item.id)) return;
+                 configuredSections.push({ sectionId: item.id, sectionName: item.name, accessType: 'custom', accessState: { status: 'active' }, timeLimits: {}, operations: [] });
+                 renderSections();
+            }
+         }));
+      });
+  }
+  renderSections();
+
+  const addReqRouteOverrideBtn = document.getElementById('addReqRouteOverrideBtn');
+  reqEnabledSelect?.addEventListener('change', updateRequestPhaseUi);
+  reqPhase2Select?.addEventListener('change', updateRequestPhaseUi);
+  reqPhase3Select?.addEventListener('change', updateRequestPhaseUi);
+  updateRequestPhaseUi();
+  if (addReqRouteOverrideBtn) {
+      addReqRouteOverrideBtn.addEventListener('click', () => {
+          openRouteOverrideModal(null);
+      });
+  }
+  const roSaveBtn = document.getElementById('roSaveBtn');
+  if (roSaveBtn) {
+      roSaveBtn.addEventListener('click', async () => {
+          const idxRaw = String(document.getElementById('roModalIndex').value || '').trim();
+          const nextRow = collectRouteOverrideFromModal();
+          if (!nextRow.path) {
+              await showMsg('Validation', 'Route path is required.', 'warning', 'btn-warning');
+              return;
+          }
+          if (idxRaw === '') {
+              requestRouteOverrides.push(nextRow);
+          } else {
+              const idx = parseInt(idxRaw, 10);
+              if (Number.isFinite(idx) && idx >= 0 && idx < requestRouteOverrides.length) {
+                  requestRouteOverrides[idx] = nextRow;
+              } else {
+                  requestRouteOverrides.push(nextRow);
+              }
+          }
+          renderRouteOverrides();
+          reqRouteOverrideModal?.hide();
+      });
+  }
+  const roDeleteBtn = document.getElementById('roDeleteBtn');
+  if (roDeleteBtn) {
+      roDeleteBtn.addEventListener('click', () => {
+          const idxRaw = String(document.getElementById('roModalIndex').value || '').trim();
+          if (idxRaw === '') return;
+          const idx = parseInt(idxRaw, 10);
+          if (Number.isFinite(idx) && idx >= 0 && idx < requestRouteOverrides.length) {
+              requestRouteOverrides.splice(idx, 1);
+              renderRouteOverrides();
+          }
+          reqRouteOverrideModal?.hide();
+      });
+  }
+  renderRouteOverrides();
+
+  // Request-route catalog helper
+  function buildRequestRouteCatalogPayload() {
+      const rows = document.querySelectorAll('#reqRouteCatalogTable tbody tr[data-route-id]');
+      const disabledRouteIds = [];
+      const groupOverrides = {};
+      const routeSettings = {};
+
+      rows.forEach((row) => {
+          const routeId = row.getAttribute('data-route-id');
+          const defaultGroup = String(row.getAttribute('data-default-group') || '').trim().toLowerCase();
+          const locked = String(row.getAttribute('data-locked') || 'false') === 'true';
+          const enabledInput = row.querySelector('.req-route-enabled');
+          const groupSelect = row.querySelector('.req-route-group');
+          if (!routeId || !enabledInput || !groupSelect) return;
+
+          const enabled = Boolean(enabledInput.checked);
+          const selectedGroup = String(groupSelect.value || '').trim().toLowerCase();
+          if (!enabled && !locked) {
+              disabledRouteIds.push(routeId);
+          }
+          if (!locked && enabled && selectedGroup && selectedGroup !== defaultGroup) {
+              groupOverrides[routeId] = selectedGroup;
+          }
+
+          const specificEnabledInput = row.querySelector('.req-route-specific-enabled');
+          const specificWindowInput = row.querySelector('.req-route-window');
+          const specificMaxInput = row.querySelector('.req-route-max');
+          const specificKeyModeSelect = row.querySelector('.req-route-keymode');
+          const specificModeSelect = row.querySelector('.req-route-mode');
+
+          if (!specificEnabledInput || !specificWindowInput || !specificMaxInput || !specificKeyModeSelect || !specificModeSelect) return;
+
+          const routeSpecificEnabled = Boolean(specificEnabledInput.checked);
+          const routeWindow = parseInt(specificWindowInput.value, 10);
+          const routeMax = parseInt(specificMaxInput.value, 10);
+          const routeKeyMode = String(specificKeyModeSelect.value || '').trim().toLowerCase();
+          const routeMode = String(specificModeSelect.value || 'inherit').trim().toLowerCase();
+
+          const hasRouteSpecific =
+              routeSpecificEnabled ||
+              (Number.isFinite(routeWindow) && routeWindow > 0) ||
+              (Number.isFinite(routeMax) && routeMax > 0) ||
+              !!routeKeyMode ||
+              (routeMode !== 'inherit');
+
+          if (hasRouteSpecific) {
+              routeSettings[routeId] = {
+                  enabled: routeSpecificEnabled,
+                  windowMs: Number.isFinite(routeWindow) && routeWindow > 0 ? routeWindow : null,
+                  max: Number.isFinite(routeMax) && routeMax > 0 ? routeMax : null,
+                  keyMode: routeKeyMode || '',
+                  mode: routeMode || 'inherit'
+              };
+          }
+      });
+
+      return { disabledRouteIds, groupOverrides, routeSettings };
+  }
+
+  // --- 4. SUBMIT ---
+  form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const payload = {
+          actionStateId: document.querySelector('input[name="actionStateId"]').value,
+          maintenance_enabled: document.getElementById('maintCheck').checked ? 'true' : 'false',
+          maintenance_message: document.querySelector('[name="maintenance_message"]').value,
+          maintenance_roles: document.querySelector('[name="maintenance_roles"]').value,
+          maintenance_ips: document.querySelector('[name="maintenance_ips"]').value,
+          feat_registration: document.querySelector('[name="feat_registration"]').checked ? 'true' : 'false',
+          feat_publicAccess: document.querySelector('[name="feat_publicAccess"]').checked ? 'true' : 'false',
+          feat_apiAccess: document.querySelector('[name="feat_apiAccess"]').checked ? 'true' : 'false',
+          feat_backgroundJobs: document.querySelector('[name="feat_backgroundJobs"]').checked ? 'true' : 'false',
+
+          // ✅ NEW: Session Control Fields
+          sess_maxSessions: document.querySelector('[name="sess_maxSessions"]').value,
+          sess_maxDuration: document.querySelector('[name="sess_maxDuration"]').value,
+          sess_idleTimeout: document.querySelector('[name="sess_idleTimeout"]').value,
+          req_enabled: document.querySelector('[name="req_enabled"]').value,
+          req_mode: document.querySelector('[name="req_mode"]').value,
+          req_logCooldownMs: document.querySelector('[name="req_logCooldownMs"]').value,
+          req_excludePaths: document.querySelector('[name="req_excludePaths"]').value,
+          req_phase2_enabled: document.querySelector('[name="req_phase2_enabled"]').value,
+          req_phase2_groups: document.querySelector('[name="req_phase2_groups"]').value,
+          req_phase3_enabled: document.querySelector('[name="req_phase3_enabled"]').value,
+          req_auth_windowMs: document.querySelector('[name="req_auth_windowMs"]').value,
+          req_auth_max: document.querySelector('[name="req_auth_max"]').value,
+          req_auth_keyMode: document.querySelector('[name="req_auth_keyMode"]').value,
+          req_picker_windowMs: document.querySelector('[name="req_picker_windowMs"]').value,
+          req_picker_max: document.querySelector('[name="req_picker_max"]').value,
+          req_picker_keyMode: document.querySelector('[name="req_picker_keyMode"]').value,
+          req_write_windowMs: document.querySelector('[name="req_write_windowMs"]').value,
+          req_write_max: document.querySelector('[name="req_write_max"]').value,
+          req_write_keyMode: document.querySelector('[name="req_write_keyMode"]').value,
+          req_heavy_windowMs: document.querySelector('[name="req_heavy_windowMs"]').value,
+          req_heavy_max: document.querySelector('[name="req_heavy_max"]').value,
+          req_heavy_keyMode: document.querySelector('[name="req_heavy_keyMode"]').value,
+          req_global_windowMs: document.querySelector('[name="req_global_windowMs"]').value,
+          req_global_max: document.querySelector('[name="req_global_max"]').value,
+          req_global_keyMode: document.querySelector('[name="req_global_keyMode"]').value,
+          req_routeCatalog: JSON.stringify(buildRequestRouteCatalogPayload()),
+          req_routeOverrides: JSON.stringify(requestRouteOverrides || []),
+
+          network: JSON.stringify(network),
+          globalSchedule: JSON.stringify(schedule),
+          sections: JSON.stringify(configuredSections),
+          bannedUsers: JSON.stringify(bannedUsers)
+      };
+
+      if (typeof window.requestProtectedAction === 'function') {
+            await window.requestProtectedAction();
+      } else {
+          showMessageModal({ title: 'Verification Code', icon: 'error', message: 'Admin Verification System not loaded.', buttons: [ { text: 'Ok', class: 'btn-danger btn-md' } ] });
+          return;
+      }
+        
+      try {
+        const resp = await fetch(form.action, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json', 'X-AJAX-Request': 'true'}, 
+            body: JSON.stringify(payload) 
+        });
+        const res = await resp.json();
+        await showMsg(res.status === 'success' ? 'Success' : 'Error', res.message || 'Done.', res.status === 'success' ? 'success' : 'error', res.status === 'success' ? 'btn-success' : 'btn-danger');
+      } catch(err) { console.error(err); await showMsg('Error', 'Save failed', 'error', 'btn-danger'); }
+  });
+});
+</script>
+<style>
+  .accordion-button:not(.collapsed) { background-color: #f8f9fa; color: #000; }
+  .cursor-pointer { cursor: pointer; }
+  .nav-tabs .nav-link.active { font-weight: bold; color: #0d6efd; border-top: 3px solid #0d6efd; }
+  .phase-overview { background: #fff; }
+  .phase-overview-1 { border-left: 4px solid #0d6efd !important; }
+  .phase-overview-2 { border-left: 4px solid #ffc107 !important; }
+  .phase-overview-3 { border-left: 4px solid #0dcaf0 !important; }
+  .phase-disabled { opacity: 0.55; transition: opacity 0.2s ease; }
+  .phase-disabled .table-responsive,
+  .phase-disabled .card-body { pointer-events: none; }
+  .phase-disabled .card-header { pointer-events: auto; }
+</style>

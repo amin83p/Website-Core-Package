@@ -1,0 +1,287 @@
+<%
+  const c = contract || {};
+  const isEdit = !!c.id;
+  
+  // JSON field initializers
+  const initRenewal = JSON.stringify(c.renewal || { autoRenew: false, renewalPeriodMonths: 12, renewalNoticeDays: 30 });
+  const initFinancials = JSON.stringify(c.financials || { amount: null, currency: 'USD', billingFrequency: 'Monthly' });
+  const initScope = JSON.stringify(c.scope || { services: [], notes: '' });
+  const initContacts = JSON.stringify(c.contacts || {});
+  const initAttachments = JSON.stringify(c.attachments || []);
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Contract' : 'New Contract' %></h1>
+      <% if(isEdit) { %> <span class="badge bg-primary border font-monospace">ID: <%= c.id %></span> <% } %>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="contractForm" action="<%= isEdit ? '/contracts/edit/'+c.id : '/contracts/new' %>" method="POST">
+      
+      <input type="hidden" name="renewal" id="hid_renewal" value='<%- initRenewal %>'>
+      <input type="hidden" name="financials" id="hid_financials" value='<%- initFinancials %>'>
+      <input type="hidden" name="scope" id="hid_scope" value='<%- initScope %>'>
+      <input type="hidden" name="contacts" id="hid_contacts" value='<%- initContacts %>'>
+      <input type="hidden" name="attachments" id="hid_attachments" value='<%- initAttachments %>'>
+
+      <ul class="nav nav-tabs mb-4" id="conTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-financials" type="button">Financials & Renewal</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scope" type="button">Scope & Contacts</button></li>
+      </ul>
+
+      <div class="tab-content">
+        
+        <div class="tab-pane fade show active" id="tab-general">
+           <div class="row">
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Title *</label>
+                 <input type="text" name="title" class="form-control size-md" value="<%= c.title || '' %>" required>
+              </div>
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Organization *</label>
+                 <div class="input-group">
+                    <input type="hidden" name="orgId" id="selectedOrgId" value="<%= c.orgId || '' %>" required>
+                    <input type="text" id="selectedOrgName" class="form-control size-md bg-white" 
+                           placeholder="Select Organization..." value="<%= orgName || '' %>" readonly required>
+                    <button type="button" class="btn btn-outline-primary" id="openOrgPickerBtn">
+                        <i class="bi bi-search"></i>
+                    </button>
+                 </div>
+              </div>
+           </div>
+
+           <div class="row">
+              <div class="col-md-4 mb-3">
+                 <label class="form-label">Status</label>
+                 <select name="status" class="form-select size-md">
+                    <option value="draft" <%= c.status=='draft'?'selected':'' %>>Draft</option>
+                    <option value="active" <%= c.status=='active'?'selected':'' %>>Active</option>
+                    <option value="expired" <%= c.status=='expired'?'selected':'' %>>Expired</option>
+                    <option value="cancelled" <%= c.status=='cancelled'?'selected':'' %>>Cancelled</option>
+                 </select>
+              </div>
+              <div class="col-md-4 mb-3">
+                 <label class="form-label">Type</label>
+                 <input type="text" name="type" class="form-control size-md" value="<%= c.type || 'subscription' %>" list="typeOptions">
+                 <datalist id="typeOptions">
+                    <option value="subscription">
+                    <option value="service_agreement">
+                    <option value="licensing">
+                 </datalist>
+              </div>
+           </div>
+
+           <div class="row">
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Start Date</label>
+                 <input type="date" name="startDate" class="form-control size-md" value="<%= c.startDate || '' %>">
+              </div>
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">End Date</label>
+                 <input type="date" name="endDate" class="form-control size-md" value="<%= c.endDate || '' %>">
+              </div>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-financials">
+           <h6 class="fw-bold text-primary mb-3">Financial Terms</h6>
+           <div class="row">
+              <div class="col-md-4 mb-3">
+                 <label class="form-label">Amount</label>
+                 <input type="number" id="inp_amount" class="form-control size-md">
+              </div>
+              <div class="col-md-4 mb-3">
+                 <label class="form-label">Currency</label>
+                 <input type="text" id="inp_currency" class="form-control size-md">
+              </div>
+              <div class="col-md-4 mb-3">
+                 <label class="form-label">Frequency</label>
+                 <select id="inp_freq" class="form-select size-md">
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Annually">Annually</option>
+                    <option value="One-Time">One-Time</option>
+                 </select>
+              </div>
+           </div>
+
+           <hr>
+           <h6 class="fw-bold text-primary mb-3">Renewal Logic</h6>
+           <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="inp_autoRenew">
+              <label class="form-check-label">Auto Renew Enabled</label>
+           </div>
+           <div class="row">
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Renewal Period (Months)</label>
+                 <input type="number" id="inp_renewPeriod" class="form-control size-md">
+              </div>
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Notice Required (Days)</label>
+                 <input type="number" id="inp_notice" class="form-control size-md">
+              </div>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-scope">
+           <div class="mb-3">
+              <label class="form-label">Services Included (Comma separated)</label>
+              <input type="text" id="inp_services" class="form-control size-md" placeholder="e.g. Hosting, Support, API Access">
+           </div>
+           <div class="mb-3">
+              <label class="form-label">Scope Notes / Remarks</label>
+              <textarea name="notes" class="form-control size-md" rows="4"><%= c.notes || '' %></textarea>
+           </div>
+        </div>
+
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Contract</button>
+        <a href="/contracts" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/contracts">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Load Data
+    const dRen = JSON.parse(document.getElementById('hid_renewal').value);
+    const dFin = JSON.parse(document.getElementById('hid_financials').value);
+    const dScope = JSON.parse(document.getElementById('hid_scope').value);
+
+    // 2. Populate UI (Manual binding for nested JSON)
+    // Financials
+    document.getElementById('inp_amount').value = dFin.amount || '';
+    document.getElementById('inp_currency').value = dFin.currency || 'USD';
+    document.getElementById('inp_freq').value = dFin.billingFrequency || 'Monthly';
+    
+    // Renewal
+    document.getElementById('inp_autoRenew').checked = !!dRen.autoRenew;
+    document.getElementById('inp_renewPeriod').value = dRen.renewalPeriodMonths || 12;
+    document.getElementById('inp_notice').value = dRen.renewalNoticeDays || 30;
+
+    // Scope
+    document.getElementById('inp_services').value = (dScope.services || []).join(', ');
+
+    // 3. Organization Picker
+    const pickBtn = document.getElementById('openOrgPickerBtn');
+    if(pickBtn) {
+        pickBtn.addEventListener('click', () => {
+            GenericPicker.open(GenericPickerPresets.organization({
+                title: 'Select Organization',
+                onSelect: (item) => {
+                    document.getElementById('selectedOrgId').value = item.id;
+                    document.getElementById('selectedOrgName').value = item.identity?.displayName || item.name;
+                }
+            }));
+        });
+    }
+
+    // 4. Submit Logic with AJAX and Modal Feedback
+    const form = document.getElementById('contractForm');
+    
+    form.addEventListener('submit', async (e) => {
+        // A. Prevent Browser Submit
+        e.preventDefault();
+
+        // B. Disable Button
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+        try {
+            // C. Pack Nested JSONs (Critical for Contract Logic)
+            
+            // Financials
+            const fin = {
+                amount: parseFloat(document.getElementById('inp_amount').value) || null,
+                currency: document.getElementById('inp_currency').value,
+                billingFrequency: document.getElementById('inp_freq').value
+            };
+            document.getElementById('hid_financials').value = JSON.stringify(fin);
+
+            // Renewal
+            const ren = {
+                autoRenew: document.getElementById('inp_autoRenew').checked,
+                renewalPeriodMonths: parseInt(document.getElementById('inp_renewPeriod').value) || 12,
+                renewalNoticeDays: parseInt(document.getElementById('inp_notice').value) || 30
+            };
+            document.getElementById('hid_renewal').value = JSON.stringify(ren);
+
+            // Scope
+            const rawSvcs = document.getElementById('inp_services').value;
+            const scope = {
+                services: rawSvcs.split(',').map(s=>s.trim()).filter(Boolean),
+                notes: '' // notes handled by main textarea
+            };
+            document.getElementById('hid_scope').value = JSON.stringify(scope);
+
+            // D. Prepare Payload
+            const formData = new FormData(form);
+            const data = new URLSearchParams(formData);
+
+            // E. Perform Fetch
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-AJAX-Request': 'true'
+                },
+                body: data.toString()
+            });
+
+            // F. Handle Response
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                 throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+            }
+
+            const result = await response.json();
+
+            // G. Show Modal
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: result.status === 'success' ? 'Success' : 'Error',
+                    icon: result.status === 'success' ? 'success' : 'error',
+                    message: result.message || 'Operation completed.',
+                    buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
+                });
+            } else {
+                alert(result.message);
+            }
+
+            // H. Redirect or Restore
+            if (result.status === 'success') {
+                window.location.href = '/contracts';
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+
+        } catch (error) {
+            console.error('Submission Error:', error);
+            
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'System Error',
+                    icon: 'error',
+                    message: error.message || 'An unexpected network error occurred.',
+                    buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                });
+            } else {
+                alert(error.message);
+            }
+        }
+    });
+});
+</script>

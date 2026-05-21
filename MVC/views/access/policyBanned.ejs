@@ -1,0 +1,149 @@
+<%
+  const accessData = (typeof accessRequest !== 'undefined' && accessRequest && typeof accessRequest === 'object') ? accessRequest : {};
+  const deniedCode = String(accessData.deniedCode || '').trim().toUpperCase();
+  const deniedMeta = (accessData.deniedMeta && typeof accessData.deniedMeta === 'object') ? accessData.deniedMeta : {};
+  const reasonRaw = String(accessData.reason || message || 'Access is restricted by policy.');
+  const cleanReason = reasonRaw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const requestedPath = String(accessData.path || '').trim();
+  const requestedSection = String(accessData.sectionId || (Array.isArray(accessData.sectionIds) ? accessData.sectionIds.join(', ') : '') || '').trim();
+  const requestedOperation = String(accessData.operationId || '').trim();
+  const deniedLayer = String(deniedMeta.layer || '').toLowerCase();
+  const isWebsiteRestriction = deniedCode === 'WEBSITE_POLICY_BAN' || deniedLayer === 'website';
+  const isOrgRestriction = deniedCode === 'ORG_POLICY_BAN' || deniedCode === 'ORG_POLICY_BANNED_USER' || deniedLayer === 'organization';
+  const isUserLayerRestriction = deniedLayer === 'user';
+  const isUserBan = deniedCode === 'ORG_POLICY_BANNED_USER' || deniedCode === 'WEBSITE_POLICY_BANNED_USER';
+
+  const pageTitle = isUserBan
+    ? 'Account Restricted in This Organization'
+    : (isUserLayerRestriction
+      ? 'Restricted by Personal Access Policy'
+      : (isWebsiteRestriction ? 'Temporarily Restricted by Website Policy' : 'Restricted by Organization Policy'));
+  const pageLead = isUserBan
+    ? 'Your account is currently blocked in this organization by policy. Please contact an administrator to review your access.'
+    : (isUserLayerRestriction
+      ? 'This area is currently restricted by your personal access policy. Please contact an administrator if you need this access adjusted.'
+      : (isWebsiteRestriction
+        ? 'This area is currently unavailable by website-level policy. This can happen during maintenance or temporary security restrictions.'
+        : 'This area is currently restricted by organization policy. Please contact your administrator if you need access.'));
+
+  const contactInfo = (typeof appContact !== 'undefined' && appContact && typeof appContact === 'object') ? appContact : {};
+  const supportEmail = String(contactInfo.supportEmail || contactInfo.email || '').trim();
+  const requesterName = user ? String(user.preferredName || user.firstName || user.name || user.username || '').trim() : '';
+  const requesterEmail = user ? String(user.email || '').trim() : '';
+  const requesterId = user ? String(user.id || user.userId || '').trim() : '';
+  const helpEmailBody = [
+    'Hello,',
+    '',
+    'My account is blocked by policy and I need access review.',
+    '',
+    requesterName ? `Requester: ${requesterName}` : '',
+    requesterEmail ? `Email: ${requesterEmail}` : '',
+    requesterId ? `User ID: ${requesterId}` : '',
+    requestedPath ? `Page: ${requestedPath}` : '',
+    requestedSection ? `Section: ${requestedSection}` : '',
+    requestedOperation ? `Operation: ${requestedOperation}` : '',
+    cleanReason ? `System message: ${cleanReason}` : '',
+    '',
+    'Please review and advise.',
+    '',
+    'Thank you.'
+  ].filter(Boolean).join('\n');
+  const supportHref = supportEmail
+    ? `mailto:${supportEmail}?subject=${encodeURIComponent('Access restriction review')}&body=${encodeURIComponent(helpEmailBody)}`
+    : '/contact';
+%>
+
+<div class="container py-5 policy-banned-page">
+  <div class="policy-banned-shell">
+    <div class="policy-banned-hero">
+      <div class="policy-banned-badge">
+        <i class="bi bi-shield-lock"></i>
+        Policy Restricted
+      </div>
+      <h1 class="page-heading size-lg mb-2"><%= pageTitle %></h1>
+      <p class="text-muted mb-0"><%= pageLead %></p>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="module-card h-100">
+          <div class="module-accent"></div>
+          <h2 class="h5 fw-bold mb-3">Restriction Details</h2>
+          <div class="alert alert-warning py-2 mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <%= cleanReason || 'Access is currently restricted by policy.' %>
+          </div>
+
+          <div class="row g-2">
+            <% if (requestedPath) { %>
+              <div class="col-12"><div class="policy-kv"><span>Page</span><code><%= requestedPath %></code></div></div>
+            <% } %>
+            <% if (requestedSection) { %>
+              <div class="col-md-6"><div class="policy-kv"><span>Section</span><code><%= requestedSection %></code></div></div>
+            <% } %>
+            <% if (requestedOperation) { %>
+              <div class="col-md-6"><div class="policy-kv"><span>Operation</span><code><%= requestedOperation %></code></div></div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="module-card h-100">
+          <div class="module-accent"></div>
+          <h2 class="h5 fw-bold mb-3">Next Steps</h2>
+          <div class="policy-step"><i class="bi bi-person-gear"></i> Contact your administrator and request policy review.</div>
+          <div class="policy-step"><i class="bi bi-envelope"></i> Share the section and operation details shown on this page.</div>
+          <div class="policy-step"><i class="bi bi-arrow-clockwise"></i> Retry after approval or policy update.</div>
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            <a href="/dashboard" class="btn btn-primary btn-filled btn-sm"><i class="bi bi-house-door me-1"></i> Dashboard</a>
+            <a href="<%= supportHref %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-envelope me-1"></i> Contact Support</a>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="history.back()">Go Back</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .policy-banned-shell { max-width: 1080px; margin: 0 auto; }
+  .policy-banned-hero {
+    border: 1px solid rgba(220, 53, 69, 0.18);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(140deg, rgba(255,255,255,0.96), rgba(255,247,247,0.96));
+  }
+  .policy-banned-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .4rem .7rem;
+    border-radius: 999px;
+    background: rgba(220, 53, 69, 0.12);
+    color: #b42318;
+    font-size: .78rem;
+    font-weight: 700;
+    margin-bottom: .8rem;
+  }
+  .policy-kv {
+    border: 1px solid #dfe6ef;
+    border-radius: .6rem;
+    background: #f8fbff;
+    padding: .55rem .7rem;
+    display: flex;
+    justify-content: space-between;
+    gap: .75rem;
+    align-items: center;
+  }
+  .policy-kv span { font-size: .78rem; color: #667085; font-weight: 600; }
+  .policy-step {
+    display: flex;
+    gap: .55rem;
+    align-items: flex-start;
+    padding: .55rem .15rem;
+    border-bottom: 1px dashed #e4e8ee;
+  }
+  .policy-step i { color: #2563eb; margin-top: .1rem; }
+</style>

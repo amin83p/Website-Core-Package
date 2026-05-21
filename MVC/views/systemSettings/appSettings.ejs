@@ -1,0 +1,1043 @@
+<%
+  const appSettings = settings && settings.app ? settings.app : {};
+  const brand = appSettings.brand || {};
+  const contact = appSettings.contact || {};
+  const contactPage = appSettings.contactPage || {};
+  const rowValue = (row, key) => row && typeof row === 'object' ? String(row[key] || row.value || '').trim() : '';
+  const rowTitle = (row, fallback) => row && typeof row === 'object' ? String(row.title || row.label || fallback || '').trim() : (fallback || '');
+  const fallbackContactHighlights = [
+    { title: 'Clear Context', body: 'Share goals, files, links, and constraints in one place.' },
+    { title: 'Follow-Up Code', body: 'Track your submitted message later with your private code.' },
+    { title: 'Direct Route', body: 'Use email if your request is urgent or already documented.' }
+  ];
+  const fallbackContactProcessImages = [
+    {
+      imageUrl: '/uploads/GLOBAL/misc/Engineering.jpg',
+      alt: 'Mega dust collector system with high efficiency fan.',
+      caption: 'Mega dust collector system with a high-efficiency fan for lower energy consumption.'
+    },
+    {
+      imageUrl: '/uploads/GLOBAL/misc/Software.jpeg',
+      alt: 'Industrial software interface.',
+      caption: 'Industrial and heavy-duty software packages.'
+    }
+  ];
+  const contactPageHighlights = Array.isArray(contactPage.highlights) && contactPage.highlights.length ? contactPage.highlights : fallbackContactHighlights;
+  const contactPageProcessImages = Array.isArray(contactPage.processImages) && contactPage.processImages.length ? contactPage.processImages : fallbackContactProcessImages;
+  const emailRows = Array.isArray(contact.emails)
+    ? contact.emails
+    : (contact.email ? [{ title: 'General Inquiries', email: contact.email }] : []);
+  const phoneRows = Array.isArray(contact.phones)
+    ? contact.phones
+    : (contact.phone ? [{ title: 'Phone', number: contact.phone }] : []);
+  const faxRows = Array.isArray(contact.faxes)
+    ? contact.faxes
+    : (contact.fax ? [{ title: 'Fax', number: contact.fax }] : []);
+  const addressRows = Array.isArray(contact.addresses)
+    ? contact.addresses
+    : (contact.address ? [{ title: 'Address', address: contact.address }] : []);
+  const publicMenu = appSettings.publicMenu && typeof appSettings.publicMenu === 'object' ? appSettings.publicMenu : {};
+  const publicMenuItems = Array.isArray(publicMenu.items) ? publicMenu.items : [];
+  const publicMenuJson = JSON.stringify(publicMenuItems).replace(/</g, '\\u003c');
+  const publicDefaultHomePath = typeof publicMenu.defaultHomePath === 'string' && publicMenu.defaultHomePath.trim()
+    ? publicMenu.defaultHomePath.trim()
+    : '/';
+  const fallbackEndpointOptions = [
+    { label: 'Home', href: '/', icon: 'bi-house', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'What I Offer', href: '/whatIOffer', icon: 'bi-stars', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'News', href: '/news', icon: 'bi-newspaper', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'PTE Test', href: '/pte', icon: 'bi-mortarboard', visibility: 'all', target: '_self', category: 'PTE' },
+    { label: 'Biography', href: '/biography', icon: 'bi-person-badge', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'Contact', href: '/contact', icon: 'bi-envelope', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'About', href: '/about', icon: 'bi-info-circle', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'Sign In', href: '/login', icon: 'bi-box-arrow-in-right', visibility: 'guest', target: '_self', category: 'Account' }
+  ];
+  const endpointOptionsFromServer = (typeof publicMenuEndpointOptions !== 'undefined' && Array.isArray(publicMenuEndpointOptions)) ? publicMenuEndpointOptions : [];
+  const endpointOptions = endpointOptionsFromServer.length ? endpointOptionsFromServer : fallbackEndpointOptions;
+  const endpointOptionsJson = JSON.stringify(endpointOptions).replace(/</g, '\\u003c');
+%>
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0">Application Defaults</h1>
+      <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Configuration</span>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="appSettingsForm" action="/systemSettings/app" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+
+      <ul class="nav nav-tabs" id="appDefaultsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active fw-semibold" id="app-branding-tab" data-bs-toggle="tab" data-bs-target="#app-branding-pane" type="button" role="tab" aria-controls="app-branding-pane" aria-selected="true">
+            <i class="bi bi-stars me-1"></i> Branding
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="app-contact-tab" data-bs-toggle="tab" data-bs-target="#app-contact-pane" type="button" role="tab" aria-controls="app-contact-pane" aria-selected="false">
+            <i class="bi bi-person-lines-fill me-1"></i> Contact Information
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="app-contact-page-tab" data-bs-toggle="tab" data-bs-target="#app-contact-page-pane" type="button" role="tab" aria-controls="app-contact-page-pane" aria-selected="false">
+            <i class="bi bi-window-sidebar me-1"></i> Contact Page
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="app-public-menu-tab" data-bs-toggle="tab" data-bs-target="#app-public-menu-pane" type="button" role="tab" aria-controls="app-public-menu-pane" aria-selected="false">
+            <i class="bi bi-menu-button-wide me-1"></i> Public Menu
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="app-operational-tab" data-bs-toggle="tab" data-bs-target="#app-operational-pane" type="button" role="tab" aria-controls="app-operational-pane" aria-selected="false">
+            <i class="bi bi-sliders me-1"></i> Operational Defaults
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content pt-3" id="appDefaultsTabContent">
+        <div class="tab-pane fade show active" id="app-branding-pane" role="tabpanel" aria-labelledby="app-branding-tab" tabindex="0">
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white border-0 pb-0">
+          <h5 class="fw-bold mb-1"><i class="bi bi-stars text-primary me-2"></i>Branding & App Information</h5>
+          <p class="text-muted small mb-0">Controls public app name, logo metadata, header tagline, footer identity, and social links.</p>
+          <p class="text-muted small mb-0 mt-1">
+            Whitespace note: leading/trailing spaces are ignored. Normal spaces inside uploaded folder or file names are allowed and rendered as <code>%20</code>; tabs and line breaks are not accepted in URL fields.
+          </p>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">App Name</label>
+              <input type="text" name="appName" class="form-control" value="<%= brand.appName || '' %>" placeholder="Amin Paknejad">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">App Short Name</label>
+              <input type="text" name="appShortName" class="form-control" value="<%= brand.appShortName || '' %>" placeholder="Website">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Header Tagline</label>
+              <input type="text" name="tagline" class="form-control" value="<%= brand.tagline || '' %>" placeholder="Learn, work, and thrive in new places.">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Logo URL</label>
+              <input type="text" name="logoUrl" class="form-control font-monospace" value="<%= brand.logoUrl || '' %>" placeholder="/uploads/GLOBAL/logo/Logo1.png">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">SVG Icon URL</label>
+              <input type="text" name="iconSvgUrl" class="form-control font-monospace" value="<%= brand.iconSvgUrl || '' %>" placeholder="/uploads/GLOBAL/logo/icon.svg">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Apple Touch Icon URL</label>
+              <input type="text" name="appleTouchIconUrl" class="form-control font-monospace" value="<%= brand.appleTouchIconUrl || '' %>" placeholder="/uploads/GLOBAL/logo/Logo1.png">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Theme Color</label>
+              <div class="input-group">
+                <input type="color" class="form-control form-control-color" value="<%= brand.themeColor || '#ffffff' %>" oninput="this.nextElementSibling.value = this.value">
+                <input type="text" name="themeColor" class="form-control font-monospace" value="<%= brand.themeColor || '#ffffff' %>" placeholder="#ffffff">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Owner Display Name</label>
+              <input type="text" name="ownerDisplayName" class="form-control" value="<%= brand.ownerDisplayName || '' %>" placeholder="Amin Paknejad">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Footer Logo Alt Text</label>
+              <input type="text" name="footerLogoAlt" class="form-control" value="<%= brand.footerLogoAlt || '' %>" placeholder="Amin Paknejad">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Footer About Title</label>
+              <input type="text" name="footerAboutTitle" class="form-control" value="<%= brand.footerAboutTitle || '' %>" placeholder="About Amin Paknejad">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Footer About Text</label>
+              <textarea name="footerAboutText" class="form-control" rows="4" placeholder="Short footer bio or organization description."><%= brand.footerAboutText || '' %></textarea>
+              <div class="form-text">HTML-aware. Safe basic tags like <code>&lt;p&gt;</code>, <code>&lt;br&gt;</code>, <code>&lt;strong&gt;</code>, <code>&lt;em&gt;</code>, lists, and links are rendered in the footer.</div>
+            </div>
+            <div class="col-12">
+              <div class="form-check form-switch p-3 bg-light rounded border">
+                <input class="form-check-input" type="checkbox" role="switch" id="footerShowNewsletter" name="footerShowNewsletter" value="true" <%= brand.footerShowNewsletter === false ? '' : 'checked' %>>
+                <label class="form-check-label fw-bold" for="footerShowNewsletter">Show newsletter subscription in footer</label>
+                <div class="form-text">When disabled, the footer will hide the "Subscribe to our newsletter" input and unsubscribe link.</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Instagram URL</label>
+              <input type="url" name="instagramUrl" class="form-control" value="<%= brand.instagramUrl || '' %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Facebook URL</label>
+              <input type="url" name="facebookUrl" class="form-control" value="<%= brand.facebookUrl || '' %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">LinkedIn URL</label>
+              <input type="url" name="linkedinUrl" class="form-control" value="<%= brand.linkedinUrl || '' %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">YouTube URL</label>
+              <input type="url" name="youtubeUrl" class="form-control" value="<%= brand.youtubeUrl || '' %>">
+            </div>
+          </div>
+        </div>
+      </div>
+        </div>
+
+        <div class="tab-pane fade" id="app-contact-pane" role="tabpanel" aria-labelledby="app-contact-tab" tabindex="0">
+          <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-0 pb-0">
+              <h5 class="fw-bold mb-1"><i class="bi bi-person-lines-fill text-primary me-2"></i>Contact Information</h5>
+              <p class="text-muted small mb-0">Controls public contact details used on the website contact and biography sections.</p>
+            </div>
+            <div class="card-body p-4">
+              <div class="row g-4">
+                <div class="col-12">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <div>
+                      <label class="form-label fw-bold mb-0">Emails</label>
+                      <div class="form-text">Add as many email addresses as needed with public labels.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-contact-row="emails">
+                      <i class="bi bi-plus-lg me-1"></i>Add Email
+                    </button>
+                  </div>
+                  <div class="vstack gap-2" data-contact-row-list="emails">
+                    <% emailRows.forEach((row) => { %>
+                      <div class="contact-repeat-row row g-2 align-items-center">
+                        <div class="col-md-4">
+                          <input type="text" name="contactEmailTitle" class="form-control" value="<%= rowTitle(row, 'General Inquiries') %>" placeholder="General Inquiries">
+                        </div>
+                        <div class="col-md-7">
+                          <input type="email" name="contactEmailValue" class="form-control" value="<%= rowValue(row, 'email') %>" placeholder="name@example.com">
+                        </div>
+                        <div class="col-md-1 d-grid">
+                          <button type="button" class="btn btn-outline-danger" data-remove-contact-row title="Remove email"><i class="bi bi-trash"></i></button>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <div>
+                      <label class="form-label fw-bold mb-0">Phones</label>
+                      <div class="form-text">Add multiple phone numbers, for example Office, Mobile, or Support.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-contact-row="phones">
+                      <i class="bi bi-plus-lg me-1"></i>Add Phone
+                    </button>
+                  </div>
+                  <div class="vstack gap-2" data-contact-row-list="phones">
+                    <% phoneRows.forEach((row) => { %>
+                      <div class="contact-repeat-row row g-2 align-items-center">
+                        <div class="col-md-4">
+                          <input type="text" name="contactPhoneTitle" class="form-control" value="<%= rowTitle(row, 'Phone') %>" placeholder="Office">
+                        </div>
+                        <div class="col-md-7">
+                          <input type="text" name="contactPhoneValue" class="form-control" value="<%= rowValue(row, 'number') %>" placeholder="+1 (437) 602-8720">
+                        </div>
+                        <div class="col-md-1 d-grid">
+                          <button type="button" class="btn btn-outline-danger" data-remove-contact-row title="Remove phone"><i class="bi bi-trash"></i></button>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <div>
+                      <label class="form-label fw-bold mb-0">Faxes</label>
+                      <div class="form-text">Optional. Add one or more fax numbers with labels.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-contact-row="faxes">
+                      <i class="bi bi-plus-lg me-1"></i>Add Fax
+                    </button>
+                  </div>
+                  <div class="vstack gap-2" data-contact-row-list="faxes">
+                    <% faxRows.forEach((row) => { %>
+                      <div class="contact-repeat-row row g-2 align-items-center">
+                        <div class="col-md-4">
+                          <input type="text" name="contactFaxTitle" class="form-control" value="<%= rowTitle(row, 'Fax') %>" placeholder="Fax">
+                        </div>
+                        <div class="col-md-7">
+                          <input type="text" name="contactFaxValue" class="form-control" value="<%= rowValue(row, 'number') %>" placeholder="+1 (000) 000-0000">
+                        </div>
+                        <div class="col-md-1 d-grid">
+                          <button type="button" class="btn btn-outline-danger" data-remove-contact-row title="Remove fax"><i class="bi bi-trash"></i></button>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <div>
+                      <label class="form-label fw-bold mb-0">Addresses</label>
+                      <div class="form-text">Add multiple public addresses with titles, for example Calgary Office or Mailing Address.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-contact-row="addresses">
+                      <i class="bi bi-plus-lg me-1"></i>Add Address
+                    </button>
+                  </div>
+                  <div class="vstack gap-2" data-contact-row-list="addresses">
+                    <% addressRows.forEach((row) => { %>
+                      <div class="contact-repeat-row row g-2 align-items-center">
+                        <div class="col-md-4">
+                          <input type="text" name="contactAddressTitle" class="form-control" value="<%= rowTitle(row, 'Address') %>" placeholder="Mailing Address">
+                        </div>
+                        <div class="col-md-7">
+                          <input type="text" name="contactAddressValue" class="form-control" value="<%= rowValue(row, 'address') %>" placeholder="Calgary, Alberta">
+                        </div>
+                        <div class="col-md-1 d-grid">
+                          <button type="button" class="btn btn-outline-danger" data-remove-contact-row title="Remove address"><i class="bi bi-trash"></i></button>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      
+        <div class="tab-pane fade" id="app-contact-page-pane" role="tabpanel" aria-labelledby="app-contact-page-tab" tabindex="0">
+          <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-0 pb-0">
+              <h5 class="fw-bold mb-1"><i class="bi bi-window-sidebar text-primary me-2"></i>Contact Page Content</h5>
+              <p class="text-muted small mb-0">Controls the public <span class="font-monospace">/contact</span> page hero, cards, highlight chips, labels, and images.</p>
+            </div>
+            <div class="card-body p-4">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Hero Eyebrow</label>
+                  <input type="text" name="contactPageHeroEyebrow" class="form-control" value="<%= contactPage.heroEyebrow || '' %>" placeholder="Contact And Support">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Hero Title</label>
+                  <input type="text" name="contactPageHeroTitle" class="form-control" value="<%= contactPage.heroTitle || '' %>" placeholder="Tell us what you need next.">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Hero Subtitle</label>
+                  <textarea name="contactPageHeroSubtitle" class="form-control" rows="2" placeholder="Short public introduction."><%= contactPage.heroSubtitle || '' %></textarea>
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Primary CTA Label</label>
+                  <input type="text" name="contactPagePrimaryCtaLabel" class="form-control" value="<%= contactPage.primaryCtaLabel || '' %>" placeholder="Go To Form">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Email CTA Label</label>
+                  <input type="text" name="contactPageEmailCtaLabel" class="form-control" value="<%= contactPage.emailCtaLabel || '' %>" placeholder="Email Directly">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Follow-Up CTA Label</label>
+                  <input type="text" name="contactPageFollowUpCtaLabel" class="form-control" value="<%= contactPage.followUpCtaLabel || '' %>" placeholder="Follow Up">
+                </div>
+
+                <div class="col-12">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2 mt-2">
+                    <div>
+                      <label class="form-label fw-bold mb-0">Hero Highlight Chips</label>
+                      <div class="form-text">Shown under the hero title. Empty rows are ignored.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-contact-page-row="highlights">
+                      <i class="bi bi-plus-lg me-1"></i>Add Highlight
+                    </button>
+                  </div>
+                  <div class="vstack gap-2" data-contact-page-row-list="highlights">
+                    <% contactPageHighlights.forEach((row) => { %>
+                      <div class="contact-page-repeat-row row g-2 align-items-start">
+                        <div class="col-md-4">
+                          <input type="text" name="contactPageHighlightTitle" class="form-control" value="<%= row.title || '' %>" placeholder="Clear Context">
+                        </div>
+                        <div class="col-md-7">
+                          <textarea name="contactPageHighlightBody" class="form-control" rows="2" placeholder="Short chip text."><%= row.body || '' %></textarea>
+                        </div>
+                        <div class="col-md-1 d-grid">
+                          <button type="button" class="btn btn-outline-danger" data-remove-contact-page-row title="Remove highlight"><i class="bi bi-trash"></i></button>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Form Eyebrow</label>
+                  <input type="text" name="contactPageFormEyebrow" class="form-control" value="<%= contactPage.formEyebrow || '' %>" placeholder="Message Details">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Form Title</label>
+                  <input type="text" name="contactPageFormTitle" class="form-control" value="<%= contactPage.formTitle || '' %>" placeholder="Project / inquiry form">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Form Subtitle</label>
+                  <textarea name="contactPageFormSubtitle" class="form-control" rows="2"><%= contactPage.formSubtitle || '' %></textarea>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Form Hint</label>
+                  <textarea name="contactPageFormHint" class="form-control" rows="2"><%= contactPage.formHint || '' %></textarea>
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Direct Contact Kicker</label>
+                  <input type="text" name="contactPageDirectContactKicker" class="form-control" value="<%= contactPage.directContactKicker || '' %>" placeholder="Reach Us">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Direct Contact Card Title</label>
+                  <input type="text" name="contactPageDirectContactTitle" class="form-control" value="<%= contactPage.directContactTitle || '' %>" placeholder="Direct Contact">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Direct Contact Lead</label>
+                  <textarea name="contactPageDirectContactLead" class="form-control" rows="2" placeholder="Choose the route that fits your request best."><%= contactPage.directContactLead || '' %></textarea>
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label fw-bold">Contact Methods Block Title</label>
+                  <input type="text" name="contactPageDirectContactMethodsTitle" class="form-control" value="<%= contactPage.directContactMethodsTitle || '' %>" placeholder="Contact Options">
+                </div>
+                <div class="col-md-7">
+                  <label class="form-label fw-bold">Contact Methods Block Subtitle</label>
+                  <input type="text" name="contactPageDirectContactMethodsSubtitle" class="form-control" value="<%= contactPage.directContactMethodsSubtitle || '' %>" placeholder="Use the saved contact details below.">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Email Action Label</label>
+                  <input type="text" name="contactPageDirectContactEmailActionLabel" class="form-control" value="<%= contactPage.directContactEmailActionLabel || '' %>" placeholder="Send email">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Phone Action Label</label>
+                  <input type="text" name="contactPageDirectContactPhoneActionLabel" class="form-control" value="<%= contactPage.directContactPhoneActionLabel || '' %>" placeholder="Call now">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Fax Action Label</label>
+                  <input type="text" name="contactPageDirectContactFaxActionLabel" class="form-control" value="<%= contactPage.directContactFaxActionLabel || '' %>" placeholder="Call fax number">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Generic Action Label</label>
+                  <input type="text" name="contactPageDirectContactDefaultActionLabel" class="form-control" value="<%= contactPage.directContactDefaultActionLabel || '' %>" placeholder="Open">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">About Card Title</label>
+                  <input type="text" name="contactPageAboutCardTitle" class="form-control" value="<%= contactPage.aboutCardTitle || '' %>" placeholder="About Me">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">About Card Body</label>
+                  <textarea name="contactPageAboutCardBody" class="form-control" rows="2"><%= contactPage.aboutCardBody || '' %></textarea>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">About Button Label</label>
+                  <input type="text" name="contactPageAboutCardButtonLabel" class="form-control" value="<%= contactPage.aboutCardButtonLabel || '' %>" placeholder="Read About Me">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">About Button Link</label>
+                  <input type="text" name="contactPageAboutCardHref" class="form-control font-monospace" value="<%= contactPage.aboutCardHref || '' %>" placeholder="/about/">
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label fw-bold">Image Card Eyebrow</label>
+                  <input type="text" name="contactPageProcessEyebrow" class="form-control" value="<%= contactPage.processEyebrow || '' %>" placeholder="Experience">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label fw-bold">Image Card Title</label>
+                  <input type="text" name="contactPageProcessTitle" class="form-control" value="<%= contactPage.processTitle || '' %>" placeholder="I Know The Process">
+                </div>
+
+                <div class="col-12">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2 mt-2">
+                    <div>
+                      <label class="form-label fw-bold mb-0">Image Blocks</label>
+                      <div class="form-text">Use uploaded file URLs or full HTTPS URLs. Empty image URL rows are ignored.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-add-contact-page-row="processImages">
+                      <i class="bi bi-plus-lg me-1"></i>Add Image
+                    </button>
+                  </div>
+                  <div class="vstack gap-2" data-contact-page-row-list="processImages">
+                    <% contactPageProcessImages.forEach((row) => { %>
+                      <div class="contact-page-repeat-row row g-2 align-items-start">
+                        <div class="col-md-4">
+                          <input type="text" name="contactPageProcessImageUrl" class="form-control font-monospace" value="<%= row.imageUrl || '' %>" placeholder="/uploads/GLOBAL/misc/image.jpg">
+                        </div>
+                        <div class="col-md-3">
+                          <input type="text" name="contactPageProcessImageAlt" class="form-control" value="<%= row.alt || '' %>" placeholder="Image alt text">
+                        </div>
+                        <div class="col-md-4">
+                          <textarea name="contactPageProcessImageCaption" class="form-control" rows="2" placeholder="Image caption."><%= row.caption || '' %></textarea>
+                        </div>
+                        <div class="col-md-1 d-grid">
+                          <button type="button" class="btn btn-outline-danger" data-remove-contact-page-row title="Remove image"><i class="bi bi-trash"></i></button>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="app-public-menu-pane" role="tabpanel" aria-labelledby="app-public-menu-tab" tabindex="0">
+          <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-0 pb-0">
+              <h5 class="fw-bold mb-1"><i class="bi bi-menu-button-wide text-primary me-2"></i>Public Main Menu</h5>
+              <p class="text-muted small mb-0">Controls the public header menu. Choose from the available public endpoints first, then use a custom URL only when the destination is external or not listed.</p>
+            </div>
+            <div class="card-body p-4">
+              <div class="row mb-3">
+                <div class="col-md-12 col-lg-8">
+                  <label class="form-label fw-bold">Default Home Route</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="bi bi-house-door"></i></span>
+                    <input
+                      type="text"
+                      name="publicHomePath"
+                      class="form-control"
+                      list="publicHomePathOptions"
+                      value="<%= publicDefaultHomePath %>"
+                      placeholder="/"
+                      aria-describedby="publicHomePathHelp"
+                      autocomplete="off">
+                  </div>
+                  <div id="publicHomePathHelp" class="form-text">The route that `/` will redirect to on this site. Use internal paths only, e.g. `/`, `/news`, `/whatIOffer`, `/pte`.</div>
+                </div>
+                <div class="col-md-12 col-lg-4 mt-2 mt-lg-4 d-none d-lg-block">
+                  <div class="alert alert-light border small mb-0">
+                    <i class="bi bi-lightbulb me-1"></i>
+                    If left empty, the website loads the default homepage (<strong>/</strong>).
+                  </div>
+                </div>
+              </div>
+
+              <datalist id="publicHomePathOptions">
+                <% endpointOptions.forEach((option) => { %>
+                  <option value="<%= option.href || '' %>">
+                <% }) %>
+              </datalist>
+
+              <input type="hidden" name="publicMenuJson" id="publicMenuJson" value="<%= publicMenuJson %>">
+
+              <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                <div class="small text-muted">
+                  Endpoint picker options come from the app's public routes. Supported custom links: internal paths beginning with <code>/</code>, <code>https://</code>, <code>mailto:</code>, and <code>tel:</code>. Nesting is limited to 3 levels.
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="publicMenuAddRootBtn">
+                  <i class="bi bi-plus-lg me-1"></i>Add Menu Item
+                </button>
+              </div>
+
+              <div id="publicMenuBuilder" class="vstack gap-2"></div>
+              <div id="publicMenuEmpty" class="alert alert-light border mt-3 d-none">
+                No menu items yet. Add a menu item to start building the public menu.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="app-operational-pane" role="tabpanel" aria-labelledby="app-operational-tab" tabindex="0">
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white border-0 pb-0">
+          <h5 class="fw-bold mb-1"><i class="bi bi-sliders text-primary me-2"></i>Operational Defaults</h5>
+          <p class="text-muted small mb-0">Controls pagination, search behavior, and upload destination.</p>
+        </div>
+        <div class="card-body p-4">
+            
+            <div class="mb-4">
+                <label class="form-label fw-bold">Default Page Size</label>
+                <div class="input-group">
+                    <input type="number" name="defaultPageSize" class="form-control" value="<%= settings.app.defaultPageSize %>" min="5" max="100">
+                    <span class="input-group-text text-muted">items per page</span>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold">Default Search Keyword</label>
+                <input type="text" name="searchDefaultKeyword" class="form-control" value="<%= settings.app.searchDefaultKeyword %>">
+                <div class="form-text">Used as a fallback wildcard when no search term is provided (e.g. 'aaa' or '%').</div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold text-primary">Uploads Directory (Absolute or Relative)</label>
+                <input type="text" name="uploadsPath" class="form-control font-monospace" 
+                       value="<%= settings.app.uploadsPath %>" placeholder="/app/uploads or uploads">
+                <div class="form-text text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    <strong>Examples:</strong> Use a relative path like <code>uploads</code> (project root) or an absolute path like <code>/app/uploads</code> (Railway volume).
+                </div>
+            </div>
+
+        </div>
+      </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+          <a href="/systemSettings" class="btn btn-secondary btn-filled btn-md">Back to Dashboard</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Save Defaults</button>
+      </div>
+   </form>
+  </div>
+</div>
+
+<style>
+  .public-menu-active-wrap {
+    min-width: 3rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .public-menu-actions {
+    min-width: 9.5rem;
+  }
+
+  .public-menu-actions .btn {
+    flex: 0 0 auto;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const contactRowConfigs = {
+    emails: {
+      titleName: 'contactEmailTitle',
+      valueName: 'contactEmailValue',
+      valueType: 'email',
+      titlePlaceholder: 'General Inquiries',
+      valuePlaceholder: 'name@example.com',
+      removeTitle: 'Remove email'
+    },
+    phones: {
+      titleName: 'contactPhoneTitle',
+      valueName: 'contactPhoneValue',
+      valueType: 'text',
+      titlePlaceholder: 'Office',
+      valuePlaceholder: '+1 (437) 602-8720',
+      removeTitle: 'Remove phone'
+    },
+    faxes: {
+      titleName: 'contactFaxTitle',
+      valueName: 'contactFaxValue',
+      valueType: 'text',
+      titlePlaceholder: 'Fax',
+      valuePlaceholder: '+1 (000) 000-0000',
+      removeTitle: 'Remove fax'
+    },
+    addresses: {
+      titleName: 'contactAddressTitle',
+      valueName: 'contactAddressValue',
+      valueType: 'text',
+      titlePlaceholder: 'Mailing Address',
+      valuePlaceholder: 'Calgary, Alberta',
+      removeTitle: 'Remove address'
+    }
+  };
+
+  function createContactRow(type) {
+    const config = contactRowConfigs[type];
+    if (!config) return null;
+    const row = document.createElement('div');
+    row.className = 'contact-repeat-row row g-2 align-items-center';
+    row.innerHTML = `
+      <div class="col-md-4">
+        <input type="text" name="${config.titleName}" class="form-control" placeholder="${config.titlePlaceholder}">
+      </div>
+      <div class="col-md-7">
+        <input type="${config.valueType}" name="${config.valueName}" class="form-control" placeholder="${config.valuePlaceholder}">
+      </div>
+      <div class="col-md-1 d-grid">
+        <button type="button" class="btn btn-outline-danger" data-remove-contact-row title="${config.removeTitle}"><i class="bi bi-trash"></i></button>
+      </div>
+    `;
+    return row;
+  }
+
+  document.querySelectorAll('[data-add-contact-row]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.addContactRow;
+      const list = document.querySelector(`[data-contact-row-list="${type}"]`);
+      const row = createContactRow(type);
+      if (!list || !row) return;
+      list.appendChild(row);
+      row.querySelector('input')?.focus();
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-remove-contact-row]');
+    if (!removeBtn) return;
+    removeBtn.closest('.contact-repeat-row')?.remove();
+  });
+
+  const contactPageRowTemplates = {
+    highlights: `
+      <div class="contact-page-repeat-row row g-2 align-items-start">
+        <div class="col-md-4">
+          <input type="text" name="contactPageHighlightTitle" class="form-control" placeholder="Clear Context">
+        </div>
+        <div class="col-md-7">
+          <textarea name="contactPageHighlightBody" class="form-control" rows="2" placeholder="Short chip text."></textarea>
+        </div>
+        <div class="col-md-1 d-grid">
+          <button type="button" class="btn btn-outline-danger" data-remove-contact-page-row title="Remove highlight"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+    `,
+    processImages: `
+      <div class="contact-page-repeat-row row g-2 align-items-start">
+        <div class="col-md-4">
+          <input type="text" name="contactPageProcessImageUrl" class="form-control font-monospace" placeholder="/uploads/GLOBAL/misc/image.jpg">
+        </div>
+        <div class="col-md-3">
+          <input type="text" name="contactPageProcessImageAlt" class="form-control" placeholder="Image alt text">
+        </div>
+        <div class="col-md-4">
+          <textarea name="contactPageProcessImageCaption" class="form-control" rows="2" placeholder="Image caption."></textarea>
+        </div>
+        <div class="col-md-1 d-grid">
+          <button type="button" class="btn btn-outline-danger" data-remove-contact-page-row title="Remove image"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+    `
+  };
+
+  document.querySelectorAll('[data-add-contact-page-row]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.addContactPageRow;
+      const list = document.querySelector(`[data-contact-page-row-list="${type}"]`);
+      const html = contactPageRowTemplates[type];
+      if (!list || !html) return;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = html.trim();
+      const row = wrap.firstElementChild;
+      if (!row) return;
+      list.appendChild(row);
+      row.querySelector('input, textarea')?.focus();
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-remove-contact-page-row]');
+    if (!removeBtn) return;
+    removeBtn.closest('.contact-page-repeat-row')?.remove();
+  });
+
+  const publicMenuInput = document.getElementById('publicMenuJson');
+  const publicMenuBuilder = document.getElementById('publicMenuBuilder');
+  const publicMenuEmpty = document.getElementById('publicMenuEmpty');
+  const publicMenuAddRootBtn = document.getElementById('publicMenuAddRootBtn');
+  const publicMenuEndpointOptions = <%- endpointOptionsJson %>;
+  let publicMenuItems = [];
+
+  try {
+    publicMenuItems = JSON.parse(publicMenuInput?.value || '[]');
+    if (!Array.isArray(publicMenuItems)) publicMenuItems = [];
+  } catch (_) {
+    publicMenuItems = [];
+  }
+
+  function createPublicMenuItem() {
+    const firstEndpoint = Array.isArray(publicMenuEndpointOptions) && publicMenuEndpointOptions.length
+      ? publicMenuEndpointOptions[0]
+      : null;
+    return {
+      id: 'menu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      label: firstEndpoint?.label || 'New Menu Item',
+      href: firstEndpoint?.href || '/',
+      icon: firstEndpoint?.icon || '',
+      visibility: firstEndpoint?.visibility || 'all',
+      target: firstEndpoint?.target || '_self',
+      active: true,
+      children: []
+    };
+  }
+
+  function findPublicEndpoint(href) {
+    const token = String(href || '').trim();
+    return (Array.isArray(publicMenuEndpointOptions) ? publicMenuEndpointOptions : [])
+      .find((option) => String(option.href || '').trim() === token) || null;
+  }
+
+  function publicEndpointOptionLabel(option) {
+    const category = String(option.category || 'Public').trim();
+    const label = String(option.label || option.href || '').trim();
+    const href = String(option.href || '').trim();
+    return `${category} - ${label} (${href})`;
+  }
+
+  function syncPublicMenuJson() {
+    if (publicMenuInput) publicMenuInput.value = JSON.stringify(publicMenuItems);
+  }
+
+  function getPublicMenuListByPath(path) {
+    let list = publicMenuItems;
+    for (const index of path) {
+      const item = list[index];
+      if (!item) return null;
+      if (!Array.isArray(item.children)) item.children = [];
+      list = item.children;
+    }
+    return list;
+  }
+
+  function getPublicMenuItemByPath(path) {
+    if (!path.length) return null;
+    const parentList = getPublicMenuListByPath(path.slice(0, -1));
+    return parentList ? parentList[path[path.length - 1]] : null;
+  }
+
+  function renderPublicMenuBuilder() {
+    if (!publicMenuBuilder) return;
+    publicMenuBuilder.innerHTML = '';
+    if (publicMenuEmpty) publicMenuEmpty.classList.toggle('d-none', publicMenuItems.length > 0);
+
+    function renderItems(items, depth, parentPath) {
+      items.forEach((item, index) => {
+        const path = parentPath.concat(index);
+        const row = document.createElement('div');
+        row.className = 'public-menu-row border rounded bg-light p-2';
+        row.style.marginLeft = depth ? `${Math.min(depth * 28, 84)}px` : '0';
+        row.dataset.menuPath = path.join('.');
+
+        const header = document.createElement('div');
+        header.className = 'row g-2 align-items-center';
+
+        const labelCol = document.createElement('div');
+        labelCol.className = 'col-lg-2 col-md-4';
+        const labelInput = document.createElement('input');
+        labelInput.type = 'text';
+        labelInput.className = 'form-control form-control-sm';
+        labelInput.placeholder = 'Label';
+        labelInput.value = item.label || '';
+        labelInput.addEventListener('input', () => { item.label = labelInput.value; syncPublicMenuJson(); });
+        labelCol.appendChild(labelInput);
+
+        const hrefCol = document.createElement('div');
+        hrefCol.className = 'col-lg-3 col-md-8';
+        const endpointSelect = document.createElement('select');
+        endpointSelect.className = 'form-select form-select-sm mb-1';
+        const selectPlaceholder = document.createElement('option');
+        selectPlaceholder.value = '';
+        selectPlaceholder.textContent = 'Select an available endpoint...';
+        endpointSelect.appendChild(selectPlaceholder);
+        const groupOption = document.createElement('option');
+        groupOption.value = '__group__';
+        groupOption.textContent = 'Navigation group (no URL)';
+        endpointSelect.appendChild(groupOption);
+        const endpointGroups = new Map();
+        (Array.isArray(publicMenuEndpointOptions) ? publicMenuEndpointOptions : []).forEach((option) => {
+          const category = String(option.category || 'Public').trim() || 'Public';
+          if (!endpointGroups.has(category)) {
+            const group = document.createElement('optgroup');
+            group.label = category;
+            endpointGroups.set(category, group);
+            endpointSelect.appendChild(group);
+          }
+          const opt = document.createElement('option');
+          opt.value = option.href || '';
+          opt.textContent = publicEndpointOptionLabel(option);
+          endpointGroups.get(category).appendChild(opt);
+        });
+        const customOption = document.createElement('option');
+        customOption.value = '__custom__';
+        customOption.textContent = 'Custom URL / not listed';
+        endpointSelect.appendChild(customOption);
+        const hrefInput = document.createElement('input');
+        hrefInput.type = 'text';
+        hrefInput.className = 'form-control form-control-sm font-monospace';
+        hrefInput.placeholder = 'Leave blank for a parent navigation group';
+        hrefInput.value = item.href || '';
+        function refreshEndpointSelect() {
+          endpointSelect.value = findPublicEndpoint(item.href) ? item.href : (item.href ? '__custom__' : '__group__');
+        }
+        endpointSelect.addEventListener('change', () => {
+          if (!endpointSelect.value) return;
+          if (endpointSelect.value === '__group__') {
+            item.href = '';
+            hrefInput.value = '';
+            syncPublicMenuJson();
+            return;
+          }
+          if (endpointSelect.value === '__custom__') {
+            hrefInput.focus();
+            return;
+          }
+          const selectedEndpoint = findPublicEndpoint(endpointSelect.value);
+          if (!selectedEndpoint) return;
+          item.href = selectedEndpoint.href;
+          hrefInput.value = item.href;
+          if (!item.label || item.label === 'New Menu Item') {
+            item.label = selectedEndpoint.label || item.label;
+            labelInput.value = item.label;
+          }
+          item.icon = selectedEndpoint.icon || item.icon || '';
+          iconInput.value = item.icon;
+          item.visibility = selectedEndpoint.visibility || 'all';
+          visibilitySelect.value = item.visibility;
+          item.target = selectedEndpoint.target || '_self';
+          targetSelect.value = item.target === '_blank' ? '_blank' : '_self';
+          syncPublicMenuJson();
+        });
+        hrefInput.addEventListener('input', () => {
+          item.href = hrefInput.value;
+          refreshEndpointSelect();
+          syncPublicMenuJson();
+        });
+        refreshEndpointSelect();
+        hrefCol.appendChild(endpointSelect);
+        hrefCol.appendChild(hrefInput);
+
+        const iconCol = document.createElement('div');
+        iconCol.className = 'col-lg-2 col-md-4';
+        const iconInput = document.createElement('input');
+        iconInput.type = 'text';
+        iconInput.className = 'form-control form-control-sm';
+        iconInput.placeholder = 'bi-house';
+        iconInput.value = item.icon || '';
+        iconInput.addEventListener('input', () => { item.icon = iconInput.value; syncPublicMenuJson(); });
+        iconCol.appendChild(iconInput);
+
+        const visibilityCol = document.createElement('div');
+        visibilityCol.className = 'col-lg-2 col-md-5';
+        const visibilitySelect = document.createElement('select');
+        visibilitySelect.className = 'form-select form-select-sm';
+        [
+          ['all', 'All Users'],
+          ['guest', 'Guests Only'],
+          ['authenticated', 'Logged In Only']
+        ].forEach(([value, label]) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          visibilitySelect.appendChild(option);
+        });
+        visibilitySelect.value = item.visibility || 'all';
+        visibilitySelect.addEventListener('change', () => { item.visibility = visibilitySelect.value; syncPublicMenuJson(); });
+        visibilityCol.appendChild(visibilitySelect);
+
+        const targetCol = document.createElement('div');
+        targetCol.className = 'col-lg-1 col-md-3';
+        const targetSelect = document.createElement('select');
+        targetSelect.className = 'form-select form-select-sm';
+        [
+          ['_self', 'Same'],
+          ['_blank', 'New']
+        ].forEach(([value, label]) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          targetSelect.appendChild(option);
+        });
+        targetSelect.value = item.target === '_blank' ? '_blank' : '_self';
+        targetSelect.addEventListener('change', () => { item.target = targetSelect.value; syncPublicMenuJson(); });
+        targetCol.appendChild(targetSelect);
+
+        const activeCol = document.createElement('div');
+        activeCol.className = 'col-lg-1 col-md-4';
+        const activeWrap = document.createElement('div');
+        activeWrap.className = 'form-check form-switch pt-1 public-menu-active-wrap';
+        const activeInput = document.createElement('input');
+        activeInput.type = 'checkbox';
+        activeInput.className = 'form-check-input';
+        activeInput.title = 'Show this menu item';
+        activeInput.checked = item.active !== false;
+        activeInput.addEventListener('change', () => { item.active = activeInput.checked; syncPublicMenuJson(); });
+        activeWrap.appendChild(activeInput);
+        activeCol.appendChild(activeWrap);
+
+        const actionCol = document.createElement('div');
+        actionCol.className = 'col-12 col-lg-auto ms-lg-auto d-flex gap-1 justify-content-end flex-wrap public-menu-actions';
+
+        const actionDefs = [
+          ['up', 'bi-arrow-up', 'Move up'],
+          ['down', 'bi-arrow-down', 'Move down'],
+          ['child', 'bi-diagram-2', 'Add child'],
+          ['remove', 'bi-trash', 'Remove']
+        ];
+        actionDefs.forEach(([action, icon, title]) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = action === 'remove' ? 'btn btn-outline-danger btn-sm' : 'btn btn-outline-secondary btn-sm';
+          btn.title = title;
+          btn.dataset.publicMenuAction = action;
+          btn.dataset.path = path.join('.');
+          btn.innerHTML = `<i class="bi ${icon}"></i>`;
+          if (action === 'child' && depth >= 2) btn.disabled = true;
+          actionCol.appendChild(btn);
+        });
+
+        [labelCol, hrefCol, iconCol, visibilityCol, targetCol, activeCol, actionCol].forEach((col) => header.appendChild(col));
+        row.appendChild(header);
+        publicMenuBuilder.appendChild(row);
+
+        if (Array.isArray(item.children) && item.children.length) renderItems(item.children, depth + 1, path);
+      });
+    }
+
+    renderItems(publicMenuItems, 0, []);
+    syncPublicMenuJson();
+  }
+
+  if (publicMenuAddRootBtn) {
+    publicMenuAddRootBtn.addEventListener('click', () => {
+      publicMenuItems.push(createPublicMenuItem());
+      renderPublicMenuBuilder();
+    });
+  }
+
+  if (publicMenuBuilder) {
+    publicMenuBuilder.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-public-menu-action]');
+      if (!btn) return;
+      const path = String(btn.dataset.path || '').split('.').filter(Boolean).map((value) => Number(value));
+      const action = btn.dataset.publicMenuAction;
+      const list = getPublicMenuListByPath(path.slice(0, -1));
+      const index = path[path.length - 1];
+      if (!list || !Number.isInteger(index) || !list[index]) return;
+
+      if (action === 'up' && index > 0) {
+        [list[index - 1], list[index]] = [list[index], list[index - 1]];
+      } else if (action === 'down' && index < list.length - 1) {
+        [list[index + 1], list[index]] = [list[index], list[index + 1]];
+      } else if (action === 'child') {
+        const item = getPublicMenuItemByPath(path);
+        if (item) {
+          if (!Array.isArray(item.children)) item.children = [];
+          item.children.push(createPublicMenuItem());
+        }
+      } else if (action === 'remove') {
+        list.splice(index, 1);
+      }
+
+      renderPublicMenuBuilder();
+    });
+  }
+
+  renderPublicMenuBuilder();
+
+  const form = document.getElementById('appSettingsForm');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; }
+      syncPublicMenuJson();
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+          body: new URLSearchParams(new FormData(form)).toString()
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          if (typeof showMessageModal === 'function') await showMessageModal({ title: 'Success', icon: 'success', message: result.message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+          window.location.reload();
+        } else throw new Error(result.message || 'Failed.');
+      } catch (error) {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = 'Save Defaults'; }
+        if (typeof showMessageModal === 'function') await showMessageModal({ title: 'Error', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        else alert(error.message);
+      }
+    });
+  }
+});
+</script>

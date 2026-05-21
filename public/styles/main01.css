@@ -1,0 +1,859 @@
+/* ==========================================================================
+   Reorganized and annotated stylesheet
+   Each section below is grouped with a clear comment header for maintainability
+   ========================================================================== */
+
+/* ==========================================================================
+   Global Variables
+   Define color palette, sizing, spacing, shadows, and transitions
+   ========================================================================== */
+:root {
+  --color-primary: #007bff;
+  --color-primary-dark: #0056b3;
+  --color-primary-light: #e7f1ff;
+  --color-secondary: #6c757d;
+  --color-success: #28a745;
+  --color-danger: #dc3545;
+  --color-info: #17a2b8;
+  --color-warning: #ffc107;
+  --color-light: #f8f9fa;
+  --color-dark: #343a40;
+  --color-text: #333333;
+  --color-text-light: #adb5bd;
+  --color-white: #ffffff;
+
+  --header-height: 120px;
+  --notice-height: 40px;
+
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 2px 5px rgba(0, 0, 0, 0.15);
+
+  --transition: all 0.3s ease;
+  --border-radius: 8px;
+
+  --spacing-sm: 10px;
+  --spacing-md: 20px;
+  --spacing-lg: 40px;
+
+  --size-lg: 1.25;
+  --size-md: 1;
+  --size-sm: 0.875;
+
+
+  --border-radius-lg: 18px;
+  --border-radius-md: 12px;
+  
+  --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.08);
+  --shadow-hover: 0 8px 22px rgba(0, 0, 0, 0.06);
+  
+  --color-primary-ghost: rgba(0, 123, 255, 0.10);
+  --color-success-ghost: rgba(40, 167, 69, 0.10);  
+}
+
+/* ==========================================================================
+   Base / Page Layout
+   Global layout, page container, headings, and basic typography
+   ========================================================================== */
+html, body {
+  height: 100%;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1 0 auto;
+  padding: var(--spacing-lg) 0;
+}
+
+.sections-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--spacing-md);
+}
+
+.page-heading {
+  font-size: calc(2.5rem * var(--size-md));
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+  margin-bottom: var(--spacing-lg);
+  animation: fadeIn 0.5s ease-in;
+}
+.page-heading.size-lg { font-size: calc(2.5rem * var(--size-lg)); }
+.page-heading.size-md { font-size: calc(2.5rem * var(--size-md)); }
+.page-heading.size-sm { font-size: calc(2.5rem * var(--size-sm)); }
+
+/* ==========================================================================
+   Animations
+   Reusable keyframes used across components
+   ========================================================================== */
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ==========================================================================
+   Header and Navigation
+   Fixed header, notice bar, logo, tagline, navigation links, and actions
+   ========================================================================== */
+#main-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--color-white);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+/* Ensure page content clears the fixed header + notice bar */
+body {
+  padding-top: calc(var(--header-height) + var(--notice-height));
+}
+
+#main-header.shrunk {
+  padding: 5px 0;
+}
+
+.header-content {
+  margin: 0 10%;
+  padding: 20px 0;
+  transition: var(--transition);
+}
+
+@media (max-width: 992px) {
+  .header-content { margin: 0 5%; }
+}
+
+@media (max-width: 576px) {
+  .header-content { margin: 0; }
+}
+
+/* Notice bar */
+.notice-bar {
+  background: var(--color-light);
+  padding: 8px 0;
+  text-align: center;
+  font-size: calc(0.875rem * var(--size-md));
+  height: var(--notice-height);
+  overflow: hidden;
+  transition: opacity var(--transition), height var(--transition), padding var(--transition);
+}
+.notice-bar.hidden {
+  opacity: 0;
+  height: 0;
+  padding: 0;
+  pointer-events: none;
+}
+.notice-bar a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.notice-bar a:hover { text-decoration: underline; }
+
+/* Logo and tagline */
+.logo-section { display: flex; flex-direction: column; align-items: flex-start; }
+.logo { height: 50px; transition: var(--transition); }
+#main-header.shrunk .logo { height: 30px; }
+
+.tagline {
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: calc(1rem * var(--size-md));
+  color: var(--color-text);
+  transition: var(--transition);
+}
+#main-header.shrunk .tagline { font-size: calc(0.75rem * var(--size-md)); }
+
+/* Navigation links */
+.nav-link { font-weight: 500; color: var(--color-text) !important; }
+.nav-link:hover { color: var(--color-primary) !important; }
+
+/* Action buttons in header */
+.action-buttons { display: flex; align-items: center; gap: 15px; }
+
+.join-btn, .login-btn, .search-btn {
+  background: none;
+  border: none;
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: calc(1rem * var(--size-md));
+  padding: calc(8px * var(--size-md)) calc(12px * var(--size-md));
+  transition: var(--transition);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+.join-btn:hover, .login-btn:hover, .search-btn:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+.join-btn:focus-visible, .login-btn:focus-visible, .search-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.search-btn i { font-size: calc(1.2rem * var(--size-md)); }
+
+#main-header.shrunk .join-btn,
+#main-header.shrunk .login-btn,
+#main-header.shrunk .search-btn {
+  font-size: calc(0.875rem * var(--size-md));
+  padding: calc(5px * var(--size-md)) calc(8px * var(--size-md));
+}
+#main-header.shrunk .search-btn i { font-size: calc(1rem * var(--size-md)); }
+
+/* ==========================================================================
+   Search Components
+   Search container, inline search form, and responsive sizing helpers
+   ========================================================================== */
+.search-container {
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+}
+
+.search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  flex-wrap: wrap; /* Allows wrapping if content is too wide */
+}
+
+/* ➡️ NEW: Stack elements vertically on smaller screens (max 768px) */
+@media (max-width: 768px) {
+  .search-wrapper {
+    flex-direction: column; /* Force vertical stacking */
+    align-items: stretch;   /* Make children take full width */
+    gap: 10px;              /* Increase vertical spacing */
+  }
+
+  /* Ensure input and select take full width and remove conflicting horizontal margins */
+  .search-wrapper .search-select, 
+  .search-wrapper .search-input,
+  .search-wrapper .me-2 { 
+    width: 100%;
+    min-width: 100%;
+    margin-right: 0 !important; /* Overrides Bootstrap 'me-2' in the stack */
+  }
+}
+.search-wrapper .form-label {
+  margin-bottom: 0;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.search-wrapper .form-select,
+.search-wrapper .form-control {
+  border-radius: 5px;
+  border: 2px solid var(--color-light);
+  transition: var(--transition);
+}
+.search-wrapper .form-select:focus,
+.search-wrapper .form-control:focus {
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);
+}
+
+.search-select {
+  width: auto;
+  min-width: 150px;
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+/* Size variants for search container */
+.search-container.size-lg .search-wrapper .form-label { font-size: calc(1rem * var(--size-lg)); }
+.search-container.size-md .search-wrapper .form-label { font-size: calc(1rem * var(--size-md)); }
+.search-container.size-sm .search-wrapper .form-label { font-size: calc(1rem * var(--size-sm)); }
+
+.search-container.size-lg .search-wrapper .form-select,
+.search-container.size-lg .search-wrapper .form-control { font-size: calc(1rem * var(--size-lg)); padding: calc(8px * var(--size-lg)); }
+.search-container.size-md .search-wrapper .form-select,
+.search-container.size-md .search-wrapper .form-control { font-size: calc(1rem * var(--size-md)); padding: calc(8px * var(--size-md)); }
+.search-container.size-sm .search-wrapper .form-select,
+.search-container.size-sm .search-wrapper .form-control { font-size: calc(1rem * var(--size-sm)); padding: calc(8px * var(--size-sm)); }
+
+/* Compact search form used in header */
+.search-form {
+  display: none;
+  align-items: center;
+  margin-left: 12px;
+  opacity: 0;
+  transform: scaleX(0.8);
+  transform-origin: right;
+  transition: var(--transition);
+}
+.search-form.active {
+  display: flex;
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.search-form-container {
+  display: flex;
+  gap: var(--spacing-sm);
+  max-width: 600px;
+  margin: 0 auto var(--spacing-md);
+}
+.search-form-container .form-control {
+  border-radius: 25px;
+  border: 2px solid var(--color-primary);
+  font-size: calc(1rem * var(--size-md));
+  padding: calc(8px * var(--size-md)) calc(12px * var(--size-md));
+  transition: var(--transition);
+}
+.search-form-container .form-control:focus {
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);
+}
+.search-form-container.size-lg .form-control { font-size: calc(1rem * var(--size-lg)); padding: calc(8px * var(--size-lg)) calc(12px * var(--size-lg)); }
+.search-form-container.size-md .form-control { font-size: calc(1rem * var(--size-md)); padding: calc(8px * var(--size-md)) calc(12px * var(--size-md)); }
+.search-form-container.size-sm .form-control { font-size: calc(1rem * var(--size-sm)); padding: calc(8px * var(--size-sm)) calc(12px * var(--size-sm)); }
+
+/* Header search input and submit */
+.search-input {
+  width: 220px;
+  padding: calc(8px * var(--size-md)) calc(12px * var(--size-md));
+  border: 2px solid var(--color-primary);
+  border-radius: 25px 0 0 25px;
+  background: var(--color-light);
+  font-size: calc(1rem * var(--size-md));
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: var(--transition);
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-primary-dark);
+  background: var(--color-white);
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);
+}
+
+.search-submit {
+  padding: calc(8px * var(--size-md)) calc(16px * var(--size-md));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: var(--color-white);
+  border: none;
+  border-radius: 0 25px 25px 0;
+  font-size: calc(1rem * var(--size-md));
+  display: flex;
+  align-items: center;
+  transition: var(--transition);
+}
+.search-submit:hover {
+  background: linear-gradient(135deg, var(--color-primary-dark), #003d80);
+}
+.search-submit i { font-size: calc(1.2rem * var(--size-md)); }
+
+/* ==========================================================================
+   Forms
+   Form container, controls, labels, and size variants
+   ========================================================================== */
+.form-container {
+  max-width: 600px;
+  margin: 0 auto;
+  background: var(--color-white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-md);
+  animation: slideUp 0.5s ease-in;
+}
+.form-container.wide { max-width: 900px; }
+
+.form-container .form-label {
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: calc(1rem * var(--size-md));
+}
+.form-container .form-control {
+  border-radius: 5px;
+  border: 2px solid var(--color-light);
+  font-size: calc(1rem * var(--size-md));
+  padding: calc(8px * var(--size-md));
+  transition: var(--transition);
+}
+.form-container .form-control:focus {
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);
+}
+
+/* Size variants for form container */
+.form-container.size-lg .form-label { font-size: calc(1rem * var(--size-lg)); }
+.form-container.size-md .form-label { font-size: calc(1rem * var(--size-md)); }
+.form-container.size-sm .form-label { font-size: calc(1rem * var(--size-sm)); }
+
+.form-container.size-lg .form-control { font-size: calc(1rem * var(--size-lg)); padding: calc(8px * var(--size-lg)); }
+.form-container.size-md .form-control { font-size: calc(1rem * var(--size-md)); padding: calc(8px * var(--size-md)); }
+.form-container.size-sm .form-control { font-size: calc(1rem * var(--size-sm)); padding: calc(8px * var(--size-sm)); }
+
+/* ==========================================================================
+   Tables
+   Responsive table styles, headers, sorting indicators, and row hover
+   ========================================================================== */
+.table-responsive {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: var(--border-radius);
+  /* overflow-x: hidden; */
+  background: var(--color-white);
+  box-shadow: var(--shadow-md);
+}
+
+
+.table-responsive {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: var(--border-radius);
+  /* overflow: hidden;  <--- DELETE THIS LINE */
+  background: var(--color-white);
+  box-shadow: var(--shadow-md);
+}
+
+/* Add this NEW class for the wrapper */
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;  /* Adds the scrollbar only when needed */
+  -webkit-overflow-scrolling: touch; /* Smooth scroll for mobile */
+  border-radius: var(--border-radius); /* Matches your rounded corners */
+}
+
+
+.table-responsive th,
+.table-responsive td {
+  padding: calc(12px * var(--size-md)) calc(15px * var(--size-md));
+  text-align: left;
+  border-bottom: 1px solid var(--color-light);
+  vertical-align: middle;
+}
+
+.table-responsive th {
+  background: var(--color-primary-light);
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: var(--transition);
+}
+.table-responsive th.draggable { cursor: move; }
+.table-responsive th:hover { background: var(--color-primary); color: var(--color-white); }
+
+.table-responsive th .sort-icon {
+  margin-left: var(--spacing-sm);
+  font-size: calc(0.8rem * var(--size-md));
+  opacity: 0.5;
+}
+.table-responsive th.sort-asc .sort-icon::after { content: '\25B2'; } /* Up arrow */
+.table-responsive th.sort-desc .sort-icon::after { content: '\25BC'; } /* Down arrow */
+
+.table-responsive tr { transition: background var(--transition); }
+.table-responsive tr:hover { background: var(--color-light); }
+
+/* Table size variants */
+.table-responsive.size-lg th, .table-responsive.size-lg td { padding: calc(12px * var(--size-lg)) calc(15px * var(--size-lg)); }
+.table-responsive.size-md th, .table-responsive.size-md td { padding: calc(12px * var(--size-md)) calc(15px * var(--size-md)); }
+.table-responsive.size-sm th, .table-responsive.size-sm td { padding: calc(12px * var(--size-sm)) calc(15px * var(--size-sm)); }
+
+.table-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+/* =========================================
+   Table Fit Toggle Styles
+   ========================================= */
+
+/* When fit-mode is active, hide the scrollbar */
+.table-scroll-wrapper.fit-mode {
+  overflow-x: hidden;
+}
+
+/* Force the table to stay inside the container width */
+.table-scroll-wrapper.fit-mode table {
+  width: 100%;
+  table-layout: fixed; /* Optional: Forces columns to share space equally */
+}
+
+/* Allow text to wrap inside cells so they don't get cut off */
+.table-scroll-wrapper.fit-mode th,
+.table-scroll-wrapper.fit-mode td {
+  white-space: normal !important; /* Overrides any 'nowrap' rules */
+  word-wrap: break-word;          /* Breaks long words if necessary */
+  overflow-wrap: break-word;
+  font-size: 0.9em;               /* Optional: slightly smaller text helps fit data */
+}
+/* ==========================================================================
+   Cards
+   Reusable card container with hover elevation and size variants
+   ========================================================================== */
+.card-container {
+  background: var(--color-white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  transition: var(--transition);
+}
+.card-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+.card-container.size-lg { padding: calc(var(--spacing-md) * var(--size-lg)); }
+.card-container.size-md { padding: var(--spacing-md); }
+.card-container.size-sm { padding: calc(var(--spacing-md) * var(--size-sm)); }
+
+/* ==========================================================================
+   Buttons
+   Base button styles, action-specific variants, and size helpers
+   ========================================================================== */
+.btn-showcase {
+  background: none;
+  border: 2px solid;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+.btn-showcase:hover {
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.btn-showcase:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Action-specific buttons */
+.btn-add { border-color: var(--color-success); color: var(--color-success); }
+.btn-add:hover { background: var(--color-success); color: var(--color-white); }
+.btn-add.btn-filled { background: var(--color-success); color: var(--color-white) !important; border: none !important; }
+
+.btn-edit { border-color: var(--color-info); color: var(--color-info); }
+.btn-edit:hover { background: var(--color-info); color: var(--color-white); }
+.btn-edit.btn-filled { background: var(--color-info); color: var(--color-white) !important; border: none !important; }
+
+.btn-delete { border-color: var(--color-danger); color: var(--color-danger); }
+.btn-delete:hover { background: var(--color-danger); color: var(--color-white); }
+.btn-delete.btn-filled { background: var(--color-danger); color: var(--color-white) !important; border: none !important; }
+
+.btn-info { border-color: var(--color-info); color: var(--color-info); }
+.btn-info:hover { background: var(--color-info); color: var(--color-white); }
+.btn-info.btn-filled { background: var(--color-info); color: var(--color-white) !important; border: none !important; }
+
+.btn-primary { border-color: var(--color-primary); color: var(--color-primary); }
+.btn-primary:hover { background: var(--color-primary); color: var(--color-white); }
+.btn-primary.btn-filled { background: var(--color-primary); color: var(--color-white) !important; border: none !important; }
+
+.btn-secondary { border-color: var(--color-secondary); color: var(--color-secondary); }
+.btn-secondary:hover { background: var(--color-secondary); color: var(--color-white); }
+.btn-secondary.btn-filled { background: var(--color-secondary); color: var(--color-white) !important; border: none !important; }
+
+.btn-warning { border-color: var(--color-warning); color: var(--color-warning); }
+.btn-warning:hover { background: var(--color-warning); color: var(--color-text); }
+.btn-warning.btn-filled { background: var(--color-warning); color: var(--color-text) !important; border: none !important; }
+
+.btn-light { border-color: var(--color-light); color: var(--color-text); }
+.btn-light:hover { background: var(--color-light); color: var(--color-text); }
+.btn-light.btn-filled { background: var(--color-light); color: var(--color-text) !important; border: none !important; }
+
+.btn-dark { border-color: var(--color-dark); color: var(--color-dark); }
+.btn-dark:hover { background: var(--color-dark); color: var(--color-white); }
+.btn-dark.btn-filled { background: var(--color-dark); color: var(--color-white) !important; border: none !important; }
+
+.btn-filled:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+/* Button sizes */
+.btn-lg { padding: calc(10px * var(--size-lg)) calc(20px * var(--size-lg)); font-size: calc(1.25rem * var(--size-lg)); min-width: calc(140px * var(--size-lg)); }
+.btn-md { padding: calc(8px * var(--size-md)) calc(16px * var(--size-md)); font-size: calc(1rem * var(--size-md)); min-width: calc(120px * var(--size-md)); }
+.btn-sm { padding: calc(6px * var(--size-sm)) calc(12px * var(--size-sm)); font-size: calc(0.875rem * var(--size-sm)); min-width: calc(100px * var(--size-sm)); }
+
+/* ==========================================================================
+   Modals
+   
+   ========================================================================== */
+
+
+/* Force message modal to always be on top */
+#messageModal {
+  z-index: 9999 !important;
+}
+
+#messageModal .modal-backdrop {
+  z-index: 9998 !important;
+}
+
+/* Dim and block interaction with background modals */
+.modal.freeze-ui {
+  pointer-events: none;
+  filter: blur(2px);
+  opacity: 0.6;
+}
+
+/* ==========================================================================
+   Footer
+   Footer layout, columns, links, social icons, and newsletter form
+   ========================================================================== */
+footer {
+  background: var(--color-dark);
+  color: var(--color-white);
+  padding: var(--spacing-lg) 0;
+  margin-top: auto;
+}
+
+.footer-column h5 {
+  font-size: calc(1.2rem * var(--size-md));
+  margin-bottom: var(--spacing-md);
+}
+
+.footer-column ul { list-style: none; padding: 0; }
+.footer-column ul li { margin-bottom: var(--spacing-sm); }
+.footer-column ul li a {
+  color: var(--color-text-light);
+  text-decoration: none;
+}
+.footer-column ul li a:hover {
+  color: var(--color-white);
+  text-decoration: underline;
+}
+
+.social-icons a {
+  color: var(--color-text-light);
+  font-size: calc(1.5rem * var(--size-md));
+  margin-right: var(--spacing-sm);
+}
+.social-icons a:hover { color: var(--color-white); }
+
+.newsletter-form { display: flex; gap: var(--spacing-sm); }
+.newsletter-input {
+  flex: 1;
+  padding: calc(8px * var(--size-md));
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: calc(1rem * var(--size-md));
+}
+.newsletter-btn {
+  padding: calc(8px * var(--size-md)) calc(16px * var(--size-md));
+  background: var(--color-primary);
+  color: var(--color-white);
+  border: none;
+  border-radius: 4px;
+  font-size: calc(1rem * var(--size-md));
+}
+.newsletter-btn:hover { background: var(--color-primary-dark); }
+
+/* ==========================================================================
+   Utilities & Accessibility
+   Small helpers and focus styles used across the UI
+   ========================================================================== */
+/* (Focus-visible styles are applied on interactive elements above) */
+/* Admin modal overlay behavior (matches theme consistency) */
+#adminVerifyModal.show {
+  backdrop-filter: blur(4px);
+}
+
+/* Slight wiggle on wrong password */
+.modal-error-wiggle {
+  animation: wiggle .3s ease;
+}
+
+@keyframes wiggle {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+/* =========================================
+   ACTION STATE TIMELINE & MODAL UTILS
+   ========================================= */
+.ls-1 {
+  letter-spacing: 1px;
+}
+
+/* Timeline Vertical Line */
+.timeline-wrapper {
+  position: relative;
+  padding-left: 1rem;
+}
+
+.timeline-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6px;
+  width: 2px;
+  background: var(--bs-gray-200, #e9ecef);
+}
+
+/* Timeline Items */
+.timeline-item {
+  position: relative;
+  padding-left: 20px;
+  padding-bottom: 20px;
+}
+
+/* Timeline Dots */
+.timeline-dot {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: var(--bs-secondary, #6c757d);
+  box-shadow: 0 0 0 1px var(--bs-gray-300, #dee2e6);
+  z-index: 1;
+}
+
+/* Dot States */
+.timeline-dot.success {
+  background: var(--bs-success, #198754);
+  box-shadow: 0 0 0 2px var(--bs-success-bg-subtle, #d1e7dd);
+}
+
+.timeline-dot.fail {
+  background: var(--bs-danger, #dc3545);
+  box-shadow: 0 0 0 2px var(--bs-danger-bg-subtle, #f8d7da);
+}
+
+.timeline-dot.start {
+  background: var(--bs-primary, #0d6efd);
+  box-shadow: 0 0 0 2px var(--bs-primary-bg-subtle, #cfe2ff);
+}
+/* ==========================================================================
+   End of stylesheet
+   ========================================================================== */
+/* =========================================
+   HEADER & CONTEXT BUTTONS (Shared Styles)
+   ========================================= */
+.nav-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 6px 16px 6px 8px;
+  height: 48px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  min-width: max-content;
+}
+
+.nav-pill-btn:hover {
+  background: #f8f9fa;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  color: inherit; 
+}
+
+.nav-pill-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Specific modifier for Org Switcher width */
+.nav-pill-btn.org-switcher {
+    min-width: 220px;
+    max-width: 320px;
+}
+
+/* Icon Box inside button */
+.nav-pill-icon {
+  width: 32px; 
+  height: 32px; 
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* Text Stack */
+.nav-pill-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  text-align: left;
+}
+
+.nav-pill-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.nav-pill-text {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Modal List Item Styles (Used in Org Switcher) */
+.org-list-container {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.org-option {
+    cursor: pointer; 
+    border-radius: 10px; 
+    transition: background 0.2s;
+    border: 1px solid transparent;
+}
+
+.org-option:hover { 
+    background-color: #f1f5f9; 
+}
+
+.org-option.active-org { 
+    background-color: #eff6ff; 
+    border-color: #bfdbfe; 
+}
+
+/* Utility Colors for Icons */
+.bg-warning-subtle { background-color: #fffbeb !important; }
+.text-warning-emphasis { color: #d97706 !important; }
+.bg-primary-subtle { background-color: #eff6ff !important; }
+.text-primary { color: #2563eb !important; }
+.bg-danger-subtle { background-color: #fef2f2 !important; }
+.text-danger { color: #dc2626 !important; }
+.bg-success-subtle { background-color: #f0fdf4 !important; }
+.text-success { color: #16a34a !important; }
+.bg-secondary-subtle { background-color: #f1f5f9 !important; }
+.text-secondary { color: #475569 !important; }

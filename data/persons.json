@@ -1,0 +1,1665 @@
+[
+  {
+    "id": "144922",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "100 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T1A1A1"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "100 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T1A1A1"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.524Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:22:24.269Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486524_1@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551000"
+        }
+      ],
+      "email": "900000_student_1772254486524_1@sample.school.local"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1980-01-01"
+    },
+    "name": {
+      "first": "Hossein",
+      "middle": null,
+      "last": "Norouzi",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": "900000",
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student",
+          "pte_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.524Z"
+      }
+    ],
+    "tags": [],
+    "manualTags": []
+  },
+  {
+    "id": "146788",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "107 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T8A8A8"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "107 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T8A8A8"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.557Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-13T23:38:35.677Z"
+    },
+    "avatarUrl": "https://i1.rgstatic.net/ii/profile.image/984766715289600-1611798089352_Q128/Javad-Amini-Foroushani.jpg",
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486557_8@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551007"
+        }
+      ],
+      "email": "900000_student_1772254486557_8@sample.school.local"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1987-08-08"
+    },
+    "name": {
+      "first": "Javad",
+      "middle": null,
+      "last": "Amini Foroushani",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": "900000",
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student",
+          "pte_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.557Z"
+      }
+    ],
+    "tags": [],
+    "manualTags": []
+  },
+  {
+    "id": "153279",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "100 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T1A1A1"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "100 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T1A1A1"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.571Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:24:55.751Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_teacher_1772254486571_1@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551000"
+        }
+      ],
+      "email": "900000_teacher_1772254486571_1@sample.school.local"
+    },
+    "demographics": {
+      "gender": "female",
+      "dateOfBirth": "1980-01-01"
+    },
+    "name": {
+      "first": "Alaleh",
+      "middle": null,
+      "last": "Ahmadi",
+      "preferred": null
+    },
+    "notes": "Generated sample teacher record.",
+    "organizations": [
+      {
+        "orgId": "900000",
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_teacher",
+          "pte_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.571Z"
+      }
+    ],
+    "tags": [],
+    "manualTags": []
+  },
+  {
+    "id": "153369",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "108 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T9A9A9"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "108 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T9A9A9"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.561Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-31T02:25:37.767Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486561_9@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551008"
+        }
+      ],
+      "email": "900000_student_1772254486561_9@sample.school.local"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1988-09-09"
+    },
+    "name": {
+      "first": "John",
+      "middle": null,
+      "last": "Redmath",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": "900000",
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.561Z"
+      }
+    ],
+    "tags": [],
+    "manualTags": []
+  },
+  {
+    "id": "174735",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "105 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T6A6A6"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "105 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T6A6A6"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.548Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.548Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486548_6@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551005"
+        }
+      ],
+      "email": "900000_student_1772254486548_6@sample.school.local"
+    },
+    "demographics": {
+      "gender": "other",
+      "dateOfBirth": "1985-06-06"
+    },
+    "name": {
+      "first": "Sample Olivia",
+      "middle": null,
+      "last": "Clark Baker",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.548Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-student"
+    ]
+  },
+  {
+    "id": "201955",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "102 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T3A3A3"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "102 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T3A3A3"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.581Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.581Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_teacher_1772254486581_3@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551002"
+        }
+      ],
+      "email": "900000_teacher_1772254486581_3@sample.school.local"
+    },
+    "demographics": {
+      "gender": "other",
+      "dateOfBirth": "1982-03-03"
+    },
+    "name": {
+      "first": "Sample Noah",
+      "middle": null,
+      "last": "Miller Wright",
+      "preferred": null
+    },
+    "notes": "Generated sample teacher record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_teacher"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.581Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-teacher"
+    ]
+  },
+  {
+    "id": "313786",
+    "active": true,
+    "address": {},
+    "addresses": [],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-19T20:18:18.442Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-05-10T19:03:15.801Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "sabbaghan@ucalgary.ca",
+          "isPrimary": false
+        }
+      ],
+      "phones": [],
+      "email": "sabbaghan@ucalgary.ca"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1980-01-01"
+    },
+    "name": {
+      "first": "Soroush",
+      "middle": null,
+      "last": "Sabbaghan",
+      "preferred": null
+    },
+    "notes": null,
+    "organizations": [
+      {
+        "orgId": "900000",
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-19T20:18:17.257Z",
+        "roles": [
+          "member"
+        ],
+        "name": "Amin Paknejad"
+      }
+    ],
+    "tags": [],
+    "manualTags": []
+  },
+  {
+    "id": "315734",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "101 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T2A2A2"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "101 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T2A2A2"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.532Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.532Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486532_2@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551001"
+        }
+      ],
+      "email": "900000_student_1772254486532_2@sample.school.local"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1981-02-02"
+    },
+    "name": {
+      "first": "Sample Liam",
+      "middle": null,
+      "last": "Taylor King",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.532Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-student"
+    ]
+  },
+  {
+    "id": "316271",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "101 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T2A2A2"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "101 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T2A2A2"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.576Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.576Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_teacher_1772254486576_2@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551001"
+        }
+      ],
+      "email": "900000_teacher_1772254486576_2@sample.school.local"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1981-02-02"
+    },
+    "name": {
+      "first": "Sample Liam",
+      "middle": null,
+      "last": "Taylor King",
+      "preferred": null
+    },
+    "notes": "Generated sample teacher record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_teacher"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.576Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-teacher"
+    ]
+  },
+  {
+    "id": "323327",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "106 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T7A7A7"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "106 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T7A7A7"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.552Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.552Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486552_7@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551006"
+        }
+      ],
+      "email": "900000_student_1772254486552_7@sample.school.local"
+    },
+    "demographics": {
+      "gender": "female",
+      "dateOfBirth": "1986-07-07"
+    },
+    "name": {
+      "first": "Sample Lucas",
+      "middle": null,
+      "last": "Hall Adams",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.552Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-student"
+    ]
+  },
+  {
+    "id": "438186",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "104 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T5A5A5"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "104 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T5A5A5"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.591Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.591Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_teacher_1772254486591_5@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551004"
+        }
+      ],
+      "email": "900000_teacher_1772254486591_5@sample.school.local"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1984-05-05"
+    },
+    "name": {
+      "first": "Sample Mia",
+      "middle": null,
+      "last": "Moore Green",
+      "preferred": null
+    },
+    "notes": "Generated sample teacher record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_teacher"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.591Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-teacher"
+    ]
+  },
+  {
+    "id": "440393",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "101 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T2A2A2"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "101 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T2A2A2"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.600Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.600Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_staff_1772254486600_2@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551001"
+        }
+      ],
+      "email": "900000_staff_1772254486600_2@sample.school.local"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1981-02-02"
+    },
+    "name": {
+      "first": "Sample Liam",
+      "middle": null,
+      "last": "Taylor King",
+      "preferred": null
+    },
+    "notes": "Generated sample staff record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_staff"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.600Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-staff"
+    ]
+  },
+  {
+    "id": "467108",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "103 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T4A4A4"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "103 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T4A4A4"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.586Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.586Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_teacher_1772254486586_4@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551003"
+        }
+      ],
+      "email": "900000_teacher_1772254486586_4@sample.school.local"
+    },
+    "demographics": {
+      "gender": "female",
+      "dateOfBirth": "1983-04-04"
+    },
+    "name": {
+      "first": "Sample Emma",
+      "middle": null,
+      "last": "Wilson Scott",
+      "preferred": null
+    },
+    "notes": "Generated sample teacher record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_teacher"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.586Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-teacher"
+    ]
+  },
+  {
+    "id": "476689",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "102 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T3A3A3"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "102 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T3A3A3"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.605Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.605Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_staff_1772254486605_3@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551002"
+        }
+      ],
+      "email": "900000_staff_1772254486605_3@sample.school.local"
+    },
+    "demographics": {
+      "gender": "other",
+      "dateOfBirth": "1982-03-03"
+    },
+    "name": {
+      "first": "Sample Noah",
+      "middle": null,
+      "last": "Miller Wright",
+      "preferred": null
+    },
+    "notes": "Generated sample staff record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_staff"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.605Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-staff"
+    ]
+  },
+  {
+    "id": "480936",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "102 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T3A3A3"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "102 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T3A3A3"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.537Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.537Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486537_3@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551002"
+        }
+      ],
+      "email": "900000_student_1772254486537_3@sample.school.local"
+    },
+    "demographics": {
+      "gender": "other",
+      "dateOfBirth": "1982-03-03"
+    },
+    "name": {
+      "first": "Sample Noah",
+      "middle": null,
+      "last": "Miller Wright",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.537Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-student"
+    ]
+  },
+  {
+    "active": true,
+    "name": {
+      "first": "Amin",
+      "middle": null,
+      "last": "Paknejad",
+      "preferred": null
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "2020-01-01"
+    },
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "amin83p@hotmail.com",
+          "isPrimary": true
+        }
+      ],
+      "phones": [],
+      "email": "amin83p@hotmail.com"
+    },
+    "addresses": [],
+    "address": {},
+    "manualTags": [],
+    "tags": [],
+    "notes": null,
+    "avatarUrl": null,
+    "organizations": [
+      {
+        "orgId": "900000",
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "pte_student_public"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-05-11T01:20:35.838Z"
+      }
+    ],
+    "audit": {
+      "createUser": null,
+      "createDateTime": "2026-05-11T01:20:35.838Z",
+      "lastUpdateUser": null,
+      "lastUpdateDateTime": "2026-05-11T01:20:35.838Z"
+    },
+    "id": "526625"
+  },
+  {
+    "id": "560378",
+    "active": true,
+    "address": {},
+    "addresses": [],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-10T06:40:31.372Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-11T20:40:22.583Z"
+    },
+    "avatarUrl": "https://media.licdn.com/dms/image/v2/D4D03AQFnApXjricxsg/profile-displayphoto-scale_200_200/B4DZpFz9WpH0AY-/0/1762107840667?e=2147483647&v=beta&t=RT1kRtgaHUB2m7qsb0O0XQmVAOHFtNQBqG2mO-Frk24",
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "amirpeivand@icloud.com",
+          "isPrimary": true
+        }
+      ],
+      "phones": [],
+      "email": "amirpeyvand@icloud.com"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "2000-01-01"
+    },
+    "manualTags": [
+      "admin"
+    ],
+    "name": {
+      "first": "Amir",
+      "middle": null,
+      "last": "Peivandzani",
+      "preferred": "Don Amir 1"
+    },
+    "notes": null,
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-10T06:40:21.967Z",
+        "roles": [
+          "member",
+          "school_teacher"
+        ]
+      }
+    ],
+    "tags": [
+      "admin"
+    ]
+  },
+  {
+    "id": "569865",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "104 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T5A5A5"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "104 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T5A5A5"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.545Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.545Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486544_5@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551004"
+        }
+      ],
+      "email": "900000_student_1772254486544_5@sample.school.local"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1984-05-05"
+    },
+    "name": {
+      "first": "Sample Mia",
+      "middle": null,
+      "last": "Moore Green",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.545Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-student"
+    ]
+  },
+  {
+    "id": "704169",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "104 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T5A5A5"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "104 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T5A5A5"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.615Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.615Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_staff_1772254486615_5@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551004"
+        }
+      ],
+      "email": "900000_staff_1772254486615_5@sample.school.local"
+    },
+    "demographics": {
+      "gender": "male",
+      "dateOfBirth": "1984-05-05"
+    },
+    "name": {
+      "first": "Sample Mia",
+      "middle": null,
+      "last": "Moore Green",
+      "preferred": null
+    },
+    "notes": "Generated sample staff record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_staff"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.615Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-staff"
+    ]
+  },
+  {
+    "id": "736401",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "103 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T4A4A4"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "103 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T4A4A4"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.610Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.610Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_staff_1772254486610_4@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551003"
+        }
+      ],
+      "email": "900000_staff_1772254486610_4@sample.school.local"
+    },
+    "demographics": {
+      "gender": "female",
+      "dateOfBirth": "1983-04-04"
+    },
+    "name": {
+      "first": "Sample Emma",
+      "middle": null,
+      "last": "Wilson Scott",
+      "preferred": null
+    },
+    "notes": "Generated sample staff record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_staff"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.610Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-staff"
+    ]
+  },
+  {
+    "id": "760360",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "50 Brentwood Common NW",
+      "city": "Calgary",
+      "province": "Alberta",
+      "postalCode": "T2L 1K8"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "50 Brentwood Common NW",
+        "city": "Calgary",
+        "province": "Alberta",
+        "postalCode": "T2L 1K8"
+      }
+    ],
+    "audit": {
+      "createUser": 1,
+      "createDateTime": "2025-11-24T03:50:24.294Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-11T20:51:53.863Z"
+    },
+    "avatarUrl": "https://scholar.googleusercontent.com/citations?view_op=view_photo&user=mQKnRXUAAAAJ&citpid=3",
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "elahe.ghorbanchian89@gmail.com",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "5551234567"
+        }
+      ],
+      "email": "elahe.ghorbanchian89@gmail.com"
+    },
+    "demographics": {
+      "gender": "female",
+      "dateOfBirth": "1991-11-11"
+    },
+    "manualTags": [
+      "developer"
+    ],
+    "name": {
+      "first": "Elahe",
+      "middle": null,
+      "last": "Ghorbanchian",
+      "preferred": "Ella"
+    },
+    "notes": null,
+    "organizations": [
+      {
+        "orgId": "900000",
+        "name": "Amin Paknejad",
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2025-11-22T00:00:00Z",
+        "roles": [
+          "member",
+          "developer",
+          "credit_customer",
+          "pte_teacher"
+        ]
+      },
+      {
+        "orgId": "464355",
+        "name": "Mohammad",
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2025-11-22T00:00:00Z",
+        "roles": [
+          "member"
+        ]
+      },
+      {
+        "orgId": "486219",
+        "name": "Kalam-Melal",
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2025-12-06T00:00:00Z",
+        "roles": [
+          "member"
+        ]
+      }
+    ],
+    "tags": [
+      "developer"
+    ]
+  },
+  {
+    "id": "827818",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "100 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T1A1A1"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "100 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T1A1A1"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.595Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.595Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_staff_1772254486595_1@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551000"
+        }
+      ],
+      "email": "900000_staff_1772254486595_1@sample.school.local"
+    },
+    "demographics": {
+      "gender": "female",
+      "dateOfBirth": "1980-01-01"
+    },
+    "name": {
+      "first": "Sample Ava",
+      "middle": null,
+      "last": "Williams Young",
+      "preferred": null
+    },
+    "notes": "Generated sample staff record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_staff"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.595Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-staff"
+    ]
+  },
+  {
+    "id": "895097",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "103 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T4A4A4"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "103 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T4A4A4"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.541Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.541Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486541_4@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551003"
+        }
+      ],
+      "email": "900000_student_1772254486541_4@sample.school.local"
+    },
+    "demographics": {
+      "gender": "female",
+      "dateOfBirth": "1983-04-04"
+    },
+    "name": {
+      "first": "Sample Emma",
+      "middle": null,
+      "last": "Wilson Scott",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.541Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-student"
+    ]
+  },
+  {
+    "id": "981924",
+    "active": true,
+    "address": {
+      "type": "home",
+      "line1": "109 Sample Avenue",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "T1A1A1"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "line1": "109 Sample Avenue",
+        "city": "Edmonton",
+        "province": "AB",
+        "postalCode": "T1A1A1"
+      }
+    ],
+    "audit": {
+      "createUser": "SYSTEM_SAMPLE",
+      "createDateTime": "2026-02-28T04:54:46.566Z",
+      "lastUpdateUser": "SYSTEM_SAMPLE",
+      "lastUpdateDateTime": "2026-02-28T04:54:46.566Z"
+    },
+    "avatarUrl": null,
+    "contact": {
+      "emails": [
+        {
+          "type": "primary",
+          "email": "900000_student_1772254486565_10@sample.school.local",
+          "isPrimary": true
+        }
+      ],
+      "phones": [
+        {
+          "type": "mobile",
+          "number": "7805551009"
+        }
+      ],
+      "email": "900000_student_1772254486565_10@sample.school.local"
+    },
+    "demographics": {
+      "gender": "female",
+      "dateOfBirth": "1989-10-10"
+    },
+    "name": {
+      "first": "Sample Sofia",
+      "middle": null,
+      "last": "King Brown",
+      "preferred": null
+    },
+    "notes": "Generated sample student record.",
+    "organizations": [
+      {
+        "orgId": 900000,
+        "name": "Amin Paknejad",
+        "roles": [
+          "member",
+          "school_student"
+        ],
+        "role": "member",
+        "memberStatus": "active",
+        "joinedAt": "2026-02-28T04:54:46.566Z"
+      }
+    ],
+    "tags": [
+      "sample-data",
+      "sample-student"
+    ]
+  }
+]

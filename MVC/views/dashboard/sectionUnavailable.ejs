@@ -1,0 +1,29 @@
+<div class="container py-5">
+  <div class="dash-hero mb-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+      <h1 class="page-heading size-lg mb-1 text-secondary">
+        <i class="bi bi-info-circle me-2"></i><%= title || 'Section unavailable' %>
+      </h1>
+      <div class="text-muted" style="font-size:1.05rem;">
+        <%= typeof message !== 'undefined' && message ? message : 'There is nothing to open for this section yet.' %>
+      </div>
+      <% if (typeof sectionName !== 'undefined' && sectionName) { %>
+        <div class="small text-muted mt-2 font-monospace">Section: <%= sectionName %></div>
+      <% } %>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <% if (user) { %>
+        <a href="/dashboard" class="btn btn-primary btn-filled btn-md">
+          <i class="bi bi-house-door me-1"></i> Dashboard
+        </a>
+        <button type="button" onclick="history.back()" class="btn btn-outline-secondary btn-md">
+          Go Back
+        </button>
+      <% } else { %>
+        <a href="/login" class="btn btn-primary btn-filled btn-md">
+          <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+        </a>
+      <% } %>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-23T03:51:54.409Z",
+    "script": "scripts/benchpath/reference/extractClbBenchmarkFragments.js",
+    "sourceId": "source:clb:2012",
+    "pdfPath": "C:\\Users\\KATANA\\Downloads\\Documents\\CLB_2012- Nov 6-2012.pdf",
+    "scope": "CLB 1-4 benchmark pages"
+  },
+  "counts": {
+    "sourceFragmentsBefore": 240,
+    "sourceFragmentsAfter": 243,
+    "fragmentsAddedOrReplaced": 3,
+    "profileFragmentsCreated": 16,
+    "competencyFragmentsCreated": 64,
+    "indicatorFragmentsCreated": 64,
+    "sampleTaskFragmentsCreated": 64,
+    "featureFragmentsCreated": 22
+  },
+  "coverage": {
+    "expectedBenchmarkCount": 16,
+    "coveredBenchmarkCount": 16,
+    "coveredBenchmarks": [
+      "benchmark:listening:1",
+      "benchmark:listening:2",
+      "benchmark:listening:3",
+      "benchmark:listening:4",
+      "benchmark:reading:1",
+      "benchmark:reading:2",
+      "benchmark:reading:3",
+      "benchmark:reading:4",
+      "benchmark:speaking:1",
+      "benchmark:speaking:2",
+      "benchmark:speaking:3",
+      "benchmark:speaking:4",
+      "benchmark:writing:1",
+      "benchmark:writing:2",
+      "benchmark:writing:3",
+      "benchmark:writing:4"
+    ],
+    "missingBenchmarkPages": [],
+    "pagesWithoutBenchmarkHeadingWhileInScope": []
+  },
+  "warnings": {
+    "indicatorContainingSampleTask": [],
+    "indicatorBenchmarkLevelMismatch": []
+  }
+}

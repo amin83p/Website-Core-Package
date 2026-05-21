@@ -1,0 +1,903 @@
+/* ==========================================================================
+   MAIN STYLESHEET
+   Project: Uniform Dashboard Theme
+   Version: 2.2 (Fit-Mode Fixed)
+   ========================================================================== */
+
+/* TABLE OF CONTENTS
+   1. Variables (Root)
+   2. Reset & Base Layout
+   3. Typography & Utilities
+   4. Header & Navigation
+   5. Search Components
+   6. Forms & Inputs
+   7. Tables & Data Grids
+   8. Cards & Containers
+   9. Buttons & Actions
+   10. Modals & Overlays
+   11. Timeline & Action States
+   12. Footer
+   13. Animations
+   14. Dashboard Specific
+   ========================================================================== */
+
+/* ==========================================================================
+   1. VARIABLES (ROOT)
+   ========================================================================== */
+:root {
+  /* --- Color Palette --- */
+  --color-primary: #007bff;
+  --color-primary-dark: #0056b3;
+  --color-primary-light: #e7f1ff;
+  --color-primary-ghost: rgba(0, 123, 255, 0.10);
+  
+  --color-secondary: #6c757d;
+  --color-secondary-subtle: #f1f5f9;
+  
+  --color-success: #28a745;
+  --color-success-ghost: rgba(40, 167, 69, 0.10);
+  
+  --color-danger: #dc3545;
+  --color-warning: #ffc107;
+  --color-info: #17a2b8;
+  
+  --color-light: #f8f9fa;
+  --color-dark: #343a40;
+  --color-white: #ffffff;
+  
+  --color-text: #333333;
+  --color-text-light: #adb5bd;
+
+  /* --- Dimensions --- */
+  --header-height: 120px;
+  --notice-height: 40px;
+
+  /* --- Spacing --- */
+  --spacing-sm: 10px;
+  --spacing-md: 20px;
+  --spacing-lg: 40px;
+
+  /* --- Sizing Multipliers --- */
+  --size-sm: 0.875;
+  --size-md: 1;
+  --size-lg: 1.25;
+
+  /* --- Borders & Shadows --- */
+  --border-radius: 8px;
+  --border-radius-md: 12px;
+  --border-radius-lg: 18px;
+
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 2px 5px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.08);
+  --shadow-hover: 0 8px 22px rgba(0, 0, 0, 0.06);
+
+  /* --- Transitions --- */
+  --transition: all 0.3s ease;
+
+  /* --- Button Specifics (Add these) --- */
+  --btn-radius: 8px; /* Default matches --border-radius */
+  --btn-hover-transform: translateY(-3px); /* Control the movement */
+  --btn-font-weight: 600;
+  --btn-letter-spacing: 0px;
+
+/* --- Table Theme Variables --- */
+  --table-header-bg: #e7f1ff;
+  --table-header-text: #333333;
+  --table-border-color: #f8f9fa;
+  --table-row-hover: #f8f9fa;
+  --table-stripe-bg: #ffffff; 
+  
+}
+
+
+/* ==========================================================================
+   2. RESET & BASE LAYOUT
+   ========================================================================== */
+html, body {
+  height: 100%;
+  margin: 0;
+  color: var(--color-text);
+  /* Optimize font rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  /* Clear fixed header */
+  padding-top: calc(var(--header-height) + var(--notice-height));
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1 0 auto;
+  padding: var(--spacing-lg) 0;
+}
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.sections-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--spacing-md);
+  width: 100%;
+}
+
+/* ==========================================================================
+   3. TYPOGRAPHY & UTILITIES
+   ========================================================================== */
+.page-heading {
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+  margin-bottom: var(--spacing-lg);
+  animation: fadeIn 0.5s ease-in;
+}
+
+/* Efficient font sizing using CSS vars */
+.page-heading.size-sm { font-size: 2rem; }
+.page-heading.size-md { font-size: 2.5rem; }
+.page-heading.size-lg { font-size: 3rem; }
+
+.ls-1 { letter-spacing: 1px; }
+.cursor-pointer { cursor: pointer; }
+
+:root {
+  /* --- Header Config --- */
+  --header-bg: #ffffff;
+  --header-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --header-padding-y: 20px;       /* Initial padding */
+  --header-padding-shrunk: 5px;   /* Padding when scrolled */
+  --header-content-width: 80%;    /* Width of container (e.g. 80% or 1200px) */
+  
+  /* --- Logo Config --- */
+  --logo-height: 50px;
+  --logo-height-shrunk: 30px;
+  
+  /* --- Navigation Links --- */
+  --nav-link-color: #333333;
+  --nav-link-hover: #007bff;      /* Usually matches primary */
+  --nav-font-size: 1rem;
+  --nav-font-weight: 500;
+
+  /* --- Notice Bar --- */
+  --notice-bg: #f8f9fa;
+  --notice-text: #333333;
+}
+
+#main-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--header-bg);
+  box-shadow: var(--header-shadow);
+  transition: var(--transition);
+  will-change: transform, padding;
+}
+
+#main-header.shrunk { 
+  padding: var(--header-padding-shrunk) 0; 
+}
+
+.header-content {
+  width: var(--header-content-width);
+  max-width: 100%;
+  margin: 0 auto;
+  padding: var(--header-padding-y) 0;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  
+  /* ✅ ADD THIS LINE: Allows items to drop to the next line */
+  flex-wrap: wrap; 
+}
+
+/* ✅ NEW RULE: Forces the navigation to the bottom row */
+.header-content > nav {
+  width: 100%;        /* Takes full width, forcing a new line */
+  order: 3;           /* Ensures it sits below Logo (1) and Buttons (2) */
+  margin-top: 15px;   /* Adds spacing between buttons and menu */
+  display: flex;      /* Keeps the links themselves in a row */
+  gap: 20px;          /* Space between menu items */
+  justify-content: flex-start; /* Aligns menu to left (use 'center' to center) */
+}
+
+/* Notice Bar */
+.notice-bar {
+  background: var(--notice-bg);
+  color: var(--notice-text);
+  padding: 8px 0;
+  text-align: center;
+  font-size: 0.875rem;
+  height: var(--notice-height);
+  overflow: hidden;
+  transition: opacity 0.3s, height 0.3s, padding 0.3s;
+}
+
+.notice-bar.hidden {
+  opacity: 0;
+  height: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.notice-bar a {
+  color: var(--nav-link-hover); /* Use highlight color */
+  text-decoration: none;
+}
+.notice-bar a:hover { text-decoration: underline; }
+
+/* Logo Section */
+.logo-section { display: flex; flex-direction: column; align-items: flex-start; }
+
+.logo { 
+  height: var(--logo-height); 
+  transition: height 0.3s; 
+}
+#main-header.shrunk .logo { 
+  height: var(--logo-height-shrunk); 
+}
+
+.tagline {
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--nav-link-color);
+  transition: font-size 0.3s;
+}
+#main-header.shrunk .tagline { font-size: 0.75rem; }
+
+/* Nav Links */
+.nav-link { 
+  font-weight: var(--nav-font-weight); 
+  font-size: var(--nav-font-size);
+  color: var(--nav-link-color) !important; 
+  transition: color 0.2s ease;
+}
+.nav-link:hover { 
+  color: var(--nav-link-hover) !important; 
+}
+
+/* Responsive Overrides */
+@media (max-width: 992px) { 
+  .header-content { width: 90%; } 
+}
+@media (max-width: 576px) { 
+  .header-content { width: 95%; } 
+}
+/* ==========================================================================
+   5. SEARCH COMPONENTS
+   ========================================================================== */
+
+:root {
+  /* --- Standard Page Search (Filters) --- */
+  --search-radius: 5px;
+  --search-border-color: #f8f9fa; /* Matches --color-light usually */
+  --search-focus-ring: rgba(0, 123, 255, 0.25);
+  
+  /* --- Header Search (The Pill) --- */
+  --header-search-bg: #f8f9fa;
+  --header-search-border: #007bff; /* Matches --color-primary usually */
+  --header-search-radius: 25px;
+  --header-search-width: 220px;
+}
+
+.search-container { width: 100%; margin-bottom: var(--spacing-md); }
+
+.search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.search-select { width: auto; min-width: 150px; flex-shrink: 0; }
+.search-input { flex-grow: 1; min-width: 0; }
+
+.search-wrapper .form-label {
+  margin-bottom: 0;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.search-wrapper .form-control,
+.search-wrapper .form-select {
+  border-radius: var(--search-radius);
+  border: 2px solid var(--search-border-color);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-wrapper .form-control:focus,
+.search-wrapper .form-select:focus {
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 0 0 3px var(--search-focus-ring);
+}
+
+/* --- Header Search Form --- */
+.search-form {
+  display: none;
+  align-items: center;
+  margin-left: 12px;
+  opacity: 0;
+  transform: scaleX(0.8);
+  transform-origin: right;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.search-form.active { display: flex; opacity: 1; transform: scaleX(1); }
+
+/* Note: Specifically targeting the header input style */
+.search-form .search-input {
+  width: var(--header-search-width);
+  padding: 8px 12px;
+  border: 2px solid var(--header-search-border);
+  border-radius: var(--header-search-radius) 0 0 var(--header-search-radius);
+  background: var(--header-search-bg);
+}
+
+.search-submit {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: var(--color-white);
+  border: none;
+  border-radius: 0 var(--header-search-radius) var(--header-search-radius) 0;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .search-wrapper { flex-direction: column; align-items: stretch; gap: 10px; }
+  .search-wrapper .search-select, 
+  .search-wrapper .search-input, 
+  .search-wrapper .me-2 { width: 100%; margin-right: 0 !important; }
+}
+
+/* ==========================================================================
+   6. FORMS & INPUTS
+   ========================================================================== */
+.form-container {
+  max-width: 600px;
+  margin: 0 auto;
+  background: var(--color-white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-md);
+  animation: slideUp 0.5s ease-in;
+}
+.form-container.wide { max-width: 900px; }
+
+.form-label { font-weight: 600; color: var(--color-text); }
+.form-control {
+  border-radius: 5px;
+  border: 2px solid var(--color-light);
+  padding: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-control:focus {
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+/* ==========================================================================
+   7. TABLES & DATA GRIDS
+   ========================================================================== */
+
+:root {
+  /* --- Colors (Existing) --- */
+  --table-header-bg: #e7f1ff;
+  --table-header-text: #333333;
+  --table-row-hover: #f8f9fa;
+  --table-border-color: #f8f9fa;
+  --table-stripe-bg: #ffffff;
+
+  /* --- NEW: Layout & Physics --- */
+  --table-padding-y: 12px;  /* Vertical spacing (Density) */
+  --table-padding-x: 15px;  /* Horizontal spacing */
+  --table-font-size: 1rem;  /* Text scaling */
+  --table-action-dir: column;  /* row = horizontal, column = vertical */
+  --table-action-align: center; /* flex alignment */
+  --table-radius: 8px;      /* Outer corner roundness */
+
+/* --- Table Controls & Search --- */
+  --control-bg: #ffffff;
+  --control-border: #dee2e6;
+  --control-text: #333333;
+  --control-radius: 5px;
+  --control-focus-color: rgba(13, 110, 253, 0.25); /* Focus Ring */
+  
+  /* --- Toggle Switch --- */
+  --switch-checked-bg: #0d6efd; /* Primary Color usually */
+  --switch-handle-color: #ffffff;
+}
+
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--table-radius); /* Customizable Radius */
+  margin-bottom: var(--spacing-md);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--table-border-color);
+}
+
+.table-responsive {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-white);
+  font-size: var(--table-font-size); /* Customizable Size */
+}
+
+.table-responsive th,
+.table-responsive td {
+  /* Customizable Padding */
+  padding: var(--table-padding-y) var(--table-padding-x);
+  text-align: left;
+  border-bottom: 1px solid var(--table-border-color);
+  vertical-align: middle;
+}
+
+.table-responsive th {
+  background-color: var(--table-header-bg) !important;
+  color: var(--table-header-text) !important;
+  font-weight: 600;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Zebra Striping Logic (Pure CSS via Variable) */
+.table-responsive tr:nth-of-type(odd) td {
+    background-color: var(--table-stripe-bg);
+}
+
+.table-responsive tr { transition: background-color 0.15s; }
+.table-responsive tr:hover td { 
+    background-color: var(--table-row-hover) !important;
+}
+
+/* --- SMART ACTION COLUMN --- */
+.table-actions { 
+  display: flex; 
+  /* ✅ Controlled by Variable (row vs column) */
+  flex-direction: var(--table-action-dir); 
+  gap: 6px; 
+  align-items: var(--table-action-align);
+  justify-content: center;
+}
+
+.table-actions .btn {
+  /* If vertical (column), stretch. If horizontal (row), auto width. */
+  width: 100%; 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Logic to make horizontal buttons not fill 100% width if desired */
+.table-actions[style*="row"] .btn { width: auto; }
+
+/* Force width on action column if vertical to keep it neat */
+.table-responsive th:last-child,
+.table-responsive td:last-child {
+  /* If vertical, we need a fixed width. If horizontal, let it grow. */
+  min-width: 90px;
+}
+
+/* --- FIT MODE OVERRIDES --- */
+.table-scroll-wrapper.fit-mode { overflow-x: hidden; }
+.table-scroll-wrapper.fit-mode table { width: 100%; table-layout: fixed; }
+.table-scroll-wrapper.fit-mode th,
+.table-scroll-wrapper.fit-mode td {
+  white-space: normal !important;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  vertical-align: top;
+}
+/* ==========================================================================
+   8. CARDS & CONTAINERS
+   ========================================================================== */
+.card-container {
+  background: var(--color-white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  transition: transform 0.2s, box-shadow 0.2s;
+  will-change: transform, box-shadow;
+}
+
+.card-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* ==========================================================================
+   9. BUTTONS & ACTIONS
+   ========================================================================== */
+/* Header & Context Pill Buttons (Shared Style) */
+.nav-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 6px 16px 6px 8px;
+  height: 48px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  min-width: max-content;
+}
+
+.nav-pill-btn:hover {
+  background: #f8f9fa;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-hover);
+}
+
+.nav-pill-btn:active { transform: translateY(0); box-shadow: none; }
+
+.nav-pill-btn.org-switcher { min-width: 220px; max-width: 320px; }
+
+.nav-pill-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0;
+}
+
+.nav-pill-info { display: flex; flex-direction: column; line-height: 1.1; text-align: left; }
+.nav-pill-label { font-size: 0.65rem; text-transform: uppercase; font-weight: 700; color: #64748b; }
+.nav-pill-text { font-size: 0.9rem; font-weight: 700; color: #1e293b; }
+
+/* Action Buttons (Add, Edit, Delete) */
+.btn-filled { 
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); /* Smoother bounce */
+  border: none !important; /* Ensure no border interferes with the color */
+}
+
+/* ✅ FIX: Specific hover states to prevent color loss */
+.btn-filled:hover { 
+  transform: translateY(-3px);
+  /* Force background color to stay consistent with the base class */
+  color: #fff !important; 
+}
+
+.btn-add { background: var(--color-success); color: #fff; border: none; }
+.btn-edit { background: var(--color-info); color: #fff; border: none; }
+.btn-delete { background: var(--color-danger); color: #fff; border: none; }
+.btn-primary { background: var(--color-primary); color: #fff; border: none; }
+
+/* Button Sizes */
+.btn-sm { padding: 6px 12px; font-size: 0.875rem; }
+.btn-md { padding: 8px 16px; font-size: 1rem; }
+.btn-lg { padding: 10px 20px; font-size: 1.25rem; }
+
+/* Utility Colors for Icons */
+.bg-warning-subtle { background-color: #fffbeb !important; }
+.text-warning-emphasis { color: #d97706 !important; }
+.bg-primary-subtle { background-color: #eff6ff !important; }
+.text-primary { color: #2563eb !important; }
+.bg-danger-subtle { background-color: #fef2f2 !important; }
+.text-danger { color: #dc2626 !important; }
+.bg-success-subtle { background-color: #f0fdf4 !important; }
+.text-success { color: #16a34a !important; }
+.bg-secondary-subtle { background-color: #f1f5f9 !important; }
+.text-secondary { color: #475569 !important; }
+
+
+/* Re-assert colors for specific button types on hover */
+.btn-add:hover { background-color: var(--color-success) !important; }
+.btn-edit:hover { background-color: var(--color-info) !important; }
+.btn-delete:hover { background-color: var(--color-danger) !important; }
+.btn-primary:hover { background-color: var(--color-primary) !important; }
+
+
+/* ... rest of the file ... */
+/* ==========================================================================
+   10. MODALS & OVERLAYS
+   ========================================================================== */
+
+:root {
+  /* --- Modal Styling --- */
+  --modal-bg: #ffffff;
+  --modal-header-bg: #ffffff;
+  --modal-header-text: #333333;
+  --modal-radius: 12px;
+  --modal-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+  --modal-border-color: #dee2e6;
+  
+  /* --- Backdrop (Overlay) --- */
+  --modal-backdrop-color: #000000;
+  --modal-backdrop-opacity: 0.5;
+  --modal-backdrop-blur: 0px; /* Modern glass effect */
+}
+
+.modal-content {
+  background-color: var(--modal-bg);
+  border-radius: var(--modal-radius);
+  border: 1px solid var(--modal-border-color);
+  box-shadow: var(--modal-shadow);
+  overflow: hidden; /* Ensures header bg respects radius */
+}
+
+.modal-header {
+  background-color: var(--modal-header-bg);
+  color: var(--modal-header-text);
+  border-bottom: 1px solid var(--modal-border-color);
+  /* Bootstrap adds radius automatically, but we enforce color consistency */
+}
+
+.modal-header .btn-close {
+  /* Auto-invert close button if header is dark? 
+     For now, we assume user picks readable text color */
+}
+
+.modal-footer {
+  border-top: 1px solid var(--modal-border-color);
+  background-color: var(--modal-bg); /* Match content bg */
+}
+
+/* Backdrop overrides */
+.modal-backdrop {
+  background-color: var(--modal-backdrop-color);
+}
+
+.modal-backdrop.show {
+  opacity: var(--modal-backdrop-opacity);
+  backdrop-filter: blur(var(--modal-backdrop-blur)); /* Glass effect */
+}
+
+/* --- Existing utility classes --- */
+.modal.freeze-ui { pointer-events: none; filter: blur(2px); opacity: 0.6; }
+#adminVerifyModal.show { backdrop-filter: blur(4px); } /* Specific override */
+
+/* Modal List Items (Org Switcher) */
+.org-list-container { max-height: 400px; overflow-y: auto; }
+.org-option { cursor: pointer; border-radius: 10px; transition: background 0.2s; border: 1px solid transparent; }
+.org-option:hover { background-color: #f1f5f9; }
+.org-option.active-org { background-color: #eff6ff; border-color: #bfdbfe; }
+
+/* ==========================================================================
+   11. TIMELINE & ACTION STATES
+   ========================================================================== */
+.timeline-wrapper { position: relative; padding-left: 1rem; }
+.timeline-wrapper::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 6px;
+  width: 2px; background: #e9ecef;
+}
+
+.timeline-item { position: relative; padding-left: 20px; padding-bottom: 20px; }
+
+.timeline-dot {
+  position: absolute; left: 0; top: 4px;
+  width: 14px; height: 14px;
+  border-radius: 50%; border: 2px solid #fff;
+  background: var(--color-secondary);
+  box-shadow: 0 0 0 1px #dee2e6;
+  z-index: 1;
+}
+
+.timeline-dot.success { background: var(--color-success); box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.25); }
+.timeline-dot.fail { background: var(--color-danger); box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.25); }
+.timeline-dot.start { background: var(--color-primary); box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25); }
+
+/* ==========================================================================
+   12. FOOTER
+   ========================================================================== */
+
+:root {
+  /* --- Footer Specific Variables --- */
+  --footer-bg: #343a40;           /* Default: Dark Grey */
+  --footer-text: #ffffff;         /* Default: White */
+  --footer-link: #adb5bd;         /* Default: Light Grey */
+  --footer-link-hover: #ffffff;   /* Default: White */
+  --footer-padding: 40px;         /* Spacing */
+  --footer-title-size: 1.2rem;
+  
+  /* Inputs inside footer */
+  --footer-input-bg: #ffffff;
+  --footer-input-border: #cccccc;
+}
+
+footer {
+  background: var(--footer-bg);
+  color: var(--footer-text);
+  padding: var(--footer-padding) 0;
+  margin-top: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.05); /* Subtle separator */
+}
+
+.footer-column h5 { 
+  font-size: var(--footer-title-size); 
+  margin-bottom: var(--spacing-md); 
+  font-weight: 700;
+  color: var(--footer-text); /* Ensure titles match text theme */
+}
+
+.footer-column ul { list-style: none; padding: 0; margin: 0; }
+.footer-column ul li { margin-bottom: var(--spacing-sm); }
+
+.footer-column a { 
+  color: var(--footer-link); 
+  text-decoration: none; 
+  transition: color 0.2s ease;
+}
+.footer-column a:hover { 
+  color: var(--footer-link-hover); 
+  text-decoration: underline; 
+}
+
+/* Social Icons */
+.social-icons a { 
+  color: var(--footer-link); 
+  font-size: 1.5rem; 
+  margin-right: 15px; 
+  transition: transform 0.2s, color 0.2s;
+  display: inline-block;
+}
+.social-icons a:hover { 
+  color: var(--footer-link-hover); 
+  transform: translateY(-3px); /* Lift effect */
+}
+
+/* Newsletter */
+.newsletter-form { display: flex; gap: 10px; }
+
+.newsletter-input {
+  flex: 1; 
+  padding: 8px 12px; 
+  border-radius: 4px; 
+  border: 1px solid var(--footer-input-border);
+  background: var(--footer-input-bg);
+  color: #333;
+}
+
+/* We reuse global primary button, but you can override if needed */
+.newsletter-btn {
+  padding: 8px 16px; 
+  background: var(--color-primary); 
+  color: #fff;
+  border: none; 
+  border-radius: 4px; 
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.newsletter-btn:hover { 
+  background: var(--color-primary-dark); 
+}
+/* ==========================================================================
+   13. ANIMATIONS
+   ========================================================================== */
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.modal-error-wiggle { animation: wiggle 0.3s ease; }
+
+/* ==========================================================================
+   14. DASHBOARD SPECIFIC
+   ========================================================================== */
+
+:root {
+  /* --- Dashboard Config --- */
+  --dash-hero-bg-1: #eff6ff;     /* Gradient Start */
+  --dash-hero-bg-2: #e6fffa;     /* Gradient End */
+  --dash-hero-border: #f0f0f0;
+  --dash-hero-text: #333333;
+  --dash-hero-radius: 18px;
+
+  --dash-stat-bg: #ffffff;
+  --dash-stat-border: #f0f0f0;
+  --dash-stat-radius: 16px;
+  --dash-stat-shadow: 0 2px 4px rgba(0,0,0,0.05);
+
+  --dash-card-bg: #ffffff;
+  --dash-card-border: #f0f0f0;
+  --dash-card-radius: 18px;
+  --dash-card-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  --dash-card-hover-shadow: 0 10px 20px rgba(0,0,0,0.1);
+  
+  --dash-icon-bg: rgba(0,123,255,0.1);
+  --dash-icon-color: #007bff;
+  --dash-accent-color: rgba(13,110,253,0.15); /* Radial glow in corner */
+}
+
+/* Hero Section */
+.dash-hero {
+  background: linear-gradient(135deg, var(--dash-hero-bg-1), var(--dash-hero-bg-2));
+  border: 1px solid var(--dash-hero-border);
+  border-radius: var(--dash-hero-radius);
+  color: var(--dash-hero-text);
+  padding: 28px;
+}
+
+/* Stat Cards */
+.dash-stat {
+  border-radius: var(--dash-stat-radius);
+  border: 1px solid var(--dash-stat-border);
+  background: var(--dash-stat-bg);
+  box-shadow: var(--dash-stat-shadow);
+  padding: 18px 20px;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.dash-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* Module Cards (Grid View) */
+.module-card {
+  border-radius: var(--dash-card-radius);
+  border: 1px solid var(--dash-card-border);
+  background: var(--dash-card-bg);
+  box-shadow: var(--dash-card-shadow);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.module-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--dash-card-hover-shadow);
+  border-color: var(--color-primary);
+}
+
+.module-accent {
+  position: absolute;
+  inset: 0 0 auto auto;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle at top right, var(--dash-accent-color), transparent 60%);
+  pointer-events: none;
+}
+
+.module-icon {
+  width: 48px;
+  height: 48px;
+  display: grid; place-items: center;
+  border-radius: 12px;
+  background: var(--dash-icon-bg);
+  color: var(--dash-icon-color);
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+  transition: background 0.3s, color 0.3s;
+}
+
+.module-card:hover .module-icon {
+    /* Optional: Invert/Saturate on hover */
+    filter: brightness(0.95);
+}
+/* ==========================================================================
+   15. CUSTOM BUTTONS (MANAGED BY BUTTON STUDIO)
+   ========================================================================== */

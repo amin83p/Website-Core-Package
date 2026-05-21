@@ -1,0 +1,2594 @@
+<%
+  const p = program || {};
+  const isEdit = !!p.id;
+  const routeId = (p.id || '');
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+
+  const initDuration = JSON.stringify(p.duration || { years: 0, months: 0, days: 0 }).replace(/</g, '\\u003c');
+  const initAcademicRules = JSON.stringify(p.academicRules || {}).replace(/</g, '\\u003c');
+  const initFeeGroups = JSON.stringify(p.feeGroups || {}).replace(/</g, '\\u003c');
+  const initPostingPolicies = JSON.stringify(p.postingPolicies || []).replace(/</g, '\\u003c');
+  const initTerms = JSON.stringify(p.terms || []).replace(/</g, '\\u003c');
+  const initSubjects = JSON.stringify(p.subjects || []).replace(/</g, '\\u003c');
+  const initTransactionDefinitions = JSON.stringify(transactionDefinitions || []).replace(/</g, '\\u003c');
+  const initSubjectCatalog = JSON.stringify(subjectCatalog || []).replace(/</g, '\\u003c');
+  const initTermCatalog = JSON.stringify(termCatalog || []).replace(/</g, '\\u003c');
+  const initDepartments = JSON.stringify(departments || []).replace(/</g, '\\u003c');
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-journal-text me-2"></i><%= title %></h1>
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-outline-primary btn-md" id="btnCopyFromProgram">
+        <i class="bi bi-copy me-1"></i> Copy From Program
+      </button>
+      <a href="/school/programs" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="programForm" action="<%= isEdit ? '/school/programs/edit/'+routeId : '/school/programs/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
+      <input type="hidden" name="feeGroups" id="hid_feeGroups" value="{}">
+      <input type="hidden" name="postingPolicies" id="hid_postingPolicies" value="[]">
+      <input type="hidden" name="terms" id="hid_terms" value="[]">
+      <input type="hidden" name="subjects" id="hid_subjects" value="[]">
+      <input type="hidden" name="academicRules" id="hid_academicRules" value="{}">
+      <input type="hidden" name="duration" id="hid_duration" value="{}">
+
+      <ul class="nav nav-tabs mb-4" id="programTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General Identity</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-rules" type="button">Academic Rules</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-terms" type="button">Terms</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-fees" type="button">Program Enrollment Fees</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-posting-policy" type="button">Posting Policies</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-curriculum" type="button">Subjects & Prerequisites</button></li>
+      </ul>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4 tab-content">
+          <div class="tab-pane fade show active" id="tab-general">
+            <div class="row">
+              <div class="col-md-8 mb-3">
+                <label class="form-label fw-bold">Program Name *</label>
+                <input type="text" name="name" class="form-control size-md" value="<%= p.name || '' %>" placeholder="e.g. Diploma in Software Engineering" required>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Program ID</label>
+                <input type="text" name="programId" class="form-control size-md font-monospace" value="<%= p.id || '' %>" placeholder="Auto-generated if blank" <%= isEdit ? 'readonly' : '' %>>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Program Code</label>
+                <input type="text" name="code" class="form-control size-md font-monospace" value="<%= p.code || '' %>" placeholder="e.g. PRG-SE-01">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Status</label>
+                <select name="status" class="form-select size-md" required>
+                  <% (programStatuses || []).forEach(st => { %>
+                    <option value="<%= st %>" <%= (p.status || 'active') === st ? 'selected' : '' %>><%= st %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Program Administrator *</label>
+                <div class="input-group">
+                  <input type="hidden" name="programAdministratorPersonId" id="inp_adminPersonId" value="<%= p.programAdministratorPersonId || '' %>" required>
+                  <input type="text" id="inp_adminPersonName" class="form-control size-md bg-white border-primary fw-bold" value="<%= administratorName || '' %>" placeholder="Select from persons..." readonly required>
+                  <button type="button" class="btn btn-primary" id="btnPickAdmin"><i class="bi bi-search"></i></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Department *</label>
+              <div class="input-group">
+                <input type="hidden" name="departmentId" id="inp_programDepartmentId" value="<%= p.departmentId || '' %>">
+                <input type="hidden" name="departmentCode" id="inp_programDepartmentCode" value="<%= p.departmentCode || '' %>">
+                <input type="text" name="departmentName" id="inp_programDepartmentName" class="form-control size-md bg-white" value="<%= p.departmentName || '' %>" placeholder="Select Department..." readonly required>
+                <button type="button" class="btn btn-outline-primary" id="btnPickProgramDepartment"><i class="bi bi-search"></i></button>
+                <button type="button" class="btn btn-outline-secondary" id="btnClearProgramDepartment" disabled title="Department is required"><i class="bi bi-x-lg"></i></button>
+              </div>
+              <div class="small text-muted mt-1">Used for inherited Posting Policies when a class does not define its own policy.</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Program Description</label>
+              <textarea name="description" class="form-control size-md" rows="3" placeholder="Program overview..."><%= p.description || '' %></textarea>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Notes</label>
+              <textarea name="notes" class="form-control size-md" rows="2" placeholder="Internal notes..."><%= p.notes || '' %></textarea>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="tab-rules">
+            <div class="alert alert-info border-info shadow-sm mb-4">
+              <i class="bi bi-info-circle me-2"></i> These rules are validated at program level and can be overridden later only where explicitly allowed.
+            </div>
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Duration (Years)</label>
+                <input type="number" id="inp_durationYears" class="form-control size-md" min="0" step="1">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Duration (Months)</label>
+                <input type="number" id="inp_durationMonths" class="form-control size-md" min="0" step="1">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Duration (Days)</label>
+                <input type="number" id="inp_durationDays" class="form-control size-md" min="0" step="1">
+              </div>
+            </div>
+            <div class="small text-muted mb-3">At least one of Years, Months, or Days is required.</div>
+
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Credits *</label>
+                <input type="number" name="credits" class="form-control size-md" value="<%= p.credits ?? '' %>" min="0" step="0.01" required>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Minimum Passing Score *</label>
+                <input type="number" name="minimumPassingScore" class="form-control size-md" value="<%= p.minimumPassingScore ?? '' %>" min="0" max="100" step="0.01" required>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Minimum Passing Average *</label>
+                <input type="number" name="minimumPassingAverage" class="form-control size-md" value="<%= p.minimumPassingAverage ?? '' %>" min="0" max="100" step="0.01" required>
+              </div>
+            </div>
+
+            <div class="card border shadow-sm mt-3">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="fw-bold">Curriculum Credit Rules</div>
+                  <div class="small text-muted">Main subjects are mandatory. Essential and Optional credits are controlled here.</div>
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Available Main Credits</label>
+                    <input type="text" id="txt_totalMainCredits" class="form-control size-md bg-light" readonly>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Available Essential Credits</label>
+                    <input type="text" id="txt_totalEssentialCredits" class="form-control size-md bg-light" readonly>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Available Optional Credits</label>
+                    <input type="text" id="txt_totalOptionalCredits" class="form-control size-md bg-light" readonly>
+                  </div>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Required Main Credits</label>
+                    <input type="number" id="inp_requiredMainCredits" class="form-control size-md bg-light" min="0" step="0.01" readonly>
+                    <div class="small text-muted mt-1">Auto-derived from all Main subjects.</div>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Required Essential Credits</label>
+                    <input type="number" id="inp_requiredEssentialCredits" class="form-control size-md" min="0" step="0.01">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Required Optional Credits</label>
+                    <input type="number" id="inp_requiredOptionalCredits" class="form-control size-md" min="0" step="0.01">
+                  </div>
+                </div>
+                <div class="form-check mt-3">
+                  <input type="checkbox" class="form-check-input" id="chk_allowEssentialCreditsTowardOptional">
+                  <label class="form-check-label fw-bold" for="chk_allowEssentialCreditsTowardOptional">Allow unused Essential credits to count toward Optional requirement</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="tab-terms">
+            <div class="alert alert-light border shadow-sm mb-3">
+              <i class="bi bi-calendar3-range me-2"></i>Assign the academic terms/semesters in which this program is offered. Classes can later reference these program-term combinations.
+            </div>
+            <div class="mb-3">
+              <button type="button" class="btn btn-filled btn-primary btn-sm" id="btnAddTerm"><i class="bi bi-plus-circle me-1"></i>Add Term</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th style="width: 16%;">Order</th>
+                    <th>Term</th>
+                    <th style="width: 10%;">Required</th>
+                    <th style="width: 10%;" class="text-end">More</th>
+                  </tr>
+                </thead>
+                <tbody id="termsTbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="tab-fees">
+            <div class="alert alert-warning border-warning shadow-sm mb-3">
+              <i class="bi bi-tools me-2"></i>Define one-time program enrollment fees. These fees are charged when a student is registered into the program. If no category is selected, the fee applies to all categories.
+            </div>
+
+            <div class="row align-items-end">
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Fee Category</label>
+                <select id="sel_feeCategory" class="form-select size-md">
+                  <option value=""><%= allFeeCategoryLabel || 'All Categories' %></option>
+                  <% (feeCategories || []).forEach(cat => { %>
+                    <option value="<%= cat %>"><%= cat %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Transaction Template (optional)</label>
+                <div class="small text-muted mb-1">Select a template. Program transactions can only be added from Transaction Templates.</div>
+                <div class="input-group">
+                  <input type="hidden" id="sel_transactionDefinition" value="">
+                  <input type="text" id="inp_transactionDefinitionLabel" class="form-control size-md bg-white" value="" placeholder="Select Transaction Template" readonly>
+                  <button type="button" class="btn btn-outline-primary" id="btnPickTransactionDefinition"><i class="bi bi-search"></i></button>
+                  <button type="button" class="btn btn-outline-secondary" id="btnClearTransactionDefinition"><i class="bi bi-x-lg"></i></button>
+                  <a href="#" class="btn btn-outline-info d-none" id="btnViewTransactionDefinition" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i></a>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="alert alert-light border shadow-sm mb-3" id="selectedTransactionDefinitionNotice">
+                  <div class="fw-bold mb-1">Transaction Template Driven</div>
+                  <div class="small text-muted">Code, label, amount, currency, and validity period are taken directly from the linked Transaction Template. Only the row note can be added here.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row align-items-end">
+              <div class="col-md-12 mb-3">
+                <label class="form-label fw-bold">Notes</label>
+                <input type="text" id="inp_feeNotes" class="form-control size-md" placeholder="Optional note">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <button type="button" class="btn btn-filled btn-primary btn-sm" id="btnAddFeeLine"><i class="bi bi-plus-circle me-1"></i>Add Fee Line</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>Transaction</th>
+                    <th>Code / Label</th>
+                    <th>Amount</th>
+                    <th>Currency</th>
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="feeLinesTbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="tab-posting-policy">
+            <div class="alert alert-warning border-warning shadow-sm mb-3">
+              <i class="bi bi-cash-stack me-2"></i>Program Posting Policies are used for term-registration class charges when the class itself does not define a policy. Class-level policies override these rows, and these rows override Department policies.
+            </div>
+
+            <div class="row align-items-end">
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Fee Category</label>
+                <select id="programPostingPolicyCategory" class="form-select size-md">
+                  <option value=""><%= allFeeCategoryLabel || 'All Categories' %></option>
+                  <% (feeCategories || []).forEach(cat => { %>
+                    <option value="<%= cat %>"><%= cat %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Transaction Template</label>
+                <div class="small text-muted mb-1">Choose the default template the program should use for class posting.</div>
+                <div class="input-group">
+                  <input type="hidden" id="sel_programPostingPolicyDefinition" value="">
+                  <input type="text" id="inp_programPostingPolicyDefinitionLabel" class="form-control size-md bg-white" value="" placeholder="Select Transaction Template" readonly>
+                  <button type="button" class="btn btn-outline-primary" id="btnPickProgramPostingPolicyDefinition"><i class="bi bi-search"></i></button>
+                  <button type="button" class="btn btn-outline-secondary" id="btnClearProgramPostingPolicyDefinition"><i class="bi bi-x-lg"></i></button>
+                  <a href="#" class="btn btn-outline-info d-none" id="btnViewProgramPostingPolicyDefinition" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i></a>
+                </div>
+              </div>
+              <div class="col-md-3 mb-3">
+                <label class="form-label fw-bold">Notes</label>
+                <input type="text" id="inp_programPostingPolicyNotes" class="form-control size-md" placeholder="Optional note">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <button type="button" class="btn btn-filled btn-primary btn-sm" id="btnAddProgramPostingPolicy"><i class="bi bi-plus-circle me-1"></i>Add Posting Policy</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>Fee Category</th>
+                    <th>Posting Policy</th>
+                    <th>Template Code</th>
+                    <th>Notes</th>
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="programPostingPolicyTbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="tab-curriculum">
+            <div class="alert alert-light border shadow-sm mb-3">
+              <i class="bi bi-journal-check me-2"></i>Add subjects via Generic Picker, then define program-specific type, credits, and one or more prerequisites.
+            </div>
+            <div class="mb-3">
+              <button type="button" class="btn btn-filled btn-primary btn-sm" id="btnAddSubject"><i class="bi bi-plus-circle me-1"></i>Add Subject</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th style="width: 8%;">Order</th>
+                    <th style="width: 28%;">Subject</th>
+                    <th style="width: 16%;">Type</th>
+                    <th style="width: 14%;">Program Credits</th>
+                    <th style="width: 18%;">Prerequisites</th>
+                    <th style="width: 16%;">Rule Summary</th>
+                    <th style="width: 20%;" class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="subjectsTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md fw-bold px-4">Save Program</button>
+        <a href="/school/programs" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/school/programs">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="preReqModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Set Prerequisites</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small text-muted mb-2">Select one or more prerequisite subjects.</div>
+        <div id="preReqOptions" class="d-grid gap-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSavePrereq">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="termDetailsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold" id="termDetailsModalTitle">Program Term Details</h5>
+          <div class="small text-muted" id="termDetailsModalMeta"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <div class="form-check mt-1">
+              <input type="checkbox" class="form-check-input" id="chk_termDetailsRequired">
+              <label class="form-check-label fw-bold" for="chk_termDetailsRequired">Term is required in this program</label>
+            </div>
+          </div>
+          <div class="col-md-6 text-md-end">
+            <div class="small text-muted" id="termDetailsModalSubmeta"></div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-uppercase text-muted fw-bold mb-1">Academic Rules</div>
+              <div class="fw-bold" id="termDetailsRuleLabel">Default</div>
+              <div class="small text-muted mt-1" id="termDetailsRuleDetails">No term-specific academic rules.</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-uppercase text-muted fw-bold mb-1">Registration Fees</div>
+              <div class="fw-bold" id="termDetailsFeeLabel">No fees</div>
+              <div class="small text-muted mt-1" id="termDetailsFeeDetails">None configured.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-bold" for="inp_termDetailsNotes">Notes</label>
+          <textarea class="form-control size-md" id="inp_termDetailsNotes" rows="4" placeholder="Optional note for this term"></textarea>
+        </div>
+
+        <div class="mb-2">
+          <div class="small text-uppercase text-muted fw-bold mb-2">Calendar Snapshot</div>
+          <div class="row g-2" id="termDetailsSnapshotList"></div>
+        </div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-secondary btn-sm" id="btnTermDetailsCalendar"><i class="bi bi-calendar-event me-1"></i>Calendar</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnTermDetailsRules"><i class="bi bi-sliders2 me-1"></i>Rules</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnTermDetailsFees"><i class="bi bi-receipt-cutoff me-1"></i>Fees</button>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-danger btn-sm" id="btnTermDetailsRemove">Remove</button>
+          <button type="button" class="btn btn-dark btn-sm" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="termRuleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Term Academic Rules</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="fw-bold" id="termRuleModalTermName">Selected Term</div>
+          <div class="small text-muted" id="termRuleModalTermMeta"></div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Minimum Passing Average</label>
+            <input type="number" class="form-control size-md" id="inp_termMinimumPassingAverage" min="0" max="100" step="0.01" placeholder="Leave blank if not required">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Minimum Passing Score</label>
+            <input type="number" class="form-control size-md" id="inp_termMinimumPassingScore" min="0" max="100" step="0.01" placeholder="Leave blank if not required">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Total Allowed Credits</label>
+            <input type="number" class="form-control size-md" id="inp_termTotalAllowedCredits" min="0" step="0.01" placeholder="Optional limit">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Minimum Required Credits</label>
+            <input type="number" class="form-control size-md" id="inp_termMinimumRequiredCredits" min="0" step="0.01" placeholder="Optional requirement">
+          </div>
+        </div>
+        <div class="form-check mb-2">
+          <input type="checkbox" class="form-check-input" id="chk_termAllowOverload">
+          <label class="form-check-label fw-bold" for="chk_termAllowOverload">Allow credit overload above the defined credit limit</label>
+        </div>
+        <div class="form-check mb-3">
+          <input type="checkbox" class="form-check-input" id="chk_termMustCompleteRequiredSubjects">
+          <label class="form-check-label fw-bold" for="chk_termMustCompleteRequiredSubjects">Student must complete all required subjects assigned to this term</label>
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Term Rule Notes</label>
+          <textarea class="form-control size-md" id="inp_termRuleNotes" rows="3" placeholder="Optional internal note for this term"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSaveTermRules">Save Rules</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="subjectRuleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Subject Score Rules</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="fw-bold" id="subjectRuleModalTitle">Selected Subject</div>
+          <div class="small text-muted">Configure subject-level pass/fail rules for the academic book.</div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Minimum Passing Score</label>
+            <input type="number" class="form-control size-md" id="inp_subjectRuleMinScore" min="0" max="100" step="0.01" placeholder="Leave blank to use higher-level rules">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Minimum Passing Average</label>
+            <input type="number" class="form-control size-md" id="inp_subjectRuleMinAverage" min="0" max="100" step="0.01" placeholder="Leave blank if not required">
+          </div>
+        </div>
+        <div class="form-check mb-2">
+          <input type="checkbox" class="form-check-input" id="chk_subjectRuleMustPass">
+          <label class="form-check-label fw-bold" for="chk_subjectRuleMustPass">Student must pass this subject individually</label>
+        </div>
+        <div class="form-check mb-3">
+          <input type="checkbox" class="form-check-input" id="chk_subjectRuleAllowCompensation">
+          <label class="form-check-label fw-bold" for="chk_subjectRuleAllowCompensation">Allow compensation by overall academic average</label>
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Rule Notes</label>
+          <textarea class="form-control size-md" id="inp_subjectRuleNotes" rows="3" placeholder="Optional internal note about this subject rule"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSaveSubjectRules">Save Rules</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="termFeeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Term Registration Fees</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning border-warning shadow-sm mb-3">
+          <i class="bi bi-receipt-cutoff me-2"></i>Define one-time registration fees for this term within this program. If no category is selected, the fee applies to all categories.
+        </div>
+        <div class="mb-3">
+          <div class="fw-bold" id="termFeeModalTermName">Selected Term</div>
+          <div class="small text-muted" id="termFeeModalTermMeta"></div>
+        </div>
+        <div class="row align-items-end">
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Fee Category</label>
+            <select id="sel_termFeeCategory" class="form-select size-md">
+              <option value=""><%= allFeeCategoryLabel || 'All Categories' %></option>
+              <% (feeCategories || []).forEach(cat => { %>
+                <option value="<%= cat %>"><%= cat %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-9 mb-3">
+            <label class="form-label fw-bold">Transaction Template</label>
+            <div class="input-group">
+              <input type="hidden" id="sel_termTransactionDefinition" value="">
+              <input type="text" id="inp_termTransactionDefinitionLabel" class="form-control size-md bg-white" value="" placeholder="Select Transaction Template" readonly>
+              <button type="button" class="btn btn-outline-primary" id="btnPickTermTransactionDefinition"><i class="bi bi-search"></i></button>
+              <button type="button" class="btn btn-outline-secondary" id="btnClearTermTransactionDefinition"><i class="bi bi-x-lg"></i></button>
+              <a href="#" class="btn btn-outline-info d-none" id="btnViewTermTransactionDefinition" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i></a>
+            </div>
+          </div>
+        </div>
+        <div class="row align-items-end">
+          <div class="col-md-12 mb-3">
+            <label class="form-label fw-bold">Notes</label>
+            <input type="text" id="inp_termFeeNotes" class="form-control size-md" placeholder="Optional note for this term registration fee">
+          </div>
+        </div>
+        <div class="mb-3">
+          <button type="button" class="btn btn-filled btn-primary btn-sm" id="btnAddTermFeeLine"><i class="bi bi-plus-circle me-1"></i>Add Term Fee</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Transaction Template</th>
+                <th>Code / Label</th>
+                <th>Amount</th>
+                <th>Currency</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="termFeeLinesTbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="termSnapshotModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold">Program Term Calendar Snapshot</h5>
+          <div class="small text-muted" id="termSnapshotModalMeta"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-light border shadow-sm small">
+          Program terms keep a snapshot of the operational calendar. Term start and end dates remain linked to the term master record.
+        </div>
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label class="form-label fw-bold">Term Code</label>
+            <input type="text" class="form-control size-md font-monospace" id="inp_termSnapshotCode">
+          </div>
+          <div class="col-md-5 mb-3">
+            <label class="form-label fw-bold">Term Name</label>
+            <input type="text" class="form-control size-md" id="inp_termSnapshotName">
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Status</label>
+            <input type="text" class="form-control size-md" id="inp_termSnapshotStatus" placeholder="active">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Description</label>
+          <textarea class="form-control size-md" id="inp_termSnapshotDescription" rows="2"></textarea>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Registration Open Date</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotRegistrationOpenDate">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Registration Close Date</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotRegistrationCloseDate">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Late Registration Deadline</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotLateRegistrationDeadline">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Payment Due Date</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotPaymentDueDate">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Classes Start Date</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotClassesStartDate">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Classes End Date</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotClassesEndDate">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Add / Drop Deadline</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotAddDropDeadline">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Swap Deadline</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotSwapDeadline">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Withdraw Without Penalty Deadline</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotWithdrawWithoutPenaltyDeadline">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Final Withdraw Deadline</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotWithdrawDeadline">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Census Date</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotCensusDate">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Result Release Date</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotResultReleaseDate">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Final Exam Start Date</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotFinalExamStartDate">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold">Final Exam End Date</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotFinalExamEndDate">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-0">
+            <label class="form-label fw-bold">Grade Submission Deadline</label>
+            <input type="date" class="form-control size-md" id="inp_termSnapshotGradeSubmissionDeadline">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSaveTermSnapshot">Save Snapshot</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+  window.__INIT_PROGRAM_DURATION__ = <%- initDuration %>;
+  window.__INIT_PROGRAM_ACADEMIC_RULES__ = <%- initAcademicRules %>;
+  window.__INIT_PROGRAM_FEES__ = <%- initFeeGroups %>;
+  window.__INIT_PROGRAM_POSTING_POLICIES__ = <%- initPostingPolicies %>;
+  window.__INIT_PROGRAM_TERMS__ = <%- initTerms %>;
+  window.__INIT_PROGRAM_SUBJECTS__ = <%- initSubjects %>;
+  window.__INIT_TRANSACTION_DEFINITIONS__ = <%- initTransactionDefinitions %>;
+  window.__INIT_SUBJECT_CATALOG__ = <%- initSubjectCatalog %>;
+  window.__INIT_TERM_CATALOG__ = <%- initTermCatalog %>;
+  window.__INIT_DEPARTMENTS__ = <%- initDepartments %>;
+</script>
+
+<script>
+(function () {
+  const form = document.getElementById('programForm');
+  const tabsRoot = document.getElementById('programTabs');
+  const hidFeeGroups = document.getElementById('hid_feeGroups');
+  const hidPostingPolicies = document.getElementById('hid_postingPolicies');
+  const hidTerms = document.getElementById('hid_terms');
+  const hidSubjects = document.getElementById('hid_subjects');
+  const hidAcademicRules = document.getElementById('hid_academicRules');
+  const hidDuration = document.getElementById('hid_duration');
+  const feeLinesTbody = document.getElementById('feeLinesTbody');
+  const termsTbody = document.getElementById('termsTbody');
+  const subjectsTbody = document.getElementById('subjectsTbody');
+  const feeCategories = <%- JSON.stringify(feeCategories || []) %>;
+  const allFeeCategoryKey = <%- JSON.stringify(allFeeCategoryKey || '__ALL__') %>;
+  const allFeeCategoryLabel = <%- JSON.stringify(allFeeCategoryLabel || 'All Categories') %>;
+  const subjectTypes = <%- JSON.stringify(subjectTypes || ['main', 'essential', 'optional']) %>;
+  const ALL_FEE_CATEGORY_KEY = allFeeCategoryKey;
+  const programOrgId = <%- JSON.stringify(programOrgId || '') %>;
+  const adminPickerEndpoint = '/school/programs/api/eligible-administrators?orgId=' + encodeURIComponent(programOrgId);
+  const transactionDefinitions = Array.isArray(window.__INIT_TRANSACTION_DEFINITIONS__) ? window.__INIT_TRANSACTION_DEFINITIONS__ : [];
+  const transactionDefMap = new Map(transactionDefinitions.map(function (t) { return [String(t.id), t]; }));
+  const departments = Array.isArray(window.__INIT_DEPARTMENTS__) ? window.__INIT_DEPARTMENTS__ : [];
+  const departmentMap = new Map(departments.map(function (d) { return [String(d.id || ''), d]; }));
+  const subjectCatalog = Array.isArray(window.__INIT_SUBJECT_CATALOG__) ? window.__INIT_SUBJECT_CATALOG__ : [];
+  const subjectCatalogMap = new Map(subjectCatalog.map(function (s) { return [String(s.id || ''), s]; }));
+  const termCatalog = Array.isArray(window.__INIT_TERM_CATALOG__) ? window.__INIT_TERM_CATALOG__ : [];
+  const termCatalogMap = new Map(termCatalog.map(function (t) { return [String(t.id || ''), t]; }));
+  const termSnapshotFields = [
+    'registrationOpenDate',
+    'registrationCloseDate',
+    'lateRegistrationDeadline',
+    'paymentDueDate',
+    'classesStartDate',
+    'classesEndDate',
+    'addDropDeadline',
+    'swapDeadline',
+    'withdrawWithoutPenaltyDeadline',
+    'withdrawDeadline',
+    'censusDate',
+    'finalExamStartDate',
+    'finalExamEndDate',
+    'gradeSubmissionDeadline',
+    'termResultReleaseDate'
+  ];
+
+  let academicRules = (window.__INIT_PROGRAM_ACADEMIC_RULES__ && typeof window.__INIT_PROGRAM_ACADEMIC_RULES__ === 'object') ? window.__INIT_PROGRAM_ACADEMIC_RULES__ : {};
+  let feeGroups = (window.__INIT_PROGRAM_FEES__ && typeof window.__INIT_PROGRAM_FEES__ === 'object') ? window.__INIT_PROGRAM_FEES__ : {};
+  let postingPolicies = Array.isArray(window.__INIT_PROGRAM_POSTING_POLICIES__) ? window.__INIT_PROGRAM_POSTING_POLICIES__ : [];
+  let terms = Array.isArray(window.__INIT_PROGRAM_TERMS__) ? window.__INIT_PROGRAM_TERMS__ : [];
+  let subjects = Array.isArray(window.__INIT_PROGRAM_SUBJECTS__) ? window.__INIT_PROGRAM_SUBJECTS__ : [];
+  let editingPrereqFor = null;
+  let editingSubjectRuleFor = null;
+  let editingTermDetailsIndex = null;
+  let editingTermRuleIndex = null;
+  let editingTermFeeIndex = null;
+  let editingTermSnapshotIndex = null;
+  let termDetailsModal = null;
+  let termFeeModal = null;
+  let termRuleModal = null;
+  let termSnapshotModal = null;
+  let subjectRuleModal = null;
+
+  function activateTab(targetSelector) {
+    if (!targetSelector) return;
+    const trigger = tabsRoot ? tabsRoot.querySelector(`[data-bs-target="${targetSelector}"]`) : null;
+    if (!trigger) return;
+    if (window.bootstrap && typeof window.bootstrap.Tab === 'function') {
+      window.bootstrap.Tab.getOrCreateInstance(trigger).show();
+      return;
+    }
+    trigger.click();
+  }
+
+  function activateTabForElement(element) {
+    if (!element) return;
+    const pane = element.closest('.tab-pane');
+    if (pane && pane.id) activateTab(`#${pane.id}`);
+  }
+
+  function getTermMaster(termId) {
+    return termCatalogMap.get(String(termId || '').trim()) || null;
+  }
+
+  function buildTermSnapshot(master, existing) {
+    const source = (master && typeof master === 'object') ? master : {};
+    const prior = (existing && typeof existing === 'object') ? existing : {};
+    const snapshot = {
+      termCode: String(prior.termCode || source.code || '').trim().toUpperCase(),
+      termName: String(prior.termName || source.name || source.title || prior.termId || '').trim(),
+      status: String(prior.status || source.status || '').trim().toLowerCase(),
+      termDescription: String(prior.termDescription || source.description || '').trim()
+    };
+    termSnapshotFields.forEach(function (field) {
+      snapshot[field] = String(prior[field] || source[field] || '').trim();
+    });
+    return snapshot;
+  }
+
+  function getTermLiveDates(termObj) {
+    const master = getTermMaster(termObj.termId);
+    return {
+      startDate: String((master && master.startDate) || termObj.startDate || '').trim(),
+      endDate: String((master && master.endDate) || termObj.endDate || '').trim()
+    };
+  }
+
+  function validateTermSnapshot(snapshot) {
+    const s = snapshot || {};
+    function fail(message) { throw new Error(message); }
+    if (s.registrationOpenDate && s.registrationCloseDate && s.registrationCloseDate < s.registrationOpenDate) fail('Program term registration close date cannot be earlier than registration open date.');
+    if (s.classesStartDate && s.classesEndDate && s.classesEndDate < s.classesStartDate) fail('Program term classes end date cannot be earlier than classes start date.');
+    if (s.finalExamStartDate && s.finalExamEndDate && s.finalExamEndDate < s.finalExamStartDate) fail('Program term final exam end date cannot be earlier than final exam start date.');
+    if (s.withdrawWithoutPenaltyDeadline && s.withdrawDeadline && s.withdrawDeadline < s.withdrawWithoutPenaltyDeadline) fail('Program term withdraw deadline cannot be earlier than withdraw without penalty deadline.');
+    if (s.classesStartDate && s.addDropDeadline && s.addDropDeadline < s.classesStartDate) fail('Program term add/drop deadline cannot be earlier than classes start date.');
+    if (s.classesStartDate && s.swapDeadline && s.swapDeadline < s.classesStartDate) fail('Program term swap deadline cannot be earlier than classes start date.');
+    if (s.classesStartDate && s.classesEndDate && s.censusDate && (s.censusDate < s.classesStartDate || s.censusDate > s.classesEndDate)) {
+      fail('Program term census date must fall within the class period.');
+    }
+  }
+
+  function activateTabForErrorMessage(message) {
+    const msg = String(message || '').toLowerCase();
+    if (!msg) return;
+    if (msg.includes('program administrator') || msg.includes('program name') || msg.includes('program code') || msg.includes('status') || msg.includes('description') || msg.includes('department')) return activateTab('#tab-general');
+    if (msg.includes('duration') || msg.includes('academic rules') || msg.includes('program credits') || msg.includes('passing score') || msg.includes('passing average') || msg.includes('required credits')) return activateTab('#tab-rules');
+    if (msg.includes('term') || msg.includes('semester') || msg.includes('overload')) return activateTab('#tab-terms');
+    if (msg.includes('fee') || msg.includes('transaction definition') || msg.includes('transaction template') || msg.includes('category')) return activateTab('#tab-fees');
+    if (msg.includes('posting policy')) return activateTab('#tab-posting-policy');
+    if (msg.includes('subject') || msg.includes('prerequisite') || msg.includes('curriculum') || msg.includes('compensation')) return activateTab('#tab-curriculum');
+  }
+
+  function getPersonDisplayName(item) {
+    const first = String(item?.name?.first || item?.firstName || '').trim();
+    const last = String(item?.name?.last || item?.lastName || '').trim();
+    return `${first} ${last}`.trim() || String(item?.displayName || item?.id || '').trim();
+  }
+
+  function showMsg(opts) {
+    if (typeof showMessageModal === 'function') return showMessageModal(opts);
+    alert(opts?.message || 'Done');
+    return Promise.resolve();
+  }
+
+  function safeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function normalizeDurationUI() {
+    const d = window.__INIT_PROGRAM_DURATION__ || {};
+    document.getElementById('inp_durationYears').value = Number(d.years || 0);
+    document.getElementById('inp_durationMonths').value = Number(d.months || 0);
+    document.getElementById('inp_durationDays').value = Number(d.days || 0);
+  }
+
+  function normalizeAcademicRulesUI() {
+    const rules = academicRules && typeof academicRules === 'object' ? academicRules : {};
+    document.getElementById('inp_requiredEssentialCredits').value =
+      (rules.requiredEssentialCredits === null || rules.requiredEssentialCredits === undefined || rules.requiredEssentialCredits === '') ? '' : Number(rules.requiredEssentialCredits);
+    document.getElementById('inp_requiredOptionalCredits').value =
+      (rules.requiredOptionalCredits === null || rules.requiredOptionalCredits === undefined || rules.requiredOptionalCredits === '') ? '' : Number(rules.requiredOptionalCredits);
+    document.getElementById('chk_allowEssentialCreditsTowardOptional').checked =
+      rules.allowEssentialCreditsTowardOptional !== false && String(rules.allowEssentialCreditsTowardOptional) !== 'false';
+  }
+
+  function ensureFeeKeys() {
+    feeGroups = ensureCategoryFeeKeys(feeGroups);
+  }
+
+  function ensureCategoryFeeKeys(groups) {
+    const next = (groups && typeof groups === 'object' && !Array.isArray(groups)) ? groups : {};
+    feeCategories.forEach(function (cat) {
+      if (!Array.isArray(next[cat])) next[cat] = [];
+    });
+    if (!Array.isArray(next[ALL_FEE_CATEGORY_KEY])) next[ALL_FEE_CATEGORY_KEY] = [];
+    Object.keys(next).forEach(function (k) {
+      if (!feeCategories.includes(k) && k !== ALL_FEE_CATEGORY_KEY) delete next[k];
+    });
+    return next;
+  }
+
+  function getCategoryLabel(cat) {
+    return cat ? String(cat) : allFeeCategoryLabel;
+  }
+
+  function setAdministrator(personId, personName) {
+    document.getElementById('inp_adminPersonId').value = String(personId || '').trim();
+    document.getElementById('inp_adminPersonName').value = String(personName || '').trim();
+  }
+
+  function setProgramDepartment(item) {
+    const department = item && typeof item === 'object' ? item : null;
+    document.getElementById('inp_programDepartmentId').value = String(department?.id || '').trim();
+    document.getElementById('inp_programDepartmentCode').value = String(department?.code || '').trim().toUpperCase();
+    document.getElementById('inp_programDepartmentName').value = String(department?.name || '').trim();
+  }
+
+  function applyProgramTemplate(item) {
+    if (!item || typeof item !== 'object') return;
+    form.querySelector('input[name="name"]').value = item.name || '';
+    form.querySelector('input[name="code"]').value = item.code || '';
+    form.querySelector('select[name="status"]').value = item.status || 'active';
+    form.querySelector('textarea[name="description"]').value = item.description || '';
+    form.querySelector('textarea[name="notes"]').value = item.notes || '';
+    form.querySelector('input[name="credits"]').value = item.credits ?? '';
+    form.querySelector('input[name="minimumPassingScore"]').value = item.minimumPassingScore ?? '';
+    form.querySelector('input[name="minimumPassingAverage"]').value = item.minimumPassingAverage ?? '';
+
+    const duration = (item.duration && typeof item.duration === 'object') ? item.duration : {};
+    window.__INIT_PROGRAM_DURATION__ = {
+      years: Number(duration.years || 0),
+      months: Number(duration.months || 0),
+      days: Number(duration.days || 0)
+    };
+    normalizeDurationUI();
+
+    academicRules = (item.academicRules && typeof item.academicRules === 'object')
+      ? JSON.parse(JSON.stringify(item.academicRules))
+      : {};
+    normalizeAcademicRulesUI();
+
+    feeGroups = (item.feeGroups && typeof item.feeGroups === 'object')
+      ? JSON.parse(JSON.stringify(item.feeGroups))
+      : {};
+    ensureFeeKeys();
+    renderFeeLines();
+
+    terms = Array.isArray(item.terms) ? JSON.parse(JSON.stringify(item.terms)) : [];
+    normalizeTerms();
+    renderTerms();
+
+    subjects = Array.isArray(item.subjects) ? JSON.parse(JSON.stringify(item.subjects)) : [];
+    normalizeSubjects();
+    renderSubjects();
+
+    const adminName = String(item.programAdministratorPersonName || item.administratorName || '').trim();
+    setAdministrator(item.programAdministratorPersonId || '', adminName);
+    setProgramDepartment({
+      id: item.departmentId || '',
+      code: item.departmentCode || '',
+      name: item.departmentName || ''
+    });
+    postingPolicies = Array.isArray(item.postingPolicies) ? JSON.parse(JSON.stringify(item.postingPolicies)) : [];
+    normalizePostingPolicies();
+    renderPostingPolicies();
+    syncHiddenState();
+    activateTab('#tab-general');
+  }
+
+  function resolveSubjectMaster(subjectId) {
+    return subjectCatalogMap.get(String(subjectId || '').trim()) || null;
+  }
+
+  function getSubjectDisplay(subject) {
+    const master = resolveSubjectMaster(subject && subject.subjectId);
+    return {
+      title: String(
+        master?.title ||
+        subject?.subjectTitle ||
+        subject?.title ||
+        subject?.name ||
+        subject?.subjectId ||
+        ''
+      ).trim(),
+      code: String(
+        master?.code ||
+        subject?.subjectCode ||
+        subject?.code ||
+        subject?.subjectId ||
+        ''
+      ).trim(),
+      status: String(master?.status || '').trim().toLowerCase(),
+      defaultCredits: master && master.configuration ? Number(master.configuration.credits) : null
+    };
+  }
+
+  function getSubjectDefaultScoreRules(subjectId) {
+    const master = resolveSubjectMaster(subjectId);
+    const rules = (master && master.defaultScoreRules && typeof master.defaultScoreRules === 'object')
+      ? master.defaultScoreRules
+      : {};
+    return {
+      minPassingScore: rules.minPassingScore === null || rules.minPassingScore === undefined || rules.minPassingScore === '' ? null : Number(rules.minPassingScore),
+      minPassingAverage: rules.minPassingAverage === null || rules.minPassingAverage === undefined || rules.minPassingAverage === '' ? null : Number(rules.minPassingAverage),
+      mustPass: rules.mustPass === true || String(rules.mustPass) === 'true',
+      allowCompensation: rules.allowCompensation === true || String(rules.allowCompensation) === 'true',
+      notes: String(rules.notes || '')
+    };
+  }
+
+  function formatCredit(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(2).replace(/\.00$/, '') : '0';
+  }
+
+  function calculateSubjectTypeTotals() {
+    return subjects.reduce(function (acc, s) {
+      const type = subjectTypes.includes(String(s.subjectType || '')) ? String(s.subjectType) : 'main';
+      const credits = Number(s.programCredits);
+      if (Number.isFinite(credits)) acc[type] += credits;
+      return acc;
+    }, { main: 0, essential: 0, optional: 0 });
+  }
+
+  function getPrerequisiteLabels(subject) {
+    return (Array.isArray(subject.prerequisites) ? subject.prerequisites : []).map(function (preId) {
+      const preSubject = subjects.find(function (candidate) { return candidate.subjectId === preId; });
+      const display = getSubjectDisplay(preSubject || { subjectId: preId });
+      return display.code || display.title || preId;
+    });
+  }
+
+  function syncAcademicRules() {
+    const totals = calculateSubjectTypeTotals();
+    const requiredEssentialCredits = Number(document.getElementById('inp_requiredEssentialCredits').value || 0);
+    const requiredOptionalCredits = Number(document.getElementById('inp_requiredOptionalCredits').value || 0);
+    const allowEssentialCreditsTowardOptional = document.getElementById('chk_allowEssentialCreditsTowardOptional').checked;
+
+    document.getElementById('txt_totalMainCredits').value = formatCredit(totals.main);
+    document.getElementById('txt_totalEssentialCredits').value = formatCredit(totals.essential);
+    document.getElementById('txt_totalOptionalCredits').value = formatCredit(totals.optional);
+    document.getElementById('inp_requiredMainCredits').value = formatCredit(totals.main);
+
+    academicRules = {
+      requiredMainCredits: Number(totals.main.toFixed(2)),
+      requiredEssentialCredits: Number((Number.isFinite(requiredEssentialCredits) ? requiredEssentialCredits : 0).toFixed(2)),
+      requiredOptionalCredits: Number((Number.isFinite(requiredOptionalCredits) ? requiredOptionalCredits : 0).toFixed(2)),
+      allowEssentialCreditsTowardOptional: allowEssentialCreditsTowardOptional
+    };
+  }
+
+  function assertAcademicRulesValid() {
+    const totals = calculateSubjectTypeTotals();
+    const requiredEssentialCredits = Number(academicRules.requiredEssentialCredits || 0);
+    const requiredOptionalCredits = Number(academicRules.requiredOptionalCredits || 0);
+    if (requiredEssentialCredits > totals.essential) {
+      throw new Error('Required essential credits cannot exceed the total available essential credits.');
+    }
+    const optionalCapacity = academicRules.allowEssentialCreditsTowardOptional
+      ? totals.optional + Math.max(0, totals.essential - requiredEssentialCredits)
+      : totals.optional;
+    if (requiredOptionalCredits > optionalCapacity) {
+      throw new Error('Required optional credits exceed the available optional credit capacity under the current academic rule.');
+    }
+  }
+
+  function getSelectedTransactionDefinition() {
+    const txId = String(document.getElementById('sel_transactionDefinition').value || '').trim();
+    return txId ? (transactionDefMap.get(txId) || null) : null;
+  }
+
+  function syncTransactionDefinitionSelectionUi() {
+    const txIdField = document.getElementById('sel_transactionDefinition');
+    const labelField = document.getElementById('inp_transactionDefinitionLabel');
+    const viewBtn = document.getElementById('btnViewTransactionDefinition');
+    const tx = getSelectedTransactionDefinition();
+    if (!tx) {
+      txIdField.value = '';
+      labelField.value = '';
+      viewBtn.classList.add('d-none');
+      viewBtn.setAttribute('href', '#');
+      return;
+    }
+    txIdField.value = String(tx.id || '');
+    labelField.value = [String(tx.code || tx.id || '').trim(), String(tx.name || '').trim()].filter(Boolean).join(' - ');
+    viewBtn.classList.remove('d-none');
+    viewBtn.setAttribute('href', '/school/transactionTemplates/edit/' + encodeURIComponent(String(tx.id || '')));
+  }
+
+  function getTodayIso() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function isExpiredDefinition(definitionLike) {
+    const validTo = String((definitionLike && definitionLike.validTo) || '').trim();
+    return !!validTo && validTo < getTodayIso();
+  }
+
+  function normalizeSubjects() {
+    subjects = subjects.map(function (s, idx) {
+      const master = resolveSubjectMaster(s.subjectId || s.id || '');
+      const defaultRules = getSubjectDefaultScoreRules(s.subjectId || s.id || '');
+      const subjectType = String(s.subjectType || (s.isRequired === false ? 'essential' : 'main')).trim().toLowerCase() || 'main';
+      const defaultCredits = master && master.configuration ? Number(master.configuration.credits) : null;
+      const programCreditsRaw = (s.programCredits === null || s.programCredits === undefined || s.programCredits === '')
+        ? defaultCredits
+        : s.programCredits;
+      return {
+        subjectId: String(s.subjectId || '').trim(),
+        order: Number(s.order || (idx + 1)),
+        isRequired: subjectType === 'main',
+        subjectType: subjectTypes.includes(subjectType) ? subjectType : 'main',
+        programCredits: (programCreditsRaw === null || programCreditsRaw === undefined || programCreditsRaw === '') ? 0 : Number(programCreditsRaw),
+        minPassingScore: (s.minPassingScore === null || s.minPassingScore === undefined || s.minPassingScore === '')
+          ? defaultRules.minPassingScore
+          : Number(s.minPassingScore),
+        minPassingAverage: (s.minPassingAverage === null || s.minPassingAverage === undefined || s.minPassingAverage === '')
+          ? defaultRules.minPassingAverage
+          : Number(s.minPassingAverage),
+        mustPass: s.mustPass === undefined
+          ? (defaultRules.mustPass || subjectType === 'main')
+          : (s.mustPass === true || String(s.mustPass) === 'true'),
+        allowCompensation: s.allowCompensation === undefined
+          ? defaultRules.allowCompensation
+          : (s.allowCompensation === true || String(s.allowCompensation) === 'true'),
+        prerequisites: Array.isArray(s.prerequisites) ? s.prerequisites.map(function (x) { return String(x); }) : [],
+        notes: String(s.notes || defaultRules.notes || ''),
+        subjectCode: String(master?.code || s.subjectCode || s.code || ''),
+        subjectTitle: String(master?.title || s.subjectTitle || s.title || s.name || s.subjectId || ''),
+        subjectStatus: String(master?.status || s.subjectStatus || '').trim().toLowerCase()
+      };
+    }).filter(function (s) { return !!s.subjectId; });
+
+    subjects.sort(function (a, b) { return a.order - b.order; });
+    subjects.forEach(function (s, i) { s.order = i + 1; });
+  }
+
+  function normalizeTerms() {
+    terms = terms.map(function (t, idx) {
+      const termId = String(t.termId || t.id || '').trim();
+      const snapshot = buildTermSnapshot(getTermMaster(termId), t);
+      const liveDates = getTermLiveDates({ termId: termId, startDate: t.startDate, endDate: t.endDate });
+      return {
+        termId: termId,
+        order: Number(t.order || (idx + 1)),
+        isRequired: t.isRequired !== false,
+        notes: String(t.notes || '').trim(),
+        termCode: snapshot.termCode,
+        termName: snapshot.termName,
+        status: snapshot.status,
+        termDescription: snapshot.termDescription,
+        startDate: liveDates.startDate,
+        endDate: liveDates.endDate,
+        registrationOpenDate: snapshot.registrationOpenDate,
+        registrationCloseDate: snapshot.registrationCloseDate,
+        lateRegistrationDeadline: snapshot.lateRegistrationDeadline,
+        paymentDueDate: snapshot.paymentDueDate,
+        classesStartDate: snapshot.classesStartDate,
+        classesEndDate: snapshot.classesEndDate,
+        addDropDeadline: snapshot.addDropDeadline,
+        swapDeadline: snapshot.swapDeadline,
+        withdrawWithoutPenaltyDeadline: snapshot.withdrawWithoutPenaltyDeadline,
+        withdrawDeadline: snapshot.withdrawDeadline,
+        censusDate: snapshot.censusDate,
+        finalExamStartDate: snapshot.finalExamStartDate,
+        finalExamEndDate: snapshot.finalExamEndDate,
+        gradeSubmissionDeadline: snapshot.gradeSubmissionDeadline,
+        termResultReleaseDate: snapshot.termResultReleaseDate,
+        termAcademicRules: {
+          minimumPassingAverage: (t.termAcademicRules && t.termAcademicRules.minimumPassingAverage !== undefined && t.termAcademicRules.minimumPassingAverage !== null && t.termAcademicRules.minimumPassingAverage !== '') ? Number(t.termAcademicRules.minimumPassingAverage) : null,
+          minimumPassingScore: (t.termAcademicRules && t.termAcademicRules.minimumPassingScore !== undefined && t.termAcademicRules.minimumPassingScore !== null && t.termAcademicRules.minimumPassingScore !== '') ? Number(t.termAcademicRules.minimumPassingScore) : null,
+          totalAllowedCredits: (t.termAcademicRules && t.termAcademicRules.totalAllowedCredits !== undefined && t.termAcademicRules.totalAllowedCredits !== null && t.termAcademicRules.totalAllowedCredits !== '') ? Number(t.termAcademicRules.totalAllowedCredits) : null,
+          minimumRequiredCredits: (t.termAcademicRules && t.termAcademicRules.minimumRequiredCredits !== undefined && t.termAcademicRules.minimumRequiredCredits !== null && t.termAcademicRules.minimumRequiredCredits !== '') ? Number(t.termAcademicRules.minimumRequiredCredits) : null,
+          allowOverload: Boolean(t.termAcademicRules && t.termAcademicRules.allowOverload),
+          mustCompleteRequiredSubjects: !(t.termAcademicRules && t.termAcademicRules.mustCompleteRequiredSubjects === false),
+          notes: String((t.termAcademicRules && t.termAcademicRules.notes) || '').trim()
+        },
+        termRegistrationFeeGroups: ensureCategoryFeeKeys(t.termRegistrationFeeGroups || t.registrationFeeGroups)
+      };
+    }).filter(function (t) { return !!t.termId; });
+
+    terms.sort(function (a, b) { return a.order - b.order; });
+    terms.forEach(function (t, i) { t.order = i + 1; });
+  }
+
+  function normalizePostingPolicies() {
+    const seen = new Set();
+    postingPolicies = (Array.isArray(postingPolicies) ? postingPolicies : []).map(function (row) {
+      return {
+        feeCategory: String(row?.feeCategory || ALL_FEE_CATEGORY_KEY).trim() || ALL_FEE_CATEGORY_KEY,
+        transactionDefinitionId: String(row?.transactionDefinitionId || '').trim(),
+        transactionDefinitionCode: String(row?.transactionDefinitionCode || '').trim().toUpperCase(),
+        transactionDefinitionName: String(row?.transactionDefinitionName || '').trim(),
+        notes: String(row?.notes || '').trim(),
+        active: row?.active !== false && String(row?.active) !== 'false'
+      };
+    }).filter(function (row) {
+      if (!row.transactionDefinitionId) return false;
+      if (seen.has(row.feeCategory)) return false;
+      seen.add(row.feeCategory);
+      return true;
+    });
+  }
+
+  function formatPostingPolicyLabel(row) {
+    return [row.transactionDefinitionCode || '', row.transactionDefinitionName || ''].filter(Boolean).join(' - ') || row.transactionDefinitionId || '-';
+  }
+
+  function syncProgramPostingPolicySelectionUi() {
+    const idField = document.getElementById('sel_programPostingPolicyDefinition');
+    const labelField = document.getElementById('inp_programPostingPolicyDefinitionLabel');
+    const viewBtn = document.getElementById('btnViewProgramPostingPolicyDefinition');
+    const txId = String(idField?.value || '').trim();
+    if (!txId) {
+      labelField.value = '';
+      viewBtn.classList.add('d-none');
+      viewBtn.setAttribute('href', '#');
+      return;
+    }
+    const tx = transactionDefMap.get(txId) || null;
+    labelField.value = tx ? [String(tx.code || '').trim(), String(tx.name || '').trim()].filter(Boolean).join(' - ') : '';
+    viewBtn.classList.remove('d-none');
+    viewBtn.setAttribute('href', '/school/transactionTemplates/edit/' + encodeURIComponent(txId));
+  }
+
+  function renderPostingPolicies() {
+    normalizePostingPolicies();
+    const tbody = document.getElementById('programPostingPolicyTbody');
+    if (!tbody) return;
+    if (!postingPolicies.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No Posting Policies added yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = postingPolicies.map(function (row, index) {
+      return '<tr>' +
+        '<td><span class="fw-bold">' + safeHtml(getCategoryLabel(row.feeCategory === ALL_FEE_CATEGORY_KEY ? '' : row.feeCategory)) + '</span></td>' +
+        '<td><div class="fw-bold">' + safeHtml(formatPostingPolicyLabel(row)) + '</div></td>' +
+        '<td><span class="font-monospace">' + safeHtml(row.transactionDefinitionCode || row.transactionDefinitionId || '-') + '</span></td>' +
+        '<td><span class="small text-muted">' + safeHtml(row.notes || '') + '</span></td>' +
+        '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-del-program-policy="' + index + '"><i class="bi bi-trash"></i></button></td>' +
+      '</tr>';
+    }).join('');
+    tbody.querySelectorAll('button[data-del-program-policy]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const index = Number(btn.getAttribute('data-del-program-policy'));
+        if (!Number.isInteger(index) || !postingPolicies[index]) return;
+        postingPolicies.splice(index, 1);
+        renderPostingPolicies();
+        syncHiddenState();
+      });
+    });
+  }
+
+  function syncHiddenState() {
+    const duration = {
+      years: Number(document.getElementById('inp_durationYears').value || 0),
+      months: Number(document.getElementById('inp_durationMonths').value || 0),
+      days: Number(document.getElementById('inp_durationDays').value || 0)
+    };
+    hidDuration.value = JSON.stringify(duration);
+    syncAcademicRules();
+    hidFeeGroups.value = JSON.stringify(feeGroups);
+    normalizePostingPolicies();
+    hidPostingPolicies.value = JSON.stringify(postingPolicies);
+    hidTerms.value = JSON.stringify(terms.map(function (t) {
+      return {
+        termId: t.termId,
+        order: t.order,
+        isRequired: t.isRequired,
+        notes: t.notes,
+        termCode: t.termCode,
+        termName: t.termName,
+        status: t.status,
+        termDescription: t.termDescription,
+        registrationOpenDate: t.registrationOpenDate,
+        registrationCloseDate: t.registrationCloseDate,
+        lateRegistrationDeadline: t.lateRegistrationDeadline,
+        paymentDueDate: t.paymentDueDate,
+        classesStartDate: t.classesStartDate,
+        classesEndDate: t.classesEndDate,
+        addDropDeadline: t.addDropDeadline,
+        swapDeadline: t.swapDeadline,
+        withdrawWithoutPenaltyDeadline: t.withdrawWithoutPenaltyDeadline,
+        withdrawDeadline: t.withdrawDeadline,
+        censusDate: t.censusDate,
+        finalExamStartDate: t.finalExamStartDate,
+        finalExamEndDate: t.finalExamEndDate,
+        gradeSubmissionDeadline: t.gradeSubmissionDeadline,
+        termResultReleaseDate: t.termResultReleaseDate,
+        termAcademicRules: t.termAcademicRules,
+        termRegistrationFeeGroups: t.termRegistrationFeeGroups
+      };
+    }));
+    hidSubjects.value = JSON.stringify(subjects.map(function (s) {
+      return {
+        subjectId: s.subjectId,
+        order: s.order,
+        isRequired: s.isRequired,
+        subjectType: s.subjectType,
+        programCredits: s.programCredits,
+        minPassingScore: s.minPassingScore,
+        minPassingAverage: s.minPassingAverage,
+        mustPass: s.mustPass,
+        allowCompensation: s.allowCompensation,
+        prerequisites: s.prerequisites,
+        notes: s.notes
+      };
+    }));
+    hidAcademicRules.value = JSON.stringify(academicRules || {});
+  }
+
+  function renderFeeLines() {
+    const groupedRows = [ALL_FEE_CATEGORY_KEY].concat(feeCategories).map(function (cat) {
+      return {
+        category: cat,
+        rows: (feeGroups[cat] || []).map(function (line, idx) {
+          return {
+            category: cat,
+            index: idx,
+            transactionDefinitionId: String(line.transactionDefinitionId || ''),
+            transactionDefinitionCode: String(line.transactionDefinitionCode || ''),
+            transactionDefinitionName: String(line.transactionDefinitionName || ''),
+            code: String(line.code || ''),
+            label: String(line.label || ''),
+            amount: (line.amount === null || line.amount === undefined || line.amount === '') ? null : Number(line.amount),
+            currency: String(line.currency || ''),
+            validFrom: String(line.validFrom || ''),
+            validTo: String(line.validTo || '')
+          };
+        })
+      };
+    }).filter(function (group) { return group.rows.length > 0; });
+
+    if (!groupedRows.length) {
+      feeLinesTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No fee lines added yet.</td></tr>';
+      syncHiddenState();
+      return;
+    }
+
+    feeLinesTbody.innerHTML = groupedRows.map(function (group) {
+      const header = '<tr class="table-light">' +
+        '<td colspan="5"><span class="fw-bold">' + safeHtml(getCategoryLabel(group.category === ALL_FEE_CATEGORY_KEY ? '' : group.category)) + '</span></td>' +
+      '</tr>';
+      const rowsHtml = group.rows.map(function (r) {
+        const txLabel = r.transactionDefinitionId
+          ? (r.transactionDefinitionCode || r.transactionDefinitionId) + (r.transactionDefinitionName ? ' - ' + r.transactionDefinitionName : '')
+          : 'Manual row';
+        const validityLabel = r.validFrom || r.validTo
+          ? ('Valid: ' + safeHtml(r.validFrom || 'Open') + ' to ' + safeHtml(r.validTo || 'Open'))
+          : 'Unlimited validity';
+        const expiredBadge = isExpiredDefinition(r)
+          ? '<span class="badge bg-warning text-dark border ms-2">Expired</span>'
+          : '';
+        const detailBtn = r.transactionDefinitionId
+          ? '<a href="/school/transactionTemplates/edit/' + encodeURIComponent(r.transactionDefinitionId) + '" class="btn btn-outline-info btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>View</a>'
+          : '';
+        return '<tr>' +
+          '<td><span class="small text-dark">' + safeHtml(txLabel) + expiredBadge + '<div class="x-small text-muted">' + validityLabel + '</div></span></td>' +
+          '<td><div class="fw-bold">' + safeHtml(r.code || '(no-code)') + '</div><div class="small text-muted">' + safeHtml(r.label || '') + '</div></td>' +
+          '<td class="fw-bold">' + safeHtml(r.amount === null || Number.isNaN(r.amount) ? '-' : r.amount.toFixed(2)) + '</td>' +
+          '<td>' + safeHtml(r.currency || '-') + '</td>' +
+          '<td class="text-end"><div class="d-flex gap-2 justify-content-end">' + detailBtn + '<button type="button" class="btn btn-outline-danger btn-sm" data-del-cat="' + safeHtml(r.category) + '" data-del-idx="' + r.index + '"><i class="bi bi-trash me-1"></i>Delete</button></div></td>' +
+        '</tr>';
+      }).join('');
+      return header + rowsHtml;
+    }).join('');
+
+    feeLinesTbody.querySelectorAll('button[data-del-cat]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const cat = btn.getAttribute('data-del-cat');
+        const idx = Number(btn.getAttribute('data-del-idx'));
+        if (!feeGroups[cat] || Number.isNaN(idx) || idx < 0 || idx >= feeGroups[cat].length) return;
+        feeGroups[cat].splice(idx, 1);
+        renderFeeLines();
+      });
+    });
+
+    syncHiddenState();
+  }
+
+  function renderTerms() {
+    if (!terms.length) {
+      termsTbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No terms added yet.</td></tr>';
+      syncHiddenState();
+      return;
+    }
+
+    termsTbody.innerHTML = terms.map(function (t, idx) {
+      const metaParts = [];
+      if (t.status) metaParts.push(t.status);
+      if (t.startDate || t.endDate) metaParts.push([t.startDate || '?', t.endDate || '?'].join(' to '));
+      if (t.classesStartDate || t.classesEndDate) metaParts.push('Classes ' + [t.classesStartDate || '?', t.classesEndDate || '?'].join(' to '));
+      const snapshotSummary = [];
+      if (t.registrationOpenDate || t.registrationCloseDate) snapshotSummary.push('Reg ' + [t.registrationOpenDate || '?', t.registrationCloseDate || '?'].join(' to '));
+      if (t.addDropDeadline) snapshotSummary.push('Add/Drop ' + t.addDropDeadline);
+      if (t.paymentDueDate) snapshotSummary.push('Payment ' + t.paymentDueDate);
+      return '<tr>' +
+        '<td>' +
+          '<div class="d-flex align-items-center gap-2">' +
+            '<span class="badge bg-primary">' + t.order + '</span>' +
+            '<div class="btn-group btn-group-sm" role="group" aria-label="Reorder term">' +
+              '<button type="button" class="btn btn-outline-secondary btn-sm" data-term-up="' + idx + '"' + (idx <= 0 ? ' disabled' : '') + '><i class="bi bi-arrow-up"></i></button>' +
+              '<button type="button" class="btn btn-outline-secondary btn-sm" data-term-down="' + idx + '"' + (idx >= terms.length - 1 ? ' disabled' : '') + '><i class="bi bi-arrow-down"></i></button>' +
+            '</div>' +
+          '</div>' +
+        '</td>' +
+        '<td><div class="fw-bold">' + safeHtml(t.termName || t.termId) + '</div><div class="x-small text-muted font-monospace">' + safeHtml(t.termCode || t.termId) + (metaParts.length ? ' | ' + safeHtml(metaParts.join(' | ')) : '') + '</div>' + (snapshotSummary.length ? '<div class="x-small text-muted mt-1">' + safeHtml(snapshotSummary.join(' | ')) + '</div>' : '') + '</td>' +
+        '<td><div class="form-check"><input class="form-check-input" type="checkbox" data-term-required="' + idx + '" ' + (t.isRequired ? 'checked' : '') + '></div></td>' +
+        '<td class="text-end">' +
+          '<button type="button" class="btn btn-outline-secondary btn-sm" data-term-details="' + idx + '" aria-label="Open term details">' +
+            '<i class="bi bi-three-dots"></i>' +
+          '</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    termsTbody.querySelectorAll('input[data-term-required]').forEach(function (input) {
+      input.addEventListener('change', function () {
+        const i = Number(input.getAttribute('data-term-required'));
+        if (Number.isNaN(i) || i < 0 || i >= terms.length) return;
+        terms[i].isRequired = input.checked;
+        if (editingTermDetailsIndex === i) {
+          document.getElementById('chk_termDetailsRequired').checked = input.checked;
+        }
+        syncHiddenState();
+      });
+    });
+
+    termsTbody.querySelectorAll('button[data-term-details]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const i = Number(btn.getAttribute('data-term-details'));
+        if (Number.isNaN(i) || i < 0 || i >= terms.length) return;
+        openTermDetailsModal(i);
+      });
+    });
+
+    termsTbody.querySelectorAll('button[data-term-up]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const i = Number(btn.getAttribute('data-term-up'));
+        if (i <= 0) return;
+        const prev = terms[i - 1];
+        const curr = terms[i];
+        terms[i - 1] = curr;
+        terms[i] = prev;
+        const tmpOrder = Number(prev.order);
+        prev.order = Number(curr.order);
+        curr.order = tmpOrder;
+        normalizeTerms();
+        renderTerms();
+      });
+    });
+
+    termsTbody.querySelectorAll('button[data-term-down]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const i = Number(btn.getAttribute('data-term-down'));
+        if (i >= terms.length - 1) return;
+        const curr = terms[i];
+        const next = terms[i + 1];
+        terms[i] = next;
+        terms[i + 1] = curr;
+        const tmpOrder = Number(curr.order);
+        curr.order = Number(next.order);
+        next.order = tmpOrder;
+        normalizeTerms();
+        renderTerms();
+      });
+    });
+
+    syncHiddenState();
+  }
+
+  function summarizeFeeGroups(groups) {
+    const normalized = ensureCategoryFeeKeys(groups);
+    let count = 0;
+    let total = 0;
+    Object.keys(normalized).forEach(function (cat) {
+      (normalized[cat] || []).forEach(function (row) {
+        count += 1;
+        const amount = Number(row && row.amount);
+        if (Number.isFinite(amount)) total += amount;
+      });
+    });
+    if (!count) return { label: 'No fees', details: 'None configured' };
+    return { label: count + ' fee' + (count === 1 ? '' : 's'), details: total.toFixed(2) + ' total' };
+  }
+
+  function summarizeTermAcademicRules(rules) {
+    const r = (rules && typeof rules === 'object') ? rules : {};
+    const parts = [];
+    if (r.minimumPassingAverage !== null && r.minimumPassingAverage !== undefined && r.minimumPassingAverage !== '') {
+      parts.push('Avg >= ' + formatCredit(r.minimumPassingAverage));
+    }
+    if (r.totalAllowedCredits !== null && r.totalAllowedCredits !== undefined && r.totalAllowedCredits !== '') {
+      parts.push('Credits <= ' + formatCredit(r.totalAllowedCredits));
+    }
+    if (r.minimumRequiredCredits !== null && r.minimumRequiredCredits !== undefined && r.minimumRequiredCredits !== '') {
+      parts.push('Min credits ' + formatCredit(r.minimumRequiredCredits));
+    }
+    if (r.mustCompleteRequiredSubjects) parts.push('Required subjects enforced');
+    return {
+      label: parts.length ? 'Configured' : 'Default',
+      details: parts.length ? parts.join(' | ') : 'No term-specific academic rules'
+    };
+  }
+
+  function getTermDetailCards(term) {
+    const liveDates = getTermLiveDates(term || {});
+    return [
+      { label: 'Status', value: String(term?.status || '').trim() },
+      { label: 'Master Term Window', value: [liveDates.startDate || '', liveDates.endDate || ''].filter(Boolean).join(' to ') },
+      { label: 'Registration Window', value: [term?.registrationOpenDate || '', term?.registrationCloseDate || ''].filter(Boolean).join(' to ') },
+      { label: 'Late Registration Deadline', value: String(term?.lateRegistrationDeadline || '').trim() },
+      { label: 'Payment Due Date', value: String(term?.paymentDueDate || '').trim() },
+      { label: 'Classes Window', value: [term?.classesStartDate || '', term?.classesEndDate || ''].filter(Boolean).join(' to ') },
+      { label: 'Add / Drop Deadline', value: String(term?.addDropDeadline || '').trim() },
+      { label: 'Swap Deadline', value: String(term?.swapDeadline || '').trim() },
+      { label: 'Withdraw Without Penalty', value: String(term?.withdrawWithoutPenaltyDeadline || '').trim() },
+      { label: 'Final Withdraw Deadline', value: String(term?.withdrawDeadline || '').trim() },
+      { label: 'Census Date', value: String(term?.censusDate || '').trim() },
+      { label: 'Final Exam Window', value: [term?.finalExamStartDate || '', term?.finalExamEndDate || ''].filter(Boolean).join(' to ') },
+      { label: 'Grade Submission Deadline', value: String(term?.gradeSubmissionDeadline || '').trim() },
+      { label: 'Result Release Date', value: String(term?.termResultReleaseDate || '').trim() },
+      { label: 'Description', value: String(term?.termDescription || '').trim() }
+    ].filter(function (item) { return !!item.value; });
+  }
+
+  function renderTermDetailsSnapshot(term) {
+    const container = document.getElementById('termDetailsSnapshotList');
+    const cards = getTermDetailCards(term);
+    if (!cards.length) {
+      container.innerHTML = '<div class="col-12"><div class="border rounded p-3 small text-muted">No extra term details are available yet for this row.</div></div>';
+      return;
+    }
+    container.innerHTML = cards.map(function (card) {
+      return '<div class="col-md-6">' +
+        '<div class="border rounded p-3 h-100">' +
+          '<div class="small text-uppercase text-muted fw-bold">' + safeHtml(card.label) + '</div>' +
+          '<div class="small mt-1">' + safeHtml(card.value) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function openTermDetailsModal(index) {
+    if (Number.isNaN(Number(index)) || index < 0 || index >= terms.length) return;
+    editingTermDetailsIndex = Number(index);
+    const term = terms[editingTermDetailsIndex];
+    const ruleSummary = summarizeTermAcademicRules(term.termAcademicRules);
+    const feeSummary = summarizeFeeGroups(term.termRegistrationFeeGroups);
+    const liveDates = getTermLiveDates(term);
+
+    document.getElementById('termDetailsModalTitle').textContent = term.termName || term.termId || 'Program Term Details';
+    document.getElementById('termDetailsModalMeta').textContent = [term.termCode || term.termId || '', term.status || ''].filter(Boolean).join(' | ');
+    document.getElementById('termDetailsModalSubmeta').textContent = [
+      liveDates.startDate ? ('Master Start: ' + liveDates.startDate) : '',
+      liveDates.endDate ? ('Master End: ' + liveDates.endDate) : ''
+    ].filter(Boolean).join(' | ');
+    document.getElementById('chk_termDetailsRequired').checked = term.isRequired !== false;
+    document.getElementById('inp_termDetailsNotes').value = String(term.notes || '');
+    document.getElementById('termDetailsRuleLabel').textContent = ruleSummary.label;
+    document.getElementById('termDetailsRuleDetails').textContent = ruleSummary.details;
+    document.getElementById('termDetailsFeeLabel').textContent = feeSummary.label;
+    document.getElementById('termDetailsFeeDetails').textContent = feeSummary.details;
+    renderTermDetailsSnapshot(term);
+
+    if (!termDetailsModal) termDetailsModal = new bootstrap.Modal(document.getElementById('termDetailsModal'));
+    termDetailsModal.show();
+  }
+
+  function closeTermDetailsThen(callback) {
+    if (typeof callback !== 'function') return;
+    const modalEl = document.getElementById('termDetailsModal');
+    const modal = termDetailsModal || bootstrap.Modal.getInstance(modalEl);
+    if (!modal || !modalEl.classList.contains('show')) {
+      callback();
+      return;
+    }
+    const handler = function () {
+      modalEl.removeEventListener('hidden.bs.modal', handler);
+      callback();
+    };
+    modalEl.addEventListener('hidden.bs.modal', handler);
+    modal.hide();
+  }
+
+  function getSelectedTermTransactionDefinition() {
+    const txId = String(document.getElementById('sel_termTransactionDefinition').value || '').trim();
+    return txId ? (transactionDefMap.get(txId) || null) : null;
+  }
+
+  function syncTermTransactionDefinitionSelectionUi() {
+    const txIdField = document.getElementById('sel_termTransactionDefinition');
+    const labelField = document.getElementById('inp_termTransactionDefinitionLabel');
+    const viewBtn = document.getElementById('btnViewTermTransactionDefinition');
+    const tx = getSelectedTermTransactionDefinition();
+    if (!tx) {
+      txIdField.value = '';
+      labelField.value = '';
+      viewBtn.classList.add('d-none');
+      viewBtn.setAttribute('href', '#');
+      return;
+    }
+    txIdField.value = String(tx.id || '');
+    labelField.value = [String(tx.code || tx.id || '').trim(), String(tx.name || '').trim()].filter(Boolean).join(' - ');
+    viewBtn.classList.remove('d-none');
+    viewBtn.setAttribute('href', '/school/transactionTemplates/edit/' + encodeURIComponent(String(tx.id || '')));
+  }
+
+  function getEditingTermFeeGroups() {
+    if (editingTermFeeIndex === null || editingTermFeeIndex < 0 || editingTermFeeIndex >= terms.length) return ensureCategoryFeeKeys({});
+    terms[editingTermFeeIndex].termRegistrationFeeGroups = ensureCategoryFeeKeys(
+      terms[editingTermFeeIndex].termRegistrationFeeGroups || terms[editingTermFeeIndex].registrationFeeGroups
+    );
+    return terms[editingTermFeeIndex].termRegistrationFeeGroups;
+  }
+
+  function assertNoTermFeeDateConflict(categoryKey, transactionDefinitionId) {
+    const tx = transactionDefinitionId ? transactionDefMap.get(String(transactionDefinitionId)) : null;
+    if (!tx || !tx.validFrom || !tx.validTo) return;
+    const targetCategory = categoryKey || ALL_FEE_CATEGORY_KEY;
+    const rows = Array.isArray(getEditingTermFeeGroups()[targetCategory]) ? getEditingTermFeeGroups()[targetCategory] : [];
+    rows.forEach(function (row) {
+      const existingTxId = String(row.transactionDefinitionId || '').trim();
+      if (!existingTxId) return;
+      const existingStart = String(row.validFrom || '').trim();
+      const existingEnd = String(row.validTo || '').trim();
+      if (rangesOverlap(String(tx.validFrom || ''), String(tx.validTo || ''), existingStart, existingEnd)) {
+        const categoryLabel = getCategoryLabel(targetCategory === ALL_FEE_CATEGORY_KEY ? '' : targetCategory);
+        throw new Error('Date conflict detected with existing transaction template "' +
+          String(row.transactionDefinitionCode || row.code || existingTxId) +
+          '" in ' + categoryLabel + '.');
+      }
+    });
+  }
+
+  function renderTermFeeLines() {
+    const tbody = document.getElementById('termFeeLinesTbody');
+    const groups = getEditingTermFeeGroups();
+    const groupedRows = [ALL_FEE_CATEGORY_KEY].concat(feeCategories).map(function (cat) {
+      return {
+        category: cat,
+        rows: (groups[cat] || []).map(function (line, idx) {
+          return {
+            category: cat,
+            index: idx,
+            transactionDefinitionId: String(line.transactionDefinitionId || ''),
+            transactionDefinitionCode: String(line.transactionDefinitionCode || ''),
+            transactionDefinitionName: String(line.transactionDefinitionName || ''),
+            code: String(line.code || ''),
+            label: String(line.label || ''),
+            amount: (line.amount === null || line.amount === undefined || line.amount === '') ? null : Number(line.amount),
+            currency: String(line.currency || ''),
+            validFrom: String(line.validFrom || ''),
+            validTo: String(line.validTo || '')
+          };
+        })
+      };
+    }).filter(function (group) { return group.rows.length > 0; });
+
+    if (!groupedRows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No term registration fees added yet.</td></tr>';
+      syncHiddenState();
+      return;
+    }
+
+    tbody.innerHTML = groupedRows.map(function (group) {
+      const header = '<tr class="table-light"><td colspan="5"><span class="fw-bold">' + safeHtml(getCategoryLabel(group.category === ALL_FEE_CATEGORY_KEY ? '' : group.category)) + '</span></td></tr>';
+      const rowsHtml = group.rows.map(function (r) {
+        const txLabel = (r.transactionDefinitionCode || r.transactionDefinitionId) + (r.transactionDefinitionName ? ' - ' + r.transactionDefinitionName : '');
+        const validityLabel = r.validFrom || r.validTo
+          ? ('Valid: ' + safeHtml(r.validFrom || '?') + ' to ' + safeHtml(r.validTo || '?'))
+          : 'No definition validity';
+        return '<tr>' +
+          '<td><span class="small text-dark">' + safeHtml(txLabel) + '<div class="x-small text-muted">' + validityLabel + '</div></span></td>' +
+          '<td><div class="fw-bold">' + safeHtml(r.code || '(no-code)') + '</div><div class="small text-muted">' + safeHtml(r.label || '') + '</div></td>' +
+          '<td class="fw-bold">' + safeHtml(r.amount === null || Number.isNaN(r.amount) ? '-' : r.amount.toFixed(2)) + '</td>' +
+          '<td>' + safeHtml(r.currency || '-') + '</td>' +
+          '<td class="text-end"><div class="d-flex gap-2 justify-content-end"><a href="/school/transactionTemplates/edit/' + encodeURIComponent(r.transactionDefinitionId) + '" class="btn btn-outline-info btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>View</a><button type="button" class="btn btn-outline-danger btn-sm" data-termfee-del-cat="' + safeHtml(r.category) + '" data-termfee-del-idx="' + r.index + '"><i class="bi bi-trash me-1"></i>Delete</button></div></td>' +
+        '</tr>';
+      }).join('');
+      return header + rowsHtml;
+    }).join('');
+
+    tbody.querySelectorAll('button[data-termfee-del-cat]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const cat = btn.getAttribute('data-termfee-del-cat');
+        const idx = Number(btn.getAttribute('data-termfee-del-idx'));
+        if (!groups[cat] || Number.isNaN(idx) || idx < 0 || idx >= groups[cat].length) return;
+        groups[cat].splice(idx, 1);
+        renderTermFeeLines();
+        renderTerms();
+      });
+    });
+
+    syncHiddenState();
+  }
+
+  function openTermFeeModal(index) {
+    editingTermFeeIndex = index;
+    const term = terms[index];
+    document.getElementById('termFeeModalTermName').textContent = term.termName || term.termId || 'Selected Term';
+    document.getElementById('termFeeModalTermMeta').textContent = [term.termCode || term.termId || '', term.startDate || '', term.endDate || ''].filter(Boolean).join(' | ');
+    document.getElementById('sel_termTransactionDefinition').value = '';
+    document.getElementById('inp_termFeeNotes').value = '';
+    syncTermTransactionDefinitionSelectionUi();
+    renderTermFeeLines();
+    if (!termFeeModal) termFeeModal = new bootstrap.Modal(document.getElementById('termFeeModal'));
+    termFeeModal.show();
+  }
+
+  function openTermRuleModal(index) {
+    editingTermRuleIndex = index;
+    const term = terms[index];
+    const rules = (term && term.termAcademicRules && typeof term.termAcademicRules === 'object') ? term.termAcademicRules : {};
+    document.getElementById('termRuleModalTermName').textContent = term.termName || term.termId || 'Selected Term';
+    document.getElementById('termRuleModalTermMeta').textContent = [term.termCode || term.termId || '', term.startDate || '', term.endDate || ''].filter(Boolean).join(' | ');
+    document.getElementById('inp_termMinimumPassingAverage').value =
+      (rules.minimumPassingAverage === null || rules.minimumPassingAverage === undefined) ? '' : Number(rules.minimumPassingAverage);
+    document.getElementById('inp_termMinimumPassingScore').value =
+      (rules.minimumPassingScore === null || rules.minimumPassingScore === undefined) ? '' : Number(rules.minimumPassingScore);
+    document.getElementById('inp_termTotalAllowedCredits').value =
+      (rules.totalAllowedCredits === null || rules.totalAllowedCredits === undefined) ? '' : Number(rules.totalAllowedCredits);
+    document.getElementById('inp_termMinimumRequiredCredits').value =
+      (rules.minimumRequiredCredits === null || rules.minimumRequiredCredits === undefined) ? '' : Number(rules.minimumRequiredCredits);
+    document.getElementById('chk_termAllowOverload').checked = rules.allowOverload === true;
+    document.getElementById('chk_termMustCompleteRequiredSubjects').checked = rules.mustCompleteRequiredSubjects !== false;
+    document.getElementById('inp_termRuleNotes').value = String(rules.notes || '');
+    if (!termRuleModal) termRuleModal = new bootstrap.Modal(document.getElementById('termRuleModal'));
+    termRuleModal.show();
+  }
+
+  function openTermSnapshotModal(index) {
+    editingTermSnapshotIndex = index;
+    const term = terms[index];
+    const liveDates = getTermLiveDates(term);
+    document.getElementById('termSnapshotModalMeta').textContent = [
+      term.termId || '',
+      liveDates.startDate ? ('Master Start: ' + liveDates.startDate) : '',
+      liveDates.endDate ? ('Master End: ' + liveDates.endDate) : ''
+    ].filter(Boolean).join(' | ');
+    document.getElementById('inp_termSnapshotCode').value = String(term.termCode || '');
+    document.getElementById('inp_termSnapshotName').value = String(term.termName || '');
+    document.getElementById('inp_termSnapshotStatus').value = String(term.status || '');
+    document.getElementById('inp_termSnapshotDescription').value = String(term.termDescription || '');
+    document.getElementById('inp_termSnapshotRegistrationOpenDate').value = String(term.registrationOpenDate || '');
+    document.getElementById('inp_termSnapshotRegistrationCloseDate').value = String(term.registrationCloseDate || '');
+    document.getElementById('inp_termSnapshotLateRegistrationDeadline').value = String(term.lateRegistrationDeadline || '');
+    document.getElementById('inp_termSnapshotPaymentDueDate').value = String(term.paymentDueDate || '');
+    document.getElementById('inp_termSnapshotClassesStartDate').value = String(term.classesStartDate || '');
+    document.getElementById('inp_termSnapshotClassesEndDate').value = String(term.classesEndDate || '');
+    document.getElementById('inp_termSnapshotAddDropDeadline').value = String(term.addDropDeadline || '');
+    document.getElementById('inp_termSnapshotSwapDeadline').value = String(term.swapDeadline || '');
+    document.getElementById('inp_termSnapshotWithdrawWithoutPenaltyDeadline').value = String(term.withdrawWithoutPenaltyDeadline || '');
+    document.getElementById('inp_termSnapshotWithdrawDeadline').value = String(term.withdrawDeadline || '');
+    document.getElementById('inp_termSnapshotCensusDate').value = String(term.censusDate || '');
+    document.getElementById('inp_termSnapshotFinalExamStartDate').value = String(term.finalExamStartDate || '');
+    document.getElementById('inp_termSnapshotFinalExamEndDate').value = String(term.finalExamEndDate || '');
+    document.getElementById('inp_termSnapshotGradeSubmissionDeadline').value = String(term.gradeSubmissionDeadline || '');
+    document.getElementById('inp_termSnapshotResultReleaseDate').value = String(term.termResultReleaseDate || '');
+    if (!termSnapshotModal) termSnapshotModal = new bootstrap.Modal(document.getElementById('termSnapshotModal'));
+    termSnapshotModal.show();
+  }
+
+  function renderSubjects() {
+    if (!subjects.length) {
+      subjectsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No subjects added yet.</td></tr>';
+      syncHiddenState();
+      return;
+    }
+
+    subjectsTbody.innerHTML = subjects.map(function (s, idx) {
+      const pre = getPrerequisiteLabels(s).join(', ');
+      const display = getSubjectDisplay(s);
+      const statusBadge = display.status && display.status !== 'active'
+        ? '<div class="x-small text-warning fw-bold mt-1">Status: ' + safeHtml(display.status) + '</div>'
+        : '';
+      const typeOptions = subjectTypes.map(function (type) {
+        return '<option value="' + safeHtml(type) + '" ' + (String(s.subjectType || 'main') === type ? 'selected' : '') + '>' +
+          safeHtml(type.charAt(0).toUpperCase() + type.slice(1)) + '</option>';
+      }).join('');
+      const ruleSummary = [
+        s.minPassingScore !== null && s.minPassingScore !== undefined ? ('Min score: ' + safeHtml(formatCredit(s.minPassingScore))) : '',
+        s.minPassingAverage !== null && s.minPassingAverage !== undefined ? ('Min average: ' + safeHtml(formatCredit(s.minPassingAverage))) : '',
+        s.mustPass ? 'Must pass' : '',
+        s.allowCompensation ? 'Compensation allowed' : ''
+      ].filter(Boolean).join(' | ');
+      return '<tr>' +
+        '<td><span class="badge bg-primary">' + s.order + '</span></td>' +
+        '<td><div class="fw-bold">' + safeHtml(display.title || s.subjectId) + '</div><div class="x-small text-muted font-monospace">' + safeHtml(display.code || s.subjectId) + '</div>' + statusBadge + '</td>' +
+        '<td><select class="form-select form-select-sm" data-subject-type="' + idx + '">' + typeOptions + '</select></td>' +
+        '<td><input type="number" class="form-control form-control-sm" data-subject-credits="' + idx + '" min="0" step="0.01" value="' + safeHtml(formatCredit(s.programCredits)) + '"></td>' +
+        '<td><span class="small text-muted">' + safeHtml(pre || 'None') + '</span></td>' +
+        '<td><span class="small text-muted">' + safeHtml(ruleSummary || 'Default program rules') + '</span></td>' +
+        '<td class="text-end">' +
+          '<div class="d-flex gap-2 justify-content-end">' +
+            '<button type="button" class="btn btn-outline-secondary btn-sm" data-up="' + idx + '"><i class="bi bi-arrow-up"></i></button>' +
+            '<button type="button" class="btn btn-outline-secondary btn-sm" data-down="' + idx + '"><i class="bi bi-arrow-down"></i></button>' +
+            '<button type="button" class="btn btn-outline-info btn-sm" data-rules="' + idx + '">Rules</button>' +
+            '<button type="button" class="btn btn-outline-primary btn-sm" data-pre="' + idx + '">Prerequisites</button>' +
+            '<button type="button" class="btn btn-outline-danger btn-sm" data-del-sub="' + idx + '">Remove</button>' +
+          '</div>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    subjectsTbody.querySelectorAll('button[data-up]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const i = Number(btn.getAttribute('data-up'));
+        if (i <= 0) return;
+        const prev = subjects[i - 1];
+        const curr = subjects[i];
+        subjects[i - 1] = curr;
+        subjects[i] = prev;
+        const tmpOrder = Number(prev.order);
+        prev.order = Number(curr.order);
+        curr.order = tmpOrder;
+        normalizeSubjects();
+        renderSubjects();
+      });
+    });
+
+    subjectsTbody.querySelectorAll('button[data-down]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const i = Number(btn.getAttribute('data-down'));
+        if (i >= subjects.length - 1) return;
+        const curr = subjects[i];
+        const next = subjects[i + 1];
+        subjects[i] = next;
+        subjects[i + 1] = curr;
+        const tmpOrder = Number(curr.order);
+        curr.order = Number(next.order);
+        next.order = tmpOrder;
+        normalizeSubjects();
+        renderSubjects();
+      });
+    });
+
+    subjectsTbody.querySelectorAll('button[data-del-sub]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const i = Number(btn.getAttribute('data-del-sub'));
+        if (Number.isNaN(i) || i < 0 || i >= subjects.length) return;
+        const removedId = subjects[i].subjectId;
+        subjects.splice(i, 1);
+        subjects.forEach(function (s) {
+          s.prerequisites = (s.prerequisites || []).filter(function (pid) { return pid !== removedId; });
+        });
+        normalizeSubjects();
+        renderSubjects();
+      });
+    });
+
+    subjectsTbody.querySelectorAll('button[data-pre]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const i = Number(btn.getAttribute('data-pre'));
+        if (Number.isNaN(i) || i < 0 || i >= subjects.length) return;
+        openPrereqModal(i);
+      });
+    });
+
+    subjectsTbody.querySelectorAll('button[data-rules]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const i = Number(btn.getAttribute('data-rules'));
+        if (Number.isNaN(i) || i < 0 || i >= subjects.length) return;
+        openSubjectRuleModal(i);
+      });
+    });
+
+    subjectsTbody.querySelectorAll('select[data-subject-type]').forEach(function (select) {
+      select.addEventListener('change', function () {
+        const i = Number(select.getAttribute('data-subject-type'));
+        if (Number.isNaN(i) || i < 0 || i >= subjects.length) return;
+        subjects[i].subjectType = select.value;
+        subjects[i].isRequired = select.value === 'main';
+        syncHiddenState();
+      });
+    });
+
+    subjectsTbody.querySelectorAll('input[data-subject-credits]').forEach(function (input) {
+      input.addEventListener('input', function () {
+        const i = Number(input.getAttribute('data-subject-credits'));
+        if (Number.isNaN(i) || i < 0 || i >= subjects.length) return;
+        const nextValue = input.value === '' ? 0 : Number(input.value);
+        subjects[i].programCredits = Number.isFinite(nextValue) ? nextValue : 0;
+        syncHiddenState();
+      });
+    });
+
+    syncHiddenState();
+  }
+
+  function openPrereqModal(index) {
+    editingPrereqFor = index;
+    const current = subjects[index];
+    const wrap = document.getElementById('preReqOptions');
+    wrap.innerHTML = subjects
+      .filter(function (s, i) { return i !== index; })
+      .map(function (s) {
+        const checked = (current.prerequisites || []).includes(s.subjectId) ? 'checked' : '';
+        const display = getSubjectDisplay(s);
+        return '<label class="form-check border rounded p-2">' +
+          '<input class="form-check-input me-2" type="checkbox" value="' + safeHtml(s.subjectId) + '" ' + checked + '>' +
+          '<span class="form-check-label"><span class="fw-bold">' + safeHtml(display.title || s.subjectId) + '</span> <span class="small text-muted">(' + safeHtml(display.code || s.subjectId) + ')</span></span>' +
+        '</label>';
+      }).join('');
+    if (!wrap.innerHTML) {
+      wrap.innerHTML = '<div class="text-muted small">Add at least one other subject first.</div>';
+    }
+    const modal = new bootstrap.Modal(document.getElementById('preReqModal'));
+    modal.show();
+  }
+
+  function openSubjectRuleModal(index) {
+    editingSubjectRuleFor = index;
+    const subject = subjects[index];
+    const display = getSubjectDisplay(subject);
+    document.getElementById('subjectRuleModalTitle').textContent =
+      (display.title || subject.subjectId) + (display.code ? ' (' + display.code + ')' : '');
+    document.getElementById('inp_subjectRuleMinScore').value =
+      (subject.minPassingScore === null || subject.minPassingScore === undefined) ? '' : Number(subject.minPassingScore);
+    document.getElementById('inp_subjectRuleMinAverage').value =
+      (subject.minPassingAverage === null || subject.minPassingAverage === undefined) ? '' : Number(subject.minPassingAverage);
+    document.getElementById('chk_subjectRuleMustPass').checked = subject.mustPass === true;
+    document.getElementById('chk_subjectRuleAllowCompensation').checked = subject.allowCompensation === true;
+    document.getElementById('inp_subjectRuleNotes').value = String(subject.notes || '');
+    if (!subjectRuleModal) subjectRuleModal = new bootstrap.Modal(document.getElementById('subjectRuleModal'));
+    subjectRuleModal.show();
+  }
+
+  function bindEvents() {
+    document.getElementById('inp_requiredEssentialCredits').addEventListener('input', function () {
+      syncHiddenState();
+    });
+
+    document.getElementById('inp_requiredOptionalCredits').addEventListener('input', function () {
+      syncHiddenState();
+    });
+
+    document.getElementById('chk_allowEssentialCreditsTowardOptional').addEventListener('change', function () {
+      syncHiddenState();
+    });
+
+    document.getElementById('btnPickTransactionDefinition').addEventListener('click', function () {
+      GenericPicker.open(GenericPickerPresets.transactionDefinition({
+        context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
+        onSelect: function (item) {
+          document.getElementById('sel_transactionDefinition').value = String(item.id || '');
+          syncTransactionDefinitionSelectionUi();
+        }
+      }));
+    });
+
+    document.getElementById('btnClearTransactionDefinition').addEventListener('click', function () {
+      document.getElementById('sel_transactionDefinition').value = '';
+      syncTransactionDefinitionSelectionUi();
+    });
+
+    document.getElementById('btnPickTermTransactionDefinition').addEventListener('click', function () {
+      GenericPicker.open(GenericPickerPresets.transactionDefinition({
+        context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
+        onSelect: function (item) {
+          document.getElementById('sel_termTransactionDefinition').value = String(item.id || '');
+          syncTermTransactionDefinitionSelectionUi();
+        }
+      }));
+    });
+
+    document.getElementById('btnClearTermTransactionDefinition').addEventListener('click', function () {
+      document.getElementById('sel_termTransactionDefinition').value = '';
+      syncTermTransactionDefinitionSelectionUi();
+    });
+
+    document.getElementById('btnPickAdmin').addEventListener('click', function () {
+      GenericPicker.open(GenericPickerPresets.person({
+        title: 'Select Program Administrator',
+        apiEndpoint: adminPickerEndpoint,
+        placeholder: 'Search teachers/staff by name or email...',
+        onSelect: function (item) {
+          setAdministrator(item.id, getPersonDisplayName(item) || item.id);
+        }
+      }));
+    });
+
+    document.getElementById('btnPickProgramDepartment').addEventListener('click', function () {
+      GenericPicker.open(GenericPickerPresets.department({
+        title: 'Select Program Department',
+        context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
+        onSelect: function (item) {
+          setProgramDepartment(item);
+        }
+      }));
+    });
+
+    document.getElementById('btnClearProgramDepartment').addEventListener('click', function () {
+      showMsg({
+        title: 'Required Field',
+        icon: 'warning',
+        message: 'Department is required and cannot be cleared. Please select another department instead.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+    });
+
+    document.getElementById('btnCopyFromProgram').addEventListener('click', function () {
+      GenericPicker.open(GenericPickerPresets.program({
+        title: 'Copy From Program',
+        placeholder: 'Search programs to copy...',
+        onSelect: async function (item) {
+          if (!item || (String(item.id || '') && String(item.id || '') === String(<%- JSON.stringify(routeId || '') %>))) return;
+          applyProgramTemplate(item);
+          await showMsg({
+            title: 'Template Applied',
+            icon: 'success',
+            message: 'Program fields were copied. Review and edit the values before saving.',
+            buttons: [{ text: 'OK', class: 'btn-success' }]
+          });
+        }
+      }));
+    });
+
+    document.getElementById('btnPickProgramPostingPolicyDefinition').addEventListener('click', function () {
+      GenericPicker.open(GenericPickerPresets.transactionDefinition({
+        context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
+        onSelect: function (item) {
+          document.getElementById('sel_programPostingPolicyDefinition').value = String(item.id || '');
+          syncProgramPostingPolicySelectionUi();
+        }
+      }));
+    });
+
+    document.getElementById('btnClearProgramPostingPolicyDefinition').addEventListener('click', function () {
+      document.getElementById('sel_programPostingPolicyDefinition').value = '';
+      syncProgramPostingPolicySelectionUi();
+    });
+
+    document.getElementById('btnAddProgramPostingPolicy').addEventListener('click', async function () {
+      try {
+        const category = document.getElementById('programPostingPolicyCategory').value;
+        const categoryKey = category || ALL_FEE_CATEGORY_KEY;
+        const transactionDefinitionId = document.getElementById('sel_programPostingPolicyDefinition').value;
+        const selectedDefinition = transactionDefinitionId ? transactionDefMap.get(String(transactionDefinitionId)) : null;
+        const notes = document.getElementById('inp_programPostingPolicyNotes').value.trim();
+
+        if (!transactionDefinitionId) throw new Error('Transaction template is required.');
+        if (postingPolicies.some(function (row) { return String(row.feeCategory || '').trim() === categoryKey; })) {
+          throw new Error('This fee category already has a Posting Policy.');
+        }
+
+        postingPolicies.push({
+          feeCategory: categoryKey,
+          transactionDefinitionId: transactionDefinitionId || '',
+          transactionDefinitionCode: String(selectedDefinition?.code || ''),
+          transactionDefinitionName: String(selectedDefinition?.name || ''),
+          notes: notes,
+          active: true
+        });
+
+        document.getElementById('programPostingPolicyCategory').value = '';
+        document.getElementById('sel_programPostingPolicyDefinition').value = '';
+        document.getElementById('inp_programPostingPolicyNotes').value = '';
+        syncProgramPostingPolicySelectionUi();
+        renderPostingPolicies();
+        syncHiddenState();
+      } catch (err) {
+        await showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: err.message || 'Invalid Posting Policy.',
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+        });
+      }
+    });
+
+    document.getElementById('btnAddTerm').addEventListener('click', function () {
+      GenericPicker.open(GenericPickerPresets.term({
+        title: 'Select Program Term',
+        icon: 'bi-calendar3-range',
+        multiselect: true,
+        placeholder: 'Search terms, select multiple, then Add Selected...',
+        context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
+        onSelect: function (items) {
+          const rows = Array.isArray(items) ? items : [items];
+          rows.forEach(function (item) {
+            const termId = String(item.id || '').trim();
+            if (!termId) return;
+            if (terms.some(function (t) { return t.termId === termId; })) return;
+            terms.push({
+              termId: termId,
+              order: terms.length + 1,
+              isRequired: true,
+              notes: '',
+              ...buildTermSnapshot(item, { termId: termId }),
+              startDate: String(item.startDate || '').trim(),
+              endDate: String(item.endDate || '').trim(),
+              termAcademicRules: {
+                minimumPassingAverage: null,
+                minimumPassingScore: null,
+                totalAllowedCredits: null,
+                minimumRequiredCredits: null,
+                allowOverload: false,
+                mustCompleteRequiredSubjects: true,
+                notes: ''
+              },
+              termRegistrationFeeGroups: ensureCategoryFeeKeys({})
+            });
+          });
+          normalizeTerms();
+          renderTerms();
+        }
+      }));
+    });
+
+    document.getElementById('btnAddFeeLine').addEventListener('click', async function () {
+      try {
+        const category = document.getElementById('sel_feeCategory').value;
+        const categoryKey = category || ALL_FEE_CATEGORY_KEY;
+        const transactionDefinitionId = document.getElementById('sel_transactionDefinition').value;
+        const selectedDefinition = transactionDefinitionId ? transactionDefMap.get(String(transactionDefinitionId)) : null;
+        const notes = document.getElementById('inp_feeNotes').value.trim();
+
+        if (!transactionDefinitionId) throw new Error('Transaction template is required.');
+        if (selectedDefinition && isExpiredDefinition(selectedDefinition)) {
+          throw new Error('Expired transaction templates cannot be added to Program Enrollment Fees.');
+        }
+
+        const txDefaultAmount = (selectedDefinition && Array.isArray(selectedDefinition.entries) && selectedDefinition.entries.length)
+          ? selectedDefinition.entries.reduce(function (sum, entry) {
+              const amount = Number(entry && entry.amount);
+              return Number.isFinite(amount) ? (sum + amount) : sum;
+            }, 0)
+          : null;
+        const normalizedAmount = (txDefaultAmount === null || txDefaultAmount === undefined || txDefaultAmount === '')
+          ? null
+          : Number(Number(txDefaultAmount).toFixed(2));
+
+        if (normalizedAmount !== null && (!Number.isFinite(normalizedAmount) || normalizedAmount < 0)) {
+          throw new Error('Valid fee amount is required.');
+        }
+        if (transactionDefinitionId && normalizedAmount === null) {
+          throw new Error('Selected transaction template does not contain a usable amount.');
+        }
+
+        const finalCode = String(selectedDefinition?.code || '').trim().toUpperCase();
+        const finalLabel = String(selectedDefinition?.name || '').trim();
+        const finalCurrency = String(selectedDefinition?.currency || '').trim().toUpperCase();
+        const finalFrequency = String(selectedDefinition?.frequency || 'one_time').trim().toLowerCase() || 'one_time';
+        const finalIsOptional = Boolean(selectedDefinition?.isOptional);
+
+        feeGroups[categoryKey].push({
+          transactionDefinitionId: transactionDefinitionId || '',
+          transactionDefinitionCode: String(selectedDefinition?.code || ''),
+          transactionDefinitionName: String(selectedDefinition?.name || ''),
+          code: finalCode,
+          label: finalLabel,
+          amount: normalizedAmount,
+          currency: finalCurrency,
+          frequency: finalFrequency,
+          validFrom: String(selectedDefinition?.validFrom || ''),
+          validTo: String(selectedDefinition?.validTo || ''),
+          notes: notes,
+          isOptional: finalIsOptional
+        });
+
+        document.getElementById('sel_transactionDefinition').value = '';
+        syncTransactionDefinitionSelectionUi();
+        document.getElementById('inp_feeNotes').value = '';
+
+        renderFeeLines();
+      } catch (err) {
+        await showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: err.message || 'Invalid fee line.',
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+        });
+      }
+    });
+
+    document.getElementById('btnAddTermFeeLine').addEventListener('click', async function () {
+      try {
+        const category = document.getElementById('sel_termFeeCategory').value;
+        const categoryKey = category || ALL_FEE_CATEGORY_KEY;
+        const transactionDefinitionId = document.getElementById('sel_termTransactionDefinition').value;
+        const selectedDefinition = transactionDefinitionId ? transactionDefMap.get(String(transactionDefinitionId)) : null;
+        const notes = document.getElementById('inp_termFeeNotes').value.trim();
+
+        if (editingTermFeeIndex === null || editingTermFeeIndex < 0 || editingTermFeeIndex >= terms.length) {
+          throw new Error('Select a program term first.');
+        }
+        if (!transactionDefinitionId) throw new Error('Transaction template is required.');
+        assertNoTermFeeDateConflict(category, transactionDefinitionId);
+
+        const totalAmount = (selectedDefinition && Array.isArray(selectedDefinition.entries) && selectedDefinition.entries.length)
+          ? selectedDefinition.entries.reduce(function (sum, entry) {
+              const amount = Number(entry && entry.amount);
+              return Number.isFinite(amount) ? (sum + amount) : sum;
+            }, 0)
+          : null;
+        const normalizedAmount = (totalAmount === null || totalAmount === undefined || totalAmount === '')
+          ? null
+          : Number(Number(totalAmount).toFixed(2));
+
+        if (normalizedAmount === null) {
+          throw new Error('Selected transaction template does not contain a usable amount.');
+        }
+
+        const groups = getEditingTermFeeGroups();
+        groups[categoryKey].push({
+          transactionDefinitionId: transactionDefinitionId || '',
+          transactionDefinitionCode: String(selectedDefinition?.code || ''),
+          transactionDefinitionName: String(selectedDefinition?.name || ''),
+          code: String(selectedDefinition?.code || '').trim().toUpperCase(),
+          label: String(selectedDefinition?.name || '').trim(),
+          amount: normalizedAmount,
+          currency: String(selectedDefinition?.currency || '').trim().toUpperCase(),
+          frequency: String(selectedDefinition?.frequency || 'one_time').trim().toLowerCase() || 'one_time',
+          validFrom: String(selectedDefinition?.validFrom || ''),
+          validTo: String(selectedDefinition?.validTo || ''),
+          notes: notes,
+          isOptional: Boolean(selectedDefinition?.isOptional)
+        });
+
+        document.getElementById('sel_termTransactionDefinition').value = '';
+        syncTermTransactionDefinitionSelectionUi();
+        document.getElementById('inp_termFeeNotes').value = '';
+        renderTermFeeLines();
+        renderTerms();
+      } catch (err) {
+        await showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: err.message || 'Invalid term registration fee.',
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+        });
+      }
+    });
+
+    document.getElementById('chk_termDetailsRequired').addEventListener('change', function () {
+      if (editingTermDetailsIndex === null || editingTermDetailsIndex < 0 || editingTermDetailsIndex >= terms.length) return;
+      terms[editingTermDetailsIndex].isRequired = this.checked;
+      renderTerms();
+      syncHiddenState();
+    });
+
+    document.getElementById('inp_termDetailsNotes').addEventListener('input', function () {
+      if (editingTermDetailsIndex === null || editingTermDetailsIndex < 0 || editingTermDetailsIndex >= terms.length) return;
+      terms[editingTermDetailsIndex].notes = this.value.trim();
+      syncHiddenState();
+    });
+
+    document.getElementById('btnTermDetailsCalendar').addEventListener('click', function () {
+      const index = editingTermDetailsIndex;
+      if (index === null || index < 0 || index >= terms.length) return;
+      closeTermDetailsThen(function () {
+        openTermSnapshotModal(index);
+      });
+    });
+
+    document.getElementById('btnTermDetailsRules').addEventListener('click', function () {
+      const index = editingTermDetailsIndex;
+      if (index === null || index < 0 || index >= terms.length) return;
+      closeTermDetailsThen(function () {
+        openTermRuleModal(index);
+      });
+    });
+
+    document.getElementById('btnTermDetailsFees').addEventListener('click', function () {
+      const index = editingTermDetailsIndex;
+      if (index === null || index < 0 || index >= terms.length) return;
+      closeTermDetailsThen(function () {
+        openTermFeeModal(index);
+      });
+    });
+
+    document.getElementById('btnTermDetailsRemove').addEventListener('click', function () {
+      const index = editingTermDetailsIndex;
+      if (index === null || index < 0 || index >= terms.length) return;
+      terms.splice(index, 1);
+      normalizeTerms();
+      renderTerms();
+      if (termDetailsModal) termDetailsModal.hide();
+    });
+
+    document.getElementById('termDetailsModal').addEventListener('hidden.bs.modal', function () {
+      editingTermDetailsIndex = null;
+    });
+
+    document.getElementById('btnAddSubject').addEventListener('click', function () {
+      GenericPicker.open(GenericPickerPresets.subject({
+        title: 'Select Subject',
+        icon: 'bi-journal-bookmark',
+        multiselect: true,
+        placeholder: 'Search subjects, select multiple, then Add Selected...',
+        onSelect: function (items) {
+          const rows = Array.isArray(items) ? items : [items];
+          rows.forEach(function (item) {
+            const sid = String(item.id || '').trim();
+            if (!sid) return;
+            if (subjects.some(function (s) { return s.subjectId === sid; })) return;
+            const defaultRules = getSubjectDefaultScoreRules(sid);
+            subjects.push({
+              subjectId: sid,
+              order: subjects.length + 1,
+              isRequired: true,
+              subjectType: 'main',
+              programCredits: item?.configuration && item.configuration.credits !== undefined && item.configuration.credits !== null
+                ? Number(item.configuration.credits)
+                : 0,
+              minPassingScore: defaultRules.minPassingScore,
+              minPassingAverage: defaultRules.minPassingAverage,
+              mustPass: defaultRules.mustPass,
+              allowCompensation: defaultRules.allowCompensation,
+              prerequisites: [],
+              notes: defaultRules.notes || '',
+              subjectCode: String(item.code || ''),
+              subjectTitle: String(item.title || item.name || sid),
+              subjectStatus: String(item.status || '').trim().toLowerCase()
+            });
+          });
+          normalizeSubjects();
+          renderSubjects();
+        }
+      }));
+    });
+
+    document.getElementById('btnSavePrereq').addEventListener('click', function () {
+      if (editingPrereqFor === null || editingPrereqFor < 0 || editingPrereqFor >= subjects.length) return;
+      const selected = Array.from(document.querySelectorAll('#preReqOptions input[type="checkbox"]:checked')).map(function (el) { return el.value; });
+      subjects[editingPrereqFor].prerequisites = selected;
+      renderSubjects();
+      const modalEl = document.getElementById('preReqModal');
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    });
+
+    document.getElementById('btnSaveSubjectRules').addEventListener('click', function () {
+      if (editingSubjectRuleFor === null || editingSubjectRuleFor < 0 || editingSubjectRuleFor >= subjects.length) return;
+      const minScoreRaw = document.getElementById('inp_subjectRuleMinScore').value.trim();
+      const minAverageRaw = document.getElementById('inp_subjectRuleMinAverage').value.trim();
+      const minScore = minScoreRaw === '' ? null : Number(minScoreRaw);
+      const minAverage = minAverageRaw === '' ? null : Number(minAverageRaw);
+      if (minScore !== null && (!Number.isFinite(minScore) || minScore < 0 || minScore > 100)) {
+        showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: 'Minimum Passing Score must be between 0 and 100.',
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+        });
+        return;
+      }
+      if (minAverage !== null && (!Number.isFinite(minAverage) || minAverage < 0 || minAverage > 100)) {
+        showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: 'Minimum Passing Average must be between 0 and 100.',
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+        });
+        return;
+      }
+
+      subjects[editingSubjectRuleFor].minPassingScore = minScore;
+      subjects[editingSubjectRuleFor].minPassingAverage = minAverage;
+      subjects[editingSubjectRuleFor].mustPass = document.getElementById('chk_subjectRuleMustPass').checked;
+      subjects[editingSubjectRuleFor].allowCompensation = document.getElementById('chk_subjectRuleAllowCompensation').checked;
+      subjects[editingSubjectRuleFor].notes = document.getElementById('inp_subjectRuleNotes').value.trim();
+      renderSubjects();
+
+      const modalEl = document.getElementById('subjectRuleModal');
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    });
+
+    document.getElementById('btnSaveTermRules').addEventListener('click', async function () {
+      if (editingTermRuleIndex === null || editingTermRuleIndex < 0 || editingTermRuleIndex >= terms.length) return;
+      const minimumPassingAverageRaw = document.getElementById('inp_termMinimumPassingAverage').value.trim();
+      const minimumPassingScoreRaw = document.getElementById('inp_termMinimumPassingScore').value.trim();
+      const totalAllowedCreditsRaw = document.getElementById('inp_termTotalAllowedCredits').value.trim();
+      const minimumRequiredCreditsRaw = document.getElementById('inp_termMinimumRequiredCredits').value.trim();
+
+      const minimumPassingAverage = minimumPassingAverageRaw === '' ? null : Number(minimumPassingAverageRaw);
+      const minimumPassingScore = minimumPassingScoreRaw === '' ? null : Number(minimumPassingScoreRaw);
+      const totalAllowedCredits = totalAllowedCreditsRaw === '' ? null : Number(totalAllowedCreditsRaw);
+      const minimumRequiredCredits = minimumRequiredCreditsRaw === '' ? null : Number(minimumRequiredCreditsRaw);
+
+      function validPercent(v) { return v === null || (Number.isFinite(v) && v >= 0 && v <= 100); }
+      function validCredits(v) { return v === null || (Number.isFinite(v) && v >= 0); }
+
+      if (!validPercent(minimumPassingAverage)) {
+        await showMsg({ title: 'Validation', icon: 'warning', message: 'Minimum Passing Average must be between 0 and 100.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+        return;
+      }
+      if (!validPercent(minimumPassingScore)) {
+        await showMsg({ title: 'Validation', icon: 'warning', message: 'Minimum Passing Score must be between 0 and 100.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+        return;
+      }
+      if (!validCredits(totalAllowedCredits) || !validCredits(minimumRequiredCredits)) {
+        await showMsg({ title: 'Validation', icon: 'warning', message: 'Credit values must be non-negative numbers.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+        return;
+      }
+      if (totalAllowedCredits !== null && minimumRequiredCredits !== null && minimumRequiredCredits > totalAllowedCredits) {
+        await showMsg({ title: 'Validation', icon: 'warning', message: 'Minimum Required Credits cannot exceed Total Allowed Credits.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+        return;
+      }
+
+      terms[editingTermRuleIndex].termAcademicRules = {
+        minimumPassingAverage: minimumPassingAverage,
+        minimumPassingScore: minimumPassingScore,
+        totalAllowedCredits: totalAllowedCredits,
+        minimumRequiredCredits: minimumRequiredCredits,
+        allowOverload: document.getElementById('chk_termAllowOverload').checked,
+        mustCompleteRequiredSubjects: document.getElementById('chk_termMustCompleteRequiredSubjects').checked,
+        notes: document.getElementById('inp_termRuleNotes').value.trim()
+      };
+
+      renderTerms();
+      const modalEl = document.getElementById('termRuleModal');
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    });
+
+    document.getElementById('btnSaveTermSnapshot').addEventListener('click', async function () {
+      if (editingTermSnapshotIndex === null || editingTermSnapshotIndex < 0 || editingTermSnapshotIndex >= terms.length) return;
+      try {
+        const snapshot = {
+          termCode: document.getElementById('inp_termSnapshotCode').value.trim().toUpperCase(),
+          termName: document.getElementById('inp_termSnapshotName').value.trim(),
+          status: document.getElementById('inp_termSnapshotStatus').value.trim().toLowerCase(),
+          termDescription: document.getElementById('inp_termSnapshotDescription').value.trim(),
+          registrationOpenDate: document.getElementById('inp_termSnapshotRegistrationOpenDate').value.trim(),
+          registrationCloseDate: document.getElementById('inp_termSnapshotRegistrationCloseDate').value.trim(),
+          lateRegistrationDeadline: document.getElementById('inp_termSnapshotLateRegistrationDeadline').value.trim(),
+          paymentDueDate: document.getElementById('inp_termSnapshotPaymentDueDate').value.trim(),
+          classesStartDate: document.getElementById('inp_termSnapshotClassesStartDate').value.trim(),
+          classesEndDate: document.getElementById('inp_termSnapshotClassesEndDate').value.trim(),
+          addDropDeadline: document.getElementById('inp_termSnapshotAddDropDeadline').value.trim(),
+          swapDeadline: document.getElementById('inp_termSnapshotSwapDeadline').value.trim(),
+          withdrawWithoutPenaltyDeadline: document.getElementById('inp_termSnapshotWithdrawWithoutPenaltyDeadline').value.trim(),
+          withdrawDeadline: document.getElementById('inp_termSnapshotWithdrawDeadline').value.trim(),
+          censusDate: document.getElementById('inp_termSnapshotCensusDate').value.trim(),
+          finalExamStartDate: document.getElementById('inp_termSnapshotFinalExamStartDate').value.trim(),
+          finalExamEndDate: document.getElementById('inp_termSnapshotFinalExamEndDate').value.trim(),
+          gradeSubmissionDeadline: document.getElementById('inp_termSnapshotGradeSubmissionDeadline').value.trim(),
+          termResultReleaseDate: document.getElementById('inp_termSnapshotResultReleaseDate').value.trim()
+        };
+        validateTermSnapshot(snapshot);
+        terms[editingTermSnapshotIndex] = {
+          ...terms[editingTermSnapshotIndex],
+          ...snapshot
+        };
+        renderTerms();
+        const modalEl = document.getElementById('termSnapshotModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+      } catch (err) {
+        await showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: err.message || 'Invalid term snapshot.',
+          buttons: [{ text: 'OK', class: 'btn-warning' }]
+        });
+      }
+    });
+
+    form.addEventListener('invalid', function (e) {
+      const invalidField = e.target;
+      activateTabForElement(invalidField);
+      setTimeout(function () { invalidField.focus(); }, 200);
+    }, true);
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+      try {
+        if (!form.checkValidity()) {
+          const firstInvalid = form.querySelector(':invalid');
+          activateTabForElement(firstInvalid);
+          form.reportValidity();
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+          return;
+        }
+
+        const adminId = document.getElementById('inp_adminPersonId').value.trim();
+        if (!adminId) throw new Error('Please select Program Administrator.');
+
+        const years = Number(document.getElementById('inp_durationYears').value || 0);
+        const months = Number(document.getElementById('inp_durationMonths').value || 0);
+        const days = Number(document.getElementById('inp_durationDays').value || 0);
+        if ((years + months + days) <= 0) throw new Error('Duration must have at least one non-zero value.');
+
+        normalizeTerms();
+        normalizeSubjects();
+        assertAcademicRulesValid();
+        const totalProgramCredits = Number(form.querySelector('input[name="credits"]').value || 0);
+        const minimumRequiredCredits =
+          Number(academicRules.requiredMainCredits || 0) +
+          Number(academicRules.requiredEssentialCredits || 0) +
+          Number(academicRules.requiredOptionalCredits || 0);
+        if (totalProgramCredits < minimumRequiredCredits) {
+          throw new Error('Program credits cannot be lower than the total required credits defined in Academic Rules.');
+        }
+        ensureFeeKeys();
+        syncHiddenState();
+
+        const formData = new FormData(form);
+        const data = new URLSearchParams(formData);
+
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+          body: data.toString()
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error('Server returned non-JSON response (Status ' + response.status + ')');
+        }
+
+        const result = await response.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+          : { stop: false };
+        if (guarded.stop) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+          return;
+        }
+        await showMsg({
+          title: result.status === 'success' ? 'Success' : 'Error',
+          icon: result.status === 'success' ? 'success' : 'error',
+          message: result.message || 'Operation completed.',
+          buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
+        });
+
+        if (result.status === 'success') {
+          window.location.href = '/school/programs';
+        } else {
+          activateTabForErrorMessage(result.message);
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
+      } catch (error) {
+        activateTabForErrorMessage(error.message);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        await showMsg({
+          title: 'System Error',
+          icon: 'error',
+          message: error.message || 'An unexpected network error occurred.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    ensureFeeKeys();
+    normalizePostingPolicies();
+    normalizeTerms();
+    normalizeSubjects();
+    normalizeDurationUI();
+    normalizeAcademicRulesUI();
+    syncTransactionDefinitionSelectionUi();
+    syncProgramPostingPolicySelectionUi();
+    renderFeeLines();
+    renderPostingPolicies();
+    renderTerms();
+    renderSubjects();
+    bindEvents();
+    syncHiddenState();
+  });
+})();
+</script>

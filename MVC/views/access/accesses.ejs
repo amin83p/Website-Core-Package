@@ -1,0 +1,119 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  print,
+  btn_export: true
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search access pools...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="name">Profile Name <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="orgId">Scope <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="adminLevel">Admin Level <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="sections">Sections <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="validity">Validity <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="active">Active <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="lastUpdateDateTime">Last Updated <span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% accesses.forEach(item => { %>
+        <tr>
+          <td class="fw-bold"><%= item.name %></td>
+          
+          <td>
+            <% if (item.orgId) { %>
+               <span class="badge bg-info text-dark">Org <%= item.orgId %></span>
+            <% } else { %>
+               <span class="badge bg-secondary">Global</span>
+            <% } %>
+          </td>
+
+          <td>
+              <% if (item.fullAdmin) { %>
+                  <span class="badge bg-danger">FULL SYSTEM ADMIN</span>
+              <% } else if (item.adminCategories && item.adminCategories.length > 0) { %>
+                  <% item.adminCategories.forEach(cat => { %>
+                      <span class="badge bg-warning text-dark border"><%= cat %></span>
+                  <% }) %>
+              <% } else { %>
+                  <span class="text-muted small">User / Restricted</span>
+              <% } %>
+          </td>
+
+          <td>
+             <span class="badge bg-light text-dark border">
+               <%= (item.sections || []).length %> Configured
+             </span>
+          </td>
+          
+          <td>
+             <% if(item.validity && (item.validity.startDate || item.validity.endDate)) { %>
+                <span class="d-block small text-nowrap"><%= item.validity.startDate || '...' %> <i class="bi bi-arrow-right-short"></i></span>
+                <span class="d-block small text-nowrap"><%= item.validity.endDate || '...' %></span>
+             <% } else { %>
+                <span class="text-muted small">Forever</span>
+             <% } %>
+          </td>
+
+          <td>
+            <% if (item.active) { %>
+                <span class="badge bg-success">Active</span>
+            <% } else { %>
+                <span class="badge bg-secondary">Inactive</span>
+            <% } %>
+          </td>
+
+          <% const audit = item.audit || {}; %>
+          <td>
+            <% if (audit.lastUpdateDateTime) { %>
+              <%= new Date(audit.lastUpdateDateTime).toLocaleString() %>
+              <div class="small text-muted">by User <%= audit.lastUpdateUser %></div>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/accesses/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>

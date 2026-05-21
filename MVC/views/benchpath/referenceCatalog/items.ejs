@@ -1,0 +1,75 @@
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  manageBtns: [
+    `<a href="/benchpath" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>`
+  ]
+}) %>
+
+<%
+  const cols = Array.isArray(listConfig?.columns) ? listConfig.columns : [];
+  const searchPlaceholder = listConfig?.placeholder || `Search ${entity.title}...`;
+%>
+
+<%- include('../../partials/tablePages-search', { placeholder: searchPlaceholder, fields: [] }) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <% cols.forEach((col) => { %>
+          <th class="draggable" data-column="<%= col.key %>"><%= col.label %> <span class="sort-icon"></span></th>
+        <% }) %>
+        <th>Flags</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if ((data || []).length === 0) { %>
+        <tr><td colspan="<%= cols.length + 2 %>" class="text-center py-4 text-muted">No records found for <%= entity.title %>.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <tr>
+          <% cols.forEach((col) => { %>
+            <td class="<%= col.type === 'mono' ? 'font-monospace small' : '' %>">
+              <% if (col.type === 'title') { %>
+                <div class="fw-bold"><%= item.cells[col.key] %></div>
+                <div class="small text-muted"><%= item.slug || '-' %><% if (item.code) { %> | <%= item.code %><% } %></div>
+              <% } else if (col.type === 'status') { %>
+                <span class="badge bg-primary"><%= item.cells[col.key] %></span>
+              <% } else if (col.type === 'review') { %>
+                <span class="badge bg-light text-dark border"><%= item.cells[col.key] %></span>
+              <% } else if (col.type === 'count') { %>
+                <span class="badge bg-light text-dark border"><%= item.cells[col.key] %></span>
+              <% } else if (col.type === 'boolean') { %>
+                <span class="badge <%= item.cells[col.key] ? 'bg-success' : 'bg-secondary' %>"><%= item.cells[col.key] ? 'Yes' : 'No' %></span>
+              <% } else { %>
+                <%= item.cells[col.key] %>
+              <% } %>
+            </td>
+          <% }) %>
+          <td>
+            <span class="badge <%= item.flags?.isActive ? 'bg-success' : 'bg-danger' %>"><%= item.flags?.isActive ? 'Active' : 'Inactive' %></span>
+            <span class="badge <%= item.flags?.isSystem ? 'bg-dark' : 'bg-light text-dark border' %>"><%= item.flags?.isSystem ? 'System' : 'Custom' %></span>
+            <span class="badge <%= item.flags?.isLocked ? 'bg-warning text-dark' : 'bg-light text-dark border' %>"><%= item.flags?.isLocked ? 'Locked' : 'Editable' %></span>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <a href="/benchpath/<%= entity.routeBase %>/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit me-1">Edit</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="benchpath/<%= entity.routeBase %>" hidden></span>
+
+<%- include('../../partials/pagination', { pagination: pagination, filters: filters, baseUrlPath: newUrl }) %>
+
+<%- include('../../partials/tablePages-end') %>
