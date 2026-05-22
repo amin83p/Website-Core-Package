@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const packageRegistryInstallerService = require('../MVC/services/packageRegistryInstallerService');
 const packageManifestService = require('../MVC/services/packageManifestService');
+const packageRouteService = require('../MVC/services/packageRouteService');
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -379,4 +380,50 @@ test('real PTE manifest validates and exercises installer declarations + default
   assert.equal(summary.uploadFolders.definitionsRegistered >= 1, true);
   assert.equal(summary.uploadFolders.valuesApplied >= 1, true);
   assert.equal(uploadMocks.state.settings.app.uploadFolders['pte.packageAssets'], 'PTE/Package_Assets');
+});
+
+test('loader hooks include route registration and keep metadata-only routes non-mounted', async () => {
+  packageRouteService.resetMountedRoutes();
+  const hooks = packageRegistryInstallerService.createLoaderHooks({
+    logger: { info() {}, warn() {}, success() {}, error() {} }
+  });
+
+  const app = {
+    calls: [],
+    use(...args) {
+      this.calls.push(args);
+    }
+  };
+
+  const summary = await hooks.registerRoutes({
+    app,
+    packageId: 'pte',
+    manifest: {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      routes: [
+        {
+          method: 'USE',
+          path: '/pte',
+          router: 'MVC/routes/pte/pteMainRoute.js',
+          metadataOnly: true
+        },
+        {
+          method: 'GET',
+          path: '/pte/test-info',
+          controller: 'MVC/controllers/pte/infoController.showPteTestInfo',
+          metadataOnly: true
+        }
+      ]
+    }
+  });
+
+  assert.equal(summary.packageId, 'pte');
+  assert.equal(summary.requested, 2);
+  assert.equal(summary.prepared, 2);
+  assert.equal(summary.mounted, 0);
+  assert.equal(summary.failed, 0);
+  assert.equal(app.calls.length, 0);
 });

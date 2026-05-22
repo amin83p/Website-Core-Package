@@ -7,6 +7,7 @@ const systemSettingsRepository = require('../repositories/systemSettingsReposito
 const uploadFolderSettingsService = require('./uploadFolderSettingsService');
 const settingService = require('./settingService');
 const packageQueryExecutorService = require('./packageQueryExecutorService');
+const packageRouteService = require('./packageRouteService');
 const startupLogger = require('../utils/startupLogger');
 
 const ENTITY_KEYS = Object.freeze([
@@ -754,7 +755,24 @@ function createLoaderHooks(options = {}) {
     ...options,
     logger
   });
+  const routeHooks = packageRouteService.createLoaderHooks({
+    ...options,
+    logger
+  });
   return {
+    registerRoutes: async (context = {}) => {
+      const summary = await routeHooks.registerRoutes(context);
+      if (logger && typeof logger.info === 'function' && (summary?.requested || summary?.mounted || summary?.failed)) {
+        logger.info('PACKAGE_INSTALLER', 'ROUTES', `Route registration complete for ${summary.packageId}.`, {
+          packageId: summary.packageId,
+          requested: summary.requested,
+          prepared: summary.prepared,
+          mounted: summary.mounted,
+          failed: summary.failed
+        });
+      }
+      return summary;
+    },
     registerRegistryData: async (context = {}) => {
       const summary = await installPackageRegistryDeclarations(context, {
         ...options,
