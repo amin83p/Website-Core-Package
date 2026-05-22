@@ -27,8 +27,6 @@ const subscriptionGroupModel = require('./subscriptionGroupModel');
 const chatModel = require('./chatModel');
 const taskModel = require('./taskModel');
 const helpArticleModel = require('./helpArticleModel');
-const schoolRepositories = require('../repositories/school');
-const ieltsRepositories = require('../repositories/ielts');
 
 let registeredBackendMode = null;
 
@@ -197,21 +195,6 @@ function createExecutor(getRows, applyScope) {
   };
 }
 
-function createRepositoryExecutor(repository) {
-  return async (plan = {}) => {
-    if (!repository || typeof repository.list !== 'function') return [];
-    const rows = await repository.list({
-      query: plan.query || {},
-      scope: plan.scope || {},
-      projection: plan.projection || null,
-      pagination: plan.pagination || null,
-      sort: plan.sort || null,
-      skipExecutor: true
-    });
-    return Array.isArray(rows) ? rows : [];
-  };
-}
-
 function registerCoreEntityQueryExecutors(options = {}) {
   const backendMode = normalizeBackendMode(options?.backendMode || 'json');
   if (registeredBackendMode === backendMode) return;
@@ -248,41 +231,7 @@ function registerCoreEntityQueryExecutors(options = {}) {
     ['subscriptiongroups', createExecutor(subscriptionGroupModel.getAllGroups, applySubscriptionGroupScope)],
     ['chatConversations', createExecutor(chatModel.getAllConversations, applyChatConversationScope)],
     ['tasks', createExecutor(() => taskModel.getAllTasks({ isSuperAdmin: true }), applyTaskScope)],
-    ['helpArticles', createExecutor(helpArticleModel.getAllArticles, applyHelpArticleScope)],
-
-    // School repositories
-    ['school.students', createRepositoryExecutor(schoolRepositories.students)],
-    ['school.programs', createRepositoryExecutor(schoolRepositories.programs)],
-    ['school.transactiondefinitions', createRepositoryExecutor(schoolRepositories.transactionDefinitions)],
-    ['school.schoolaccounts', createRepositoryExecutor(schoolRepositories.schoolAccounts)],
-    ['school.globaltransactions', createRepositoryExecutor(schoolRepositories.globalTransactions)],
-    ['school.transactionjournals', createRepositoryExecutor(schoolRepositories.transactionJournals)],
-    ['school.academicledger', createRepositoryExecutor(schoolRepositories.academicLedger)],
-    ['school.academicsnapshots', createRepositoryExecutor(schoolRepositories.academicSnapshots)],
-    ['school.reporttemplates', createRepositoryExecutor(schoolRepositories.reportTemplates)],
-    ['school.reportassignments', createRepositoryExecutor(schoolRepositories.reportAssignments)],
-    ['school.reportinstances', createRepositoryExecutor(schoolRepositories.reportInstances)],
-    ['school.subjects', createRepositoryExecutor(schoolRepositories.subjects)],
-    ['school.classes', createRepositoryExecutor(schoolRepositories.classes)],
-    ['school.holidays', createRepositoryExecutor(schoolRepositories.holidays)],
-    ['school.terms', createRepositoryExecutor(schoolRepositories.terms)],
-    ['school.departments', createRepositoryExecutor(schoolRepositories.departments)],
-    ['school.teachers', createRepositoryExecutor(schoolRepositories.teachers)],
-    ['school.staff', createRepositoryExecutor(schoolRepositories.staff)],
-    ['school.payrates', createRepositoryExecutor(schoolRepositories.payRates)],
-    ['school.sessionstatuses', createRepositoryExecutor(schoolRepositories.sessionStatuses)],
-    ['school.timesheetperiods', createRepositoryExecutor(schoolRepositories.timesheetPeriods)],
-    ['school.timesheets', createRepositoryExecutor(schoolRepositories.timesheets)],
-    ['school.studentprogramregistrations', createRepositoryExecutor(schoolRepositories.studentProgramRegistrations)],
-    ['school.studentprogrampriorsubjects', createRepositoryExecutor(schoolRepositories.studentProgramPriorSubjects)],
-    ['school.studenttermregistrations', createRepositoryExecutor(schoolRepositories.studentTermRegistrations)],
-    ['school.classenrollmentperiods', createRepositoryExecutor(schoolRepositories.classEnrollmentPeriods)],
-
-    // IELTS repositories
-    ['ielts.task2samples', createRepositoryExecutor(ieltsRepositories.task2Samples)],
-    ['ielts.microassessments', createRepositoryExecutor(ieltsRepositories.microAssessments)],
-    ['ielts.prompts', createRepositoryExecutor(ieltsRepositories.prompts)],
-    ['ielts.scoringhistory', createRepositoryExecutor(ieltsRepositories.scoringHistory)]
+    ['helpArticles', createExecutor(helpArticleModel.getAllArticles, applyHelpArticleScope)]
   ];
 
   executors.forEach(([entityName, executor]) => registerEntityQueryExecutor(entityName, executor));

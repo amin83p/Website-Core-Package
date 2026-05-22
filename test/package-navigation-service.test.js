@@ -1,0 +1,120 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const os = require('node:os');
+
+const packageRegistryService = require('../MVC/services/packageRegistryService');
+const packageNavigationService = require('../MVC/services/packageNavigationService');
+
+async function withTempPackageWorkspace(callback) {
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-nav-'));
+  const packageRootDir = path.join(tempRoot, 'packages');
+  const registryPath = path.join(tempRoot, 'packageRegistry.test.json');
+  const previousRegistryPath = process.env.PACKAGE_REGISTRY_DATA_PATH;
+  process.env.PACKAGE_REGISTRY_DATA_PATH = registryPath;
+
+  try {
+    await fs.mkdir(packageRootDir, { recursive: true });
+    await callback({ tempRoot, packageRootDir });
+  } finally {
+    packageNavigationService.resetCache();
+    if (previousRegistryPath === undefined) delete process.env.PACKAGE_REGISTRY_DATA_PATH;
+    else process.env.PACKAGE_REGISTRY_DATA_PATH = previousRegistryPath;
+    await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function writeManifest(packageRootDir, packageId, payload) {
+  const dir = path.join(packageRootDir, packageId);
+  await fs.mkdir(dir, { recursive: true });
+  const manifestPath = path.join(dir, 'package.manifest.json');
+  await fs.writeFile(manifestPath, JSON.stringify(payload, null, 2), 'utf8');
+  return manifestPath;
+}
+
+test('package navigation loads enabled manifest declarations for menu + dashboard', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'alpha', {
+      id: 'alpha',
+      name: 'Alpha',
+      version: '1.0.0',
+      mountPath: '/alpha',
+      menuEntries: [
+        {
+          id: 'alpha-docs',
+          label: 'Alpha Docs',
+          href: '/alpha/docs',
+          icon: 'bi-journal-text',
+          visibility: 'all'
+        }
+      ],
+      dashboardEntries: [
+        {
+          id: 'alpha-home',
+          label: 'Alpha Dashboard',
+          href: '/alpha',
+          icon: 'bi-box',
+          visibility: 'authenticated'
+        }
+      ]
+    });
+
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'alpha',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const snapshot = await packageNavigationService.refreshNavigationRegistry({
+      backendMode: 'json',
+      packageRootDir
+    });
+
+    assert.equal(snapshot.enabledPackageIds.includes('alpha'), true);
+    const publicEntries = packageNavigationService.getPublicMenuEntries(null);
+    const hasAlphaMenu = publicEntries.some((entry) => entry.href === '/alpha/docs' && entry.label === 'Alpha Docs');
+    assert.equal(hasAlphaMenu, true);
+
+    const guestDashboardEntries = packageNavigationService.getDashboardEntries(null);
+    assert.equal(guestDashboardEntries.some((entry) => entry.href === '/alpha'), false);
+
+    const authDashboardEntries = packageNavigationService.getDashboardEntries({ id: 'U1' });
+    assert.equal(authDashboardEntries.some((entry) => entry.href === '/alpha'), true);
+  });
+});
+
+test('disabled packages contribute mount-path filtering for menu entries', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte'
+    });
+
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: false,
+      installStatus: 'disabled'
+    }, { backendMode: 'json' });
+
+    const snapshot = await packageNavigationService.refreshNavigationRegistry({
+      backendMode: 'json',
+      packageRootDir
+    });
+    assert.equal(snapshot.disabledPackageIds.includes('pte'), true);
+    assert.equal(snapshot.disabledMountPaths.includes('/pte'), true);
+
+    const filtered = packageNavigationService.filterMenuItemsAgainstDisabledPackages([
+      { id: 'home', label: 'Home', href: '/' },
+      { id: 'pte', label: 'PTE', href: '/pte' },
+      { id: 'pte-sub', label: 'PTE Packages', href: '/pte/packages' },
+      { id: 'about', label: 'About', href: '/about' }
+    ]);
+
+    assert.equal(filtered.some((entry) => entry.href === '/pte'), false);
+    assert.equal(filtered.some((entry) => entry.href === '/pte/packages'), false);
+    assert.equal(filtered.some((entry) => entry.href === '/about'), true);
+  });
+});

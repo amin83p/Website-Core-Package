@@ -1,0 +1,143 @@
+{
+  "id": "pte",
+  "name": "PTE",
+  "version": "1.0.0",
+  "mountPath": "/pte",
+  "enabledByDefault": false,
+  "routes": [],
+  "queryExecutors": [],
+  "operations": [
+    {
+      "name": "PTE_PACKAGE_SETUP",
+      "description": "Package-level setup operation for PTE registration.",
+      "active": true,
+      "trackState": true,
+      "keepActive": false,
+      "system": false
+    }
+  ],
+  "roles": [
+    {
+      "key": "pte_package_viewer",
+      "label": "PTE Package Viewer",
+      "description": "Sample package-managed role for PTE package installation flow.",
+      "domain": "pte",
+      "packageName": "PTE",
+      "aliases": [
+        "pte-package-viewer",
+        "ptepackageviewer"
+      ],
+      "active": true,
+      "system": false
+    }
+  ],
+  "sections": [
+    {
+      "name": "PTE_PACKAGE_SETUP",
+      "category": "SYSTEM",
+      "description": "Sample package-managed section for PTE package installation flow.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": false,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte",
+      "operations": [
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 10,
+          "active": true
+        },
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 10,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": []
+    }
+  ],
+  "symbols": [
+    {
+      "name": "PTE_PACKAGE_SETUP",
+      "type": "class",
+      "value": "bi bi-box-seam",
+      "tags": [
+        "PTE_PACKAGE_SETUP",
+        "PTE_PACKAGE"
+      ],
+      "orgId": "SYSTEM"
+    }
+  ],
+  "accesses": [
+    {
+      "name": "PTE_PACKAGE_SETUP",
+      "orgId": null,
+      "description": "Sample package-managed access profile for PTE package setup.",
+      "active": true,
+      "fullAdmin": false,
+      "adminCategories": [],
+      "validity": {
+        "startDate": null,
+        "endDate": null
+      },
+      "sections": []
+    }
+  ],
+  "uploadFolders": [
+    {
+      "key": "pte.questionBank",
+      "template": "PTE/Question_Bank"
+    },
+    {
+      "key": "pte.packageAssets",
+      "packageName": "PTE",
+      "group": "PTE Uploads",
+      "label": "PTE Package Assets",
+      "defaultTemplate": "PTE/Package_Assets",
+      "placeholders": [],
+      "applyDefault": true
+    }
+  ],
+  "quotaDefinitions": [],
+  "settings": [],
+  "menuEntries": [
+    {
+      "id": "pte-home",
+      "label": "PTE Test",
+      "href": "/pte",
+      "icon": "bi-mortarboard",
+      "visibility": "all",
+      "target": "_self",
+      "active": true
+    },
+    {
+      "id": "pte-packages",
+      "label": "PTE Packages",
+      "href": "/pte/packages",
+      "icon": "bi-box-seam",
+      "visibility": "all",
+      "target": "_self",
+      "active": true
+    }
+  ],
+  "dashboardEntries": [
+    {
+      "id": "pte-dashboard",
+      "label": "PTE Dashboard",
+      "href": "/pte",
+      "icon": "bi-mortarboard",
+      "description": "Open PTE package workspace.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "active": true
+    }
+  ],
+  "seeders": [],
+  "migrations": [],
+  "dependencies": []
+}

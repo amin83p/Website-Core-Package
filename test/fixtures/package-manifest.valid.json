@@ -1,0 +1,37 @@
+{
+  "id": "pte",
+  "name": "PTE",
+  "version": "1.0.0",
+  "mountPath": "/pte",
+  "enabledByDefault": false,
+  "routes": [
+    "MVC/routes/pte/pteMainRoute.js"
+  ],
+  "queryExecutors": [],
+  "views": {
+    "path": "MVC/views/pte"
+  },
+  "assets": {
+    "publicPath": "public/pte"
+  },
+  "roles": [
+    {
+      "key": "pte_student"
+    }
+  ],
+  "sections": [],
+  "symbols": [],
+  "accesses": [],
+  "uploadFolders": [
+    {
+      "key": "pte.questionBank"
+    }
+  ],
+  "quotaDefinitions": [],
+  "settings": [],
+  "menuEntries": [],
+  "dashboardEntries": [],
+  "seeders": [],
+  "migrations": [],
+  "dependencies": []
+}

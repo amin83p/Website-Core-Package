@@ -10,6 +10,7 @@ const settingService = require('../services/settingService');
 const appBrandingService = require('../services/appBrandingService');
 const dataBackendRuntimeService = require('../services/dataBackendRuntimeService');
 const { registerCoreEntityQueryExecutors } = require('../models/queryExecutorBootstrap');
+const packageQueryExecutorService = require('../services/packageQueryExecutorService');
 const actionStateRetentionService = require('../services/actionStateRetentionService');
 const jsonToMongoMigrationService = require('../services/migration/jsonToMongoMigrationService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
@@ -824,6 +825,9 @@ exports.retryDataBackendConnection = async (req, res) => {
   try {
     const runtimeBackend = await dataBackendRuntimeService.retryMongoConnection(process.env);
     registerCoreEntityQueryExecutors({ backendMode: runtimeBackend.mode });
+    await packageQueryExecutorService.refreshEnabledPackageQueryExecutors({
+      backendMode: runtimeBackend.mode
+    });
     await settingService.refresh();
     actionStateRetentionService.start({ enabled: runtimeBackend.mode === 'mongo' });
     if (req.app?.locals) {

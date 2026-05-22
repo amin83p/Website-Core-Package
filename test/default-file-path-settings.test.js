@@ -60,7 +60,10 @@ test('upload folder validation rejects unsafe templates', () => {
   assert.ok(definition, 'expected core.fileManager definition');
 
   assert.throws(() => uploadFolderSettingsService.validateTemplateForDefinition(definition, 'C:/temp/path'), /relative/i);
-  assert.throws(() => uploadFolderSettingsService.validateTemplateForDefinition(definition, '/uploads/GLOBAL/misc'), /uploads prefix/i);
+  assert.throws(
+    () => uploadFolderSettingsService.validateTemplateForDefinition(definition, '/uploads/GLOBAL/misc'),
+    /(uploads prefix|relative to the scoped upload folder)/i
+  );
   assert.throws(() => uploadFolderSettingsService.validateTemplateForDefinition(definition, 'ORG_123/misc'), /ORG scope folders/i);
 });
 

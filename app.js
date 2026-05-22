@@ -51,6 +51,9 @@ const smsProviderService = require('./MVC/services/sms/smsProviderService');
 const { registerCoreEntityQueryExecutors } = require('./MVC/models/queryExecutorBootstrap');
 const dataBackendRuntimeService = require('./MVC/services/dataBackendRuntimeService');
 const dataBackendRecoveryMiddleware = require('./MVC/middleware/dataBackendRecoveryMiddleware');
+const packageLoaderService = require('./MVC/services/packageLoaderService');
+const packageRegistryInstallerService = require('./MVC/services/packageRegistryInstallerService');
+const packageNavigationService = require('./MVC/services/packageNavigationService');
 const startupLogger = require('./MVC/utils/startupLogger');
 const actionStateRetentionService = require('./MVC/services/actionStateRetentionService');
 const { runWithRequestContext } = require('./MVC/utils/requestContextStore');
@@ -317,6 +320,41 @@ async function startServer() {
     app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
 
     await settingService.init();
+    try {
+      const packageLoaderHooks = packageRegistryInstallerService.createLoaderHooks({
+        backendMode: dataBackend.mode
+      });
+      const packageLoadSummary = await packageLoaderService.loadEnabledPackages({
+        app,
+        backendMode: dataBackend.mode,
+        hooks: packageLoaderHooks
+      });
+      app.locals.packageLoadSummary = packageLoadSummary;
+    } catch (packageLoaderError) {
+      startupLogger.warn('PACKAGE_LOADER', 'STARTUP', 'Package loader failed during startup; continuing with core + hardcoded routes.', {
+        error: packageLoaderError?.message || String(packageLoaderError)
+      });
+      app.locals.packageLoadSummary = {
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        enabledCount: 0,
+        loadedCount: 0,
+        failedCount: 1,
+        loaded: [],
+        failed: [{ packageId: '', message: packageLoaderError?.message || String(packageLoaderError) }]
+      };
+    }
+    try {
+      const packageNavigationSnapshot = await packageNavigationService.refreshNavigationRegistry({
+        backendMode: dataBackend.mode
+      });
+      app.locals.packageNavigationSnapshot = packageNavigationSnapshot;
+    } catch (packageNavigationError) {
+      startupLogger.warn('PACKAGE_NAV', 'STARTUP', 'Package navigation registry failed to refresh; continuing with static defaults.', {
+        error: packageNavigationError?.message || String(packageNavigationError)
+      });
+      app.locals.packageNavigationSnapshot = null;
+    }
     actionStateRetentionService.start({ enabled: dataBackend.mode === 'mongo' });
     smsProviderService.logStartupDiagnostics();
 

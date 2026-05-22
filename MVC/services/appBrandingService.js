@@ -1,4 +1,5 @@
 const settingService = require('./settingService');
+const packageNavigationService = require('./packageNavigationService');
 
 const DEFAULT_BRAND = Object.freeze({
   appName: 'Amin Paknejad',
@@ -434,11 +435,37 @@ function normalizePublicMenuItems(items, user = null, depth = 0) {
     .filter(Boolean);
 }
 
+function dedupeMenuItems(items = []) {
+  const seen = new Set();
+  const out = [];
+  (Array.isArray(items) ? items : []).forEach((item, index) => {
+    const source = item && typeof item === 'object' ? item : {};
+    const href = cleanMenuHref(source.href || '');
+    const label = cleanText(source.label, { max: 120, fallback: '' });
+    const id = cleanText(source.id, { max: 120, fallback: `menu-item-${index + 1}` });
+    const key = `${id}|${href}|${label}`.toLowerCase();
+    if (!href || !label || seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      ...source,
+      href,
+      label,
+      id
+    });
+  });
+  return out;
+}
+
 function getPublicMenu(user = null) {
   const raw = getRawPublicMenuSettings();
   const sourceItems = Array.isArray(raw.items) && raw.items.length ? raw.items : DEFAULT_PUBLIC_MENU_ITEMS;
-  const normalized = normalizePublicMenuItems(sourceItems, user, 0);
-  return normalized.length ? normalized : normalizePublicMenuItems(DEFAULT_PUBLIC_MENU_ITEMS, user, 0);
+  const filteredBaseItems = packageNavigationService.filterMenuItemsAgainstDisabledPackages(sourceItems);
+  const packageItems = packageNavigationService.getPublicMenuEntries(user);
+  const mergedItems = dedupeMenuItems([...(filteredBaseItems || []), ...(packageItems || [])]);
+  const normalized = normalizePublicMenuItems(mergedItems, user, 0);
+  if (normalized.length) return normalized;
+  const fallbackItems = packageNavigationService.filterMenuItemsAgainstDisabledPackages(DEFAULT_PUBLIC_MENU_ITEMS);
+  return normalizePublicMenuItems(fallbackItems, user, 0);
 }
 
 function getPublicDefaultHomePath() {
@@ -448,7 +475,25 @@ function getPublicDefaultHomePath() {
 }
 
 function getPublicMenuEndpointOptions() {
-  return PUBLIC_MENU_ENDPOINT_OPTIONS.map((item) => ({
+  const staticOptions = PUBLIC_MENU_ENDPOINT_OPTIONS.map((item) => ({
+    label: cleanText(item.label, { max: 120, fallback: '' }),
+    href: cleanMenuHref(item.href),
+    icon: cleanMenuIcon(item.icon),
+    visibility: ['all', 'guest', 'authenticated'].includes(item.visibility) ? item.visibility : 'all',
+    target: item.target === '_blank' ? '_blank' : '_self',
+    category: cleanText(item.category, { max: 80, fallback: 'Public' })
+  })).filter((item) => item.label && item.href);
+  const filteredStatic = packageNavigationService.filterMenuItemsAgainstDisabledPackages(staticOptions);
+  const packageOptions = packageNavigationService.getPublicMenuEntries(null).map((row) => ({
+    label: cleanText(row.label, { max: 120, fallback: '' }),
+    href: cleanMenuHref(row.href),
+    icon: cleanMenuIcon(row.icon),
+    visibility: ['all', 'guest', 'authenticated'].includes(row.visibility) ? row.visibility : 'all',
+    target: row.target === '_blank' ? '_blank' : '_self',
+    category: cleanText(row.sourcePackageName || row.category || 'Package', { max: 80, fallback: 'Package' })
+  })).filter((item) => item.label && item.href);
+  const deduped = dedupeMenuItems([...filteredStatic, ...packageOptions]);
+  return deduped.map((item) => ({
     label: cleanText(item.label, { max: 120, fallback: '' }),
     href: cleanMenuHref(item.href),
     icon: cleanMenuIcon(item.icon),
