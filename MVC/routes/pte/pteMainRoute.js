@@ -4,7 +4,7 @@ const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const infoController = require('../../controllers/pte/infoController');
 const userDashboardController = require('../../controllers/pte/userDashboardController');
 const publicPageSettingsController = require('../../controllers/pte/publicPageSettingsController');
-const personController = require('../../controllers/personController');
+const publicJoinController = require('../../controllers/pte/publicJoinController');
 const { requireAuth } = require('../../middleware/authMiddleware');
 const { requireAccess } = require('../../middleware/accessMiddleware');
 const { trackActionState } = require('../../middleware/actionStateMiddleware');
@@ -19,8 +19,8 @@ router.get('/', infoController.showPteTestInfo);
 router.get('/dashboard', requireAuth, userDashboardController.showDashboard);
 
 router.get('/test-info', infoController.showPteTestInfo);
-router.get('/join', personController.showPtePublicJoinForm);
-router.post('/join', personController.processPtePublicJoin);
+router.get('/join', publicJoinController.showPtePublicJoinForm);
+router.post('/join', publicJoinController.processPtePublicJoin);
 router.get('/packages', infoController.showPublicPackages);
 router.post('/packages/:packageId/select', requireAuth, infoController.selectPublicPackage);
 router.get('/public-page',

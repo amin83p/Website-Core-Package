@@ -5352,5 +5352,74 @@
     "changeEvents": [],
     "finalData": null,
     "lastActiveAt": "2026-05-19T23:28:15.328Z"
+  },
+  {
+    "id": "ASI202605221779430811850",
+    "userId": "ROOT_001",
+    "sectionId": "340738",
+    "operationId": "OP1005",
+    "targetKey": "GLOBAL_SCOPE",
+    "status": "active",
+    "attemptCount": 1,
+    "volumeUsageKB": 157.59375,
+    "startedAt": "2026-05-22T06:20:11.492Z",
+    "expiresAt": "2026-05-22T07:20:11.492Z",
+    "appliedLimits": {
+      "maxAttempts": null,
+      "maxTimeMinutes": null,
+      "maxVolumeKB": null
+    },
+    "initialContext": {
+      "method": "GET",
+      "url": "/systemSettings/data-backend",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
+      "requestId": "f1b0dd8d-d9a2-4135-ab38-fe656f1b1a79",
+      "userId": "ROOT_001",
+      "username": "Amin",
+      "displayName": "Amin",
+      "orgId": "SYSTEM",
+      "orgName": "SYSTEM / GLOBAL MODE"
+    },
+    "history": [
+      {
+        "ts": "2026-05-22T06:20:11.492Z",
+        "status": "attempt_started",
+        "details": "New/Auto Session Started",
+        "context": {
+          "method": "GET",
+          "url": "/systemSettings/data-backend",
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
+          "requestId": "f1b0dd8d-d9a2-4135-ab38-fe656f1b1a79",
+          "userId": "ROOT_001",
+          "username": "Amin",
+          "displayName": "Amin",
+          "orgId": "SYSTEM",
+          "orgName": "SYSTEM / GLOBAL MODE"
+        }
+      },
+      {
+        "ts": "2026-05-22T06:20:11.508Z",
+        "status": "step_completed",
+        "details": "Intermediate response sent",
+        "volumeKB": 157.59375,
+        "context": {
+          "method": "GET",
+          "url": "/systemSettings/data-backend",
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
+          "requestId": "f1b0dd8d-d9a2-4135-ab38-fe656f1b1a79",
+          "userId": "ROOT_001",
+          "username": "Amin",
+          "displayName": "Amin",
+          "orgId": "SYSTEM",
+          "orgName": "SYSTEM / GLOBAL MODE"
+        }
+      }
+    ],
+    "changeEvents": [],
+    "finalData": null,
+    "lastActiveAt": "2026-05-22T06:20:11.508Z"
   }
 ]

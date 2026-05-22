@@ -2,4 +2,7 @@ node_modules/
 /uploads/
 /data/pte/*.report.json
 /data/pte/*migration*.json
+/data/actionStates.json
+/data/logs.json
+/data/sessions.json
 .env

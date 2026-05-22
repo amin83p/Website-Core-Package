@@ -4,80 +4,1933 @@
   "version": "1.0.0",
   "mountPath": "/pte",
   "enabledByDefault": false,
-  "routes": [],
+  "routes": [
+    {
+      "method": "USE",
+      "path": "/pte",
+      "router": "MVC/routes/pte/pteMainRoute.js",
+      "metadataOnly": true,
+      "active": true
+    },
+    {
+      "method": "GET",
+      "path": "/pte",
+      "controller": "MVC/controllers/pte/infoController.showPteTestInfo",
+      "metadataOnly": true,
+      "active": true
+    },
+    {
+      "method": "GET",
+      "path": "/pte/join",
+      "controller": "MVC/controllers/pte/publicJoinController.showPtePublicJoinForm",
+      "metadataOnly": true,
+      "active": true
+    },
+    {
+      "method": "POST",
+      "path": "/pte/join",
+      "controller": "MVC/controllers/pte/publicJoinController.processPtePublicJoin",
+      "metadataOnly": true,
+      "active": true
+    },
+    {
+      "method": "GET",
+      "path": "/pte/packages",
+      "controller": "MVC/controllers/pte/infoController.showPublicPackages",
+      "metadataOnly": true,
+      "active": true
+    },
+    {
+      "method": "GET",
+      "path": "/pte/dashboard",
+      "controller": "MVC/controllers/pte/userDashboardController.showDashboard",
+      "metadataOnly": true,
+      "active": true
+    }
+  ],
   "queryExecutors": [],
   "operations": [
     {
-      "name": "PTE_PACKAGE_SETUP",
-      "description": "Package-level setup operation for PTE registration.",
+      "id": "935362",
+      "name": "AI_SCORING",
       "active": true,
+      "system": false,
       "trackState": true,
-      "keepActive": false,
-      "system": false
+      "keepActive": true,
+      "adoptExisting": true
     }
   ],
   "roles": [
     {
-      "key": "pte_package_viewer",
-      "label": "PTE Package Viewer",
-      "description": "Sample package-managed role for PTE package installation flow.",
+      "id": "ROL1007",
+      "key": "pte_student",
+      "label": "PTE Student",
+      "description": "PTE domain managed student role.",
       "domain": "pte",
       "packageName": "PTE",
       "aliases": [
-        "pte-package-viewer",
-        "ptepackageviewer"
+        "ptestudent",
+        "pte-student",
+        "ptestudents",
+        "pte-students",
+        "pte_students"
       ],
       "active": true,
-      "system": false
+      "system": true,
+      "adoptExisting": true
+    },
+    {
+      "id": "ROL1009",
+      "key": "pte_student_public",
+      "label": "PTE Student Public",
+      "description": "PTE public applicant role token.",
+      "domain": "pte",
+      "packageName": "PTE",
+      "aliases": [
+        "ptestudentpublic",
+        "pte-student-public",
+        "ptestudentspublic",
+        "pte-students-public",
+        "pte_students_public"
+      ],
+      "active": true,
+      "system": true,
+      "adoptExisting": true
+    },
+    {
+      "id": "ROL1010",
+      "key": "pte_teacher",
+      "label": "PTE Teacher",
+      "description": "PTE domain managed teacher role.",
+      "domain": "pte",
+      "packageName": "PTE",
+      "aliases": [
+        "pteteacher",
+        "pte-teacher",
+        "pteteachers",
+        "pte-teachers",
+        "pte_teachers"
+      ],
+      "active": true,
+      "system": true,
+      "adoptExisting": true
+    },
+    {
+      "id": "ROL1011",
+      "key": "pte_instructor",
+      "label": "PTE Instructor",
+      "description": "PTE instructor role.",
+      "domain": "pte",
+      "packageName": "PTE",
+      "aliases": [
+        "pteinstructor",
+        "pte-instructor",
+        "pteinstructors",
+        "pte-instructors",
+        "pte_instructors"
+      ],
+      "active": true,
+      "system": true,
+      "adoptExisting": true
+    },
+    {
+      "id": "ROL1012",
+      "key": "pte_trainer",
+      "label": "PTE Trainer",
+      "description": "PTE trainer role.",
+      "domain": "pte",
+      "packageName": "PTE",
+      "aliases": [
+        "ptetrainer",
+        "pte-trainer",
+        "ptetrainers",
+        "pte-trainers",
+        "pte_trainers"
+      ],
+      "active": true,
+      "system": true,
+      "adoptExisting": true
     }
   ],
   "sections": [
     {
-      "name": "PTE_PACKAGE_SETUP",
-      "category": "SYSTEM",
-      "description": "Sample package-managed section for PTE package installation flow.",
+      "id": "768493",
+      "name": "PTE_PEOPLE",
+      "category": "PTE",
+      "description": "Navigator for PTE people-related sections.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "930101"
+        },
+        {
+          "id": "930122"
+        },
+        {
+          "id": "930113"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "910001",
+      "name": "PTE",
+      "category": "PTE",
+      "description": "PTE domain dashboard and navigation root for exam practice, feedback, and progress tools.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": true,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "768493"
+        },
+        {
+          "id": "930112"
+        },
+        {
+          "id": "930102"
+        },
+        {
+          "id": "930108"
+        },
+        {
+          "id": "930103"
+        },
+        {
+          "id": "930110"
+        },
+        {
+          "id": "930104"
+        },
+        {
+          "id": "930116"
+        },
+        {
+          "id": "930114"
+        },
+        {
+          "id": "948948"
+        },
+        {
+          "id": "930123"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930101",
+      "name": "PTE_STUDENTS",
+      "category": "PTE",
+      "description": "Manage PTE applicants/students lifecycle, packages, and supporting documents.",
       "active": true,
       "trackState": true,
       "minimumAccessRequirement": 5,
-      "dashboardDisplay": false,
+      "dashboardDisplay": true,
       "mainDashboardDisplay": false,
       "navigatorSection": false,
-      "homeURL": "/pte",
+      "homeURL": "/pte/students",
+      "inactiveMessage": "",
+      "message": "",
       "operations": [
-        {
-          "id": "OP1002",
-          "sessionAttempts": 5,
-          "sessionTime": 10,
-          "active": true
-        },
         {
           "id": "OP1001",
           "sessionAttempts": 5,
-          "sessionTime": 10,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
           "active": true
         }
       ],
       "subsections": [],
-      "related": []
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930102",
+      "name": "PTE_QUESTIONS_BANK",
+      "category": "PTE",
+      "description": "Author, version, and manage PTE question bank items with immutable published revisions.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/questions-bank",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930103",
+      "name": "PTE_TESTS",
+      "category": "PTE",
+      "description": "Define and version PTE tests, allocating published questions across all four skills.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/tests",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930104",
+      "name": "PTE_ATTEMPT",
+      "category": "PTE",
+      "description": "Navigator for PTE runtime attempt records, details, and performance views.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "930105"
+        },
+        {
+          "id": "930106"
+        },
+        {
+          "id": "930107"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930105",
+      "name": "PTE_ATTEMPT_LEDGER",
+      "category": "PTE",
+      "description": "Browse event-level runtime attempt ledger entries across PTE attempts.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/attempt/ledger",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930106",
+      "name": "PTE_ATTEMPT_DETAILS",
+      "category": "PTE",
+      "description": "Detailed per-attempt session and item drill-down view.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/attempt/details",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930107",
+      "name": "PTE_ATTEMPT_OVERALL_PERFORMANCE",
+      "category": "PTE",
+      "description": "Overall learner performance, trends, and analytics view.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/attempt/overall-performance",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930108",
+      "name": "PTE_PRACTICE",
+      "category": "PTE",
+      "description": "Navigator for PTE practice sections.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "930109"
+        },
+        {
+          "id": "930121"
+        },
+        {
+          "id": "930120"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930109",
+      "name": "PTE_PRACTICE_BY_SKILLS",
+      "category": "PTE",
+      "description": "Run skill-based PTE practice sessions with type multi-select and runtime ledger tracking.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/practice/by-skills",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "935362",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930110",
+      "name": "PTE_FEEDBACK",
+      "category": "PTE",
+      "description": "Navigator for PTE feedback sections.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "930111"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930111",
+      "name": "PTE_FEEDBACK_ON_PRACTICE",
+      "category": "PTE",
+      "description": "Review started practice sessions and provide per-question feedback for learners.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/feedback/practice",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930112",
+      "name": "PTE_COURSES",
+      "category": "PTE",
+      "description": "Manage PTE courses with teachers, students, schedules, and lifecycle status.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/courses",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930113",
+      "name": "PTE_TEACHERS",
+      "category": "PTE",
+      "description": "Manage PTE teachers linked to person records, courses, and lifecycle status.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/teachers",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930114",
+      "name": "PTE_AI_ASSISST",
+      "category": "PTE",
+      "description": "Navigator for PTE AI provider and key settings.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "930115"
+        },
+        {
+          "id": "930119"
+        },
+        {
+          "id": "930118"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930115",
+      "name": "PTE_AI_PROVIDER_KEYS",
+      "category": "PTE",
+      "description": "Define API providers and keys for PTE AI-assisted features.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/ai-assisst/api-providers",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930116",
+      "name": "PTE_SCORING",
+      "category": "PTE",
+      "description": "Navigator for PTE scoring tools and defaults management.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "930117"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930117",
+      "name": "PTE_SCORING_DEFAULTS",
+      "category": "PTE",
+      "description": "Manage global scoring defaults by PTE question type with revision history.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/scoring/defaults",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930118",
+      "name": "PTE_AI_TOKEN_USAGE",
+      "category": "PTE",
+      "description": "Track PTE AI communication usage with token consumption and runtime metadata.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/ai-assisst/token-usage",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930119",
+      "name": "PTE_AI_SCORING_SETTINGS",
+      "category": "PTE",
+      "description": "Assign PTE scoring question types to saved AI provider keys and models.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/ai-assisst/scoring-settings",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930120",
+      "name": "PTE_MOCK_EXAMS",
+      "category": "PTE",
+      "description": "Run strict PTE mock exams from published registered tests with real-test timing and sequencing rules.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/practice/mock-exams",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930121",
+      "name": "PTE_SMART_PRACTICE",
+      "category": "PTE",
+      "description": "Generate adaptive PTE practice plans from student performance, self-rated difficulty, and question difficulty.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/practice/smart",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930122",
+      "name": "PTE_PUBLIC_APPLICANTS",
+      "category": "PTE",
+      "description": "Manage applicants who joined from the public PTE website flow.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/public-applicants",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "930123",
+      "name": "PTE_PUBLIC_PAGE",
+      "category": "PTE",
+      "description": "Manage public PTE landing page content, slider images, calls to action, and applicant information.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/pte/public-page",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "948948",
+      "name": "PTE_TOOLS_AND_REPORTS",
+      "category": "PTE",
+      "description": "You can find useful tools and reports here on this page.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "920106"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
     }
   ],
   "symbols": [
     {
-      "name": "PTE_PACKAGE_SETUP",
-      "type": "class",
-      "value": "bi bi-box-seam",
+      "id": "467570",
+      "name": "PTE",
+      "type": "image",
+      "value": "/uploads/ORG_900000/symbols/testing_PTE_1775539685033.png",
       "tags": [
-        "PTE_PACKAGE_SETUP",
-        "PTE_PACKAGE"
+        "PTE",
+        "PTE_EXAM",
+        "PTE_TEST"
       ],
-      "orgId": "SYSTEM"
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_AI_ASSISST_930114",
+      "name": "PTE_AI_ASSISST",
+      "type": "class",
+      "value": "bi bi-robot",
+      "tags": [
+        "PTE_AI_ASSISST",
+        "930114"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_AI_PROVIDER_KEYS_930115",
+      "name": "PTE_AI_PROVIDER_KEYS",
+      "type": "class",
+      "value": "bi bi-key-fill",
+      "tags": [
+        "PTE_AI_PROVIDER_KEYS",
+        "930115"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_AI_SCORING_SETTINGS_930119",
+      "name": "PTE_AI_SCORING_SETTINGS",
+      "type": "class",
+      "value": "bi bi-sliders",
+      "tags": [
+        "PTE_AI_SCORING_SETTINGS",
+        "930119"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_AI_TOKEN_USAGE_930118",
+      "name": "PTE_AI_TOKEN_USAGE",
+      "type": "class",
+      "value": "bi bi-cpu-fill",
+      "tags": [
+        "PTE_AI_TOKEN_USAGE",
+        "930118"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_ATTEMPT_930104",
+      "name": "PTE_ATTEMPT",
+      "type": "class",
+      "value": "bi bi-journal-check",
+      "tags": [
+        "PTE_ATTEMPT",
+        "930104"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_ATTEMPT_DETAILS_930106",
+      "name": "PTE_ATTEMPT_DETAILS",
+      "type": "class",
+      "value": "bi bi-file-earmark-text",
+      "tags": [
+        "PTE_ATTEMPT_DETAILS",
+        "930106"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_ATTEMPT_LEDGER_930105",
+      "name": "PTE_ATTEMPT_LEDGER",
+      "type": "class",
+      "value": "bi bi-list-columns-reverse",
+      "tags": [
+        "PTE_ATTEMPT_LEDGER",
+        "930105"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_ATTEMPT_OVERALL_PERFORMANCE_930107",
+      "name": "PTE_ATTEMPT_OVERALL_PERFORMANCE",
+      "type": "class",
+      "value": "bi bi-graph-up-arrow",
+      "tags": [
+        "PTE_ATTEMPT_OVERALL_PERFORMANCE",
+        "930107"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_COURSES_930112",
+      "name": "PTE_COURSES",
+      "type": "class",
+      "value": "bi bi-journal-bookmark-fill",
+      "tags": [
+        "PTE_COURSES",
+        "930112"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_FEEDBACK_930110",
+      "name": "PTE_FEEDBACK",
+      "type": "class",
+      "value": "bi bi-chat-square-dots",
+      "tags": [
+        "PTE_FEEDBACK",
+        "930110"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_FEEDBACK_ON_PRACTICE_930111",
+      "name": "PTE_FEEDBACK_ON_PRACTICE",
+      "type": "class",
+      "value": "bi bi-chat-left-text",
+      "tags": [
+        "PTE_FEEDBACK_ON_PRACTICE",
+        "930111"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_MOCK_EXAMS_930120",
+      "name": "PTE_MOCK_EXAMS",
+      "type": "class",
+      "value": "bi bi-pc-display-horizontal",
+      "tags": [
+        "PTE_MOCK_EXAMS",
+        "930120"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_PEOPLE_930100",
+      "name": "PTE_PEOPLE",
+      "type": "class",
+      "value": "bi bi-people-fill",
+      "tags": [
+        "PTE_PEOPLE",
+        "930100"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_PRACTICE_930108",
+      "name": "PTE_PRACTICE",
+      "type": "class",
+      "value": "bi bi-joystick",
+      "tags": [
+        "PTE_PRACTICE",
+        "930108"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_PRACTICE_BY_SKILLS_930109",
+      "name": "PTE_PRACTICE_BY_SKILLS",
+      "type": "class",
+      "value": "bi bi-bullseye",
+      "tags": [
+        "PTE_PRACTICE_BY_SKILLS",
+        "930109"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_PUBLIC_APPLICANTS_930122",
+      "name": "PTE_PUBLIC_APPLICANTS",
+      "type": "class",
+      "value": "bi bi-person-plus-fill",
+      "tags": [
+        "PTE_PUBLIC_APPLICANTS",
+        "930122"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_PUBLIC_PAGE_930123",
+      "name": "PTE_PUBLIC_PAGE",
+      "type": "class",
+      "value": "bi bi-window-sidebar",
+      "tags": [
+        "PTE_PUBLIC_PAGE",
+        "930123"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_QUESTIONS_BANK_930102",
+      "name": "PTE_QUESTIONS_BANK",
+      "type": "class",
+      "value": "bi bi-journal-richtext",
+      "tags": [
+        "PTE_QUESTIONS_BANK",
+        "930102"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_SCORING_930116",
+      "name": "PTE_SCORING",
+      "type": "class",
+      "value": "bi bi-graph-up",
+      "tags": [
+        "PTE_SCORING",
+        "930116"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_SCORING_DEFAULTS_930117",
+      "name": "PTE_SCORING_DEFAULTS",
+      "type": "class",
+      "value": "bi bi-sliders",
+      "tags": [
+        "PTE_SCORING_DEFAULTS",
+        "930117"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_SMART_PRACTICE_930121",
+      "name": "PTE_SMART_PRACTICE",
+      "type": "class",
+      "value": "bi bi-stars",
+      "tags": [
+        "PTE_SMART_PRACTICE",
+        "930121"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_STUDENTS_930101",
+      "name": "PTE_STUDENTS",
+      "type": "class",
+      "value": "bi bi-person-vcard-fill",
+      "tags": [
+        "PTE_STUDENTS",
+        "930101"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_TEACHERS_930113",
+      "name": "PTE_TEACHERS",
+      "type": "class",
+      "value": "bi bi-person-workspace",
+      "tags": [
+        "PTE_TEACHERS",
+        "930113"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_PTE_TESTS_930103",
+      "name": "PTE_TESTS",
+      "type": "class",
+      "value": "bi bi-ui-checks-grid",
+      "tags": [
+        "PTE_TESTS",
+        "930103"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
     }
   ],
   "accesses": [
     {
-      "name": "PTE_PACKAGE_SETUP",
-      "orgId": null,
-      "description": "Sample package-managed access profile for PTE package setup.",
+      "id": "191019",
+      "name": "PTE_APPLICANT",
+      "orgId": 900000,
+      "description": "",
       "active": true,
       "fullAdmin": false,
       "adminCategories": [],
@@ -85,13 +1938,309 @@
         "startDate": null,
         "endDate": null
       },
-      "sections": []
+      "sections": [
+        {
+          "sectionId": "910001",
+          "adminAccess": false,
+          "operations": []
+        },
+        {
+          "sectionId": "930108",
+          "adminAccess": false,
+          "operations": []
+        },
+        {
+          "sectionId": "930111",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "930110",
+          "adminAccess": false,
+          "operations": []
+        },
+        {
+          "sectionId": "930104",
+          "adminAccess": false,
+          "operations": []
+        },
+        {
+          "sectionId": "930107",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "930109",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": 100,
+              "maxSessionDurationMinutes": 100,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": 100,
+              "maxSessionDurationMinutes": 100,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "935362",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "930120",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": 300,
+              "maxSessionDurationMinutes": 300,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": 300,
+              "maxSessionDurationMinutes": 300,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "930121",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": 100,
+              "maxSessionDurationMinutes": 100,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": 100,
+              "maxSessionDurationMinutes": 100,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "948948",
+          "adminAccess": false,
+          "operations": []
+        },
+        {
+          "sectionId": "920106",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "188404",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        }
+      ],
+      "adoptExisting": true
     }
   ],
   "uploadFolders": [
     {
       "key": "pte.questionBank",
-      "template": "PTE/Question_Bank"
+      "packageName": "PTE",
+      "group": "PTE Uploads",
+      "label": "PTE Question Bank",
+      "defaultTemplate": "PTE/Question_Bank",
+      "placeholders": [],
+      "applyDefault": true
+    },
+    {
+      "key": "pte.students",
+      "packageName": "PTE",
+      "group": "PTE Uploads",
+      "label": "PTE Student Root",
+      "defaultTemplate": "PTE/Students",
+      "placeholders": [],
+      "applyDefault": true
+    },
+    {
+      "key": "pte.studentItem",
+      "packageName": "PTE",
+      "group": "PTE Uploads",
+      "label": "PTE Student Files",
+      "defaultTemplate": "PTE/Students/{itemId}",
+      "placeholders": [
+        "itemId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "pte.publicApplicants",
+      "packageName": "PTE",
+      "group": "PTE Uploads",
+      "label": "PTE Public Applicant Root",
+      "defaultTemplate": "PTE/Public_Applicants",
+      "placeholders": [],
+      "applyDefault": true
+    },
+    {
+      "key": "pte.publicApplicantItem",
+      "packageName": "PTE",
+      "group": "PTE Uploads",
+      "label": "PTE Public Applicant Files",
+      "defaultTemplate": "PTE/Public_Applicants/{itemId}",
+      "placeholders": [
+        "itemId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "pte.practiceAttempt",
+      "packageName": "PTE",
+      "group": "PTE Uploads",
+      "label": "PTE Practice Audio",
+      "defaultTemplate": "PTE/Practice_By_Skills/{userId}/{practiceName}/{sessionId}/{itemId}",
+      "placeholders": [
+        "userId",
+        "practiceName",
+        "sessionId",
+        "itemId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "pte.smartPracticeAttempt",
+      "packageName": "PTE",
+      "group": "PTE Uploads",
+      "label": "PTE Smart Practice Audio",
+      "defaultTemplate": "PTE/Smart_Practice/{userId}/{practiceName}/{sessionId}/{itemId}",
+      "placeholders": [
+        "userId",
+        "practiceName",
+        "sessionId",
+        "itemId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "pte.mockExamAttempt",
+      "packageName": "PTE",
+      "group": "PTE Uploads",
+      "label": "PTE Mock Exam Audio",
+      "defaultTemplate": "PTE/Mock_Exams/{userId}/{testName}/{sessionId}/{itemId}",
+      "placeholders": [
+        "userId",
+        "testName",
+        "sessionId",
+        "itemId"
+      ],
+      "applyDefault": true
     },
     {
       "key": "pte.packageAssets",
@@ -107,12 +2256,33 @@
   "settings": [],
   "menuEntries": [
     {
-      "id": "pte-home",
+      "id": "pte-test",
       "label": "PTE Test",
       "href": "/pte",
       "icon": "bi-mortarboard",
       "visibility": "all",
       "target": "_self",
+      "category": "PTE",
+      "active": true
+    },
+    {
+      "id": "pte-test-info",
+      "label": "PTE Test Info",
+      "href": "/pte/test-info",
+      "icon": "bi-info-square",
+      "visibility": "all",
+      "target": "_self",
+      "category": "PTE",
+      "active": true
+    },
+    {
+      "id": "pte-join",
+      "label": "Join PTE Practice",
+      "href": "/pte/join",
+      "icon": "bi-person-plus",
+      "visibility": "all",
+      "target": "_self",
+      "category": "PTE",
       "active": true
     },
     {
@@ -122,6 +2292,7 @@
       "icon": "bi-box-seam",
       "visibility": "all",
       "target": "_self",
+      "category": "PTE",
       "active": true
     }
   ],
@@ -129,11 +2300,34 @@
     {
       "id": "pte-dashboard",
       "label": "PTE Dashboard",
-      "href": "/pte",
+      "href": "/pte/dashboard",
       "icon": "bi-mortarboard",
-      "description": "Open PTE package workspace.",
+      "description": "Open the PTE learner workspace.",
       "visibility": "authenticated",
       "target": "_self",
+      "category": "PTE",
+      "active": true
+    },
+    {
+      "id": "pte-practice",
+      "label": "PTE Practice",
+      "href": "/pte/practice/by-skills",
+      "icon": "bi-bullseye",
+      "description": "Practice PTE tasks by skill.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "PTE",
+      "active": true
+    },
+    {
+      "id": "pte-packages-dashboard",
+      "label": "PTE Packages",
+      "href": "/pte/packages",
+      "icon": "bi-box-seam",
+      "description": "Browse public PTE packages.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "PTE",
       "active": true
     }
   ],
