@@ -2,10 +2,10 @@ const express = require('express');
 
 const router = express.Router();
 const { SECTIONS, OPERATIONS } = require('../../../../config/accessConstants');
-const infoController = require('../../../../MVC/controllers/pte/infoController');
-const userDashboardController = require('../../../../MVC/controllers/pte/userDashboardController');
-const publicPageSettingsController = require('../../../../MVC/controllers/pte/publicPageSettingsController');
-const publicJoinController = require('../../../../MVC/controllers/pte/publicJoinController');
+const infoController = require('../controllers/infoController');
+const userDashboardController = require('../controllers/userDashboardController');
+const publicPageSettingsController = require('../controllers/publicPageSettingsController');
+const publicJoinController = require('../controllers/publicJoinController');
 const { requireAuth } = require('../../../../MVC/middleware/authMiddleware');
 const { requireAccess } = require('../../../../MVC/middleware/accessMiddleware');
 const { trackActionState } = require('../../../../MVC/middleware/actionStateMiddleware');

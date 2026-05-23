@@ -41,7 +41,7 @@ test('Step 13 keeps PTE in compatibility-first locations', () => {
   assert.equal(exists('MVC/views/pte/testInfo.ejs'), true);
 
   assert.equal(exists('packages/pte/MVC/routes/pteMainRoute.js'), true);
-  assert.equal(exists('packages/pte/MVC/controllers/infoController.js'), false);
+  assert.equal(exists('packages/pte/MVC/controllers/infoController.js'), true);
   assert.equal(exists('packages/pte/MVC/services/ptePublicJoinService.js'), false);
   assert.equal(exists('packages/pte/MVC/views/testInfo.ejs'), false);
 });

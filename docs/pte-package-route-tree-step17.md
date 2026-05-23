@@ -18,5 +18,5 @@ Step 17 moves the route boundary forward without moving the real PTE route imple
 ## Remaining Work
 
 - Move subroute implementations into `packages/pte/MVC/routes` after controller/service import boundaries are ready.
-- Add package-owned controller/service shims before moving route internals that import controllers.
+- Step 18 added package-owned controller shims. Add service shims next before moving route internals that import services directly.
 - Keep the current route shims until the package route tree can run independently.
