@@ -22,7 +22,6 @@ Controller implementations can later move into the package with a clear service 
 
 ## Remaining Work
 
-- Prepare PTE model and repository shims before moving real service implementations.
+- Step 20 prepared PTE model and repository shims before moving real service implementations.
 - Decide how shared AI providers should be represented long term: core/shared service boundary, explicit cross-package dependency, or package-owned adapter.
 - Move service implementations only after their model, repository, storage, settings, and AI provider dependencies are mapped.
-
