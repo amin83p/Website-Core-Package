@@ -27,3 +27,7 @@ The route loader can now resolve both old MVC route paths and future package-own
 - Add package-aware controller/service import adapters or update paths during the physical move.
 - Keep `/pte` metadata-only until duplicate route handoff testing is complete.
 - Move PTE route files only after route import compatibility and view/asset compatibility are both stable.
+
+## Step 16 Follow-Up
+
+Step 16 adds a package-owned PTE route entrypoint shim at `packages/pte/MVC/routes/pteMainRoute.js` and points the PTE manifest `USE /pte` router declaration at that shim. The shim delegates to the existing `MVC/routes/pte/pteMainRoute.js` route tree, so hardcoded `/pte` behavior remains unchanged.

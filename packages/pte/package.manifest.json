@@ -8,7 +8,7 @@
     {
       "method": "USE",
       "path": "/pte",
-      "router": "MVC/routes/pte/pteMainRoute.js",
+      "router": "MVC/routes/pteMainRoute.js",
       "metadataOnly": true,
       "active": true
     },
