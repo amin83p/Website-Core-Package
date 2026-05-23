@@ -44,11 +44,33 @@ test('PTE manifest points the package route declaration at the package entrypoin
   assert.equal(route.metadataOnly, true);
 });
 
-test('PTE package route entrypoint delegates to the current MVC route tree', () => {
+test('PTE package route entrypoint is package-owned while subroute shims delegate to current MVC routes', () => {
   const packageRoute = require('../packages/pte/MVC/routes/pteMainRoute');
   const currentRoute = require('../MVC/routes/pte/pteMainRoute');
 
-  assert.equal(packageRoute, currentRoute);
+  assert.notEqual(packageRoute, currentRoute);
+  assert.equal(typeof packageRoute, 'function');
+  assert.equal(typeof currentRoute, 'function');
+
+  [
+    'aiAssistRoutes.js',
+    'attemptRoutes.js',
+    'courseRoutes.js',
+    'feedbackRoutes.js',
+    'practiceRoutes.js',
+    'publicApplicantRoutes.js',
+    'questionBankRoutes.js',
+    'scoringRoutes.js',
+    'studentRoutes.js',
+    'teacherRoutes.js',
+    'testRoutes.js'
+  ].forEach((fileName) => {
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    const packageSubroute = require(`../packages/pte/MVC/routes/${fileName}`);
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    const currentSubroute = require(`../MVC/routes/pte/${fileName}`);
+    assert.equal(packageSubroute, currentSubroute, `${fileName} should remain a compatibility shim`);
+  });
 });
 
 test('package resolver resolves the PTE route entrypoint from package root first', () => {

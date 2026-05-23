@@ -20,3 +20,7 @@ Step 16 gives the PTE package its own route entrypoint without moving the full P
 - Move individual PTE route modules under `packages/pte/MVC/routes` in a later step.
 - Add package-owned controller/service shims or move controllers/services together when route internals are relocated.
 - Keep the hardcoded `/pte` mount until dynamic package mounting is tested as the active runtime path.
+
+## Step 17 Follow-Up
+
+Step 17 adds package-local route module shims for the PTE subroutes and updates the package entrypoint to require those package-local shims. Each subroute shim still delegates to the current `MVC/routes/pte/*` module until the physical route move happens.
