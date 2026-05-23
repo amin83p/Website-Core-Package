@@ -24,7 +24,7 @@ PTE now has package-owned command locations for seeders, migrations, maintenance
 
 ## Remaining Work
 
-- Convert each delegated script into a package-safe implementation with explicit core dependencies.
+- Step 25 converted the package-local PTE enable script into a package-safe implementation.
+- Convert the remaining delegated scripts into package-safe implementations with explicit core dependencies.
 - Add dry-run coverage for package-local scripts where possible before moving script logic.
 - Keep destructive maintenance scripts delegated until their safety prompts and environment assumptions are reviewed.
-

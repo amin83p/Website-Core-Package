@@ -51,6 +51,7 @@ test('Step 13 keeps PTE in compatibility-first locations', () => {
   assert.equal(exists('packages/pte/public/scripts/ptePracticeCoachRules.js'), true);
   assert.equal(exists('packages/pte/package.support-files.json'), true);
   assert.equal(exists('packages/pte/scripts/seed/seed-pte-sections.js'), true);
+  assert.equal(exists('packages/pte/scripts/maintenance/enable-pte-package.js'), true);
 });
 
 test('Step 13 keeps /pte hardcoded and package routes metadata-only', () => {

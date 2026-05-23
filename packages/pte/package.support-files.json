@@ -5,7 +5,8 @@
   "notes": [
     "Support files remain root-active during this step.",
     "Targets describe the intended package-owned locations for a later physical move.",
-    "Package script entrypoints delegate to root-active scripts until imports are adjusted for package-local execution.",
+    "Most package script entrypoints delegate to root-active scripts until imports are adjusted for package-local execution.",
+    "The package enable script is package-safe and uses the package-local manifest directly.",
     "Do not run copied tests from package-local paths until their imports are adjusted."
   ],
   "scripts": [
@@ -121,6 +122,7 @@
       "source": "scripts/packages/enable-pte-package.js",
       "target": "packages/pte/scripts/maintenance/enable-pte-package.js",
       "category": "package-activation",
+      "entrypointMode": "package-safe",
       "status": "root-active"
     }
   ],
@@ -188,6 +190,12 @@
     {
       "source": "docs/pte-package-script-entrypoints-step24.md",
       "target": "packages/pte/docs/pte-package-script-entrypoints-step24.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-enable-script-step25.md",
+      "target": "packages/pte/docs/pte-package-enable-script-step25.md",
       "category": "package-preparation",
       "status": "root-active"
     },
@@ -286,6 +294,12 @@
     {
       "source": "test/pte-package-script-entrypoints-step24.test.js",
       "target": "packages/pte/test/pte-package-script-entrypoints-step24.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-enable-script-step25.test.js",
+      "target": "packages/pte/test/pte-package-enable-script-step25.test.js",
       "category": "package-preparation",
       "status": "root-active"
     },

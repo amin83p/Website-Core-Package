@@ -36,6 +36,7 @@ test('PTE package script entrypoints delegate to root-active scripts', () => {
   const supportMap = readJson(SUPPORT_MAP_PATH);
 
   (supportMap.scripts || []).forEach((row) => {
+    if (row.entrypointMode === 'package-safe') return;
     const targetPath = path.join(ROOT_DIR, row.target);
     const source = readText(targetPath);
     const expectedRequire = expectedRequireFor(row);
@@ -53,6 +54,19 @@ test('PTE package script entrypoints keep root scripts active as source of truth
   assert.ok((supportMap.notes || []).some((note) => /root-active scripts/i.test(note)));
   (supportMap.scripts || []).forEach((row) => {
     assert.equal(row.status, 'root-active');
+  });
+});
+
+test('package-safe PTE script entrypoints do not delegate to root scripts', () => {
+  const supportMap = readJson(SUPPORT_MAP_PATH);
+  const packageSafeRows = (supportMap.scripts || []).filter((row) => row.entrypointMode === 'package-safe');
+
+  assert.ok(packageSafeRows.some((row) => row.target === 'packages/pte/scripts/maintenance/enable-pte-package.js'));
+  packageSafeRows.forEach((row) => {
+    const source = readText(path.join(ROOT_DIR, row.target));
+    const expectedRequire = expectedRequireFor(row);
+
+    assert.doesNotMatch(source, new RegExp(expectedRequire.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
 });
 
