@@ -293,10 +293,36 @@ function normalizeBooleanFlag(value, fallback = false) {
   return fallback;
 }
 
-function canRequesterRescoreSameRevision(requestingUser) {
-  return adminChekersService.isSuperAdmin(requestingUser)
+function hasExplicitAdminSignalOnUser(requestingUser) {
+  return normalizeBooleanFlag(requestingUser?.isVirtualSuperAdmin, false)
+    || normalizeBooleanFlag(requestingUser?.isSuperAdmin, false)
+    || normalizeBooleanFlag(requestingUser?.isSystemAdmin, false)
+    || normalizeBooleanFlag(requestingUser?.isAdmin, false);
+}
+
+function hasResolvableAdminHintsOnUser(requestingUser) {
+  if (!isPlainObject(requestingUser)) return false;
+  if (isPlainObject(requestingUser.activeProfile)) return true;
+  if (isPlainObject(requestingUser.activePolicy)) return true;
+  if (isPlainObject(requestingUser.activeOrgPolicy)) return true;
+  if (Array.isArray(requestingUser.accessProfileIds) && requestingUser.accessProfileIds.length) return true;
+  if (cleanString(requestingUser.systemAccessProfileId, { max: 120, allowEmpty: true })) return true;
+  return false;
+}
+
+async function canRequesterRescoreSameRevision(requestingUser, accessContext = {}) {
+  if (hasExplicitAdminSignalOnUser(requestingUser)) return true;
+  if (
+    adminChekersService.isSuperAdmin(requestingUser)
     || adminChekersService.isAdmin(requestingUser)
-    || adminChekersService.isOrgAdmin(requestingUser);
+    || adminChekersService.isOrgAdmin(requestingUser)
+  ) {
+    return true;
+  }
+  if (isPracticeQuotaAdminContext(accessContext)) return true;
+  if (!hasResolvableAdminHintsOnUser(requestingUser)) return false;
+  const authority = await resolvePracticeQuotaAdminAuthority(requestingUser, OPERATIONS.AI_SCORING);
+  return Boolean(authority?.isRequestAdmin);
 }
 
 function resolveRequestedResponseRevision(item = {}, payload = {}) {
@@ -310,10 +336,8 @@ function resolveRequestedResponseRevision(item = {}, payload = {}) {
 function hasStoredScoredResultForRevision(item = {}, responseRevision = 0) {
   const itemMetadata = isPlainObject(item?.metadata) ? item.metadata : {};
   const scoringMetadata = isPlainObject(itemMetadata.scoring) ? itemMetadata.scoring : {};
-  if (!Object.keys(scoringMetadata).length) return false;
-
   const scoringStatus = cleanString(scoringMetadata.status, { max: 40, allowEmpty: true }).toLowerCase();
-  if (scoringStatus !== 'scored') return false;
+  if (scoringStatus && scoringStatus !== 'scored' && scoringStatus !== 'feedback_provided') return false;
 
   const itemStatus = cleanString(item?.status, { max: 40, allowEmpty: true }).toLowerCase();
   const hasStoredScore = cleanNonNegativeInteger(item?.scoreRevisionCount, 0) > 0
@@ -2379,7 +2403,7 @@ async function tryAutoScoreSubmittedAttemptItem({
     eventType: `${questionTypeKey || 'attempt_item'}_auto_score`
   };
   const requestedResponseRevision = resolveRequestedResponseRevision(item, payload);
-  const canRescoreSameRevision = canRequesterRescoreSameRevision(requestingUser);
+  const canRescoreSameRevision = await canRequesterRescoreSameRevision(requestingUser, accessContext);
   const forceRescoreRequested = normalizeBooleanFlag(payload?.forceRescore, false)
     || normalizeBooleanFlag(options?.forceRescore, false);
   const allowForcedRescore = forceRescoreRequested

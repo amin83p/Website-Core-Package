@@ -10,6 +10,11 @@ const paginate = require('../../utils/paginationHelper');
 const { buildDataServiceQuery, isAjax } = require('../../utils/generalTools');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const MAX_PTE_PRACTICE_QUESTIONS = 15;
+const PRACTICE_RESCORING_SECTION_CANDIDATES = Object.freeze([
+  SECTIONS.PTE_PRACTICE_BY_SKILLS,
+  SECTIONS.PTE_PRACTICE,
+  SECTIONS.PTE
+]);
 
 function buildPracticeAccessContext(req) {
   return {
@@ -32,6 +37,76 @@ function cleanNumber(value, fallback = 0) {
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  const token = String(value).trim().toLowerCase();
+  if (!token) return fallback;
+  if (['1', 'true', 'yes', 'y', 'on'].includes(token)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(token)) return false;
+  return fallback;
+}
+
+function hasExplicitAdminSignalOnUser(requestingUser = {}) {
+  return normalizeBoolean(requestingUser?.isVirtualSuperAdmin, false)
+    || normalizeBoolean(requestingUser?.isSuperAdmin, false)
+    || normalizeBoolean(requestingUser?.isSystemAdmin, false)
+    || normalizeBoolean(requestingUser?.isAdmin, false);
+}
+
+function hasPracticeRescoreAdminContext(adminContext = {}) {
+  const context = isPlainObject(adminContext) ? adminContext : {};
+  if (context.isSuperAdmin || context.isSystemAdmin) return true;
+  if (!(context.isRequestAdmin || context.isSectionAdmin || context.isOperationAdminForRequest)) return false;
+  const category = cleanText(context.category, 80).toUpperCase();
+  if (category === 'PTE') return true;
+  const sectionId = cleanText(context.sectionId, 160).toUpperCase();
+  if (!sectionId) return false;
+  return PRACTICE_RESCORING_SECTION_CANDIDATES.some((candidate) => cleanText(candidate, 160).toUpperCase() === sectionId);
+}
+
+async function canRequesterRescoreSameRevision(requestingUser = {}, accessContext = {}) {
+  if (!requestingUser || typeof requestingUser !== 'object') return false;
+  if (hasExplicitAdminSignalOnUser(requestingUser)) return true;
+  if (
+    adminChekersService.isSuperAdmin(requestingUser)
+    || adminChekersService.isAdmin(requestingUser)
+    || adminChekersService.isOrgAdmin(requestingUser)
+  ) {
+    return true;
+  }
+  if (hasPracticeRescoreAdminContext(accessContext?.adminContext || {})) return true;
+
+  const orgId = cleanText(
+    requestingUser?.activeOrgId
+      || requestingUser?.primaryOrgId
+      || requestingUser?.orgId,
+    120
+  );
+  for (const sectionId of PRACTICE_RESCORING_SECTION_CANDIDATES) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const isRequestAdmin = await adminChekersService.isAdminForRequestAsync(
+        requestingUser,
+        sectionId,
+        OPERATIONS.AI_SCORING,
+        {
+          orgId,
+          section: {
+            id: sectionId,
+            category: 'PTE'
+          }
+        }
+      );
+      if (isRequestAdmin) return true;
+    } catch (_) {
+      // keep graceful fallback behaviour
+    }
+  }
+  return false;
 }
 
 function resolveAttemptItemQuestion(item = {}, questionMap = new Map()) {
@@ -781,9 +856,10 @@ async function showPracticeRunner(req, res) {
       buildPracticeAccessContext(req)
     );
 
-    const canRescoreSameRevision = adminChekersService.isSuperAdmin(req.user)
-      || adminChekersService.isAdmin(req.user)
-      || adminChekersService.isOrgAdmin(req.user);
+    const canRescoreSameRevision = await canRequesterRescoreSameRevision(
+      req.user,
+      buildPracticeAccessContext(req)
+    );
     const runnerConfig = {
       ...(req.ptePracticeRunnerConfig || {}),
       permissions: {

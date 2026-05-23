@@ -939,6 +939,95 @@ test('explicit Read Aloud scoring allows super-admin users to rescore the same r
   assert.equal(second.item.scoreRevisionCount, 2);
 });
 
+test('explicit Read Aloud scoring allows request-admin context to rescore the same response revision', async () => {
+  installRuntimeStubs({ questionType: 'speaking_read_aloud' });
+  const requestingUser = {
+    id: 'USR-1',
+    activeOrgId: 'ORG-1',
+    isSystemAdmin: false,
+    activeProfile: {
+      fullAdmin: false,
+      adminCategories: [],
+      sections: []
+    }
+  };
+  const accessContext = {
+    adminContext: {
+      isRequestAdmin: true,
+      isSectionAdmin: true,
+      isOperationAdminForRequest: true,
+      sectionId: 'PTE_PRACTICE_BY_SKILLS',
+      category: 'PTE'
+    }
+  };
+  const scoringOptions = {
+    scoringOptions: {
+      aiAnalysis: {
+        transcript: 'The quick brown fox jumps.',
+        pronunciation: { score: 5, evidence: ['Clear pronunciation.'] },
+        fluency: { score: 4, evidence: ['Smooth pace.'] },
+        microResponses: speakingQualityMicroResponses({ pronunciation: 'excellent', fluency: 'good' }),
+        speechMetrics: {
+          speechDurationSeconds: 3.8,
+          estimatedWpm: 78
+        },
+        confidence: 0.9
+      },
+      provider: {
+        providerId: 'test-provider',
+        modelUsed: 'test-model',
+        tokenUsage: {
+          promptTokenCount: 200,
+          candidatesTokenCount: 121,
+          totalTokenCount: 321
+        }
+      }
+    }
+  };
+
+  await pteAttemptLedgerService.saveAttemptItem(
+    'S-RA-1',
+    'I-RA-1',
+    {
+      responsePayload: {
+        artifactId: 'AUDIO-1',
+        audioDurationSeconds: 3.8
+      },
+      responseSummary: { kind: 'speaking', audioDurationSeconds: 3.8 },
+      source: {
+        module: 'pte_practice_runner_ui',
+        eventType: 'response_saved',
+        eventId: 'PTE-PRACTICE-SAVE-I-RA-1-CONTEXT-RESCORE'
+      }
+    },
+    requestingUser,
+    accessContext,
+    {}
+  );
+
+  const first = await pteAttemptLedgerService.scoreAttemptItem(
+    'S-RA-1',
+    'I-RA-1',
+    {},
+    requestingUser,
+    accessContext,
+    scoringOptions
+  );
+  const second = await pteAttemptLedgerService.scoreAttemptItem(
+    'S-RA-1',
+    'I-RA-1',
+    {},
+    requestingUser,
+    accessContext,
+    scoringOptions
+  );
+
+  assert.equal(first.autoScoring.status, 'scored');
+  assert.equal(second.autoScoring.status, 'scored');
+  assert.equal(Boolean(second.autoScoring.reused), false);
+  assert.equal(second.item.scoreRevisionCount, 2);
+});
+
 test('submitting unsupported speaking item remains submitted and unscored', async () => {
   installRuntimeStubs({ questionType: 'speaking_future_type' });
   const requestingUser = { id: 'USR-1', activeOrgId: 'ORG-1', isVirtualSuperAdmin: true };
