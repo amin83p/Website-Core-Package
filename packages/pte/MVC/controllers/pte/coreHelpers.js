@@ -1,13 +1,10 @@
-const paginate = require('../../../../MVC/utils/paginationHelper');
-const generalTools = require('../../../../MVC/utils/generalTools');
-const adminChekersService = require('../../../../MVC/services/adminChekersService');
-const { toPublicId } = require('../../../../MVC/utils/idAdapter');
+const pteCoreHelpersDependencies = require('./pteCoreHelpersDependencies');
 
 module.exports = {
-  paginate,
-  buildDataServiceQuery: generalTools.buildDataServiceQuery,
-  inferSearchableFields: generalTools.inferSearchableFields,
-  isAjax: generalTools.isAjax,
-  adminChekersService,
-  toPublicId
+  paginate: pteCoreHelpersDependencies.paginate,
+  buildDataServiceQuery: pteCoreHelpersDependencies.buildDataServiceQuery,
+  inferSearchableFields: pteCoreHelpersDependencies.inferSearchableFields,
+  isAjax: pteCoreHelpersDependencies.isAjax,
+  adminChekersService: pteCoreHelpersDependencies.adminChekersService,
+  toPublicId: pteCoreHelpersDependencies.toPublicId
 };
