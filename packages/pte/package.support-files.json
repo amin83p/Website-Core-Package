@@ -5,7 +5,8 @@
   "notes": [
     "Support files remain root-active during this step.",
     "Targets describe the intended package-owned locations for a later physical move.",
-    "Do not run copied scripts/tests from package-local paths until their imports are adjusted."
+    "Package script entrypoints delegate to root-active scripts until imports are adjusted for package-local execution.",
+    "Do not run copied tests from package-local paths until their imports are adjusted."
   ],
   "scripts": [
     {
@@ -185,6 +186,12 @@
       "status": "root-active"
     },
     {
+      "source": "docs/pte-package-script-entrypoints-step24.md",
+      "target": "packages/pte/docs/pte-package-script-entrypoints-step24.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
       "source": "docs/pte-package-view-asset-ownership-step22.md",
       "target": "packages/pte/docs/pte-package-view-asset-ownership-step22.md",
       "category": "package-preparation",
@@ -273,6 +280,12 @@
     {
       "source": "test/pte-package-support-files-step23.test.js",
       "target": "packages/pte/test/pte-package-support-files-step23.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-script-entrypoints-step24.test.js",
+      "target": "packages/pte/test/pte-package-script-entrypoints-step24.test.js",
       "category": "package-preparation",
       "status": "root-active"
     },

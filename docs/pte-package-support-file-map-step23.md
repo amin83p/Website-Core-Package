@@ -21,7 +21,7 @@ The remaining PTE files outside the MVC and public asset trees are now visible i
 
 ## Remaining Work
 
-- Convert mapped scripts into package-safe scripts with adjusted imports before copying or moving them.
+- Step 24 added package-local script entrypoints that delegate to root-active scripts.
+- Convert delegated scripts into package-safe implementations with adjusted imports before moving script logic.
 - Decide which docs should remain project-level handover docs and which should become package docs.
 - Move PTE tests only after their fixtures and imports can run from package-local paths.
-
