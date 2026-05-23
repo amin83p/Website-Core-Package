@@ -50,15 +50,14 @@
   ],
   "queryExecutors": [],
   "views": {
-    "id": "pte-views-current",
-    "root": "MVC/views",
-    "path": "MVC/views/pte",
+    "id": "pte-package-views",
+    "path": "packages/pte/MVC/views",
     "namespace": "pte",
     "active": true
   },
   "assets": {
-    "id": "pte-current-public-scripts",
-    "path": "public/scripts",
+    "id": "pte-package-public-scripts",
+    "path": "packages/pte/public/scripts",
     "publicPath": "/scripts",
     "metadataOnly": true,
     "active": true

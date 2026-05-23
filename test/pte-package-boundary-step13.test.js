@@ -47,7 +47,8 @@ test('Step 13 keeps PTE in compatibility-first locations', () => {
   assert.equal(exists('packages/pte/MVC/repositories/pteApplicantRepository.js'), true);
   assert.equal(exists('packages/pte/MVC/middleware/pteUploadContextMiddleware.js'), true);
   assert.equal(exists('packages/pte/MVC/utils/pteUploadPathUtils.js'), true);
-  assert.equal(exists('packages/pte/MVC/views/testInfo.ejs'), false);
+  assert.equal(exists('packages/pte/MVC/views/pte/testInfo.ejs'), true);
+  assert.equal(exists('packages/pte/public/scripts/ptePracticeCoachRules.js'), true);
 });
 
 test('Step 13 keeps /pte hardcoded and package routes metadata-only', () => {

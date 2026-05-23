@@ -1,0 +1,540 @@
+<%
+  const options = (formOptions && typeof formOptions === 'object') ? formOptions : {};
+  const testTypes = Array.isArray(options.testTypes) ? options.testTypes : [];
+  const questionTypes = Array.isArray(options.questionTypes) ? options.questionTypes : [];
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const pteDashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+  const pteScoringDashboardHref = '/dashboard/section-nav/PTE_SCORING';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0">PTE Scoring Defaults</h1>
+    <div class="d-flex align-items-center gap-2">
+      <a href="<%= pteDashboardHref %>" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-speedometer2 me-1"></i> PTE Dashboard
+      </a>
+      <a href="<%= pteScoringDashboardHref %>" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-graph-up me-1"></i> PTE Scoring
+      </a>
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    Latest saved defaults are applied globally per question type. Question-level override can still be enabled in the question scoring tab when a question needs special handling.
+  </div>
+
+  <div class="form-container wide" style="max-width: 1450px;">
+    <input type="hidden" id="pteScoringActionStateId" value="<%= asid %>">
+    <script type="application/json" id="pteScoringFormOptions"><%- JSON.stringify({ testTypes, questionTypes }).replace(/</g, '\\u003c') %></script>
+
+    <div class="row">
+      <div class="col-md-3 mb-3">
+        <label class="form-label">Test Type *</label>
+        <select class="form-select size-md" id="pteScoringTestTypeSelect">
+          <option value="">-- Select Test Type --</option>
+          <% testTypes.forEach((row) => { %>
+            <option value="<%= row.value %>"><%= row.label || row.value %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-5 mb-3">
+        <label class="form-label">Question Type *</label>
+        <select class="form-select size-md" id="pteScoringQuestionTypeSelect">
+          <option value="">-- Select Question Type --</option>
+        </select>
+        <div class="form-text" id="pteScoringTypeHelpText">Choose test type first, then question type.</div>
+      </div>
+      <div class="col-md-4 mb-3">
+        <label class="form-label">Change Note</label>
+        <input type="text" id="pteScoringChangeNoteInput" class="form-control size-md" maxlength="1000" placeholder="Optional note about this update">
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div>
+            <h6 class="m-0 fw-bold"><i class="bi bi-sliders me-2"></i>Global Scoring Fields</h6>
+            <div class="small text-muted mt-1" id="pteScoringProfileMeta">Select a question type to load defaults.</div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="pteScoringReloadBtn">
+              <i class="bi bi-arrow-repeat me-1"></i>Reload
+            </button>
+            <button type="button" class="btn btn-filled btn-success btn-sm" id="pteScoringSaveBtn">
+              <i class="bi bi-check2-circle me-1"></i>Save As Latest Defaults
+            </button>
+          </div>
+        </div>
+        <div id="pteScoringFieldContainer" class="row">
+          <div class="text-muted">No type selected.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h6 class="m-0 fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>Change History</h6>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width: 12%;">Version</th>
+                <th style="width: 22%;">Updated At</th>
+                <th style="width: 18%;">Updated By</th>
+                <th style="width: 48%;">Details</th>
+              </tr>
+            </thead>
+            <tbody id="pteScoringHistoryBody">
+              <tr>
+                <td colspan="4" class="text-muted">No history loaded yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal') %>
+
+<script>
+(() => {
+  function cleanText(value) {
+    return String(value || '').replace(/\0/g, '').trim();
+  }
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function parseJsonScript(id, fallback) {
+    try {
+      const node = document.getElementById(id);
+      return JSON.parse((node && node.textContent) || '');
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  async function showModal(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  function formatDateTime(value) {
+    const token = cleanText(value);
+    if (!token) return '-';
+    const parsed = new Date(token);
+    if (Number.isNaN(parsed.getTime())) return token;
+    return parsed.toLocaleString();
+  }
+
+  function deepClone(value, fallback = {}) {
+    try {
+      if (value === undefined) return fallback;
+      return JSON.parse(JSON.stringify(value));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function parseFieldValue(field, rawValue) {
+    const inputType = cleanText(field?.input).toLowerCase();
+    if (inputType === 'number') {
+      const numeric = Number(rawValue);
+      if (!Number.isFinite(numeric)) throw new Error((field.label || field.key) + ' must be numeric.');
+      return Number(numeric.toFixed(6));
+    }
+    if (inputType === 'integer') {
+      const numeric = Number.parseInt(String(rawValue || ''), 10);
+      if (!Number.isFinite(numeric) || Number.isNaN(numeric)) {
+        throw new Error((field.label || field.key) + ' must be an integer.');
+      }
+      return numeric;
+    }
+    if (inputType === 'boolean') {
+      if (typeof rawValue === 'boolean') return rawValue;
+      return String(rawValue || '').toLowerCase() === 'true';
+    }
+    if (inputType === 'list_string') {
+      return String(rawValue || '')
+        .split('\n')
+        .map((item) => cleanText(item))
+        .filter(Boolean);
+    }
+    if (inputType === 'json') {
+      const token = String(rawValue || '').trim();
+      if (!token) {
+        if (field.jsonKind === 'array') return [];
+        if (field.jsonKind === 'object') return {};
+        return null;
+      }
+      let parsed = null;
+      try {
+        parsed = JSON.parse(token);
+      } catch (_) {
+        throw new Error((field.label || field.key) + ' contains invalid JSON.');
+      }
+      if (field.jsonKind === 'array' && !Array.isArray(parsed)) {
+        throw new Error((field.label || field.key) + ' must be a JSON array.');
+      }
+      if (field.jsonKind === 'object' && (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))) {
+        throw new Error((field.label || field.key) + ' must be a JSON object.');
+      }
+      return parsed;
+    }
+    return cleanText(rawValue);
+  }
+
+  function getActionStateId() {
+    const hidden = document.getElementById('pteScoringActionStateId');
+    const direct = cleanText(hidden && hidden.value);
+    if (direct) return direct;
+    const fallbackNode = document.getElementById('actionStateIdRef');
+    return cleanText(fallbackNode?.dataset?.id || '');
+  }
+
+  const options = parseJsonScript('pteScoringFormOptions', { testTypes: [], questionTypes: [] });
+  const typeRows = Array.isArray(options.questionTypes) ? options.questionTypes : [];
+  const typeMap = new Map(typeRows.map((row) => [cleanText(row.key).toLowerCase(), row]));
+
+  const testTypeSelect = document.getElementById('pteScoringTestTypeSelect');
+  const questionTypeSelect = document.getElementById('pteScoringQuestionTypeSelect');
+  const typeHelpText = document.getElementById('pteScoringTypeHelpText');
+  const changeNoteInput = document.getElementById('pteScoringChangeNoteInput');
+  const profileMetaNode = document.getElementById('pteScoringProfileMeta');
+  const fieldContainer = document.getElementById('pteScoringFieldContainer');
+  const historyBody = document.getElementById('pteScoringHistoryBody');
+  const reloadBtn = document.getElementById('pteScoringReloadBtn');
+  const saveBtn = document.getElementById('pteScoringSaveBtn');
+
+  const state = {
+    profileId: '',
+    profileVersion: 1,
+    profileScoring: {},
+    historyRows: []
+  };
+
+  function getSelectedTypeRow() {
+    return typeMap.get(cleanText(questionTypeSelect?.value).toLowerCase()) || null;
+  }
+
+  function buildQuestionTypeOptions() {
+    const selectedTestType = cleanText(testTypeSelect?.value).toLowerCase();
+    const previous = cleanText(questionTypeSelect?.value).toLowerCase();
+    const rows = typeRows.filter((row) => {
+      if (!selectedTestType) return false;
+      const allowed = Array.isArray(row?.testTypes)
+        ? row.testTypes.map((item) => cleanText(item).toLowerCase()).filter(Boolean)
+        : [];
+      return !allowed.length || allowed.includes(selectedTestType);
+    });
+
+    questionTypeSelect.innerHTML = '<option value="">-- Select Question Type --</option>'
+      + rows.map((row) => {
+        const key = cleanText(row.key).toLowerCase();
+        const selected = key && key === previous ? 'selected' : '';
+        const label = cleanText(row.label) || key;
+        return '<option value="' + esc(key) + '" ' + selected + '>' + esc(label) + '</option>';
+      }).join('');
+
+    if (previous && !rows.some((row) => cleanText(row.key).toLowerCase() === previous)) {
+      questionTypeSelect.value = '';
+    }
+
+    if (!selectedTestType) {
+      typeHelpText.textContent = 'Choose test type first, then question type.';
+    } else if (!rows.length) {
+      typeHelpText.textContent = 'No question types available for this test type.';
+    } else {
+      typeHelpText.textContent = 'Choose a question type to edit global scoring defaults.';
+    }
+  }
+
+  function renderFieldControl(field, sourceScoring) {
+    const key = cleanText(field?.key);
+    if (!key) return '';
+    const inputType = cleanText(field?.input).toLowerCase() || 'text';
+    const value = Object.prototype.hasOwnProperty.call(sourceScoring || {}, key)
+      ? sourceScoring[key]
+      : field.default;
+    const inputId = 'pte-scoring-field-' + key.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    let control = '';
+    if (inputType === 'textarea') {
+      control = '<textarea class="form-control size-md" rows="3" data-field-key="' + esc(key) + '" data-field-input="' + esc(inputType) + '" id="' + esc(inputId) + '">' + esc(value == null ? '' : value) + '</textarea>';
+    } else if (inputType === 'number' || inputType === 'integer') {
+      const step = inputType === 'integer' ? '1' : '0.000001';
+      const minAttr = Number.isFinite(Number(field?.min)) ? (' min="' + Number(field.min) + '"') : '';
+      control = '<input type="number" class="form-control size-md" step="' + step + '"' + minAttr + ' data-field-key="' + esc(key) + '" data-field-input="' + esc(inputType) + '" id="' + esc(inputId) + '" value="' + esc(value == null ? '' : value) + '">';
+    } else if (inputType === 'boolean') {
+      const checked = value === true ? 'checked' : '';
+      control = '<div class="form-check form-switch mt-1"><input class="form-check-input" type="checkbox" data-field-key="' + esc(key) + '" data-field-input="' + esc(inputType) + '" id="' + esc(inputId) + '" ' + checked + '></div>';
+    } else if (inputType === 'select') {
+      const options = Array.isArray(field?.options) ? field.options : [];
+      control = '<select class="form-select size-md" data-field-key="' + esc(key) + '" data-field-input="' + esc(inputType) + '" id="' + esc(inputId) + '">'
+        + options.map((opt) => {
+          const optValue = cleanText(opt?.value || opt);
+          const optLabel = cleanText(opt?.label || optValue || opt);
+          const selected = String(value || '') === optValue ? 'selected' : '';
+          return '<option value="' + esc(optValue) + '" ' + selected + '>' + esc(optLabel) + '</option>';
+        }).join('')
+        + '</select>';
+    } else if (inputType === 'list_string') {
+      const rows = Array.isArray(value) ? value : [];
+      control = '<textarea class="form-control size-md font-monospace" rows="4" data-field-key="' + esc(key) + '" data-field-input="' + esc(inputType) + '" id="' + esc(inputId) + '">' + esc(rows.join('\n')) + '</textarea>'
+        + '<div class="form-text small">Enter one item per line.</div>';
+    } else if (inputType === 'json') {
+      let jsonText = '';
+      if (value !== undefined) {
+        try { jsonText = JSON.stringify(value, null, 2); } catch (_) { jsonText = ''; }
+      }
+      control = '<textarea class="form-control size-md font-monospace" rows="6" data-field-key="' + esc(key) + '" data-field-input="' + esc(inputType) + '" data-field-json-kind="' + esc(field?.jsonKind || 'any') + '" id="' + esc(inputId) + '">' + esc(jsonText) + '</textarea>';
+    } else {
+      control = '<input type="text" class="form-control size-md" data-field-key="' + esc(key) + '" data-field-input="' + esc(inputType) + '" id="' + esc(inputId) + '" value="' + esc(value == null ? '' : value) + '">';
+    }
+
+    return ''
+      + '<div class="col-md-6 mb-3">'
+      + '  <label class="form-label">' + esc(cleanText(field?.label) || key) + (field?.required ? ' *' : '') + '</label>'
+      + control
+      + '</div>';
+  }
+
+  function renderScoringFields() {
+    const typeRow = getSelectedTypeRow();
+    if (!typeRow) {
+      fieldContainer.innerHTML = '<div class="text-muted">No type selected.</div>';
+      return;
+    }
+    const fields = Array.isArray(typeRow.scoringFields) ? typeRow.scoringFields : [];
+    fieldContainer.innerHTML = fields.length
+      ? fields.map((field) => renderFieldControl(field, state.profileScoring || {})).join('')
+      : '<div class="text-muted">No scoring fields defined for this question type.</div>';
+  }
+
+  function collectScoringFieldsFromDom() {
+    const typeRow = getSelectedTypeRow();
+    if (!typeRow) return {};
+    const fields = Array.isArray(typeRow.scoringFields) ? typeRow.scoringFields : [];
+    const out = {};
+
+    fields.forEach((field) => {
+      const key = cleanText(field?.key);
+      if (!key) return;
+      const input = fieldContainer.querySelector('[data-field-key="' + key + '"]');
+      if (!input) return;
+      const inputType = cleanText(input.getAttribute('data-field-input')).toLowerCase();
+      const raw = inputType === 'boolean' ? input.checked : input.value;
+      out[key] = parseFieldValue(field, raw);
+    });
+    return out;
+  }
+
+  function buildChangedKeys(previousConfig, nextConfig) {
+    const left = previousConfig && typeof previousConfig === 'object' ? previousConfig : {};
+    const right = nextConfig && typeof nextConfig === 'object' ? nextConfig : {};
+    const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+    return Array.from(keys).filter((key) => {
+      try {
+        return JSON.stringify(left[key]) !== JSON.stringify(right[key]);
+      } catch (_) {
+        return true;
+      }
+    }).sort();
+  }
+
+  function renderHistoryRows() {
+    const rows = Array.isArray(state.historyRows) ? state.historyRows : [];
+    if (!rows.length) {
+      historyBody.innerHTML = '<tr><td colspan="4" class="text-muted">No history records found.</td></tr>';
+      return;
+    }
+    historyBody.innerHTML = rows.map((row) => {
+      const toVersion = Number.parseInt(String(row?.toVersion || row?.profileVersion || ''), 10) || '-';
+      const updatedAt = formatDateTime(row?.updatedAt || row?.audit?.lastUpdateDateTime || row?.createdAt);
+      const actor = cleanText(row?.creator?.displayName)
+        || cleanText(row?.creator?.userId)
+        || cleanText(row?.audit?.lastUpdateUser)
+        || 'System';
+      const note = cleanText(row?.changeNote) || '-';
+      const changedKeys = buildChangedKeys(row?.previousScoringConfig, row?.nextScoringConfig);
+      const changedLabel = changedKeys.length ? changedKeys.join(', ') : 'No field-level diff';
+      return ''
+        + '<tr>'
+        + '  <td><span class="badge bg-light text-dark border">v' + esc(toVersion) + '</span></td>'
+        + '  <td>' + esc(updatedAt) + '</td>'
+        + '  <td>' + esc(actor) + '</td>'
+        + '  <td>'
+        + '    <div class="fw-semibold">' + esc(note) + '</div>'
+        + '    <div class="small text-muted">Changed: ' + esc(changedLabel) + '</div>'
+        + '  </td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  function updateProfileMetaNode(profileData) {
+    const profile = profileData && typeof profileData === 'object' ? profileData : {};
+    const row = profile.profile && typeof profile.profile === 'object' ? profile.profile : {};
+    const version = Number.parseInt(String(profile.profileVersion || row.profileVersion || 1), 10) || 1;
+    const updatedAt = formatDateTime(row.updatedAt || row.audit?.lastUpdateDateTime || '');
+    profileMetaNode.textContent = 'Profile ID: ' + (cleanText(row.id) || '-') + ' | Version: ' + version + ' | Last Update: ' + updatedAt;
+  }
+
+  function setButtonsBusy(isBusy) {
+    if (reloadBtn) reloadBtn.disabled = Boolean(isBusy);
+    if (saveBtn) saveBtn.disabled = Boolean(isBusy);
+    if (testTypeSelect) testTypeSelect.disabled = Boolean(isBusy);
+    if (questionTypeSelect) questionTypeSelect.disabled = Boolean(isBusy);
+  }
+
+  async function loadSelectedProfile() {
+    const testType = cleanText(testTypeSelect?.value).toLowerCase();
+    const questionType = cleanText(questionTypeSelect?.value).toLowerCase();
+    if (!testType || !questionType) {
+      state.profileId = '';
+      state.profileVersion = 1;
+      state.profileScoring = {};
+      state.historyRows = [];
+      profileMetaNode.textContent = 'Select a question type to load defaults.';
+      renderScoringFields();
+      renderHistoryRows();
+      return;
+    }
+
+    setButtonsBusy(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('testType', testType);
+      params.set('questionType', questionType);
+      params.set('historyLimit', '30');
+      const actionStateId = getActionStateId();
+      if (actionStateId) params.set('actionStateId', actionStateId);
+      const response = await fetch('/pte/scoring/defaults/profile?' + params.toString(), {
+        method: 'GET',
+        headers: {
+          'X-AJAX-Request': 'true',
+          Accept: 'application/json'
+        },
+        credentials: 'include'
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Unable to load defaults (status ' + response.status + ').'));
+      }
+
+      const payload = result.results && typeof result.results === 'object' ? result.results : {};
+      const profile = payload.profile && typeof payload.profile === 'object' ? payload.profile : {};
+      state.profileId = cleanText(profile?.profile?.id);
+      state.profileVersion = Number.parseInt(String(profile.profileVersion || 1), 10) || 1;
+      state.profileScoring = deepClone(profile.scoringConfig, {});
+      state.historyRows = Array.isArray(payload.history) ? payload.history : [];
+      updateProfileMetaNode(profile);
+      renderScoringFields();
+      renderHistoryRows();
+    } catch (error) {
+      await showModal('Load Failed', error.message || 'Unable to load defaults.', 'error');
+    } finally {
+      setButtonsBusy(false);
+    }
+  }
+
+  async function saveSelectedProfile() {
+    const testType = cleanText(testTypeSelect?.value).toLowerCase();
+    const questionType = cleanText(questionTypeSelect?.value).toLowerCase();
+    if (!testType || !questionType) {
+      await showModal('Validation', 'Select test type and question type first.', 'warning');
+      return;
+    }
+
+    let scoringConfig = {};
+    try {
+      scoringConfig = collectScoringFieldsFromDom();
+    } catch (error) {
+      await showModal('Validation', error.message || 'Please review scoring fields.', 'warning');
+      return;
+    }
+
+    setButtonsBusy(true);
+    try {
+      const body = new URLSearchParams();
+      body.set('testType', testType);
+      body.set('questionType', questionType);
+      body.set('scoringConfig', JSON.stringify(scoringConfig));
+      body.set('changeNote', cleanText(changeNoteInput?.value, 1000));
+      body.set('historyLimit', '30');
+      const actionStateId = getActionStateId();
+      if (actionStateId) body.set('actionStateId', actionStateId);
+      const response = await fetch('/pte/scoring/defaults/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true',
+          Accept: 'application/json'
+        },
+        credentials: 'include',
+        body: body.toString()
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Unable to save defaults (status ' + response.status + ').'));
+      }
+
+      const payload = result.results && typeof result.results === 'object' ? result.results : {};
+      const profile = payload.profile && typeof payload.profile === 'object' ? payload.profile : {};
+      state.profileId = cleanText(profile?.profile?.id);
+      state.profileVersion = Number.parseInt(String(profile.profileVersion || 1), 10) || 1;
+      state.profileScoring = deepClone(profile.scoringConfig, {});
+      state.historyRows = Array.isArray(payload.history) ? payload.history : [];
+      updateProfileMetaNode(profile);
+      renderScoringFields();
+      renderHistoryRows();
+      if (changeNoteInput) changeNoteInput.value = '';
+      await showModal('Saved', result.message || 'Scoring defaults updated successfully.', 'success');
+    } catch (error) {
+      await showModal('Save Failed', error.message || 'Unable to save defaults.', 'error');
+    } finally {
+      setButtonsBusy(false);
+    }
+  }
+
+  testTypeSelect?.addEventListener('change', async () => {
+    buildQuestionTypeOptions();
+    await loadSelectedProfile();
+  });
+
+  questionTypeSelect?.addEventListener('change', async () => {
+    await loadSelectedProfile();
+  });
+
+  reloadBtn?.addEventListener('click', async () => {
+    await loadSelectedProfile();
+  });
+
+  saveBtn?.addEventListener('click', async () => {
+    await saveSelectedProfile();
+  });
+
+  buildQuestionTypeOptions();
+  renderScoringFields();
+  renderHistoryRows();
+})();
+</script>

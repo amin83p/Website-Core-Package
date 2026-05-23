@@ -1,0 +1,141 @@
+<%
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+  const guideData = guide || {};
+  const sectionMeta = guideData.sectionMeta || {};
+  const academicRows = Array.isArray(guideData.academicRows) ? guideData.academicRows : [];
+  const coreRows = Array.isArray(guideData.coreRows) ? guideData.coreRows : [];
+%>
+
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl: 'pte/tests',
+  newLabel: null,
+  user,
+  tableName,
+  btn_export: false,
+  print: false,
+  manageBtns: [
+    '<a href="/pte/tests" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-arrow-left me-1"></i> Back To Tests</a>',
+    '<a href="' + dashboardHref + '" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> PTE Dashboard</a>'
+  ]
+}) %>
+
+<div class="alert alert-info mb-4" role="alert">
+  Use this guide while composing test drafts to confirm the expected sequence and approximate item counts for each test type.
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="mb-2">1. <%= sectionMeta.speaking_writing?.label || 'Speaking & Writing' %></h6>
+        <div class="x-small text-muted">Academic: <%= sectionMeta.speaking_writing?.academicMinutes || '-' %></div>
+        <div class="x-small text-muted">Core: <%= sectionMeta.speaking_writing?.coreMinutes || '-' %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="mb-2">2. <%= sectionMeta.reading?.label || 'Reading' %></h6>
+        <div class="x-small text-muted">Academic: <%= sectionMeta.reading?.academicMinutes || '-' %></div>
+        <div class="x-small text-muted">Core: <%= sectionMeta.reading?.coreMinutes || '-' %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="mb-2">3. <%= sectionMeta.listening?.label || 'Listening' %></h6>
+        <div class="x-small text-muted">Academic: <%= sectionMeta.listening?.academicMinutes || '-' %></div>
+        <div class="x-small text-muted">Core: <%= sectionMeta.listening?.coreMinutes || '-' %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h5 class="mb-0">PTE Academic Configuration</h5>
+    <span class="badge bg-primary">Order + Recommended Count</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-scroll-wrapper">
+      <table class="table-responsive size-md mb-0">
+        <thead>
+          <tr>
+            <th class="ps-4">Order</th>
+            <th>Section</th>
+            <th>Question Type</th>
+            <th>Skill</th>
+            <th class="pe-4">Recommended Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!academicRows.length) { %>
+            <tr><td colspan="5" class="text-center py-4 text-muted">No academic rows defined.</td></tr>
+          <% } %>
+          <% academicRows.forEach((row) => { %>
+            <tr>
+              <td class="ps-4"><span class="badge bg-light text-dark border"><%= row.order %></span></td>
+              <td><%= row.sectionLabel || '-' %></td>
+              <td>
+                <div class="fw-semibold"><%= row.questionLabel || '-' %></div>
+                <div class="x-small text-muted font-monospace"><%= row.questionType || '-' %></div>
+              </td>
+              <td class="text-capitalize"><%= row.skill || '-' %></td>
+              <td class="pe-4"><%= row.recommendedCount || '-' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h5 class="mb-0">PTE Core Configuration</h5>
+    <span class="badge bg-secondary">Order + Recommended Count</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-scroll-wrapper">
+      <table class="table-responsive size-md mb-0">
+        <thead>
+          <tr>
+            <th class="ps-4">Order</th>
+            <th>Section</th>
+            <th>Question Type</th>
+            <th>Skill</th>
+            <th class="pe-4">Recommended Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!coreRows.length) { %>
+            <tr><td colspan="5" class="text-center py-4 text-muted">No core rows defined.</td></tr>
+          <% } %>
+          <% coreRows.forEach((row) => { %>
+            <tr>
+              <td class="ps-4"><span class="badge bg-light text-dark border"><%= row.order %></span></td>
+              <td><%= row.sectionLabel || '-' %></td>
+              <td>
+                <div class="fw-semibold"><%= row.questionLabel || '-' %></div>
+                <div class="x-small text-muted font-monospace"><%= row.questionType || '-' %></div>
+              </td>
+              <td class="text-capitalize"><%= row.skill || '-' %></td>
+              <td class="pe-4"><%= row.recommendedCount || '-' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="text-muted x-small mb-3">
+  Note: counts are planning ranges and can be adjusted if the official exam design changes.
+</div>
+
+<%- include('../../partials/tablePages-end') %>

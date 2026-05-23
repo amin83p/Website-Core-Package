@@ -1,0 +1,678 @@
+<%
+  const c = (course && typeof course === 'object') ? course : {};
+  const isEdit = Boolean(c.id);
+  const routeId = String(c.id || '').trim();
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const options = (formOptions && typeof formOptions === 'object') ? formOptions : {};
+  const statuses = Array.isArray(options.statuses) ? options.statuses : [];
+  const courseTypes = Array.isArray(options.courseTypes) && options.courseTypes.length
+    ? options.courseTypes
+    : [{ value: 'CORE', label: 'CORE' }, { value: 'ACADEMIC', label: 'ACADEMIC' }];
+  const userSafe = (user && typeof user === 'object') ? user : {};
+  const activeOrgId = String(userSafe.activeOrgId || userSafe.primaryOrgId || '').trim();
+  const allowedOrgs = Array.isArray(userSafe.allowedOrgs) ? userSafe.allowedOrgs : [];
+  const courseOrgId = String(c.orgId || activeOrgId).trim();
+  const activeOrgMeta = allowedOrgs.find((org) => String(org?.orgId || '').trim() === courseOrgId)
+    || allowedOrgs.find((org) => String(org?.orgId || '').trim() === activeOrgId)
+    || null;
+  const organizationName = String(
+    activeOrgMeta?.name
+    || activeOrgMeta?.orgName
+    || activeOrgMeta?.organizationName
+    || userSafe.activeOrgName
+    || c.orgId
+    || ''
+  ).trim();
+  const selectedCourseType = String(c.courseType || c.level || 'CORE').trim().toUpperCase() || 'CORE';
+  const initTeachersJson = JSON.stringify(Array.isArray(c.teachers) ? c.teachers : []).replace(/</g, '\\u003c');
+  const initStudentsJson = JSON.stringify(Array.isArray(c.students) ? c.students : []).replace(/</g, '\\u003c');
+  const actionUrl = isEdit
+    ? ('/pte/courses/update/' + encodeURIComponent(routeId))
+    : '/pte/courses/save';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-journal-bookmark me-2"></i><%= title %></h1>
+    <div class="d-flex align-items-center gap-2">
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= routeId %></span>
+      <% } %>
+      <a href="/pte/courses" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1450px;">
+    <form id="pteCourseForm" action="<%= actionUrl %>" method="POST">
+      <input type="hidden" name="actionStateId" id="pteCourseActionStateId" value="<%= asid %>">
+      <input type="hidden" name="coursePlan" id="pteCoursePlanInput" value="">
+
+      <script type="application/json" id="pteCourseInitial"><%- JSON.stringify(c || {}).replace(/</g, '\\u003c') %></script>
+      <script type="application/json" id="pteCourseInitTeachers"><%- initTeachersJson %></script>
+      <script type="application/json" id="pteCourseInitStudents"><%- initStudentsJson %></script>
+
+      <ul class="nav nav-tabs mb-4" id="pteCourseTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#pte-course-tab-details" type="button">Details</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#pte-course-tab-teachers" type="button">Teachers</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#pte-course-tab-students" type="button">Students</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#pte-course-tab-settings" type="button">Settings</button></li>
+      </ul>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4 tab-content">
+          <div class="tab-pane fade show active" id="pte-course-tab-details">
+            <div class="row g-3">
+              <div class="col-md-5">
+                <label class="form-label fw-bold">Course Name *</label>
+                <input type="text" class="form-control size-md" id="pteCourseNameInput" value="<%= c.name || '' %>" maxlength="220" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold">Course Code</label>
+                <input type="text" class="form-control size-md font-monospace" id="pteCourseCodeInput" value="<%= c.code || '' %>" maxlength="120" placeholder="Optional">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label fw-bold">Status</label>
+                <select class="form-select size-md text-capitalize" id="pteCourseStatusSelect">
+                  <% statuses.forEach((st) => { %>
+                    <% const selected = String(st.value || '').toLowerCase() === String(c.status || 'draft').toLowerCase(); %>
+                    <option value="<%= st.value %>" <%= selected ? 'selected' : '' %>><%= st.label || st.value %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label fw-bold">Course Type</label>
+                <select class="form-select size-md text-uppercase" id="pteCourseTypeSelect">
+                  <% courseTypes.forEach((row) => { %>
+                    <% const optionValue = String(row.value || '').trim().toUpperCase(); %>
+                    <option value="<%= optionValue %>" <%= optionValue === selectedCourseType ? 'selected' : '' %>><%= row.label || optionValue %></option>
+                  <% }) %>
+                </select>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-md-3">
+                <label class="form-label fw-bold">Start Date</label>
+                <input type="date" class="form-control size-md" id="pteCourseStartDateInput" value="<%= c.startDate || '' %>">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold">End Date</label>
+                <input type="date" class="form-control size-md" id="pteCourseEndDateInput" value="<%= c.endDate || '' %>">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold">Max Students</label>
+                <input type="number" class="form-control size-md" id="pteCourseMaxStudentsInput" value="<%= Number(c.maxStudents || 0) %>" min="0" step="1">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold">Organization</label>
+                <input type="text" class="form-control size-md bg-light" value="<%= organizationName || '-' %>" readonly>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-md-12">
+                <label class="form-label fw-bold">Description</label>
+                <textarea class="form-control size-md" id="pteCourseDescriptionInput" rows="4" maxlength="4000" placeholder="Course overview, notes, and delivery details..."><%= c.description || '' %></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="pte-course-tab-teachers">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <h6 class="m-0 fw-bold"><i class="bi bi-person-workspace me-2"></i>Assigned Teachers</h6>
+                  <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="pteCourseBtnPickTeachers">
+                      <i class="bi bi-search me-1"></i> Add Teachers
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="pteCourseBtnClearTeachers">Clear</button>
+                  </div>
+                </div>
+                <div class="small text-muted mb-3">Select one or multiple teachers. Stored values include display snapshots for reliable history.</div>
+                <div id="pteCourseTeachersContainer" class="border rounded p-3 bg-light-subtle"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="pte-course-tab-students">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <h6 class="m-0 fw-bold"><i class="bi bi-people me-2"></i>Course Students</h6>
+                  <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="pteCourseBtnPickStudents">
+                      <i class="bi bi-search me-1"></i> Add Students
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="pteCourseBtnClearStudents">Clear</button>
+                  </div>
+                </div>
+                <div class="small text-muted mb-3">Students can be managed in bulk. Membership status can be adjusted per student.</div>
+                <div id="pteCourseStudentsContainer" class="border rounded p-3 bg-light-subtle"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="pte-course-tab-settings">
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                  <div class="card-body">
+                    <h6 class="fw-bold mb-2"><i class="bi bi-card-list me-2"></i>Summary</h6>
+                    <table class="table table-sm mb-0">
+                      <tbody>
+                        <tr>
+                          <th class="text-muted" style="width: 35%;">Teachers</th>
+                          <td id="pteCourseSummaryTeacherCount">0</td>
+                        </tr>
+                        <tr>
+                          <th class="text-muted">Students</th>
+                          <td id="pteCourseSummaryStudentCount">0</td>
+                        </tr>
+                        <tr>
+                          <th class="text-muted">Status</th>
+                          <td id="pteCourseSummaryStatus">draft</td>
+                        </tr>
+                        <tr>
+                          <th class="text-muted">Date Window</th>
+                          <td id="pteCourseSummaryDateWindow">-</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                  <div class="card-body">
+                    <h6 class="fw-bold mb-2"><i class="bi bi-shield-check me-2"></i>Validation Notes</h6>
+                    <ul class="small mb-0">
+                      <li>Course name is required.</li>
+                      <li>End date cannot be earlier than start date.</li>
+                      <li>Code must be unique within the active organization.</li>
+                      <li>Changes are org-scoped and audited.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          <button type="button" id="pteCourseBtnPrevStep" class="btn btn-outline-primary btn-md" data-no-wait="true">Back</button>
+          <button type="button" id="pteCourseBtnNextStep" class="btn btn-filled btn-primary btn-md fw-bold px-4" data-no-wait="true">Next</button>
+          <button type="submit" id="pteCourseBtnSave" class="btn btn-filled btn-success btn-md fw-bold px-4 d-none"><%= isEdit ? 'Update Course' : 'Save Course' %></button>
+          <a href="/pte/courses" class="btn btn-filled btn-secondary btn-md" id="pteCourseBtnCancel">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker', { user }) %>
+
+<script>
+(() => {
+  const form = document.getElementById('pteCourseForm');
+  if (!form) return;
+
+  const actionStateId = document.getElementById('pteCourseActionStateId')?.value || '';
+  const planInput = document.getElementById('pteCoursePlanInput');
+
+  const teachersContainer = document.getElementById('pteCourseTeachersContainer');
+  const studentsContainer = document.getElementById('pteCourseStudentsContainer');
+  const btnPickTeachers = document.getElementById('pteCourseBtnPickTeachers');
+  const btnPickStudents = document.getElementById('pteCourseBtnPickStudents');
+  const btnClearTeachers = document.getElementById('pteCourseBtnClearTeachers');
+  const btnClearStudents = document.getElementById('pteCourseBtnClearStudents');
+  const btnSave = document.getElementById('pteCourseBtnSave');
+  const btnCancel = document.getElementById('pteCourseBtnCancel');
+  const btnPrevStep = document.getElementById('pteCourseBtnPrevStep');
+  const btnNextStep = document.getElementById('pteCourseBtnNextStep');
+
+  const inputName = document.getElementById('pteCourseNameInput');
+  const inputCode = document.getElementById('pteCourseCodeInput');
+  const inputStatus = document.getElementById('pteCourseStatusSelect');
+  const inputCourseType = document.getElementById('pteCourseTypeSelect');
+  const inputStartDate = document.getElementById('pteCourseStartDateInput');
+  const inputEndDate = document.getElementById('pteCourseEndDateInput');
+  const inputMaxStudents = document.getElementById('pteCourseMaxStudentsInput');
+  const inputDescription = document.getElementById('pteCourseDescriptionInput');
+
+  const summaryTeacherCount = document.getElementById('pteCourseSummaryTeacherCount');
+  const summaryStudentCount = document.getElementById('pteCourseSummaryStudentCount');
+  const summaryStatus = document.getElementById('pteCourseSummaryStatus');
+  const summaryDateWindow = document.getElementById('pteCourseSummaryDateWindow');
+
+  const tabTargets = [
+    '#pte-course-tab-details',
+    '#pte-course-tab-teachers',
+    '#pte-course-tab-students',
+    '#pte-course-tab-settings'
+  ];
+  let currentStepIndex = 0;
+  let isSubmitting = false;
+
+  function parseJsonScript(id, fallback) {
+    try {
+      const node = document.getElementById(id);
+      return JSON.parse((node && node.textContent) || '');
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function cleanText(value, max = 4000) {
+    const out = String(value || '').replace(/\0/g, '').trim();
+    if (!out) return '';
+    return out.length > max ? out.slice(0, max) : out;
+  }
+
+  function normalizeIsoDate(value) {
+    const token = cleanText(value, 40);
+    if (!token) return '';
+    const parsed = new Date(token);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString();
+  }
+
+  function normalizeMember(raw, type, includeMembershipStatus) {
+    const row = raw && typeof raw === 'object' ? raw : { id: raw };
+    const id = cleanText(row.id || row.personId || row.userId || row.applicantId || '', 140);
+    if (!id) return null;
+    const displayName = cleanText(row.displayName || row.name || row.username || row.email || id, 220) || id;
+    const out = {
+      type: cleanText(row.type || type, 60).toLowerCase() || type,
+      id: id,
+      displayName: displayName,
+      email: cleanText(row.email, 220),
+      addedDate: normalizeIsoDate(row.addedDate) || new Date().toISOString(),
+      addedBy: cleanText(row.addedBy, 140) || cleanText(window.__USER__?.id, 140) || 'System'
+    };
+    if (includeMembershipStatus) {
+      out.membershipStatus = cleanText(row.membershipStatus, 60).toLowerCase() || 'active';
+    }
+    return out;
+  }
+
+  function showModal(title, message, icon) {
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal({
+        title: title,
+        message: message,
+        icon: icon || 'info',
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+    }
+    alert(title + ': ' + message);
+    return Promise.resolve();
+  }
+
+  function cacheButtonHtml(button) {
+    if (!button) return;
+    if (!button.dataset.originalHtml) button.dataset.originalHtml = button.innerHTML;
+  }
+
+  function setButtonBusy(button, label) {
+    if (!button) return;
+    cacheButtonHtml(button);
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + esc(label || 'Working...');
+  }
+
+  function restoreButton(button) {
+    if (!button) return;
+    if (button.dataset.originalHtml) button.innerHTML = button.dataset.originalHtml;
+    button.disabled = false;
+  }
+
+  const initial = parseJsonScript('pteCourseInitial', {});
+  const initialTeachers = parseJsonScript('pteCourseInitTeachers', []);
+  const initialStudents = parseJsonScript('pteCourseInitStudents', []);
+
+  const state = {
+    teachers: Array.isArray(initialTeachers)
+      ? initialTeachers.map((row) => normalizeMember(row, 'person', false)).filter(Boolean)
+      : [],
+    students: Array.isArray(initialStudents)
+      ? initialStudents.map((row) => normalizeMember(row, 'applicant', true)).filter(Boolean)
+      : []
+  };
+
+  function addUnique(list, row, type, includeMembershipStatus) {
+    const normalized = normalizeMember(row, type, includeMembershipStatus);
+    if (!normalized) return;
+    const exists = list.some((entry) => String(entry.type) + ':' + String(entry.id) === String(normalized.type) + ':' + String(normalized.id));
+    if (!exists) list.push(normalized);
+  }
+
+  function renderTeachers() {
+    if (!teachersContainer) return;
+    if (!state.teachers.length) {
+      teachersContainer.innerHTML = '<div class="small text-muted">No teacher selected.</div>';
+      return;
+    }
+    teachersContainer.innerHTML = ''
+      + '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
+      + '<thead><tr><th>Teacher</th><th>Email</th><th>Added</th><th class="text-end">Action</th></tr></thead><tbody>'
+      + state.teachers.map((row, index) => {
+        const label = row.displayName || row.id;
+        const added = String(row.addedDate || '').replace('T', ' ').slice(0, 19) || '-';
+        return ''
+          + '<tr>'
+          + '<td><div class="fw-bold">' + esc(label) + '</div><div class="x-small text-muted font-monospace">' + esc(row.id) + '</div></td>'
+          + '<td class="small">' + esc(row.email || '-') + '</td>'
+          + '<td class="small">' + esc(added) + '</td>'
+          + '<td class="text-end">'
+          + '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-teacher="' + index + '"><i class="bi bi-x-lg"></i></button>'
+          + '</td>'
+          + '</tr>';
+      }).join('')
+      + '</tbody></table></div>';
+  }
+
+  function renderStudents() {
+    if (!studentsContainer) return;
+    if (!state.students.length) {
+      studentsContainer.innerHTML = '<div class="small text-muted">No student selected.</div>';
+      return;
+    }
+    studentsContainer.innerHTML = ''
+      + '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
+      + '<thead><tr><th>Student</th><th>Email</th><th>Status</th><th class="text-end">Action</th></tr></thead><tbody>'
+      + state.students.map((row, index) => {
+        const label = row.displayName || row.id;
+        const status = cleanText(row.membershipStatus, 60).toLowerCase() || 'active';
+        return ''
+          + '<tr>'
+          + '<td><div class="fw-bold">' + esc(label) + '</div><div class="x-small text-muted font-monospace">' + esc(row.id) + '</div></td>'
+          + '<td class="small">' + esc(row.email || '-') + '</td>'
+          + '<td>'
+          + '<select class="form-select form-select-sm" data-student-status="' + index + '">'
+          + '<option value="active"' + (status === 'active' ? ' selected' : '') + '>Active</option>'
+          + '<option value="pending"' + (status === 'pending' ? ' selected' : '') + '>Pending</option>'
+          + '<option value="paused"' + (status === 'paused' ? ' selected' : '') + '>Paused</option>'
+          + '<option value="completed"' + (status === 'completed' ? ' selected' : '') + '>Completed</option>'
+          + '</select>'
+          + '</td>'
+          + '<td class="text-end">'
+          + '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-student="' + index + '"><i class="bi bi-x-lg"></i></button>'
+          + '</td>'
+          + '</tr>';
+      }).join('')
+      + '</tbody></table></div>';
+  }
+
+  function updateSummary() {
+    if (summaryTeacherCount) summaryTeacherCount.textContent = String(state.teachers.length);
+    if (summaryStudentCount) summaryStudentCount.textContent = String(state.students.length);
+    if (summaryStatus) summaryStatus.textContent = cleanText(inputStatus?.value || 'draft').toLowerCase() || 'draft';
+    if (summaryDateWindow) {
+      const start = cleanText(inputStartDate?.value, 40) || '-';
+      const end = cleanText(inputEndDate?.value, 40) || '-';
+      summaryDateWindow.textContent = start + ' to ' + end;
+    }
+  }
+
+  function syncPayload() {
+    const payload = {
+      id: cleanText(initial.id || '', 120),
+      code: cleanText(inputCode?.value || '', 120),
+      name: cleanText(inputName?.value || '', 220),
+      description: cleanText(inputDescription?.value || '', 4000),
+      startDate: cleanText(inputStartDate?.value || '', 40),
+      endDate: cleanText(inputEndDate?.value || '', 40),
+      status: cleanText(inputStatus?.value || '', 40).toLowerCase() || 'draft',
+      courseType: cleanText(inputCourseType?.value || '', 40).toUpperCase() || 'CORE',
+      maxStudents: Number.parseInt(String(inputMaxStudents?.value || '0'), 10) || 0,
+      teachers: state.teachers.map((row) => ({
+        type: row.type || 'person',
+        id: row.id,
+        displayName: row.displayName || row.id,
+        email: row.email || '',
+        addedDate: row.addedDate || new Date().toISOString(),
+        addedBy: row.addedBy || 'System'
+      })),
+      students: state.students.map((row) => ({
+        type: row.type || 'applicant',
+        id: row.id,
+        displayName: row.displayName || row.id,
+        email: row.email || '',
+        addedDate: row.addedDate || new Date().toISOString(),
+        addedBy: row.addedBy || 'System',
+        membershipStatus: cleanText(row.membershipStatus || 'active', 60).toLowerCase() || 'active'
+      }))
+    };
+    if (planInput) planInput.value = JSON.stringify(payload);
+  }
+
+  async function validateBeforeSave() {
+    const name = cleanText(inputName?.value || '', 220);
+    if (!name) {
+      await showModal('Validation', 'Course name is required.', 'warning');
+      showStep(0);
+      return false;
+    }
+    const startDate = cleanText(inputStartDate?.value || '', 40);
+    const endDate = cleanText(inputEndDate?.value || '', 40);
+    if (startDate && endDate && endDate < startDate) {
+      await showModal('Validation', 'End date cannot be earlier than start date.', 'warning');
+      showStep(0);
+      return false;
+    }
+    return true;
+  }
+
+  function getActiveTabTarget() {
+    const active = document.querySelector('#pteCourseTabs .nav-link.active');
+    const target = active ? String(active.getAttribute('data-bs-target') || '') : '';
+    return target || tabTargets[0];
+  }
+
+  function refreshWizardButtons() {
+    const atFirst = currentStepIndex <= 0;
+    const atLast = currentStepIndex >= tabTargets.length - 1;
+    if (btnPrevStep) btnPrevStep.disabled = atFirst;
+    if (btnNextStep) btnNextStep.classList.toggle('d-none', atLast);
+    if (btnSave) btnSave.classList.toggle('d-none', !atLast);
+  }
+
+  function showStep(index) {
+    const targetIndex = Math.max(0, Math.min(tabTargets.length - 1, index));
+    const selector = tabTargets[targetIndex];
+    const trigger = document.querySelector('#pteCourseTabs .nav-link[data-bs-target="' + selector + '"]');
+    if (trigger && window.bootstrap && window.bootstrap.Tab) {
+      window.bootstrap.Tab.getOrCreateInstance(trigger).show();
+      currentStepIndex = targetIndex;
+      refreshWizardButtons();
+      return;
+    }
+    currentStepIndex = targetIndex;
+    refreshWizardButtons();
+  }
+
+  function openTeacherPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.person({
+      title: 'Select Teachers',
+      icon: 'bi-person-workspace',
+      apiEndpoint: '/pte/courses/api/pickers/teachers',
+      placeholder: 'Search teachers by id, name, or email...',
+      multiselect: true,
+      context,
+      onSelect: (items) => {
+        const rows = Array.isArray(items) ? items : [items];
+        rows.forEach((row) => addUnique(state.teachers, row, 'person', false));
+        renderTeachers();
+        updateSummary();
+      }
+    }));
+  }
+
+  function openStudentPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.student({
+      title: 'Select Students',
+      icon: 'bi-people',
+      apiEndpoint: '/pte/courses/api/pickers/students',
+      placeholder: 'Search students/applicants by id, name, or email...',
+      multiselect: true,
+      context,
+      onSelect: (items) => {
+        const rows = Array.isArray(items) ? items : [items];
+        rows.forEach((row) => addUnique(state.students, row, 'applicant', true));
+        renderStudents();
+        updateSummary();
+      }
+    }));
+  }
+
+  teachersContainer?.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-remove-teacher]');
+    if (!removeBtn) return;
+    const index = Number(removeBtn.getAttribute('data-remove-teacher'));
+    if (!Number.isFinite(index) || index < 0 || index >= state.teachers.length) return;
+    state.teachers.splice(index, 1);
+    renderTeachers();
+    updateSummary();
+  });
+
+  studentsContainer?.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-remove-student]');
+    if (!removeBtn) return;
+    const index = Number(removeBtn.getAttribute('data-remove-student'));
+    if (!Number.isFinite(index) || index < 0 || index >= state.students.length) return;
+    state.students.splice(index, 1);
+    renderStudents();
+    updateSummary();
+  });
+
+  studentsContainer?.addEventListener('change', (event) => {
+    const statusSelect = event.target.closest('[data-student-status]');
+    if (!statusSelect) return;
+    const index = Number(statusSelect.getAttribute('data-student-status'));
+    if (!Number.isFinite(index) || index < 0 || index >= state.students.length) return;
+    state.students[index].membershipStatus = cleanText(statusSelect.value, 60).toLowerCase() || 'active';
+  });
+
+  if (btnPickTeachers) btnPickTeachers.addEventListener('click', openTeacherPicker);
+  if (btnPickStudents) btnPickStudents.addEventListener('click', openStudentPicker);
+
+  if (btnClearTeachers) {
+    btnClearTeachers.addEventListener('click', () => {
+      state.teachers = [];
+      renderTeachers();
+      updateSummary();
+    });
+  }
+  if (btnClearStudents) {
+    btnClearStudents.addEventListener('click', () => {
+      state.students = [];
+      renderStudents();
+      updateSummary();
+    });
+  }
+
+  document.querySelectorAll('#pteCourseTabs .nav-link').forEach((tabButton) => {
+    tabButton.addEventListener('shown.bs.tab', () => {
+      currentStepIndex = Math.max(0, tabTargets.indexOf(getActiveTabTarget()));
+      refreshWizardButtons();
+    });
+  });
+
+  if (btnPrevStep) btnPrevStep.addEventListener('click', () => showStep(currentStepIndex - 1));
+  if (btnNextStep) btnNextStep.addEventListener('click', () => showStep(currentStepIndex + 1));
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+    if (currentStepIndex !== tabTargets.length - 1) {
+      showStep(currentStepIndex + 1);
+      return;
+    }
+
+    const valid = await validateBeforeSave();
+    if (!valid) return;
+
+    syncPayload();
+    isSubmitting = true;
+    setButtonBusy(btnSave, 'Saving...');
+    if (btnCancel) btnCancel.disabled = true;
+
+    try {
+      const submitUrl = (() => {
+        if (!actionStateId) return form.action;
+        const hasToken = /[?&]actionStateId=/.test(String(form.action || ''));
+        if (hasToken) return form.action;
+        return String(form.action || '') + (String(form.action || '').includes('?') ? '&' : '?') + 'actionStateId=' + encodeURIComponent(actionStateId);
+      })();
+
+      const response = await fetch(submitUrl, {
+        method: 'POST',
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        body: new FormData(form),
+        credentials: 'include'
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Request failed with status ' + response.status + '.'));
+      }
+
+      await showModal('Success', result.message || 'Course saved successfully.', 'success');
+      window.location.href = '/pte/courses';
+    } catch (error) {
+      await showModal('Save Failed', error.message || 'Unexpected save error.', 'error');
+      isSubmitting = false;
+      restoreButton(btnSave);
+      restoreButton(btnCancel);
+    }
+  });
+
+  if (btnCancel) {
+    cacheButtonHtml(btnCancel);
+    btnCancel.addEventListener('click', (event) => {
+      if (isSubmitting) {
+        event.preventDefault();
+        return;
+      }
+      setButtonBusy(btnCancel, 'Cancelling...');
+      if (btnSave) btnSave.disabled = true;
+    });
+  }
+
+  [inputStatus, inputStartDate, inputEndDate].forEach((node) => {
+    if (!node) return;
+    node.addEventListener('change', updateSummary);
+  });
+
+  if (btnSave) cacheButtonHtml(btnSave);
+  renderTeachers();
+  renderStudents();
+  updateSummary();
+  currentStepIndex = Math.max(0, tabTargets.indexOf(getActiveTabTarget()));
+  refreshWizardButtons();
+})();
+</script>

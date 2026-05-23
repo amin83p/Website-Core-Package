@@ -1,0 +1,458 @@
+<%
+  const pageData = (typeof data !== 'undefined' && data && typeof data === 'object') ? data : {};
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+  const aiAssistDashboardHref = '/dashboard/section-nav/PTE_AI_ASSISST';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><%= title || 'PTE AI Scoring Settings' %></h1>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="<%= dashboardHref %>" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-speedometer2 me-1"></i> PTE Dashboard
+      </a>
+      <a href="<%= aiAssistDashboardHref %>" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-robot me-1"></i> PTE AI Assist
+      </a>
+    </div>
+  </div>
+
+  <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end mb-4">
+    <a href="/pte/ai-assisst/scoring-settings/help" class="btn btn-outline-primary btn-md">
+      <i class="bi bi-question-circle me-1"></i> Help
+    </a>
+    <a href="/pte/ai-assisst/api-providers" class="btn btn-outline-secondary btn-md">
+      <i class="bi bi-key-fill me-1"></i> API Providers
+    </a>
+    <a href="/pte/ai-assisst/token-usage" class="btn btn-outline-secondary btn-md">
+      <i class="bi bi-cpu-fill me-1"></i> Token Usage
+    </a>
+  </div>
+
+  <script type="application/json" id="pteAiScoringSettingsInitialData"><%- JSON.stringify(pageData).replace(/</g, '\\u003c') %></script>
+
+  <div class="alert alert-info">
+    Assign one saved provider key to each implemented scorer. Unassigned scorers keep using the current default provider behavior.
+  </div>
+
+  <div class="form-container wide" style="max-width: 1450px;">
+    <div class="row g-3">
+      <div class="col-12">
+        <section class="border rounded bg-white p-3 shadow-sm h-100">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="h6 fw-bold m-0"><i class="bi bi-sliders me-2"></i>Scorer Provider</h2>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="pteAiScoringReloadBtn">
+              <i class="bi bi-arrow-repeat me-1"></i>Reload
+            </button>
+          </div>
+
+          <div class="row g-3 align-items-start">
+            <div class="col-lg-4">
+              <label for="pteAiScoringQuestionType" class="form-label">Question Type *</label>
+              <select class="form-select size-md" id="pteAiScoringQuestionType"></select>
+              <div class="form-text" id="pteAiScoringRecommendation">Choose a scorer to see model guidance.</div>
+            </div>
+
+            <div class="col-lg-4">
+              <label for="pteAiScoringProvider" class="form-label">Provider Key *</label>
+              <select class="form-select size-md" id="pteAiScoringProvider"></select>
+              <div class="form-text" id="pteAiScoringProviderMeta">Only active provider keys in this organization are selectable.</div>
+            </div>
+
+            <div class="col-lg-4">
+              <label for="pteAiScoringNotes" class="form-label">Notes</label>
+              <textarea class="form-control" id="pteAiScoringNotes" rows="3" maxlength="4000" placeholder="Optional note for this scorer/provider choice"></textarea>
+            </div>
+
+            <div class="col-12 d-flex align-items-center justify-content-between gap-3 flex-wrap">
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="pteAiScoringActive" checked>
+                <label class="form-check-label" for="pteAiScoringActive">Active assignment</label>
+              </div>
+
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button type="button" class="btn btn-filled btn-success" id="pteAiScoringSaveBtn">
+                  <i class="bi bi-check2-circle me-1"></i>Save Setting
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="pteAiScoringClearBtn">
+                  <i class="bi bi-x-circle me-1"></i>Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="col-12">
+        <section class="border rounded bg-white p-3 shadow-sm h-100">
+          <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <h2 class="h6 fw-bold m-0"><i class="bi bi-list-check me-2"></i>Current Assignments</h2>
+            <span class="badge bg-light text-dark border" id="pteAiScoringOrgBadge">Org</span>
+          </div>
+
+          <div class="table-responsive" data-floating-row-actions="true">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Scorer</th>
+                  <th>Provider</th>
+                  <th>Model</th>
+                  <th>Status</th>
+                  <th>Updated</th>
+                  <th class="text-end pe-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pteAiScoringAssignmentsBody">
+                <tr>
+                  <td colspan="6" class="text-muted">Loading settings...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal') %>
+
+<script>
+(() => {
+  function cleanText(value) {
+    return String(value == null ? '' : value).replace(/\0/g, '').trim();
+  }
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function parseJsonScript(id, fallback) {
+    try {
+      const node = document.getElementById(id);
+      return JSON.parse((node && node.textContent) || '');
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  async function showModal(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+    }
+    alert(message);
+    return 'OK';
+  }
+
+  function formatDateTime(value) {
+    const token = cleanText(value);
+    if (!token) return '-';
+    const parsed = new Date(token);
+    if (Number.isNaN(parsed.getTime())) return token;
+    return parsed.toLocaleString();
+  }
+
+  function providerOptionLabel(provider) {
+    const name = cleanText(provider?.name || provider?.id) || 'Unnamed provider';
+    const type = cleanText(provider?.providerLabel || provider?.providerId);
+    const model = cleanText(provider?.modelId) || 'model not set';
+    const tags = [
+      provider?.isDefault ? 'Default' : '',
+      provider?.isActive === false ? 'Inactive' : ''
+    ].filter(Boolean).join(', ');
+    return name + ' - ' + type + ' - ' + model + (tags ? ' (' + tags + ')' : '');
+  }
+
+  const els = {
+    questionType: document.getElementById('pteAiScoringQuestionType'),
+    provider: document.getElementById('pteAiScoringProvider'),
+    active: document.getElementById('pteAiScoringActive'),
+    notes: document.getElementById('pteAiScoringNotes'),
+    recommendation: document.getElementById('pteAiScoringRecommendation'),
+    providerMeta: document.getElementById('pteAiScoringProviderMeta'),
+    orgBadge: document.getElementById('pteAiScoringOrgBadge'),
+    assignmentsBody: document.getElementById('pteAiScoringAssignmentsBody'),
+    saveBtn: document.getElementById('pteAiScoringSaveBtn'),
+    clearBtn: document.getElementById('pteAiScoringClearBtn'),
+    reloadBtn: document.getElementById('pteAiScoringReloadBtn')
+  };
+
+  const state = {
+    data: parseJsonScript('pteAiScoringSettingsInitialData', {
+      orgId: '',
+      scorers: [],
+      providerOptions: [],
+      assignments: []
+    })
+  };
+
+  function getScorers() {
+    return Array.isArray(state.data?.scorers) ? state.data.scorers : [];
+  }
+
+  function getProviders() {
+    return Array.isArray(state.data?.providerOptions) ? state.data.providerOptions : [];
+  }
+
+  function getSelectableProviders() {
+    return getProviders().filter((provider) => provider?.isActive !== false && provider?.hasApiKey !== false);
+  }
+
+  function getAssignments() {
+    return Array.isArray(state.data?.assignments) ? state.data.assignments : [];
+  }
+
+  function selectedScorer() {
+    const type = cleanText(els.questionType?.value).toLowerCase();
+    return getScorers().find((row) => cleanText(row.questionType).toLowerCase() === type) || null;
+  }
+
+  function assignmentForType(questionType) {
+    const type = cleanText(questionType).toLowerCase();
+    return getAssignments().find((row) => cleanText(row.questionType).toLowerCase() === type) || null;
+  }
+
+  function renderQuestionTypes() {
+    const previous = cleanText(els.questionType?.value).toLowerCase();
+    const rows = getScorers();
+    els.questionType.innerHTML = '<option value="">-- Select scorer --</option>' + rows.map((row) => {
+      const value = cleanText(row.questionType).toLowerCase();
+      const selected = value === previous ? ' selected' : '';
+      return '<option value="' + esc(value) + '"' + selected + '>' + esc(row.label || value) + '</option>';
+    }).join('');
+    if (previous && !rows.some((row) => cleanText(row.questionType).toLowerCase() === previous)) {
+      els.questionType.value = '';
+    }
+  }
+
+  function renderProviders() {
+    const previous = cleanText(els.provider?.value);
+    const rows = getSelectableProviders();
+    els.provider.innerHTML = '<option value="">-- Select provider key --</option>' + rows.map((row) => {
+      const value = cleanText(row.id);
+      const selected = value === previous ? ' selected' : '';
+      return '<option value="' + esc(value) + '"' + selected + '>' + esc(providerOptionLabel(row)) + '</option>';
+    }).join('');
+    if (previous && !rows.some((row) => cleanText(row.id) === previous)) {
+      els.provider.value = '';
+    }
+    if (!rows.length) {
+      els.providerMeta.textContent = 'No active provider keys with usable API keys are available in this organization.';
+    } else {
+      els.providerMeta.textContent = 'Only active provider keys in this organization are selectable.';
+    }
+  }
+
+  function renderRecommendation() {
+    const scorer = selectedScorer();
+    els.recommendation.textContent = scorer?.recommendation || 'Choose a scorer to see model guidance.';
+  }
+
+  function syncFormFromSelection() {
+    const scorer = selectedScorer();
+    renderRecommendation();
+    if (!scorer) {
+      els.provider.value = '';
+      els.active.checked = true;
+      els.notes.value = '';
+      return;
+    }
+    const assignment = assignmentForType(scorer.questionType);
+    els.provider.value = cleanText(assignment?.providerRecordId || '');
+    els.active.checked = assignment ? assignment.isActive !== false : true;
+    els.notes.value = cleanText(assignment?.notes || '');
+  }
+
+  function renderAssignments() {
+    const assignments = getAssignments();
+    els.orgBadge.textContent = state.data?.orgId ? 'Org ' + state.data.orgId : 'Org';
+    if (!assignments.length) {
+      els.assignmentsBody.innerHTML = '<tr><td colspan="6" class="text-muted">No scoring provider assignments yet.</td></tr>';
+      return;
+    }
+    els.assignmentsBody.innerHTML = assignments.map((row) => {
+      const scorer = row.scorer || {};
+      const provider = row.provider || {};
+      const providerName = cleanText(provider.name || row.providerRecordId) || '-';
+      const providerType = cleanText(provider.providerLabel || provider.providerId);
+      const model = cleanText(provider.modelId) || '-';
+      const statusBadge = row.isActive === false
+        ? '<span class="badge bg-secondary">Inactive</span>'
+        : '<span class="badge bg-success">Active</span>';
+      const defaultBadge = provider?.isDefault ? '<span class="badge bg-primary ms-1">Default</span>' : '';
+      const providerStatus = provider?.isActive === false ? '<span class="badge bg-warning text-dark ms-1">Provider inactive</span>' : '';
+      const noKey = provider && provider.hasApiKey === false ? '<span class="badge bg-danger ms-1">No key</span>' : '';
+      return '<tr>'
+        + '<td><div class="fw-semibold">' + esc(scorer.label || row.questionType) + '</div><div class="small text-muted">' + esc(row.questionType) + '</div></td>'
+        + '<td><div>' + esc(providerName) + '</div><div class="small text-muted">' + esc(providerType || '-') + defaultBadge + providerStatus + noKey + '</div></td>'
+        + '<td>' + esc(model) + '</td>'
+        + '<td>' + statusBadge + '</td>'
+        + '<td>' + esc(formatDateTime(row.updatedAt || row.audit?.lastUpdateDateTime)) + '</td>'
+        + '<td class="table-actions text-end pe-4">'
+        + '<div class="row-actions-wrap">'
+        + '<button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="' + esc(row.id) + '" title="Row actions">'
+        + '<i class="bi bi-three-dots-vertical"></i>'
+        + '</button>'
+        + '<div class="row-actions-menu d-none" data-row-actions-id="' + esc(row.id) + '">'
+        + '<button type="button" class="btn btn-outline-primary btn-sm" data-edit-setting="' + esc(row.questionType) + '">'
+        + '<i class="bi bi-pencil-square me-2"></i>Edit'
+        + '</button>'
+        + '<button type="button" class="btn btn-outline-danger btn-sm" data-delete-setting="' + esc(row.id) + '">'
+        + '<i class="bi bi-trash me-2"></i>Delete'
+        + '</button>'
+        + '</div>'
+        + '</div>'
+        + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  function renderAll() {
+    renderQuestionTypes();
+    renderProviders();
+    syncFormFromSelection();
+    renderAssignments();
+  }
+
+  async function loadSettings() {
+    try {
+      const response = await fetch('/pte/ai-assisst/scoring-settings/api', {
+        headers: { 'x-ajax-request': 'true' }
+      });
+      const json = await response.json();
+      if (!response.ok || json.status !== 'success') {
+        throw new Error(json.message || 'Unable to load PTE AI scoring settings.');
+      }
+      state.data = json.data || {};
+      renderAll();
+    } catch (error) {
+      await showModal('Load Failed', error.message || 'Unable to load PTE AI scoring settings.', 'error');
+    }
+  }
+
+  async function saveSetting() {
+    const questionType = cleanText(els.questionType?.value).toLowerCase();
+    const providerRecordId = cleanText(els.provider?.value);
+    if (!questionType) {
+      await showModal('Scorer Required', 'Please choose a scorer/question type.', 'error');
+      return;
+    }
+    if (!providerRecordId) {
+      await showModal('Provider Required', 'Please choose an active provider key.', 'error');
+      return;
+    }
+
+    const original = els.saveBtn.innerHTML;
+    els.saveBtn.disabled = true;
+    els.saveBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Saving...';
+    try {
+      const body = new URLSearchParams();
+      body.set('questionType', questionType);
+      body.set('providerRecordId', providerRecordId);
+      body.set('isActive', els.active.checked ? 'true' : 'false');
+      body.set('notes', cleanText(els.notes?.value));
+
+      const response = await fetch('/pte/ai-assisst/scoring-settings/api', {
+        method: 'POST',
+        headers: {
+          'x-ajax-request': 'true',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        },
+        body: body.toString()
+      });
+      const json = await response.json();
+      if (!response.ok || json.status !== 'success') {
+        throw new Error(json.message || 'Unable to save PTE AI scoring setting.');
+      }
+      await showModal('Setting Saved', json.message || 'PTE AI scoring setting saved.', 'success');
+      await loadSettings();
+      els.questionType.value = questionType;
+      syncFormFromSelection();
+    } catch (error) {
+      await showModal('Save Failed', error.message || 'Unable to save PTE AI scoring setting.', 'error');
+    } finally {
+      els.saveBtn.disabled = false;
+      els.saveBtn.innerHTML = original;
+    }
+  }
+
+  async function deleteSetting(id) {
+    const settingId = cleanText(id);
+    if (!settingId) return;
+    let confirmed = true;
+    if (typeof window.showMessageModal === 'function') {
+      const result = await window.showMessageModal({
+        title: 'Delete Setting',
+        icon: 'warning',
+        message: 'Delete this PTE AI scoring provider assignment?',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Delete', class: 'btn-warning' }
+        ]
+      });
+      confirmed = result === 'Delete';
+    } else {
+      confirmed = confirm('Delete this PTE AI scoring provider assignment?');
+    }
+    if (!confirmed) return;
+
+    try {
+      const body = new URLSearchParams();
+      const response = await fetch('/pte/ai-assisst/scoring-settings/api/delete/' + encodeURIComponent(settingId), {
+        method: 'POST',
+        headers: {
+          'x-ajax-request': 'true',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        },
+        body: body.toString()
+      });
+      const json = await response.json();
+      if (!response.ok || json.status !== 'success') {
+        throw new Error(json.message || 'Unable to delete PTE AI scoring setting.');
+      }
+      await loadSettings();
+    } catch (error) {
+      await showModal('Delete Failed', error.message || 'Unable to delete PTE AI scoring setting.', 'error');
+    }
+  }
+
+  els.questionType?.addEventListener('change', syncFormFromSelection);
+  els.saveBtn?.addEventListener('click', saveSetting);
+  els.reloadBtn?.addEventListener('click', loadSettings);
+  els.clearBtn?.addEventListener('click', () => {
+    els.questionType.value = '';
+    syncFormFromSelection();
+  });
+
+  document.addEventListener('click', (event) => {
+    const editButton = event.target?.closest?.('[data-edit-setting]');
+    if (editButton) {
+      const editType = editButton.getAttribute('data-edit-setting');
+      const knownType = getScorers().some((row) => cleanText(row.questionType).toLowerCase() === cleanText(editType).toLowerCase());
+      if (!knownType) return;
+      els.questionType.value = cleanText(editType).toLowerCase();
+      syncFormFromSelection();
+      els.questionType.focus();
+      return;
+    }
+    const deleteButton = event.target?.closest?.('[data-delete-setting]');
+    const deleteId = deleteButton?.getAttribute?.('data-delete-setting');
+    const knownAssignment = getAssignments().some((row) => cleanText(row.id) === cleanText(deleteId));
+    if (deleteId && knownAssignment) deleteSetting(deleteId);
+  });
+
+  renderAll();
+})();
+</script>

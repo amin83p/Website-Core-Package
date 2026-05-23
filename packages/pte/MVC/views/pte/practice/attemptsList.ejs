@@ -1,0 +1,500 @@
+<%
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const rows = Array.isArray(attempts) ? attempts : [];
+  const statuses = Array.isArray(filterOptions?.statuses) ? filterOptions.statuses : [];
+  const skills = Array.isArray(filterOptions?.skills) ? filterOptions.skills : [];
+  const feedbackStates = Array.isArray(filterOptions?.feedbackStates) ? filterOptions.feedbackStates : [];
+  const studentRows = Array.isArray(filterOptions?.students) ? filterOptions.students : [];
+  const selectedStatus = String(stateFilters.status || '').trim().toLowerCase();
+  const selectedSkill = String(stateFilters.skill || '').trim().toLowerCase();
+  const selectedFeedbackState = String(stateFilters.feedbackState || '').trim().toLowerCase();
+  const selectedUserId = String(stateFilters.userId || '').trim();
+  const selectedStudentRow = studentRows.find((row) => String(row?.value || '').trim() === selectedUserId) || null;
+  const selectedStudentLabel = String(selectedStudentRow?.label || '').trim();
+  const actionStateToken = (typeof actionStateId === 'string' ? actionStateId : '').trim();
+  const canDeletePracticeAttempt = Boolean(canDeleteAttempt === true);
+  const totalMatchedRows = Number(pagination?.totalItems ?? rows.length);
+  const attemptsSearchableFields = (typeof searchableFields !== 'undefined' && Array.isArray(searchableFields) && searchableFields.length)
+    ? searchableFields
+    : ['id', 'practiceName', 'status', 'practiceSkill', 'questionTitle', 'feedbackState', 'userId'];
+  const hasPracticeAttemptFiltersApplied = Boolean(
+    String(stateFilters.status || '').trim()
+    || String(stateFilters.skill || '').trim()
+    || String(stateFilters.feedbackState || '').trim()
+    || String(stateFilters.startedFrom || '').trim()
+    || String(stateFilters.startedTo || '').trim()
+    || String(stateFilters.userId || '').trim()
+  );
+%>
+
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl: 'pte/practice/attempts',
+  newLabel: null,
+  user,
+  tableName,
+  manageBtns: [
+    '<a href="' + dashboardHref + '" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> PTE Dashboard</a>',
+    '<a href="/pte/practice/by-skills" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-arrow-left me-1"></i> Back to Practice</a>'
+  ]
+}) %>
+
+<div class="small text-muted mb-3">Unread feedback attempts are pinned on top and highlighted.</div>
+
+<style>
+  .pte-attempt-row {
+    cursor: pointer;
+  }
+  .pte-attempt-row:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: -2px;
+  }
+</style>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter My Practice Attempts</div>
+    <button
+      id="ptePracticeAttemptFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#ptePracticeAttemptFilterCollapse"
+      aria-expanded="<%= hasPracticeAttemptFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="ptePracticeAttemptFilterCollapse"
+      aria-label="<%= hasPracticeAttemptFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="ptePracticeAttemptFilterToggleIcon" class="bi <%= hasPracticeAttemptFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasPracticeAttemptFiltersApplied ? ' show' : '' %>" id="ptePracticeAttemptFilterCollapse">
+    <form method="GET" action="/pte/practice/attempts" class="card-body p-3">
+      <% if (stateFilters?.q) { %><input type="hidden" name="q" value="<%= stateFilters.q %>"><% } %>
+      <% if (stateFilters?.type) { %><input type="hidden" name="type" value="<%= stateFilters.type %>"><% } %>
+      <% if (stateFilters?.searchFields) { %><input type="hidden" name="searchFields" value="<%= stateFilters.searchFields %>"><% } %>
+
+      <% if (canSelectStudent) { %>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Student</label>
+            <input type="hidden" name="userId" id="practiceStudentId" value="<%= selectedUserId || '' %>">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                id="practiceStudentLabel"
+                class="form-control size-md"
+                value="<%= selectedStudentLabel || '' %>"
+                placeholder="All Students"
+                readonly>
+              <button type="button" class="btn btn-outline-primary btn-md flex-shrink-0" id="btnPickPracticeStudent">
+                <i class="bi bi-search me-1"></i> Select
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-md flex-shrink-0" id="btnClearPracticeStudent">Clear</button>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="row g-3 mt-1">
+        <div class="col-md-4">
+          <label class="form-label">Status</label>
+          <select class="form-select size-md" name="status">
+            <option value="">All Statuses</option>
+            <% statuses.forEach((row) => { %>
+              <% const value = String(row?.value || row || '').trim().toLowerCase(); %>
+              <% const label = String(row?.label || value || '').trim(); %>
+              <option value="<%= value %>" <%= value === selectedStatus ? 'selected' : '' %>><%= label || value %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Skill</label>
+          <select class="form-select size-md" name="skill">
+            <option value="">All Skills</option>
+            <% skills.forEach((row) => { %>
+              <% const value = String(row?.value || row || '').trim().toLowerCase(); %>
+              <% const label = String(row?.label || value || '').trim(); %>
+              <option value="<%= value %>" <%= value === selectedSkill ? 'selected' : '' %>><%= label || value %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Feedback</label>
+          <select class="form-select size-md" name="feedbackState">
+            <% feedbackStates.forEach((row) => { %>
+              <% const value = String(row?.value || '').trim().toLowerCase(); %>
+              <% const label = String(row?.label || value || '').trim(); %>
+              <option value="<%= value %>" <%= value === selectedFeedbackState ? 'selected' : '' %>><%= label || value %></option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1 align-items-end">
+        <div class="col-md-6 col-xl-3">
+          <label class="form-label">Started From</label>
+          <input type="date" class="form-control size-md" name="startedFrom" value="<%= stateFilters?.startedFrom || '' %>">
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <label class="form-label">Started To</label>
+          <input type="date" class="form-control size-md" name="startedTo" value="<%= stateFilters?.startedTo || '' %>">
+        </div>
+        <div class="col-xl-6 d-flex justify-content-xl-end gap-2 pt-xl-4">
+          <a href="/pte/practice/attempts" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="small text-muted">
+      Matched rows: <span class="fw-bold text-dark"><%= totalMatchedRows.toLocaleString() %></span>
+    </div>
+    <div class="small text-muted">
+      Showing page: <span class="fw-bold text-dark"><%= Number(pagination?.currentPage || 1) %> / <%= Number(pagination?.totalPages || 1) %></span>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search attempts by session id, practice name, status, skill, feedback state, or question title...',
+  fields: attemptsSearchableFields
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="sortable draggable dragable ps-4" data-column="session">Session <span class="sort-icon"></span></th>
+        <th class="sortable draggable dragable" data-column="statusSkill">Status / Skill <span class="sort-icon"></span></th>
+        <th class="sortable draggable dragable" data-column="progress">Progress <span class="sort-icon"></span></th>
+        <th class="sortable draggable dragable" data-column="score">Score <span class="sort-icon"></span></th>
+        <th class="sortable draggable dragable" data-column="feedback">Feedback <span class="sort-icon"></span></th>
+        <th class="sortable draggable dragable" data-column="started">Started <span class="sort-icon"></span></th>
+        <th class="sortable draggable dragable text-end pe-4" data-column="action">Action <span class="sort-icon"></span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!rows.length) { %>
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">No practice attempts found.</td>
+        </tr>
+      <% } %>
+      <% rows.forEach((row) => { %>
+        <% const status = String(row.status || '').toLowerCase(); %>
+        <% const statusClass = status === 'finished' ? 'bg-success' : (status === 'in_progress' ? 'bg-primary' : (status === 'submitted' ? 'bg-info text-dark' : 'bg-secondary')); %>
+        <% const openUrl = `/pte/practice/session/${encodeURIComponent(row.id)}`; %>
+        <% const feedbackUrl = `/pte/practice/attempts/${encodeURIComponent(row.id)}/feedback`; %>
+        <% const detailsUrl = `/pte/practice/attempts/${encodeURIComponent(row.id)}/details`; %>
+        <tr
+          class="pte-attempt-row <%= row.unreadFeedback ? 'table-warning' : '' %>"
+          data-open-url="<%= openUrl %>"
+          tabindex="0"
+          title="Open session">
+          <td class="ps-4">
+            <% if (row.practiceName) { %>
+              <div class="small fw-bold text-dark">
+                <a href="<%= openUrl %>"><%= row.practiceName %></a>
+              </div>
+            <% } %>
+            <div class="x-small text-muted font-monospace mt-1"><%= row.id || '-' %></div>
+            <% if (row.unreadFeedback) { %>
+              <div class="small mt-1">
+                <span class="badge bg-warning text-dark"><i class="bi bi-bell-fill me-1"></i>New Feedback</span>
+              </div>
+            <% } %>
+          </td>
+          <td>
+            <div class="x-small mb-1">
+              <span class="badge <%= statusClass %> text-capitalize"><%= row.status || '-' %></span>
+            </div>
+            <div class="small text-capitalize"><%= row.practiceSkill || '-' %></div>
+          </td>
+          <td>
+            <div class="small"><strong><%= Number(row.submittedQuestions || 0) %></strong> / <%= Number(row.totalQuestions || 0) %></div>
+          </td>
+          <td>
+            <div class="small fw-bold"><%= Number(row.percentage || 0).toFixed(2) %>%</div>
+            <div class="x-small text-muted">Avg Time: <%= Number(row.averageTimePerQuestionSeconds || 0).toFixed(2) %> sec</div>
+          </td>
+          <td>
+            <div class="small"><%= Number(row.feedbackCount || 0) %> question(s)</div>
+            <div class="x-small text-muted">Latest: <%= row.latestFeedbackAtDisplay || '-' %></div>
+          </td>
+          <td class="small"><%= row.startedAtDisplay || '-' %></td>
+          <td class="table-actions text-end pe-4" data-row-action-cell="1">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Session Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <a href="<%= openUrl %>" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-play-circle me-2"></i>Open
+                </a>
+                <a href="<%= feedbackUrl %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-chat-left-text me-2"></i>Feedback
+                </a>
+                <a href="<%= detailsUrl %>" class="btn btn-outline-info btn-sm">
+                  <i class="bi bi-clipboard-data me-2"></i>Details
+                </a>
+                <% if (canDeletePracticeAttempt) { %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger btn-sm pte-delete-attempt-btn"
+                    data-delete-url="/pte/practice/attempts/<%= encodeURIComponent(row.id) %>/delete"
+                    data-session-id="<%= row.id %>">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </button>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: '/pte/practice/attempts'
+}) %>
+
+<%- include('../../partials/tablePages-end') %>
+
+<%- include('../../partials/modal_GenericPicker', { user }) %>
+
+<script>
+(() => {
+  const canSelectStudent = <%- canSelectStudent ? 'true' : 'false' %>;
+  const studentIdInput = document.getElementById('practiceStudentId');
+  const studentLabelInput = document.getElementById('practiceStudentLabel');
+  const pickStudentBtn = document.getElementById('btnPickPracticeStudent');
+  const clearStudentBtn = document.getElementById('btnClearPracticeStudent');
+  const rowNodes = Array.from(document.querySelectorAll('tr[data-open-url]'));
+  const deleteButtons = Array.from(document.querySelectorAll('.pte-delete-attempt-btn'));
+  const attemptsTableBody = document.querySelector('#first-table tbody');
+  const actionStateId = <%- JSON.stringify(actionStateToken || '').replace(/</g, '\\u003c') %>;
+
+  function initCollapseToggleIcon(options = {}) {
+    const collapseEl = document.getElementById(String(options.collapseId || ''));
+    const buttonEl = document.getElementById(String(options.buttonId || ''));
+    const iconEl = document.getElementById(String(options.iconId || ''));
+    if (!collapseEl || !buttonEl || !iconEl) return;
+
+    const openIcon = String(options.openIcon || 'bi-chevron-down');
+    const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+    const openLabel = String(options.openLabel || 'Open filters');
+    const closeLabel = String(options.closeLabel || 'Close filters');
+
+    const setState = (expanded) => {
+      iconEl.classList.remove(openIcon, closeIcon);
+      iconEl.classList.add(expanded ? closeIcon : openIcon);
+      buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+    };
+
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+    collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+  }
+
+  initCollapseToggleIcon({
+    collapseId: 'ptePracticeAttemptFilterCollapse',
+    buttonId: 'ptePracticeAttemptFilterToggleBtn',
+    iconId: 'ptePracticeAttemptFilterToggleIcon',
+    openIcon: 'bi-chevron-down',
+    closeIcon: 'bi-chevron-up',
+    openLabel: 'Open filters',
+    closeLabel: 'Close filters'
+  });
+
+  function setSelectedStudent(item) {
+    if (!studentIdInput || !studentLabelInput) return;
+    const id = String(item?.id || '').trim();
+    const label = String(
+      item?.name
+      || item?.username
+      || item?.email
+      || id
+      || ''
+    ).trim();
+    studentIdInput.value = id;
+    studentLabelInput.value = label;
+  }
+
+  async function showMessage(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+    }
+    window.alert(`${title}: ${message}`);
+    return 'OK';
+  }
+
+  async function confirmDelete(sessionId = '') {
+    const target = String(sessionId || '').trim();
+    if (typeof window.showMessageModal === 'function') {
+      const response = await window.showMessageModal({
+        title: 'Delete Practice Attempt',
+        icon: 'warning',
+        message: `This will permanently delete practice attempt <b>${target}</b>, all related ledger records, and uploaded files.<br>This action cannot be undone.`,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: false },
+          { text: 'Delete', class: 'btn-danger', value: true }
+        ]
+      });
+      return response === true || response === 'Delete';
+    }
+    return window.confirm(`Delete practice attempt ${target}? This cannot be undone.`);
+  }
+
+  function ensureEmptyAttemptsState() {
+    if (!attemptsTableBody) return;
+    const dataRows = Array.from(attemptsTableBody.querySelectorAll('tr[data-open-url]'));
+    const existingEmptyRow = attemptsTableBody.querySelector('tr[data-empty-attempts-row]');
+
+    if (dataRows.length > 0) {
+      if (existingEmptyRow) existingEmptyRow.remove();
+      return;
+    }
+
+    if (existingEmptyRow) return;
+    const row = document.createElement('tr');
+    row.setAttribute('data-empty-attempts-row', '1');
+    row.innerHTML = '<td colspan="7" class="text-center py-4 text-muted">No practice attempts found.</td>';
+    attemptsTableBody.appendChild(row);
+  }
+
+  function removeAttemptRow(sessionId = '', button = null) {
+    const targetId = String(sessionId || '').trim();
+    if (!targetId) return;
+
+    const sourceButton = button || Array.from(document.querySelectorAll('.pte-delete-attempt-btn'))
+      .find((node) => String(node.getAttribute('data-session-id') || '').trim() === targetId);
+    const row = sourceButton?.closest('tr[data-open-url]') || null;
+    if (row && typeof row.remove === 'function') {
+      row.remove();
+      ensureEmptyAttemptsState();
+    }
+  }
+
+  rowNodes.forEach((row) => {
+    row.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!target) return;
+      if (target.closest('a, button, input, select, textarea, label, [data-row-action-cell], .row-actions-menu')) return;
+      const openUrl = String(row.getAttribute('data-open-url') || '').trim();
+      if (!openUrl) return;
+      window.location.href = openUrl;
+    });
+
+    row.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const openUrl = String(row.getAttribute('data-open-url') || '').trim();
+      if (!openUrl) return;
+      event.preventDefault();
+      window.location.href = openUrl;
+    });
+  });
+
+  deleteButtons.forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.preventDefault();
+
+      const sessionId = String(button.getAttribute('data-session-id') || '').trim();
+      const baseUrl = String(button.getAttribute('data-delete-url') || '').trim();
+      if (!baseUrl || !sessionId) return;
+
+      const allowed = await confirmDelete(sessionId);
+      if (!allowed) return;
+
+      const originalHtml = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Deleting...';
+
+      try {
+        const tokenResponse = await fetch(`/pte/practice/attempts/${encodeURIComponent(sessionId)}/delete/token`, {
+          method: 'POST',
+          headers: {
+            'X-AJAX-Request': 'true',
+            Accept: 'application/json'
+          },
+          credentials: 'include'
+        });
+        const tokenPayload = await tokenResponse.json().catch(() => null);
+        const runtimeActionStateId = String(tokenPayload?.results?.actionStateId || '').trim();
+        if (!tokenResponse.ok || !runtimeActionStateId) {
+          throw new Error(tokenPayload?.message || `Failed to prepare delete session (status ${tokenResponse.status}).`);
+        }
+
+        const separator = baseUrl.includes('?') ? '&' : '?';
+        const deleteActionStateId = runtimeActionStateId || actionStateId;
+        const requestUrl = deleteActionStateId
+          ? `${baseUrl}${separator}actionStateId=${encodeURIComponent(deleteActionStateId)}`
+          : baseUrl;
+        const response = await fetch(requestUrl, {
+          method: 'POST',
+          headers: {
+            'X-AJAX-Request': 'true',
+            Accept: 'application/json'
+          },
+          credentials: 'include'
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload || payload.status !== 'success') {
+          throw new Error(payload?.message || `Delete failed with status ${response.status}.`);
+        }
+
+        removeAttemptRow(sessionId, button);
+        await showMessage('Deleted', payload.message || 'Practice attempt deleted successfully.', 'success');
+      } catch (error) {
+        await showMessage('Delete Failed', error.message || 'Unexpected delete error.', 'error');
+        button.disabled = false;
+        button.innerHTML = originalHtml;
+      }
+    });
+  });
+
+  if (canSelectStudent) {
+    pickStudentBtn?.addEventListener('click', () => {
+      if (!window.GenericPicker || !window.GenericPickerPresets) return;
+      const contexts = window.GenericPickerContexts || {};
+      const context = (typeof contexts.activeOrganizationScope === 'function')
+        ? contexts.activeOrganizationScope({ label: 'Active Organization' })
+        : null;
+
+      window.GenericPicker.open(window.GenericPickerPresets.user({
+        title: 'Select Student',
+        apiEndpoint: '/pte/practice/picker/users',
+        placeholder: 'Search students by name, username, email, or id...',
+        context,
+        onSelect: (item) => setSelectedStudent(item || {})
+      }));
+    });
+
+    clearStudentBtn?.addEventListener('click', () => {
+      setSelectedStudent({});
+    });
+  }
+})();
+</script>

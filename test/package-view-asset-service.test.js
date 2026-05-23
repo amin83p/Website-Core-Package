@@ -128,7 +128,7 @@ test('metadata-only PTE assets are prepared but not mounted', async () => {
   assert.equal(viewSummary.prepared, 1);
   assert.equal(viewSummary.failed, 0);
   assert.equal(Array.isArray(app.get('views')), true);
-  assert.ok(app.get('views').some((viewRoot) => path.basename(viewRoot) === 'pte'));
+  assert.ok(app.get('views').some((viewRoot) => path.resolve(viewRoot) === path.resolve(__dirname, '../packages/pte/MVC/views')));
 
   assert.equal(assetSummary.packageId, 'pte');
   assert.equal(assetSummary.requested, 1);
@@ -137,4 +137,5 @@ test('metadata-only PTE assets are prepared but not mounted', async () => {
   assert.equal(assetSummary.failed, 0);
   assert.equal(app.calls.length, 0);
   assert.equal(assetSummary.results[0].metadataOnly, true);
+  assert.equal(path.resolve(assetSummary.results[0].root), path.resolve(__dirname, '../packages/pte/public/scripts'));
 });

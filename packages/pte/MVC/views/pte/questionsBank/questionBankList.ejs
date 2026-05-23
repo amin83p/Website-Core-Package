@@ -1,0 +1,914 @@
+<%
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const testTypeRows = Array.isArray(testTypeOptions) ? testTypeOptions : [];
+  const statusRows = Array.isArray(statusOptions) ? statusOptions : [];
+  const difficultyRows = Array.isArray(difficultyOptions) ? difficultyOptions : [];
+  const practiceStateRows = Array.isArray(practiceStateOptions) ? practiceStateOptions : [];
+  const questionTypeRows = Array.isArray(questionTypeOptions) ? questionTypeOptions : [];
+  const canUnpublish = Boolean(isSuperUser);
+  const activeTestType = String(stateFilters.testType || '').trim().toLowerCase();
+  const activeStatus = String(stateFilters.status || '').trim().toLowerCase();
+  const activeDifficulty = String(stateFilters.difficulty || '').trim().toLowerCase();
+  const activePracticeState = String(stateFilters.practiceEnabled || '').trim().toLowerCase();
+  const activeQuestionType = String(stateFilters.questionType || '').trim().toLowerCase();
+  const activeTranscriptArtifactSearch = String(stateFilters.transcriptArtifactSearch || '').trim();
+  const totalMatchedRows = Number(pagination?.totalItems ?? (Array.isArray(data) ? data.length : 0));
+  const formatQuestionTypeLabel = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+  const hasQuestionBankAdvancedFilters = Boolean(
+    String(stateFilters.questionType || '').trim()
+    || String(stateFilters.difficulty || '').trim()
+    || String(stateFilters.practiceEnabled || '').trim()
+    || String(stateFilters.transcriptArtifactSearch || '').trim()
+  );
+
+  const hasQuestionBankFiltersApplied = Boolean(
+    String(stateFilters.testType || '').trim()
+    || String(stateFilters.status || '').trim()
+    || hasQuestionBankAdvancedFilters
+  );
+%>
+
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  manageBtns: [
+    '<a href="' + dashboardHref + '" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> PTE Dashboard</a>'
+  ]
+}) %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Questions</div>
+    <button
+      id="pteQbFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#pteQbFilterCollapse"
+      aria-expanded="<%= hasQuestionBankFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="pteQbFilterCollapse"
+      aria-label="<%= hasQuestionBankFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="pteQbFilterToggleIcon" class="bi <%= hasQuestionBankFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasQuestionBankFiltersApplied ? ' show' : '' %>" id="pteQbFilterCollapse">
+    <form method="GET" action="/pte/questions-bank" id="pteQbFilterForm" class="card-body p-3">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-6 col-xl-4">
+          <label class="form-label">Test Type</label>
+          <select class="form-select size-md" name="testType">
+            <option value="">All Test Types</option>
+            <% testTypeRows.forEach((row) => { %>
+              <% const token = String(row.value || '').trim().toLowerCase(); %>
+              <option value="<%= row.value %>" <%= token === activeTestType ? 'selected' : '' %>><%= row.label || row.value %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-6 col-xl-4">
+          <label class="form-label">Status</label>
+          <select class="form-select size-md" name="status">
+            <option value="">All Statuses</option>
+            <% statusRows.forEach((row) => { %>
+              <% const token = String(row.value || '').trim().toLowerCase(); %>
+              <option value="<%= row.value %>" <%= token === activeStatus ? 'selected' : '' %>><%= row.label || row.value %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-12 col-xl-4 d-flex justify-content-xl-end gap-2 pt-xl-4">
+          <a href="/pte/questions-bank" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+
+      <div class="border rounded-3 bg-light-subtle p-2 mt-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="small fw-bold text-uppercase text-muted">Advanced Filters</div>
+          <button
+            id="pteQbAdvancedToggleBtn"
+            type="button"
+            class="btn btn-outline-secondary btn-sm px-2"
+            data-bs-toggle="collapse"
+            data-bs-target="#pteQbAdvancedFilterCollapse"
+            aria-expanded="<%= hasQuestionBankAdvancedFilters ? 'true' : 'false' %>"
+            aria-controls="pteQbAdvancedFilterCollapse"
+            aria-label="<%= hasQuestionBankAdvancedFilters ? 'Close advanced filters' : 'Open advanced filters' %>">
+            <i id="pteQbAdvancedToggleIcon" class="bi <%= hasQuestionBankAdvancedFilters ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+          </button>
+        </div>
+        <div class="collapse mt-2<%= hasQuestionBankAdvancedFilters ? ' show' : '' %>" id="pteQbAdvancedFilterCollapse">
+          <div class="row g-3">
+            <div class="col-md-6 col-xl-4">
+              <label class="form-label">Question Type</label>
+              <select class="form-select size-md" name="questionType">
+                <option value="">All Question Types</option>
+                <% questionTypeRows.forEach((row) => { %>
+                  <% const token = String(row.key || row.value || '').trim().toLowerCase(); %>
+                  <option value="<%= row.key || row.value || '' %>" <%= token === activeQuestionType ? 'selected' : '' %>><%= row.label || row.name || row.key || row.value %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 col-xl-4">
+              <label class="form-label">Difficulty</label>
+              <select class="form-select size-md" name="difficulty">
+                <option value="">All Difficulties</option>
+                <% difficultyRows.forEach((row) => { %>
+                  <% const token = String(row.value || '').trim().toLowerCase(); %>
+                  <option value="<%= row.value %>" <%= token === activeDifficulty ? 'selected' : '' %>><%= row.label || row.value %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 col-xl-4">
+              <label class="form-label">Practice Mode</label>
+              <select class="form-select size-md" name="practiceEnabled">
+                <option value="">All</option>
+                <% practiceStateRows.forEach((row) => { %>
+                  <% const token = String(row.value || '').trim().toLowerCase(); %>
+                  <option value="<%= row.value %>" <%= token === activePracticeState ? 'selected' : '' %>><%= row.label || row.value %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-12 col-xl-8">
+              <label class="form-label">Transcript / Artifact Search</label>
+              <input
+                type="text"
+                class="form-control size-md"
+                name="transcriptArtifactSearch"
+                value="<%= activeTranscriptArtifactSearch %>"
+                placeholder="Search transcript fields or assigned media file names...">
+              <div class="form-text">Searches transcript-like payload fields and attached media names, filenames, IDs, paths, or URLs.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <% Object.keys(stateFilters || {}).forEach((key) => { %>
+        <% if (key === 'testType' || key === 'questionType' || key === 'status' || key === 'difficulty' || key === 'practiceEnabled' || key === 'transcriptArtifactSearch' || key === 'page') return; %>
+        <% const val = stateFilters[key]; %>
+        <% if (Array.isArray(val)) { %>
+          <% val.forEach((entry) => { %>
+            <% if (String(entry || '').trim()) { %>
+              <input type="hidden" name="<%= key %>" value="<%= entry %>">
+            <% } %>
+          <% }) %>
+        <% } else if (String(val || '').trim()) { %>
+          <input type="hidden" name="<%= key %>" value="<%= val %>">
+        <% } %>
+      <% }) %>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="small text-muted">
+      Matched rows: <span class="fw-bold text-dark"><%= totalMatchedRows.toLocaleString() %></span>
+    </div>
+    <div class="small text-muted">
+      Showing page: <span class="fw-bold text-dark"><%= Number(pagination?.currentPage || 1) %> / <%= Number(pagination?.totalPages || 1) %></span>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search questions by title, code, family, type, status, or tags...',
+  fields: searchableFields || []
+}) %>
+
+<div id="qbBulkToolbar" class="alert alert-info d-flex justify-content-between align-items-center mb-3 d-none">
+  <div>
+    <i class="bi bi-check-square-fill me-2"></i>
+    <span class="fw-bold" id="qbBulkSelectedCount">0</span> question(s) selected
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <button id="qbBulkPublishBtn" type="button" class="btn btn-success btn-sm fw-bold">
+      <i class="bi bi-upload me-1"></i>Publish Selected
+    </button>
+    <% if (canUnpublish) { %>
+      <button id="qbBulkUnpublishBtn" type="button" class="btn btn-danger btn-sm fw-bold">
+        <i class="bi bi-arrow-down-circle me-1"></i>Unpublish Selected
+      </button>
+    <% } %>
+  </div>
+</div>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th id="qbSelectAllHeader" style="width: 92px;" class="text-center ps-4" data-column="select" title="Select all / Deselect all" role="button" tabindex="0">
+          <label class="d-flex align-items-center justify-content-center gap-1 mb-0" for="selectAll" style="cursor:pointer;">
+            <input type="checkbox" class="form-check-input" id="selectAll">
+            <span class="small text-muted">Select</span>
+          </label>
+        </th>
+        <th class="draggable dragable" data-column="question">Question <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="testType">Test Type <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="type">Type <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="familyRevision">Family / Revision <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="difficultyTags">Difficulty / Tags <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="validationUsage">Validation / Usage <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="creator">Creator <span class="sort-icon"></span></th>
+        <th class="text-end pe-4" data-column="actions">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr>
+          <td colspan="10" class="text-center py-4 text-muted">No question versions found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const summary = item.summary || {}; %>
+        <% const creator = item.creator || {}; %>
+        <% const validation = item.validation || {}; %>
+        <% const status = String(item.status || 'draft').toLowerCase(); %>
+        <% const statusClass = status === 'published' ? 'bg-success' : (status === 'retired' ? 'bg-warning text-dark' : (status === 'archived' ? 'bg-secondary' : 'bg-info text-dark')); %>
+        <% const tags = Array.isArray(item.tags) ? item.tags : []; %>
+        <tr data-question-id="<%= item.id %>">
+          <td class="text-center ps-4">
+            <input type="checkbox" class="form-check-input qb-row-select session-checkbox" value="<%= item.id %>" data-status="<%= status %>" aria-label="Select question <%= item.code || item.id %>">
+          </td>
+          <td>
+            <div class="fw-bold text-dark"><%= item.title || '-' %></div>
+            <div class="x-small text-muted">Code: <span class="font-monospace"><%= item.code || '-' %></span></div>
+            <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
+          </td>
+          <td>
+            <% const testType = String(item.testType || '').toLowerCase(); %>
+            <span class="badge <%= testType === 'core' ? 'bg-info text-dark' : (testType === 'academic' ? 'bg-primary' : 'bg-light text-dark border') %>">
+              <%= testType === 'core' ? 'PTE Core' : (testType === 'academic' ? 'PTE Academic' : '-') %>
+            </span>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark text-capitalize"><%= item.skill || '-' %></div>
+            <div class="x-small text-muted"><%= formatQuestionTypeLabel(item.questionType) || '-' %></div>
+          </td>
+          <td>
+            <div class="small font-monospace text-dark"><%= item.familyId || '-' %></div>
+            <div class="x-small text-muted">Revision <%= Number(item.revisionNumber || 0) %></div>
+            <div class="x-small mt-1">
+              <span class="badge <%= item.isLatestRevision ? 'bg-primary' : 'bg-light text-dark border' %>"><%= item.isLatestRevision ? 'Latest' : 'Older' %></span>
+            </div>
+          </td>
+          <td data-qb-col="status">
+            <span class="badge qb-status-badge <%= statusClass %> text-capitalize" data-status="<%= status %>"><%= status %></span>
+          </td>
+          <td>
+            <div class="small text-capitalize"><%= item.difficulty || 'medium' %></div>
+            <div class="x-small mt-1">
+              <span class="badge <%= item.practiceEnabled === false ? 'bg-light text-dark border' : 'bg-success' %>">
+                <%= item.practiceEnabled === false ? 'Practice Off' : 'Practice On' %>
+              </span>
+            </div>
+            <div class="x-small text-muted">
+              <% if (!tags.length) { %>
+                -
+              <% } else { %>
+                <%= tags.slice(0, 3).join(', ') %><%= tags.length > 3 ? ', ...' : '' %>
+              <% } %>
+            </div>
+          </td>
+          <td>
+            <div class="small <%= validation.isValid ? 'text-success' : 'text-danger' %>">
+              <%= validation.isValid ? 'Valid' : 'Has Validation Errors' %>
+            </div>
+            <div class="x-small text-muted">
+              Errors: <%= Number(summary.validationErrors || 0) %>
+            </div>
+            <div class="x-small text-muted">
+              Tests: <%= Number(summary.testsCount || 0) %> |
+              Attempts: <%= Number(summary.attemptsCount || 0) %>
+            </div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= creator.displayName || (creator.type === 'system' ? 'System' : '-') %></div>
+            <div class="x-small text-muted font-monospace"><%= creator.userId || 'System' %></div>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/pte/questions-bank/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <a href="/pte/questions-bank/preview/exam/<%= item.id %>" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-eye me-2"></i>Preview
+                </a>
+                <% if (status === 'draft') { %>
+                  <button class="btn btn-outline-success btn-sm pte-qb-action-btn" data-method="POST" data-action="publish" data-id="<%= item.id %>" data-url="/pte/questions-bank/publish/<%= item.id %>">
+                    <i class="bi bi-upload me-2"></i>Publish
+                  </button>
+                <% } %>
+                <% if (status === 'published' || status === 'retired' || status === 'archived') { %>
+                  <button class="btn btn-outline-info btn-sm pte-qb-action-btn" data-method="POST" data-action="revise" data-id="<%= item.id %>" data-url="/pte/questions-bank/revise/<%= item.id %>">
+                    <i class="bi bi-arrow-repeat me-2"></i>Revise
+                  </button>
+                <% } %>
+                <% if (status === 'published') { %>
+                  <button class="btn btn-outline-warning btn-sm pte-qb-action-btn" data-method="POST" data-action="retire" data-id="<%= item.id %>" data-url="/pte/questions-bank/retire/<%= item.id %>">
+                    <i class="bi bi-pause-circle me-2"></i>Retire
+                  </button>
+                  <% if (canUnpublish) { %>
+                    <button class="btn btn-outline-danger btn-sm pte-qb-action-btn" data-method="POST" data-action="unpublish" data-id="<%= item.id %>" data-url="/pte/questions-bank/unpublish/<%= item.id %>">
+                      <i class="bi bi-arrow-down-circle me-2"></i>Unpublish
+                    </button>
+                  <% } %>
+                <% } %>
+                <% if (status !== 'archived') { %>
+                  <button class="btn btn-outline-secondary btn-sm pte-qb-action-btn" data-method="POST" data-action="archive" data-id="<%= item.id %>" data-url="/pte/questions-bank/archive/<%= item.id %>">
+                    <i class="bi bi-archive me-2"></i>Archive
+                  </button>
+                <% } %>
+                <button class="btn btn-outline-dark btn-sm pte-qb-action-btn" data-method="POST" data-action="duplicate" data-id="<%= item.id %>" data-url="/pte/questions-bank/duplicate-family/<%= item.id %>" title="Create a draft copy from this question">
+                  <i class="bi bi-files me-2"></i>Create Copy
+                </button>
+                <% if (status === 'draft') { %>
+                  <button class="btn btn-outline-danger btn-sm pte-qb-action-btn" data-method="DELETE" data-action="delete" data-id="<%= item.id %>" data-url="/pte/questions-bank/delete/<%= item.id %>">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </button>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('../../partials/tablePages-end') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const canUnpublish = <%= canUnpublish ? 'true' : 'false' %>;
+  const selectAllNode = document.getElementById('selectAll') || document.getElementById('qbSelectAll');
+  const selectAllHeader = document.getElementById('qbSelectAllHeader');
+  const rowCheckboxes = Array.from(document.querySelectorAll('.qb-row-select'));
+  const bulkToolbar = document.getElementById('qbBulkToolbar');
+  const bulkSelectedCount = document.getElementById('qbBulkSelectedCount');
+  const bulkPublishBtn = document.getElementById('qbBulkPublishBtn');
+  const bulkUnpublishBtn = document.getElementById('qbBulkUnpublishBtn');
+
+  function initCollapseToggleIcon(options = {}) {
+    const collapseEl = document.getElementById(String(options.collapseId || ''));
+    const buttonEl = document.getElementById(String(options.buttonId || ''));
+    const iconEl = document.getElementById(String(options.iconId || ''));
+    if (!collapseEl || !buttonEl || !iconEl) return;
+
+    const openIcon = String(options.openIcon || 'bi-chevron-down');
+    const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+    const openLabel = String(options.openLabel || 'Open filters');
+    const closeLabel = String(options.closeLabel || 'Close filters');
+
+    const setState = (expanded) => {
+      iconEl.classList.remove(openIcon, closeIcon);
+      iconEl.classList.add(expanded ? closeIcon : openIcon);
+      buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+    };
+
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+    collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+  }
+
+  initCollapseToggleIcon({
+    collapseId: 'pteQbFilterCollapse',
+    buttonId: 'pteQbFilterToggleBtn',
+    iconId: 'pteQbFilterToggleIcon',
+    openIcon: 'bi-chevron-down',
+    closeIcon: 'bi-chevron-up',
+    openLabel: 'Open filters',
+    closeLabel: 'Close filters'
+  });
+
+  initCollapseToggleIcon({
+    collapseId: 'pteQbAdvancedFilterCollapse',
+    buttonId: 'pteQbAdvancedToggleBtn',
+    iconId: 'pteQbAdvancedToggleIcon',
+    openIcon: 'bi-chevron-down',
+    closeIcon: 'bi-chevron-up',
+    openLabel: 'Open advanced filters',
+    closeLabel: 'Close advanced filters'
+  });
+
+  async function showMessage(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+      return;
+    }
+    console.warn('[PTE Questions Bank] message modal is unavailable:', title, message);
+  }
+
+  async function showConfirm(title, message, confirmText = 'Confirm', confirmClass = 'btn-danger') {
+    if (typeof window.showMessageModal === 'function') {
+      const decision = await window.showMessageModal({
+        title,
+        message,
+        icon: 'warning',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: confirmText, class: confirmClass }
+        ]
+      });
+      return String(decision || '').trim().toLowerCase() === String(confirmText || '').trim().toLowerCase();
+    }
+    return false;
+  }
+
+  function toActionLabel(action) {
+    const token = String(action || '').trim().toLowerCase();
+    if (!token) return 'Operation';
+    return token.charAt(0).toUpperCase() + token.slice(1);
+  }
+
+  function resolveMutationTokenOperation(action, method = 'POST') {
+    const actionToken = String(action || '').trim().toLowerCase();
+    const methodToken = String(method || '').trim().toUpperCase();
+    if (actionToken === 'duplicate') return 'create';
+    if (actionToken === 'delete' || methodToken === 'DELETE') return 'delete';
+    return 'update';
+  }
+
+  async function issueMutationActionState({ action, id = '', method = 'POST', bulk = false } = {}) {
+    const operation = resolveMutationTokenOperation(action, method);
+    const targetId = String(id || '').trim();
+    const endpoint = bulk
+      ? '/pte/questions-bank/bulk/mutation-token/' + encodeURIComponent(operation)
+      : '/pte/questions-bank/mutation-token/' + encodeURIComponent(operation) + '/' + encodeURIComponent(targetId);
+
+    if (!bulk && !targetId) {
+      throw new Error('Question id is required before this action can be verified.');
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'X-AJAX-Request': 'true',
+        'Accept': 'application/json',
+        'X-Action-State-Id': ''
+      },
+      credentials: 'include'
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.status !== 'success') {
+      throw new Error((result && result.message) || 'Unable to verify this action. Please refresh and try again.');
+    }
+    const token = String(result?.results?.actionStateId || '').trim();
+    if (!token) throw new Error('Unable to verify this action. Please refresh and try again.');
+    return token;
+  }
+
+  function setButtonBusy(button, isBusy, busyLabel = 'Working...') {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) {
+      button.dataset.defaultHtml = button.innerHTML;
+    }
+    if (isBusy) {
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + String(busyLabel || 'Working...');
+      return;
+    }
+    button.disabled = false;
+    button.innerHTML = button.dataset.defaultHtml || button.innerHTML;
+  }
+
+  function getSelectedQuestionIds() {
+    return rowCheckboxes
+      .filter((checkbox) => checkbox && checkbox.checked)
+      .map((checkbox) => String(checkbox.value || '').trim())
+      .filter(Boolean);
+  }
+
+  function syncSelectionToolbar() {
+    const selectedCount = getSelectedQuestionIds().length;
+    if (bulkSelectedCount) bulkSelectedCount.textContent = String(selectedCount);
+    if (bulkToolbar) {
+      bulkToolbar.classList.toggle('d-none', selectedCount <= 0);
+    }
+    if (selectAllNode) {
+      const totalCount = rowCheckboxes.length;
+      selectAllNode.checked = totalCount > 0 && selectedCount === totalCount;
+      selectAllNode.indeterminate = selectedCount > 0 && selectedCount < totalCount;
+    }
+  }
+
+  function clearSelection() {
+    rowCheckboxes.forEach((checkbox) => {
+      checkbox.checked = false;
+    });
+    syncSelectionToolbar();
+  }
+
+  function findRowByQuestionId(id) {
+    const token = String(id || '').trim();
+    if (!token) return null;
+    return document.querySelector('tr[data-question-id="' + token.replace(/"/g, '\\"') + '"]');
+  }
+
+  function updateStatusBadge(row, nextStatus) {
+    if (!row) return;
+    const statusToken = String(nextStatus || '').trim().toLowerCase() || 'draft';
+    const badge = row.querySelector('.qb-status-badge');
+    if (badge) {
+      if (statusToken === 'published') {
+        badge.className = 'badge qb-status-badge bg-success text-capitalize';
+      } else if (statusToken === 'retired') {
+        badge.className = 'badge qb-status-badge bg-warning text-dark text-capitalize';
+      } else if (statusToken === 'archived') {
+        badge.className = 'badge qb-status-badge bg-secondary text-capitalize';
+      } else {
+        badge.className = 'badge qb-status-badge bg-info text-dark text-capitalize';
+      }
+      badge.dataset.status = statusToken;
+      badge.textContent = statusToken;
+    }
+    const picker = row.querySelector('.qb-row-select');
+    if (picker) picker.dataset.status = statusToken;
+  }
+
+  function buildActionButton({ action, id, url, label, iconClass, btnClass, method = 'POST', title = '' }) {
+    const button = document.createElement('button');
+    button.className = 'btn btn-sm pte-qb-action-btn ' + String(btnClass || 'btn-outline-secondary');
+    button.setAttribute('data-method', String(method || 'POST').toUpperCase());
+    button.setAttribute('data-action', String(action || '').trim());
+    button.setAttribute('data-id', String(id || '').trim());
+    button.setAttribute('data-url', String(url || '').trim());
+    if (title) button.setAttribute('title', title);
+    button.innerHTML = '<i class="' + String(iconClass || 'bi bi-gear') + ' me-2"></i>' + String(label || 'Action');
+    button.addEventListener('click', () => runRowAction(button));
+    return button;
+  }
+
+  function updateRowAfterPublish(buttonOrRow, explicitId = '') {
+    const row = (buttonOrRow && typeof buttonOrRow.closest === 'function')
+      ? buttonOrRow.closest('tr')
+      : buttonOrRow;
+    if (!row) return;
+    const id = String(explicitId || row.getAttribute('data-question-id') || (buttonOrRow && buttonOrRow.getAttribute && buttonOrRow.getAttribute('data-id')) || '').trim();
+    if (!id) return;
+
+    updateStatusBadge(row, 'published');
+
+    const menu = row.querySelector('.row-actions-menu');
+    if (!menu) return;
+
+    menu.querySelectorAll('.pte-qb-action-btn[data-action="publish"]').forEach((node) => node.remove());
+    menu.querySelectorAll('.pte-qb-action-btn[data-action="delete"]').forEach((node) => node.remove());
+
+    const hasRevise = Boolean(menu.querySelector('.pte-qb-action-btn[data-action="revise"]'));
+    if (!hasRevise) {
+      const reviseBtn = buildActionButton({
+        action: 'revise',
+        id,
+        url: '/pte/questions-bank/revise/' + encodeURIComponent(id),
+        label: 'Revise',
+        iconClass: 'bi bi-arrow-repeat',
+        btnClass: 'btn-outline-info',
+        method: 'POST'
+      });
+      menu.appendChild(reviseBtn);
+    }
+
+    const hasRetire = Boolean(menu.querySelector('.pte-qb-action-btn[data-action="retire"]'));
+    if (!hasRetire) {
+      const retireBtn = buildActionButton({
+        action: 'retire',
+        id,
+        url: '/pte/questions-bank/retire/' + encodeURIComponent(id),
+        label: 'Retire',
+        iconClass: 'bi bi-pause-circle',
+        btnClass: 'btn-outline-warning',
+        method: 'POST'
+      });
+      menu.appendChild(retireBtn);
+    }
+
+    if (canUnpublish) {
+      const hasUnpublish = Boolean(menu.querySelector('.pte-qb-action-btn[data-action="unpublish"]'));
+      if (!hasUnpublish) {
+        const unpublishBtn = buildActionButton({
+          action: 'unpublish',
+          id,
+          url: '/pte/questions-bank/unpublish/' + encodeURIComponent(id),
+          label: 'Unpublish',
+          iconClass: 'bi bi-arrow-down-circle',
+          btnClass: 'btn-outline-danger',
+          method: 'POST'
+        });
+        menu.appendChild(unpublishBtn);
+      }
+    }
+  }
+
+  function updateRowAfterUnpublish(buttonOrRow, explicitId = '') {
+    const row = (buttonOrRow && typeof buttonOrRow.closest === 'function')
+      ? buttonOrRow.closest('tr')
+      : buttonOrRow;
+    if (!row) return;
+    const id = String(explicitId || row.getAttribute('data-question-id') || (buttonOrRow && buttonOrRow.getAttribute && buttonOrRow.getAttribute('data-id')) || '').trim();
+    if (!id) return;
+
+    updateStatusBadge(row, 'draft');
+
+    const menu = row.querySelector('.row-actions-menu');
+    if (!menu) return;
+
+    menu.querySelectorAll('.pte-qb-action-btn[data-action="retire"]').forEach((node) => node.remove());
+    menu.querySelectorAll('.pte-qb-action-btn[data-action="unpublish"]').forEach((node) => node.remove());
+    menu.querySelectorAll('.pte-qb-action-btn[data-action="revise"]').forEach((node) => node.remove());
+
+    const hasPublish = Boolean(menu.querySelector('.pte-qb-action-btn[data-action="publish"]'));
+    if (!hasPublish) {
+      const publishBtn = buildActionButton({
+        action: 'publish',
+        id,
+        url: '/pte/questions-bank/publish/' + encodeURIComponent(id),
+        label: 'Publish',
+        iconClass: 'bi bi-upload',
+        btnClass: 'btn-outline-success',
+        method: 'POST'
+      });
+      menu.appendChild(publishBtn);
+    }
+
+    const hasDelete = Boolean(menu.querySelector('.pte-qb-action-btn[data-action="delete"]'));
+    if (!hasDelete) {
+      const deleteBtn = buildActionButton({
+        action: 'delete',
+        id,
+        url: '/pte/questions-bank/delete/' + encodeURIComponent(id),
+        label: 'Delete',
+        iconClass: 'bi bi-trash',
+        btnClass: 'btn-outline-danger',
+        method: 'DELETE'
+      });
+      menu.appendChild(deleteBtn);
+    }
+  }
+
+  function formatBulkFailureSummary(failures = []) {
+    const rows = Array.isArray(failures) ? failures : [];
+    if (!rows.length) return '';
+    const lines = rows.slice(0, 5).map((row) => {
+      const id = String(row?.id || '').trim();
+      const message = String(row?.message || 'Operation failed.').trim();
+      return id ? ('- ' + id + ': ' + message) : ('- ' + message);
+    });
+    const remaining = rows.length - lines.length;
+    if (remaining > 0) {
+      lines.push('- ... and ' + remaining + ' more.');
+    }
+    return lines.join('\n');
+  }
+
+  async function runBulkAction(action) {
+    const actionToken = String(action || '').trim().toLowerCase();
+    if (actionToken !== 'publish' && actionToken !== 'unpublish') return;
+
+    const ids = getSelectedQuestionIds();
+    if (!ids.length) {
+      await showMessage('No Selection', 'Select at least one question first.', 'warning');
+      return;
+    }
+
+    const isUnpublish = actionToken === 'unpublish';
+    const confirmText = isUnpublish ? 'Unpublish' : 'Publish';
+    const confirmed = await showConfirm(
+      (isUnpublish ? 'Unpublish' : 'Publish') + ' Selected Questions?',
+      'Apply ' + confirmText.toLowerCase() + ' to ' + ids.length + ' selected question(s)?',
+      confirmText,
+      isUnpublish ? 'btn-danger' : 'btn-success'
+    );
+    if (!confirmed) return;
+
+    const targetButton = isUnpublish ? bulkUnpublishBtn : bulkPublishBtn;
+    setButtonBusy(targetButton, true, isUnpublish ? 'Unpublishing...' : 'Publishing...');
+    if (isUnpublish) {
+      setButtonBusy(bulkPublishBtn, true, 'Working...');
+    } else {
+      setButtonBusy(bulkUnpublishBtn, true, 'Working...');
+    }
+
+    try {
+      const mutationActionStateId = await issueMutationActionState({
+        action: actionToken,
+        method: 'POST',
+        bulk: true
+      });
+      const endpoint = '/pte/questions-bank/bulk/' + actionToken + '?actionStateId=' + encodeURIComponent(mutationActionStateId);
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Action-State-Id': mutationActionStateId
+        },
+        credentials: 'include',
+        body: JSON.stringify({ ids })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Request failed with status ' + response.status + '.'));
+      }
+
+      const updatedIds = Array.isArray(result?.results?.updatedIds) ? result.results.updatedIds : [];
+      if (isUnpublish) {
+        updatedIds.forEach((id) => {
+          const row = findRowByQuestionId(id);
+          if (row) updateRowAfterUnpublish(row, id);
+        });
+      } else {
+        updatedIds.forEach((id) => {
+          const row = findRowByQuestionId(id);
+          if (row) updateRowAfterPublish(row, id);
+        });
+      }
+
+      const failedRows = Array.isArray(result?.results?.failures) ? result.results.failures : [];
+      const failedIds = new Set(
+        failedRows
+          .map((row) => String(row?.id || '').trim())
+          .filter(Boolean)
+      );
+      rowCheckboxes.forEach((checkbox) => {
+        const rowId = String(checkbox.value || '').trim();
+        checkbox.checked = failedIds.size > 0 ? failedIds.has(rowId) : false;
+      });
+      syncSelectionToolbar();
+
+      const failureSummary = formatBulkFailureSummary(failedRows);
+      const finalMessage = failureSummary
+        ? ((result.message || 'Bulk operation completed.') + '\n\nFailed items:\n' + failureSummary)
+        : (result.message || 'Bulk operation completed successfully.');
+      await showMessage(
+        isUnpublish ? 'Bulk Unpublish Result' : 'Bulk Publish Result',
+        finalMessage,
+        failureSummary ? 'warning' : 'success'
+      );
+    } catch (error) {
+      await showMessage(
+        isUnpublish ? 'Bulk Unpublish Failed' : 'Bulk Publish Failed',
+        error.message || 'Unexpected operation error.',
+        'error'
+      );
+    } finally {
+      setButtonBusy(targetButton, false);
+      if (isUnpublish) {
+        setButtonBusy(bulkPublishBtn, false);
+      } else {
+        setButtonBusy(bulkUnpublishBtn, false);
+      }
+    }
+  }
+
+  async function runRowAction(button) {
+    const action = String(button.getAttribute('data-action') || '').trim();
+    const id = String(button.getAttribute('data-id') || '').trim();
+    const url = String(button.getAttribute('data-url') || '').trim();
+    const method = String(button.getAttribute('data-method') || 'POST').toUpperCase();
+    if (!id || !url || !action) return;
+
+    if (action === 'delete') {
+      const ok = await showConfirm(
+        'Delete Draft Question?',
+        'Delete this draft question version? This action cannot be undone.',
+        'Delete',
+        'btn-danger'
+      );
+      if (!ok) return;
+    }
+
+    button.disabled = true;
+    const originalHtml = button.innerHTML;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Working...';
+
+    try {
+      const mutationActionStateId = await issueMutationActionState({ action, id, method });
+      const endpoint = url + '?actionStateId=' + encodeURIComponent(mutationActionStateId);
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json',
+          'X-Action-State-Id': mutationActionStateId
+        },
+        credentials: 'include'
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Request failed with status ' + response.status + '.'));
+      }
+
+      const actionLabel = toActionLabel(action);
+      await showMessage(
+        actionLabel + ' Result',
+        result.message || (actionLabel + ' operation completed successfully.'),
+        'success'
+      );
+
+      if ((action === 'revise' || action === 'duplicate') && result.results && result.results.id) {
+        window.location.href = '/pte/questions-bank/edit/' + encodeURIComponent(result.results.id);
+        return;
+      }
+      if (action === 'publish') {
+        updateRowAfterPublish(button);
+        return;
+      }
+      if (action === 'unpublish') {
+        updateRowAfterUnpublish(button);
+        return;
+      }
+      window.location.reload();
+    } catch (error) {
+      const actionLabel = toActionLabel(action);
+      await showMessage(actionLabel + ' Failed', error.message || 'Unexpected operation error.', 'error');
+      button.disabled = false;
+      button.innerHTML = originalHtml;
+    }
+  }
+
+  document.querySelectorAll('.pte-qb-action-btn').forEach((button) => {
+    button.addEventListener('click', () => runRowAction(button));
+  });
+
+  rowCheckboxes.forEach((checkbox) => {
+    checkbox.addEventListener('change', syncSelectionToolbar);
+  });
+
+  if (selectAllNode) {
+    selectAllNode.addEventListener('change', () => {
+      const checked = Boolean(selectAllNode.checked);
+      rowCheckboxes.forEach((checkbox) => {
+        checkbox.checked = checked;
+      });
+      syncSelectionToolbar();
+    });
+  }
+
+  if (selectAllHeader && selectAllNode) {
+    const toggleSelectAllFromHeader = () => {
+      selectAllNode.checked = !selectAllNode.checked;
+      selectAllNode.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    selectAllHeader.addEventListener('click', (event) => {
+      if (event.target === selectAllNode) return;
+      if (event.target.closest('label[for="selectAll"], label[for="qbSelectAll"]')) return;
+      toggleSelectAllFromHeader();
+    });
+
+    selectAllHeader.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleSelectAllFromHeader();
+      }
+    });
+  }
+
+  if (bulkPublishBtn) {
+    bulkPublishBtn.addEventListener('click', () => runBulkAction('publish'));
+  }
+  if (bulkUnpublishBtn) {
+    bulkUnpublishBtn.addEventListener('click', () => runBulkAction('unpublish'));
+  }
+
+  clearSelection();
+});
+</script>

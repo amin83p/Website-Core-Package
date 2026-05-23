@@ -1,0 +1,1933 @@
+<%
+  const pageData = page || {};
+  const hero = pageData.hero || {};
+  const showcase = Array.isArray(pageData.imageShowcase) ? pageData.imageShowcase : [];
+  const highlights = Array.isArray(pageData.highlights) ? pageData.highlights : [];
+  const applicantFeatures = Array.isArray(pageData.applicantFeatures) ? pageData.applicantFeatures : [];
+  const learningPath = Array.isArray(pageData.learningPath) ? pageData.learningPath : [];
+  const pteOverview = pageData.pteOverview || {};
+  const ptePoints = Array.isArray(pteOverview.points) ? pteOverview.points : [];
+  const testTypes = Array.isArray(pageData.testTypes) ? pageData.testTypes : [];
+  const skillGroups = Array.isArray(pageData.skillGroups) ? pageData.skillGroups : [];
+  const skillTaskCount = skillGroups.reduce((total, group) => total + (Array.isArray(group.items) ? group.items.length : 0), 0);
+  const finalCta = pageData.finalCta || {};
+  const firstFeature = applicantFeatures[0] || {};
+  const skillVisualFallbacks = [
+    { key: 'speaking', icon: 'bi-mic-fill', label: 'Speak with confidence', body: 'Build clear spoken answers with rhythm, structure, and exam-style timing.' },
+    { key: 'writing', icon: 'bi-pencil-square', label: 'Write with control', body: 'Practice concise summaries and organized written responses for timed tasks.' },
+    { key: 'reading', icon: 'bi-book-half', label: 'Read with accuracy', body: 'Improve comprehension, detail spotting, and decision-making under time pressure.' },
+    { key: 'listening', icon: 'bi-headphones', label: 'Listen with focus', body: 'Train dictation, spoken meaning, and audio attention for common listening tasks.' }
+  ];
+  const skillVisualMap = {
+    speaking: skillVisualFallbacks[0],
+    writing: skillVisualFallbacks[1],
+    reading: skillVisualFallbacks[2],
+    listening: skillVisualFallbacks[3]
+  };
+  const getSkillVisual = (group, index) => {
+    const key = String(group?.title || '').trim().toLowerCase();
+    return skillVisualMap[key] || skillVisualFallbacks[index % skillVisualFallbacks.length];
+  };
+%>
+
+<section class="pte-public-page">
+  <section class="pte-hero-intro" aria-labelledby="pteLandingTitle">
+    <div class="pte-hero-orbit" aria-hidden="true">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+    <div class="pte-hero-copy">
+      <div class="pte-eyebrow"><%= hero.eyebrow || 'PTE Practice App' %></div>
+      <h1 id="pteLandingTitle"><%= hero.title || 'Prepare for PTE with guided practice.' %></h1>
+      <% if (hero.subtitle) { %>
+        <p><%= hero.subtitle %></p>
+      <% } %>
+
+      <div class="pte-hero-actions">
+        <a class="btn pte-btn-primary" href="<%= hero.primaryHref || '/pte/join' %>">
+          <i class="bi bi-person-plus-fill me-2"></i><%= hero.primaryLabel || 'Join And Start Practicing' %>
+        </a>
+        <a class="btn pte-btn-secondary" href="<%= hero.secondaryHref || '/login' %>">
+          <i class="bi bi-box-arrow-in-right me-2"></i><%= hero.secondaryLabel || 'Sign In' %>
+        </a>
+      </div>
+    </div>
+
+    <div class="pte-highlight-row" aria-label="PTE practice highlights">
+      <% highlights.forEach((item) => { %>
+        <div class="pte-highlight-chip">
+          <strong><%= item.value || '' %></strong>
+          <span><%= item.label || '' %></span>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="pte-showcase-block" aria-label="PTE public page image showcase">
+    <div id="pteApplicantImageShowcase" class="carousel slide pte-showcase-carousel" data-bs-ride="carousel" data-bs-interval="4500" data-bs-pause="false">
+
+      <div class="carousel-inner pte-showcase-inner">
+        <% showcase.forEach((item, index) => { %>
+          <% const hasSlideCaption = Boolean((item.title || '').trim() || (item.caption || '').trim()); %>
+          <div class="carousel-item pte-showcase-item <%= index === 0 ? 'active' : '' %>" data-bs-interval="<%= Number(item.durationMs) > 0 ? Number(item.durationMs) : 4500 %>">
+            <img src="<%= item.src %>" alt="<%= item.alt || item.title || 'PTE practice image' %>" class="pte-showcase-image">
+            <% if (hasSlideCaption) { %>
+              <div class="pte-image-caption">
+                <% if ((item.title || '').trim()) { %>
+                  <span><%= item.title %></span>
+                <% } %>
+                <% if ((item.caption || '').trim()) { %>
+                  <small><%= item.caption %></small>
+                <% } %>
+              </div>
+            <% } %>
+          </div>
+        <% }) %>
+      </div>
+
+      <% if (showcase.length > 1) { %>
+        <div class="pte-showcase-controls">
+          <button type="button" class="pte-showcase-control-btn" data-no-wait="true" data-pte-showcase-prev aria-label="Previous image">
+            <i class="bi bi-chevron-left"></i>
+            <span class="visually-hidden">Previous image</span>
+          </button>
+          <button type="button" class="pte-showcase-control-btn" data-no-wait="true" data-pte-showcase-toggle aria-label="Pause slideshow">
+            <i class="bi bi-pause-fill" data-pte-showcase-toggle-icon></i>
+            <span class="visually-hidden" data-pte-showcase-toggle-text>Pause</span>
+          </button>
+          <button type="button" class="pte-showcase-control-btn" data-no-wait="true" data-pte-showcase-next aria-label="Next image">
+            <i class="bi bi-chevron-right"></i>
+            <span class="visually-hidden">Next image</span>
+          </button>
+        </div>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="pte-section pte-feature-section" aria-labelledby="pteFeaturesTitle">
+    <div class="pte-section-heading">
+      <span>Applicant Features</span>
+      <h2 id="pteFeaturesTitle">Everything is focused on practice, feedback, and exam confidence.</h2>
+      <p>
+        This page is for applicants. The tools below are the learner-facing parts of the PTE module, not the internal question-management workflow.
+      </p>
+    </div>
+
+    <div class="pte-feature-showcase">
+      <article class="pte-feature-focus-card" id="pteFeatureFocusCard" aria-live="polite">
+        <div class="pte-feature-focus-icon">
+          <i class="bi <%= firstFeature.icon || 'bi-check2-circle' %>" data-feature-focus-icon></i>
+        </div>
+        <div class="pte-feature-focus-copy">
+          <span>Focused Feature</span>
+          <h3 data-feature-focus-title><%= firstFeature.title || '' %></h3>
+          <p data-feature-focus-body><%= firstFeature.body || '' %></p>
+        </div>
+      </article>
+
+      <div class="pte-feature-grid">
+      <% applicantFeatures.forEach((feature) => { %>
+        <article
+          class="pte-feature-card"
+          tabindex="0"
+          data-feature-icon="<%= feature.icon || 'bi-check2-circle' %>"
+          data-feature-title="<%= feature.title || '' %>"
+          data-feature-body="<%= feature.body || '' %>">
+          <div class="pte-feature-icon"><i class="bi <%= feature.icon || 'bi-check2-circle' %>"></i></div>
+          <h3><%= feature.title || '' %></h3>
+          <p><%= feature.body || '' %></p>
+        </article>
+      <% }) %>
+      </div>
+    </div>
+  </section>
+
+  <section class="pte-section pte-path-section" aria-labelledby="ptePathTitle">
+    <div class="pte-section-heading pte-section-heading-compact">
+      <span>How You Use It</span>
+      <h2 id="ptePathTitle">A simple path from joining to improving.</h2>
+    </div>
+
+    <div class="pte-path-list">
+      <% learningPath.forEach((item) => { %>
+        <article class="pte-path-item">
+          <div class="pte-path-step"><%= item.step || '' %></div>
+          <div>
+            <h3><%= item.title || '' %></h3>
+            <p><%= item.body || '' %></p>
+            <% if (item.href) { %>
+              <a class="pte-path-link" href="<%= item.href %>">
+                <span><%= item.linkLabel || 'Learn More' %></span>
+                <i class="bi bi-arrow-right"></i>
+              </a>
+            <% } %>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="pte-section pte-info-section" aria-labelledby="pteInfoTitle">
+    <div class="pte-info-main">
+      <div class="pte-section-heading pte-section-heading-left">
+        <span>General PTE Information</span>
+        <h2 id="pteInfoTitle">What applicants should know about PTE.</h2>
+      </div>
+      <p class="pte-info-lead"><%= pteOverview.intro || '' %></p>
+      <ul class="pte-info-points">
+        <% ptePoints.forEach((point) => { %>
+          <li><i class="bi bi-check2"></i><span><%= point %></span></li>
+        <% }) %>
+      </ul>
+    </div>
+
+    <aside class="pte-info-side" aria-label="PTE test types">
+      <% testTypes.forEach((item) => { %>
+        <article class="pte-type-card">
+          <h3><%= item.title || '' %></h3>
+          <p><%= item.body || '' %></p>
+        </article>
+      <% }) %>
+    </aside>
+  </section>
+
+  <section class="pte-section pte-skills-section" aria-labelledby="pteSkillsTitle">
+    <div class="pte-skills-header">
+      <div class="pte-section-heading pte-section-heading-left">
+        <span>Practice Areas</span>
+        <h2 id="pteSkillsTitle">Build the skills that appear across PTE tasks.</h2>
+      </div>
+
+      <% if (skillGroups.length) { %>
+        <div class="pte-skills-metrics" aria-label="Practice area summary">
+          <div>
+            <strong><%= skillGroups.length %></strong>
+            <span>Skill Areas</span>
+          </div>
+          <div>
+            <strong><%= skillTaskCount %></strong>
+            <span>Task Types</span>
+          </div>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (skillGroups.length) { %>
+      <div id="pteSkillShowcase" class="carousel slide pte-skill-showcase" data-bs-ride="carousel" data-bs-interval="4200" data-bs-touch="true">
+        <div class="carousel-indicators pte-skill-tabs">
+          <% skillGroups.forEach((group, index) => {
+            const visual = getSkillVisual(group, index);
+          %>
+            <button
+              type="button"
+              data-bs-target="#pteSkillShowcase"
+              data-bs-slide-to="<%= index %>"
+              class="<%= index === 0 ? 'active' : '' %>"
+              aria-current="<%= index === 0 ? 'true' : 'false' %>"
+              aria-label="Show <%= group.title || ('skill ' + (index + 1)) %> practice">
+              <i class="bi <%= visual.icon %>"></i>
+              <span><%= group.title || ('Skill ' + (index + 1)) %></span>
+            </button>
+          <% }) %>
+        </div>
+
+        <div class="carousel-inner pte-skill-carousel-inner">
+          <% skillGroups.forEach((group, index) => {
+            const visual = getSkillVisual(group, index);
+            const items = Array.isArray(group.items) ? group.items : [];
+          %>
+            <div class="carousel-item <%= index === 0 ? 'active' : '' %>">
+              <article class="pte-skill-slide pte-skill-slide--<%= visual.key %>">
+                <div class="pte-skill-visual">
+                  <div class="pte-skill-orbit" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <div class="pte-skill-icon">
+                    <i class="bi <%= visual.icon %>"></i>
+                  </div>
+                  <p class="pte-skill-kicker">Skill <%= String(index + 1).padStart(2, '0') %></p>
+                  <h3><%= group.title || '' %></h3>
+                  <p><%= visual.body %></p>
+                </div>
+
+                <div class="pte-skill-task-panel">
+                  <div class="pte-skill-task-head">
+                    <span><%= visual.label %></span>
+                    <strong><%= items.length %> task<%= items.length === 1 ? '' : 's' %></strong>
+                  </div>
+                  <div class="pte-skill-task-list">
+                    <% items.forEach((item, itemIndex) => { %>
+                      <div class="pte-skill-task">
+                        <span><%= itemIndex + 1 %></span>
+                        <p><%= item %></p>
+                      </div>
+                    <% }) %>
+                  </div>
+                </div>
+              </article>
+            </div>
+          <% }) %>
+        </div>
+
+        <% if (skillGroups.length > 1) { %>
+          <button class="carousel-control-prev pte-skill-control pte-skill-control-prev" type="button" data-bs-target="#pteSkillShowcase" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Previous skill</span>
+          </button>
+          <button class="carousel-control-next pte-skill-control pte-skill-control-next" type="button" data-bs-target="#pteSkillShowcase" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Next skill</span>
+          </button>
+        <% } %>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="pte-final-cta" aria-labelledby="pteFinalCtaTitle">
+    <div>
+      <span>Join The Practice Space</span>
+      <h2 id="pteFinalCtaTitle"><%= finalCta.title || 'Ready to start your PTE preparation?' %></h2>
+      <p><%= finalCta.body || '' %></p>
+    </div>
+    <div class="pte-final-actions">
+      <a class="btn pte-btn-light" href="<%= finalCta.primaryHref || '/pte/join' %>">
+        <i class="bi bi-arrow-right-circle-fill me-2"></i><%= finalCta.primaryLabel || 'Create Account' %>
+      </a>
+      <a class="btn pte-btn-outline-light" href="<%= finalCta.secondaryHref || '/contact' %>">
+        <i class="bi bi-chat-dots-fill me-2"></i><%= finalCta.secondaryLabel || 'Ask A Question' %>
+      </a>
+    </div>
+  </section>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const showcaseCarousel = document.getElementById('pteApplicantImageShowcase');
+  if (showcaseCarousel) {
+    const items = Array.from(showcaseCarousel.querySelectorAll('.carousel-item'));
+    const controls = showcaseCarousel.querySelector('.pte-showcase-controls');
+    const prevButton = controls?.querySelector('[data-pte-showcase-prev]');
+    const nextButton = controls?.querySelector('[data-pte-showcase-next]');
+    const toggleButton = controls?.querySelector('[data-pte-showcase-toggle]');
+    const toggleIcon = controls?.querySelector('[data-pte-showcase-toggle-icon]');
+    const toggleText = controls?.querySelector('[data-pte-showcase-toggle-text]');
+    const hasMultipleSlides = items.length > 1;
+    let isPaused = false;
+
+    if (controls) {
+      controls.classList.toggle('is-hidden', !hasMultipleSlides);
+      controls.setAttribute('aria-hidden', hasMultipleSlides ? 'false' : 'true');
+    }
+
+    if (window.bootstrap?.Carousel && hasMultipleSlides) {
+      const carousel = window.bootstrap.Carousel.getOrCreateInstance(showcaseCarousel, {
+        interval: 4500,
+        pause: false,
+        ride: 'carousel',
+        wrap: true
+      });
+
+      const setPlayState = (paused) => {
+        isPaused = Boolean(paused);
+        if (toggleIcon) {
+          toggleIcon.className = isPaused ? 'bi bi-play-fill' : 'bi bi-pause-fill';
+        }
+        if (toggleText) {
+          toggleText.textContent = isPaused ? 'Play slideshow' : 'Pause slideshow';
+        }
+        if (toggleButton) {
+          toggleButton.setAttribute('aria-label', isPaused ? 'Play slideshow' : 'Pause slideshow');
+        }
+      };
+
+      const pause = () => {
+        carousel.pause();
+        setPlayState(true);
+      };
+
+      const play = () => {
+        carousel.cycle();
+        setPlayState(false);
+      };
+
+      prevButton?.addEventListener('click', () => {
+        carousel.prev();
+      });
+      nextButton?.addEventListener('click', () => {
+        carousel.next();
+      });
+      toggleButton?.addEventListener('click', () => {
+        if (isPaused) {
+          play();
+        } else {
+          pause();
+        }
+      });
+      setPlayState(false);
+      carousel.cycle();
+    }
+  }
+
+  const featureShowcase = document.querySelector('.pte-feature-showcase');
+  const featureGrid = featureShowcase?.querySelector('.pte-feature-grid');
+  const focusCard = featureShowcase?.querySelector('#pteFeatureFocusCard');
+  if (!featureShowcase || !featureGrid || !focusCard) return;
+
+  const featureCards = Array.from(featureGrid.querySelectorAll('.pte-feature-card'));
+  const focusIcon = focusCard.querySelector('[data-feature-focus-icon]');
+  const focusTitle = focusCard.querySelector('[data-feature-focus-title]');
+  const focusBody = focusCard.querySelector('[data-feature-focus-body]');
+  const featureThemeVars = [
+    '--feature-accent',
+    '--feature-accent-strong',
+    '--feature-line',
+    '--feature-wash',
+    '--feature-wash-2',
+    '--feature-shadow'
+  ];
+  let focusedFeatureCard = null;
+
+  const clearFeatureFocus = () => {
+    focusedFeatureCard = null;
+    featureShowcase.classList.remove('is-feature-focus');
+    featureCards.forEach((card) => card.classList.remove('is-feature-active'));
+  };
+
+  const setFeatureFocus = (card) => {
+    if (!card) return;
+    if (focusedFeatureCard === card) return;
+    focusedFeatureCard = card;
+    const computed = window.getComputedStyle(card);
+    featureThemeVars.forEach((varName) => {
+      const value = computed.getPropertyValue(varName);
+      if (value) focusCard.style.setProperty(varName, value);
+    });
+    if (focusIcon) focusIcon.className = `bi ${card.dataset.featureIcon || 'bi-check2-circle'}`;
+    if (focusTitle) focusTitle.textContent = card.dataset.featureTitle || '';
+    if (focusBody) focusBody.textContent = card.dataset.featureBody || '';
+    featureShowcase.classList.add('is-feature-focus');
+    featureCards.forEach((item) => item.classList.toggle('is-feature-active', item === card));
+  };
+
+  featureCards.forEach((card) => {
+    card.addEventListener('pointerenter', () => setFeatureFocus(card));
+    card.addEventListener('focus', () => setFeatureFocus(card));
+  });
+
+  featureShowcase.addEventListener('mouseleave', clearFeatureFocus);
+  featureShowcase.addEventListener('focusout', () => {
+    window.setTimeout(() => {
+      if (!featureShowcase.contains(document.activeElement)) clearFeatureFocus();
+    }, 0);
+  });
+});
+</script>
+
+<style>
+  html.pte-public-root,
+  html.pte-public-root body.pte-public-body {
+    background:
+      radial-gradient(circle at 8% 5%, rgba(29, 95, 184, 0.16), transparent 28%),
+      radial-gradient(circle at 92% 4%, rgba(8, 127, 140, 0.16), transparent 26%),
+      radial-gradient(circle at 9% 44%, rgba(29, 95, 184, 0.08), transparent 24%),
+      radial-gradient(circle at 91% 72%, rgba(8, 127, 140, 0.1), transparent 28%),
+      linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
+    min-height: 100%;
+  }
+
+  body.pte-public-body {
+    background-attachment: fixed;
+  }
+
+  main.pte-public-main {
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+    padding-bottom: 0;
+    padding-top: 0;
+    position: relative;
+  }
+
+  .pte-public-page {
+    --pte-ink: #13222c;
+    --pte-muted: #53636f;
+    --pte-line: #d7e1e7;
+    --pte-surface: #ffffff;
+    --pte-soft: #f5f8fa;
+    --pte-teal: #087f8c;
+    --pte-blue: #1d5fb8;
+    --pte-coral: #c24f39;
+    --pte-green: #287a54;
+    --pte-amber: #b56b00;
+    color: var(--pte-ink);
+    font-family: "Manrope", "Segoe UI", Arial, sans-serif;
+    isolation: isolate;
+    padding-bottom: clamp(2rem, 5vw, 4.5rem);
+    position: relative;
+  }
+
+  .pte-public-page * {
+    letter-spacing: 0;
+  }
+
+  .pte-public-page::before {
+    background:
+      radial-gradient(circle at 8% 5%, rgba(29, 95, 184, 0.16), transparent 28%),
+      radial-gradient(circle at 92% 4%, rgba(8, 127, 140, 0.16), transparent 26%),
+      radial-gradient(circle at 9% 44%, rgba(29, 95, 184, 0.08), transparent 24%),
+      radial-gradient(circle at 91% 72%, rgba(8, 127, 140, 0.1), transparent 28%),
+      linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
+    bottom: 0;
+    content: "";
+    left: 50%;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    width: 100vw;
+    z-index: -1;
+  }
+
+  .pte-hero-intro {
+    background: transparent;
+    margin-bottom: 1.15rem;
+    overflow: visible;
+    padding: clamp(1.4rem, 3vw, 2.4rem) 0;
+    position: relative;
+  }
+
+  .pte-hero-orbit {
+    bottom: 0;
+    left: 50%;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    width: 100vw;
+    z-index: 1;
+  }
+
+  .pte-hero-orbit span {
+    border-radius: 999px;
+    position: absolute;
+  }
+
+  .pte-hero-orbit span:nth-child(1) {
+    background: rgba(29, 95, 184, 0.12);
+    height: 210px;
+    right: -74px;
+    top: -78px;
+    width: 210px;
+  }
+
+  .pte-hero-orbit span:nth-child(2) {
+    border: 1px solid rgba(8, 127, 140, 0.2);
+    height: 150px;
+    left: -54px;
+    top: 54%;
+    width: 150px;
+  }
+
+  .pte-hero-orbit span:nth-child(3) {
+    background:
+      radial-gradient(circle, rgba(29, 95, 184, 0.18) 1px, transparent 2px);
+    background-size: 18px 18px;
+    border-radius: 0;
+    height: 120px;
+    right: 18%;
+    top: 20%;
+    width: 150px;
+  }
+
+  .pte-hero-copy {
+    margin-left: 0;
+    margin-right: auto;
+    max-width: none;
+    position: relative;
+    text-align: left;
+    width: 100%;
+    z-index: 2;
+  }
+
+  .pte-eyebrow,
+  .pte-section-heading span,
+  .pte-final-cta span {
+    color: var(--pte-teal);
+    display: inline-flex;
+    font-size: 0.8rem;
+    font-weight: 850;
+    line-height: 1;
+    margin-bottom: 0.85rem;
+    text-transform: uppercase;
+  }
+
+  .pte-hero-copy h1 {
+    color: #083253;
+    font-size: clamp(2.25rem, 5.2vw, 5.05rem);
+    font-weight: 920;
+    letter-spacing: -0.055em;
+    line-height: 0.96;
+    margin: 0;
+    max-width: none;
+  }
+
+  .pte-hero-copy p {
+    color: #365568;
+    font-size: clamp(1rem, 1.7vw, 1.28rem);
+    font-weight: 560;
+    line-height: 1.72;
+    margin: 1rem 0 0;
+    max-width: none;
+  }
+
+  .pte-showcase-block {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(241, 247, 252, 0.98));
+    border: 1px solid #dce7f0;
+    border-radius: 18px;
+    box-shadow: 0 22px 70px rgba(18, 48, 70, 0.12);
+    overflow: hidden;
+    padding: clamp(0.45rem, 1vw, 0.7rem);
+    position: relative;
+  }
+
+  .pte-showcase-carousel,
+  .pte-showcase-inner,
+  .pte-showcase-item {
+    border-radius: 14px;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+  }
+
+  .pte-showcase-carousel {
+    aspect-ratio: 1672 / 941;
+  }
+
+  .pte-showcase-image {
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    width: 100%;
+  }
+
+  .pte-showcase-controls {
+    display: flex;
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 6;
+    gap: 0.48rem;
+  }
+
+  .pte-showcase-controls.is-hidden {
+    display: none;
+  }
+
+  .pte-showcase-control-btn {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: 999px;
+    color: #0d1f2f;
+    display: inline-flex;
+    font-size: 1rem;
+    height: 38px;
+    justify-content: center;
+    padding: 0;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    width: 38px;
+  }
+
+  .pte-showcase-control-btn:hover,
+  .pte-showcase-control-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.42);
+    border-color: rgba(13, 31, 43, 0.3);
+    color: #0d1f2f;
+    transform: translateY(-1px);
+    outline: none;
+  }
+
+  .pte-image-caption {
+    align-items: flex-start;
+    backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid rgba(210, 225, 237, 0.8);
+    border-radius: 14px;
+    bottom: 1.25rem;
+    box-shadow: 0 18px 44px rgba(13, 41, 64, 0.16);
+    color: #17303d;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    max-width: min(380px, calc(100% - 2.4rem));
+    padding: 0.85rem 1rem;
+    position: absolute;
+    left: 1.2rem;
+    z-index: 4;
+  }
+
+  .pte-image-caption span {
+    font-size: 0.92rem;
+    font-weight: 800;
+  }
+
+  .pte-image-caption small {
+    color: #53636f;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .pte-hero-actions,
+  .pte-final-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1.35rem;
+  }
+
+  .pte-public-page .btn {
+    align-items: center;
+    border-radius: 8px;
+    display: inline-flex;
+    font-weight: 760;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.62rem 1rem;
+  }
+
+  .pte-btn-primary {
+    background: #f0b84e;
+    border: 1px solid #f0b84e;
+    color: #16232c;
+  }
+
+  .pte-btn-primary:hover,
+  .pte-btn-primary:focus {
+    background: #d99b23;
+    border-color: #d99b23;
+    color: #16232c;
+  }
+
+  .pte-btn-secondary {
+    background: #ffffff;
+    border: 1px solid #c9dce9;
+    color: #163445;
+  }
+
+  .pte-btn-secondary:hover,
+  .pte-btn-secondary:focus {
+    background: #e9f4fb;
+    border-color: #9cc6df;
+    color: #16232c;
+  }
+
+  .pte-highlight-row {
+    display: grid;
+    gap: 0.7rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 1.35rem;
+    max-width: none;
+    position: relative;
+    z-index: 2;
+  }
+
+  .pte-highlight-chip {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(202, 219, 232, 0.92);
+    border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(17, 54, 78, 0.07);
+    min-height: 76px;
+    padding: 0.78rem 0.85rem;
+  }
+
+  .pte-highlight-chip strong {
+    color: #0d4fa9;
+    display: block;
+    font-size: 1rem;
+    margin-bottom: 0.24rem;
+  }
+
+  .pte-highlight-chip span {
+    color: #456071;
+    display: block;
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .pte-section {
+    margin-top: 2rem;
+  }
+
+  .pte-feature-section {
+    margin-top: 3.4rem;
+  }
+
+  .pte-section-heading {
+    margin: 0 auto 1.15rem;
+    max-width: 760px;
+    text-align: center;
+  }
+
+  .pte-section-heading span {
+    color: var(--pte-teal);
+    margin-bottom: 0.55rem;
+  }
+
+  .pte-section-heading h2 {
+    color: var(--pte-ink);
+    font-size: 2rem;
+    font-weight: 830;
+    line-height: 1.18;
+    margin: 0;
+  }
+
+  .pte-section-heading p {
+    color: var(--pte-muted);
+    font-size: 1rem;
+    line-height: 1.65;
+    margin: 0.65rem 0 0;
+  }
+
+  .pte-section-heading-compact {
+    margin-bottom: 0.85rem;
+  }
+
+  .pte-section-heading-left {
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .pte-feature-showcase {
+    position: relative;
+  }
+
+  .pte-feature-focus-card {
+    --feature-accent: #087f8c;
+    --feature-accent-strong: #065d67;
+    --feature-line: #b8e6e2;
+    --feature-wash: rgba(8, 127, 140, 0.1);
+    --feature-wash-2: rgba(240, 184, 78, 0.16);
+    --feature-shadow: rgba(8, 127, 140, 0.18);
+    align-items: center;
+    animation: pteFeatureFocusIn 170ms ease-out;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.9) 44%, var(--feature-wash-2) 100%),
+      linear-gradient(135deg, var(--feature-wash), #ffffff);
+    border: 1px solid var(--feature-accent);
+    border-radius: 8px;
+    box-shadow: 0 28px 72px var(--feature-shadow), 0 18px 44px rgba(13, 31, 43, 0.18);
+    display: none;
+    gap: 1.4rem;
+    grid-template-columns: 112px minmax(0, 1fr);
+    min-height: 330px;
+    overflow: hidden;
+    padding: 2rem;
+    position: relative;
+  }
+
+  .pte-feature-showcase.is-feature-focus .pte-feature-focus-card {
+    display: grid;
+    margin-bottom: 0.7rem;
+  }
+
+  .pte-feature-focus-card::before {
+    background: linear-gradient(90deg, var(--feature-accent), var(--feature-accent-strong));
+    content: "";
+    height: 6px;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+
+  .pte-feature-focus-card::after {
+    background: linear-gradient(135deg, var(--feature-accent), var(--feature-accent-strong));
+    border-radius: 999px;
+    bottom: -80px;
+    content: "";
+    height: 220px;
+    opacity: 0.12;
+    position: absolute;
+    right: -70px;
+    width: 220px;
+  }
+
+  .pte-feature-focus-icon {
+    align-items: center;
+    align-self: start;
+    background: var(--feature-accent);
+    border-radius: 8px;
+    box-shadow: 0 18px 36px var(--feature-shadow);
+    color: #ffffff;
+    display: inline-flex;
+    font-size: 2.1rem;
+    height: 92px;
+    justify-content: center;
+    transform: rotate(-4deg);
+    width: 92px;
+  }
+
+  .pte-feature-focus-copy {
+    position: relative;
+    z-index: 2;
+  }
+
+  .pte-feature-focus-copy span {
+    color: var(--feature-accent);
+    display: inline-flex;
+    font-size: 0.8rem;
+    font-weight: 850;
+    margin-bottom: 0.48rem;
+    text-transform: uppercase;
+  }
+
+  .pte-feature-focus-copy h3 {
+    color: var(--feature-accent-strong);
+    font-size: 2.25rem;
+    font-weight: 850;
+    line-height: 1.05;
+    margin: 0 0 0.55rem;
+    max-width: 760px;
+  }
+
+  .pte-feature-focus-copy p {
+    color: #263f4e;
+    font-size: 1.16rem;
+    font-weight: 620;
+    line-height: 1.75;
+    margin: 0;
+    max-width: 860px;
+  }
+
+  .pte-feature-grid {
+    display: grid;
+    gap: 0.9rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    isolation: isolate;
+    min-height: calc((214px * 2) + 0.9rem);
+    position: relative;
+  }
+
+  .pte-feature-card,
+  .pte-type-card,
+  .pte-path-item {
+    background: var(--pte-surface);
+    border: 1px solid var(--pte-line);
+    border-radius: 8px;
+  }
+
+  .pte-feature-card {
+    --feature-accent: #087f8c;
+    --feature-accent-strong: #065d67;
+    --feature-line: #b8e6e2;
+    --feature-wash: rgba(8, 127, 140, 0.1);
+    --feature-wash-2: rgba(240, 184, 78, 0.16);
+    --feature-shadow: rgba(8, 127, 140, 0.18);
+    background:
+      linear-gradient(135deg, var(--feature-wash) 0%, #ffffff 48%, var(--feature-wash-2) 100%);
+    border-color: var(--feature-line);
+    box-shadow: 0 10px 24px rgba(20, 49, 66, 0.06);
+    min-height: 214px;
+    padding: 1rem;
+    overflow: hidden;
+    position: relative;
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease, opacity 180ms ease, filter 180ms ease;
+    z-index: 1;
+  }
+
+  .pte-feature-card::before {
+    background: linear-gradient(90deg, var(--feature-accent), var(--feature-accent-strong));
+    content: "";
+    height: 5px;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+
+  .pte-feature-card:nth-child(1) {
+    --feature-accent: #087f8c;
+    --feature-accent-strong: #13b0a5;
+    --feature-line: #b8e6e2;
+    --feature-wash: rgba(8, 127, 140, 0.12);
+    --feature-wash-2: rgba(19, 176, 165, 0.12);
+    --feature-shadow: rgba(8, 127, 140, 0.22);
+  }
+
+  .pte-feature-card:nth-child(2) {
+    --feature-accent: #2457c5;
+    --feature-accent-strong: #6f55d8;
+    --feature-line: #c8d6fb;
+    --feature-wash: rgba(36, 87, 197, 0.12);
+    --feature-wash-2: rgba(111, 85, 216, 0.12);
+    --feature-shadow: rgba(36, 87, 197, 0.22);
+  }
+
+  .pte-feature-card:nth-child(3) {
+    --feature-accent: #c24f39;
+    --feature-accent-strong: #f0a340;
+    --feature-line: #f2cbbc;
+    --feature-wash: rgba(194, 79, 57, 0.12);
+    --feature-wash-2: rgba(240, 163, 64, 0.16);
+    --feature-shadow: rgba(194, 79, 57, 0.2);
+  }
+
+  .pte-feature-card:nth-child(4) {
+    --feature-accent: #287a54;
+    --feature-accent-strong: #8bb43f;
+    --feature-line: #c8e4cf;
+    --feature-wash: rgba(40, 122, 84, 0.12);
+    --feature-wash-2: rgba(139, 180, 63, 0.14);
+    --feature-shadow: rgba(40, 122, 84, 0.2);
+  }
+
+  .pte-feature-card:nth-child(5) {
+    --feature-accent: #b56b00;
+    --feature-accent-strong: #de8d2e;
+    --feature-line: #ecd2a5;
+    --feature-wash: rgba(181, 107, 0, 0.12);
+    --feature-wash-2: rgba(222, 141, 46, 0.14);
+    --feature-shadow: rgba(181, 107, 0, 0.2);
+  }
+
+  .pte-feature-card:nth-child(6) {
+    --feature-accent: #8d3f95;
+    --feature-accent-strong: #d24b7c;
+    --feature-line: #e5c3e8;
+    --feature-wash: rgba(141, 63, 149, 0.12);
+    --feature-wash-2: rgba(210, 75, 124, 0.12);
+    --feature-shadow: rgba(141, 63, 149, 0.2);
+  }
+
+  @keyframes pteFeatureFocusIn {
+    from {
+      opacity: 0.88;
+      transform: scale(0.975);
+    }
+
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
+    .pte-feature-showcase.is-feature-focus .pte-feature-grid {
+      gap: 0.7rem;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      min-height: 148px;
+    }
+
+    .pte-feature-showcase.is-feature-focus .pte-feature-card {
+      min-height: 148px;
+      padding: 0.78rem;
+      transform: none;
+      z-index: 1;
+    }
+
+    .pte-feature-showcase.is-feature-focus .pte-feature-card:not(.is-feature-active) {
+      filter: saturate(0.92);
+      opacity: 0.88;
+    }
+
+    .pte-feature-showcase.is-feature-focus .pte-feature-card.is-feature-active {
+      border-color: var(--feature-accent);
+      box-shadow: 0 14px 30px var(--feature-shadow);
+      opacity: 1;
+    }
+
+    .pte-feature-showcase.is-feature-focus .pte-feature-card .pte-feature-icon {
+      font-size: 1rem;
+      height: 34px;
+      margin-bottom: 0.55rem;
+      width: 34px;
+    }
+
+    .pte-feature-showcase.is-feature-focus .pte-feature-card h3 {
+      font-size: 0.92rem;
+      line-height: 1.22;
+      margin-bottom: 0.32rem;
+    }
+
+    .pte-feature-showcase.is-feature-focus .pte-feature-card p {
+      display: -webkit-box;
+      font-size: 0.74rem;
+      line-height: 1.32;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .pte-feature-card:focus-visible {
+      outline: 3px solid rgba(8, 127, 140, 0.24);
+      outline-offset: 3px;
+    }
+  }
+
+  .pte-feature-icon {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid var(--feature-line);
+    border-radius: 8px;
+    box-shadow: 0 8px 18px rgba(20, 49, 66, 0.08);
+    color: var(--feature-accent);
+    display: inline-flex;
+    font-size: 1.25rem;
+    height: 42px;
+    justify-content: center;
+    margin-bottom: 0.82rem;
+    transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+    width: 42px;
+  }
+
+  .pte-feature-card h3,
+  .pte-path-item h3,
+  .pte-type-card h3 {
+    color: var(--pte-ink);
+    font-size: 1.08rem;
+    font-weight: 820;
+    line-height: 1.3;
+    margin: 0 0 0.45rem;
+  }
+
+  .pte-feature-card p,
+  .pte-path-item p,
+  .pte-type-card p {
+    color: var(--pte-muted);
+    font-size: 0.93rem;
+    line-height: 1.58;
+    margin: 0;
+  }
+
+  .pte-path-section {
+    background:
+      radial-gradient(circle at 12% 12%, rgba(29, 95, 184, 0.1), transparent 34%),
+      radial-gradient(circle at 88% 78%, rgba(8, 127, 140, 0.12), transparent 32%),
+      linear-gradient(135deg, #f6fbff 0%, #eef8f5 100%);
+    border: 1px solid #dbe8ef;
+    border-radius: 18px;
+    box-shadow: 0 18px 54px rgba(18, 48, 70, 0.08);
+    overflow: hidden;
+    padding: 1.65rem;
+    position: relative;
+  }
+
+  .pte-path-list {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .pte-path-item {
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(247, 251, 253, 0.88));
+    border-color: rgba(180, 205, 219, 0.82);
+    box-shadow: 0 14px 34px rgba(20, 49, 66, 0.08);
+    min-height: 224px;
+    overflow: hidden;
+    padding: 1.35rem 1rem 1rem;
+    position: relative;
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  }
+
+  .pte-path-item:hover,
+  .pte-path-item:focus-within {
+    border-color: rgba(8, 127, 140, 0.34);
+    box-shadow: 0 18px 44px rgba(8, 127, 140, 0.16);
+    transform: translateY(-3px);
+  }
+
+  .pte-path-step {
+    color: rgba(29, 95, 184, 0.08);
+    font-size: clamp(4.2rem, 7vw, 6.8rem);
+    font-weight: 950;
+    letter-spacing: -0.08em;
+    line-height: 0.75;
+    pointer-events: none;
+    position: absolute;
+    right: 0.55rem;
+    top: 0.85rem;
+    user-select: none;
+    z-index: 1;
+  }
+
+  .pte-path-item > div:last-child {
+    min-height: 100%;
+    position: relative;
+    z-index: 2;
+  }
+
+  .pte-path-item h3 {
+    color: #102f43;
+    font-size: 1.12rem;
+    margin-top: 3.2rem;
+    max-width: 92%;
+  }
+
+  .pte-path-item p {
+    color: #4b6574;
+    font-weight: 540;
+  }
+
+  .pte-path-link {
+    align-items: center;
+    background: rgba(8, 127, 140, 0.08);
+    border: 1px solid rgba(8, 127, 140, 0.16);
+    border-radius: 999px;
+    color: #087f8c;
+    display: inline-flex;
+    font-size: 0.86rem;
+    font-weight: 820;
+    gap: 0.35rem;
+    margin-top: 0.7rem;
+    padding: 0.42rem 0.65rem;
+    text-decoration: none;
+  }
+
+  .pte-path-link:hover,
+  .pte-path-link:focus {
+    background: rgba(8, 127, 140, 0.14);
+    border-color: rgba(8, 127, 140, 0.28);
+    color: #065d67;
+    text-decoration: none;
+  }
+
+  .pte-info-section {
+    align-items: start;
+    display: grid;
+    gap: clamp(1.4rem, 3vw, 2.35rem);
+    grid-template-columns: minmax(0, 1.28fr) minmax(260px, 0.72fr);
+    overflow: hidden;
+    padding: clamp(1.4rem, 3vw, 2.8rem) 0;
+    position: relative;
+  }
+
+  .pte-info-section::before {
+    color: rgba(12, 92, 199, 0.055);
+    content: "PTE";
+    font-size: clamp(7rem, 18vw, 16rem);
+    font-weight: 950;
+    letter-spacing: -0.1em;
+    line-height: 0.75;
+    pointer-events: none;
+    position: absolute;
+    right: clamp(-0.8rem, 2vw, 2rem);
+    top: 0;
+    z-index: 0;
+  }
+
+  .pte-info-section::after {
+    background:
+      radial-gradient(circle at center, rgba(0, 159, 176, 0.15), rgba(0, 159, 176, 0) 64%),
+      linear-gradient(135deg, rgba(12, 92, 199, 0.08), rgba(255, 255, 255, 0));
+    border-radius: 999px;
+    content: "";
+    height: 18rem;
+    pointer-events: none;
+    position: absolute;
+    right: -7rem;
+    top: -4rem;
+    width: 18rem;
+    z-index: 0;
+  }
+
+  .pte-info-main,
+  .pte-info-side {
+    position: relative;
+    z-index: 1;
+  }
+
+  .pte-info-main {
+    border-left: 5px solid var(--pte-blue);
+    padding-left: clamp(0.9rem, 2vw, 1.55rem);
+  }
+
+  .pte-info-lead {
+    color: #284a60;
+    font-size: clamp(1.05rem, 1.65vw, 1.28rem);
+    line-height: 1.74;
+    margin: 0 0 1.15rem;
+    max-width: 850px;
+  }
+
+  .pte-info-points {
+    display: grid;
+    gap: 0.78rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .pte-info-points li {
+    align-items: flex-start;
+    color: #2b4658;
+    display: grid;
+    gap: 0.7rem;
+    grid-template-columns: 34px minmax(0, 1fr);
+    line-height: 1.5;
+    padding: 0.16rem 0;
+  }
+
+  .pte-info-points i {
+    align-items: center;
+    background: linear-gradient(135deg, var(--pte-blue), var(--pte-green));
+    border-radius: 999px;
+    color: #ffffff;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 1rem;
+    height: 30px;
+    justify-content: center;
+    margin-top: 0.02rem;
+    width: 30px;
+  }
+
+  .pte-info-side {
+    display: grid;
+    gap: 1rem;
+    padding-top: clamp(1.2rem, 5vw, 3.1rem);
+  }
+
+  .pte-type-card {
+    background: transparent;
+    border: 0;
+    border-left: 0;
+    border-radius: 0;
+    padding: 0 0 1.05rem 1.1rem;
+    position: relative;
+  }
+
+  .pte-type-card::before {
+    background: linear-gradient(180deg, var(--pte-blue), var(--pte-green));
+    border-radius: 999px;
+    bottom: 1.05rem;
+    content: "";
+    left: 0;
+    position: absolute;
+    top: 0.15rem;
+    width: 4px;
+  }
+
+  .pte-type-card:nth-child(2)::before {
+    background: linear-gradient(180deg, var(--pte-amber), #f97316);
+  }
+
+  .pte-skills-section {
+    background:
+      radial-gradient(circle at 9% 12%, rgba(12, 92, 199, 0.14), transparent 30%),
+      radial-gradient(circle at 88% 28%, rgba(8, 127, 140, 0.15), transparent 32%),
+      linear-gradient(135deg, #f7fbff 0%, #eef8f5 52%, #ffffff 100%);
+    border: 1px solid #dbe8ef;
+    border-radius: 18px;
+    box-shadow: 0 20px 58px rgba(18, 48, 70, 0.08);
+    overflow: hidden;
+    padding: clamp(1.25rem, 3vw, 2rem);
+    position: relative;
+  }
+
+  .pte-skills-section::before {
+    color: rgba(12, 92, 199, 0.045);
+    content: "Skill";
+    font-size: clamp(6.5rem, 17vw, 15rem);
+    font-weight: 950;
+    letter-spacing: -0.11em;
+    line-height: 0.8;
+    pointer-events: none;
+    position: absolute;
+    right: -1.6rem;
+    top: 0.4rem;
+    z-index: 0;
+  }
+
+  .pte-skills-header {
+    align-items: flex-start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1.2rem;
+    position: relative;
+    z-index: 2;
+  }
+
+  .pte-skills-section .pte-section-heading {
+    margin: 0;
+    max-width: 760px;
+  }
+
+  .pte-skills-metrics {
+    display: flex;
+    gap: 0.7rem;
+    justify-content: flex-end;
+    min-width: fit-content;
+  }
+
+  .pte-skills-metrics div {
+    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid rgba(198, 218, 231, 0.86);
+    border-radius: 16px;
+    box-shadow: 0 14px 34px rgba(17, 54, 78, 0.08);
+    min-width: 112px;
+    padding: 0.78rem 0.9rem;
+  }
+
+  .pte-skills-metrics strong {
+    color: #0d4fa9;
+    display: block;
+    font-size: 1.55rem;
+    font-weight: 920;
+    line-height: 1;
+  }
+
+  .pte-skills-metrics span {
+    color: #506a7a;
+    display: block;
+    font-size: 0.74rem;
+    font-weight: 820;
+    letter-spacing: 0.04em;
+    margin-top: 0.3rem;
+    text-transform: uppercase;
+  }
+
+  .pte-skill-showcase {
+    color: #13222c;
+    overflow: visible;
+    padding: 0;
+    position: relative;
+    z-index: 2;
+  }
+
+  .pte-skill-showcase::before {
+    display: none;
+  }
+
+  .pte-skill-tabs.carousel-indicators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    justify-content: flex-start;
+    margin: 0 0 1rem;
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    z-index: 3;
+  }
+
+  .pte-skill-tabs [data-bs-target] {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(184, 207, 221, 0.94);
+    border-radius: 999px;
+    box-shadow: 0 10px 24px rgba(17, 54, 78, 0.07);
+    color: #274657;
+    display: inline-flex;
+    gap: 0.46rem;
+    height: auto;
+    margin: 0;
+    min-height: 42px;
+    opacity: 1;
+    padding: 0.55rem 0.86rem;
+    text-indent: 0;
+    transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, transform 180ms ease;
+    width: auto;
+  }
+
+  .pte-skill-tabs [data-bs-target] i {
+    color: #0d73a8;
+    font-size: 1rem;
+  }
+
+  .pte-skill-tabs [data-bs-target].active,
+  .pte-skill-tabs [data-bs-target]:hover,
+  .pte-skill-tabs [data-bs-target]:focus {
+    background: linear-gradient(135deg, var(--pte-blue), var(--pte-green));
+    border-color: transparent;
+    box-shadow: 0 16px 32px rgba(12, 92, 199, 0.2);
+    color: #ffffff;
+    transform: translateY(-2px);
+  }
+
+  .pte-skill-tabs [data-bs-target].active i,
+  .pte-skill-tabs [data-bs-target]:hover i,
+  .pte-skill-tabs [data-bs-target]:focus i {
+    color: #ffffff;
+  }
+
+  .pte-skill-carousel-inner {
+    border-radius: 18px;
+    overflow: hidden;
+    position: relative;
+    z-index: 2;
+  }
+
+  .pte-skill-slide {
+    --skill-a: #087f8c;
+    --skill-b: #13b0a5;
+    --skill-c: #f0b84e;
+    align-items: stretch;
+    background:
+      linear-gradient(90deg, var(--skill-a) 0%, var(--skill-b) 39%, rgba(255, 255, 255, 0.96) 39.1%, #ffffff 100%);
+    border: 1px solid rgba(181, 207, 222, 0.9);
+    border-radius: 18px;
+    box-shadow: 0 18px 48px rgba(18, 48, 70, 0.14);
+    display: grid;
+    gap: clamp(1rem, 2vw, 1.55rem);
+    grid-template-columns: minmax(240px, 0.82fr) minmax(0, 1.18fr);
+    min-height: 390px;
+    overflow: hidden;
+    padding: clamp(1rem, 2vw, 1.35rem);
+    position: relative;
+  }
+
+  .pte-skill-slide::after {
+    background:
+      radial-gradient(circle, rgba(255, 255, 255, 0.36) 1px, transparent 2px);
+    background-size: 18px 18px;
+    content: "";
+    height: 170px;
+    left: 1rem;
+    opacity: 0.58;
+    position: absolute;
+    top: 1rem;
+    width: 190px;
+  }
+
+  .pte-skill-slide--writing {
+    --skill-a: #b94e3f;
+    --skill-b: #df8a36;
+    --skill-c: #ffd080;
+  }
+
+  .pte-skill-slide--reading {
+    --skill-a: #2457c5;
+    --skill-b: #287a54;
+    --skill-c: #9ed8ff;
+  }
+
+  .pte-skill-slide--listening {
+    --skill-a: #4b4fa8;
+    --skill-b: #087f8c;
+    --skill-c: #b8fff5;
+  }
+
+  .pte-skill-visual,
+  .pte-skill-task-panel {
+    position: relative;
+    z-index: 2;
+  }
+
+  .pte-skill-visual {
+    align-items: flex-start;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 310px;
+    padding: clamp(0.8rem, 2vw, 1.25rem);
+  }
+
+  .pte-skill-icon {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 24px;
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
+    color: var(--skill-a);
+    display: inline-flex;
+    font-size: 2.15rem;
+    height: 78px;
+    justify-content: center;
+    margin-bottom: 1.05rem;
+    transform: rotate(-3deg);
+    width: 78px;
+  }
+
+  .pte-skill-kicker {
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 0.82rem;
+    font-weight: 840;
+    margin: 0 0 0.42rem;
+    text-transform: uppercase;
+  }
+
+  .pte-skill-visual h3 {
+    color: #ffffff;
+    font-size: clamp(2.15rem, 4vw, 3.25rem);
+    font-weight: 920;
+    line-height: 1.05;
+    margin: 0 0 0.78rem;
+  }
+
+  .pte-skill-visual p:not(.pte-skill-kicker) {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 1rem;
+    line-height: 1.64;
+    margin: 0;
+    max-width: 430px;
+  }
+
+  .pte-skill-orbit {
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .pte-skill-orbit span {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    display: block;
+    position: absolute;
+  }
+
+  .pte-skill-orbit span:nth-child(1) {
+    height: 180px;
+    left: -48px;
+    top: 28px;
+    width: 180px;
+  }
+
+  .pte-skill-orbit span:nth-child(2) {
+    border-color: rgba(255, 255, 255, 0.16);
+    height: 112px;
+    right: 8%;
+    top: 18%;
+    width: 112px;
+  }
+
+  .pte-skill-orbit span:nth-child(3) {
+    background: var(--skill-c);
+    border: 0;
+    bottom: 2rem;
+    height: 18px;
+    left: 38%;
+    opacity: 0.9;
+    width: 18px;
+  }
+
+  .pte-skill-task-panel {
+    align-self: center;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    color: #13222c;
+    padding: 0.4rem 0.3rem 0.4rem 0;
+  }
+
+  .pte-skill-task-head {
+    align-items: center;
+    border-bottom: 1px solid #dce8ef;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .pte-skill-task-head span {
+    color: var(--skill-a);
+    font-size: 0.82rem;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .pte-skill-task-head strong {
+    background: rgba(8, 127, 140, 0.1);
+    border-radius: 999px;
+    color: #0c5c65;
+    font-size: 0.82rem;
+    padding: 0.38rem 0.7rem;
+    white-space: nowrap;
+  }
+
+  .pte-skill-task-list {
+    display: grid;
+    gap: 0.65rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pte-skill-task {
+    align-items: center;
+    background: #f7fafc;
+    border: 1px solid #dbe8ef;
+    border-left: 4px solid var(--skill-a);
+    border-radius: 15px;
+    display: grid;
+    gap: 0.62rem;
+    grid-template-columns: auto 1fr;
+    min-height: 82px;
+    padding: 0.75rem;
+    transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+  }
+
+  .pte-skill-task:hover {
+    background: #ffffff;
+    border-color: rgba(8, 127, 140, 0.28);
+    transform: translateY(-2px);
+  }
+
+  .pte-skill-task span {
+    align-items: center;
+    background: linear-gradient(135deg, var(--skill-a), var(--skill-b));
+    border-radius: 12px;
+    color: #ffffff;
+    display: inline-flex;
+    font-size: 0.82rem;
+    font-weight: 840;
+    height: 34px;
+    justify-content: center;
+    width: 34px;
+  }
+
+  .pte-skill-task p {
+    color: #314b5a;
+    font-size: 0.94rem;
+    font-weight: 720;
+    line-height: 1.35;
+    margin: 0;
+  }
+
+  .pte-skill-control {
+    background: rgba(19, 34, 44, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.62);
+    border-radius: 999px;
+    bottom: 1.35rem;
+    height: 44px;
+    opacity: 1;
+    top: auto;
+    width: 44px;
+    z-index: 4;
+  }
+
+  .pte-skill-control-prev {
+    left: 1.35rem;
+  }
+
+  .pte-skill-control-next {
+    left: 4.35rem;
+    right: auto;
+  }
+
+  .pte-skill-control:hover,
+  .pte-skill-control:focus {
+    background: var(--pte-blue);
+  }
+
+  .pte-final-cta {
+    align-items: center;
+    background: linear-gradient(135deg, #123142 0%, #0f5f6a 55%, #244a7d 100%);
+    border-radius: 8px;
+    color: #ffffff;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-top: 3.5rem;
+    padding: 1.6rem;
+  }
+
+  .pte-final-cta span {
+    color: #b8fff5;
+  }
+
+  .pte-final-cta h2 {
+    font-size: 1.65rem;
+    font-weight: 830;
+    line-height: 1.18;
+    margin: 0 0 0.48rem;
+  }
+
+  .pte-final-cta p {
+    color: #d9edf3;
+    line-height: 1.58;
+    margin: 0;
+    max-width: 660px;
+  }
+
+  .pte-btn-light {
+    background: #ffffff;
+    border: 1px solid #ffffff;
+    color: #143142;
+  }
+
+  .pte-btn-light:hover,
+  .pte-btn-light:focus {
+    background: #f0b84e;
+    border-color: #f0b84e;
+    color: #143142;
+  }
+
+  .pte-btn-outline-light {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.74);
+    color: #ffffff;
+  }
+
+  .pte-btn-outline-light:hover,
+  .pte-btn-outline-light:focus {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+  }
+
+  @media (max-width: 1199.98px) {
+    .pte-feature-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pte-path-list {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 899.98px) {
+    .pte-path-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 991.98px) {
+    .pte-hero-intro {
+      border-radius: 0;
+    }
+
+    .pte-showcase-block {
+      border-radius: 14px;
+    }
+
+    .pte-showcase-carousel,
+    .pte-showcase-inner,
+    .pte-showcase-item {
+      border-radius: 11px;
+    }
+
+    .pte-highlight-row {
+      grid-template-columns: 1fr;
+    }
+
+    .pte-highlight-chip {
+      min-height: 0;
+    }
+
+    .pte-image-caption {
+      bottom: 0.85rem;
+      left: 0.85rem;
+    }
+
+    .pte-info-section {
+      grid-template-columns: 1fr;
+    }
+
+    .pte-skills-header {
+      flex-direction: column;
+    }
+
+    .pte-skills-metrics {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    .pte-skill-slide {
+      background:
+        linear-gradient(180deg, var(--skill-a) 0%, var(--skill-b) 42%, rgba(255, 255, 255, 0.98) 42.1%, #ffffff 100%);
+      grid-template-columns: 1fr;
+      min-height: 0;
+    }
+
+    .pte-skill-visual {
+      min-height: 250px;
+    }
+
+    .pte-skill-task-panel {
+      align-self: stretch;
+      padding: 0;
+    }
+
+    .pte-final-cta {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .pte-hero-copy p,
+    .pte-info-lead {
+      font-size: 0.98rem;
+    }
+
+    .pte-section-heading h2 {
+      font-size: 1.55rem;
+    }
+
+    .pte-feature-grid,
+    .pte-path-list,
+    .pte-skill-task-list {
+      grid-template-columns: 1fr;
+    }
+
+    .pte-path-section,
+    .pte-skills-section,
+    .pte-final-cta {
+      padding: 1rem;
+    }
+
+    .pte-feature-section,
+    .pte-final-cta {
+      margin-top: 2.5rem;
+    }
+  }
+
+  @media (max-width: 575.98px) {
+    .pte-hero-intro {
+      padding: 1rem 0;
+    }
+
+    .pte-showcase-block {
+      padding: 0.35rem;
+    }
+
+    .pte-public-page .btn {
+      width: 100%;
+    }
+
+    .pte-image-caption {
+      display: none;
+    }
+
+    .pte-skills-metrics div {
+      flex: 1 1 46%;
+      min-width: 0;
+    }
+
+    .pte-skill-showcase {
+      padding: 0;
+    }
+
+    .pte-skill-tabs [data-bs-target] {
+      flex: 1 1 46%;
+      justify-content: center;
+    }
+
+    .pte-skill-slide {
+      padding: 0.9rem;
+    }
+
+    .pte-skill-visual h3 {
+      font-size: 2rem;
+    }
+
+    .pte-skill-control {
+      bottom: 0.95rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pte-showcase-carousel .carousel-item,
+    .pte-skill-showcase .carousel-item {
+      transition: none;
+    }
+  }
+</style>

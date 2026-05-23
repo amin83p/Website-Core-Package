@@ -1,0 +1,209 @@
+<%
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+%>
+
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print: true,
+  manageBtns: [
+    '<a href="' + dashboardHref + '" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> PTE Dashboard</a>',
+    '<a href="/pte/tests/runtime/ledger" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-journal-text me-1"></i> Attempt Ledger</a>',
+    '<a href="/pte/tests/blueprint-guide" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-diagram-3 me-1"></i> Test Configuration Guide</a>'
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search tests by title, code, family, status, or tags...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Test</th>
+        <th>Family / Revision</th>
+        <th>Status</th>
+        <th>Skill Coverage</th>
+        <th>Validation</th>
+        <th>Creator</th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || data.length === 0) { %>
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">No test versions found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const summary = item.summary || {}; %>
+        <% const creator = item.creator || {}; %>
+        <% const validation = item.validation || {}; %>
+        <% const status = String(item.status || 'draft').toLowerCase(); %>
+        <% const statusClass = status === 'published' ? 'bg-success' : (status === 'archived' ? 'bg-secondary' : 'bg-info text-dark'); %>
+        <% const skillCounts = summary.skillCounts || {}; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.title || '-' %></div>
+            <div class="x-small text-muted">Code: <span class="font-monospace"><%= item.code || '-' %></span></div>
+            <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
+          </td>
+          <td>
+            <div class="small font-monospace text-dark"><%= item.familyId || '-' %></div>
+            <div class="x-small text-muted">Revision <%= Number(item.revisionNumber || 0) %></div>
+            <div class="x-small mt-1">
+              <span class="badge <%= item.isLatestRevision ? 'bg-primary' : 'bg-light text-dark border' %>"><%= item.isLatestRevision ? 'Latest' : 'Older' %></span>
+            </div>
+          </td>
+          <td>
+            <span class="badge <%= statusClass %> text-capitalize"><%= status %></span>
+          </td>
+          <td>
+            <div class="x-small text-muted">
+              S: <%= Number(skillCounts.speaking || 0) %> |
+              W: <%= Number(skillCounts.writing || 0) %> |
+              R: <%= Number(skillCounts.reading || 0) %> |
+              L: <%= Number(skillCounts.listening || 0) %>
+            </div>
+            <div class="small text-dark mt-1">Total: <%= Number(summary.questionCount || 0) %> question(s)</div>
+          </td>
+          <td>
+            <div class="small <%= validation.isValid ? 'text-success' : 'text-danger' %>">
+              <%= validation.isValid ? 'Valid' : 'Has Validation Errors' %>
+            </div>
+            <div class="x-small text-muted">Errors: <%= Number(summary.validationErrors || 0) %></div>
+            <div class="x-small text-muted">Retired Warnings: <%= Number(summary.retiredWarnings || 0) %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= creator.displayName || (creator.type === 'system' ? 'System' : '-') %></div>
+            <div class="x-small text-muted font-monospace"><%= creator.userId || 'System' %></div>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/pte/tests/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <a href="/pte/tests/preview/exam/<%= item.id %>" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-eye me-2"></i>Preview
+                </a>
+                <% if (status === 'draft') { %>
+                  <button class="btn btn-outline-success btn-sm pte-test-action-btn" data-method="POST" data-action="publish" data-id="<%= item.id %>" data-url="/pte/tests/publish/<%= item.id %>">
+                    <i class="bi bi-upload me-2"></i>Publish
+                  </button>
+                <% } %>
+                <% if (status === 'published' || status === 'archived') { %>
+                  <button class="btn btn-outline-info btn-sm pte-test-action-btn" data-method="POST" data-action="revise" data-id="<%= item.id %>" data-url="/pte/tests/revise/<%= item.id %>">
+                    <i class="bi bi-arrow-repeat me-2"></i>Revise
+                  </button>
+                <% } %>
+                <% if (status !== 'archived') { %>
+                  <button class="btn btn-outline-secondary btn-sm pte-test-action-btn" data-method="POST" data-action="archive" data-id="<%= item.id %>" data-url="/pte/tests/archive/<%= item.id %>">
+                    <i class="bi bi-archive me-2"></i>Archive
+                  </button>
+                <% } %>
+                <% if (status === 'draft') { %>
+                  <button class="btn btn-outline-danger btn-sm pte-test-action-btn" data-method="DELETE" data-action="delete" data-id="<%= item.id %>" data-url="/pte/tests/delete/<%= item.id %>">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </button>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('../../partials/tablePages-end') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const actionStateRef = document.getElementById('actionStateIdRef');
+  const actionStateId = actionStateRef ? String(actionStateRef.getAttribute('data-id') || '').trim() : '';
+
+  async function showMessage(title, message, icon = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title,
+        message,
+        icon,
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }]
+      });
+      return;
+    }
+    alert(title + ': ' + message);
+  }
+
+  async function runRowAction(button) {
+    const action = String(button.getAttribute('data-action') || '').trim();
+    const id = String(button.getAttribute('data-id') || '').trim();
+    const url = String(button.getAttribute('data-url') || '').trim();
+    const method = String(button.getAttribute('data-method') || 'POST').toUpperCase();
+    if (!id || !url || !action) return;
+
+    if (action === 'delete') {
+      const ok = window.confirm('Delete this draft test version?');
+      if (!ok) return;
+    }
+
+    button.disabled = true;
+    const originalHtml = button.innerHTML;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Working...';
+
+    try {
+      const endpoint = url + '?actionStateId=' + encodeURIComponent(actionStateId);
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.status !== 'success') {
+        throw new Error((result && result.message) || ('Request failed with status ' + response.status + '.'));
+      }
+
+      await showMessage('Success', result.message || 'Operation completed.', 'success');
+
+      if (action === 'revise' && result.results && result.results.id) {
+        window.location.href = '/pte/tests/edit/' + encodeURIComponent(result.results.id);
+        return;
+      }
+      window.location.reload();
+    } catch (error) {
+      await showMessage('Operation Failed', error.message || 'Unexpected operation error.', 'error');
+      button.disabled = false;
+      button.innerHTML = originalHtml;
+    }
+  }
+
+  document.querySelectorAll('.pte-test-action-btn').forEach((button) => {
+    button.addEventListener('click', () => runRowAction(button));
+  });
+});
+</script>

@@ -22,7 +22,6 @@ PTE route and controller implementations depend on these helpers for upload cont
 
 ## Remaining Work
 
-- Prepare package-local view/public asset ownership for PTE-specific files.
+- Step 22 prepared package-local view/public asset ownership for PTE-specific files.
 - Map PTE scripts, docs, and package-local tests before moving real implementations.
 - Keep storage internals in core and continue consuming them through `coreFilesService` and upload folder settings.
-

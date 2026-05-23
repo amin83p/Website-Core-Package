@@ -1,0 +1,69 @@
+<%
+  const help = (typeof guidance !== 'undefined' && guidance && typeof guidance === 'object') ? guidance : {};
+  const useCases = Array.isArray(help.useCases) ? help.useCases : [];
+  const notes = Array.isArray(help.notes) ? help.notes : [];
+  const defaults = help.defaults || {};
+  const dashboardHref = typeof pteSectionDashboardHref === 'string' && pteSectionDashboardHref
+    ? pteSectionDashboardHref
+    : '/dashboard';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><%= title || 'PTE AI Scoring Help' %></h1>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="/pte/ai-assisst/scoring-settings" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-arrow-left me-1"></i> Scoring Settings
+      </a>
+      <a href="<%= dashboardHref %>" class="btn btn-filled btn-secondary btn-md">
+        <i class="bi bi-speedometer2 me-1"></i> PTE Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="alert alert-info mb-4">
+    Use the default provider for general AI Assist, then assign stronger or audio-capable models only to scorers that need them.
+  </div>
+
+  <div class="form-container wide" style="max-width: 1450px;">
+    <section class="border rounded bg-white p-3 shadow-sm mb-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <h2 class="h6 fw-bold m-0"><i class="bi bi-cpu me-2"></i>Model Guidance</h2>
+        <span class="badge bg-light text-dark border">OpenAI vision default: <%= defaults.openAiVisionModelDefault || 'gpt-5.4-mini' %></span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Use Case</th>
+              <th>How To Choose</th>
+              <th>Gemini</th>
+              <th>OpenAI</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% useCases.forEach((row) => { %>
+              <tr>
+                <td class="fw-semibold"><%= row.title || '' %></td>
+                <td><%= row.guidance || '' %></td>
+                <td><%= row.gemini || '' %></td>
+                <td><%= row.openai || '' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="border rounded bg-white p-3 shadow-sm">
+      <h2 class="h6 fw-bold mb-3"><i class="bi bi-info-circle me-2"></i>Setup Notes</h2>
+      <ul class="mb-0 ps-3">
+        <% notes.forEach((note) => { %>
+          <li class="mb-2"><%= note %></li>
+        <% }) %>
+        <li class="mb-0">Change the Describe Image OpenAI vision pre-pass model with <code><%= defaults.openAiVisionModelEnv || 'PTE_OPENAI_DESCRIBE_IMAGE_VISION_MODEL_ID' %></code>.</li>
+      </ul>
+    </section>
+  </div>
+</div>
