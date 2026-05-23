@@ -361,6 +361,90 @@ test('Gemini Flash Describe Image scorer recovers transcript with audio-only fol
   }
 });
 
+test('Describe Image scorer runs strict transcript recovery when primary transcript looks truncated', async () => {
+  const tmpAudioPath = path.join(os.tmpdir(), `pte-describe-image-partial-transcript-${Date.now()}.webm`);
+  await fs.writeFile(tmpAudioPath, Buffer.from('fake-audio'));
+  const calls = [];
+
+  pteAiProviderDataService.resolveRuntimeProvider = async () => ({
+    providerId: 'google-gemini',
+    modelId: 'gemini-2.5-flash',
+    credentials: {},
+    providerRecord: {
+      id: 'PROVIDER-FLASH',
+      name: 'Gemini Flash'
+    }
+  });
+  pteAiProviderService.sendPrompt = async (payload) => {
+    calls.push(payload);
+    if (calls.length <= 2) {
+      return {
+        provider: 'google-gemini',
+        modelUsed: 'gemini-2.5-flash',
+        text: '{"transcript":"The line chart shows sales increasing and","microResponses":[{"id":"content_main_idea","choice":"yes","evidence":"main trend","confidence":0.8},{"id":"content_key_details","choice":"partial","evidence":"some details","confidence":0.8},{"id":"content_visual_accuracy","choice":"yes","evidence":"accurate","confidence":0.8},{"id":"pronunciation_quality","choice":"good","evidence":"clear","confidence":0.8},{"id":"fluency_quality","choice":"developing","evidence":"some hesitation","confidence":0.8}],"content":{"score":1},"pronunciation":{"score":1},"fluency":{"score":1},"speechMetrics":{"estimatedWpm":110},"confidence":0.8,"warnings":[]}',
+        usage: { promptTokenCount: 24, candidatesTokenCount: 8, totalTokenCount: 32 }
+      };
+    }
+    return {
+      provider: 'google-gemini',
+      modelUsed: 'gemini-2.5-flash',
+      text: '{"transcript":"The line chart shows sales increasing steadily until 2024.","confidence":0.86,"speechMetrics":{"estimatedWpm":112},"warnings":[]}',
+      usage: { promptTokenCount: 12, candidatesTokenCount: 5, totalTokenCount: 17 }
+    };
+  };
+
+  try {
+    const result = await scoreDescribeImageAttemptItem({
+      session: { id: 'session-1' },
+      item: {
+        id: 'item-1',
+        questionType: 'speaking_describe_image',
+        artifactIds: ['audio-1'],
+        metadata: {}
+      },
+      question: {
+        questionType: 'speaking_describe_image',
+        payload: {
+          imageCaption: 'A line chart showing sales increasing from 2020 to 2024.',
+          expectedKeyPoints: ['Sales rise over time', '2024 is the highest point'],
+          chartType: 'line_chart'
+        }
+      },
+      artifacts: [
+        {
+          id: 'audio-1',
+          artifactType: 'audio',
+          mimeType: 'audio/webm',
+          path: tmpAudioPath
+        }
+      ],
+      responsePayload: {
+        artifactId: 'audio-1',
+        audioDurationSeconds: 28
+      },
+      scoringConfig: {
+        contentMax: 5,
+        pronunciationMax: 5,
+        fluencyMax: 5
+      }
+    }, {});
+
+    assert.equal(result.status, 'scored');
+    assert.equal(calls.length, 3);
+    assert.equal(Boolean(calls[0].responseSchema), true);
+    assert.equal(calls[1].responseSchema, undefined);
+    assert.equal(calls[2].requestLabel, 'pte-describe-image-transcript-recovery-v1');
+    assert.equal(result.metadata.transcript, 'The line chart shows sales increasing steadily until 2024.');
+    const recoveryUser = calls[2].messages.find((row) => row.role === 'user');
+    const recoveryPrompt = Array.isArray(recoveryUser?.content)
+      ? String(recoveryUser.content[0]?.text || '')
+      : String(recoveryUser?.content || '');
+    assert.equal(recoveryPrompt.includes('complete verbatim transcript'), true);
+  } finally {
+    await fs.unlink(tmpAudioPath).catch(() => {});
+  }
+});
+
 test('Describe Image scorer recovers micro rubric when prompt image file is missing but text context exists', async () => {
   const tmpAudioPath = path.join(os.tmpdir(), `pte-describe-image-missing-image-${Date.now()}.wav`);
   const missingImagePath = path.join(os.tmpdir(), `pte-describe-image-missing-${Date.now()}.png`);

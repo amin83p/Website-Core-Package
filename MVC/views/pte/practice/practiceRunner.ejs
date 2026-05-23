@@ -4358,6 +4358,7 @@
   const runnerConfig = parseJson('ptePracticeRunnerConfigJson', {});
   const strictMockExam = (runnerConfig && clean(runnerConfig.mode).toLowerCase() === 'strict_mock_exam')
     || clean(session?.metadata?.mockExam?.mode).toLowerCase() === 'strict';
+  const canRescoreSameRevision = runnerConfig?.permissions?.canRescoreSameRevision === true;
   const runtimeBasePath = clean(runnerConfig?.endpoints?.base || (strictMockExam ? '/pte/practice/mock-exams/api/runtime' : '/pte/practice/api/runtime'));
   const completionUrl = clean(runnerConfig?.completionUrl || (strictMockExam ? ('/pte/practice/mock-exams/session/' + encodeURIComponent(clean(session.id)) + '/complete') : '/pte/practice/by-skills'));
   const actionStateId = clean(document.getElementById('ptePracticeActionStateId')?.value);
@@ -7892,7 +7893,9 @@
   function canScoreAutomatedItem(item) {
     if (!item || !isAutomatedScoringQuestion(item)) return false;
     if (isSessionClosedForEditing()) return false;
-    return ['saved', 'submitted', 'auto_submitted', 'scored', 'feedback_provided'].includes(clean(item.status || '').toLowerCase());
+    const status = clean(item.status || '').toLowerCase();
+    if (!canRescoreSameRevision && (status === 'scored' || status === 'feedback_provided')) return false;
+    return ['saved', 'submitted', 'auto_submitted', 'scored', 'feedback_provided'].includes(status);
   }
 
   function syncScoreButtonForItem(item) {
@@ -8431,7 +8434,10 @@
     const item = getActiveItem();
     if (!item) return;
     if (!canScoreAutomatedItem(item)) {
-      await showMessage('Score Unavailable', 'Save a scorable response before scoring it. Already scored responses can be scored again.', 'info');
+      const message = canRescoreSameRevision
+        ? 'Save a scorable response before scoring it. Already scored responses can be scored again.'
+        : 'Save a scorable response before scoring it. Re-scoring the same saved response is disabled for standard users.';
+      await showMessage('Score Unavailable', message, 'info');
       return;
     }
 
@@ -8444,12 +8450,15 @@
       const responseRevision = toInt(item?.metadata?.responseRevision, 0);
       responsePayload.coaching = normalizeCoachingRuntime(runtime.coaching || {});
       if (responseRevision > 0) responsePayload.responseRevision = responseRevision;
+      const statusToken = clean(item?.status || '').toLowerCase();
+      const forceRescore = canRescoreSameRevision && (statusToken === 'scored' || statusToken === 'feedback_provided');
       scoringLoadingToken = showScoringWaitModal(item, responsePayload, responseSummary);
       const result = await withTimeout(
         postRuntime(runtimeEndpoint('/' + encodeURIComponent(clean(session.id))) + '/items/' + encodeURIComponent(clean(item.id)) + '/score', {
           responseSummary,
           responsePayload,
           responseRevision,
+          forceRescore,
           source: {
             module: 'pte_practice_runner_ui',
             eventType: clean(getQuestionTypeToken(item) || 'speaking_item') + '_score_requested',

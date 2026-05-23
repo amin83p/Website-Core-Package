@@ -690,7 +690,7 @@ test('saved Describe Image response is scored through the scoring framework', as
   assert.equal(state.events.some((event) => event.eventType === 'score_recorded'), true);
 });
 
-test('explicit Read Aloud scoring consumes rule call/token quota, records actual tokens, and allows rescoring', async () => {
+test('explicit Read Aloud scoring consumes quota once and reuses score on same response for non-admin users', async () => {
   installRuntimeStubs({ questionType: 'speaking_read_aloud' });
   const requestingUser = {
     id: 'USR-1',
@@ -854,17 +854,89 @@ test('explicit Read Aloud scoring consumes rule call/token quota, records actual
   );
 
   assert.equal(second.autoScoring.status, 'scored');
+  assert.equal(second.autoScoring.reused, true);
   assert.equal(second.item.status, 'scored');
-  assert.equal(second.item.scoreRevisionCount, 2);
-  assert.equal(quotaCalls.filter((entry) => entry.type === 'evaluate').length, 2);
-  assert.equal(quotaCalls.filter((entry) => entry.type === 'consumeCall').length, 2);
-  assert.equal(quotaCalls.filter((entry) => entry.type === 'recordTokens').length, 2);
-  assert.equal(quotaCalls.filter((entry) => entry.type === 'rebuild').length, 2);
+  assert.equal(second.item.scoreRevisionCount, 1);
+  assert.equal(quotaCalls.filter((entry) => entry.type === 'evaluate').length, 1);
+  assert.equal(quotaCalls.filter((entry) => entry.type === 'consumeCall').length, 1);
+  assert.equal(quotaCalls.filter((entry) => entry.type === 'recordTokens').length, 1);
+  assert.equal(quotaCalls.filter((entry) => entry.type === 'rebuild').length, 1);
   const scoringCallKeys = quotaCalls
     .filter((entry) => entry.type === 'consumeCall')
     .map((entry) => entry.input?.source?.idempotencyKey)
     .filter(Boolean);
-  assert.equal(new Set(scoringCallKeys).size, 2);
+  assert.equal(new Set(scoringCallKeys).size, 1);
+});
+
+test('explicit Read Aloud scoring allows super-admin users to rescore the same response revision', async () => {
+  installRuntimeStubs({ questionType: 'speaking_read_aloud' });
+  const requestingUser = { id: 'USR-1', activeOrgId: 'ORG-1', isVirtualSuperAdmin: true };
+  const scoringOptions = {
+    scoringOptions: {
+      aiAnalysis: {
+        transcript: 'The quick brown fox jumps.',
+        pronunciation: { score: 5, evidence: ['Clear pronunciation.'] },
+        fluency: { score: 4, evidence: ['Smooth pace.'] },
+        microResponses: speakingQualityMicroResponses({ pronunciation: 'excellent', fluency: 'good' }),
+        speechMetrics: {
+          speechDurationSeconds: 3.8,
+          estimatedWpm: 78
+        },
+        confidence: 0.9
+      },
+      provider: {
+        providerId: 'test-provider',
+        modelUsed: 'test-model',
+        tokenUsage: {
+          promptTokenCount: 200,
+          candidatesTokenCount: 121,
+          totalTokenCount: 321
+        }
+      }
+    }
+  };
+
+  await pteAttemptLedgerService.saveAttemptItem(
+    'S-RA-1',
+    'I-RA-1',
+    {
+      responsePayload: {
+        artifactId: 'AUDIO-1',
+        audioDurationSeconds: 3.8
+      },
+      responseSummary: { kind: 'speaking', audioDurationSeconds: 3.8 },
+      source: {
+        module: 'pte_practice_runner_ui',
+        eventType: 'response_saved',
+        eventId: 'PTE-PRACTICE-SAVE-I-RA-1-ADMIN-RESCORE'
+      }
+    },
+    requestingUser,
+    {},
+    {}
+  );
+
+  const first = await pteAttemptLedgerService.scoreAttemptItem(
+    'S-RA-1',
+    'I-RA-1',
+    {},
+    requestingUser,
+    {},
+    scoringOptions
+  );
+  const second = await pteAttemptLedgerService.scoreAttemptItem(
+    'S-RA-1',
+    'I-RA-1',
+    {},
+    requestingUser,
+    {},
+    scoringOptions
+  );
+
+  assert.equal(first.autoScoring.status, 'scored');
+  assert.equal(second.autoScoring.status, 'scored');
+  assert.equal(Boolean(second.autoScoring.reused), false);
+  assert.equal(second.item.scoreRevisionCount, 2);
 });
 
 test('submitting unsupported speaking item remains submitted and unscored', async () => {

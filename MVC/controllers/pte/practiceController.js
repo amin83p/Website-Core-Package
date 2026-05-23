@@ -2,6 +2,7 @@ const path = require('path');
 const coreFilesService = require('../../services/coreFilesService');
 const uploadMiddleware = require('../../middleware/upload');
 const securityService = require('../../services/security');
+const adminChekersService = require('../../services/adminChekersService');
 const pteAttemptLedgerService = require('../../services/pte/pteAttemptLedgerService');
 const pteSmartPracticeService = require('../../services/pte/pteSmartPracticeService');
 const pteQuestionVersionRepository = require('../../repositories/pteQuestionVersionRepository');
@@ -780,12 +781,25 @@ async function showPracticeRunner(req, res) {
       buildPracticeAccessContext(req)
     );
 
+    const canRescoreSameRevision = adminChekersService.isSuperAdmin(req.user)
+      || adminChekersService.isAdmin(req.user)
+      || adminChekersService.isOrgAdmin(req.user);
+    const runnerConfig = {
+      ...(req.ptePracticeRunnerConfig || {}),
+      permissions: {
+        ...((req.ptePracticeRunnerConfig && typeof req.ptePracticeRunnerConfig === 'object' && req.ptePracticeRunnerConfig.permissions && typeof req.ptePracticeRunnerConfig.permissions === 'object')
+          ? req.ptePracticeRunnerConfig.permissions
+          : {}),
+        canRescoreSameRevision
+      }
+    };
+
     return res.render('pte/practice/practiceRunner', {
       title: `PTE Practice Session ${session.id}`,
       session,
       items: runnerItems,
       events: Array.isArray(detail?.events) ? detail.events : [],
-      runnerConfig: req.ptePracticeRunnerConfig || {},
+      runnerConfig,
       includeModal: true,
       user: req.user || null,
       actionStateId: req.actionStateId || ''

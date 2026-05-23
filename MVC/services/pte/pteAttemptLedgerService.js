@@ -282,6 +282,70 @@ function canViewDetailedAiScoringProviderErrors(requestingUser) {
     || adminChekersService.isOrgAdmin(requestingUser);
 }
 
+function normalizeBooleanFlag(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  const token = String(value).trim().toLowerCase();
+  if (!token) return fallback;
+  if (['1', 'true', 'yes', 'y', 'on'].includes(token)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(token)) return false;
+  return fallback;
+}
+
+function canRequesterRescoreSameRevision(requestingUser) {
+  return adminChekersService.isSuperAdmin(requestingUser)
+    || adminChekersService.isAdmin(requestingUser)
+    || adminChekersService.isOrgAdmin(requestingUser);
+}
+
+function resolveRequestedResponseRevision(item = {}, payload = {}) {
+  const itemMetadata = isPlainObject(item?.metadata) ? item.metadata : {};
+  return cleanNonNegativeInteger(
+    payload?.responseRevision,
+    cleanNonNegativeInteger(itemMetadata.responseRevision, 0)
+  );
+}
+
+function hasStoredScoredResultForRevision(item = {}, responseRevision = 0) {
+  const itemMetadata = isPlainObject(item?.metadata) ? item.metadata : {};
+  const scoringMetadata = isPlainObject(itemMetadata.scoring) ? itemMetadata.scoring : {};
+  if (!Object.keys(scoringMetadata).length) return false;
+
+  const scoringStatus = cleanString(scoringMetadata.status, { max: 40, allowEmpty: true }).toLowerCase();
+  if (scoringStatus !== 'scored') return false;
+
+  const itemStatus = cleanString(item?.status, { max: 40, allowEmpty: true }).toLowerCase();
+  const hasStoredScore = cleanNonNegativeInteger(item?.scoreRevisionCount, 0) > 0
+    || itemStatus === 'scored'
+    || itemStatus === 'feedback_provided';
+  if (!hasStoredScore) return false;
+
+  const itemRevision = cleanNonNegativeInteger(itemMetadata.responseRevision, 0);
+  const scoringRevision = cleanNonNegativeInteger(scoringMetadata.responseRevision, itemRevision);
+  if (responseRevision > 0) return scoringRevision === responseRevision;
+  if (itemRevision > 0) return scoringRevision === itemRevision;
+  return true;
+}
+
+function buildReusedAutoScoringResult(item = {}, responseRevision = 0) {
+  const metadata = isPlainObject(item?.metadata) ? item.metadata : {};
+  const scoring = isPlainObject(metadata.scoring) ? metadata.scoring : {};
+  return {
+    status: 'scored',
+    reason: 'score_reused_for_current_response_revision',
+    reused: true,
+    result: {
+      status: 'scored',
+      reused: true,
+      metadata: scoring,
+      warnings: Array.isArray(scoring?.warnings) ? scoring.warnings : []
+    },
+    item,
+    responseRevision
+  };
+}
+
 function isAiProviderConfigurationWarning(value) {
   const token = cleanString(value, { max: 2000, allowEmpty: true }).toLowerCase();
   if (!token) return false;
@@ -2314,6 +2378,19 @@ async function tryAutoScoreSubmittedAttemptItem({
     module: 'pte_attempt_scoring',
     eventType: `${questionTypeKey || 'attempt_item'}_auto_score`
   };
+  const requestedResponseRevision = resolveRequestedResponseRevision(item, payload);
+  const canRescoreSameRevision = canRequesterRescoreSameRevision(requestingUser);
+  const forceRescoreRequested = normalizeBooleanFlag(payload?.forceRescore, false)
+    || normalizeBooleanFlag(options?.forceRescore, false);
+  const allowForcedRescore = forceRescoreRequested
+    && (canRescoreSameRevision || options?.allowForceRescore === true);
+  if (
+    !canRescoreSameRevision
+    && !allowForcedRescore
+    && hasStoredScoredResultForRevision(item, requestedResponseRevision)
+  ) {
+    return buildReusedAutoScoringResult(item, requestedResponseRevision);
+  }
   const shouldEnforceScoringQuota = String(session.attemptType || '').toLowerCase() === 'skill_practice_run'
     && isPlainObject(payload?.activityQuotaPolicy);
 

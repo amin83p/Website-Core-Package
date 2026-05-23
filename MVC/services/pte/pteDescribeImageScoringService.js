@@ -259,6 +259,80 @@ function looksLikeTranscriptRefusal(text = '') {
   );
 }
 
+function transcriptWordCount(text = '') {
+  const tokens = s(text, 50000)
+    .toLowerCase()
+    .match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu);
+  return Array.isArray(tokens) ? tokens.length : 0;
+}
+
+function transcriptLooksIncompleteOrTruncated(text = '', options = {}) {
+  const allowLongRefusalFragment = options?.allowLongRefusalFragment === true;
+  const normalized = s(text, 50000).replace(/\s+/g, ' ').trim();
+  if (!normalized) return true;
+  const words = normalized
+    .toLowerCase()
+    .match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu) || [];
+  if (!words.length) return true;
+
+  const last = words[words.length - 1] || '';
+  const previous = words[words.length - 2] || '';
+  const trailingOpeners = new Set([
+    'and',
+    'but',
+    'because',
+    'so',
+    'if',
+    'when',
+    'while',
+    'although',
+    'that',
+    'to',
+    'for',
+    'with',
+    'of',
+    'in',
+    'on',
+    'at',
+    'by',
+    'from',
+    'about',
+    'as',
+    'than',
+    'then',
+    'the',
+    'a',
+    'an',
+    'my',
+    'your',
+    'our',
+    'their',
+    'i',
+    "i'm",
+    'im'
+  ]);
+  if (trailingOpeners.has(last)) return true;
+
+  const canScoreTrailingRefusalFragment = allowLongRefusalFragment && words.length >= 30;
+  const trailingRefusalTokens = new Set(['can', 'cannot', "can't", 'cant', 'could', "couldn't", 'couldnt', 'will', "won't", 'wont', 'unable', 'able', 'not']);
+  if (!canScoreTrailingRefusalFragment && trailingRefusalTokens.has(last)) return true;
+  if (!canScoreTrailingRefusalFragment && (previous === 'cannot' || previous === "can't" || previous === 'cant' || previous === 'unable' || previous === 'not') && last === 'to') {
+    return true;
+  }
+  if (!canScoreTrailingRefusalFragment && previous === 'can' && last === 'not') return true;
+  if ((previous === 'and' || previous === 'but' || previous === 'because') && (last === "i'm" || last === 'im' || last === 'i')) {
+    return true;
+  }
+  if (/(?:\band\s+i'?m|\band\s+i|\bbecause\s+i|\bbut\s+i'?m)\s*$/i.test(normalized)) {
+    return true;
+  }
+  return false;
+}
+
+function transcriptTooIncompleteToScore(text = '') {
+  return transcriptLooksIncompleteOrTruncated(text, { allowLongRefusalFragment: true });
+}
+
 function normalizeTranscriptCandidate(value, max = 50000) {
   if (value === undefined || value === null) return '';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -1548,6 +1622,9 @@ function buildAudioAnalysisPrompt({
     'Use the audio as the only source for what the candidate said; ignore any typed transcript notes.',
     'Return strict JSON only.',
     'Required JSON keys: transcript, microResponses, speechMetrics, confidence, warnings.',
+    'Return the complete verbatim transcript from beginning to end.',
+    'Do not summarize or paraphrase the spoken response.',
+    'Do not stop at the first clause or sentence; include every spoken word until the audio ends.',
     'Do not provide final trait scores for content, pronunciation, or fluency; the server will aggregate the micro responses deterministically.',
     `The server will map content to 0-${contentMax}, pronunciation to 0-${pronunciationMax}, and fluency to 0-${fluencyMax}.`,
     buildMicroRubricPrompt('speaking_describe_image'),
@@ -1640,15 +1717,22 @@ async function sendDescribeImageTranscriptRecoveryRequest({
   audio = {},
   session = {},
   item = {},
+  strictFullTranscript = false,
   requestLabel = 'pte-describe-image-transcript-recovery-v1'
 } = {}) {
   const promptText = [
     'Transcribe the attached PTE Describe Image response audio.',
     'Use the audio only. Do not infer words from the image, question, or typed notes.',
+    strictFullTranscript
+      ? 'The previous transcript looked incomplete or cut off. Listen to the whole recording from beginning to end and return the complete verbatim transcript.'
+      : '',
+    strictFullTranscript
+      ? 'Do not stop at the first clause or sentence. Include every spoken word until the audio ends.'
+      : '',
     'Return exactly one JSON object with keys: transcript, confidence, speechMetrics, warnings.',
     'transcript must contain only the words actually spoken by the candidate.',
     'If there is no usable speech, set transcript to an empty string and explain why in warnings.'
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   return pteAiProviderService.sendPrompt({
     messages: [
@@ -1904,7 +1988,9 @@ async function recoverDescribeImageTranscriptIfMissing({
   item = {}
 } = {}) {
   const analysis = parseAiDescribeImageAnalysis(bundle?.analysis || bundle?.aiAnalysis || bundle);
-  if (s(analysis.transcript, 50000)) return bundle;
+  const transcript = s(analysis.transcript, 50000);
+  const initialLooksIncomplete = transcriptTooIncompleteToScore(transcript);
+  if (transcript && !initialLooksIncomplete) return bundle;
 
   try {
     const recoveryResult = await sendDescribeImageTranscriptRecoveryRequest({
@@ -1912,6 +1998,7 @@ async function recoverDescribeImageTranscriptIfMissing({
       audio,
       session,
       item,
+      strictFullTranscript: Boolean(initialLooksIncomplete),
       requestLabel: 'pte-describe-image-transcript-recovery-v1'
     });
     const recoveryBundle = buildTranscriptRecoveryBundleFromProviderResult(recoveryResult, runtimeProvider);
@@ -2254,12 +2341,14 @@ async function analyzeDescribeImageAudioWithAi({
   ]), visualContextProvider);
   const primaryAnalysis = parseAiDescribeImageAnalysis(primaryBundle?.analysis || {});
   const primaryHasTranscript = Boolean(s(primaryAnalysis.transcript, 50000));
+  const primaryTranscriptLooksIncomplete = transcriptTooIncompleteToScore(primaryAnalysis.transcript);
   const primaryHasUsableMicro = hasUsableDescribeImageMicroResponses(primaryAnalysis, scoringConfig);
-  if (primaryHasTranscript && primaryHasUsableMicro) {
+  if (primaryHasTranscript && !primaryTranscriptLooksIncomplete && primaryHasUsableMicro) {
     return attachDescribeImageContextToAnalysisBundle(primaryBundle, effectiveDescribeImageContext);
   }
 
   const shouldRetryLooseJson = isGeminiRuntimeProvider(activeRuntimeProvider)
+    || primaryTranscriptLooksIncomplete
     || (primaryHasTranscript && !primaryHasUsableMicro);
   if (!shouldRetryLooseJson) {
     return attachDescribeImageContextToAnalysisBundle(primaryBundle, effectiveDescribeImageContext);
@@ -2293,7 +2382,11 @@ async function analyzeDescribeImageAudioWithAi({
     ...(visualContextProvider ? { visualContext: visualContextProvider } : {})
   };
   const retryAnalysis = parseAiDescribeImageAnalysis(retryBundle?.analysis || {});
-  if (s(retryAnalysis.transcript, 50000) && hasUsableDescribeImageMicroResponses(retryAnalysis, scoringConfig)) {
+  if (
+    s(retryAnalysis.transcript, 50000)
+    && !transcriptTooIncompleteToScore(retryAnalysis.transcript)
+    && hasUsableDescribeImageMicroResponses(retryAnalysis, scoringConfig)
+  ) {
     return attachDescribeImageContextToAnalysisBundle(retryBundle, effectiveDescribeImageContext);
   }
   const recoveredBundle = await recoverDescribeImageAnalysisIfNeeded({
@@ -2512,6 +2605,22 @@ function buildMissingTranscriptWarnings(aiAnalysis = {}, provider = {}) {
   ]);
 }
 
+function buildIncompleteTranscriptWarnings(aiAnalysis = {}, responsePayload = {}) {
+  const words = transcriptWordCount(aiAnalysis?.transcript || '');
+  const duration = round2(toFiniteNumber(
+    responsePayload.audioDurationSeconds
+      ?? responsePayload.durationSeconds
+      ?? aiAnalysis?.speechMetrics?.speechDurationSeconds,
+    0
+  ));
+  return normalizeWarnings([
+    'Describe Image transcript appears incomplete or truncated, so the raw score was not recorded.',
+    words > 0 ? `Recovered transcript contains ${words} words and may not represent the full response.` : '',
+    duration > 0 ? `Recorded duration was ${duration} seconds.` : '',
+    ...(Array.isArray(aiAnalysis?.warnings) ? aiAnalysis.warnings : [])
+  ]);
+}
+
 function buildInvalidAnalysisWarnings(aiAnalysis = {}, provider = {}) {
   const providerId = s(provider?.providerId || provider?.provider, 80);
   const model = s(provider?.modelUsed || provider?.modelId, 180);
@@ -2606,6 +2715,15 @@ async function scoreDescribeImageAttemptItem(args = {}, options = {}) {
   const provider = safeObject(analysisBundle?.provider, {});
   if (!s(aiAnalysis.transcript, 50000)) {
     return failedResult(buildMissingTranscriptWarnings(aiAnalysis, provider), {
+      ...scoringBaseContext,
+      aiAnalysis,
+      provider,
+      audioArtifact,
+      imageArtifact
+    });
+  }
+  if (transcriptTooIncompleteToScore(aiAnalysis.transcript)) {
+    return failedResult(buildIncompleteTranscriptWarnings(aiAnalysis, responsePayload), {
       ...scoringBaseContext,
       aiAnalysis,
       provider,
