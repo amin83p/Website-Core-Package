@@ -66,6 +66,8 @@ test('PTE enable script apply creates an enabled registry row and is idempotent'
     assert.equal(firstReport.result.enabled, true);
     assert.equal(firstReport.result.installStatus, 'enabled');
     assert.equal(firstReport.result.metadata.manifestPath, 'packages/pte/package.manifest.json');
+    assert.equal(firstReport.result.metadata.declarationCounts.views, 1);
+    assert.equal(firstReport.result.metadata.declarationCounts.assets, 1);
 
     const second = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--json'], {
       cwd: ROOT_DIR,

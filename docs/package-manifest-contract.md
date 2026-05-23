@@ -45,6 +45,23 @@ This step is **validation-only**. No package loader/runtime mounting is introduc
 - Unknown top-level keys are rejected by default.
 - `dependencies` must contain valid package ids and cannot self-reference.
 
+## View and asset declarations
+
+`views` may declare one package view root or a small set of roots. Supported fields include:
+
+- `path`, `paths`, `root`, `roots`, `rootPath`, or `viewRoot`
+- `metadataOnly`
+- `active`
+
+`assets` may declare one package static asset root. Supported fields include:
+
+- `path`, `root`, `rootPath`, `assetRoot`, or `directory`
+- `publicPath`, `publicMountPath`, `mountPath`, or `urlPath`
+- `metadataOnly`
+- `active`
+
+When `metadataOnly` is true, the loader validates and prepares the declaration but does not change Express runtime mounting.
+
 ## Implementation
 
 Validator service:

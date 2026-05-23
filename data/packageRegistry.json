@@ -12,6 +12,8 @@
       "activationMode": "manual",
       "declarationCounts": {
         "routes": 6,
+        "views": 1,
+        "assets": 1,
         "operations": 1,
         "roles": 5,
         "sections": 26,

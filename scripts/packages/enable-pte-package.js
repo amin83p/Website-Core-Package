@@ -23,8 +23,15 @@ function loadPteManifest() {
 }
 
 function countDeclarations(manifest = {}) {
+  const countObjectDeclaration = (value) => (
+    value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length
+      ? 1
+      : 0
+  );
   return {
     routes: manifest.routes.length,
+    views: countObjectDeclaration(manifest.views),
+    assets: countObjectDeclaration(manifest.assets),
     operations: manifest.operations.length,
     roles: manifest.roles.length,
     sections: manifest.sections.length,

@@ -68,6 +68,9 @@ test('PTE package manifest validates and declares real PTE package surface', () 
   assert.equal(manifest.id, 'pte');
   assert.equal(manifest.mountPath, '/pte');
   assert.equal(manifest.queryExecutors.length, 0);
+  assert.equal(manifest.views.path, 'MVC/views/pte');
+  assert.equal(manifest.assets.path, 'public/scripts');
+  assert.equal(manifest.assets.metadataOnly, true);
   assert.ok(manifest.roles.some((role) => role.key === 'pte_student'));
   assert.ok(manifest.roles.some((role) => role.key === 'pte_student_public'));
   assert.ok(manifest.sections.some((section) => section.name === 'PTE_PUBLIC_APPLICANTS'));
@@ -96,6 +99,8 @@ test('PTE enable script dry-run reports registry upsert without writing', () => 
   assert.equal(report.payload.packageId, 'pte');
   assert.equal(report.payload.enabled, true);
   assert.equal(report.payload.installStatus, 'enabled');
+  assert.equal(report.payload.metadata.declarationCounts.views, 1);
+  assert.equal(report.payload.metadata.declarationCounts.assets, 1);
   assert.equal(fs.existsSync(registryPath), false);
 });
 

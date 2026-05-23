@@ -107,3 +107,7 @@ These remain core-owned boundaries. The later move should update import paths or
 - `app.js` still hardcodes `/pte`.
 - The PTE manifest still keeps `/pte` runtime routing metadata-only.
 - Step 12 package activation and route-order tests continue to pass.
+
+## Step 14 Follow-Up
+
+Step 14 adds package-aware view and asset loading support. PTE still remains physically in the current MVC/public locations, and its asset declaration stays metadata-only to avoid changing public script URLs.

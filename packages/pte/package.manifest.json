@@ -49,6 +49,20 @@
     }
   ],
   "queryExecutors": [],
+  "views": {
+    "id": "pte-views-current",
+    "root": "MVC/views",
+    "path": "MVC/views/pte",
+    "namespace": "pte",
+    "active": true
+  },
+  "assets": {
+    "id": "pte-current-public-scripts",
+    "path": "public/scripts",
+    "publicPath": "/scripts",
+    "metadataOnly": true,
+    "active": true
+  },
   "operations": [
     {
       "id": "935362",
