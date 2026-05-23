@@ -21,7 +21,6 @@ The package route entrypoint can now resolve its own controller boundary from in
 
 ## Remaining Work
 
-- Add package-local service shims for PTE service dependencies.
+- Step 19 added package-local service shims for PTE service dependencies.
 - Move package-local controller implementations only after service, model, repository, view, and asset dependencies are ready.
 - Keep current compatibility shims until the package route tree can run independently from the hardcoded MVC PTE files.
-
