@@ -42,3 +42,10 @@ Step 10 acceptance is met for a safe route-loading preparation path:
 - route metadata is now processed through package loader hooks,
 - existing `/pte` runtime behavior is preserved,
 - no physical PTE file move was introduced in this step.
+
+## Step 11 runtime ordering update
+
+- The final 404 fallback is registered after the package loader runs during startup.
+- Package `USE` routes that become runtime-mounted in later steps can now be inserted before the 404 handler.
+- Current hardcoded domain mounts remain unchanged.
+- PTE remains metadata-only in the manifest while hardcoded `/pte` routing is still active.

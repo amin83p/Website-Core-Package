@@ -301,13 +301,17 @@ app.use('/internal/file-gateway', fileGatewayRoutes);
 //     actionStateModel.cleanupExpiredStates().catch(console.error);
 // }, 10 * 60 * 1000);
 
-// ---- 404 fallback ----
-app.use((req, res) => {
-  res.status(404).render('404', {
-     title: 'Not Found',
-     user: req.user || null
+let notFoundHandlerRegistered = false;
+function registerNotFoundHandler() {
+  if (notFoundHandlerRegistered) return;
+  notFoundHandlerRegistered = true;
+  app.use((req, res) => {
+    res.status(404).render('404', {
+      title: 'Not Found',
+      user: req.user || null
     });
-});
+  });
+}
 
 // ✅ Initialize Socket.io
 socketService.init(server);
@@ -344,6 +348,7 @@ async function startServer() {
         failed: [{ packageId: '', message: packageLoaderError?.message || String(packageLoaderError) }]
       };
     }
+    registerNotFoundHandler();
     try {
       const packageNavigationSnapshot = await packageNavigationService.refreshNavigationRegistry({
         backendMode: dataBackend.mode
