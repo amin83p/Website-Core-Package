@@ -1,5 +1,4 @@
 const pteAiProviderRepository = require('../../repositories/pteAiProviderRepository');
-const pteAiProviderModel = require('../../models/pte/pteAiProviderModel');
 const {
   adminChekersService,
   activityQuotaLedgerService,
@@ -7,10 +6,7 @@ const {
   normalizeQueryOptions,
   idsEqual,
   toPublicId,
-  assertCreateOrgContextOrThrow,
-  decrypt,
-  runByRepositoryBackend,
-  getMongoCollection
+  assertCreateOrgContextOrThrow
 } = require('./pteCoreDependencies');
 
 const PROVIDER_OPTIONS = Object.freeze([
@@ -314,20 +310,14 @@ function buildNoUsableApiKeyMessage(providerRecord = {}, label = 'Selected provi
   return `${label} "${displayName}" has no usable API key. Update it at /pte/ai-assisst/api-providers.`;
 }
 
-async function loadDecryptedApiKeyForProviderRecord(providerId = '') {
+async function loadDecryptedApiKeyForProviderRecord(providerId = '', options = {}) {
   const targetId = cleanString(providerId, { max: 120, allowEmpty: true });
   if (!targetId) return '';
 
   try {
-    const value = await runByRepositoryBackend({}, {
-      json: async () => pteAiProviderModel.getDecryptedApiKeyById(targetId),
-      mongo: async () => {
-        const collection = getMongoCollection('pteAiProviders');
-        const row = await collection.findOne({ id: targetId });
-        if (!row?.apiKeyEncrypted) return '';
-        return decrypt(row.apiKeyEncrypted) || '';
-      }
-    }, 'pte.aiProviders.loadApiKeyForProviderRecord');
+    const value = await pteAiProviderRepository.getDecryptedApiKeyById(targetId, {
+      backendMode: options?.backendMode
+    });
     return cleanString(value, { max: 8000, allowEmpty: true }) || '';
   } catch (_) {
     return '';
@@ -489,7 +479,10 @@ const pteAiProviderDataService = {
         if (Array.isArray(candidate?.warnings)) providerSelectionWarnings.push(...candidate.warnings);
 
         if (candidate?.providerRecord) {
-          const assignedApiKey = await loadDecryptedApiKeyForProviderRecord(candidate.providerRecord.id);
+          const assignedApiKey = await loadDecryptedApiKeyForProviderRecord(
+            candidate.providerRecord.id,
+            { backendMode: options?.backendMode }
+          );
           if (assignedApiKey) {
             return buildRuntimeProviderPayload(candidate.providerRecord, assignedApiKey, {
               providerSelectionSource: 'scoring_setting',
@@ -538,7 +531,10 @@ const pteAiProviderDataService = {
       );
     }
 
-    const decryptedApiKey = await loadDecryptedApiKeyForProviderRecord(selected.id);
+    const decryptedApiKey = await loadDecryptedApiKeyForProviderRecord(
+      selected.id,
+      { backendMode: options?.backendMode }
+    );
     if (!decryptedApiKey) {
       throw buildProviderSelectionError(
         buildNoUsableApiKeyMessage(selected, 'Selected default provider'),

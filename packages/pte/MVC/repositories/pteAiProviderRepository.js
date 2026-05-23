@@ -1,18 +1,20 @@
-const { applyGenericFilter } = require('../../../../MVC/utils/queryEngine');
 const pteAiProviderModel = require('../models/pte/pteAiProviderModel');
-const { assertQueryableCrudRepository } = require('../../../../MVC/repositories/contracts/crudRepositoryContract');
-const { runByRepositoryBackend } = require('../../../../MVC/repositories/backend/repositoryBackendSelector');
-const { getMongoCollection } = require('../../../../MVC/infrastructure/mongo/mongoConnection');
-const { toPublicId, idsEqual } = require('../../../../MVC/utils/idAdapter');
 const {
+  applyGenericFilter,
+  assertQueryableCrudRepository,
+  runByRepositoryBackend,
+  getMongoCollection,
+  toPublicId,
+  idsEqual,
+  decrypt,
   buildMongoFilterFromQuery,
   buildMongoSortFromQuery,
   resolveMongoPagination,
   normalizeMongoDocument,
   combineMongoFilters,
-  resolveMongoIdFilter
-} = require('../../../../MVC/repositories/backend/mongoRepositoryUtils');
-const actionStateChangeTrackerService = require('../../../../MVC/services/actionStateChangeTrackerService');
+  resolveMongoIdFilter,
+  actionStateChangeTrackerService
+} = require('./pteAiRepositoryDependencies');
 
 const COLLECTION_NAME = 'pteAiProviders';
 const DEFAULT_SEARCH_FIELDS = Object.freeze([
@@ -84,6 +86,16 @@ function isDefaultUniqueConflict(error) {
   if (!message) return false;
   if (message.includes('idx_pte_ai_providers_org_user_default_unique')) return true;
   return message.includes('orgid') && message.includes('userid') && message.includes('isdefault');
+}
+
+function resolveApiKeyFromProviderRecord(row = {}) {
+  try {
+    const encrypted = cleanString(row?.apiKeyEncrypted, { max: 12000, allowEmpty: true });
+    if (!encrypted) return '';
+    return decrypt(encrypted) || '';
+  } catch (_) {
+    return '';
+  }
 }
 
 async function generateMongoProviderId(collection, requestedId = null, isoDateTime = null) {
@@ -320,6 +332,23 @@ const pteAiProviderRepository = {
         return Number(result?.deletedCount || 0) > 0;
       }
     }, 'pte.aiProviders.remove');
+  },
+
+  async getDecryptedApiKeyById(id, options = {}) {
+    return runByRepositoryBackend(options, {
+      json: async () => {
+        const row = await pteAiProviderModel.getProviderById(id);
+        return resolveApiKeyFromProviderRecord(row);
+      },
+      mongo: async () => {
+        const row = await getMongoCollection(COLLECTION_NAME).findOne(
+          resolveMongoIdFilter(id),
+          { projection: { apiKeyEncrypted: 1, id: 1 } }
+        );
+        if (!row) return '';
+        return resolveApiKeyFromProviderRecord(normalizeMongoDocument(row));
+      }
+    }, 'pte.aiProviders.getDecryptedApiKeyById');
   }
 };
 
