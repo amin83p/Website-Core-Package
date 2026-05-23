@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
 
 const packageRouteService = require('../MVC/services/packageRouteService');
 
@@ -114,6 +115,40 @@ test('route service mounts active USE routes and avoids duplicate mount in the s
   assert.equal(second.mounted, 0);
   assert.equal(second.skipped, 1);
   assert.equal(app.calls.length, 1);
+});
+
+test('route service can mount package-root relative router modules', async () => {
+  packageRouteService.resetMountedRoutes();
+  const app = createAppStub();
+  const summary = await packageRouteService.registerManifestRoutes({
+    app,
+    packageId: 'pte',
+    packageRootDir: path.resolve(__dirname, '../packages'),
+    manifestPath: path.resolve(__dirname, '../packages/pte/package.manifest.json'),
+    manifest: {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      routes: [
+        {
+          id: 'pte-package-root-relative-fixture',
+          method: 'USE',
+          path: '/pte-fixture',
+          router: 'test/fixtures/package-route.fixture.router.js',
+          metadataOnly: false
+        }
+      ]
+    }
+  }, { logger: makeSilentLogger() });
+
+  assert.equal(summary.requested, 1);
+  assert.equal(summary.prepared, 1);
+  assert.equal(summary.mounted, 1);
+  assert.equal(summary.failed, 0);
+  assert.equal(app.calls.length, 1);
+  assert.equal(app.calls[0][0], '/pte-fixture');
+  assert.equal(typeof app.calls[0][1], 'function');
 });
 
 test('route service reports invalid declarations as failures without throwing', async () => {

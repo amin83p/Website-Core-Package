@@ -1,6 +1,7 @@
 const path = require('path');
 
 const startupLogger = require('../utils/startupLogger');
+const packageModuleResolverService = require('./packageModuleResolverService');
 
 const ROUTE_METHODS = Object.freeze(['USE', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']);
 const ROUTE_METHOD_SET = new Set(ROUTE_METHODS);
@@ -81,18 +82,8 @@ function pickRouterExport(moduleValue) {
   return null;
 }
 
-function resolveRouterModulePath(routerPath = '') {
-  const token = cleanText(routerPath, 1600);
-  if (!token) return '';
-  const projectRoot = resolveProjectRoot();
-  const resolved = path.isAbsolute(token)
-    ? path.resolve(token)
-    : path.resolve(projectRoot, token);
-  const rel = path.relative(projectRoot, resolved);
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error(`Router module path must stay inside project root: ${token}`);
-  }
-  return resolved;
+function resolveRouterModulePath(routerPath = '', context = {}, options = {}) {
+  return packageModuleResolverService.resolvePackageModulePath(routerPath, context, options);
 }
 
 function createSummary(packageId = '') {
@@ -211,7 +202,7 @@ async function registerManifestRoutes(context = {}, options = {}) {
     }
 
     try {
-      const routerModulePath = resolveRouterModulePath(normalized.router);
+      const routerModulePath = resolveRouterModulePath(normalized.router, context, options);
       // eslint-disable-next-line global-require, import/no-dynamic-require
       const routerModule = require(routerModulePath);
       const router = pickRouterExport(routerModule);
@@ -262,6 +253,7 @@ function createLoaderHooks(options = {}) {
 module.exports = {
   ROUTE_METHODS,
   normalizeRouteDeclaration,
+  resolveRouterModulePath,
   registerManifestRoutes,
   resetMountedRoutes,
   createLoaderHooks
