@@ -1,27 +1,31 @@
-# PTE Package Middleware And Utility Shims (Step 21)
+# PTE Package Middleware And Utility Ownership (Step 21 + 30)
 
-Step 21 adds package-local shims for the PTE upload middleware and utility boundary while preserving current storage behavior.
+Step 21 added package-local upload middleware and utility files.
+Step 30 moved those upload files from plain delegate shims to package-owned implementations.
 
 ## What Changed
 
-- Added `packages/pte/MVC/middleware/pteUploadContextMiddleware.js`.
-- Added `packages/pte/MVC/utils/pteUploadPathUtils.js`.
-- Both shims delegate to the current root MVC implementations.
-- Added regression coverage for the package-local middleware and utility boundary.
+- `packages/pte/MVC/middleware/pteUploadContextMiddleware.js` now contains the local middleware implementation and
+  uses package-local utilities.
+- `packages/pte/MVC/utils/pteUploadPathUtils.js` now contains the local utility implementation and still
+  resolves upload folders through core upload folder settings.
+- Regression coverage in `test/pte-package-middleware-utility-shims-step21.test.js` now validates
+  package ownership and behavior parity with core versions.
 
 ## Compatibility Behavior
 
 - Upload folder keys, generated upload categories, and `/uploads/...` URLs remain unchanged.
-- Runtime PTE routes still use the current hardcoded MVC route tree.
+- Runtime PTE routes still use the existing hardcoded MVC route tree, so external behavior is unaffected.
 - The PTE manifest route remains `metadataOnly: true`.
-- `coreFilesService`, upload folder settings, and storage gateway behavior remain core-owned.
+- Storage internals remain in core services, preserving existing upload folder and permission behavior.
 
 ## Why This Matters
 
-PTE route and controller implementations depend on these helpers for upload context and folder resolution. With package-local shims in place, future moved route/controller code can resolve PTE-owned upload helpers from inside the package while the actual storage logic continues to live in the current framework boundary.
+With package-owned upload middleware/utilities in place, package-boundary route/controller code can be moved
+without introducing extra delegate layers for these storage-facing concerns.
 
 ## Remaining Work
 
-- Step 22 prepared package-local view/public asset ownership for PTE-specific files.
-- Map PTE scripts, docs, and package-local tests before moving real implementations.
-- Keep storage internals in core and continue consuming them through `coreFilesService` and upload folder settings.
+- Continue converting other shared helper and adapter files (beyond upload helpers) to package-owned implementations.
+- Keep route/controller ownership migration coordinated with route entrypoint and manifest activation sequencing.
+

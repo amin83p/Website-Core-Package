@@ -31,57 +31,38 @@ function expectedShimRequirePath({ packageRoot, currentRoot, relativeFile }) {
   return relativeRequirePath;
 }
 
-function assertShimSet({ files, packageRoot, currentRoot }) {
+function assertFilePresence({ files, packageRoot, currentRoot }) {
   files.forEach((relativeFile) => {
     assert.equal(fs.existsSync(path.join(currentRoot, relativeFile)), true, `${relativeFile} should exist in current MVC`);
     assert.equal(fs.existsSync(path.join(packageRoot, relativeFile)), true, `${relativeFile} should exist in the package`);
   });
 }
 
-function assertDelegates({ files, packageRoot, currentRoot }) {
-  files.forEach((relativeFile) => {
-    const packageShimPath = path.join(packageRoot, relativeFile);
-    const source = readText(packageShimPath);
-    const expectedRequire = expectedShimRequirePath({
-      packageRoot,
-      currentRoot,
-      relativeFile
-    });
-
-    assert.ok(
-      source.includes(`require('${expectedRequire}')`),
-      `${relativeFile} should delegate to ${expectedRequire}`
-    );
+function readSourceRelativePackage({ packageRoot, currentRoot, relativeFile }) {
+  const packagePath = path.join(packageRoot, relativeFile);
+  const source = readText(packagePath);
+  const expectedRequire = expectedShimRequirePath({
+    packageRoot,
+    currentRoot,
+    relativeFile
   });
+  return { source, expectedRequire };
 }
 
-test('PTE package middleware and utility shims exist for upload boundaries', () => {
-  assertShimSet({
+test('PTE package middleware and utility files exist for upload boundaries', () => {
+  assertFilePresence({
     files: PTE_MIDDLEWARE_FILES,
     packageRoot: PACKAGE_MIDDLEWARE_ROOT,
     currentRoot: CURRENT_MIDDLEWARE_ROOT
   });
-  assertShimSet({
+  assertFilePresence({
     files: PTE_UTILITY_FILES,
     packageRoot: PACKAGE_UTIL_ROOT,
     currentRoot: CURRENT_UTIL_ROOT
   });
 });
 
-test('PTE package middleware and utility shims delegate to current MVC modules', () => {
-  assertDelegates({
-    files: PTE_MIDDLEWARE_FILES,
-    packageRoot: PACKAGE_MIDDLEWARE_ROOT,
-    currentRoot: CURRENT_MIDDLEWARE_ROOT
-  });
-  assertDelegates({
-    files: PTE_UTILITY_FILES,
-    packageRoot: PACKAGE_UTIL_ROOT,
-    currentRoot: CURRENT_UTIL_ROOT
-  });
-});
-
-test('PTE package middleware and utility shims export current modules', () => {
+test('PTE package middleware and utility files are package-owned implementations', () => {
   [
     {
       packageRoot: PACKAGE_MIDDLEWARE_ROOT,
@@ -94,11 +75,135 @@ test('PTE package middleware and utility shims export current modules', () => {
       relativeFile: 'pteUploadPathUtils.js'
     }
   ].forEach(({ packageRoot, currentRoot, relativeFile }) => {
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    const packageModule = require(path.join(packageRoot, relativeFile));
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    const currentModule = require(path.join(currentRoot, relativeFile));
-    assert.equal(packageModule, currentModule, `${relativeFile} should export the current module`);
+    const { source, expectedRequire } = readSourceRelativePackage({
+      packageRoot,
+      currentRoot,
+      relativeFile
+    });
+
+    assert.equal(
+      source.includes(`require('${expectedRequire}')`),
+      false,
+      `${relativeFile} should not delegate via ${expectedRequire}`
+    );
   });
+});
+
+test('PTE package upload utility behavior matches current utility behavior', () => {
+  const rootUtility = require(path.join(CURRENT_UTIL_ROOT, 'pteUploadPathUtils'));
+  const packageUtility = require(path.join(PACKAGE_UTIL_ROOT, 'pteUploadPathUtils'));
+
+  const bucketSamples = Object.freeze([
+    'practice_by_skills',
+    'smart_practice',
+    'mock_exams',
+    'question_bank',
+    'students',
+    'public_applicants',
+    'unknown'
+  ]);
+  bucketSamples.forEach((bucket) => {
+    assert.equal(
+      rootUtility.normalizeBucketToken(bucket),
+      packageUtility.normalizeBucketToken(bucket),
+      `normalizeBucketToken(${bucket}) should match`
+    );
+  });
+
+  const sampleContext = {
+    bucket: rootUtility.PTE_BUCKETS.STUDENTS,
+    itemId: ' Item 01 '
+  };
+  assert.equal(
+    rootUtility.getQuestionBankRoot(),
+    packageUtility.getQuestionBankRoot(),
+    'getQuestionBankRoot should match'
+  );
+  assert.equal(
+    rootUtility.buildStudentCategory(sampleContext),
+    packageUtility.buildStudentCategory(sampleContext),
+    'buildStudentCategory should match'
+  );
+});
+
+test('PTE package upload middleware applies the same context shape as current middleware', async () => {
+  const rootMiddleware = require(path.join(CURRENT_MIDDLEWARE_ROOT, 'pteUploadContextMiddleware'));
+  const packageMiddleware = require(path.join(PACKAGE_MIDDLEWARE_ROOT, 'pteUploadContextMiddleware'));
+
+  function createBaseReq() {
+    return {
+      user: { id: 'USR001' },
+      body: {
+        practiceName: 'Sample Practice',
+        testName: 'Sample Test'
+      },
+      params: {
+        sessionId: '',
+        itemId: 'ItemOne'
+      },
+      accessScope: 'org-1'
+    };
+  }
+
+  function runWithNext(middleware, req) {
+    return new Promise((resolve, reject) => {
+      const res = {
+        status: (code) => ({
+          json: (payload) => {
+            reject(new Error(`unexpected status ${code}: ${JSON.stringify(payload)}`));
+          }
+        })
+      };
+      const next = () => resolve(req);
+      const result = middleware(req, res, next);
+      if (result && typeof result.then === 'function') {
+        result.then(() => {
+          resolve(req);
+        }).catch(reject);
+      }
+    });
+  }
+
+  const rootQuestionBankReq = await runWithNext(
+    rootMiddleware.setQuestionBankContext,
+    createBaseReq()
+  );
+  const packageQuestionBankReq = await runWithNext(
+    packageMiddleware.setQuestionBankContext,
+    createBaseReq()
+  );
+  assert.equal(
+    rootQuestionBankReq.pteStorageContext.bucket,
+    packageQuestionBankReq.pteStorageContext.bucket,
+    'question bank bucket should match'
+  );
+
+  const rootStudentReq = await runWithNext(
+    rootMiddleware.setStudentContext({ publicApplicant: true }),
+    createBaseReq()
+  );
+  const packageStudentReq = await runWithNext(
+    packageMiddleware.setStudentContext({ publicApplicant: true }),
+    createBaseReq()
+  );
+  assert.equal(
+    rootStudentReq.pteStorageContext.bucket,
+    packageStudentReq.pteStorageContext.bucket,
+    'student public bucket should match'
+  );
+
+  const rootRuntimeReq = await runWithNext(
+    rootMiddleware.setRuntimeAttemptContext('mock'),
+    createBaseReq()
+  );
+  const packageRuntimeReq = await runWithNext(
+    packageMiddleware.setRuntimeAttemptContext('mock'),
+    createBaseReq()
+  );
+  assert.equal(
+    rootRuntimeReq.pteStorageContext.bucket,
+    packageRuntimeReq.pteStorageContext.bucket,
+    'runtime bucket should match'
+  );
 });
 

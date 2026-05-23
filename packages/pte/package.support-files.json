@@ -7,6 +7,10 @@
     "Targets describe the intended package-owned locations for a later physical move.",
     "Most package script entrypoints delegate to root-active scripts until imports are adjusted for package-local execution.",
     "The package enable script is package-safe and uses the package-local manifest directly.",
+    "The package-local ensure-pte-list-indexes script is package-safe and references core mongo index services directly.",
+    "The package-local mongo-validate-explain script is package-safe and reads settings from core data paths using package-local resolution.",
+    "The package-local validate-remaining script is package-safe and reads settings from core data paths using package-local resolution.",
+    "The package-local hard-delete-all-pte-attempts script is package-safe and uses core Mongo/repo configuration imports directly.",
     "Do not run copied tests from package-local paths until their imports are adjusted."
   ],
   "scripts": [
@@ -86,11 +90,13 @@
       "source": "scripts/pte/ensure-pte-list-indexes.js",
       "target": "packages/pte/scripts/maintenance/ensure-pte-list-indexes.js",
       "category": "maintenance",
+      "entrypointMode": "package-safe",
       "status": "root-active"
     },
     {
       "source": "scripts/pte/hard-delete-all-pte-attempts.js",
       "target": "packages/pte/scripts/maintenance/hard-delete-all-pte-attempts.js",
+      "entrypointMode": "package-safe",
       "category": "maintenance",
       "status": "root-active"
     },
@@ -110,12 +116,14 @@
       "source": "scripts/pte/mongo-validate-explain.js",
       "target": "packages/pte/scripts/maintenance/mongo-validate-explain.js",
       "category": "maintenance",
+      "entrypointMode": "package-safe",
       "status": "root-active"
     },
     {
       "source": "scripts/pte/validate-remaining.js",
       "target": "packages/pte/scripts/maintenance/validate-remaining.js",
       "category": "maintenance",
+      "entrypointMode": "package-safe",
       "status": "root-active"
     },
     {
@@ -196,6 +204,30 @@
     {
       "source": "docs/pte-package-enable-script-step25.md",
       "target": "packages/pte/docs/pte-package-enable-script-step25.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-ensure-indexes-step26.md",
+      "target": "packages/pte/docs/pte-package-ensure-indexes-step26.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-validate-remaining-step28.md",
+      "target": "packages/pte/docs/pte-package-validate-remaining-step28.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-mongo-validate-step27.md",
+      "target": "packages/pte/docs/pte-package-mongo-validate-step27.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-hard-delete-attempts-step29.md",
+      "target": "packages/pte/docs/pte-package-hard-delete-attempts-step29.md",
       "category": "package-preparation",
       "status": "root-active"
     },
@@ -300,6 +332,30 @@
     {
       "source": "test/pte-package-enable-script-step25.test.js",
       "target": "packages/pte/test/pte-package-enable-script-step25.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-ensure-indexes-step26.test.js",
+      "target": "packages/pte/test/pte-package-ensure-indexes-step26.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-validate-remaining-step28.test.js",
+      "target": "packages/pte/test/pte-package-validate-remaining-step28.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-mongo-validate-step27.test.js",
+      "target": "packages/pte/test/pte-package-mongo-validate-step27.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-hard-delete-all-pte-attempts-step29.test.js",
+      "target": "packages/pte/test/pte-package-hard-delete-all-pte-attempts-step29.test.js",
       "category": "package-preparation",
       "status": "root-active"
     },
