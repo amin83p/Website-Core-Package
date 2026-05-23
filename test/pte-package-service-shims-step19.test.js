@@ -41,6 +41,12 @@ function expectedShimRequirePath(relativeFile) {
   return relativeRequirePath;
 }
 
+const packageOwnedServices = new Set([
+  'pte/pteAiProviderDataService.js',
+  'pte/pteAiScoringSettingsDataService.js',
+  'pte/pteAiTokenUsageDataService.js'
+]);
+
 test('PTE package service shims mirror the current recursive PTE service tree', () => {
   const currentFiles = listJsFiles(CURRENT_SERVICE_ROOT);
   const packageFiles = listJsFiles(PACKAGE_SERVICE_ROOT);
@@ -50,6 +56,10 @@ test('PTE package service shims mirror the current recursive PTE service tree', 
 
 test('PTE package service shims delegate to current MVC service modules', () => {
   listJsFiles(CURRENT_SERVICE_ROOT).forEach((relativeFile) => {
+    if (packageOwnedServices.has(relativeFile)) {
+      return;
+    }
+
     const packageShimPath = path.join(PACKAGE_SERVICE_ROOT, relativeFile);
     const source = readText(packageShimPath);
     const expectedRequire = expectedShimRequirePath(relativeFile);
@@ -57,6 +67,19 @@ test('PTE package service shims delegate to current MVC service modules', () => 
     assert.ok(
       source.includes(`require('${expectedRequire}')`),
       `${relativeFile} should delegate to ${expectedRequire}`
+    );
+  });
+});
+
+test('PTE package-owned AI Assist services are not simple shims', () => {
+  packageOwnedServices.forEach((relativeFile) => {
+    const packageServicePath = path.join(PACKAGE_SERVICE_ROOT, relativeFile);
+    const source = readText(packageServicePath);
+    const expectedRequire = expectedShimRequirePath(relativeFile);
+
+    assert.ok(
+      !source.includes(`require('${expectedRequire}')`),
+      `${relativeFile} should not delegate to ${expectedRequire}`
     );
   });
 });
@@ -74,4 +97,3 @@ test('representative PTE package service shims export the current services', () 
     assert.equal(packageService, currentService, `${relativeFile} should export the current service`);
   });
 });
-

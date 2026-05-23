@@ -40,6 +40,12 @@ function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
+const packageOwnedRepositories = new Set([
+  'pteAiProviderRepository.js',
+  'pteAiScoringSettingRepository.js',
+  'pteAiTokenUsageRepository.js'
+]);
+
 function expectedShimRequirePath({ packageRoot, currentRoot, relativeFile }) {
   const packageShimPath = path.join(packageRoot, relativeFile);
   const currentPath = path.join(currentRoot, relativeFile).replace(/\.js$/, '');
@@ -83,6 +89,10 @@ test('PTE package model shims delegate to current MVC model modules', () => {
 
 test('PTE package repository shims delegate to current MVC repository modules', () => {
   listPteRepositoryFiles(CURRENT_REPOSITORY_ROOT).forEach((relativeFile) => {
+    if (packageOwnedRepositories.has(relativeFile)) {
+      return;
+    }
+
     const packageShimPath = path.join(PACKAGE_REPOSITORY_ROOT, relativeFile);
     const source = readText(packageShimPath);
     const expectedRequire = expectedShimRequirePath({
@@ -94,6 +104,23 @@ test('PTE package repository shims delegate to current MVC repository modules', 
     assert.ok(
       source.includes(`require('${expectedRequire}')`),
       `${relativeFile} should delegate to ${expectedRequire}`
+    );
+  });
+});
+
+test('PTE package-owned AI Assist repositories are not simple shims', () => {
+  packageOwnedRepositories.forEach((relativeFile) => {
+    const packageRepositoryPath = path.join(PACKAGE_REPOSITORY_ROOT, relativeFile);
+    const source = readText(packageRepositoryPath);
+    const expectedRequire = expectedShimRequirePath({
+      packageRoot: PACKAGE_REPOSITORY_ROOT,
+      currentRoot: CURRENT_REPOSITORY_ROOT,
+      relativeFile
+    });
+
+    assert.ok(
+      !source.includes(`require('${expectedRequire}')`),
+      `${relativeFile} should not delegate to ${expectedRequire}`
     );
   });
 });
@@ -118,4 +145,3 @@ test('representative PTE package model and repository shims export current modul
     assert.equal(packageModule, currentModule, `${relativeFile} should export the current module`);
   });
 });
-

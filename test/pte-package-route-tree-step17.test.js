@@ -11,7 +11,6 @@ function readText(relativePath) {
 
 function routeFileNames() {
   return [
-    'aiAssistRoutes.js',
     'attemptRoutes.js',
     'courseRoutes.js',
     'feedbackRoutes.js',
@@ -61,4 +60,16 @@ test('PTE route shims delegate to current MVC route modules until physical move'
       `${fileName} should delegate to the current MVC route module`
     );
   });
+});
+
+test('PTE AI Assist route remains package-owned', () => {
+  const source = readText('packages/pte/MVC/routes/aiAssistRoutes.js');
+  assert.ok(
+    source.includes('express = require(\'express\')'),
+    'AI Assist route should expose express router setup'
+  );
+  assert.ok(
+    !source.includes('../../../../MVC/routes/pte/aiAssistRoutes'),
+    'AI Assist route should not delegate to core MVC route module'
+  );
 });

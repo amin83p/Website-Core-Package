@@ -31,6 +31,12 @@ function controllerFileNames() {
   ];
 }
 
+const packageOwnedControllers = new Set([
+  'aiProviderController.js',
+  'aiScoringSettingsController.js',
+  'aiTokenUsageController.js'
+]);
+
 test('PTE package controller shims mirror current PTE controller module names', () => {
   controllerFileNames().forEach((fileName) => {
     assert.equal(fs.existsSync(path.join(ROOT_DIR, 'MVC/controllers/pte', fileName)), true);
@@ -40,6 +46,10 @@ test('PTE package controller shims mirror current PTE controller module names', 
 
 test('PTE package controller shims delegate to current MVC controller modules', () => {
   controllerFileNames().forEach((fileName) => {
+    if (packageOwnedControllers.has(fileName)) {
+      return;
+    }
+
     const source = readText(`packages/pte/MVC/controllers/${fileName}`);
     assert.ok(
       source.includes(`../../../../MVC/controllers/pte/${fileName.replace(/\.js$/, '')}`),
@@ -51,6 +61,16 @@ test('PTE package controller shims delegate to current MVC controller modules', 
     // eslint-disable-next-line global-require, import/no-dynamic-require
     const currentController = require(`../MVC/controllers/pte/${fileName}`);
     assert.equal(packageController, currentController, `${fileName} should export the current controller`);
+  });
+});
+
+test('Package-owned AI Assist controllers are not simple shims', () => {
+  packageOwnedControllers.forEach((fileName) => {
+    const source = readText(`packages/pte/MVC/controllers/${fileName}`);
+    assert.ok(
+      !source.includes(`module.exports = require('../../../../MVC/controllers/pte/${fileName.replace(/\\.js$/, '')}`),
+      `${fileName} should not delegate to MVC controller`
+    );
   });
 });
 
@@ -73,4 +93,3 @@ test('PTE package main route uses package-local top-level controller shims', () 
     );
   });
 });
-
