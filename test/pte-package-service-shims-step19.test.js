@@ -44,7 +44,13 @@ function expectedShimRequirePath(relativeFile) {
 const packageOwnedServices = new Set([
   'pte/pteAiProviderDataService.js',
   'pte/pteAiScoringSettingsDataService.js',
-  'pte/pteAiTokenUsageDataService.js'
+  'pte/pteAiTokenUsageDataService.js',
+  'ai/aiProviderService.js',
+  'ai/providers/openaiService.js',
+  'ai/providers/azureOpenAIService.js',
+  'ai/providers/googleGeminiService.js',
+  'ai/providers/googleVertexService.js',
+  'ai/providers/anthropicService.js'
 ]);
 
 test('PTE package service shims mirror the current recursive PTE service tree', () => {
@@ -87,8 +93,7 @@ test('PTE package-owned AI Assist services are not simple shims', () => {
 test('representative PTE package service shims export the current services', () => {
   [
     'questionTypeRegistry.js',
-    'pteScoringRubricRegistry.js',
-    'ai/aiProviderService.js'
+    'pteScoringRubricRegistry.js'
   ].forEach((relativeFile) => {
     // eslint-disable-next-line global-require, import/no-dynamic-require
     const packageService = require(path.join(PACKAGE_SERVICE_ROOT, relativeFile));
