@@ -1,11 +1,14 @@
 const pteAiScoringSettingRepository = require('../../repositories/pteAiScoringSettingRepository');
 const pteAiProviderRepository = require('../../repositories/pteAiProviderRepository');
 const pteAiProviderDataService = require('./pteAiProviderDataService');
-const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
 const questionTypeRegistry = require('./questionTypeRegistry');
 const pteScoringRubricRegistry = require('./pteScoringRubricRegistry');
-const { normalizeQueryOptions } = require('../../../../../MVC/utils/queryOptionsAdapter');
-const { idsEqual, toPublicId } = require('../../../../../MVC/utils/idAdapter');
+const {
+  activityQuotaLedgerService,
+  normalizeQueryOptions,
+  idsEqual,
+  toPublicId
+} = require('./pteCoreDependencies');
 
 const SCORER_RECOMMENDATIONS = Object.freeze({
   speaking_respond_to_situation: 'Pro model recommended for situational appropriacy and full-rubric audio scoring.',

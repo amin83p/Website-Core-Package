@@ -1,4 +1,4 @@
-const pteAttemptLedgerService = require('../../../../MVC/services/pte/pteAttemptLedgerService');
+const pteAttemptLedgerService = require('../services/pte/pteAttemptLedgerService');
 const pteUploadPathUtils = require('../utils/pteUploadPathUtils');
 
 function cleanText(value, max = 260) {

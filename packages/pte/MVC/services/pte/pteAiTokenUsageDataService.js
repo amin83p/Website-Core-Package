@@ -1,11 +1,14 @@
 const pteAiTokenUsageRepository = require('../../repositories/pteAiTokenUsageRepository');
-const adminChekersService = require('../../../../../MVC/services/adminChekersService');
-const dataService = require('../../../../../MVC/services/dataService');
-const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
-const { normalizeQueryOptions } = require('../../../../../MVC/utils/queryOptionsAdapter');
-const { resolveEntity } = require('../../../../../MVC/utils/entityResolver');
-const { applyGenericFilter } = require('../../../../../MVC/utils/queryEngine');
-const { idsEqual, toPublicId } = require('../../../../../MVC/utils/idAdapter');
+const {
+  adminChekersService,
+  dataService,
+  activityQuotaLedgerService,
+  normalizeQueryOptions,
+  resolveEntity,
+  applyGenericFilter,
+  idsEqual,
+  toPublicId
+} = require('./pteCoreDependencies');
 
 const ORGANIZATION_SCOPE_NAMES = new Set(['ADMIN', 'GLOBAL', 'ORGANIZATION', 'ORG']);
 const STATUS_OPTIONS = Object.freeze([

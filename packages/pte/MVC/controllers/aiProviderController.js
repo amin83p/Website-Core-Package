@@ -1,9 +1,8 @@
-const paginate = require('../../../../MVC/utils/paginationHelper');
+const {
+  paginate,
+  isAjax
+} = require('./coreHelpers');
 const pteAiProviderDataService = require('../services/pte/pteAiProviderDataService');
-
-function isAjax(req) {
-  return Boolean(req?.headers?.['x-ajax-request']);
-}
 
 function hasOwn(source, key) {
   return Object.prototype.hasOwnProperty.call(source || {}, key);

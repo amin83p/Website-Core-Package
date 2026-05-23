@@ -1,4 +1,4 @@
-const uploadFolderSettingsService = require('../../../../MVC/services/uploadFolderSettingsService');
+const { coreFilesService } = require('../services/pte/pteCoreDependencies');
 
 const PTE_ROOT_FOLDER = 'PTE';
 
@@ -43,13 +43,16 @@ function normalizeBucketToken(value, fallback = PTE_BUCKETS.PRACTICE_BY_SKILLS) 
 }
 
 function getQuestionBankRoot() {
-  return uploadFolderSettingsService.resolveUploadFolder('pte.questionBank');
+  return coreFilesService.resolveUploadCategory('pte-question-bank');
 }
 
 function getStudentsRoot(isPublicApplicant = false) {
-  return uploadFolderSettingsService.resolveUploadFolder(
-    isPublicApplicant ? 'pte.publicApplicants' : 'pte.students'
-  );
+  const bucket = isPublicApplicant
+    ? PTE_BUCKETS.PUBLIC_APPLICANTS
+    : PTE_BUCKETS.STUDENTS;
+  return coreFilesService.resolveUploadCategory('pte-students', false, {
+    pteStorageContext: { bucket }
+  });
 }
 
 function buildQuestionBankCategory() {
@@ -61,31 +64,34 @@ function buildStudentCategory(context = {}) {
     context.bucket || '',
     context.isPublicApplicant ? PTE_BUCKETS.PUBLIC_APPLICANTS : PTE_BUCKETS.STUDENTS
   );
-  const root = uploadFolderSettingsService.resolveUploadFolder(
-    bucket === PTE_BUCKETS.PUBLIC_APPLICANTS ? 'pte.publicApplicants' : 'pte.students'
-  );
-  const itemId = sanitizeFolderToken(
+  const normalizedItemId = sanitizeFolderToken(
     context.itemId || context.studentId || context.applicantId || context.personId || '',
     'item_unsaved'
   );
-  if (context.includeItemFolder === false) return root;
-  return uploadFolderSettingsService.resolveUploadFolder(
-    bucket === PTE_BUCKETS.PUBLIC_APPLICANTS ? 'pte.publicApplicantItem' : 'pte.studentItem',
-    { itemId }
-  );
+  return coreFilesService.resolveUploadCategory('pte-students', context.includeItemFolder !== false, {
+    pteStorageContext: { bucket },
+    params: { id: normalizedItemId },
+    body: {
+      studentId: context.studentId || normalizedItemId,
+      mediaItemId: context.mediaItemId || '',
+      applicantId: context.applicantId || '',
+      personId: context.personId || '',
+      studentItemId: context.itemId || ''
+    }
+  });
 }
 
 function buildAttemptCategory(context = {}) {
   const bucket = normalizeBucketToken(context.bucket, PTE_BUCKETS.PRACTICE_BY_SKILLS);
-  const key = bucket === PTE_BUCKETS.MOCK_EXAMS
-    ? 'pte.mockExamAttempt'
-    : (bucket === PTE_BUCKETS.SMART_PRACTICE ? 'pte.smartPracticeAttempt' : 'pte.practiceAttempt');
-  return uploadFolderSettingsService.resolveUploadFolder(key, {
-    userId: context.userId,
-    practiceName: context.practiceName,
-    testName: context.testName,
-    sessionId: context.sessionId,
-    itemId: context.itemId
+  return coreFilesService.resolveUploadCategory('pte-attempts', false, {
+    pteStorageContext: {
+      bucket,
+      userId: context.userId,
+      practiceName: context.practiceName,
+      testName: context.testName,
+      sessionId: context.sessionId,
+      itemId: context.itemId
+    }
   });
 }
 

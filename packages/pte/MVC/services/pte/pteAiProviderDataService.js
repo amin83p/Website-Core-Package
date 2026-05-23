@@ -1,14 +1,17 @@
 const pteAiProviderRepository = require('../../repositories/pteAiProviderRepository');
 const pteAiProviderModel = require('../../models/pte/pteAiProviderModel');
-const adminChekersService = require('../../../../../MVC/services/adminChekersService');
-const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
-const settingService = require('../../../../../MVC/services/settingService');
-const { normalizeQueryOptions } = require('../../../../../MVC/utils/queryOptionsAdapter');
-const { idsEqual, toPublicId } = require('../../../../../MVC/utils/idAdapter');
-const { assertCreateOrgContextOrThrow } = require('../../../../../MVC/utils/orgContextUtils');
-const { decrypt } = require('../../../../../MVC/utils/encyptors');
-const { runByRepositoryBackend } = require('../../../../../MVC/repositories/backend/repositoryBackendSelector');
-const { getMongoCollection } = require('../../../../../MVC/infrastructure/mongo/mongoConnection');
+const {
+  adminChekersService,
+  activityQuotaLedgerService,
+  settingService,
+  normalizeQueryOptions,
+  idsEqual,
+  toPublicId,
+  assertCreateOrgContextOrThrow,
+  decrypt,
+  runByRepositoryBackend,
+  getMongoCollection
+} = require('./pteCoreDependencies');
 
 const PROVIDER_OPTIONS = Object.freeze([
   { id: 'google-gemini', label: 'Google Gemini' },
