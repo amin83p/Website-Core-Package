@@ -24,7 +24,6 @@ PTE now has package-local view and public script ownership ready for the physica
 
 ## Remaining Work
 
-- Map PTE scripts, migrations, seeders, docs, and package-local tests into package-owned folders.
+- Step 23 mapped PTE scripts, migrations, seeders, docs, and package-local tests into package-owned target folders.
 - Decide when to switch the app from root-first view resolution to package-first or package-only resolution for PTE.
 - Keep `/scripts` asset mounting unchanged until duplicate static mount behavior is explicitly tested and the root public script copy can be retired.
-

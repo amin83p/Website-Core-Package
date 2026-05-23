@@ -1,0 +1,424 @@
+{
+  "packageId": "pte",
+  "step": 23,
+  "status": "mapped",
+  "notes": [
+    "Support files remain root-active during this step.",
+    "Targets describe the intended package-owned locations for a later physical move.",
+    "Do not run copied scripts/tests from package-local paths until their imports are adjusted."
+  ],
+  "scripts": [
+    {
+      "source": "scripts/migrate-pte-student-role-token.js",
+      "target": "packages/pte/scripts/migration/migrate-pte-student-role-token.js",
+      "category": "migration",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-feedback-section.js",
+      "target": "packages/pte/scripts/seed/seed-pte-feedback-section.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-feedback-symbols.js",
+      "target": "packages/pte/scripts/seed/seed-pte-feedback-symbols.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-questions-bank-section.js",
+      "target": "packages/pte/scripts/seed/seed-pte-questions-bank-section.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-questions-bank-symbols.js",
+      "target": "packages/pte/scripts/seed/seed-pte-questions-bank-symbols.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-sections.js",
+      "target": "packages/pte/scripts/seed/seed-pte-sections.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-students-section.js",
+      "target": "packages/pte/scripts/seed/seed-pte-students-section.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-symbols.js",
+      "target": "packages/pte/scripts/seed/seed-pte-symbols.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-teachers-section.js",
+      "target": "packages/pte/scripts/seed/seed-pte-teachers-section.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-teachers-symbols.js",
+      "target": "packages/pte/scripts/seed/seed-pte-teachers-symbols.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-tests-section.js",
+      "target": "packages/pte/scripts/seed/seed-pte-tests-section.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/seed-pte-tests-symbols.js",
+      "target": "packages/pte/scripts/seed/seed-pte-tests-symbols.js",
+      "category": "seed",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/pte/ensure-pte-list-indexes.js",
+      "target": "packages/pte/scripts/maintenance/ensure-pte-list-indexes.js",
+      "category": "maintenance",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/pte/hard-delete-all-pte-attempts.js",
+      "target": "packages/pte/scripts/maintenance/hard-delete-all-pte-attempts.js",
+      "category": "maintenance",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/pte/migrate-active-org-questions-to-draft.js",
+      "target": "packages/pte/scripts/migration/migrate-active-org-questions-to-draft.js",
+      "category": "migration",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/pte/migrate-pte-uploads-to-org-pte.js",
+      "target": "packages/pte/scripts/migration/migrate-pte-uploads-to-org-pte.js",
+      "category": "migration",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/pte/mongo-validate-explain.js",
+      "target": "packages/pte/scripts/maintenance/mongo-validate-explain.js",
+      "category": "maintenance",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/pte/validate-remaining.js",
+      "target": "packages/pte/scripts/maintenance/validate-remaining.js",
+      "category": "maintenance",
+      "status": "root-active"
+    },
+    {
+      "source": "scripts/packages/enable-pte-package.js",
+      "target": "packages/pte/scripts/maintenance/enable-pte-package.js",
+      "category": "package-activation",
+      "status": "root-active"
+    }
+  ],
+  "docs": [
+    {
+      "source": "docs/handover-2026-05-22-pte-step9.md",
+      "target": "packages/pte/docs/handover-2026-05-22-pte-step9.md",
+      "category": "handover",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-activation-step12.md",
+      "target": "packages/pte/docs/pte-package-activation-step12.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-controller-shims-step18.md",
+      "target": "packages/pte/docs/pte-package-controller-shims-step18.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-middleware-utility-shims-step21.md",
+      "target": "packages/pte/docs/pte-package-middleware-utility-shims-step21.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-model-repository-shims-step20.md",
+      "target": "packages/pte/docs/pte-package-model-repository-shims-step20.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-physical-move-map-step13.md",
+      "target": "packages/pte/docs/pte-package-physical-move-map-step13.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-route-entrypoint-step16.md",
+      "target": "packages/pte/docs/pte-package-route-entrypoint-step16.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-route-tree-step17.md",
+      "target": "packages/pte/docs/pte-package-route-tree-step17.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-service-shims-step19.md",
+      "target": "packages/pte/docs/pte-package-service-shims-step19.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-support-file-map-step23.md",
+      "target": "packages/pte/docs/pte-package-support-file-map-step23.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-package-view-asset-ownership-step22.md",
+      "target": "packages/pte/docs/pte-package-view-asset-ownership-step22.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte-preparation-step9.md",
+      "target": "packages/pte/docs/pte-preparation-step9.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte/postman/README.md",
+      "target": "packages/pte/docs/postman/README.md",
+      "category": "postman",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte/postman/pte-attempt-runtime.local.postman_environment.json",
+      "target": "packages/pte/docs/postman/pte-attempt-runtime.local.postman_environment.json",
+      "category": "postman",
+      "status": "root-active"
+    },
+    {
+      "source": "docs/pte/postman/pte-attempt-runtime.postman_collection.json",
+      "target": "packages/pte/docs/postman/pte-attempt-runtime.postman_collection.json",
+      "category": "postman",
+      "status": "root-active"
+    }
+  ],
+  "tests": [
+    {
+      "source": "test/pte-package-activation-step12.test.js",
+      "target": "packages/pte/test/pte-package-activation-step12.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-boundary-step13.test.js",
+      "target": "packages/pte/test/pte-package-boundary-step13.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-controller-shims-step18.test.js",
+      "target": "packages/pte/test/pte-package-controller-shims-step18.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-middleware-utility-shims-step21.test.js",
+      "target": "packages/pte/test/pte-package-middleware-utility-shims-step21.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-model-repository-shims-step20.test.js",
+      "target": "packages/pte/test/pte-package-model-repository-shims-step20.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-route-entrypoint-step16.test.js",
+      "target": "packages/pte/test/pte-package-route-entrypoint-step16.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-route-tree-step17.test.js",
+      "target": "packages/pte/test/pte-package-route-tree-step17.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-service-shims-step19.test.js",
+      "target": "packages/pte/test/pte-package-service-shims-step19.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-step9.test.js",
+      "target": "packages/pte/test/pte-package-step9.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-support-files-step23.test.js",
+      "target": "packages/pte/test/pte-package-support-files-step23.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-view-asset-ownership-step22.test.js",
+      "target": "packages/pte/test/pte-package-view-asset-ownership-step22.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-student-role-token-migration.test.js",
+      "target": "packages/pte/test/pte-student-role-token-migration.test.js",
+      "category": "migration",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.ai-assist.autofill-private.test.js",
+      "target": "packages/pte/test/pte.ai-assist.autofill-private.test.js",
+      "category": "ai-assist",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.ai-assist.prompt-registry.test.js",
+      "target": "packages/pte/test/pte.ai-assist.prompt-registry.test.js",
+      "category": "ai-assist",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.ai-scoring-settings-help.test.js",
+      "target": "packages/pte/test/pte.ai-scoring-settings-help.test.js",
+      "category": "ai-assist",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.ai-scoring-settings-service.test.js",
+      "target": "packages/pte/test/pte.ai-scoring-settings-service.test.js",
+      "category": "ai-assist",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.answer-short-question-scoring-service.test.js",
+      "target": "packages/pte/test/pte.answer-short-question-scoring-service.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.attempt-ledger-save-timing.test.js",
+      "target": "packages/pte/test/pte.attempt-ledger-save-timing.test.js",
+      "category": "attempt",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.attempt-lifecycle-analytics.test.js",
+      "target": "packages/pte/test/pte.attempt-lifecycle-analytics.test.js",
+      "category": "attempt",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.attempt-lifecycle-controller.test.js",
+      "target": "packages/pte/test/pte.attempt-lifecycle-controller.test.js",
+      "category": "attempt",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.attempt-read-aloud-autoscoring.test.js",
+      "target": "packages/pte/test/pte.attempt-read-aloud-autoscoring.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.describe-image-scoring-service.test.js",
+      "target": "packages/pte/test/pte.describe-image-scoring-service.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.listening-dictation-scoring-service.test.js",
+      "target": "packages/pte/test/pte.listening-dictation-scoring-service.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.practice-coach-rules.test.js",
+      "target": "packages/pte/test/pte.practice-coach-rules.test.js",
+      "category": "practice",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.question-bank-controller.endpoints.test.js",
+      "target": "packages/pte/test/pte.question-bank-controller.endpoints.test.js",
+      "category": "question-bank",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.question-bank-data-service.publish-gating.test.js",
+      "target": "packages/pte/test/pte.question-bank-data-service.publish-gating.test.js",
+      "category": "question-bank",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.question-type-registry.scoring-contracts.test.js",
+      "target": "packages/pte/test/pte.question-type-registry.scoring-contracts.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.read-aloud-scoring-service.test.js",
+      "target": "packages/pte/test/pte.read-aloud-scoring-service.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.reading-scoring-service.test.js",
+      "target": "packages/pte/test/pte.reading-scoring-service.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.repeat-sentence-scoring-service.test.js",
+      "target": "packages/pte/test/pte.repeat-sentence-scoring-service.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.respond-situation-scoring-service.test.js",
+      "target": "packages/pte/test/pte.respond-situation-scoring-service.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.smart-practice-service.test.js",
+      "target": "packages/pte/test/pte.smart-practice-service.test.js",
+      "category": "practice",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.speaking-micro-rubric-service.test.js",
+      "target": "packages/pte/test/pte.speaking-micro-rubric-service.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte.writing-scoring-service.test.js",
+      "target": "packages/pte/test/pte.writing-scoring-service.test.js",
+      "category": "scoring",
+      "status": "root-active"
+    }
+  ]
+}
