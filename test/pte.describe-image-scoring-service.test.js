@@ -381,7 +381,7 @@ test('Describe Image scorer runs strict transcript recovery when primary transcr
       return {
         provider: 'google-gemini',
         modelUsed: 'gemini-2.5-flash',
-        text: '{"transcript":"The line chart shows sales increasing and","microResponses":[{"id":"content_main_idea","choice":"yes","evidence":"main trend","confidence":0.8},{"id":"content_key_details","choice":"partial","evidence":"some details","confidence":0.8},{"id":"content_visual_accuracy","choice":"yes","evidence":"accurate","confidence":0.8},{"id":"pronunciation_quality","choice":"good","evidence":"clear","confidence":0.8},{"id":"fluency_quality","choice":"developing","evidence":"some hesitation","confidence":0.8}],"content":{"score":1},"pronunciation":{"score":1},"fluency":{"score":1},"speechMetrics":{"estimatedWpm":110},"confidence":0.8,"warnings":[]}',
+        text: '{"transcript":"The bar chart displays export volume by country in year 2024. There are","microResponses":[{"id":"content_main_idea","choice":"yes","evidence":"main trend","confidence":0.8},{"id":"content_key_details","choice":"partial","evidence":"some details","confidence":0.8},{"id":"content_visual_accuracy","choice":"yes","evidence":"accurate","confidence":0.8},{"id":"pronunciation_quality","choice":"good","evidence":"clear","confidence":0.8},{"id":"fluency_quality","choice":"developing","evidence":"some hesitation","confidence":0.8}],"content":{"score":1},"pronunciation":{"score":1},"fluency":{"score":1},"speechMetrics":{"estimatedWpm":110},"confidence":0.8,"warnings":[]}',
         usage: { promptTokenCount: 24, candidatesTokenCount: 8, totalTokenCount: 32 }
       };
     }

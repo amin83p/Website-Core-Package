@@ -312,6 +312,24 @@ function transcriptLooksIncompleteOrTruncated(text = '', options = {}) {
     'im'
   ]);
   if (trailingOpeners.has(last)) return true;
+  const trailingCopulas = new Set(['is', 'are', 'was', 'were', 'be', 'been', 'being']);
+  if (trailingCopulas.has(last)) {
+    const likelyCopulaSubjects = new Set([
+      'there',
+      'it',
+      'this',
+      'that',
+      'these',
+      'those',
+      'they',
+      'we',
+      'you',
+      'i',
+      'he',
+      'she'
+    ]);
+    if (likelyCopulaSubjects.has(previous)) return true;
+  }
 
   const canScoreTrailingRefusalFragment = allowLongRefusalFragment && words.length >= 30;
   const trailingRefusalTokens = new Set(['can', 'cannot', "can't", 'cant', 'could', "couldn't", 'couldnt', 'will', "won't", 'wont', 'unable', 'able', 'not']);
