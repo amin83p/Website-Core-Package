@@ -3,10 +3,13 @@ const router = express.Router();
 const ctrl = require('../controllers/aiProviderController');
 const usageCtrl = require('../controllers/aiTokenUsageController');
 const scoringSettingsCtrl = require('../controllers/aiScoringSettingsController');
-const { requireAuth } = require('../../../../MVC/middleware/authMiddleware');
-const { requireAccess } = require('../../../../MVC/middleware/accessMiddleware');
-const { trackActionState } = require('../../../../MVC/middleware/actionStateMiddleware');
-const { SECTIONS, OPERATIONS } = require('../../../../config/accessConstants');
+const {
+  requireAuth,
+  requireAccess,
+  trackActionState,
+  SECTIONS,
+  OPERATIONS
+} = require('./pteRouteDependencies');
 
 router.use(requireAuth);
 
