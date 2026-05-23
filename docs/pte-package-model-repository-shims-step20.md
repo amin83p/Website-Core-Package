@@ -23,7 +23,6 @@ The PTE service layer now has a future package-local data boundary available. Wh
 
 ## Remaining Work
 
-- Prepare package-local middleware and utility shims for PTE upload/context helpers.
+- Step 21 prepared package-local middleware and utility shims for PTE upload/context helpers.
 - Prepare package-local view and public script ownership before moving controllers or routes for real.
 - Keep repository implementations in place until JSON/Mongo parity and package data-root assumptions are explicitly checked.
-
