@@ -1,4 +1,4 @@
-const { coreFilesService } = require('../services/pte/pteCoreDependencies');
+const { coreFilesService } = require('./pteUploadPathCoreDependencies');
 
 const PTE_ROOT_FOLDER = 'PTE';
 
