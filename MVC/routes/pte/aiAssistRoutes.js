@@ -118,4 +118,5 @@ router.post('/api-providers/default',
   ctrl.setDefaultApiProvider
 );
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/aiAssistRoutes');

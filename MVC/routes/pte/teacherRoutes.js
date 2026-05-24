@@ -68,5 +68,6 @@ router.delete('/delete/:id',
   trackActionState(SECTIONS.PTE_TEACHERS, OPERATIONS.DELETE, { requireToken: true }),
   ctrl.archiveTeacher);
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/teacherRoutes');
 

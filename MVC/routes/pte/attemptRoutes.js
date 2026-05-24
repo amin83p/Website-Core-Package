@@ -43,4 +43,5 @@ router.get('/overall-performance',
   trackActionState(SECTIONS.PTE_ATTEMPT_OVERALL_PERFORMANCE, OPERATIONS.READ),
   ctrl.showOverallPerformance);
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/attemptRoutes');

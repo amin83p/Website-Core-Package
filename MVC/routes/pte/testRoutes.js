@@ -149,4 +149,5 @@ router.delete('/delete/:id',
   trackActionState(SECTIONS.PTE_TESTS, OPERATIONS.DELETE, { requireToken: true }),
   ctrl.deleteTest);
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/testRoutes');

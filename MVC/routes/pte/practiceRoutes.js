@@ -318,4 +318,5 @@ router.get('/api/runtime/sessions/:sessionId',
   trackActionState(SECTIONS.PTE_PRACTICE_BY_SKILLS, OPERATIONS.UPDATE),
   ctrl.getRuntimeSession);
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/practiceRoutes');

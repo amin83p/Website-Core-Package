@@ -64,4 +64,5 @@ router.use('/practice', require('./practiceRoutes'));
 router.use('/feedback', require('./feedbackRoutes'));
 router.use('/attempt', require('./attemptRoutes'));
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/pteMainRoute');

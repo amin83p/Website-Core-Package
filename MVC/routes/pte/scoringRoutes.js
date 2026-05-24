@@ -32,4 +32,5 @@ router.post('/defaults/profile',
   ctrl.updateTypeDefaults
 );
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/scoringRoutes');

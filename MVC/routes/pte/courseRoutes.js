@@ -53,4 +53,5 @@ router.get('/api/pickers/students',
   trackActionState(SECTIONS.PTE_COURSES, OPERATIONS.READ_ALL),
   ctrl.pickerStudents);
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/courseRoutes');

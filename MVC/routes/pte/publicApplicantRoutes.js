@@ -89,4 +89,5 @@ router.delete('/delete/:id',
   trackActionState(SECTIONS.PTE_PUBLIC_APPLICANTS, OPERATIONS.DELETE, { requireToken: true }),
   ctrl.archivePublicApplicant);
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/publicApplicantRoutes');

@@ -203,4 +203,5 @@ router.delete('/delete/:id',
   trackActionState(SECTIONS.PTE_QUESTIONS_BANK, OPERATIONS.DELETE, REQUIRED_DELETE_TOKEN_OPTIONS),
   ctrl.deleteQuestion);
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/questionBankRoutes');

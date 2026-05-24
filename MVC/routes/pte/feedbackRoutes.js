@@ -43,4 +43,5 @@ router.post('/practice/:sessionId/save-detailed-feedback',
   trackActionState(SECTIONS.PTE_FEEDBACK_ON_PRACTICE, OPERATIONS.CREATE, { requireToken: true, keepActive: true }),
   ctrl.savePracticeDetailedFeedback);
 
-module.exports = router;
+// Compatibility shim: prefer package-owned route implementation.
+module.exports = require('../../../packages/pte/MVC/routes/feedbackRoutes');
