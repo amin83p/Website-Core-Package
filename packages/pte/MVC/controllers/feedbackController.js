@@ -7,7 +7,7 @@ const {
   SECTIONS,
   OPERATIONS
 } = require('./feedbackControllerDependencies');
-const pteAttemptLedgerService = require('../../services/pte/pteAttemptLedgerService');
+const pteAttemptLedgerService = require('../services/pte/pteAttemptLedgerService');
 const FEEDBACK_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['status', 'skill', 'withFeedback'],
   allowedSearchFields: [

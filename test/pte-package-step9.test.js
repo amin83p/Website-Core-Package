@@ -106,8 +106,8 @@ test('PTE enable script dry-run reports registry upsert without writing', () => 
 });
 
 test('PTE route owns /pte/join through PTE public join controller', () => {
-  const routeSource = readText('MVC/routes/pte/pteMainRoute.js');
-  assert.match(routeSource, /controllers\/pte\/publicJoinController/);
+  const routeSource = readText('packages/pte/MVC/routes/pteMainRoute.js');
+  assert.match(routeSource, /controllers\/publicJoinController/);
   assert.doesNotMatch(routeSource, /personController\.showPtePublicJoinForm/);
   assert.doesNotMatch(routeSource, /personController\.processPtePublicJoin/);
 });

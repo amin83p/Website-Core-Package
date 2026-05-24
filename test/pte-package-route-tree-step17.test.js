@@ -52,29 +52,12 @@ test('PTE package main route uses package-local subroute shims', () => {
   });
 });
 
-test('PTE route shims delegate to current MVC route modules until physical move', () => {
-  const packageOwnedRouteModules = new Set([
-    'attemptRoutes.js',
-    'courseRoutes.js',
-    'feedbackRoutes.js',
-    'practiceRoutes.js',
-    'publicApplicantRoutes.js',
-    'questionBankRoutes.js',
-    'studentRoutes.js',
-    'scoringRoutes.js',
-    'teacherRoutes.js',
-    'testRoutes.js'
-  ]);
-
+test('PTE package subroutes do not delegate back to current MVC route modules', () => {
   routeFileNames().forEach((fileName) => {
-    if (packageOwnedRouteModules.has(fileName)) {
-      return;
-    }
-
     const source = readText(`packages/pte/MVC/routes/${fileName}`);
     assert.ok(
-      source.includes(`../../../../MVC/routes/pte/${fileName.replace(/\.js$/, '')}`),
-      `${fileName} should delegate to the current MVC route module`
+      !source.includes(`../../../../MVC/routes/pte/${fileName.replace(/\.js$/, '')}`),
+      `${fileName} should remain package-owned instead of delegating back to core MVC routes`
     );
   });
 });

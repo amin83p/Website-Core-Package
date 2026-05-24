@@ -10,7 +10,7 @@ const {
   inferSearchableFields,
   settingService
 } = require('./studentControllerDependencies');
-const pteStudentDataService = require('../../services/pte/pteStudentDataService');
+const pteStudentDataService = require('../services/pte/pteStudentDataService');
 
 
 const LIST_QUERY_OPTIONS = Object.freeze({

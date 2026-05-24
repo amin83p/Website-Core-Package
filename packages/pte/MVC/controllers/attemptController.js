@@ -4,8 +4,8 @@ const {
   inferSearchableFields,
   paginate
 } = require('./attemptControllerDependencies');
-const pteAttemptLedgerService = require('../../services/pte/pteAttemptLedgerService');
-const pteQuestionBankDataService = require('../../services/pte/pteQuestionBankDataService');
+const pteAttemptLedgerService = require('../services/pte/pteAttemptLedgerService');
+const pteQuestionBankDataService = require('../services/pte/pteQuestionBankDataService');
 
 const RUNTIME_PICKER_USER_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'username', 'email', 'status'],

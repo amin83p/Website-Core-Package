@@ -44,52 +44,35 @@ test('PTE manifest points the package route declaration at the package entrypoin
   assert.equal(route.metadataOnly, false);
 });
 
-test('PTE package route entrypoint is package-owned while remaining subroute shims delegate to current MVC routes', () => {
-  const packageRoute = require('../packages/pte/MVC/routes/pteMainRoute');
-  const currentRoute = require('../MVC/routes/pte/pteMainRoute');
-
-  assert.notEqual(packageRoute, currentRoute);
-  assert.equal(typeof packageRoute, 'function');
-  assert.equal(typeof currentRoute, 'function');
-
-  const packageOwnedRoutes = new Set([
-    'attemptRoutes.js',
-    'courseRoutes.js',
-    'feedbackRoutes.js',
-    'practiceRoutes.js',
-    'publicApplicantRoutes.js',
-    'questionBankRoutes.js',
-    'studentRoutes.js',
-    'scoringRoutes.js',
-    'teacherRoutes.js',
-    'testRoutes.js'
-  ]);
-
-  [
+test('PTE current MVC route files are pure compatibility shims to package-owned routes', () => {
+  const routeFiles = [
     'aiAssistRoutes.js',
     'attemptRoutes.js',
     'courseRoutes.js',
     'feedbackRoutes.js',
     'practiceRoutes.js',
+    'pteMainRoute.js',
     'publicApplicantRoutes.js',
     'questionBankRoutes.js',
     'scoringRoutes.js',
     'studentRoutes.js',
     'teacherRoutes.js',
     'testRoutes.js'
-  ].forEach((fileName) => {
+  ];
+
+  routeFiles.forEach((fileName) => {
+    const moduleName = fileName.replace(/\.js$/, '');
+    const expectedShim = `module.exports = require('../../../packages/pte/MVC/routes/${moduleName}');`;
+    const currentSource = readText(`MVC/routes/pte/${fileName}`).trim();
+    assert.equal(currentSource, expectedShim, `${fileName} should be a pure compatibility shim`);
+
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    const packageSubroute = require(`../packages/pte/MVC/routes/${fileName}`);
-    if (packageOwnedRoutes.has(fileName)) {
-      assert.notEqual(typeof packageSubroute, 'undefined', `${fileName} should resolve to package-owned route implementation`);
-      return;
-    }
+    const packageRoute = require(`../packages/pte/MVC/routes/${fileName}`);
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    const currentSubroute = require(`../MVC/routes/pte/${fileName}`);
-    assert.equal(packageSubroute, currentSubroute, `${fileName} should remain a compatibility shim`);
+    const currentRoute = require(`../MVC/routes/pte/${fileName}`);
+    assert.equal(currentRoute, packageRoute, `${fileName} should export the package-owned route module`);
   });
 });
-
 test('package resolver resolves the PTE route entrypoint from package root first', () => {
   const resolved = packageModuleResolverService.resolvePackageModulePath(
     'MVC/routes/pteMainRoute.js',
