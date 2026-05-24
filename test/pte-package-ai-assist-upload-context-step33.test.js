@@ -9,12 +9,17 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
 }
 
-test('PTE upload context middleware uses package-local attempt ledger service', () => {
+test('PTE upload context middleware delegates to core middleware implementation', () => {
   const source = readText('packages/pte/MVC/middleware/pteUploadContextMiddleware.js');
 
   assert.ok(
-    source.includes("require('../services/pte/pteUploadContextDependencies')"),
-    'pteUploadContextMiddleware should import attempt ledger dependency through package adapter.'
+    source.includes("require('../../../../MVC/middleware/pteUploadContextMiddleware')"),
+    'pteUploadContextMiddleware should delegate directly to the core middleware.'
+  );
+
+  assert.ok(
+    !source.includes("require('../services/pte/pteUploadContextDependencies')"),
+    'pteUploadContextMiddleware should not import package upload-context adapter.'
   );
 
   assert.ok(
@@ -25,22 +30,5 @@ test('PTE upload context middleware uses package-local attempt ledger service', 
   assert.ok(
     !source.includes("require('../utils/pteUploadPathUtils')"),
     'pteUploadContextMiddleware should not import upload path utils directly.'
-  );
-
-  const dependencySource = readText('packages/pte/MVC/services/pte/pteUploadContextDependencies.js');
-
-  assert.ok(
-    dependencySource.includes('module.exports'),
-    'Upload context dependency module should export upload context dependencies.'
-  );
-
-  assert.ok(
-    dependencySource.includes("require('./pteAttemptLedgerService')"),
-    'Upload context dependency module should import package-local attempt ledger service.'
-  );
-
-  assert.ok(
-    dependencySource.includes("require('../utils/pteUploadPathUtils')"),
-    'Upload context dependency module should import package-local upload utility.'
   );
 });

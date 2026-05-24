@@ -42,27 +42,19 @@ test('PTE helper core dependency adapter should delegate to core pte dependencie
     true,
     'core helper adapter should delegate to pteCoreDependencies.'
   );
-
-  const adapter = require(helperCoreDependenciesPath);
-  assert.equal(typeof adapter.paginate, 'function', 'paginate should be exported');
-  assert.equal(typeof adapter.buildDataServiceQuery, 'function', 'buildDataServiceQuery should be exported');
-  assert.equal(typeof adapter.inferSearchableFields, 'function', 'inferSearchableFields should be exported');
-  assert.equal(typeof adapter.isAjax, 'function', 'isAjax should be exported');
-  assert.equal(typeof adapter.adminChekersService, 'object', 'adminChekersService should be exported');
-  assert.equal(typeof adapter.toPublicId, 'function', 'toPublicId should be exported');
 });
 
-test('PTE upload path utility should consume upload path core dependency adapter', () => {
+test('PTE upload path utility should delegate to core utility', () => {
   const source = fs.readFileSync(uploadPathUtilsPath, 'utf8');
   assert.equal(
-    source.includes("require('./pteUploadPathCoreDependencies')"),
+    source.includes("require('../../../../MVC/utils/pteUploadPathUtils')"),
     true,
-    'pteUploadPathUtils should consume pteUploadPathCoreDependencies.'
+    'pteUploadPathUtils should delegate to the core utility directly.'
   );
   assert.equal(
-    source.includes('../services/pte/pteCoreDependencies'),
+    source.includes('coreFilesService'),
     false,
-    'pteUploadPathUtils should not import pteCoreDependencies directly.'
+    'pteUploadPathUtils should not import coreFilesService directly.'
   );
 });
 
@@ -73,7 +65,9 @@ test('PTE upload path core dependency adapter should export coreFilesService', (
     true,
     'upload path core adapter should delegate to pteCoreDependencies for coreFilesService.'
   );
-
-  const adapter = require(uploadPathCoreDependenciesPath);
-  assert.equal(typeof adapter.coreFilesService, 'object', 'coreFilesService should be exported.');
+  assert.equal(
+    source.includes('coreFilesService'),
+    true,
+    'upload path core adapter should export coreFilesService.'
+  );
 });

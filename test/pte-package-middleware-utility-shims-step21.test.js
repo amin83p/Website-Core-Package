@@ -62,7 +62,7 @@ test('PTE package middleware and utility files exist for upload boundaries', () 
   });
 });
 
-test('PTE package middleware and utility files are package-owned implementations', () => {
+test('PTE package middleware and utility files delegate to core implementations', () => {
   [
     {
       packageRoot: PACKAGE_MIDDLEWARE_ROOT,
@@ -83,8 +83,8 @@ test('PTE package middleware and utility files are package-owned implementations
 
     assert.equal(
       source.includes(`require('${expectedRequire}')`),
-      false,
-      `${relativeFile} should not delegate via ${expectedRequire}`
+      true,
+      `${relativeFile} should delegate via ${expectedRequire}`
     );
   });
 });
@@ -206,4 +206,3 @@ test('PTE package upload middleware applies the same context shape as current mi
     'runtime bucket should match'
   );
 });
-

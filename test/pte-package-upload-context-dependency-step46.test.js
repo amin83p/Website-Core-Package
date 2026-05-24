@@ -9,31 +9,22 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
 }
 
-test('PTE upload context middleware should consume package dependency facade', () => {
+test('PTE upload context middleware should delegate to core middleware implementation', () => {
   const middlewareSource = readText('packages/pte/MVC/middleware/pteUploadContextMiddleware.js');
+
+  assert.equal(
+    middlewareSource.includes("require('../../../../MVC/middleware/pteUploadContextMiddleware')"),
+    true,
+    'Upload context middleware should import from the core middleware package path.'
+  );
+});
+
+test('Upload context adapter module remains available for compatibility', () => {
   const dependencySource = readText('packages/pte/MVC/services/pte/pteUploadContextDependencies.js');
-
-  assert.equal(
-    middlewareSource.includes('require(\'../services/pte/pteUploadContextDependencies\')'),
-    true,
-    'Upload context middleware should import from package upload-context dependency adapter.'
-  );
-
-  assert.equal(
-    dependencySource.includes("require('./pteAttemptLedgerService')"),
-    true,
-    'Upload context dependency adapter should re-export package attempt-ledger service dependency.'
-  );
-
-  assert.equal(
-    dependencySource.includes("require('../utils/pteUploadPathUtils')"),
-    true,
-    'Upload context dependency adapter should re-export package upload utils dependency.'
-  );
 
   assert.equal(
     dependencySource.includes('module.exports'),
     true,
-    'Upload context dependency adapter should export an object.'
+    'Upload context dependency adapter should still export an object.'
   );
 });

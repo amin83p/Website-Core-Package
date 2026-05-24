@@ -13,25 +13,20 @@ test('PTE upload path utility uses package core file service adapter', () => {
   const source = readText('packages/pte/MVC/utils/pteUploadPathUtils.js');
 
   assert.ok(
-    source.includes("const { coreFilesService } = require('../services/pte/pteCoreDependencies');"),
-    'pteUploadPathUtils should consume the package core dependency adapter.'
+    source.includes("require('../../../../MVC/utils/pteUploadPathUtils')"),
+    'pteUploadPathUtils should delegate to the core upload path utility.'
   );
 
   assert.ok(
-    !source.includes('uploadFolderSettingsService'),
-    'pteUploadPathUtils should not import uploadFolderSettingsService directly.'
-  );
-  assert.ok(
-    !source.includes("resolveUploadFolder('pte.questionBank'"),
-    'pteUploadPathUtils should not hard-code uploadFolderSettingsService resolveUploadFolder calls.'
+    !source.includes('coreFilesService'),
+    'pteUploadPathUtils should not import coreFilesService directly.'
   );
 });
 
 test('PTE core dependency bridge exposes coreFilesService', () => {
-  const source = readText('packages/pte/MVC/services/pte/pteCoreDependencies.js');
+  const source = readText('packages/pte/MVC/services/pte/pteCoreDependenciesCoreAdapter.js');
   assert.ok(
     source.includes('coreFilesService'),
     'pteCoreDependencies should export coreFilesService for package upload helpers.'
   );
 });
-
