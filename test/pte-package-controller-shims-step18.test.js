@@ -33,9 +33,22 @@ function controllerFileNames() {
 
 const packageOwnedControllers = new Set([
   'attemptController.js',
+  'feedbackController.js',
+  'infoController.js',
   'aiProviderController.js',
   'aiScoringSettingsController.js',
-  'aiTokenUsageController.js'
+  'aiTokenUsageController.js',
+  'publicPageSettingsController.js',
+  'studentController.js',
+  'publicJoinController.js',
+  'userDashboardController.js',
+  'scoringController.js',
+  'courseController.js',
+  'teacherController.js',
+  'questionBankController.js',
+  'practiceController.js',
+  'mockExamController.js',
+  'testController.js'
 ]);
 
 test('PTE package controller shims mirror current PTE controller module names', () => {
@@ -94,3 +107,4 @@ test('PTE package main route uses package-local top-level controller shims', () 
     );
   });
 });
+
