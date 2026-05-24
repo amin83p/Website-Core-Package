@@ -6,7 +6,12 @@ Step 17 moves the route boundary forward without moving the real PTE route imple
 
 - Added package-local route shim files under `packages/pte/MVC/routes`.
 - Updated `packages/pte/MVC/routes/pteMainRoute.js` so it owns the top-level PTE route composition and requires package-local subroute shims.
-- Each package-local subroute shim delegates to the current route module under `MVC/routes/pte`.
+- Each package-local subroute was migrated from shim status to local implementations for:
+  - `studentRoutes`
+  - `publicApplicantRoutes`
+  - `questionBankRoutes`
+  - `practiceRoutes`
+- Remaining package-local subroutes now delegate to the current route modules under `MVC/routes/pte`.
 
 ## Compatibility Behavior
 

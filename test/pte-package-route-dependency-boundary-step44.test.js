@@ -43,10 +43,18 @@ test('PTE route dependency shim should consume package route dependency adapter'
 
 test('PTE route dependency service adapter should export route boundary hooks', () => {
   const routeServiceDeps = require(pteRouteDepsServicePath);
+  const routeDeps = require(pteRouteDepsPath);
 
   assert.equal(typeof routeServiceDeps.requireAuth, 'function', 'requireAuth should be exported.');
   assert.equal(typeof routeServiceDeps.requireAccess, 'function', 'requireAccess should be exported.');
   assert.equal(typeof routeServiceDeps.trackActionState, 'function', 'trackActionState should be exported.');
+  assert.equal(typeof routeServiceDeps.upload, 'function', 'upload should be exported.');
+  assert.equal(typeof routeServiceDeps.pteUploadContext, 'object', 'pteUploadContext should be exported.');
+  assert.equal(typeof routeServiceDeps.resolveActivityQuotaPolicy, 'function', 'resolveActivityQuotaPolicy should be exported.');
   assert.equal(typeof routeServiceDeps.SECTIONS, 'object', 'SECTIONS should be exported.');
   assert.equal(typeof routeServiceDeps.OPERATIONS, 'object', 'OPERATIONS should be exported.');
+
+  assert.equal(typeof routeDeps.upload, 'function', 'route shim should expose upload.');
+  assert.equal(typeof routeDeps.pteUploadContext, 'object', 'route shim should expose pteUploadContext.');
+  assert.equal(typeof routeDeps.resolveActivityQuotaPolicy, 'function', 'route shim should expose resolveActivityQuotaPolicy.');
 });

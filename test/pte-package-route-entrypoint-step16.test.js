@@ -54,7 +54,15 @@ test('PTE package route entrypoint is package-owned while remaining subroute shi
 
   const packageOwnedRoutes = new Set([
     'attemptRoutes.js',
-    'feedbackRoutes.js'
+    'courseRoutes.js',
+    'feedbackRoutes.js',
+    'practiceRoutes.js',
+    'publicApplicantRoutes.js',
+    'questionBankRoutes.js',
+    'studentRoutes.js',
+    'scoringRoutes.js',
+    'teacherRoutes.js',
+    'testRoutes.js'
   ]);
 
   [
