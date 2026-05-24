@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
-test('PTE package middleware files should delegate to core middleware where available', () => {
+test('PTE package middleware files should stay inside package boundary', () => {
   const middlewareDir = path.join(ROOT_DIR, 'packages/pte/MVC/middleware');
   const files = fs.readdirSync(middlewareDir).filter((name) => name.endsWith('.js'));
 
@@ -22,8 +22,13 @@ test('PTE package middleware files should delegate to core middleware where avai
     if (fileName === 'pteUploadContextMiddleware.js') {
       assert.equal(
         source.includes("require('../../../../MVC/middleware/pteUploadContextMiddleware')"),
+        false,
+        `${fileName} should not delegate to the core upload middleware.`
+      );
+      assert.equal(
+        source.includes("require('../services/pte/pteUploadContextDependencies')"),
         true,
-        `${fileName} should delegate to the core upload middleware.`
+        `${fileName} should use the package upload-context adapter.`
       );
     }
 

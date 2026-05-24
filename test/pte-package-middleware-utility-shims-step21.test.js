@@ -21,10 +21,10 @@ function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
-function expectedShimRequirePath({ packageRoot, currentRoot, relativeFile }) {
-  const packageShimPath = path.join(packageRoot, relativeFile);
-  const currentPath = path.join(currentRoot, relativeFile).replace(/\.js$/, '');
-  let relativeRequirePath = path.relative(path.dirname(packageShimPath), currentPath).replace(/\\/g, '/');
+function expectedCoreShimRequirePath({ packageRoot, currentRoot, relativeFile }) {
+  const currentShimPath = path.join(currentRoot, relativeFile);
+  const packagePath = path.join(packageRoot, relativeFile).replace(/\.js$/, '');
+  let relativeRequirePath = path.relative(path.dirname(currentShimPath), packagePath).replace(/\\/g, '/');
   if (!relativeRequirePath.startsWith('.')) {
     relativeRequirePath = `./${relativeRequirePath}`;
   }
@@ -38,15 +38,21 @@ function assertFilePresence({ files, packageRoot, currentRoot }) {
   });
 }
 
-function readSourceRelativePackage({ packageRoot, currentRoot, relativeFile }) {
-  const packagePath = path.join(packageRoot, relativeFile);
-  const source = readText(packagePath);
-  const expectedRequire = expectedShimRequirePath({
+function readCoreShimSource({ packageRoot, currentRoot, relativeFile }) {
+  const currentPath = path.join(currentRoot, relativeFile);
+  const source = readText(currentPath);
+  const expectedRequire = expectedCoreShimRequirePath({
     packageRoot,
     currentRoot,
     relativeFile
   });
   return { source, expectedRequire };
+}
+
+function registerPteUploadFolderDefinitions() {
+  const manifest = require(path.join(ROOT_DIR, 'packages/pte/package.manifest.json'));
+  const uploadFolderSettingsService = require(path.join(ROOT_DIR, 'MVC/services/uploadFolderSettingsService'));
+  uploadFolderSettingsService.registerUploadFolderDefinitions(manifest.uploadFolders || []);
 }
 
 test('PTE package middleware and utility files exist for upload boundaries', () => {
@@ -62,7 +68,7 @@ test('PTE package middleware and utility files exist for upload boundaries', () 
   });
 });
 
-test('PTE package middleware and utility files delegate to core implementations', () => {
+test('PTE core middleware and utility compatibility files delegate to package implementations', () => {
   [
     {
       packageRoot: PACKAGE_MIDDLEWARE_ROOT,
@@ -75,7 +81,7 @@ test('PTE package middleware and utility files delegate to core implementations'
       relativeFile: 'pteUploadPathUtils.js'
     }
   ].forEach(({ packageRoot, currentRoot, relativeFile }) => {
-    const { source, expectedRequire } = readSourceRelativePackage({
+    const { source, expectedRequire } = readCoreShimSource({
       packageRoot,
       currentRoot,
       relativeFile
@@ -84,12 +90,13 @@ test('PTE package middleware and utility files delegate to core implementations'
     assert.equal(
       source.includes(`require('${expectedRequire}')`),
       true,
-      `${relativeFile} should delegate via ${expectedRequire}`
+      `${relativeFile} core compatibility file should delegate via ${expectedRequire}`
     );
   });
 });
 
 test('PTE package upload utility behavior matches current utility behavior', () => {
+  registerPteUploadFolderDefinitions();
   const rootUtility = require(path.join(CURRENT_UTIL_ROOT, 'pteUploadPathUtils'));
   const packageUtility = require(path.join(PACKAGE_UTIL_ROOT, 'pteUploadPathUtils'));
 

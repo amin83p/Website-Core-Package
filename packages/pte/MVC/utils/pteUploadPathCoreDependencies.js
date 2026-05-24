@@ -1,5 +1,9 @@
-const { coreFilesService } = require('../services/pte/pteCoreDependencies');
+const {
+  coreFilesService,
+  uploadFolderSettingsService
+} = require('../services/pte/pteCoreDependencies');
 
 module.exports = {
-  coreFilesService
+  coreFilesService,
+  uploadFolderSettingsService
 };

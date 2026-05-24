@@ -44,30 +44,40 @@ test('PTE helper core dependency adapter should delegate to core pte dependencie
   );
 });
 
-test('PTE upload path utility should delegate to core utility', () => {
+test('PTE upload path utility should consume package core dependency adapter', () => {
   const source = fs.readFileSync(uploadPathUtilsPath, 'utf8');
   assert.equal(
-    source.includes("require('../../../../MVC/utils/pteUploadPathUtils')"),
+    source.includes("require('./pteUploadPathCoreDependencies')"),
     true,
-    'pteUploadPathUtils should delegate to the core utility directly.'
+    'pteUploadPathUtils should import the package upload path core dependency adapter.'
   );
   assert.equal(
-    source.includes('coreFilesService'),
+    source.includes("require('../../../../MVC/utils/pteUploadPathUtils')"),
     false,
-    'pteUploadPathUtils should not import coreFilesService directly.'
+    'pteUploadPathUtils should not delegate back to the core utility directly.'
+  );
+  assert.equal(
+    source.includes('uploadFolderSettingsService'),
+    true,
+    'pteUploadPathUtils should use uploadFolderSettingsService through the adapter.'
   );
 });
 
-test('PTE upload path core dependency adapter should export coreFilesService', () => {
+test('PTE upload path core dependency adapter should export upload services', () => {
   const source = fs.readFileSync(uploadPathCoreDependenciesPath, 'utf8');
   assert.equal(
     source.includes("require('../services/pte/pteCoreDependencies')"),
     true,
-    'upload path core adapter should delegate to pteCoreDependencies for coreFilesService.'
+    'upload path core adapter should delegate to pteCoreDependencies for upload services.'
   );
   assert.equal(
     source.includes('coreFilesService'),
     true,
     'upload path core adapter should export coreFilesService.'
+  );
+  assert.equal(
+    source.includes('uploadFolderSettingsService'),
+    true,
+    'upload path core adapter should export uploadFolderSettingsService.'
   );
 });

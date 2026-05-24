@@ -1,6 +1,7 @@
 const adminChekersService = require('../../../../../MVC/services/adminChekersService');
 const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
 const coreFilesService = require('../../../../../MVC/services/coreFilesService');
+const uploadFolderSettingsService = require('../../../../../MVC/services/uploadFolderSettingsService');
 const settingService = require('../../../../../MVC/services/settingService');
 const dataService = require('../../../../../MVC/services/dataService');
 const { normalizeQueryOptions } = require('../../../../../MVC/utils/queryOptionsAdapter');
@@ -22,6 +23,7 @@ module.exports = {
   adminChekersService,
   activityQuotaLedgerService,
   coreFilesService,
+  uploadFolderSettingsService,
   settingService,
   dataService,
   normalizeQueryOptions,

@@ -9,13 +9,18 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
 }
 
-test('PTE upload context middleware should delegate to core middleware implementation', () => {
+test('PTE upload context middleware should consume package dependency adapter', () => {
   const middlewareSource = readText('packages/pte/MVC/middleware/pteUploadContextMiddleware.js');
 
   assert.equal(
-    middlewareSource.includes("require('../../../../MVC/middleware/pteUploadContextMiddleware')"),
+    middlewareSource.includes("require('../services/pte/pteUploadContextDependencies')"),
     true,
-    'Upload context middleware should import from the core middleware package path.'
+    'Upload context middleware should import the package upload-context dependencies.'
+  );
+  assert.equal(
+    middlewareSource.includes("require('../../../../MVC/middleware/pteUploadContextMiddleware')"),
+    false,
+    'Upload context middleware should not delegate to the core middleware path.'
   );
 });
 
