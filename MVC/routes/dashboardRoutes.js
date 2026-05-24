@@ -4,16 +4,22 @@ const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
 const { requireAuth } = require('../middleware/authMiddleware');
 const adminCheckersService = require('../services/adminChekersService');
+const packageNavigationService = require('../services/packageNavigationService');
 
-function redirectNonAdminToPteHub(req, res, next) {
+const DEFAULT_DASHBOARD_URL = '/dashboard';
+
+function redirectNonAdminToPackageDashboard(req, res, next) {
   const isAdminUser = adminCheckersService.isAdmin(req.user)
     || adminCheckersService.isOrgAdmin(req.user)
     || Boolean(String(req.user?.systemAccessProfileId || '').trim());
-  if (!isAdminUser) return res.redirect('/pte/dashboard');
+  if (!isAdminUser) {
+    const targetHref = packageNavigationService.getPrimaryDashboardHref(req.user, { fallback: '' });
+    if (targetHref && targetHref !== DEFAULT_DASHBOARD_URL) return res.redirect(targetHref);
+  }
   return next();
 }
 
-router.get('/', requireAuth, redirectNonAdminToPteHub, dashboardController.showDashboard);
+router.get('/', requireAuth, redirectNonAdminToPackageDashboard, dashboardController.showDashboard);
 
 router.get('/bootstrap-setup', requireAuth, dashboardController.showBootstrapSetup);
 

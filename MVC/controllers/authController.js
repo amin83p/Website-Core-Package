@@ -15,13 +15,14 @@ const resendEmailService = require('../services/resendEmailService');
 const smsProviderService = require('../services/sms/smsProviderService');
 const settingService = require('../services/settingService');
 const appBrandingService = require('../services/appBrandingService');
+const packageNavigationService = require('../services/packageNavigationService');
 const userRepository = require('../repositories/userRepository');
 const microsoftAuthService = require('../services/microsoftAuthService');
 const adminCheckersService = require('../services/adminChekersService');
 const { normalizePhoneE164, validateSmsPhoneE164, maskPhone } = require('../utils/phoneUtils');
 
 const DEFAULT_DASHBOARD_URL = '/dashboard';
-const PTE_USER_DASHBOARD_URL = '/pte/dashboard';
+const USER_DASHBOARD_FALLBACK_URL = DEFAULT_DASHBOARD_URL;
 const MICROSOFT_PENDING_LOGIN_TTL_MS = 10 * 60 * 1000;
 
 function cleanString(value, { max = 600, allowEmpty = true } = {}) {
@@ -395,11 +396,17 @@ function resolvePendingMicrosoftSessionLimit(req) {
   return pending?.sessionLimit || null;
 }
 
+function resolveUserDashboardRedirectUrl(user) {
+  return packageNavigationService.getPrimaryDashboardHref(user, {
+    fallback: USER_DASHBOARD_FALLBACK_URL
+  }) || USER_DASHBOARD_FALLBACK_URL;
+}
+
 function resolvePostLoginRedirectUrl(user) {
   const isAdminUser = adminCheckersService.isAdmin(user)
     || adminCheckersService.isOrgAdmin(user)
     || Boolean(String(user?.systemAccessProfileId || '').trim());
-  return isAdminUser ? DEFAULT_DASHBOARD_URL : PTE_USER_DASHBOARD_URL;
+  return isAdminUser ? DEFAULT_DASHBOARD_URL : resolveUserDashboardRedirectUrl(user);
 }
 
 async function recordSuccessfulLogin(user, { provider = 'password', providerAccount = null } = {}) {

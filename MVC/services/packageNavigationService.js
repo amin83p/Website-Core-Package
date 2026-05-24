@@ -267,35 +267,28 @@ function getCompatPackage(id = '') {
 }
 
 function seedCompatEnabledPackages(registryRows = []) {
-  const registryMap = new Map();
+  const rows = [];
+  const registryIds = new Set();
+
   (Array.isArray(registryRows) ? registryRows : []).forEach((row) => {
     const id = normalizePackageId(row?.packageId || row?.id || '');
     if (!id) return;
-    registryMap.set(id, row);
-  });
-
-  const rows = [];
-  Object.values(COMPAT_PACKAGE_DEFAULTS).forEach((base) => {
-    const row = registryMap.get(base.id);
-    if (!row) {
-      rows.push({
-        packageId: base.id,
-        enabled: true,
-        installStatus: 'compat',
-        metadata: {
-          compat: true
-        }
-      });
-      return;
-    }
+    registryIds.add(id);
     rows.push(row);
   });
 
-  registryMap.forEach((row, id) => {
-    if (!COMPAT_PACKAGE_DEFAULTS[id]) {
-      rows.push(row);
-    }
+  Object.values(COMPAT_PACKAGE_DEFAULTS).forEach((base) => {
+    if (registryIds.has(base.id)) return;
+    rows.push({
+      packageId: base.id,
+      enabled: true,
+      installStatus: 'compat',
+      metadata: {
+        compat: true
+      }
+    });
   });
+
   return rows;
 }
 
@@ -488,6 +481,12 @@ function getDashboardEntries(user = null) {
     .map((row) => ({ ...row }));
 }
 
+function getPrimaryDashboardHref(user = null, options = {}) {
+  const fallback = cleanMenuHref(options.fallback || '');
+  const entry = getDashboardEntries(user).find((row) => cleanMenuHref(row?.href));
+  return cleanMenuHref(entry?.href || '') || fallback;
+}
+
 function filterMenuItemsAgainstDisabledPackages(items = []) {
   return removeDisabledMountEntries(items, cache.disabledMountPaths);
 }
@@ -514,6 +513,7 @@ module.exports = {
   getDisabledMountPaths,
   getPublicMenuEntries,
   getDashboardEntries,
+  getPrimaryDashboardHref,
   filterMenuItemsAgainstDisabledPackages,
   resetCache
 };

@@ -163,3 +163,49 @@ test('PTE navigation comes from manifest declarations instead of compat fallback
     assert.equal(packageNavigationService.getPublicMenuEntries(null).some((entry) => entry.href === '/pte/join'), true);
   });
 });
+
+test('primary dashboard href resolves from enabled package dashboard entries', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'gamma', {
+      id: 'gamma',
+      name: 'Gamma',
+      version: '1.0.0',
+      mountPath: '/gamma',
+      dashboardEntries: [
+        {
+          id: 'gamma-dashboard',
+          label: 'Gamma Dashboard',
+          href: '/gamma/dashboard',
+          icon: 'bi-box',
+          visibility: 'authenticated'
+        }
+      ]
+    });
+
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'gamma',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    await packageNavigationService.refreshNavigationRegistry({
+      backendMode: 'json',
+      packageRootDir
+    });
+
+    assert.equal(packageNavigationService.getPrimaryDashboardHref({ id: 'U1' }, { fallback: '/dashboard' }), '/gamma/dashboard');
+    assert.equal(packageNavigationService.getPrimaryDashboardHref(null, { fallback: '/dashboard' }), '/dashboard');
+  });
+});
+
+test('core dashboard redirects are package-navigation driven instead of PTE literals', async () => {
+  const [authSource, dashboardRouteSource] = await Promise.all([
+    fs.readFile(path.resolve(__dirname, '../MVC/controllers/authController.js'), 'utf8'),
+    fs.readFile(path.resolve(__dirname, '../MVC/routes/dashboardRoutes.js'), 'utf8')
+  ]);
+
+  assert.doesNotMatch(authSource, /\/pte\/dashboard/);
+  assert.doesNotMatch(dashboardRouteSource, /\/pte\/dashboard/);
+  assert.match(authSource, /packageNavigationService\.getPrimaryDashboardHref/);
+  assert.match(dashboardRouteSource, /packageNavigationService\.getPrimaryDashboardHref/);
+});
