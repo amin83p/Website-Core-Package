@@ -82,7 +82,6 @@ const DEFAULT_PUBLIC_MENU_ITEMS = [
   { id: 'home', label: 'Home', href: '/', icon: 'bi-house', visibility: 'all', target: '_self', active: true, children: [] },
   { id: 'what-i-offer', label: 'What I Offer', href: '/whatIOffer', icon: 'bi-stars', visibility: 'all', target: '_self', active: true, children: [] },
   { id: 'news', label: 'News', href: '/news', icon: 'bi-newspaper', visibility: 'all', target: '_self', active: true, children: [] },
-  { id: 'pte-test', label: 'PTE Test', href: '/pte', icon: 'bi-mortarboard', visibility: 'all', target: '_self', active: true, children: [] },
   { id: 'biography', label: 'Biography', href: '/biography', icon: 'bi-person-badge', visibility: 'all', target: '_self', active: true, children: [] },
   { id: 'contact', label: 'Contact', href: '/contact', icon: 'bi-envelope', visibility: 'all', target: '_self', active: true, children: [] },
   { id: 'about', label: 'About', href: '/about', icon: 'bi-info-circle', visibility: 'all', target: '_self', active: true, children: [] },

@@ -3,13 +3,11 @@ const path = require('path');
 const GROUPS = Object.freeze({
   CORE: 'Core Uploads',
   SCHOOL: 'School Uploads',
-  PTE: 'PTE Uploads',
   GENERATED: 'Generated Assets'
 });
 
 const PACKAGE_NAMES = Object.freeze({
   CORE: 'Core',
-  PTE: 'PTE',
   SCHOOL: 'School',
   IELTS: 'IELTS',
   BENCHPATH: 'BenchPath',
@@ -48,15 +46,6 @@ const BUILTIN_DEFINITIONS = Object.freeze([
   { key: 'school.examMedia', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Exam Media', defaultTemplate: 'school-exams/{templateId}/{questionId}', placeholders: ['templateId', 'questionId'] },
   { key: 'school.classWorkspace', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Class Workspaces', defaultTemplate: 'school/classes/{classId}', placeholders: ['classId'] },
   { key: 'school.subjectWorkspace', packageName: 'SCHOOL', group: GROUPS.SCHOOL, label: 'School Subject Workspaces', defaultTemplate: 'school/subjects/{subjectId}', placeholders: ['subjectId'] },
-
-  { key: 'pte.questionBank', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Question Bank', defaultTemplate: 'PTE/Question_Bank', placeholders: [] },
-  { key: 'pte.students', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Student Root', defaultTemplate: 'PTE/Students', placeholders: [] },
-  { key: 'pte.studentItem', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Student Files', defaultTemplate: 'PTE/Students/{itemId}', placeholders: ['itemId'] },
-  { key: 'pte.publicApplicants', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Public Applicant Root', defaultTemplate: 'PTE/Public_Applicants', placeholders: [] },
-  { key: 'pte.publicApplicantItem', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Public Applicant Files', defaultTemplate: 'PTE/Public_Applicants/{itemId}', placeholders: ['itemId'] },
-  { key: 'pte.practiceAttempt', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Practice Audio', defaultTemplate: 'PTE/Practice_By_Skills/{userId}/{practiceName}/{sessionId}/{itemId}', placeholders: ['userId', 'practiceName', 'sessionId', 'itemId'] },
-  { key: 'pte.smartPracticeAttempt', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Smart Practice Audio', defaultTemplate: 'PTE/Smart_Practice/{userId}/{practiceName}/{sessionId}/{itemId}', placeholders: ['userId', 'practiceName', 'sessionId', 'itemId'] },
-  { key: 'pte.mockExamAttempt', packageName: 'PTE', group: GROUPS.PTE, label: 'PTE Mock Exam Audio', defaultTemplate: 'PTE/Mock_Exams/{userId}/{testName}/{sessionId}/{itemId}', placeholders: ['userId', 'testName', 'sessionId', 'itemId'] },
 
   { key: 'generated.heic', packageName: 'CORE', group: GROUPS.GENERATED, label: 'HEIC Converter Jobs', defaultTemplate: 'heic-converter/{jobDate}/{jobId}', placeholders: ['jobDate', 'jobId'] },
   { key: 'generated.importReports', packageName: 'CORE', group: GROUPS.GENERATED, label: 'Import Reports', defaultTemplate: 'importReports', placeholders: [] },
