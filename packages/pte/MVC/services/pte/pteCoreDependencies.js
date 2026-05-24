@@ -9,6 +9,12 @@ const { applyGenericFilter } = require('../../../../MVC/utils/queryEngine');
 const { idsEqual, toPublicId } = require('../../../../MVC/utils/idAdapter');
 const { assertCreateOrgContextOrThrow } = require('../../../../MVC/utils/orgContextUtils');
 const { decrypt } = require('../../../../MVC/utils/encyptors');
+const {
+  paginate,
+  buildDataServiceQuery,
+  inferSearchableFields,
+  isAjax
+} = require('../../../../MVC/utils/generalTools');
 const { runByRepositoryBackend } = require('../../../../MVC/repositories/backend/repositoryBackendSelector');
 const { getMongoCollection } = require('../../../../MVC/infrastructure/mongo/mongoConnection');
 
@@ -23,6 +29,10 @@ module.exports = {
   applyGenericFilter,
   idsEqual,
   toPublicId,
+  paginate,
+  buildDataServiceQuery,
+  inferSearchableFields,
+  isAjax,
   assertCreateOrgContextOrThrow,
   decrypt,
   runByRepositoryBackend,

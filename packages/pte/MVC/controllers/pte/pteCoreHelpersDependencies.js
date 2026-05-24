@@ -1,13 +1,17 @@
-const paginate = require('../../../../MVC/utils/paginationHelper');
-const generalTools = require('../../../../MVC/utils/generalTools');
-const adminChekersService = require('../../../../MVC/services/adminChekersService');
-const { toPublicId } = require('../../../../MVC/utils/idAdapter');
+const {
+  paginate,
+  buildDataServiceQuery,
+  inferSearchableFields,
+  isAjax,
+  adminChekersService,
+  toPublicId
+} = require('../services/pte/pteCoreDependencies');
 
 module.exports = {
   paginate,
-  buildDataServiceQuery: generalTools.buildDataServiceQuery,
-  inferSearchableFields: generalTools.inferSearchableFields,
-  isAjax: generalTools.isAjax,
+  buildDataServiceQuery,
+  inferSearchableFields,
+  isAjax,
   adminChekersService,
   toPublicId
 };
