@@ -54,10 +54,10 @@ test('Step 13 keeps PTE in compatibility-first locations', () => {
   assert.equal(exists('packages/pte/scripts/maintenance/enable-pte-package.js'), true);
 });
 
-test('Step 13 keeps /pte hardcoded while package route is mount-ready', () => {
+test('Step 13 migrates /pte mounting from hardcoded app route to package manifest route', () => {
   const appSource = readText('app.js');
-  assert.match(appSource, /const pteRoutes\s*=\s*require\('\.\/MVC\/routes\/pte\/pteMainRoute'\)/);
-  assert.match(appSource, /app\.use\('\/pte',\s*pteRoutes\)/);
+  assert.equal(/const pteRoutes\s*=\s*require\('\.\/MVC\/routes\/pte\/pteMainRoute'\)/.test(appSource), false);
+  assert.equal(/app\.use\('\/pte',\s*pteRoutes\)/.test(appSource), false);
 
   const manifest = JSON.parse(readText('packages/pte/package.manifest.json'));
   const pteUseRoutes = (manifest.routes || []).filter((route) => (

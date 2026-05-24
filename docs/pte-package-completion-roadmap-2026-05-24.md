@@ -24,8 +24,8 @@ This roadmap lists remaining passes to take `Website-Core-Package` from PTE logi
 - Update `packages/pte/package.manifest.json` route entries and install/activation assumptions accordingly.
 
 ### Pass 2 - Remove hardcoded `/pte` app mount
-- After Pass 1 guard tests pass, remove the hardcoded `app.use('/pte', ...)` from `app.js`.
-- Validate route precedence and 404 behavior through startup and integration tests.
+- ✅ Remove the hardcoded `app.use('/pte', ...)` from `app.js`.
+- Keep package runtime mount as the source of truth for `/pte` while validating startup order remains correct.
 
 ### Pass 3 - Reduce remaining hardcoded core ties to PTE
 - Move remaining PTE references out of core coupling points:
