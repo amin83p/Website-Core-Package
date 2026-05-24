@@ -28,3 +28,6 @@ PTE package views currently use `../../partials/...` includes. Without a local p
 
 - Package-side PTE views that include `../../partials/...` can resolve those includes from the package partial bridge directory.
 - Each bridge file delegates to an existing core partial.
+
+
+> Note (Step 61): Bridge files were intentionally replaced with direct core partial references for installable-package boundaries. See pte-package-view-core-partials-direct-step61.md.

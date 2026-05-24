@@ -20,7 +20,7 @@
   );
 %>
 
-<%- include('../../partials/tablePages-start', {
+<%- include('../../../../../../MVC/views/partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -119,7 +119,7 @@
   </div>
 </div>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('../../../../../../MVC/views/partials/tablePages-search', {
   placeholder: 'Search sessions by id, student, status, or skill...',
   fields: searchableFields || []
 }) %>
@@ -203,13 +203,13 @@
   </table>
 </div>
 
-<%- include('../../partials/pagination', {
+<%- include('../../../../../../MVC/views/partials/pagination', {
   pagination: pagination,
   filters: filters,
   baseUrlPath: newUrl
 }) %>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('../../../../../../MVC/views/partials/tablePages-end') %>
 
 <script>
 (() => {

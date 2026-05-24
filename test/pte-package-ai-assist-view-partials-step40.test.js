@@ -1,12 +1,13 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const PTE_VIEW_DIR = path.join(ROOT_DIR, 'packages/pte/MVC/views/pte');
-const PTE_PARTIAL_DIR = path.join(ROOT_DIR, 'packages/pte/MVC/views/partials');
 const CORE_PARTIAL_DIR = path.join(ROOT_DIR, 'MVC/views/partials');
+const PACKAGE_PARTIAL_DIR = path.join(ROOT_DIR, 'packages/pte/MVC/views/partials');
+const CORE_PARTIAL_INCLUDE_PREFIX = '../../../../../../MVC/views/partials/';
 
 function walkFiles(directory) {
   const entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -29,59 +30,46 @@ function extractPartialIncludes(filePath) {
   let match = null;
   while ((match = re.exec(source)) !== null) {
     const token = match[1].trim();
-    if (token.startsWith('../../partials/')) {
-      matches.push(token.replace('../../partials/', ''));
+    if (token.startsWith(CORE_PARTIAL_INCLUDE_PREFIX)) {
+      matches.push(token);
     }
   }
   return matches;
 }
 
 const PTE_VIEW_FILES = walkFiles(PTE_VIEW_DIR);
-const EXPECTED_PARTIAL_BRIDGES = new Set([
-  'modal',
-  'modal_AudioPreview',
-  'modal_GenericPicker',
-  'modal_ImageViewer',
-  'modal_MediaManager',
-  'pagination',
-  'tablePages-end',
-  'tablePages-search',
-  'tablePages-start'
-]);
 
-test('package views should keep partial includes inside package partial bridge directory', () => {
+test('package views should reference core partials directly, with no local bridge copy', () => {
   const referencedPartials = new Set();
 
   for (const viewFile of PTE_VIEW_FILES) {
     for (const includeName of extractPartialIncludes(viewFile)) {
-      referencedPartials.add(includeName);
-      const bridgePath = path.join(PTE_PARTIAL_DIR, `${includeName}.ejs`);
-      assert.ok(
-        fs.existsSync(bridgePath),
-        `Missing package partial bridge: ${includeName} (expected ${bridgePath})`
-      );
+      const partialName = includeName.replace(CORE_PARTIAL_INCLUDE_PREFIX, '');
+      referencedPartials.add(partialName);
     }
   }
 
-  for (const partialName of [...EXPECTED_PARTIAL_BRIDGES].sort()) {
+  assert.equal(
+    fs.existsSync(PACKAGE_PARTIAL_DIR),
+    false,
+    'PTE package-local partial bridge directory should be removed; package views must use core partials directly.'
+  );
+
+  for (const partialName of [...referencedPartials].sort()) {
+    const corePartial = path.join(CORE_PARTIAL_DIR, `${partialName}.ejs`);
     assert.ok(
-      referencedPartials.has(partialName),
-      `Expected package view usage to cover partial: ${partialName}`
+      fs.existsSync(corePartial),
+      `Referenced core partial should exist before rendering: ${corePartial}`
     );
   }
+
+  assert.equal(referencedPartials.size > 0, true, 'Expected PTE package views to reference shared table/page/modal partials.');
 });
 
-test('package partial bridges should delegate to core view partials', () => {
-  for (const partialName of [...EXPECTED_PARTIAL_BRIDGES].sort()) {
-    const bridgePath = path.join(PTE_PARTIAL_DIR, `${partialName}.ejs`);
-    const source = fs.readFileSync(bridgePath, 'utf8');
-    const expectedCoreDelegate = `../../../../MVC/views/partials/${partialName}`;
-    assert.ok(
-      source.includes(`<%- include('${expectedCoreDelegate}') %>`) ||
-        source.includes(`<%- include("${expectedCoreDelegate}") %>`),
-      `Partial bridge ${partialName} should include core partial: ${expectedCoreDelegate}`
-    );
-    const corePartial = path.join(CORE_PARTIAL_DIR, `${partialName}.ejs`);
-    assert.ok(fs.existsSync(corePartial), `Expected core partial exists before delegation: ${corePartial}`);
+test('package views should never include package-local partial path tokens', () => {
+  for (const viewFile of PTE_VIEW_FILES) {
+    const source = fs.readFileSync(viewFile, 'utf8');
+    assert.equal(source.includes("'../../partials/"), false, `${path.relative(PTE_VIEW_DIR, viewFile)} should not include '../../partials/'`);
+    assert.equal(source.includes('"../../partials/'), false, `${path.relative(PTE_VIEW_DIR, viewFile)} should not include "../../partials/"`);
   }
 });
