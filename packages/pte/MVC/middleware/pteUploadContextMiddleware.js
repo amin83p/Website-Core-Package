@@ -1,5 +1,4 @@
-const pteAttemptLedgerService = require('../services/pte/pteAttemptLedgerService');
-const pteUploadPathUtils = require('../utils/pteUploadPathUtils');
+const { pteAttemptLedgerService, pteUploadPathUtils } = require('../services/pte/pteUploadContextDependencies');
 
 function cleanText(value, max = 260) {
   const out = String(value || '').replace(/\0/g, '').trim();

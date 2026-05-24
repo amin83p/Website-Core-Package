@@ -11,10 +11,16 @@ function readText(relativePath) {
 
 test('PTE upload context middleware uses package upload path constants', () => {
   const middlewareSource = readText('packages/pte/MVC/middleware/pteUploadContextMiddleware.js');
+  const dependencySource = readText('packages/pte/MVC/services/pte/pteUploadContextDependencies.js');
 
   assert.ok(
-    middlewareSource.includes("const pteUploadPathUtils = require('../utils/pteUploadPathUtils');"),
-    'Upload context middleware should import package-local upload path utility.'
+    middlewareSource.includes("const { pteAttemptLedgerService, pteUploadPathUtils } = require('../services/pte/pteUploadContextDependencies');"),
+    'Upload context middleware should import package upload dependencies through local adapter.'
+  );
+
+  assert.ok(
+    dependencySource.includes("const pteUploadPathUtils = require('../utils/pteUploadPathUtils');"),
+    'Upload context dependencies should use package-local upload path utility.'
   );
 
   assert.ok(
