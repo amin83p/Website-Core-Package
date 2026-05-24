@@ -1,7 +1,7 @@
 const {
   paginate,
   isAjax
-} = require('./coreHelpers');
+} = require('./pte/coreHelpers');
 const pteAiProviderDataService = require('../services/pte/pteAiProviderDataService');
 
 function hasOwn(source, key) {

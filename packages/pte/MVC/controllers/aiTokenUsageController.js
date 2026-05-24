@@ -5,7 +5,7 @@ const {
   isAjax,
   adminChekersService,
   toPublicId
-} = require('./coreHelpers');
+} = require('./pte/coreHelpers');
 const pteAiTokenUsageDataService = require('../services/pte/pteAiTokenUsageDataService');
 
 const TOKEN_USAGE_PICKER_USER_QUERY_OPTIONS = Object.freeze({
