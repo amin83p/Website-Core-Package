@@ -1,5 +1,5 @@
 const { paginate, buildDataServiceQuery, inferSearchableFields, isAjax } = require('./coreHelpers');
-const pathResolver = require('../../utils/pathResolver');
+const coreFilesService = require('../../services/coreFilesService');
 const uploadMiddleware = require('../../middleware/upload');
 const pteUploadContext = require('../../middleware/pteUploadContextMiddleware');
 const securityService = require('../../services/security');
@@ -14,7 +14,7 @@ module.exports = {
   isAjax,
   buildDataServiceQuery,
   inferSearchableFields,
-  pathResolver,
+  coreFilesService,
   uploadMiddleware,
   pteUploadContext,
   securityService,

@@ -7,13 +7,11 @@ const pteAttemptArtifactRepository = require('../../repositories/pteAttemptArtif
 const pteTestVersionRepository = require('../../repositories/pteTestVersionRepository');
 const pteQuestionVersionRepository = require('../../repositories/pteQuestionVersionRepository');
 const pteApplicantRepository = require('../../repositories/pteApplicantRepository');
-const pathResolver = require('../../utils/pathResolver');
 const adminChekersService = require('../adminChekersService');
 const dataService = require('../dataService');
-const uploadPathUtils = require('../../utils/uploadPathUtils');
+const coreFilesService = require('../coreFilesService');
 const pteUploadPathUtils = require('../../utils/pteUploadPathUtils');
 const { isRailwayProxyMode } = require('../../utils/uploadModeUtils');
-const { gatewayDeleteByUploadUrl } = require('../fileGatewayClientService');
 const activityQuotaLedgerService = require('../activityQuotaLedgerService');
 const consumptionDefinitionPolicyService = require('../activityQuota/consumptionDefinitionPolicyService');
 const { resolveEntity } = require('../../utils/entityResolver');
@@ -946,7 +944,7 @@ function isPathInsideBase(basePath = '', candidatePath = '') {
 }
 
 function resolveUploadsRoot() {
-  return uploadPathUtils.getUploadRootAbsolute();
+  return coreFilesService.getUploadRootAbsolute();
 }
 
 function toAbsoluteUploadPath(rawPath = '', uploadsRoot = '') {
@@ -954,7 +952,7 @@ function toAbsoluteUploadPath(rawPath = '', uploadsRoot = '') {
   if (!token || !uploadsRoot) return '';
 
   const normalizedRoot = path.resolve(uploadsRoot);
-  const fromUploadUrl = uploadPathUtils.fromUploadsUrlToDiskPath(token, normalizedRoot);
+  const fromUploadUrl = coreFilesService.fromUploadsUrlToDiskPath(token, normalizedRoot);
   if (fromUploadUrl && isPathInsideBase(normalizedRoot, fromUploadUrl)) {
     return fromUploadUrl;
   }
@@ -1010,7 +1008,7 @@ async function removeRemoteUploadIfExists(uploadUrl = '') {
   const token = cleanString(uploadUrl, { max: 2000, allowEmpty: true }) || '';
   if (!token || !isUploadUrlLike(token) || !isRailwayProxyMode()) return false;
   try {
-    await gatewayDeleteByUploadUrl(token);
+    await coreFilesService.deleteFilePaths([token]);
     return true;
   } catch (_) {
     return false;
@@ -1121,8 +1119,8 @@ async function cleanupPracticeAttemptUploads(session = {}, artifacts = [], event
 
   let removedDirectories = 0;
   const baseRoots = new Set();
-  if (orgId) baseRoots.add(pathResolver.getRootPath(orgId));
-  baseRoots.add(pathResolver.getRootPath('GLOBAL'));
+  if (orgId) baseRoots.add(coreFilesService.getRootPath(orgId));
+  baseRoots.add(coreFilesService.getRootPath('GLOBAL'));
 
   for (const baseRoot of baseRoots) {
     const normalizedBaseRoot = path.resolve(String(baseRoot || ''));
@@ -1130,7 +1128,7 @@ async function cleanupPracticeAttemptUploads(session = {}, artifacts = [], event
     for (const relativePath of relativeCandidates) {
       let targetDirectory = '';
       try {
-        targetDirectory = pathResolver.resolveSafePath(normalizedBaseRoot, relativePath);
+        targetDirectory = coreFilesService.resolveSafePath(normalizedBaseRoot, relativePath);
       } catch (_) {
         targetDirectory = '';
       }

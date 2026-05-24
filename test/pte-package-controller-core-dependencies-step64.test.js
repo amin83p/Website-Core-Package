@@ -73,9 +73,10 @@ test('Package controller dependency shims should remain loadable through core ad
 
 test('Core controller dependency adapters should exist on disk', () => {
   packageToCoreDependencyMap.forEach(({ expectedCoreTarget }) => {
+    const coreRelativePath = expectedCoreTarget.replace(/^\.\.\/\.\.\/\.\.\/\.\.\//, '');
     const absoluteCorePath = path.join(
       ROOT_DIR,
-      expectedCoreTarget.replace(/^\.\.\/\.\.\/\.\.\/\.\.\//, 'MVC/')
+      coreRelativePath
     );
     assert.equal(
       fs.existsSync(absoluteCorePath + '.js'),

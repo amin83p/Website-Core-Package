@@ -1,4 +1,4 @@
-const { uploadFolderSettingsService } = require('./pteUploadPathCoreDependencies');
+const pteUploadPathCoreDependencies = require('./pteUploadPathCoreDependencies');
 
 const PTE_ROOT_FOLDER = 'PTE';
 
@@ -42,12 +42,20 @@ function normalizeBucketToken(value, fallback = PTE_BUCKETS.PRACTICE_BY_SKILLS) 
   return byToken[token] || fallback;
 }
 
+function getUploadFolderSettingsService() {
+  const { uploadFolderSettingsService } = pteUploadPathCoreDependencies;
+  if (!uploadFolderSettingsService || typeof uploadFolderSettingsService.resolveUploadFolder !== 'function') {
+    throw new Error('PTE upload folder settings service is not available.');
+  }
+  return uploadFolderSettingsService;
+}
+
 function getQuestionBankRoot() {
-  return uploadFolderSettingsService.resolveUploadFolder('pte.questionBank');
+  return getUploadFolderSettingsService().resolveUploadFolder('pte.questionBank');
 }
 
 function getStudentsRoot(isPublicApplicant = false) {
-  return uploadFolderSettingsService.resolveUploadFolder(
+  return getUploadFolderSettingsService().resolveUploadFolder(
     isPublicApplicant ? 'pte.publicApplicants' : 'pte.students'
   );
 }
@@ -61,6 +69,7 @@ function buildStudentCategory(context = {}) {
     context.bucket || '',
     context.isPublicApplicant ? PTE_BUCKETS.PUBLIC_APPLICANTS : PTE_BUCKETS.STUDENTS
   );
+  const uploadFolderSettingsService = getUploadFolderSettingsService();
   const root = uploadFolderSettingsService.resolveUploadFolder(
     bucket === PTE_BUCKETS.PUBLIC_APPLICANTS ? 'pte.publicApplicants' : 'pte.students'
   );
@@ -80,7 +89,7 @@ function buildAttemptCategory(context = {}) {
   const key = bucket === PTE_BUCKETS.MOCK_EXAMS
     ? 'pte.mockExamAttempt'
     : (bucket === PTE_BUCKETS.SMART_PRACTICE ? 'pte.smartPracticeAttempt' : 'pte.practiceAttempt');
-  return uploadFolderSettingsService.resolveUploadFolder(key, {
+  return getUploadFolderSettingsService().resolveUploadFolder(key, {
     userId: context.userId,
     practiceName: context.practiceName,
     testName: context.testName,

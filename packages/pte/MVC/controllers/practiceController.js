@@ -4,7 +4,7 @@ const {
   isAjax,
   buildDataServiceQuery,
   inferSearchableFields,
-  pathResolver,
+  coreFilesService,
   uploadMiddleware,
   pteUploadContext,
   securityService,
@@ -134,7 +134,7 @@ function buildAttachmentUrlFromPath(filePath) {
   if (/^https?:\/\/[^/]+\/uploads\//i.test(normalized)) return normalized;
   if (/^\/uploads\//i.test(normalized)) return normalized;
   const dirPath = path.dirname(normalized);
-  const dirUrl = pathResolver.getWebUrlForUpload(dirPath);
+  const dirUrl = coreFilesService.getWebUrlForUpload(dirPath);
   const filename = path.basename(normalized);
   if (!dirUrl || !filename) return '';
   return `${dirUrl}/${filename}`;

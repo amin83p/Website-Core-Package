@@ -10,8 +10,8 @@ const { applyGenericFilter } = require('../../../../../MVC/utils/queryEngine');
 const { idsEqual, toPublicId } = require('../../../../../MVC/utils/idAdapter');
 const { assertCreateOrgContextOrThrow } = require('../../../../../MVC/utils/orgContextUtils');
 const { decrypt } = require('../../../../../MVC/utils/encyptors');
+const paginate = require('../../../../../MVC/utils/paginationHelper');
 const {
-  paginate,
   buildDataServiceQuery,
   inferSearchableFields,
   isAjax

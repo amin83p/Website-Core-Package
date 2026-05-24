@@ -11,7 +11,7 @@ test('PTE core helper dependencies should use package dependency shim', () => {
   const source = fs.readFileSync(coreHelpersDepsPath, 'utf8');
 
   assert.ok(
-    source.includes("require('../services/pte/pteCoreDependencies')"),
+    source.includes("require('../../services/pte/pteCoreDependencies')"),
     'pteCoreHelpersDependencies should import package core dependency adapter.'
   );
   assert.ok(

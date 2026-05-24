@@ -5,7 +5,7 @@ const {
   isAjax,
   adminChekersService,
   toPublicId
-} = require('./pteCoreHelpersCoreDependencies');
+} = require('../../services/pte/pteCoreDependencies');
 
 module.exports = {
   paginate,
