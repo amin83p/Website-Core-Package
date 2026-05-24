@@ -32,6 +32,7 @@ function controllerFileNames() {
 }
 
 const packageOwnedControllers = new Set([
+  'attemptController.js',
   'aiProviderController.js',
   'aiScoringSettingsController.js',
   'aiTokenUsageController.js'
