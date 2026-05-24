@@ -41,7 +41,7 @@ test('PTE manifest points the package route declaration at the package entrypoin
 
   assert.ok(route);
   assert.equal(route.router, 'MVC/routes/pteMainRoute.js');
-  assert.equal(route.metadataOnly, true);
+  assert.equal(route.metadataOnly, false);
 });
 
 test('PTE package route entrypoint is package-owned while remaining subroute shims delegate to current MVC routes', () => {
@@ -103,7 +103,7 @@ test('package resolver resolves the PTE route entrypoint from package root first
   assert.equal(resolved, path.join(ROOT_DIR, 'packages/pte/MVC/routes/pteMainRoute.js'));
 });
 
-test('PTE package route remains metadata-only and is not dynamically mounted', async () => {
+test('PTE package route is mount-ready from manifest entries', async () => {
   packageRouteService.resetMountedRoutes();
   const manifest = JSON.parse(readText('packages/pte/package.manifest.json'));
   const app = createAppStub();
@@ -117,7 +117,8 @@ test('PTE package route remains metadata-only and is not dynamically mounted', a
 
   assert.equal(summary.packageId, 'pte');
   assert.equal(summary.requested, manifest.routes.length);
-  assert.equal(summary.mounted, 0);
+  assert.equal(summary.mounted, 1);
   assert.equal(summary.failed, 0);
-  assert.equal(app.calls.length, 0);
+  assert.equal(app.calls.length, 1);
+  assert.equal(summary.results.some((row) => row.status === 'mounted'), true);
 });

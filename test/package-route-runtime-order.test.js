@@ -141,7 +141,7 @@ test('app startup registers 404 after package loader runtime route registration'
   );
 });
 
-test('PTE manifest remains metadata-only while hardcoded /pte routing is active', async () => {
+test('PTE manifest exposes /pte runtime route as mountable', async () => {
   const raw = await fs.readFile(path.join(__dirname, '../packages/pte/package.manifest.json'), 'utf8');
   const manifest = JSON.parse(raw);
   const pteRuntimeRoutes = (manifest.routes || []).filter((row) => (
@@ -150,5 +150,6 @@ test('PTE manifest remains metadata-only while hardcoded /pte routing is active'
   ));
 
   assert.equal(pteRuntimeRoutes.length, 1);
-  assert.equal(pteRuntimeRoutes[0].metadataOnly, true);
+  assert.equal(pteRuntimeRoutes[0].metadataOnly, false);
+  assert.equal(pteRuntimeRoutes[0].active, true);
 });

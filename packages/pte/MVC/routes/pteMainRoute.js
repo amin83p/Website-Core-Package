@@ -13,6 +13,14 @@ const {
   trackActionState
 } = require('./pteRouteDependencies');
 
+const PTE_MOUNT_GUARD_KEY = '__pteMainRouteMounted';
+
+router.use((req, _res, next) => {
+  if (req?.[PTE_MOUNT_GUARD_KEY]) return next('router');
+  req[PTE_MOUNT_GUARD_KEY] = true;
+  next();
+});
+
 router.use((req, res, next) => {
   res.locals.pteSectionDashboardHref = `/dashboard/section-nav/${encodeURIComponent(SECTIONS.PTE || 'PTE')}`;
   res.locals.ptePeopleSectionDashboardHref = `/dashboard/section-nav/${encodeURIComponent(SECTIONS.PTE_PEOPLE || 'PTE_PEOPLE')}`;

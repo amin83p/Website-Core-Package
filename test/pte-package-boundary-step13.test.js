@@ -54,7 +54,7 @@ test('Step 13 keeps PTE in compatibility-first locations', () => {
   assert.equal(exists('packages/pte/scripts/maintenance/enable-pte-package.js'), true);
 });
 
-test('Step 13 keeps /pte hardcoded and package routes metadata-only', () => {
+test('Step 13 keeps /pte hardcoded while package route is mount-ready', () => {
   const appSource = readText('app.js');
   assert.match(appSource, /const pteRoutes\s*=\s*require\('\.\/MVC\/routes\/pte\/pteMainRoute'\)/);
   assert.match(appSource, /app\.use\('\/pte',\s*pteRoutes\)/);
@@ -66,7 +66,7 @@ test('Step 13 keeps /pte hardcoded and package routes metadata-only', () => {
   ));
 
   assert.equal(pteUseRoutes.length, 1);
-  assert.equal(pteUseRoutes[0].metadataOnly, true);
+  assert.equal(pteUseRoutes[0].metadataOnly, false);
 });
 
 test('Step 13 map preserves core-owned service boundaries for PTE consumption', () => {

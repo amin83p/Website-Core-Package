@@ -6,8 +6,8 @@ Step 13 prepares the PTE package for a later physical move into `packages/pte`. 
 
 - PTE is enabled in `data/packageRegistry.json`.
 - `packages/pte/package.manifest.json` is the package declaration source.
-- PTE route declarations remain `metadataOnly: true`.
-- Runtime `/pte` traffic still comes from the hardcoded mount in `app.js`.
+- PTE `/pte` route declaration in the manifest is now runtime mountable (`metadataOnly: false`).
+- Runtime `/pte` traffic currently comes from both the hardcoded mount in `app.js` and package route registration (with duplicate-run guard).
 - PTE implementation files still live in the current MVC and shared root folders.
 
 ## PTE-Owned File Inventory
@@ -96,7 +96,7 @@ These remain core-owned boundaries. The later move should update import paths or
 1. Add package-aware view and asset loading support while preserving existing core view lookup.
 2. Add a compatibility import strategy for package-owned route modules.
 3. Move PTE repositories, middleware, utilities, controllers, routes, services, models, views, public assets, docs, tests, and scripts in small groups.
-4. Update PTE manifest route paths from old MVC locations to package locations, but keep `metadataOnly: true`.
+4. Update PTE manifest route paths from old MVC locations to package locations.
 5. Switch `/pte` from hardcoded app mount to package route loader only after duplicate-route behavior is explicitly tested.
 6. Remove the hardcoded `/pte` mount after package dynamic mounting is proven.
 
@@ -105,7 +105,7 @@ These remain core-owned boundaries. The later move should update import paths or
 - This document exists and records the PTE file groups.
 - No PTE files are physically moved in Step 13.
 - `app.js` still hardcodes `/pte`.
-- The PTE manifest still keeps `/pte` runtime routing metadata-only.
+- The PTE manifest keeps `/pte` runtime routing metadata-enabled (`metadataOnly: false`) for safe handoff.
 - Step 12 package activation and route-order tests continue to pass.
 
 ## Step 14 Follow-Up

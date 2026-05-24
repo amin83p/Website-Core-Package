@@ -86,7 +86,7 @@ test('PTE enable script apply creates an enabled registry row and is idempotent'
   });
 });
 
-test('enabled PTE package loads from registry while keeping /pte route metadata-only', async () => {
+test('enabled PTE package loads from registry and mounts /pte runtime route', async () => {
   await withTempRegistry(async () => {
     packageRouteService.resetMountedRoutes();
     await packageRegistryService.upsertPackageRegistry({
@@ -124,9 +124,8 @@ test('enabled PTE package loads from registry while keeping /pte route metadata-
     assert.equal(summary.loaded[0].packageId, 'pte');
     assert.equal(routeSummary.packageId, 'pte');
     assert.equal(routeSummary.requested, 6);
-    assert.equal(routeSummary.mounted, 0);
+    assert.equal(routeSummary.mounted, 1);
     assert.equal(routeSummary.failed, 0);
-    assert.equal(app.calls.length, 0);
-    assert.ok(routeSummary.results.every((row) => row.metadataOnly === true));
+    assert.equal(app.calls.length, 1);
   });
 });
