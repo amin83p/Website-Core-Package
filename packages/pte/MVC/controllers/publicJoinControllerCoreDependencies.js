@@ -1,6 +1,1 @@
-const ptePublicJoinService = require('../../../../MVC/services/pte/ptePublicJoinService');
-
-module.exports = {
-  ptePublicJoinService
-};
-
+module.exports = require('../../../../MVC/controllers/pte/publicJoinControllerCoreDependencies');
