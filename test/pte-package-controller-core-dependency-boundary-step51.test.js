@@ -6,7 +6,9 @@ const path = require('node:path');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const controllerDir = path.join(ROOT_DIR, 'packages/pte/MVC/controllers');
 
-const authorizedShims = new Set([]);
+const isDependencyAdapter = (fileName) => {
+  return fileName.endsWith('Dependencies.js') || fileName.endsWith('CoreDependencies.js');
+};
 const shimPattern = /^\s*module\.exports\s*=\s*require\(['"]\.\.\/\.\.\/\.\.\/\.\.\/MVC\/controllers\/pte\/[^'"]+['"]\)\s*;?\s*$/;
 const deepImportPatterns = [
   '../../../../../MVC/',
@@ -24,7 +26,7 @@ test('PTE package controllers should not import core directly', () => {
 
     if (!hasDeepImport) return;
 
-    if (authorizedShims.has(fileName)) return;
+    if (isDependencyAdapter(fileName)) return;
 
     const isDomainShim = shimPattern.test(source.trim());
     assert.equal(

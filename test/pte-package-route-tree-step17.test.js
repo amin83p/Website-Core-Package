@@ -54,7 +54,8 @@ test('PTE package main route uses package-local subroute shims', () => {
 
 test('PTE route shims delegate to current MVC route modules until physical move', () => {
   const packageOwnedRouteModules = new Set([
-    'attemptRoutes.js'
+    'attemptRoutes.js',
+    'feedbackRoutes.js'
   ]);
 
   routeFileNames().forEach((fileName) => {

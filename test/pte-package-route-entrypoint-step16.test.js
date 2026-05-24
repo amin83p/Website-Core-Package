@@ -44,13 +44,18 @@ test('PTE manifest points the package route declaration at the package entrypoin
   assert.equal(route.metadataOnly, true);
 });
 
-test('PTE package route entrypoint is package-owned while subroute shims delegate to current MVC routes', () => {
+test('PTE package route entrypoint is package-owned while remaining subroute shims delegate to current MVC routes', () => {
   const packageRoute = require('../packages/pte/MVC/routes/pteMainRoute');
   const currentRoute = require('../MVC/routes/pte/pteMainRoute');
 
   assert.notEqual(packageRoute, currentRoute);
   assert.equal(typeof packageRoute, 'function');
   assert.equal(typeof currentRoute, 'function');
+
+  const packageOwnedRoutes = new Set([
+    'attemptRoutes.js',
+    'feedbackRoutes.js'
+  ]);
 
   [
     'aiAssistRoutes.js',
@@ -67,6 +72,10 @@ test('PTE package route entrypoint is package-owned while subroute shims delegat
   ].forEach((fileName) => {
     // eslint-disable-next-line global-require, import/no-dynamic-require
     const packageSubroute = require(`../packages/pte/MVC/routes/${fileName}`);
+    if (packageOwnedRoutes.has(fileName)) {
+      assert.notEqual(typeof packageSubroute, 'undefined', `${fileName} should resolve to package-owned route implementation`);
+      return;
+    }
     // eslint-disable-next-line global-require, import/no-dynamic-require
     const currentSubroute = require(`../MVC/routes/pte/${fileName}`);
     assert.equal(packageSubroute, currentSubroute, `${fileName} should remain a compatibility shim`);
