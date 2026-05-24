@@ -10,23 +10,6 @@ const CACHE_TTL_MS = 60 * 1000;
 const VISIBILITY_VALUES = new Set(['all', 'guest', 'authenticated']);
 
 const COMPAT_PACKAGE_DEFAULTS = Object.freeze({
-  pte: {
-    id: 'pte',
-    name: 'PTE',
-    mountPath: '/pte',
-    menuEntries: [],
-    dashboardEntries: [
-      {
-        id: 'pte-dashboard',
-        label: 'PTE Dashboard',
-        href: '/pte',
-        icon: 'bi-mortarboard',
-        description: 'Open PTE package area.',
-        visibility: 'authenticated',
-        target: '_self'
-      }
-    ]
-  },
   school: {
     id: 'school',
     name: 'School',

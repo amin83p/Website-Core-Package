@@ -118,3 +118,48 @@ test('disabled packages contribute mount-path filtering for menu entries', async
     assert.equal(filtered.some((entry) => entry.href === '/about'), true);
   });
 });
+
+test('PTE navigation comes from manifest declarations instead of compat fallback', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      menuEntries: [
+        {
+          id: 'pte-join',
+          label: 'Join PTE Practice',
+          href: '/pte/join',
+          icon: 'bi-person-plus',
+          visibility: 'all'
+        }
+      ],
+      dashboardEntries: [
+        {
+          id: 'pte-dashboard',
+          label: 'PTE Dashboard',
+          href: '/pte/dashboard',
+          icon: 'bi-mortarboard',
+          visibility: 'authenticated'
+        }
+      ]
+    });
+
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const snapshot = await packageNavigationService.refreshNavigationRegistry({
+      backendMode: 'json',
+      packageRootDir
+    });
+
+    assert.equal(snapshot.enabledPackageIds.includes('pte'), true);
+    assert.equal(snapshot.dashboardEntries.some((entry) => entry.href === '/pte/dashboard'), true);
+    assert.equal(snapshot.dashboardEntries.some((entry) => entry.href === '/pte'), false);
+    assert.equal(packageNavigationService.getPublicMenuEntries(null).some((entry) => entry.href === '/pte/join'), true);
+  });
+});
