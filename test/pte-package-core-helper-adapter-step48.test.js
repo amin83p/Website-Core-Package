@@ -38,9 +38,9 @@ test('PTE helper dependency adapter split', () => {
 test('PTE helper core dependency adapter should delegate to core pte dependencies', () => {
   const source = fs.readFileSync(helperCoreDependenciesPath, 'utf8');
   assert.equal(
-    source.includes("require('../services/pte/pteCoreDependencies')"),
+    source.includes("require('../../../../../MVC/controllers/pte/pteCoreHelpersCoreDependencies')"),
     true,
-    'core helper adapter should delegate to pteCoreDependencies.'
+    'core helper adapter should delegate to the core controller helper adapter.'
   );
 });
 
