@@ -24,9 +24,9 @@ const uploadPathCoreDependenciesPath = path.join(
 test('PTE helper dependency adapter split', () => {
   const source = fs.readFileSync(helperDependenciesPath, 'utf8');
   assert.equal(
-    source.includes("require('./pteCoreHelpersCoreDependencies')"),
+    source.includes("require('../../services/pte/pteCoreDependencies')"),
     true,
-    'pteCoreHelpersDependencies should consume the helper core dependency adapter.'
+    'pteCoreHelpersDependencies should consume the package core dependency adapter.'
   );
   assert.equal(
     source.includes('../../../../MVC/'),
@@ -35,7 +35,7 @@ test('PTE helper dependency adapter split', () => {
   );
 });
 
-test('PTE helper core dependency adapter should delegate to core pte dependencies', () => {
+test('PTE helper core dependency adapter remains available for compatibility', () => {
   const source = fs.readFileSync(helperCoreDependenciesPath, 'utf8');
   assert.equal(
     source.includes("require('../../../../../MVC/controllers/pte/pteCoreHelpersCoreDependencies')"),

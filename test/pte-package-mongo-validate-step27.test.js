@@ -33,5 +33,8 @@ test('PTE mongo validate script is package-safe', () => {
   const expectedDelegate = expectedDelegateRequire({ source: 'scripts/pte/mongo-validate-explain.js', target: TARGET });
   assert.doesNotMatch(source, new RegExp(expectedDelegate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(source, /MONGODB_URI/);
-  assert.match(source, /settingsPath = path.join\\(repoRoot, 'data', 'systemSettings\\.json'\\)/);
+  assert.ok(
+    source.includes("settingsPath = path.join(repoRoot, 'data', 'systemSettings.json')"),
+    'package mongo validate script should resolve system settings from the core repo root.'
+  );
 });

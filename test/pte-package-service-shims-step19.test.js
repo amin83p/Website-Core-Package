@@ -42,9 +42,9 @@ function expectedShimRequirePath(relativeFile) {
 }
 
 const packageOwnedServices = new Set([
-  'pte/pteAiProviderDataService.js',
-  'pte/pteAiScoringSettingsDataService.js',
-  'pte/pteAiTokenUsageDataService.js',
+  'pteAiProviderDataService.js',
+  'pteAiScoringSettingsDataService.js',
+  'pteAiTokenUsageDataService.js',
   'ai/aiProviderService.js',
   'ai/providers/openaiService.js',
   'ai/providers/azureOpenAIService.js',
@@ -53,9 +53,18 @@ const packageOwnedServices = new Set([
   'ai/providers/anthropicService.js'
 ]);
 
+const packageOnlyServiceAdapters = new Set([
+  'pteCoreDependencies.js',
+  'pteCoreDependenciesCoreAdapter.js',
+  'pteRouteCoreDependencies.js',
+  'pteRouteDependencies.js',
+  'pteUploadContextDependencies.js'
+]);
+
 test('PTE package service shims mirror the current recursive PTE service tree', () => {
   const currentFiles = listJsFiles(CURRENT_SERVICE_ROOT);
-  const packageFiles = listJsFiles(PACKAGE_SERVICE_ROOT);
+  const packageFiles = listJsFiles(PACKAGE_SERVICE_ROOT)
+    .filter((relativeFile) => !packageOnlyServiceAdapters.has(relativeFile));
 
   assert.deepEqual(packageFiles, currentFiles);
 });

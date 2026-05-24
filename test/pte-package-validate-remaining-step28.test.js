@@ -30,6 +30,9 @@ test('PTE validate-remaining script is package-safe', () => {
 
   const source = readText(path.join(ROOT_DIR, TARGET));
   assert.match(source, /repoRoot = path\.resolve/);
-  assert.match(source, /repoRoot, 'data', 'systemSettings\\.json'/);
+  assert.ok(
+    source.includes("repoRoot, 'data', 'systemSettings.json'"),
+    'validate-remaining should resolve system settings from the core repo root.'
+  );
   assert.doesNotMatch(source, expectedDelegateRequire(row));
 });

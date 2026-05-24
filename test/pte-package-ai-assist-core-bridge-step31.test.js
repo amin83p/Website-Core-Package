@@ -96,7 +96,7 @@ test('AI Assist services and controllers use package-local core adapters', () =>
   AI_CONTROLLER_FILES.forEach((relativePath) => {
     const source = readText(relativePath);
     assert.ok(
-      source.includes('./coreHelpers'),
+      source.includes('./pte/coreHelpers') || source.includes('./coreHelpers'),
       `${relativePath} should use the package-local controller core helper.`
     );
     assert.ok(

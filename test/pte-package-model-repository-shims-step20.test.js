@@ -46,6 +46,10 @@ const packageOwnedRepositories = new Set([
   'pteAiTokenUsageRepository.js'
 ]);
 
+const packageOnlyRepositoryAdapters = new Set([
+  'pteAiRepositoryDependencies.js'
+]);
+
 function expectedShimRequirePath({ packageRoot, currentRoot, relativeFile }) {
   const packageShimPath = path.join(packageRoot, relativeFile);
   const currentPath = path.join(currentRoot, relativeFile).replace(/\.js$/, '');
@@ -65,7 +69,8 @@ test('PTE package model shims mirror the current PTE model tree', () => {
 
 test('PTE package repository shims mirror the current flat PTE repository modules', () => {
   const currentFiles = listPteRepositoryFiles(CURRENT_REPOSITORY_ROOT);
-  const packageFiles = listPteRepositoryFiles(PACKAGE_REPOSITORY_ROOT);
+  const packageFiles = listPteRepositoryFiles(PACKAGE_REPOSITORY_ROOT)
+    .filter((relativeFile) => !packageOnlyRepositoryAdapters.has(relativeFile));
 
   assert.deepEqual(packageFiles, currentFiles);
 });

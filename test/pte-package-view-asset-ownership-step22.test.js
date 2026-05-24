@@ -16,6 +16,14 @@ function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
+function normalizePackageViewForComparison(source = '') {
+  return String(source || '')
+    .replaceAll(
+      "include('../../../../../../MVC/views/partials/",
+      "include('../../partials/"
+    );
+}
+
 function listFiles(rootDir) {
   const found = [];
 
@@ -70,7 +78,7 @@ test('PTE package view tree mirrors current PTE views', () => {
   assert.deepEqual(packageFiles, currentFiles);
   currentFiles.forEach((relativeFile) => {
     assert.equal(
-      readText(path.join(PACKAGE_VIEW_ROOT, relativeFile)),
+      normalizePackageViewForComparison(readText(path.join(PACKAGE_VIEW_ROOT, relativeFile))),
       readText(path.join(CURRENT_VIEW_ROOT, relativeFile)),
       `${relativeFile} should match the current PTE view copy`
     );
@@ -117,4 +125,3 @@ test('PTE package view root registers while package assets remain metadata-only'
   assert.equal(assetSummary.results[0].metadataOnly, true);
   assert.equal(app.calls.length, 0);
 });
-
