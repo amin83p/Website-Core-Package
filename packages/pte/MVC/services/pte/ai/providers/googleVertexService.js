@@ -77,6 +77,7 @@ function resolveApiKey(credentials = {}) {
   const explicitApiKey = s(credentials.apiKey);
   if (explicitApiKey) return explicitApiKey;
   return firstNonEmpty([
+    process.env.PTE_VERTEX_API_KEY,
     process.env.IELTS_VERTEX_API_KEY,
     process.env.VERTEX_API_KEY,
     process.env.GOOGLE_API_KEY
@@ -87,6 +88,7 @@ function resolveAccessToken(credentials = {}) {
   const explicitAccessToken = s(credentials.accessToken);
   if (explicitAccessToken) return explicitAccessToken;
   return firstNonEmpty([
+    process.env.PTE_VERTEX_ACCESS_TOKEN,
     process.env.IELTS_VERTEX_ACCESS_TOKEN,
     process.env.VERTEX_ACCESS_TOKEN,
     process.env.GOOGLE_OAUTH_ACCESS_TOKEN
@@ -96,6 +98,7 @@ function resolveAccessToken(credentials = {}) {
 function resolveProjectId(credentials = {}) {
   return firstNonEmpty([
     credentials.project,
+    process.env.PTE_VERTEX_PROJECT_ID,
     process.env.IELTS_VERTEX_PROJECT_ID,
     process.env.VERTEX_PROJECT_ID,
     process.env.GOOGLE_CLOUD_PROJECT,
@@ -106,6 +109,7 @@ function resolveProjectId(credentials = {}) {
 function resolveLocation(credentials = {}) {
   return firstNonEmpty([
     credentials.location,
+    process.env.PTE_VERTEX_LOCATION,
     process.env.IELTS_VERTEX_LOCATION,
     process.env.VERTEX_LOCATION,
     DEFAULT_LOCATION
@@ -119,6 +123,7 @@ function resolveBaseUrl(credentials = {}, location = DEFAULT_LOCATION, options =
     : `https://${location || DEFAULT_LOCATION}-aiplatform.googleapis.com`;
   return firstNonEmpty([
     credentials.baseUrl,
+    process.env.PTE_VERTEX_BASE_URL,
     process.env.IELTS_VERTEX_BASE_URL,
     process.env.VERTEX_BASE_URL,
     defaultEndpoint
@@ -128,6 +133,7 @@ function resolveBaseUrl(credentials = {}, location = DEFAULT_LOCATION, options =
 function resolveGeminiBaseUrl(credentials = {}) {
   return firstNonEmpty([
     credentials.geminiBaseUrl,
+    process.env.PTE_GEMINI_BASE_URL,
     process.env.IELTS_GEMINI_BASE_URL,
     process.env.GEMINI_BASE_URL,
     'https://generativelanguage.googleapis.com'
@@ -136,6 +142,7 @@ function resolveGeminiBaseUrl(credentials = {}) {
 
 function resolveConfiguredModelId() {
   return normalizeModelId(firstNonEmpty([
+    process.env.PTE_VERTEX_MODEL_ID,
     process.env.IELTS_VERTEX_MODEL_ID,
     process.env.VERTEX_MODEL_ID
   ]));
@@ -251,7 +258,7 @@ function buildAuthContext(credentials = {}) {
 
   if (!authMode) {
     const err = new Error(
-      'Vertex credentials are missing. Provide an OAuth access token (credentials.accessToken / IELTS_VERTEX_ACCESS_TOKEN) or an API key (credentials.apiKey / IELTS_VERTEX_API_KEY).'
+      'Vertex credentials are missing. Provide an OAuth access token (credentials.accessToken / PTE_VERTEX_ACCESS_TOKEN / IELTS_VERTEX_ACCESS_TOKEN) or an API key (credentials.apiKey / PTE_VERTEX_API_KEY / IELTS_VERTEX_API_KEY).'
     );
     err.code = 'MISSING_CREDENTIALS';
     throw err;

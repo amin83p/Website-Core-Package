@@ -37,6 +37,7 @@ function firstNonEmpty(values = []) {
 function resolveApiKey(credentials = {}) {
   return firstNonEmpty([
     credentials.apiKey,
+    process.env.PTE_ANTHROPIC_API_KEY,
     process.env.IELTS_ANTHROPIC_API_KEY,
     process.env.ANTHROPIC_API_KEY
   ]);
@@ -45,6 +46,7 @@ function resolveApiKey(credentials = {}) {
 function resolveBaseUrl(credentials = {}) {
   return firstNonEmpty([
     credentials.baseUrl,
+    process.env.PTE_ANTHROPIC_BASE_URL,
     process.env.IELTS_ANTHROPIC_BASE_URL,
     process.env.ANTHROPIC_BASE_URL,
     'https://api.anthropic.com'
@@ -54,6 +56,7 @@ function resolveBaseUrl(credentials = {}) {
 function resolveApiVersion(credentials = {}) {
   return firstNonEmpty([
     credentials.apiVersion,
+    process.env.PTE_ANTHROPIC_API_VERSION,
     process.env.IELTS_ANTHROPIC_API_VERSION,
     process.env.ANTHROPIC_API_VERSION,
     DEFAULT_API_VERSION
@@ -62,6 +65,7 @@ function resolveApiVersion(credentials = {}) {
 
 function resolveConfiguredModelId() {
   return firstNonEmpty([
+    process.env.PTE_ANTHROPIC_MODEL_ID,
     process.env.IELTS_ANTHROPIC_MODEL_ID,
     process.env.ANTHROPIC_MODEL_ID
   ]);
@@ -70,7 +74,7 @@ function resolveConfiguredModelId() {
 function assertApiKey(credentials = {}) {
   const apiKey = resolveApiKey(credentials);
   if (!apiKey) {
-    const err = new Error('Anthropic API key is missing. Provide credentials.apiKey or configure IELTS_ANTHROPIC_API_KEY / ANTHROPIC_API_KEY.');
+    const err = new Error('Anthropic API key is missing. Provide credentials.apiKey or configure PTE_ANTHROPIC_API_KEY / IELTS_ANTHROPIC_API_KEY / ANTHROPIC_API_KEY.');
     err.code = 'MISSING_API_KEY';
     throw err;
   }

@@ -38,6 +38,7 @@ function firstNonEmpty(values = []) {
 function resolveApiKey(credentials = {}) {
   return firstNonEmpty([
     credentials.apiKey,
+    process.env.PTE_OPENAI_API_KEY,
     process.env.IELTS_OPENAI_API_KEY,
     process.env.OPENAI_API_KEY
   ]);
@@ -46,6 +47,7 @@ function resolveApiKey(credentials = {}) {
 function resolveBaseUrl(credentials = {}) {
   return firstNonEmpty([
     credentials.baseUrl,
+    process.env.PTE_OPENAI_BASE_URL,
     process.env.IELTS_OPENAI_BASE_URL,
     process.env.OPENAI_BASE_URL,
     'https://api.openai.com/v1'
@@ -54,6 +56,7 @@ function resolveBaseUrl(credentials = {}) {
 
 function resolveConfiguredModelId() {
   return firstNonEmpty([
+    process.env.PTE_OPENAI_MODEL_ID,
     process.env.IELTS_OPENAI_MODEL_ID,
     process.env.OPENAI_MODEL_ID
   ]);
@@ -62,7 +65,7 @@ function resolveConfiguredModelId() {
 function assertApiKey(credentials = {}) {
   const apiKey = resolveApiKey(credentials);
   if (!apiKey) {
-    const err = new Error('OpenAI API key is missing. Provide credentials.apiKey or configure IELTS_OPENAI_API_KEY / OPENAI_API_KEY.');
+    const err = new Error('OpenAI API key is missing. Provide credentials.apiKey or configure PTE_OPENAI_API_KEY / IELTS_OPENAI_API_KEY / OPENAI_API_KEY.');
     err.code = 'MISSING_API_KEY';
     throw err;
   }
@@ -99,6 +102,7 @@ function resolveReasoningEffort(generationConfig = {}) {
   if (explicit) return explicit;
 
   const fromEnv = normalizeReasoningEffort(firstNonEmpty([
+    process.env.PTE_OPENAI_REASONING_EFFORT,
     process.env.IELTS_OPENAI_REASONING_EFFORT,
     process.env.OPENAI_REASONING_EFFORT,
     'high'
@@ -430,7 +434,7 @@ function buildRequestBody({
       body.response_format = {
         type: 'json_schema',
         json_schema: {
-          name: 'ielts_response_schema',
+          name: 'pte_response_schema',
           schema: responseSchema
         }
       };
