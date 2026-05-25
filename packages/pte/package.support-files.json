@@ -512,6 +512,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "docs/pte-package-shim-retirement-step75.md",
+      "target": "packages/pte/docs/pte-package-shim-retirement-step75.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "docs/pte-package-support-file-map-step23.md",
       "target": "packages/pte/docs/pte-package-support-file-map-step23.md",
       "category": "package-preparation",
@@ -589,23 +596,23 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "docs/pte/postman/README.md",
+      "target": "packages/pte/docs/pte/postman/README.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "docs/pte/postman/pte-attempt-runtime.local.postman_environment.json",
-      "target": "packages/pte/docs/postman/pte-attempt-runtime.local.postman_environment.json",
-      "category": "postman",
+      "target": "packages/pte/docs/pte/postman/pte-attempt-runtime.local.postman_environment.json",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte/postman/pte-attempt-runtime.postman_collection.json",
-      "target": "packages/pte/docs/postman/pte-attempt-runtime.postman_collection.json",
-      "category": "postman",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "docs/pte/postman/README.md",
-      "target": "packages/pte/docs/postman/README.md",
-      "category": "postman",
+      "target": "packages/pte/docs/pte/postman/pte-attempt-runtime.postman_collection.json",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     }
@@ -621,90 +628,69 @@
     {
       "source": "test/pte-package-ai-assist-controller-boundary-step39.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-controller-boundary-step39.test.js",
-      "category": "ai-assist",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-controller-helper-step37.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-controller-helper-step37.test.js",
-      "category": "ai-assist",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-controller-helper-step43.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-controller-helper-step43.test.js",
-      "category": "ai-assist",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-core-bridge-step31.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-core-bridge-step31.test.js",
-      "category": "ai-assist",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-decryption-core-bridge-step36.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-decryption-core-bridge-step36.test.js",
-      "category": "ai-assist",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-repository-core-bridge-step35.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-repository-core-bridge-step35.test.js",
-      "category": "ai-assist",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-service-boundary-step38.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-service-boundary-step38.test.js",
-      "category": "ai-assist",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-upload-context-step33.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-upload-context-step33.test.js",
-      "category": "ai-assist",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-view-partials-step40.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-view-partials-step40.test.js",
-      "category": "ai-assist",
+      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-provider-env-fallback-step41.test.js",
       "target": "packages/pte/test/pte-package-ai-provider-env-fallback-step41.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-ai-service-root-shims-step71.test.js",
-      "target": "packages/pte/test/pte-package-ai-service-root-shims-step71.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-boundary-step13.test.js",
-      "target": "packages/pte/test/pte-package-boundary-step13.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-controller-core-dependencies-step64.test.js",
-      "target": "packages/pte/test/pte-package-controller-core-dependencies-step64.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -719,20 +705,6 @@
     {
       "source": "test/pte-package-controller-helper-boundary-step55.test.js",
       "target": "packages/pte/test/pte-package-controller-helper-boundary-step55.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-controller-root-shims-step70.test.js",
-      "target": "packages/pte/test/pte-package-controller-root-shims-step70.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-controller-shims-step18.test.js",
-      "target": "packages/pte/test/pte-package-controller-shims-step18.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -787,22 +759,8 @@
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "test/pte-package-middleware-utility-shims-step21.test.js",
-      "target": "packages/pte/test/pte-package-middleware-utility-shims-step21.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
       "source": "test/pte-package-model-core-dependency-boundary-step54.test.js",
       "target": "packages/pte/test/pte-package-model-core-dependency-boundary-step54.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-model-repository-shims-step20.test.js",
-      "target": "packages/pte/test/pte-package-model-repository-shims-step20.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -817,20 +775,6 @@
     {
       "source": "test/pte-package-mongo-validate-step27.test.js",
       "target": "packages/pte/test/pte-package-mongo-validate-step27.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-pass3-finalization-step68.test.js",
-      "target": "packages/pte/test/pte-package-pass3-finalization-step68.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-question-bank-ai-root-shims-step73.test.js",
-      "target": "packages/pte/test/pte-package-question-bank-ai-root-shims-step73.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -878,20 +822,6 @@
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "test/pte-package-route-entrypoint-step16.test.js",
-      "target": "packages/pte/test/pte-package-route-entrypoint-step16.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-route-tree-step17.test.js",
-      "target": "packages/pte/test/pte-package-route-tree-step17.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
       "source": "test/pte-package-route-upload-context-invocation-step59.test.js",
       "target": "packages/pte/test/pte-package-route-upload-context-invocation-step59.test.js",
       "category": "package-preparation",
@@ -901,13 +831,6 @@
     {
       "source": "test/pte-package-route-upload-middleware-contract-step60.test.js",
       "target": "packages/pte/test/pte-package-route-upload-middleware-contract-step60.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-scoring-registry-root-shims-step72.test.js",
-      "target": "packages/pte/test/pte-package-scoring-registry-root-shims-step72.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -927,8 +850,8 @@
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "test/pte-package-service-shims-step19.test.js",
-      "target": "packages/pte/test/pte-package-service-shims-step19.test.js",
+      "source": "test/pte-package-shim-retirement-step75.test.js",
+      "target": "packages/pte/test/pte-package-shim-retirement-step75.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -1069,7 +992,7 @@
     {
       "source": "test/pte.attempt-read-aloud-autoscoring.test.js",
       "target": "packages/pte/test/pte.attempt-read-aloud-autoscoring.test.js",
-      "category": "scoring",
+      "category": "attempt",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },

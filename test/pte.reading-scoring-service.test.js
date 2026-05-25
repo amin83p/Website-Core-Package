@@ -1,8 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const readingScoringService = require('../MVC/services/pte/pteReadingScoringService');
-const scoringEngineService = require('../MVC/services/pte/pteScoringEngineService');
+const readingScoringService = require('../packages/pte/MVC/services/pte/pteReadingScoringService');
+const scoringEngineService = require('../packages/pte/MVC/services/pte/pteScoringEngineService');
 
 const { scoreReadingAttemptItem } = readingScoringService;
 

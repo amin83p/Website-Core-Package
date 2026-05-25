@@ -18,8 +18,8 @@ function resolveRepoRoot() {
 }
 
 const REPO_ROOT = resolveRepoRoot();
-const pteCourseDataService = require(path.join(REPO_ROOT, 'MVC/services/pte/pteCourseDataService.js'));
-const pteApplicantRepository = require(path.join(REPO_ROOT, 'MVC/repositories/pteApplicantRepository.js'));
+const pteCourseDataService = require(path.join(REPO_ROOT, 'packages/pte/MVC/services/pte/pteCourseDataService.js'));
+const pteApplicantRepository = require(path.join(REPO_ROOT, 'packages/pte/MVC/repositories/pteApplicantRepository.js'));
 const adminChekersService = require(path.join(REPO_ROOT, 'MVC/services/adminChekersService.js'));
 const dataService = require(path.join(REPO_ROOT, 'MVC/services/dataService.js'));
 const settingService = require(path.join(REPO_ROOT, 'MVC/services/settingService.js'));

@@ -1,10 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const attemptController = require('../MVC/controllers/pte/attemptController');
-const practiceController = require('../MVC/controllers/pte/practiceController');
-const pteAttemptLedgerService = require('../MVC/services/pte/pteAttemptLedgerService');
-const pteQuestionBankDataService = require('../MVC/services/pte/pteQuestionBankDataService');
+const attemptController = require('../packages/pte/MVC/controllers/attemptController');
+const practiceController = require('../packages/pte/MVC/controllers/practiceController');
+const pteAttemptLedgerService = require('../packages/pte/MVC/services/pte/pteAttemptLedgerService');
+const pteQuestionBankDataService = require('../packages/pte/MVC/services/pte/pteQuestionBankDataService');
 
 const originals = {
   listAttemptSessionsForDetails: pteAttemptLedgerService.listAttemptSessionsForDetails,

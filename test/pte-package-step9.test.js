@@ -6,7 +6,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const packageManifestService = require('../MVC/services/packageManifestService');
-const { createPtePublicJoinService } = require('../MVC/services/pte/ptePublicJoinService');
+const { createPtePublicJoinService } = require('../packages/pte/MVC/services/pte/ptePublicJoinService');
 const coreEnableScript = require('../scripts/packages/enable-pte-package');
 
 const ROOT_DIR = path.resolve(__dirname, '..');

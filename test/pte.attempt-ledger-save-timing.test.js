@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const ledgerService = require('../MVC/services/pte/pteAttemptLedgerService');
+const ledgerService = require('../packages/pte/MVC/services/pte/pteAttemptLedgerService');
 const policyService = require('../MVC/services/activityQuota/consumptionDefinitionPolicyService');
 
 const {

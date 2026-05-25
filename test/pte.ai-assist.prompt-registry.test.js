@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const promptRegistry = require('../MVC/services/pte/questionBankAiPromptRegistry');
+const promptRegistry = require('../packages/pte/MVC/services/pte/questionBankAiPromptRegistry');
 
 test('prompt registry returns scoped payload+scoring targets for respond-to-situation', () => {
   const config = promptRegistry.getPromptConfig({

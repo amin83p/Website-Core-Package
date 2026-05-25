@@ -4,10 +4,10 @@ const fs = require('fs/promises');
 const os = require('os');
 const path = require('path');
 
-const respondSituationScoringService = require('../MVC/services/pte/pteRespondSituationScoringService');
-const scoringEngineService = require('../MVC/services/pte/pteScoringEngineService');
-const pteAiProviderDataService = require('../MVC/services/pte/pteAiProviderDataService');
-const pteAiProviderService = require('../MVC/services/pte/ai/aiProviderService');
+const respondSituationScoringService = require('../packages/pte/MVC/services/pte/pteRespondSituationScoringService');
+const scoringEngineService = require('../packages/pte/MVC/services/pte/pteScoringEngineService');
+const pteAiProviderDataService = require('../packages/pte/MVC/services/pte/pteAiProviderDataService');
+const pteAiProviderService = require('../packages/pte/MVC/services/pte/ai/aiProviderService');
 
 const {
   calculateRespondSituationScore,

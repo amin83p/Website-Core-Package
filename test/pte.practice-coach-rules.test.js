@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const questionTypeRegistry = require('../MVC/services/pte/questionTypeRegistry');
+const questionTypeRegistry = require('../packages/pte/MVC/services/pte/questionTypeRegistry');
 const coachRules = require('../public/scripts/ptePracticeCoachRules');
 
 function buildContext(questionType, payload = {}, response = {}) {

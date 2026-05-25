@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const smartPracticeService = require('../MVC/services/pte/pteSmartPracticeService');
+const smartPracticeService = require('../packages/pte/MVC/services/pte/pteSmartPracticeService');
 
 const {
   calculateNeedScore,

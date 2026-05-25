@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const lifecycleAnalytics = require('../MVC/services/pte/pteAttemptLifecycleAnalytics');
+const lifecycleAnalytics = require('../packages/pte/MVC/services/pte/pteAttemptLifecycleAnalytics');
 
 function makeSession(overrides = {}) {
   return {

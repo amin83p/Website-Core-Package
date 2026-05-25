@@ -35,12 +35,17 @@ test('PTE helper dependency adapter split', () => {
   );
 });
 
-test('PTE helper core dependency adapter remains available for compatibility', () => {
+test('PTE helper core dependency adapter remains package-owned without root shim dependency', () => {
   const source = fs.readFileSync(helperCoreDependenciesPath, 'utf8');
   assert.equal(
-    source.includes("require('../../../../../MVC/controllers/pte/pteCoreHelpersCoreDependencies')"),
+    source.includes("require('../../services/pte/pteCoreDependencies')"),
     true,
-    'core helper adapter should delegate to the core controller helper adapter.'
+    'core helper adapter should consume package pteCoreDependencies.'
+  );
+  assert.equal(
+    source.includes('MVC/controllers/pte/'),
+    false,
+    'core helper adapter should not rely on retired root controller shim paths.'
   );
 });
 

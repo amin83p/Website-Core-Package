@@ -1,9 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const questionBankController = require('../MVC/controllers/pte/questionBankController');
-const pteQuestionBankDataService = require('../MVC/services/pte/pteQuestionBankDataService');
-const questionBankAiAutofillService = require('../MVC/services/pte/questionBankAiAutofillService');
+const questionBankController = require('../packages/pte/MVC/controllers/questionBankController');
+const pteQuestionBankDataService = require('../packages/pte/MVC/services/pte/pteQuestionBankDataService');
+const questionBankAiAutofillService = require('../packages/pte/MVC/services/pte/questionBankAiAutofillService');
 
 const originalPublishQuestion = pteQuestionBankDataService.publishQuestion;
 const originalSuggestTypeFields = questionBankAiAutofillService.suggestTypeFields;

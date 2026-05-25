@@ -1,12 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const pteAiScoringSettingModel = require('../MVC/models/pte/pteAiScoringSettingModel');
-const pteAiScoringSettingsDataService = require('../MVC/services/pte/pteAiScoringSettingsDataService');
-const pteAiProviderDataService = require('../MVC/services/pte/pteAiProviderDataService');
-const pteAiScoringSettingRepository = require('../MVC/repositories/pteAiScoringSettingRepository');
-const pteAiProviderRepository = require('../MVC/repositories/pteAiProviderRepository');
-const pteAiProviderModel = require('../MVC/models/pte/pteAiProviderModel');
+const pteAiScoringSettingModel = require('../packages/pte/MVC/models/pte/pteAiScoringSettingModel');
+const pteAiScoringSettingsDataService = require('../packages/pte/MVC/services/pte/pteAiScoringSettingsDataService');
+const pteAiProviderDataService = require('../packages/pte/MVC/services/pte/pteAiProviderDataService');
+const pteAiScoringSettingRepository = require('../packages/pte/MVC/repositories/pteAiScoringSettingRepository');
+const pteAiProviderRepository = require('../packages/pte/MVC/repositories/pteAiProviderRepository');
+const pteAiProviderModel = require('../packages/pte/MVC/models/pte/pteAiProviderModel');
 
 const USER = Object.freeze({
   id: 'USER_001',

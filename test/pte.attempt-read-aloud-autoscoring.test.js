@@ -1,13 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const pteAttemptLedgerService = require('../MVC/services/pte/pteAttemptLedgerService');
-const pteAttemptSessionRepository = require('../MVC/repositories/pteAttemptSessionRepository');
-const pteAttemptItemRepository = require('../MVC/repositories/pteAttemptItemRepository');
-const pteAttemptLedgerEventRepository = require('../MVC/repositories/pteAttemptLedgerEventRepository');
-const pteAttemptArtifactRepository = require('../MVC/repositories/pteAttemptArtifactRepository');
-const pteQuestionVersionRepository = require('../MVC/repositories/pteQuestionVersionRepository');
-const pteQuestionScoringProfileService = require('../MVC/services/pte/pteQuestionScoringProfileService');
+const pteAttemptLedgerService = require('../packages/pte/MVC/services/pte/pteAttemptLedgerService');
+const pteAttemptSessionRepository = require('../packages/pte/MVC/repositories/pteAttemptSessionRepository');
+const pteAttemptItemRepository = require('../packages/pte/MVC/repositories/pteAttemptItemRepository');
+const pteAttemptLedgerEventRepository = require('../packages/pte/MVC/repositories/pteAttemptLedgerEventRepository');
+const pteAttemptArtifactRepository = require('../packages/pte/MVC/repositories/pteAttemptArtifactRepository');
+const pteQuestionVersionRepository = require('../packages/pte/MVC/repositories/pteQuestionVersionRepository');
+const pteQuestionScoringProfileService = require('../packages/pte/MVC/services/pte/pteQuestionScoringProfileService');
 const activityQuotaLedgerService = require('../MVC/services/activityQuotaLedgerService');
 
 const ORIGINALS = {

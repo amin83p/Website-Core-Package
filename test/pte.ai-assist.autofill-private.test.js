@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 
-const aiAutofillService = require('../MVC/services/pte/questionBankAiAutofillService');
+const aiAutofillService = require('../packages/pte/MVC/services/pte/questionBankAiAutofillService');
 
 const {
   parseAiSuggestionPayload,
@@ -403,7 +403,7 @@ test('parseAiSuggestionPayload keeps listening mcq single structured options and
         ],
         correctOptionKey: 'B',
         allowReplay: true,
-        explanation: 'Option B directly reflects the speaker’s main point.'
+        explanation: 'Option B directly reflects the speakerâ€™s main point.'
       },
       scoring: {
         method: 'auto_objective',

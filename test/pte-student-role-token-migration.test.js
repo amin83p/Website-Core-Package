@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 
 const roleRegistryService = require('../MVC/services/person/roleRegistryService');
 const roleModel = require('../MVC/models/roleModel');
-const pteApplicantModel = require('../MVC/models/pte/pteApplicantModel');
-const pteStudentDataService = require('../MVC/services/pte/pteStudentDataService');
+const pteApplicantModel = require('../packages/pte/MVC/models/pte/pteApplicantModel');
+const pteStudentDataService = require('../packages/pte/MVC/services/pte/pteStudentDataService');
 const migration = require('../scripts/migrate-pte-student-role-token');
 
 test('role registry exposes canonical PTE student role and not typo role', () => {

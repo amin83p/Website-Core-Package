@@ -8,7 +8,7 @@ const {
   collectLegacyDirectModelScores,
   evaluateSpeakingMicroRubric,
   normalizeMicroResponseRows
-} = require('../MVC/services/pte/pteSpeakingMicroRubricService');
+} = require('../packages/pte/MVC/services/pte/pteSpeakingMicroRubricService');
 
 test('Speaking micro rubric maps fixed choices to deterministic trait scores', () => {
   const result = evaluateSpeakingMicroRubric({

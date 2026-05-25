@@ -4,8 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const ejs = require('ejs');
 
-const aiAssistRoutes = require('../MVC/routes/pte/aiAssistRoutes');
-const aiScoringSettingsController = require('../MVC/controllers/pte/aiScoringSettingsController');
+const aiAssistRoutes = require('../packages/pte/MVC/routes/aiAssistRoutes');
+const aiScoringSettingsController = require('../packages/pte/MVC/controllers/aiScoringSettingsController');
 
 function makeRenderResponse() {
   return {

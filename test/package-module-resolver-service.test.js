@@ -13,13 +13,22 @@ const PTE_CONTEXT = {
   manifestPath: path.join(ROOT_DIR, 'packages/pte/package.manifest.json')
 };
 
-test('module resolver keeps current project-root route paths working', () => {
+test('module resolver maps legacy pte route shim paths to package-owned routes', () => {
   const resolved = packageModuleResolverService.resolvePackageModulePath(
     'MVC/routes/pte/pteMainRoute.js',
     PTE_CONTEXT
   );
 
-  assert.equal(resolved, path.join(ROOT_DIR, 'MVC/routes/pte/pteMainRoute.js'));
+  assert.equal(resolved, path.join(ROOT_DIR, 'packages/pte/MVC/routes/pteMainRoute.js'));
+});
+
+test('module resolver maps legacy pte controller shim paths to package-owned controllers', () => {
+  const resolved = packageModuleResolverService.resolvePackageModulePath(
+    'MVC/controllers/pte/infoController.js',
+    PTE_CONTEXT
+  );
+
+  assert.equal(resolved, path.join(ROOT_DIR, 'packages/pte/MVC/controllers/infoController.js'));
 });
 
 test('module resolver supports future package-root relative route paths', () => {

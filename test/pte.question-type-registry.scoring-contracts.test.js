@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const questionTypeRegistry = require('../MVC/services/pte/questionTypeRegistry');
+const questionTypeRegistry = require('../packages/pte/MVC/services/pte/questionTypeRegistry');
 
 const RESPOND_PAYLOAD = Object.freeze({
   situationText: 'Your friend invited you to dinner, but you already have a family event.',

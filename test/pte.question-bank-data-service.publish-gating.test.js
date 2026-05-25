@@ -1,9 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const pteQuestionBankDataService = require('../MVC/services/pte/pteQuestionBankDataService');
-const pteQuestionVersionRepository = require('../MVC/repositories/pteQuestionVersionRepository');
-const questionTypeRegistry = require('../MVC/services/pte/questionTypeRegistry');
+const pteQuestionBankDataService = require('../packages/pte/MVC/services/pte/pteQuestionBankDataService');
+const pteQuestionVersionRepository = require('../packages/pte/MVC/repositories/pteQuestionVersionRepository');
+const questionTypeRegistry = require('../packages/pte/MVC/services/pte/questionTypeRegistry');
 
 const originalGetQuestionById = pteQuestionBankDataService.getQuestionById;
 const originalRepoUpdate = pteQuestionVersionRepository.update;
