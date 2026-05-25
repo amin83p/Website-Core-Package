@@ -1,1 +1,0 @@
-module.exports = require('../../../packages/pte/MVC/models/pte/pteQuestionVersionModel');

@@ -14,6 +14,28 @@ function resolveProjectRoot() {
   return path.resolve(__dirname, '../../');
 }
 
+function resolvePackageIdFromContext(context = {}, options = {}) {
+  return normalizePackageId(context?.packageId || context?.manifest?.id || options?.packageId || '');
+}
+
+function applyLegacyPteModuleAliases(modulePath = '', context = {}, options = {}) {
+  const packageId = resolvePackageIdFromContext(context, options);
+  if (packageId !== 'pte') return cleanText(modulePath, 1600);
+
+  const normalized = cleanText(modulePath, 1600).replace(/\\/g, '/');
+  if (!normalized) return '';
+
+  if (normalized.startsWith('MVC/controllers/pte/')) {
+    return `MVC/controllers/${normalized.slice('MVC/controllers/pte/'.length)}`;
+  }
+
+  if (normalized.startsWith('MVC/routes/pte/')) {
+    return `MVC/routes/${normalized.slice('MVC/routes/pte/'.length)}`;
+  }
+
+  return normalized;
+}
+
 function hasParentTraversal(value = '') {
   return cleanText(value, 1600)
     .replace(/\\/g, '/')
@@ -94,8 +116,12 @@ function tryResolveModule(candidatePath = '', originalPath = '', allowedRoots = 
 }
 
 function resolvePackageModulePath(modulePath = '', context = {}, options = {}) {
-  const token = cleanText(modulePath, 1600);
-  if (!token) return '';
+  const rawToken = cleanText(modulePath, 1600);
+  if (!rawToken) return '';
+  if (hasParentTraversal(rawToken)) {
+    throw new Error(`Package module path must not include parent traversal: ${rawToken}`);
+  }
+  const token = applyLegacyPteModuleAliases(rawToken, context, options);
   if (hasParentTraversal(token)) {
     throw new Error(`Package module path must not include parent traversal: ${token}`);
   }
