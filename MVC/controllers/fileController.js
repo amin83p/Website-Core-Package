@@ -33,6 +33,12 @@ function getOrganizationLabel(org = {}) {
   ).trim();
 }
 
+function resolveOrgBackupRestoreMaxUploadMb() {
+  const raw = Number.parseInt(String(process.env.ORG_BACKUP_RESTORE_MAX_UPLOAD_MB || ''), 10);
+  if (!Number.isFinite(raw) || Number.isNaN(raw) || raw <= 0) return 500;
+  return Math.min(raw, 10240);
+}
+
 async function getOrgBackupOrganizations(user) {
   if (!canManageOrgBackups(user)) return [];
   const globalScope = {
@@ -255,6 +261,7 @@ exports.listFiles = async (req, res) => {
     const context = coreFilesService.resolveContextFromPath(user, currentPathStr, { allowRoot: true });
     const orgBackupOrganizations = await getOrgBackupOrganizations(user).catch(() => []);
     const orgBackupEnabled = canManageOrgBackups(user);
+    const orgBackupRestoreMaxUploadMb = resolveOrgBackupRestoreMaxUploadMb();
 
     if (context.isRoot) {
       return res.render('files/fileList', {
@@ -268,6 +275,7 @@ exports.listFiles = async (req, res) => {
         user,
         canManageOrgBackups: orgBackupEnabled,
         orgBackupOrganizations,
+        orgBackupRestoreMaxUploadMb,
         actionStateId: req.actionStateId
       });
     }
@@ -293,6 +301,7 @@ exports.listFiles = async (req, res) => {
       currentSubfolder: context.relativeSub,
       canManageOrgBackups: orgBackupEnabled,
       orgBackupOrganizations,
+      orgBackupRestoreMaxUploadMb,
       actionStateId: req.actionStateId
     });
   } catch (error) {

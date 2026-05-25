@@ -5,7 +5,7 @@
     const orgBackupRows = Array.isArray(typeof orgBackupOrganizations !== 'undefined' ? orgBackupOrganizations : [])
       ? orgBackupOrganizations
       : [];
-    const orgBackupRestoreMaxMb = Number.isFinite(Number(orgBackupRestoreMaxUploadMb))
+    const orgBackupRestoreMaxMb = Number.isFinite(Number(typeof orgBackupRestoreMaxUploadMb !== 'undefined' ? orgBackupRestoreMaxUploadMb : NaN))
       ? Number(orgBackupRestoreMaxUploadMb)
       : 500;
     const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg|bmp|ico|tiff?)$/i;
