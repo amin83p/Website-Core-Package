@@ -17,6 +17,11 @@ const {
   inferSearchableFields,
   isAjax
 } = require('../../../../../MVC/utils/generalTools');
+const {
+  isRailwayProxyMode,
+  getGatewayBaseUrl,
+  getGatewayTimeoutMs
+} = require('../../../../../MVC/utils/uploadModeUtils');
 const { runByRepositoryBackend } = require('../../../../../MVC/repositories/backend/repositoryBackendSelector');
 const { getMongoCollection } = require('../../../../../MVC/infrastructure/mongo/mongoConnection');
 
@@ -37,6 +42,9 @@ module.exports = {
   buildDataServiceQuery,
   inferSearchableFields,
   isAjax,
+  isRailwayProxyMode,
+  getGatewayBaseUrl,
+  getGatewayTimeoutMs,
   assertCreateOrgContextOrThrow,
   decrypt,
   runByRepositoryBackend,

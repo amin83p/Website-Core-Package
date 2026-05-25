@@ -47,6 +47,9 @@ test('PTE core dependency adapter should expose stable utility exports', () => {
   assert.equal(typeof adapter.buildDataServiceQuery, 'function', 'buildDataServiceQuery should be exported.');
   assert.equal(typeof adapter.inferSearchableFields, 'function', 'inferSearchableFields should be exported.');
   assert.equal(typeof adapter.isAjax, 'function', 'isAjax should be exported.');
+  assert.equal(typeof adapter.isRailwayProxyMode, 'function', 'isRailwayProxyMode should be exported.');
+  assert.equal(typeof adapter.getGatewayBaseUrl, 'function', 'getGatewayBaseUrl should be exported.');
+  assert.equal(typeof adapter.getGatewayTimeoutMs, 'function', 'getGatewayTimeoutMs should be exported.');
   assert.equal(typeof adapter.assertCreateOrgContextOrThrow, 'function', 'assertCreateOrgContextOrThrow should be exported.');
   assert.equal(typeof adapter.decrypt, 'function', 'decrypt should be exported.');
   assert.equal(typeof adapter.runByRepositoryBackend, 'function', 'runByRepositoryBackend should be exported.');

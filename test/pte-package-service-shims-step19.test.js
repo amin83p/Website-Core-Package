@@ -44,6 +44,8 @@ function expectedShimRequirePath(relativeFile) {
 const packageOwnedServices = new Set([
   'questionTypeRegistry.js',
   'pteScoringRubricRegistry.js',
+  'questionBankAiPromptRegistry.js',
+  'questionBankAiAutofillService.js',
   'pteAiProviderDataService.js',
   'pteAiScoringSettingsDataService.js',
   'pteAiTokenUsageDataService.js',
