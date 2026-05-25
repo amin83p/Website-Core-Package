@@ -3,6 +3,7 @@ const path = require('path');
 
 const packageManifestService = require('../../MVC/services/packageManifestService');
 const packageRegistryService = require('../../MVC/services/packageRegistryService');
+const packageRegistryInstallerService = require('../../MVC/services/packageRegistryInstallerService');
 const dataBackendRuntimeService = require('../../MVC/services/dataBackendRuntimeService');
 const { disconnectMongo } = require('../../MVC/infrastructure/mongo/mongoConnection');
 
@@ -25,7 +26,7 @@ function loadLocalEnvFile() {
       let value = trimmed.slice(eqIdx + 1).trim();
       if (
         (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
+        (value.startsWith('\'') && value.endsWith('\''))
       ) {
         value = value.slice(1, -1);
       }
@@ -65,6 +66,8 @@ function parseArgs(argv = []) {
   const args = new Set(argv);
   return {
     apply: args.has('--apply'),
+    disable: args.has('--disable'),
+    remove: args.has('--remove'),
     json: args.has('--json'),
     help: args.has('--help') || args.has('-h')
   };
@@ -97,12 +100,12 @@ function countDeclarations(manifest = {}) {
   };
 }
 
-function buildRegistryPayload(manifest = {}) {
+function buildRegistryPayload(manifest = {}, action = 'enable') {
   return {
     packageId: manifest.id,
     version: manifest.version,
-    enabled: true,
-    installStatus: 'enabled',
+    enabled: action !== 'remove',
+    installStatus: action === 'remove' ? 'removed' : action === 'disable' ? 'disabled' : 'enabled',
     metadata: {
       packageName: manifest.name,
       mountPath: manifest.mountPath,
@@ -119,6 +122,7 @@ function printHumanReport(report = {}) {
   console.log(`[${mode}] PTE package registry activation`);
   console.log(`Package: ${report.payload.packageId}@${report.payload.version}`);
   console.log(`Action: ${report.action}`);
+  if (report.packageAction) console.log(`Package action: ${report.packageAction}`);
   console.log(`Enabled: ${report.payload.enabled}`);
   console.log(`Install status: ${report.payload.installStatus}`);
   console.log(`Manifest: ${report.payload.metadata.manifestPath}`);
@@ -131,46 +135,76 @@ function printHumanReport(report = {}) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
-    console.log('Usage: node scripts/packages/enable-pte-package.js [--apply] [--json]');
-    console.log('Default mode is dry-run. Use --apply to upsert the PTE package registry row.');
+    console.log('Usage: node scripts/packages/enable-pte-package.js [--apply] [--disable|--remove] [--json]');
+    console.log('Default mode is dry-run. Use --apply to persist changes.');
+    console.log('Use --disable to disable package registry + owned declarations.');
+    console.log('Use --remove to remove package registry row + owned declarations.');
     return;
   }
 
   const manifest = loadPteManifest();
-  const payload = buildRegistryPayload(manifest);
-  const backendMode = await initializeRegistryBackend({ json: options.json });
-  const registryOptions = { backendMode };
-  const existing = await packageRegistryService.getPackageRegistryById(payload.packageId, registryOptions);
-  const report = {
-    apply: options.apply,
-    backendMode,
-    action: existing ? 'update' : 'create',
-    existing: existing ? {
-      packageId: existing.packageId,
-      version: existing.version,
-      enabled: existing.enabled,
-      installStatus: existing.installStatus
-    } : null,
-    payload
-  };
+  const payloadMode = options.remove ? 'remove' : options.disable ? 'disable' : 'enable';
+  const payload = buildRegistryPayload(manifest, payloadMode);
+  let backendMode = 'json';
 
-  if (options.apply) {
-    report.result = await packageRegistryService.upsertPackageRegistry(payload, {
+  try {
+    backendMode = await initializeRegistryBackend({ json: options.json });
+    const existing = await packageRegistryService.getPackageRegistryById(payload.packageId, { backendMode });
+    const context = {
       backendMode,
-      actor: { id: 'SYSTEM', username: SCRIPT_ID }
-    });
-  }
+      packageId: manifest.id,
+      manifest
+    };
+    const report = {
+      apply: options.apply,
+      backendMode,
+      action: options.remove || options.disable ? payloadMode : (existing ? 'update' : 'create'),
+      packageAction: payloadMode,
+      existing: existing ? {
+        packageId: existing.packageId,
+        version: existing.version,
+        enabled: existing.enabled,
+        installStatus: existing.installStatus
+      } : null,
+      payload,
+      declarationSummary: null
+    };
 
-  if (backendMode === 'mongo') {
-    await disconnectMongo();
-  }
+    if (options.apply) {
+      if (options.remove) {
+        report.declarationSummary = await packageRegistryInstallerService.removePackageRegistryDeclarations(context, {
+          action: 'remove',
+          backendMode
+        });
+        report.result = await packageRegistryService.removePackageRegistry(payload.packageId, { backendMode });
+      } else if (options.disable) {
+        report.declarationSummary = await packageRegistryInstallerService.removePackageRegistryDeclarations(context, {
+          action: 'disable',
+          backendMode
+        });
+        report.result = await packageRegistryService.setPackageEnabled(payload.packageId, false, {
+          backendMode,
+          actor: { id: 'SYSTEM', username: SCRIPT_ID }
+        });
+      } else {
+        report.result = await packageRegistryService.upsertPackageRegistry(payload, {
+          backendMode,
+          actor: { id: 'SYSTEM', username: SCRIPT_ID }
+        });
+      }
+    }
 
-  if (options.json) {
-    console.log(JSON.stringify(report, null, 2));
-    return;
-  }
+    if (options.json) {
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
 
-  printHumanReport(report);
+    printHumanReport(report);
+  } finally {
+    if (backendMode === 'mongo') {
+      await disconnectMongo();
+    }
+  }
 }
 
 main().catch((error) => {

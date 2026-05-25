@@ -11,7 +11,8 @@ const PACKAGE_NAMES = Object.freeze({
   SCHOOL: 'School',
   IELTS: 'IELTS',
   BENCHPATH: 'BenchPath',
-  CREDIT: 'Credit'
+  CREDIT: 'Credit',
+  PTE: 'PTE'
 });
 
 const PLACEHOLDER_DEFAULTS = Object.freeze({
@@ -311,6 +312,26 @@ function registerUploadFolderDefinitions(definitions = []) {
   return inserted;
 }
 
+function removeUploadFolderDefinitions(definitions = []) {
+  const keys = new Set(
+    Array.isArray(definitions)
+      ? definitions
+        .map((value) => String(value || '').trim().replace(/\0/g, ''))
+        .filter(Boolean)
+      : []
+  );
+  if (!keys.size) return 0;
+
+  let removed = 0;
+  for (let i = RUNTIME_DEFINITIONS.length - 1; i >= 0; i -= 1) {
+    const definition = RUNTIME_DEFINITIONS[i];
+    if (!definition || !keys.has(definition.key)) continue;
+    RUNTIME_DEFINITIONS.splice(i, 1);
+    removed += 1;
+  }
+  return removed;
+}
+
 module.exports = {
   GROUPS,
   PACKAGE_NAMES,
@@ -327,5 +348,9 @@ module.exports = {
   sanitizeUploadFolderSettingsPatch,
   mergeUploadFolderSettings,
   registerUploadFolderDefinitions,
+  removeUploadFolderDefinitions,
   validateTemplateForDefinition
 };
+
+
+

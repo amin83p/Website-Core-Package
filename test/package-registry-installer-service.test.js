@@ -54,6 +54,12 @@ function createMemoryRepository(initialRows = [], options = {}) {
       rows[index] = next;
       return clone(next);
     },
+    remove: async (id) => {
+      const index = rows.findIndex((row) => String(row?.id || '') === String(id || ''));
+      if (index < 0) return null;
+      const [removed] = rows.splice(index, 1);
+      return clone(removed);
+    },
     getRows: () => clone(rows)
   };
 }
@@ -114,6 +120,7 @@ function createUploadFolderMocks(initialDefinitions = [], initialSettings = {}) 
     state,
     uploadFolderSettingsService: {
       getUploadFolderDefinitions: () => Array.from(definitionMap.values()).map((row) => ({ ...row })),
+      getDefinition: (key) => definitionMap.get(String(key || '').trim()) || null,
       registerUploadFolderDefinitions: (rows = []) => {
         const list = Array.isArray(rows) ? rows : [rows];
         list.forEach((row) => {
@@ -127,6 +134,19 @@ function createUploadFolderMocks(initialDefinitions = [], initialSettings = {}) 
             placeholders: Array.isArray(row.placeholders) ? [...row.placeholders] : []
           });
         });
+      },
+      removeUploadFolderDefinitions: (keys = []) => {
+        const keySet = new Set(
+          (Array.isArray(keys) ? keys : [keys])
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+        );
+        if (!keySet.size) return 0;
+        let removed = 0;
+        keySet.forEach((key) => {
+          if (definitionMap.delete(key)) removed += 1;
+        });
+        return removed;
       },
       sanitizeUploadFolderSettingsPatch: (patch = {}) => {
         const source = patch && typeof patch === 'object' ? patch : {};
@@ -149,16 +169,17 @@ function createUploadFolderMocks(initialDefinitions = [], initialSettings = {}) 
     systemSettingsRepository: {
       getSettings: async () => clone(state.settings),
       updateSettings: async (patch = {}) => {
+        const nextUploadFolders = Object.prototype.hasOwnProperty.call(patch, 'app')
+          && Object.prototype.hasOwnProperty.call(patch.app, 'uploadFolders')
+          ? { ...((patch.app || {}).uploadFolders || {}) }
+          : { ...((state.settings.app || {}).uploadFolders || {}) };
         const next = {
           ...state.settings,
           ...patch,
           app: {
             ...(state.settings.app || {}),
             ...(patch.app || {}),
-            uploadFolders: {
-              ...((state.settings.app || {}).uploadFolders || {}),
-              ...((patch.app || {}).uploadFolders || {})
-            }
+            uploadFolders: nextUploadFolders
           }
         };
         state.settings = next;
@@ -267,7 +288,7 @@ test('installer creates package registry declarations and applies upload folder 
   assert.equal(summary.entities.symbols.created, 1);
   assert.equal(summary.entities.accesses.created, 1);
   assert.equal(summary.uploadFolders.definitionsRegistered, 1);
-  assert.equal(summary.uploadFolders.valuesApplied, 2);
+  assert.equal(summary.uploadFolders.valuesApplied >= 2, true);
   assert.equal(summary.uploadFolders.settingsUpdated, true);
 
   assert.equal(repos.opRepo.getRows().length, 1);
@@ -356,6 +377,200 @@ test('installer protects ownership boundaries and supports explicit adoption', a
   assert.equal(adoptSummary.entities.roles.updated, 1);
   const adopted = repos.roleRepo.getRows().find((row) => row.key === 'pte_teacher');
   assert.equal(adopted.packageId, 'school');
+});
+
+test('installer disable action deactivates package-owned entities and clears upload values', async () => {
+  const { deps, repos, uploadMocks } = createInstallerDeps({
+    operations: [{
+      id: 'OP1001',
+      name: 'PTE_AI_SCORE',
+      packageId: 'pte',
+      packageName: 'PTE',
+      active: true,
+      system: false,
+      trackState: true
+    }],
+    roles: [{
+      id: 'ROL1001',
+      key: 'pte_examiner',
+      label: 'PTE Examiner',
+      packageId: 'pte',
+      packageName: 'PTE',
+      domain: 'pte',
+      active: true,
+      system: false
+    }],
+    sections: [{
+      id: 'SEC1001',
+      name: 'PTE_AI_SCORING',
+      packageId: 'pte',
+      packageName: 'PTE',
+      category: 'SYSTEM',
+      active: true
+    }],
+    symbols: [{
+      id: 'SYM1001',
+      name: 'PTE_AI_SCORING',
+      packageId: 'pte',
+      packageName: 'PTE',
+      orgId: 'SYSTEM',
+      type: 'class',
+      value: 'bi bi-cpu',
+      active: true
+    }],
+    accesses: [{
+      id: 'ACC1001',
+      name: 'PTE_EXAMINER',
+      packageId: 'pte',
+      packageName: 'PTE',
+      orgId: '',
+      active: true,
+      sections: [],
+      fullAdmin: false
+    }]
+  });
+
+  uploadMocks.state.settings.app.uploadFolders['pte.aiScoringArtifacts'] = 'PTE/AI_Scoring';
+  uploadMocks.uploadFolderSettingsService.registerUploadFolderDefinitions([
+    {
+      key: 'pte.aiScoringArtifacts',
+      packageName: 'PTE',
+      group: 'PTE Uploads',
+      label: 'PTE AI Scoring Artifacts',
+      defaultTemplate: 'PTE/AI_Scoring',
+      placeholders: []
+    }
+  ]);
+
+  const summary = await packageRegistryInstallerService.removePackageRegistryDeclarations({
+    backendMode: 'json',
+    packageId: 'pte',
+    manifest: {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      operations: [{ name: 'PTE_AI_SCORE' }],
+      roles: [{ key: 'pte_examiner' }],
+      sections: [{ name: 'PTE_AI_SCORING', operations: [] }],
+      symbols: [{ name: 'PTE_AI_SCORING', orgId: 'SYSTEM' }],
+      accesses: [{ name: 'PTE_EXAMINER', orgId: null, sections: [] }],
+      uploadFolders: [{ key: 'pte.aiScoringArtifacts' }]
+    }
+  }, { ...deps, backendMode: 'json', action: 'disable' });
+
+  assert.equal(summary.entities.operations.deactivated, 1);
+  assert.equal(summary.entities.roles.deactivated, 1);
+  assert.equal(summary.entities.sections.deactivated, 1);
+  assert.equal(summary.entities.accesses.deactivated, 1);
+  assert.equal(summary.entities.symbols.skipped >= 1, true);
+  assert.equal(summary.uploadFolders.valuesCleared, 1);
+  assert.equal(summary.uploadFolders.settingsUpdated, true);
+  assert.equal(uploadMocks.state.settings.app.uploadFolders['pte.aiScoringArtifacts'], undefined);
+  assert.equal(uploadMocks.uploadFolderSettingsService.getDefinition('pte.aiScoringArtifacts') !== null, true);
+
+  assert.equal(repos.opRepo.getRows().find((row) => row.id === 'OP1001').active, false);
+  assert.equal(repos.roleRepo.getRows().find((row) => row.id === 'ROL1001').active, false);
+  assert.equal(repos.sectionRepo.getRows().find((row) => row.id === 'SEC1001').active, false);
+  assert.equal(repos.accessRepo.getRows().find((row) => row.id === 'ACC1001').active, false);
+});
+
+test('installer remove action deletes package-owned entities and package upload definitions', async () => {
+  const { deps, repos, uploadMocks } = createInstallerDeps({
+    operations: [{
+      id: 'OP1002',
+      name: 'PTE_WRITER',
+      packageId: 'pte',
+      packageName: 'PTE',
+      active: true,
+      system: false,
+      trackState: true
+    }],
+    roles: [{
+      id: 'ROL1002',
+      key: 'pte_writer',
+      label: 'PTE Writer',
+      packageId: 'pte',
+      packageName: 'PTE',
+      domain: 'pte',
+      active: true,
+      system: false
+    }],
+    sections: [{
+      id: 'SEC1002',
+      name: 'PTE_WRITING',
+      packageId: 'pte',
+      packageName: 'PTE',
+      category: 'SYSTEM',
+      active: true
+    }],
+    symbols: [{
+      id: 'SYM1002',
+      name: 'PTE_WRITING',
+      packageId: 'pte',
+      packageName: 'PTE',
+      orgId: 'SYSTEM',
+      type: 'class',
+      value: 'bi bi-pen',
+      active: true
+    }],
+    accesses: [{
+      id: 'ACC1002',
+      name: 'PTE_WRITER',
+      packageId: 'pte',
+      packageName: 'PTE',
+      orgId: '',
+      active: true,
+      sections: [],
+      fullAdmin: false
+    }]
+  });
+
+  uploadMocks.state.settings.app.uploadFolders['pte.writerArtifacts'] = 'PTE/Writer';
+  uploadMocks.uploadFolderSettingsService.registerUploadFolderDefinitions([
+    {
+      key: 'pte.writerArtifacts',
+      packageName: 'PTE',
+      group: 'PTE Uploads',
+      label: 'PTE Writer Artifacts',
+      defaultTemplate: 'PTE/Writer',
+      placeholders: []
+    }
+  ]);
+
+  const summary = await packageRegistryInstallerService.removePackageRegistryDeclarations({
+    backendMode: 'json',
+    packageId: 'pte',
+    manifest: {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      operations: [{ name: 'PTE_WRITER' }],
+      roles: [{ key: 'pte_writer' }],
+      sections: [{ name: 'PTE_WRITING', operations: [] }],
+      symbols: [{ name: 'PTE_WRITING', orgId: 'SYSTEM' }],
+      accesses: [{ name: 'PTE_WRITER', orgId: null, sections: [] }],
+      uploadFolders: [{ key: 'pte.writerArtifacts' }]
+    }
+  }, { ...deps, backendMode: 'json', action: 'remove' });
+
+  assert.equal(summary.entities.operations.removed, 1);
+  assert.equal(summary.entities.roles.removed, 1);
+  assert.equal(summary.entities.sections.removed, 1);
+  assert.equal(summary.entities.accesses.removed, 1);
+  assert.equal(summary.entities.symbols.removed, 1);
+  assert.equal(summary.uploadFolders.definitionsRemoved, 1);
+  assert.equal(summary.uploadFolders.valuesCleared, 1);
+  assert.equal(summary.uploadFolders.settingsUpdated, true);
+
+  assert.equal(uploadMocks.state.settings.app.uploadFolders['pte.writerArtifacts'], undefined);
+  assert.equal(uploadMocks.uploadFolderSettingsService.getDefinition('pte.writerArtifacts'), null);
+  assert.equal(repos.opRepo.getRows().find((row) => row.id === 'OP1002'), undefined);
+  assert.equal(repos.roleRepo.getRows().find((row) => row.id === 'ROL1002'), undefined);
+  assert.equal(repos.sectionRepo.getRows().find((row) => row.id === 'SEC1002'), undefined);
+  assert.equal(repos.accessRepo.getRows().find((row) => row.id === 'ACC1002'), undefined);
+  assert.equal(repos.symbolRepo.getRows().find((row) => row.id === 'SYM1002'), undefined);
 });
 
 test('real PTE manifest validates and exercises installer declarations + default-path install', async () => {

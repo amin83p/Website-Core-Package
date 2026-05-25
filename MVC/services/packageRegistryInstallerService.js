@@ -46,6 +46,8 @@ function normalizeEntitySummary() {
     requested: 0,
     created: 0,
     updated: 0,
+    deactivated: 0,
+    removed: 0,
     skipped: 0,
     failed: 0
   };
@@ -55,7 +57,9 @@ function normalizeUploadSummary() {
   return {
     requested: 0,
     definitionsRegistered: 0,
+    definitionsRemoved: 0,
     valuesApplied: 0,
+    valuesCleared: 0,
     skipped: 0,
     failed: 0,
     settingsUpdated: false
@@ -134,6 +138,15 @@ function isOwnershipConflict(existing = {}, packageId = '') {
   return owner.packageId !== packageId;
 }
 
+function isOwnedByPackage(existing = {}, packageId = '') {
+  const owner = getOwnershipFromRow(existing);
+  return owner.packageId === packageId;
+}
+
+function isUnmanaged(existing = {}) {
+  return !getOwnershipFromRow(existing).packageId;
+}
+
 function shouldAdoptExisting(declaration = {}, options = {}) {
   if (declaration?.adoptExisting === true) return true;
   return options?.allowAdoptExisting === true;
@@ -145,6 +158,8 @@ function markResult(summary, category, input = {}) {
   const status = cleanText(input?.status, 40).toLowerCase();
   if (status === 'created') bucket.created += 1;
   else if (status === 'updated') bucket.updated += 1;
+  else if (status === 'deactivated') bucket.deactivated += 1;
+  else if (status === 'removed') bucket.removed += 1;
   else if (status === 'skipped') bucket.skipped += 1;
   else if (status === 'failed') bucket.failed += 1;
 
@@ -155,6 +170,29 @@ function markResult(summary, category, input = {}) {
     id: cleanText(input?.id, 240),
     message: cleanText(input?.message, 800)
   });
+}
+
+function markUploadFolderResult(summary, input = {}) {
+  const uploadSummary = summary.uploadFolders;
+  const status = cleanText(input?.status, 40).toLowerCase();
+  if (status === 'updated') uploadSummary.valuesApplied += 1;
+  else if (status === 'removed') uploadSummary.definitionsRemoved += 1;
+  else if (status === 'requested') uploadSummary.requested += 1;
+  else if (status === 'skipped') uploadSummary.skipped += 1;
+  else if (status === 'failed') uploadSummary.failed += 1;
+
+  summary.results.push({
+    category: 'uploadFolders',
+    status,
+    key: cleanText(input?.key, 240),
+    id: cleanText(input?.id, 240),
+    message: cleanText(input?.message, 800)
+  });
+}
+
+function normalizeUninstallAction(value = '') {
+  const token = cleanText(value, 40).toLowerCase();
+  return token === 'remove' ? 'remove' : 'disable';
 }
 
 function normalizeOperationDeclaration(row = {}, packageMeta = {}) {
@@ -413,6 +451,8 @@ function buildEntityDefinitions(deps, packageMeta, backendMode) {
       find: async (normalized) => findOperationByName(deps.operationRepository, normalized.name, repoOptions),
       create: async (payload) => deps.operationRepository.create(payload, repoOptions),
       update: async (id, payload) => deps.operationRepository.update(id, payload, repoOptions),
+      remove: async (id) => deps.operationRepository.remove(id, repoOptions),
+      supportsActiveToggle: true,
       updateFields: ['name', 'description', 'active', 'system', 'trackState', 'keepActive', 'sectionId', 'audit']
     },
     roles: {
@@ -420,6 +460,8 @@ function buildEntityDefinitions(deps, packageMeta, backendMode) {
       find: async (normalized) => findRoleByKey(deps.roleRepository, normalized.key, repoOptions),
       create: async (payload) => deps.roleRepository.create(payload, repoOptions),
       update: async (id, payload) => deps.roleRepository.update(id, payload, repoOptions),
+      remove: async (id) => deps.roleRepository.remove(id, repoOptions),
+      supportsActiveToggle: true,
       updateFields: ['key', 'label', 'description', 'domain', 'packageName', 'aliases', 'active', 'system']
     },
     sections: {
@@ -427,6 +469,8 @@ function buildEntityDefinitions(deps, packageMeta, backendMode) {
       find: async (normalized) => findSectionByName(deps.sectionRepository, normalized.name, repoOptions),
       create: async (payload) => deps.sectionRepository.create(payload, repoOptions),
       update: async (id, payload) => deps.sectionRepository.update(id, payload, repoOptions),
+      remove: async (id) => deps.sectionRepository.remove(id, repoOptions),
+      supportsActiveToggle: true,
       updateFields: [
         'name',
         'category',
@@ -450,6 +494,8 @@ function buildEntityDefinitions(deps, packageMeta, backendMode) {
       find: async (normalized) => findSymbolByNameOrg(deps.symbolRepository, normalized.name, normalized.orgId, repoOptions),
       create: async (payload) => deps.symbolRepository.create(payload, repoOptions),
       update: async (id, payload) => deps.symbolRepository.update(id, payload, repoOptions),
+      remove: async (id) => deps.symbolRepository.remove(id, repoOptions),
+      supportsActiveToggle: false,
       updateFields: ['name', 'type', 'value', 'tags', 'orgId']
     },
     accesses: {
@@ -462,6 +508,8 @@ function buildEntityDefinitions(deps, packageMeta, backendMode) {
       ),
       create: async (payload) => deps.accessRepository.create(payload, repoOptions),
       update: async (id, payload) => deps.accessRepository.update(id, payload, repoOptions),
+      remove: async (id) => deps.accessRepository.remove(id, repoOptions),
+      supportsActiveToggle: true,
       updateFields: ['name', 'orgId', 'description', 'active', 'fullAdmin', 'adminCategories', 'validity', 'sections']
     }
   };
@@ -489,6 +537,43 @@ function rowBelongsToSameIdentity(category, existing = {}, normalized = {}) {
   if (category === 'operations') return cleanText(existing?.name, 180).toUpperCase() === normalized.name;
   if (category === 'sections') return cleanText(existing?.name, 180).toUpperCase() === normalized.name;
   return false;
+}
+
+function buildUninstallSummaryMessage(action, category, reason) {
+  if (action === 'remove') return reason || 'Removed per uninstall action.';
+  return reason || 'Deactivated per uninstall action.';
+}
+
+function summarizeUninstallOwnershipResult(category, existing = {}, summary, identity = '') {
+  const owner = getOwnershipFromRow(existing);
+  if (!owner.packageId) {
+    markResult(summary, category, {
+      status: 'skipped',
+      key: identity,
+      id: cleanText(existing?.id, 120),
+      message: 'Record is unmanaged.'
+    });
+    return 'skipped';
+  }
+  if (isOwnershipConflict(existing, summary.packageId)) {
+    markResult(summary, category, {
+      status: 'skipped',
+      key: identity,
+      id: cleanText(existing?.id, 120),
+      message: 'Record is owned by another package.'
+    });
+    return 'skipped';
+  }
+  if (isReadonlyExistingRow(category, existing)) {
+    markResult(summary, category, {
+      status: 'skipped',
+      key: identity,
+      id: cleanText(existing?.id, 120),
+      message: 'System-protected record is read-only.'
+    });
+    return 'skipped';
+  }
+  return null;
 }
 
 async function installEntityDeclarations(manifest, summary, context, deps, options = {}) {
@@ -619,6 +704,118 @@ async function installEntityDeclarations(manifest, summary, context, deps, optio
   }
 }
 
+async function removeOrDisableEntityDeclarations(manifest, summary, deps, options = {}) {
+  const action = normalizeUninstallAction(options?.action);
+  const packageId = summary.packageId;
+  const packageName = summary.packageName;
+  const declarationsByCategory = {
+    operations: normalizeDeclarationArray(manifest.operations),
+    roles: normalizeDeclarationArray(manifest.roles),
+    sections: normalizeDeclarationArray(manifest.sections),
+    symbols: normalizeDeclarationArray(manifest.symbols),
+    accesses: normalizeDeclarationArray(manifest.accesses)
+  };
+  const entityDefs = buildEntityDefinitions(
+    deps,
+    { packageId, packageName },
+    summary.backendMode
+  );
+
+  for (const category of ENTITY_KEYS) {
+    const rows = declarationsByCategory[category] || [];
+    const entityDef = entityDefs[category];
+    if (!entityDef) continue;
+
+    for (const declaration of rows) {
+      summary.entities[category].requested += 1;
+      let normalized;
+      try {
+        normalized = entityDef.normalize(declaration);
+      } catch (error) {
+        markResult(summary, category, {
+          status: 'failed',
+          key: findStableIdentity(category, declaration),
+          message: error?.message || String(error)
+        });
+        continue;
+      }
+
+      const identity = findStableIdentity(category, normalized);
+      try {
+        const existing = await entityDef.find(normalized);
+        if (!existing || !rowBelongsToSameIdentity(category, existing, normalized)) {
+          markResult(summary, category, {
+            status: 'skipped',
+            key: identity,
+            message: 'Record not found.'
+          });
+          continue;
+        }
+
+        const blocked = summarizeUninstallOwnershipResult(category, existing, summary, identity);
+        if (blocked) continue;
+
+        if (action === 'remove' && typeof entityDef.remove === 'function') {
+          await entityDef.remove(existing.id);
+          markResult(summary, category, {
+            status: 'removed',
+            key: identity,
+            id: cleanText(existing?.id, 120),
+            message: buildUninstallSummaryMessage('remove')
+          });
+          continue;
+        }
+
+        if (action === 'remove' && !entityDef.remove) {
+          markResult(summary, category, {
+            status: 'failed',
+            key: identity,
+            id: cleanText(existing?.id, 120),
+            message: 'Remove operation is not supported.'
+          });
+          continue;
+        }
+
+        if (!entityDef.supportsActiveToggle) {
+          markResult(summary, category, {
+            status: 'skipped',
+            key: identity,
+            id: cleanText(existing?.id, 120),
+            message: 'No active field to deactivate.'
+          });
+          continue;
+        }
+
+        if (normalized.active === false || existing.active === false) {
+          markResult(summary, category, {
+            status: 'skipped',
+            key: identity,
+            id: cleanText(existing?.id, 120),
+            message: 'Already inactive.'
+          });
+          continue;
+        }
+
+        const updated = await entityDef.update(existing.id, {
+          active: false
+        });
+        markResult(summary, category, {
+          status: 'deactivated',
+          key: identity,
+          id: cleanText(updated?.id || existing?.id, 120),
+          message: buildUninstallSummaryMessage('disable')
+        });
+      } catch (error) {
+        markResult(summary, category, {
+          status: 'failed',
+          key: identity,
+          message: error?.message || String(error)
+        });
+      }
+    }
+  }
+}
+
 async function installUploadFolderDeclarations(manifest, summary, deps) {
   const declarations = normalizeDeclarationArray(manifest.uploadFolders);
   if (!declarations.length) return;
@@ -692,17 +889,14 @@ async function installUploadFolderDeclarations(manifest, summary, deps) {
       });
       patch[normalized.key] = sanitizedPatch[normalized.key];
       uploadSummary.valuesApplied += 1;
-      summary.results.push({
-        category: 'uploadFolders',
+      markUploadFolderResult(summary, {
         status: 'updated',
         key: normalized.key,
         id: '',
         message: 'Upload folder value prepared.'
       });
     } catch (error) {
-      uploadSummary.failed += 1;
-      summary.results.push({
-        category: 'uploadFolders',
+      markUploadFolderResult(summary, {
         status: 'failed',
         key: normalized.key,
         id: '',
@@ -735,6 +929,131 @@ async function installUploadFolderDeclarations(manifest, summary, deps) {
   uploadSummary.settingsUpdated = true;
 }
 
+async function removeOrDisableUploadFolderDeclarations(manifest, summary, deps, options = {}) {
+  const action = normalizeUninstallAction(options?.action);
+  const declarations = normalizeDeclarationArray(manifest.uploadFolders);
+  if (!declarations.length) return;
+
+  const uploadSummary = summary.uploadFolders;
+  const uploadService = deps.uploadFolderSettingsService;
+  const settingsRepo = deps.systemSettingsRepository;
+  const packageName = cleanText(summary.packageName, 80).toUpperCase();
+  const uploadDefs = uploadService.getUploadFolderDefinitions();
+  const packageDefinitions = new Set(
+    uploadDefs
+      .filter((row) => {
+        const definitionPackage = cleanText(row?.packageName, 120).toUpperCase();
+        return !packageName || definitionPackage === packageName;
+      })
+      .map((row) => String(row?.key || '').trim())
+      .filter(Boolean)
+  );
+  const currentSettings = (await settingsRepo.getSettings({ backendMode: summary.backendMode }))
+    ?.app?.uploadFolders || {};
+  const nextSettings = { ...(currentSettings || {}) };
+  const changedKeys = [];
+
+  declarations.forEach((row) => {
+    uploadSummary.requested += 1;
+    let normalized;
+    try {
+      normalized = normalizeUploadFolderDeclaration(row, {
+        packageId: summary.packageId,
+        packageName: summary.packageName
+      });
+    } catch (error) {
+      markUploadFolderResult(summary, {
+        status: 'failed',
+        key: cleanText(row?.key, 220),
+        id: '',
+        message: error?.message || String(error)
+      });
+      return;
+    }
+
+    const key = normalized.key;
+    if (!packageDefinitions.has(key)) {
+      markUploadFolderResult(summary, {
+        status: 'skipped',
+        key,
+        id: '',
+        message: 'Upload folder definition not owned by package.'
+      });
+      return;
+    }
+
+    if (action === 'remove') {
+      try {
+        const removed = uploadService.removeUploadFolderDefinitions([key]);
+        if (removed > 0) {
+          markUploadFolderResult(summary, {
+            status: 'removed',
+            key,
+            id: '',
+            message: 'Upload folder definition removed.'
+          });
+        } else {
+          markUploadFolderResult(summary, {
+            status: 'skipped',
+            key,
+            id: '',
+            message: 'Upload folder definition was not dynamically registered.'
+          });
+        }
+      } catch (error) {
+        markUploadFolderResult(summary, {
+          status: 'failed',
+          key,
+          id: '',
+          message: error?.message || String(error)
+        });
+      }
+
+      if (Object.prototype.hasOwnProperty.call(nextSettings, key)) {
+        delete nextSettings[key];
+        changedKeys.push(key);
+      }
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(nextSettings, key)) {
+      delete nextSettings[key];
+      changedKeys.push(key);
+    }
+
+    markUploadFolderResult(summary, {
+      status: 'cleared',
+      key,
+      id: '',
+      message: 'Upload folder assignment cleared for disable action.'
+    });
+  });
+
+  if (!changedKeys.length) return;
+
+  const currentJson = JSON.stringify(currentSettings || {});
+  const nextJson = JSON.stringify(nextSettings || {});
+  if (currentJson === nextJson) return;
+
+  const settings = await settingsRepo.getSettings({ backendMode: summary.backendMode });
+  await settingsRepo.updateSettings({
+    app: {
+      ...(settings?.app || {}),
+      uploadFolders: nextSettings
+    }
+  }, SYSTEM_ACTOR, { backendMode: summary.backendMode });
+
+  uploadSummary.valuesCleared += changedKeys.length;
+  uploadSummary.settingsUpdated = true;
+
+  try {
+    if (deps.settingService && typeof deps.settingService.refresh === 'function') {
+      await deps.settingService.refresh();
+    }
+  } catch (_) {
+    // Non-fatal: persistence succeeded, runtime cache can refresh naturally on restart.
+  }
+}
 async function installPackageRegistryDeclarations(context = {}, options = {}) {
   const deps = createDefaultDependencies(options);
   const packageMeta = normalizePackageContext(context);
@@ -746,6 +1065,21 @@ async function installPackageRegistryDeclarations(context = {}, options = {}) {
 
   await installEntityDeclarations(manifest, summary, context, deps, options);
   await installUploadFolderDeclarations(manifest, summary, deps);
+  return summary;
+}
+
+async function removePackageRegistryDeclarations(context = {}, options = {}) {
+  const deps = createDefaultDependencies(options);
+  const packageMeta = normalizePackageContext(context);
+  const manifest = context?.manifest && typeof context.manifest === 'object'
+    ? context.manifest
+    : {};
+  const summary = defaultInstallSummary(packageMeta.packageId, packageMeta.packageName);
+  summary.backendMode = cleanText(context?.backendMode || options?.backendMode, 20);
+  const action = normalizeUninstallAction(options?.action || context?.action);
+
+  await removeOrDisableEntityDeclarations(manifest, summary, deps, { ...options, action });
+  await removeOrDisableUploadFolderDeclarations(manifest, summary, deps, { ...options, action });
   return summary;
 }
 
@@ -840,6 +1174,9 @@ function createLoaderHooks(options = {}) {
 module.exports = {
   ENTITY_KEYS,
   installPackageRegistryDeclarations,
+  removePackageRegistryDeclarations,
   createLoaderHooks,
   createDefaultDependencies
 };
+
+

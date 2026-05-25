@@ -74,3 +74,36 @@ test('package-local PTE enable script apply upserts registry idempotently', asyn
   });
 });
 
+test('package-local PTE enable script dry-run supports disable action', async () => {
+  await withTempRegistry(async ({ registryPath }) => {
+    const result = runPackageEnableScript(['--disable', '--json'], registryPath);
+
+    assert.equal(result.status, 0, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.apply, false);
+    assert.equal(report.action, 'disable');
+    assert.equal(report.payload.packageId, 'pte');
+    assert.equal(report.payload.enabled, false);
+    assert.equal(report.payload.installStatus, 'disabled');
+    assert.equal(report.packageAction, 'disable');
+
+    await assert.rejects(() => fs.stat(registryPath), { code: 'ENOENT' });
+  });
+});
+
+test('package-local PTE enable script dry-run supports remove action', async () => {
+  await withTempRegistry(async ({ registryPath }) => {
+    const result = runPackageEnableScript(['--remove', '--json'], registryPath);
+
+    assert.equal(result.status, 0, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.apply, false);
+    assert.equal(report.action, 'remove');
+    assert.equal(report.payload.packageId, 'pte');
+    assert.equal(report.payload.enabled, false);
+    assert.equal(report.payload.installStatus, 'removed');
+    assert.equal(report.packageAction, 'remove');
+
+    await assert.rejects(() => fs.stat(registryPath), { code: 'ENOENT' });
+  });
+});
