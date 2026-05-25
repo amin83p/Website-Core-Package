@@ -184,7 +184,50 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       return;
     }
-    alert(title + ': ' + message);
+    console.warn(title + ': ' + message);
+  }
+
+  async function showConfirm({
+    title,
+    message,
+    icon = 'question',
+    confirmText = 'Confirm',
+    confirmClass = 'btn-primary',
+    cancelText = 'Cancel',
+    cancelClass = 'btn-secondary'
+  } = {}) {
+    if (typeof window.showMessageModal !== 'function') {
+      console.warn('showMessageModal is unavailable. Blocking confirm action for safety.');
+      return false;
+    }
+    const selected = await window.showMessageModal({
+      title,
+      message,
+      icon,
+      buttons: [
+        { text: cancelText, class: cancelClass },
+        { text: confirmText, class: confirmClass }
+      ]
+    });
+    return selected === confirmText;
+  }
+
+  function showWaitingModal({
+    title = 'Please wait',
+    note = 'Processing your request...',
+    operation = ''
+  } = {}) {
+    if (typeof window.showLoading !== 'function') return null;
+    return window.showLoading({ title, note, operation });
+  }
+
+  function hideWaitingModal(token = null) {
+    if (typeof window.hideLoading !== 'function') return;
+    if (token) {
+      window.hideLoading(token);
+      return;
+    }
+    window.hideLoading();
   }
 
   document.querySelectorAll('.pte-recover-btn').forEach((button) => {
@@ -195,8 +238,14 @@ document.addEventListener('DOMContentLoaded', () => {
       button.disabled = true;
       const originalHtml = button.innerHTML;
       button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Recovering...';
+      let loadingToken = null;
 
       try {
+        loadingToken = showWaitingModal({
+          title: 'Recovering Applicant',
+          note: 'Please wait while we restore this applicant.',
+          operation: 'Recover applicant record'
+        });
         const url = recoverPathBase + '/' + encodeURIComponent(id)
           + '?actionStateId=' + encodeURIComponent(actionStateId);
         const response = await fetch(url, {
@@ -217,6 +266,8 @@ document.addEventListener('DOMContentLoaded', () => {
         await showMessage('Recover Failed', error.message || 'Unexpected recover error.', 'error');
         button.disabled = false;
         button.innerHTML = originalHtml;
+      } finally {
+        hideWaitingModal(loadingToken);
       }
     });
   });
@@ -227,28 +278,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const promoteUrlRaw = String(button.getAttribute('data-promote-url') || '').trim();
         if (!promoteUrlRaw) return;
 
-        let proceed = false;
-        if (typeof window.showMessageModal === 'function') {
-          const selected = await window.showMessageModal({
-            title: 'Promote Applicant',
-            icon: 'question',
-            message: 'Promote this user to regular PTE applicant?',
-            buttons: [
-              { text: 'Cancel', class: 'btn-secondary' },
-              { text: 'Promote', class: 'btn-primary' }
-            ]
-          });
-          proceed = selected === 'Promote';
-        } else {
-          proceed = window.confirm('Promote this user to regular PTE applicant?');
-        }
+        const proceed = await showConfirm({
+          title: 'Promote Applicant',
+          icon: 'question',
+          message: 'Promote this user to regular PTE applicant?',
+          confirmText: 'Promote',
+          confirmClass: 'btn-primary'
+        });
         if (!proceed) return;
 
         button.disabled = true;
         const originalHtml = button.innerHTML;
         button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Promoting...';
+        let loadingToken = null;
 
         try {
+          loadingToken = showWaitingModal({
+            title: 'Promoting Applicant',
+            note: 'Please wait while we promote this applicant.',
+            operation: 'Promote to regular applicant'
+          });
           const promoteUrl = promoteUrlRaw + '?actionStateId=' + encodeURIComponent(actionStateId);
           const response = await fetch(promoteUrl, {
             method: 'POST',
@@ -268,6 +317,8 @@ document.addEventListener('DOMContentLoaded', () => {
           await showMessage('Promote Failed', error.message || 'Unexpected promote error.', 'error');
           button.disabled = false;
           button.innerHTML = originalHtml;
+        } finally {
+          hideWaitingModal(loadingToken);
         }
       });
     });
