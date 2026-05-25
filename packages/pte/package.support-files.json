@@ -310,6 +310,12 @@
       "status": "root-active"
     },
     {
+      "source": "docs/pte-package-role-registry-step67.md",
+      "target": "packages/pte/docs/pte-package-role-registry-step67.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
       "source": "docs/pte-package-mongo-validate-step27.md",
       "target": "packages/pte/docs/pte-package-mongo-validate-step27.md",
       "category": "package-preparation",
@@ -638,6 +644,12 @@
     {
       "source": "test/pte-package-mongo-index-registration-step66.test.js",
       "target": "packages/pte/test/pte-package-mongo-index-registration-step66.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-role-registry-step67.test.js",
+      "target": "packages/pte/test/pte-package-role-registry-step67.test.js",
       "category": "package-preparation",
       "status": "root-active"
     },

@@ -2,19 +2,17 @@ const fs = require('fs');
 const path = require('path');
 const { resolveRepositoryBackendMode } = require('../../repositories/backend/repositoryBackendSelector');
 const { getMongoCollection } = require('../../infrastructure/mongo/mongoConnection');
+const packageManifestService = require('../packageManifestService');
 
+const PROJECT_ROOT = path.join(__dirname, '../../..');
 const ROLE_DATA_PATH = path.join(__dirname, '../../../data/roles.json');
+const PACKAGE_ROOT = path.join(PROJECT_ROOT, 'packages');
 const CACHE_TTL_MS = 2000;
 
 const LEGACY_SYSTEM_ROLE_KEYS = Object.freeze([
   'school_student',
   'school_teacher',
   'school_staff',
-  'pte_student',
-  'pte_student_public',
-  'pte_teacher',
-  'pte_instructor',
-  'pte_trainer',
   'credit_customer'
 ]);
 
@@ -31,26 +29,6 @@ const LEGACY_SYSTEM_ROLE_ALIAS = Object.freeze({
   'school-staff': 'school_staff',
   schoolstaffs: 'school_staff',
   'school-staffs': 'school_staff',
-  ptestudent: 'pte_student',
-  'pte-student': 'pte_student',
-  ptestudents: 'pte_student',
-  'pte-students': 'pte_student',
-  ptestudentpublic: 'pte_student_public',
-  'pte-student-public': 'pte_student_public',
-  ptestudentspublic: 'pte_student_public',
-  'pte-students-public': 'pte_student_public',
-  pteteacher: 'pte_teacher',
-  'pte-teacher': 'pte_teacher',
-  pteteachers: 'pte_teacher',
-  'pte-teachers': 'pte_teacher',
-  pteinstructor: 'pte_instructor',
-  'pte-instructor': 'pte_instructor',
-  pteinstructors: 'pte_instructor',
-  'pte-instructors': 'pte_instructor',
-  ptetrainer: 'pte_trainer',
-  'pte-trainer': 'pte_trainer',
-  ptetrainers: 'pte_trainer',
-  'pte-trainers': 'pte_trainer',
   creditcustomer: 'credit_customer',
   'credit-customer': 'credit_customer',
   creditcustomers: 'credit_customer',
@@ -118,24 +96,20 @@ function toTitleCase(value = '') {
     .join(' ');
 }
 
-function resolvePackageNameForKey(key = '') {
+function inferDomainPrefix(key = '') {
   const token = normalizeRoleToken(key);
-  if (token.startsWith('school_')) {
-    return 'SCHOOL';
-  }
-  if (token.startsWith('pte_')) return 'PTE';
-  if (token.startsWith('credit_')) return 'CREDIT';
-  return 'CORE';
+  if (!token.includes('_')) return 'core';
+  const [prefix] = token.split('_').filter(Boolean);
+  return prefix || 'core';
+}
+
+function resolvePackageNameForKey(key = '') {
+  const prefix = inferDomainPrefix(key);
+  return prefix === 'core' ? 'CORE' : prefix.toUpperCase();
 }
 
 function resolveDomainForKey(key = '') {
-  const token = normalizeRoleToken(key);
-  if (token.startsWith('school_')) {
-    return 'school';
-  }
-  if (token.startsWith('pte_')) return 'pte';
-  if (token.startsWith('credit_')) return 'credit';
-  return 'core';
+  return inferDomainPrefix(key);
 }
 
 function createBuiltInRoleRow(key, overrides = {}) {
@@ -151,6 +125,44 @@ function createBuiltInRoleRow(key, overrides = {}) {
     system: false,
     ...overrides
   };
+}
+
+function readPackageManifestRowsSync(packageRoot = PACKAGE_ROOT) {
+  try {
+    return fs.readdirSync(packageRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(packageRoot, entry.name, 'package.manifest.json'))
+      .filter((manifestPath) => fs.existsSync(manifestPath))
+      .map((manifestPath) => {
+        try {
+          const raw = fs.readFileSync(manifestPath, 'utf8');
+          const parsed = JSON.parse(String(raw || '').replace(/^\uFEFF/, ''));
+          return packageManifestService.validatePackageManifest(parsed, {
+            allowUnknownKeys: true
+          });
+        } catch (_) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+function buildPackageRoleSeedRows(options = {}) {
+  const packageRoot = options.packageRoot || PACKAGE_ROOT;
+  return readPackageManifestRowsSync(packageRoot)
+    .flatMap((manifest) => (
+      Array.isArray(manifest.roles)
+        ? manifest.roles.map((role) => ({
+          ...(role || {}),
+          domain: role?.domain || manifest.id,
+          packageName: role?.packageName || manifest.name || manifest.id.toUpperCase(),
+          system: role?.system === true
+        }))
+        : []
+    ));
 }
 
 function buildBuiltInRoleSeedRows() {
@@ -175,6 +187,13 @@ function buildBuiltInRoleSeedRows() {
     const row = byKey.get(canonical);
     if (!row) return;
     row.aliases = dedupe([...(row.aliases || []), alias]);
+  });
+
+  buildPackageRoleSeedRows().forEach((row) => {
+    const normalized = normalizeRoleRow(row);
+    if (!normalized || byKey.has(normalized.key)) return;
+    rows.push(normalized);
+    byKey.set(normalized.key, normalized);
   });
 
   return rows;
@@ -379,6 +398,7 @@ module.exports = {
   isDeprecatedRoleToken,
   isDeprecatedGenericSchoolRoleKey,
   isDeprecatedGenericSchoolRoleToken,
+  buildPackageRoleSeedRows,
   buildBuiltInRoleSeedRows,
   buildRoleRegistry,
   getRoleRegistrySnapshot,
