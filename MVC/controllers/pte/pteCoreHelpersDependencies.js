@@ -1,17 +1,1 @@
-const {
-  paginate,
-  buildDataServiceQuery,
-  inferSearchableFields,
-  isAjax,
-  adminChekersService,
-  toPublicId
-} = require('./pteCoreHelpersCoreDependencies');
-
-module.exports = {
-  paginate,
-  buildDataServiceQuery,
-  inferSearchableFields,
-  isAjax,
-  adminChekersService,
-  toPublicId
-};
+module.exports = require('../../../packages/pte/MVC/controllers/pte/pteCoreHelpersDependencies');
