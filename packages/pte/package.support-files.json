@@ -304,6 +304,12 @@
       "status": "root-active"
     },
     {
+      "source": "docs/pte-package-mongo-index-registration-step66.md",
+      "target": "packages/pte/docs/pte-package-mongo-index-registration-step66.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
       "source": "docs/pte-package-mongo-validate-step27.md",
       "target": "packages/pte/docs/pte-package-mongo-validate-step27.md",
       "category": "package-preparation",
@@ -626,6 +632,12 @@
     {
       "source": "test/pte-package-model-repository-shims-step20.test.js",
       "target": "packages/pte/test/pte-package-model-repository-shims-step20.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-mongo-index-registration-step66.test.js",
+      "target": "packages/pte/test/pte-package-mongo-index-registration-step66.test.js",
       "category": "package-preparation",
       "status": "root-active"
     },

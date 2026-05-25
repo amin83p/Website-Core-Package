@@ -21,6 +21,8 @@ test('valid fixture manifest passes and normalizes required fields', () => {
   assert.equal(Array.isArray(out.routes), true);
   assert.equal(Array.isArray(out.queryExecutors), true);
   assert.equal(Array.isArray(out.roles), true);
+  assert.equal(Array.isArray(out.mongoIndexes), true);
+  assert.equal(out.mongoIndexes[0].path, 'MVC/infrastructure/mongo/exampleMongoIndexes.js');
 });
 
 test('missing required fields are rejected', () => {

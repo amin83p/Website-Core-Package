@@ -8,6 +8,7 @@ const DECLARATION_ARRAY_KEYS = Object.freeze([
   'accesses',
   'uploadFolders',
   'quotaDefinitions',
+  'mongoIndexes',
   'settings',
   'menuEntries',
   'dashboardEntries',

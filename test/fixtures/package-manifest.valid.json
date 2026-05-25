@@ -28,6 +28,12 @@
     }
   ],
   "quotaDefinitions": [],
+  "mongoIndexes": [
+    {
+      "path": "MVC/infrastructure/mongo/exampleMongoIndexes.js",
+      "active": true
+    }
+  ],
   "settings": [],
   "menuEntries": [],
   "dashboardEntries": [],

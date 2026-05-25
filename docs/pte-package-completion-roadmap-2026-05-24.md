@@ -36,6 +36,7 @@ This roadmap lists remaining passes to take `Website-Core-Package` from PTE logi
   - query executor bootstrap direct PTE hook points.
 - Keep behavior unchanged by asserting regression tests around `/pte` pages, uploads, symbols/accesses visibility.
 - Completed slice: PTE upload middleware categories now register through a package-owned upload category registration module instead of `coreFilesService` importing PTE upload path utilities directly.
+- Completed slice: PTE Mongo index definitions now live in `packages/pte` and are merged into the core Mongo index startup pipeline through package manifest discovery.
 
 ### Pass 4 - Package-local physical layout finalization
 - Move remaining PTE-owned non-core assets/scripts/files from root/MVC locations into `packages/pte`:

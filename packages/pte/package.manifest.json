@@ -2266,6 +2266,12 @@
     }
   ],
   "quotaDefinitions": [],
+  "mongoIndexes": [
+    {
+      "path": "MVC/infrastructure/mongo/pteMongoIndexDefinitions.js",
+      "active": true
+    }
+  ],
   "settings": [],
   "menuEntries": [
     {
