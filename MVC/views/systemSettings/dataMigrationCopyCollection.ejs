@@ -1,0 +1,236 @@
+<%
+  const backend = runtimeBackend || {};
+  const mongo = backend.mongo || {};
+  const mongoReady = Boolean(mongo.ready);
+  const sourceDb = String(sourceDbName || '');
+  const collectionRows = Array.isArray(collections) ? collections : [];
+  const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
+%>
+
+<div class="sections-page migration-redesign-page">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h1 class="page-heading size-md text-start m-0">Copy Single Collection</h1>
+      <p class="text-muted mb-0 mt-1">Overwrite one destination Mongo collection from the current source Mongo.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">ADMIN VERIFIED</span>
+      <a href="/systemSettings/data-migration" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Data Migration
+      </a>
+    </div>
+  </div>
+
+  <% if (!mongoReady) { %>
+    <div class="alert alert-danger py-2 px-3 mb-3">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      Mongo URI is not configured. Set <code>MONGODB_URI</code> in deployment variables, then restart the app.
+    </div>
+  <% } %>
+
+  <% if (loadWarning) { %>
+    <div class="alert alert-warning py-2 px-3 mb-3">
+      <i class="bi bi-info-circle me-2"></i><%= loadWarning %>
+    </div>
+  <% } %>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-3">
+      <div class="row g-3 mb-3">
+        <div class="col-lg-4 col-md-6">
+          <label class="form-label small fw-bold">Source Database</label>
+          <input type="text" class="form-control" value="<%= sourceDb || 'Unknown' %>" readonly>
+        </div>
+        <div class="col-lg-8 col-md-6">
+          <label class="form-label small fw-bold">Source Collection</label>
+          <select id="sourceCollectionSelect" class="form-select" <%= mongoReady && collectionRows.length ? '' : 'disabled' %>>
+            <option value="">Select one collection</option>
+            <% collectionRows.forEach((name) => { %>
+              <option value="<%= name %>"><%= name %></option>
+            <% }) %>
+          </select>
+          <% if (!collectionRows.length) { %>
+            <div class="small text-muted mt-1">No eligible source collections were detected.</div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-bold">Destination Mongo URI</label>
+        <input
+          id="destinationUriInput"
+          type="password"
+          class="form-control"
+          placeholder="mongodb+srv://user:pass@cluster.mongodb.net/targetDb"
+          autocomplete="off"
+          <%= mongoReady ? '' : 'disabled' %>
+        >
+        <div class="small text-muted mt-1">
+          If database name is missing from URI, source database name will be used.
+        </div>
+      </div>
+
+      <div class="alert alert-danger py-2 px-3 small mb-3">
+        <i class="bi bi-exclamation-octagon me-2"></i>
+        This operation will delete all existing documents in the destination collection before copying.
+      </div>
+
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          id="overwriteCollectionBtn"
+          class="btn btn-danger btn-filled"
+          <%= mongoReady && collectionRows.length ? '' : 'disabled' %>
+        >
+          <i class="bi bi-arrow-repeat me-1"></i>Overwrite Destination Collection
+        </button>
+        <a href="/systemSettings/data-migration" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mt-3">
+    <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between">
+      <span>Copy Output</span>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="clearCopyOutputBtn">Clear</button>
+    </div>
+    <div class="card-body">
+      <pre id="copyOutput" class="small bg-dark text-success p-3 rounded mb-0" style="max-height: 320px; overflow:auto;">Ready.</pre>
+    </div>
+  </div>
+
+  <input type="hidden" id="copyActionStateId" value="<%= actionStateValue %>">
+</div>
+
+<script>
+(() => {
+  const collectionEl = document.getElementById('sourceCollectionSelect');
+  const destinationUriEl = document.getElementById('destinationUriInput');
+  const runBtn = document.getElementById('overwriteCollectionBtn');
+  const outputEl = document.getElementById('copyOutput');
+  const actionStateId = document.getElementById('copyActionStateId')?.value || '';
+
+  function setOutput(title, payload) {
+    const stamp = new Date().toISOString();
+    outputEl.textContent = `[${stamp}] ${title}\n${JSON.stringify(payload || {}, null, 2)}`;
+  }
+
+  async function ensureAdminVerification() {
+    if (typeof window.requestProtectedAction !== 'function') {
+      throw new Error('Admin verification system is not loaded. Please refresh the page and try again.');
+    }
+    await window.requestProtectedAction();
+  }
+
+  async function confirmOverwrite() {
+    const message = 'This will <b>delete all destination documents</b> and copy the source collection.';
+    if (typeof showMessageModal === 'function') {
+      const selected = await showMessageModal({
+        title: 'Confirm Collection Overwrite',
+        icon: 'warning',
+        message,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Overwrite', class: 'btn-danger btn-md' }
+        ]
+      });
+      return selected === 'Overwrite';
+    }
+    return window.confirm('Overwrite destination collection?');
+  }
+
+  function readSafeJson(response) {
+    return response.json().catch(() => ({}));
+  }
+
+  async function runOverwrite() {
+    const collection = String(collectionEl?.value || '').trim();
+    const destinationUri = String(destinationUriEl?.value || '').trim();
+    if (!collection) {
+      throw new Error('Please select a source collection.');
+    }
+    if (!destinationUri) {
+      throw new Error('Please enter a destination Mongo URI.');
+    }
+
+    const confirmed = await confirmOverwrite();
+    if (!confirmed) return null;
+
+    await ensureAdminVerification();
+
+    const response = await fetch('/systemSettings/data-migration/copy-collection/overwrite', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: new URLSearchParams({
+        collection,
+        destinationUri,
+        actionStateId
+      }).toString()
+    });
+
+    const result = await readSafeJson(response);
+    if (response.status === 403 && result?.status === 'admin_required') {
+      if (typeof window.resetAdminVerificationCache === 'function') {
+        window.resetAdminVerificationCache();
+      }
+      const error = new Error(result.message || 'Admin approval required or session expired.');
+      error.code = 'ADMIN_VERIFICATION_REQUIRED';
+      throw error;
+    }
+    if (!response.ok || result?.status === 'error') {
+      throw new Error(result?.message || 'Collection overwrite failed.');
+    }
+    return result;
+  }
+
+  async function onOverwriteClick() {
+    if (!runBtn) return;
+    const originalText = runBtn.innerHTML;
+    runBtn.disabled = true;
+    runBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running...';
+    try {
+      const result = await runOverwrite();
+      if (!result) {
+        setOutput('Cancelled', { status: 'cancelled' });
+        return;
+      }
+      setOutput('Overwrite Completed', result.report || result);
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Completed',
+          icon: 'success',
+          message: 'Collection copy completed successfully.',
+          buttons: [{ text: 'OK', class: 'btn-primary btn-md' }]
+        });
+      }
+    } catch (error) {
+      setOutput('Overwrite Failed', { status: 'error', message: error.message || 'Unknown error' });
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Copy Failed',
+          icon: 'error',
+          message: error.message || 'Collection copy failed.',
+          buttons: [{ text: 'OK', class: 'btn-secondary btn-md' }]
+        });
+      }
+    } finally {
+      runBtn.disabled = false;
+      runBtn.innerHTML = originalText;
+    }
+  }
+
+  document.getElementById('clearCopyOutputBtn')?.addEventListener('click', () => {
+    outputEl.textContent = 'Ready.';
+  });
+  runBtn?.addEventListener('click', () => {
+    onOverwriteClick().catch((error) => {
+      setOutput('Overwrite Failed', { status: 'error', message: error.message || 'Unknown error' });
+    });
+  });
+})();
+</script>

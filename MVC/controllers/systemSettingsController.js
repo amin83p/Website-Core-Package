@@ -939,6 +939,76 @@ exports.showDataMigrationPage = async (req, res) => {
   }
 };
 
+exports.showDataMigrationCopyCollectionPage = async (req, res) => {
+  try {
+    const settings = await systemSettingsRepository.getSettings();
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    let sourceDbName = '';
+    let collections = [];
+    let loadWarning = '';
+
+    try {
+      const snapshot = await jsonToMongoMigrationService.listCopyEligibleCollections();
+      sourceDbName = snapshot.sourceDbName;
+      collections = snapshot.collections;
+    } catch (error) {
+      loadWarning = error.message || 'Unable to load source collections.';
+    }
+
+    return res.render('systemSettings/dataMigrationCopyCollection', {
+      title: 'Copy Single Collection',
+      settings,
+      runtimeBackend,
+      sourceDbName,
+      collections,
+      loadWarning,
+      includeModal: true,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+exports.overwriteDataMigrationCollection = async (req, res) => {
+  const collectionName = cleanFormText(req.body?.collection, 180);
+  const destinationUri = cleanFormText(req.body?.destinationUri, 4000);
+  if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'destinationUri')) {
+    req.body.destinationUri = destinationUri ? '[REDACTED]' : '';
+  }
+
+  try {
+    if (!checkAdminVerificationCode(req)) {
+      return res.status(403).json({
+        status: 'admin_required',
+        message: 'Admin approval required or session expired.'
+      });
+    }
+    if (!collectionName) throw new Error('Collection is required.');
+    if (!destinationUri) throw new Error('Destination Mongo URI is required.');
+
+    const report = await jsonToMongoMigrationService.overwriteCollectionToDestination({
+      collectionName,
+      destinationUri,
+      userId: req.user?.id || ''
+    });
+
+    return res.json({
+      status: 'success',
+      message: `Collection "${collectionName}" was copied successfully to destination Mongo.`,
+      report
+    });
+  } catch (error) {
+    const code = String(error?.code || '').trim().toUpperCase();
+    const statusCode = code === 'ADMIN_REQUIRED' ? 403 : 400;
+    return res.status(statusCode).json({
+      status: statusCode === 403 ? 'admin_required' : 'error',
+      message: error.message || 'Collection copy failed.'
+    });
+  }
+};
+
 exports.listDataMigrationItems = async (req, res) => {
   try {
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();

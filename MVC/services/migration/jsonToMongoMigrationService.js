@@ -11,6 +11,7 @@ const WEBSITE_POLICY_SINGLETON_ID = 'website-policy';
 const SOURCE_COUNT_CACHE = new Map();
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
+let mongoDriver = null;
 
 const GENERATED_FILE_PATTERNS = [
   /\.report\.json$/i,
@@ -41,6 +42,104 @@ function normalizeToken(value) {
 
 function toRelativeDataPath(filePath = '') {
   return path.relative(DATA_ROOT, filePath).replace(/\\/g, '/');
+}
+
+function loadMongoDriver() {
+  if (mongoDriver) return mongoDriver;
+  try {
+    // Lazy-load so JSON mode does not require mongodb package at runtime.
+    // eslint-disable-next-line global-require, import/no-extraneous-dependencies
+    mongoDriver = require('mongodb');
+    return mongoDriver;
+  } catch (error) {
+    const help = 'Install package "mongodb" and ensure dependencies are up to date.';
+    throw new Error(`MongoDB driver is not available. ${help} Original: ${error.message}`);
+  }
+}
+
+function inferDbNameFromUri(uri = '') {
+  const safeUri = toPublicString(uri);
+  if (!safeUri) return '';
+  try {
+    const normalized = safeUri.startsWith('mongodb://') || safeUri.startsWith('mongodb+srv://')
+      ? safeUri
+      : `mongodb://${safeUri}`;
+    const parsed = new URL(normalized);
+    const pathname = toPublicString(parsed.pathname).replace(/^\/+/, '');
+    if (!pathname) return '';
+    if (pathname.includes('/')) return pathname.split('/')[0];
+    return pathname;
+  } catch (_) {
+    return '';
+  }
+}
+
+function normalizeMongoSearchParams(searchParams = new URLSearchParams()) {
+  const rows = [];
+  for (const [key, value] of searchParams.entries()) {
+    rows.push([String(key || '').toLowerCase(), String(value || '')]);
+  }
+  return rows
+    .sort((left, right) => {
+      if (left[0] === right[0]) return left[1].localeCompare(right[1]);
+      return left[0].localeCompare(right[0]);
+    })
+    .map(([key, value]) => `${key}=${value}`)
+    .join('&');
+}
+
+function parseMongoUriIdentity(uri = '') {
+  const safeUri = toPublicString(uri);
+  if (!safeUri) return null;
+  try {
+    const normalized = safeUri.startsWith('mongodb://') || safeUri.startsWith('mongodb+srv://')
+      ? safeUri
+      : `mongodb://${safeUri}`;
+    const parsed = new URL(normalized);
+    return {
+      protocol: String(parsed.protocol || '').toLowerCase(),
+      username: decodeURIComponent(String(parsed.username || '')),
+      password: decodeURIComponent(String(parsed.password || '')),
+      hosts: String(parsed.host || '')
+        .split(',')
+        .map((part) => String(part || '').trim().toLowerCase())
+        .filter(Boolean)
+        .sort()
+        .join(','),
+      search: normalizeMongoSearchParams(parsed.searchParams)
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function mongoUrisLikelySameDeployment(sourceUri = '', destinationUri = '') {
+  const sourceRaw = toPublicString(sourceUri).toLowerCase();
+  const destinationRaw = toPublicString(destinationUri).toLowerCase();
+  if (!sourceRaw || !destinationRaw) return false;
+  if (sourceRaw === destinationRaw) return true;
+
+  const left = parseMongoUriIdentity(sourceUri);
+  const right = parseMongoUriIdentity(destinationUri);
+  if (!left || !right) return false;
+
+  return left.protocol === right.protocol
+    && left.username === right.username
+    && left.password === right.password
+    && left.hosts === right.hosts
+    && left.search === right.search;
+}
+
+function assertCopyCollectionName(value = '') {
+  const name = toPublicString(value);
+  if (!name) throw new Error('Collection is required.');
+  if (!/^[A-Za-z0-9_.-]+$/.test(name)) {
+    throw new Error('Collection name contains invalid characters.');
+  }
+  if (name.startsWith('system.')) {
+    throw new Error('System collections are not allowed in this tool.');
+  }
+  return name;
 }
 
 async function runWithConcurrency(items = [], limit = 4, worker = async () => null) {
@@ -859,6 +958,118 @@ async function listMigrationItems(options = {}) {
   };
 }
 
+async function listCopyEligibleCollections() {
+  await ensureMongoReady();
+  const sourceDb = getMongoDbOrNull();
+  if (!sourceDb) throw new Error('MongoDB is not connected.');
+
+  const rows = await sourceDb.listCollections({}, { nameOnly: true }).toArray();
+  const collections = (Array.isArray(rows) ? rows : [])
+    .map((row) => toPublicString(row?.name || ''))
+    .filter((name) => name && !name.startsWith('system.') && /^[A-Za-z0-9_.-]+$/.test(name))
+    .sort((left, right) => left.localeCompare(right));
+
+  return {
+    sourceDbName: toPublicString(sourceDb.databaseName),
+    collections
+  };
+}
+
+async function overwriteCollectionToDestination(options = {}) {
+  const startedAt = Date.now();
+  const collectionName = assertCopyCollectionName(options.collectionName || options.collection);
+  const destinationUri = toPublicString(options.destinationUri);
+  if (!destinationUri) throw new Error('Destination Mongo URI is required.');
+
+  const runtimeBackend = await ensureMongoReady();
+  const sourceDb = getMongoDbOrNull();
+  if (!sourceDb) throw new Error('MongoDB is not connected.');
+
+  const sourceDbName = toPublicString(sourceDb.databaseName);
+  const destinationDbName = inferDbNameFromUri(destinationUri) || sourceDbName;
+  const sourceUri = toPublicString(
+    runtimeBackend?.mongo?.uri || process.env.MONGODB_URI || process.env.MONGO_URI || ''
+  );
+
+  if (mongoUrisLikelySameDeployment(sourceUri, destinationUri) && destinationDbName === sourceDbName) {
+    throw new Error('Source and destination cannot be the same database target for this overwrite operation.');
+  }
+
+  const sourceCollectionExists = await sourceDb
+    .listCollections({ name: collectionName }, { nameOnly: true })
+    .hasNext();
+  if (!sourceCollectionExists) {
+    throw new Error(`Source collection "${collectionName}" was not found.`);
+  }
+
+  const sourceCollection = sourceDb.collection(collectionName);
+  const sourceCount = await sourceCollection.countDocuments({});
+  const { MongoClient } = loadMongoDriver();
+  const destinationClient = new MongoClient(destinationUri, {
+    maxPoolSize: Number(process.env.MONGO_MAX_POOL || 20),
+    minPoolSize: Number(process.env.MONGO_MIN_POOL || 0),
+    serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 5000)
+  });
+
+  let destinationBeforeCount = 0;
+  let deletedCount = 0;
+  let insertedCount = 0;
+  let destinationAfterCount = 0;
+  const warnings = [];
+
+  try {
+    await destinationClient.connect();
+    const destinationDb = destinationClient.db(destinationDbName);
+    const destinationCollection = destinationDb.collection(collectionName);
+
+    destinationBeforeCount = await destinationCollection.countDocuments({});
+    if (destinationBeforeCount > 0) {
+      const deleteResult = await destinationCollection.deleteMany({});
+      deletedCount = Number(deleteResult?.deletedCount || 0);
+    }
+
+    const cursor = sourceCollection.find({});
+    let batch = [];
+    // eslint-disable-next-line no-restricted-syntax
+    for await (const row of cursor) {
+      batch.push(row);
+      if (batch.length < 500) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const insertResult = await destinationCollection.insertMany(batch, { ordered: true });
+      insertedCount += Number(insertResult?.insertedCount || Object.keys(insertResult?.insertedIds || {}).length || 0);
+      batch = [];
+    }
+
+    if (batch.length > 0) {
+      const insertResult = await destinationCollection.insertMany(batch, { ordered: true });
+      insertedCount += Number(insertResult?.insertedCount || Object.keys(insertResult?.insertedIds || {}).length || 0);
+    }
+
+    destinationAfterCount = await destinationCollection.countDocuments({});
+
+    if (insertedCount !== sourceCount) {
+      warnings.push(`Inserted count (${insertedCount}) does not match source count (${sourceCount}).`);
+    }
+  } catch (error) {
+    throw new Error(`Destination overwrite failed: ${error.message}`);
+  } finally {
+    await destinationClient.close().catch(() => null);
+  }
+
+  return {
+    collection: collectionName,
+    sourceDbName,
+    destinationDbName,
+    sourceCount,
+    destinationBeforeCount,
+    deletedCount,
+    insertedCount,
+    destinationAfterCount,
+    durationMs: Math.max(0, Date.now() - startedAt),
+    warnings
+  };
+}
+
 async function getMigrationCounts(keys = [], options = {}) {
   const includeTargetCounts = options?.includeTargetCounts !== false;
   const catalog = buildCatalog();
@@ -1454,6 +1665,8 @@ module.exports = {
   ensureMongoReady,
   buildDashboardRows,
   listMigrationItems,
+  listCopyEligibleCollections,
+  overwriteCollectionToDestination,
   getMigrationCounts,
   dryRunMigrationItem,
   transferMigrationItem,

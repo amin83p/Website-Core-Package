@@ -8,6 +8,7 @@ const upload = require('../middleware/upload');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { requireAccess } = require('../middleware/accessMiddleware');
 const { trackActionState } = require('../middleware/actionStateMiddleware');
+const adminApproval = require('../middleware/adminApproval');
 const accessService = require('../services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
@@ -206,6 +207,21 @@ router.get('/data-migration',
           requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
           trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
           ctrl.showDataMigrationPage);
+router.get('/data-migration/copy-collection',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE, { keepActive: true }),
+          ctrl.showDataMigrationCopyCollectionPage);
+router.post('/data-migration/copy-collection/overwrite',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_SETTINGS,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true }
+          ),
+          adminApproval,
+          ctrl.overwriteDataMigrationCollection);
 router.get('/data-migration/items',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
