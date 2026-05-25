@@ -86,6 +86,51 @@ test('PTE enable script apply creates an enabled registry row and is idempotent'
   });
 });
 
+test('PTE enable script apply supports disable and remove lifecycle actions', async () => {
+  await withTempRegistry(async ({ registryPath }) => {
+    const env = {
+      ...process.env,
+      PACKAGE_REGISTRY_DATA_PATH: registryPath
+    };
+
+    const enableRun = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--json'], {
+      cwd: ROOT_DIR,
+      env,
+      encoding: 'utf8'
+    });
+    assert.equal(enableRun.status, 0, enableRun.stderr);
+
+    const disableRun = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--disable', '--json'], {
+      cwd: ROOT_DIR,
+      env,
+      encoding: 'utf8'
+    });
+    assert.equal(disableRun.status, 0, disableRun.stderr);
+    const disableReport = JSON.parse(disableRun.stdout);
+    assert.equal(disableReport.action, 'disable');
+    assert.equal(disableReport.packageAction, 'disable');
+    assert.equal(disableReport.result.packageId, 'pte');
+    assert.equal(disableReport.result.enabled, false);
+    assert.equal(disableReport.result.installStatus, 'disabled');
+    assert.equal(disableReport.declarationSummary.packageId, 'pte');
+
+    const removeRun = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--remove', '--json'], {
+      cwd: ROOT_DIR,
+      env,
+      encoding: 'utf8'
+    });
+    assert.equal(removeRun.status, 0, removeRun.stderr);
+    const removeReport = JSON.parse(removeRun.stdout);
+    assert.equal(removeReport.action, 'remove');
+    assert.equal(removeReport.packageAction, 'remove');
+    assert.equal(removeReport.result, true);
+    assert.equal(removeReport.declarationSummary.packageId, 'pte');
+
+    const rows = JSON.parse(await fs.readFile(registryPath, 'utf8'));
+    assert.equal(rows.length, 0);
+  });
+});
+
 test('enabled PTE package loads from registry and mounts /pte runtime route', async () => {
   await withTempRegistry(async () => {
     packageRouteService.resetMountedRoutes();

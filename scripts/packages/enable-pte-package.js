@@ -104,7 +104,7 @@ function buildRegistryPayload(manifest = {}, action = 'enable') {
   return {
     packageId: manifest.id,
     version: manifest.version,
-    enabled: action !== 'remove',
+    enabled: action === 'enable',
     installStatus: action === 'remove' ? 'removed' : action === 'disable' ? 'disabled' : 'enabled',
     metadata: {
       packageName: manifest.name,
