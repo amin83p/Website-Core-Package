@@ -1,1 +1,1 @@
-module.exports = require('../../../packages/pte/MVC/services/pte/pteSmartPracticeService.js')
+module.exports = require('../../../packages/pte/MVC/services/pte/pteSmartPracticeService.js');
