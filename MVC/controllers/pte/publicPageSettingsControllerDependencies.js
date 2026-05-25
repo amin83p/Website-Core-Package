@@ -1,7 +1,1 @@
-const ptePublicPageSettingsDataService = require('../../services/pte/ptePublicPageSettingsDataService');
-const { isAjax } = require('./coreHelpers');
-
-module.exports = {
-  ptePublicPageSettingsDataService,
-  isAjax
-};
+module.exports = require('../../../packages/pte/MVC/controllers/publicPageSettingsControllerDependencies');

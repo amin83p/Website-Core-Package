@@ -1,9 +1,1 @@
-const { SECTIONS } = require('../../../packages/pte/config/accessConstants');
-const ptePublicPackageDataService = require('../../services/pte/ptePublicPackageDataService');
-const ptePublicPageSettingsDataService = require('../../services/pte/ptePublicPageSettingsDataService');
-
-module.exports = {
-  SECTIONS,
-  ptePublicPackageDataService,
-  ptePublicPageSettingsDataService
-};
+module.exports = require('../../../packages/pte/MVC/controllers/infoControllerDependencies');
