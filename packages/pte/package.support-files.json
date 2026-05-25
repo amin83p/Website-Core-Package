@@ -13,7 +13,8 @@
     "Do not run copied tests from package-local paths until their imports are adjusted.",
     "Support file root paths remain active during this transition.",
     "Docs and tests now have package-local mirrors for Pass 4 physical layout finalization.",
-    "Package-local copied tests are inventory mirrors only until their imports are adjusted for package-local execution."
+    "Package-local copied tests are inventory mirrors only until their imports are adjusted for package-local execution.",
+    "Root top-level PTE controllers now delegate to package-owned controller implementations during Pass 4."
   ],
   "scripts": [
     {
@@ -563,6 +564,13 @@
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/pte-package-root-controller-shims-step70.md",
+      "target": "packages/pte/docs/pte-package-root-controller-shims-step70.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     }
   ],
   "tests": [
@@ -1080,6 +1088,13 @@
     {
       "source": "test/pte-package-support-file-mirroring-step69.test.js",
       "target": "packages/pte/test/pte-package-support-file-mirroring-step69.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/pte-package-controller-root-shims-step70.test.js",
+      "target": "packages/pte/test/pte-package-controller-root-shims-step70.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"

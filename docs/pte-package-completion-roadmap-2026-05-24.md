@@ -46,6 +46,8 @@ This roadmap lists remaining passes to take `Website-Core-Package` from PTE logi
   - any middleware/utils/repository/model/service/controller/view file groups still effectively root-owned.
 - Keep `/uploads` and URL contracts unchanged.
 - Update package manifests / import paths for moved files.
+- Completed slice: PTE docs and tests now have package-local mirrors under `packages/pte/docs` and `packages/pte/test`, while root paths remain active compatibility locations.
+- Completed slice: root top-level PTE controllers now delegate to package-owned controller implementations, leaving only dependency/core adapter files as intentional bridge points.
 
 ### Pass 5 - Package install lifecycle completeness
 - Extend install/uninstall behavior to support clean disable/remove for PTE-specific declarations (roles/sections/symbols/accesses/uploads if introduced dynamically).
