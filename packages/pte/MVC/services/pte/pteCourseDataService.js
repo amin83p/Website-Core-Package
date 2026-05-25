@@ -305,16 +305,9 @@ function resolveUserDisplayName(user = {}) {
   return cleanString(user?.displayName || user?.username || user?.email, { max: 220, allowEmpty: true }) || '';
 }
 
-function hasPteStudentRole(applicantRow = {}, personRow = {}, userRow = null) {
-  const orgId = toPublicId(applicantRow?.orgId || '');
+function hasStrictPteStudentApplicantToken(applicantRow = {}) {
   const applicantRole = normalizeRoleToken(applicantRow?.personRoleToken || '');
-  if (PTE_STUDENT_ROLE_TOKENS.has(applicantRole)) return true;
-
-  const personRoles = getOrgScopedRoleTokens(personRow, orgId);
-  if (hasAnyRoleToken(personRoles, PTE_STUDENT_ROLE_TOKENS)) return true;
-
-  const userRoles = getOrgScopedRoleTokens(userRow || {}, orgId);
-  return hasAnyRoleToken(userRoles, PTE_STUDENT_ROLE_TOKENS);
+  return PTE_STUDENT_ROLE_TOKENS.has(applicantRole);
 }
 
 function hasPteTeacherRole(userRow = {}, targetOrgId = '') {
@@ -912,7 +905,7 @@ const pteCourseDataService = {
           const pickerId = userId || personId || toPublicId(row?.id || '');
           const personName = buildPersonDisplayName(person);
           const userName = resolveUserDisplayName(user);
-          const displayName = userName || personName || cleanString(row?.teacherId, { max: 120, allowEmpty: true }) || pickerId;
+          const displayName = personName || userName || cleanString(row?.teacherId, { max: 120, allowEmpty: true }) || pickerId;
           return {
             id: pickerId,
             type: 'user',
@@ -988,7 +981,7 @@ const pteCourseDataService = {
         const pickerId = userId || personId || toPublicId(row?.id || '');
         const personName = buildPersonDisplayName(person);
         const userName = resolveUserDisplayName(user);
-        const displayName = userName || personName || cleanString(row?.teacherId, { max: 120, allowEmpty: true }) || pickerId;
+        const displayName = personName || userName || cleanString(row?.teacherId, { max: 120, allowEmpty: true }) || pickerId;
         return {
           id: pickerId,
           type: 'user',
@@ -1063,7 +1056,8 @@ const pteCourseDataService = {
       ]);
 
       const applicants = (Array.isArray(rows) ? rows : [])
-        .filter((row) => isVisibleApplicantRow(row, visibility));
+        .filter((row) => isVisibleApplicantRow(row, visibility))
+        .filter((row) => hasStrictPteStudentApplicantToken(row));
 
       const personIds = Array.from(new Set(
         applicants.map((row) => toPublicId(row?.personId || '')).filter(Boolean)
@@ -1093,11 +1087,6 @@ const pteCourseDataService = {
       const personMap = new Map((Array.isArray(personRows) ? personRows : []).map((row) => [toPublicId(row?.id || ''), row]));
       const userMap = new Map((Array.isArray(userRows) ? userRows : []).map((row) => [toPublicId(row?.id || ''), row]));
       const mappedRows = applicants
-        .filter((row) => {
-          const person = personMap.get(toPublicId(row?.personId || '')) || {};
-          const user = userMap.get(toPublicId(row?.userId || '')) || null;
-          return hasPteStudentRole(row, person, user);
-        })
         .map((row) => {
           const id = toPublicId(row?.id || '');
           const person = personMap.get(toPublicId(row?.personId || '')) || {};
@@ -1136,7 +1125,8 @@ const pteCourseDataService = {
         const status = cleanString(row?.status, { max: 40, allowEmpty: true }).toLowerCase() || 'active';
         if (statusFilter) return status === statusFilter;
         return status !== 'archived';
-      });
+      })
+      .filter((row) => hasStrictPteStudentApplicantToken(row));
 
     const personIds = Array.from(new Set(
       applicants.map((row) => toPublicId(row?.personId || '')).filter(Boolean)
@@ -1168,27 +1158,22 @@ const pteCourseDataService = {
     const userMap = new Map((Array.isArray(userRows) ? userRows : []).map((row) => [toPublicId(row?.id || ''), row]));
 
     const mapped = applicants
-      .filter((row) => {
-        const person = personMap.get(toPublicId(row?.personId || '')) || {};
-        const user = userMap.get(toPublicId(row?.userId || '')) || null;
-        return hasPteStudentRole(row, person, user);
-      })
       .map((row) => {
-      const id = toPublicId(row?.id || '');
-      const person = personMap.get(toPublicId(row?.personId || '')) || {};
-      const user = userMap.get(toPublicId(row?.userId || '')) || {};
-      const personName = buildPersonDisplayName(person);
-      const label = personName || cleanString(row?.applicantId, { max: 120, allowEmpty: true }) || id;
-      return {
-        id,
-        type: 'applicant',
-        name: label,
-        displayName: label,
-        email: cleanString(user?.email, { max: 220, allowEmpty: true }) || resolvePersonEmail(person),
-        applicantId: cleanString(row?.applicantId, { max: 120, allowEmpty: true }) || '',
-        orgId: toPublicId(row?.orgId || '')
-      };
-    }).filter((row) => row.id);
+        const id = toPublicId(row?.id || '');
+        const person = personMap.get(toPublicId(row?.personId || '')) || {};
+        const user = userMap.get(toPublicId(row?.userId || '')) || {};
+        const personName = buildPersonDisplayName(person);
+        const label = personName || cleanString(row?.applicantId, { max: 120, allowEmpty: true }) || id;
+        return {
+          id,
+          type: 'applicant',
+          name: label,
+          displayName: label,
+          email: cleanString(user?.email, { max: 220, allowEmpty: true }) || resolvePersonEmail(person),
+          applicantId: cleanString(row?.applicantId, { max: 120, allowEmpty: true }) || '',
+          orgId: toPublicId(row?.orgId || '')
+        };
+      }).filter((row) => row.id);
 
     const filteredRows = applyGenericFilter(mapped, normalizedQuery, {
       defaultSearchFields: ['id', 'name', 'displayName', 'email', 'applicantId'],
