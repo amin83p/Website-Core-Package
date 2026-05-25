@@ -3,10 +3,63 @@ const path = require('path');
 
 const packageManifestService = require('../../MVC/services/packageManifestService');
 const packageRegistryService = require('../../MVC/services/packageRegistryService');
+const dataBackendRuntimeService = require('../../MVC/services/dataBackendRuntimeService');
+const { disconnectMongo } = require('../../MVC/infrastructure/mongo/mongoConnection');
 
 const ROOT_DIR = path.resolve(__dirname, '../..');
 const MANIFEST_PATH = path.join(ROOT_DIR, 'packages', 'pte', 'package.manifest.json');
 const SCRIPT_ID = 'scripts/packages/enable-pte-package.js';
+
+function loadLocalEnvFile() {
+  try {
+    const envPath = path.join(ROOT_DIR, '.env');
+    if (!fs.existsSync(envPath)) return;
+    const raw = fs.readFileSync(envPath, 'utf8');
+    raw.split(/\r?\n/).forEach((line) => {
+      const trimmed = String(line || '').trim();
+      if (!trimmed || trimmed.startsWith('#')) return;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx <= 0) return;
+      const key = trimmed.slice(0, eqIdx).trim();
+      if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) return;
+      let value = trimmed.slice(eqIdx + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      process.env[key] = value;
+    });
+  } catch (_) {
+    // The app can still run with process.env or the default JSON backend.
+  }
+}
+
+async function withMutedStartupLogs(enabled, callback) {
+  if (!enabled) return callback();
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  console.log = () => {};
+  console.warn = () => {};
+  try {
+    return await callback();
+  } finally {
+    console.log = originalLog;
+    console.warn = originalWarn;
+  }
+}
+
+async function initializeRegistryBackend(options = {}) {
+  if (process.env.PACKAGE_REGISTRY_DATA_PATH && !process.env.DATA_BACKEND) {
+    process.env.DATA_BACKEND = 'json';
+  }
+  loadLocalEnvFile();
+  const backend = await withMutedStartupLogs(Boolean(options.json), () => (
+    dataBackendRuntimeService.initializeDataBackend(process.env)
+  ));
+  return backend?.mode || 'json';
+}
 
 function parseArgs(argv = []) {
   const args = new Set(argv);
@@ -85,9 +138,12 @@ async function main() {
 
   const manifest = loadPteManifest();
   const payload = buildRegistryPayload(manifest);
-  const existing = await packageRegistryService.getPackageRegistryById(payload.packageId);
+  const backendMode = await initializeRegistryBackend({ json: options.json });
+  const registryOptions = { backendMode };
+  const existing = await packageRegistryService.getPackageRegistryById(payload.packageId, registryOptions);
   const report = {
     apply: options.apply,
+    backendMode,
     action: existing ? 'update' : 'create',
     existing: existing ? {
       packageId: existing.packageId,
@@ -100,8 +156,13 @@ async function main() {
 
   if (options.apply) {
     report.result = await packageRegistryService.upsertPackageRegistry(payload, {
+      backendMode,
       actor: { id: 'SYSTEM', username: SCRIPT_ID }
     });
+  }
+
+  if (backendMode === 'mongo') {
+    await disconnectMongo();
   }
 
   if (options.json) {
