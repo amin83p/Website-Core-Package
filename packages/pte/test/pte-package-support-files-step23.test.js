@@ -3,7 +3,21 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+function findProjectRoot(startDir) {
+  let current = startDir;
+  while (current && current !== path.dirname(current)) {
+    if (
+      fs.existsSync(path.join(current, 'package.json'))
+      && fs.existsSync(path.join(current, 'packages/pte/package.support-files.json'))
+    ) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  throw new Error(`Unable to locate project root from ${startDir}`);
+}
+
+const ROOT_DIR = findProjectRoot(__dirname);
 const SUPPORT_MAP_PATH = path.join(ROOT_DIR, 'packages/pte/package.support-files.json');
 
 function toRepoPath(filePath) {
@@ -100,4 +114,3 @@ test('PTE package support-file map uses expected target folders', () => {
     assert.match(row.target, /^packages\/pte\/test\//);
   });
 });
-

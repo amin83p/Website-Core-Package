@@ -51,6 +51,7 @@ This roadmap lists remaining passes to take `Website-Core-Package` from PTE logi
 - Completed slice: root PTE AI Assist data/provider services and AI repositories now delegate to package-owned implementations.
 - Completed slice: PTE question type and scoring rubric registries now live in `packages/pte`, with root service files reduced to compatibility shims.
 - Completed slice: PTE question-bank AI prompt/autofill helper services now live in `packages/pte`, with root service files reduced to compatibility shims.
+- Completed slice: PTE model and repository implementations now live in `packages/pte`, with root model/repository files reduced to compatibility shims.
 
 ### Pass 5 - Package install lifecycle completeness
 - Extend install/uninstall behavior to support clean disable/remove for PTE-specific declarations (roles/sections/symbols/accesses/uploads if introduced dynamically).

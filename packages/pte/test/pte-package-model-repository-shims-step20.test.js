@@ -3,7 +3,20 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+function findProjectRoot(startDir) {
+  let current = startDir;
+  for (let i = 0; i < 8; i += 1) {
+    if (fs.existsSync(path.join(current, 'package.json')) && fs.existsSync(path.join(current, 'MVC'))) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  throw new Error('Unable to resolve project root.');
+}
+
+const ROOT_DIR = findProjectRoot(__dirname);
 const CURRENT_MODEL_ROOT = path.join(ROOT_DIR, 'MVC/models/pte');
 const PACKAGE_MODEL_ROOT = path.join(ROOT_DIR, 'packages/pte/MVC/models/pte');
 const CURRENT_REPOSITORY_ROOT = path.join(ROOT_DIR, 'MVC/repositories');
@@ -40,34 +53,28 @@ function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
-const packageOwnedRepositories = new Set([
-  'pteAiProviderRepository.js',
-  'pteAiScoringSettingRepository.js',
-  'pteAiTokenUsageRepository.js'
-]);
-
-const packageOnlyRepositoryAdapters = new Set([
-  'pteAiRepositoryDependencies.js'
-]);
-
-function expectedShimRequirePath({ packageRoot, currentRoot, relativeFile }) {
-  const packageShimPath = path.join(packageRoot, relativeFile);
-  const currentPath = path.join(currentRoot, relativeFile).replace(/\.js$/, '');
-  let relativeRequirePath = path.relative(path.dirname(packageShimPath), currentPath).replace(/\\/g, '/');
+function expectedShimRequirePath({ shimRoot, targetRoot, relativeFile }) {
+  const shimPath = path.join(shimRoot, relativeFile);
+  const targetPath = path.join(targetRoot, relativeFile).replace(/\.js$/, '');
+  let relativeRequirePath = path.relative(path.dirname(shimPath), targetPath).replace(/\\/g, '/');
   if (!relativeRequirePath.startsWith('.')) {
     relativeRequirePath = `./${relativeRequirePath}`;
   }
   return relativeRequirePath;
 }
 
-test('PTE package model shims mirror the current PTE model tree', () => {
+const packageOnlyRepositoryAdapters = new Set([
+  'pteAiRepositoryDependencies.js'
+]);
+
+test('PTE package model implementations mirror the root compatibility model tree', () => {
   const currentFiles = listJsFiles(CURRENT_MODEL_ROOT);
   const packageFiles = listJsFiles(PACKAGE_MODEL_ROOT);
 
   assert.deepEqual(packageFiles, currentFiles);
 });
 
-test('PTE package repository shims mirror the current flat PTE repository modules', () => {
+test('PTE package repository implementations mirror the root compatibility repository modules', () => {
   const currentFiles = listPteRepositoryFiles(CURRENT_REPOSITORY_ROOT);
   const packageFiles = listPteRepositoryFiles(PACKAGE_REPOSITORY_ROOT)
     .filter((relativeFile) => !packageOnlyRepositoryAdapters.has(relativeFile));
@@ -75,78 +82,75 @@ test('PTE package repository shims mirror the current flat PTE repository module
   assert.deepEqual(packageFiles, currentFiles);
 });
 
-test('PTE package model shims delegate to current MVC model modules', () => {
+test('root PTE model compatibility shims delegate to package-owned models', () => {
   listJsFiles(CURRENT_MODEL_ROOT).forEach((relativeFile) => {
-    const packageShimPath = path.join(PACKAGE_MODEL_ROOT, relativeFile);
-    const source = readText(packageShimPath);
+    const rootShimPath = path.join(CURRENT_MODEL_ROOT, relativeFile);
+    const source = readText(rootShimPath).trim();
     const expectedRequire = expectedShimRequirePath({
-      packageRoot: PACKAGE_MODEL_ROOT,
-      currentRoot: CURRENT_MODEL_ROOT,
+      shimRoot: CURRENT_MODEL_ROOT,
+      targetRoot: PACKAGE_MODEL_ROOT,
       relativeFile
     });
 
-    assert.ok(
-      source.includes(`require('${expectedRequire}')`),
-      `${relativeFile} should delegate to ${expectedRequire}`
+    assert.equal(
+      source,
+      `module.exports = require('${expectedRequire}');`,
+      `${relativeFile} should delegate to package model ${expectedRequire}`
     );
   });
 });
 
-test('PTE package repository shims delegate to current MVC repository modules', () => {
+test('root PTE repository compatibility shims delegate to package-owned repositories', () => {
   listPteRepositoryFiles(CURRENT_REPOSITORY_ROOT).forEach((relativeFile) => {
-    if (packageOwnedRepositories.has(relativeFile)) {
-      return;
-    }
-
-    const packageShimPath = path.join(PACKAGE_REPOSITORY_ROOT, relativeFile);
-    const source = readText(packageShimPath);
+    const rootShimPath = path.join(CURRENT_REPOSITORY_ROOT, relativeFile);
+    const source = readText(rootShimPath).trim();
     const expectedRequire = expectedShimRequirePath({
-      packageRoot: PACKAGE_REPOSITORY_ROOT,
-      currentRoot: CURRENT_REPOSITORY_ROOT,
+      shimRoot: CURRENT_REPOSITORY_ROOT,
+      targetRoot: PACKAGE_REPOSITORY_ROOT,
       relativeFile
     });
 
-    assert.ok(
-      source.includes(`require('${expectedRequire}')`),
-      `${relativeFile} should delegate to ${expectedRequire}`
+    assert.equal(
+      source,
+      `module.exports = require('${expectedRequire}');`,
+      `${relativeFile} should delegate to package repository ${expectedRequire}`
     );
   });
 });
 
-test('PTE package-owned AI Assist repositories are not simple shims', () => {
-  packageOwnedRepositories.forEach((relativeFile) => {
-    const packageRepositoryPath = path.join(PACKAGE_REPOSITORY_ROOT, relativeFile);
-    const source = readText(packageRepositoryPath);
-    const expectedRequire = expectedShimRequirePath({
-      packageRoot: PACKAGE_REPOSITORY_ROOT,
-      currentRoot: CURRENT_REPOSITORY_ROOT,
-      relativeFile
-    });
-
-    assert.ok(
-      !source.includes(`require('${expectedRequire}')`),
-      `${relativeFile} should not delegate to ${expectedRequire}`
-    );
+test('PTE package models and repositories are active implementations, not root shims', () => {
+  listJsFiles(PACKAGE_MODEL_ROOT).forEach((relativeFile) => {
+    const source = readText(path.join(PACKAGE_MODEL_ROOT, relativeFile)).trim();
+    assert.doesNotMatch(source, /MVC\/models\/pte/);
+    assert.doesNotMatch(source, /MVC\\models\\pte/);
+    assert.doesNotMatch(source, /^module\.exports\s*=\s*require\(/);
   });
+
+  listPteRepositoryFiles(PACKAGE_REPOSITORY_ROOT)
+    .filter((relativeFile) => !packageOnlyRepositoryAdapters.has(relativeFile))
+    .forEach((relativeFile) => {
+      const source = readText(path.join(PACKAGE_REPOSITORY_ROOT, relativeFile)).trim();
+      assert.doesNotMatch(source, /MVC\/repositories\/pte/);
+      assert.doesNotMatch(source, /MVC\\repositories\\pte/);
+      assert.doesNotMatch(source, /^module\.exports\s*=\s*require\(/);
+    });
 });
 
-test('representative PTE package model and repository shims export current modules', () => {
+test('representative PTE root shims export package-owned model and repository modules', () => {
   [
     {
-      packageRoot: PACKAGE_MODEL_ROOT,
-      currentRoot: CURRENT_MODEL_ROOT,
-      relativeFile: 'pteAttemptModelUtils.js'
+      rootPath: path.join(CURRENT_MODEL_ROOT, 'pteAttemptModelUtils.js'),
+      packagePath: path.join(PACKAGE_MODEL_ROOT, 'pteAttemptModelUtils.js')
     },
     {
-      packageRoot: PACKAGE_REPOSITORY_ROOT,
-      currentRoot: CURRENT_REPOSITORY_ROOT,
-      relativeFile: 'pteApplicantRepository.js'
+      rootPath: path.join(CURRENT_REPOSITORY_ROOT, 'pteApplicantRepository.js'),
+      packagePath: path.join(PACKAGE_REPOSITORY_ROOT, 'pteApplicantRepository.js')
     }
-  ].forEach(({ packageRoot, currentRoot, relativeFile }) => {
+  ].forEach(({ rootPath, packagePath }) => {
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    const packageModule = require(path.join(packageRoot, relativeFile));
+    const rootModule = require(rootPath);
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    const currentModule = require(path.join(currentRoot, relativeFile));
-    assert.equal(packageModule, currentModule, `${relativeFile} should export the current module`);
+    const packageModule = require(packagePath);
+    assert.equal(rootModule, packageModule, `${rootPath} should export ${packagePath}`);
   });
 });

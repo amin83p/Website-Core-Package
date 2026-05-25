@@ -15,7 +15,8 @@
     "Docs and tests now have package-local mirrors for Pass 4 physical layout finalization.",
     "Package-local copied tests are inventory mirrors only until their imports are adjusted for package-local execution.",
     "Root top-level PTE controllers now delegate to package-owned controller implementations during Pass 4.",
-    "Root PTE AI Assist services and AI repositories now delegate to package-owned implementations during Pass 4."
+    "Root PTE AI Assist services and AI repositories now delegate to package-owned implementations during Pass 4.",
+    "Root PTE models and repositories now delegate to package-owned implementations during Pass 4."
   ],
   "scripts": [
     {
@@ -336,6 +337,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "docs/pte-package-model-repository-ownership-step74.md",
+      "target": "packages/pte/docs/pte-package-model-repository-ownership-step74.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "docs/pte-package-mongo-index-registration-step66.md",
       "target": "packages/pte/docs/pte-package-mongo-index-registration-step66.md",
       "category": "package-preparation",
@@ -366,6 +374,13 @@
     {
       "source": "docs/pte-package-physical-move-map-step13.md",
       "target": "packages/pte/docs/pte-package-physical-move-map-step13.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/pte-package-question-bank-ai-root-shims-step73.md",
+      "target": "packages/pte/docs/pte-package-question-bank-ai-root-shims-step73.md",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -443,6 +458,13 @@
     {
       "source": "docs/pte-package-route-upload-middleware-contract-step60.md",
       "target": "packages/pte/docs/pte-package-route-upload-middleware-contract-step60.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/pte-package-scoring-registry-root-shims-step72.md",
+      "target": "packages/pte/docs/pte-package-scoring-registry-root-shims-step72.md",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -786,6 +808,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "test/pte-package-question-bank-ai-root-shims-step73.test.js",
+      "target": "packages/pte/test/pte-package-question-bank-ai-root-shims-step73.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "test/pte-package-repository-core-dependency-boundary-step53.test.js",
       "target": "packages/pte/test/pte-package-repository-core-dependency-boundary-step53.test.js",
       "category": "package-preparation",
@@ -844,6 +873,13 @@
     {
       "source": "test/pte-package-route-upload-middleware-contract-step60.test.js",
       "target": "packages/pte/test/pte-package-route-upload-middleware-contract-step60.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/pte-package-scoring-registry-root-shims-step72.test.js",
+      "target": "packages/pte/test/pte-package-scoring-registry-root-shims-step72.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
