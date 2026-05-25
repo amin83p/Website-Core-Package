@@ -327,3 +327,5 @@ module.exports = {
   selectPublicPackage,
   isPtePublicRoleToken
 };
+
+module.exports = require('../../../packages/pte/MVC/services/pte/ptePublicPackageDataService.js');

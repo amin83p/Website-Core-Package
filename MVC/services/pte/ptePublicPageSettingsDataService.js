@@ -532,3 +532,5 @@ module.exports = {
   getSettingsForManagement,
   saveSettings
 };
+
+module.exports = require('../../../packages/pte/MVC/services/pte/ptePublicPageSettingsDataService.js');

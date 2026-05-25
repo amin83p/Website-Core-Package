@@ -246,3 +246,5 @@ module.exports = {
   readUploadArtifactForAi,
   resolveUploadArtifactPath
 };
+
+module.exports = require('../../../packages/pte/MVC/services/pte/pteScoringArtifactReader.js');

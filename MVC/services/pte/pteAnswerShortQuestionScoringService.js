@@ -1330,3 +1330,5 @@ module.exports = {
   scoreAnswerShortQuestionAttemptItem,
   analyzeAnswerShortQuestionAudioWithAi
 };
+
+module.exports = require('../../../packages/pte/MVC/services/pte/pteAnswerShortQuestionScoringService.js');

@@ -162,3 +162,4 @@ const pteScoringDefaultsDataService = {
 };
 
 module.exports = pteScoringDefaultsDataService;
+module.exports = require('../../../packages/pte/MVC/services/pte/pteScoringDefaultsDataService.js');
