@@ -11,6 +11,7 @@ const appBrandingService = require('../services/appBrandingService');
 const dataBackendRuntimeService = require('../services/dataBackendRuntimeService');
 const { registerCoreEntityQueryExecutors } = require('../models/queryExecutorBootstrap');
 const packageQueryExecutorService = require('../services/packageQueryExecutorService');
+const systemSettingsPackageManagerService = require('../services/systemSettingsPackageManagerService');
 const actionStateRetentionService = require('../services/actionStateRetentionService');
 const jsonToMongoMigrationService = require('../services/migration/jsonToMongoMigrationService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
@@ -968,6 +969,130 @@ exports.showDataMigrationCopyCollectionPage = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+/* =========================================================
+   PACKAGE MANAGER (System Settings)
+========================================================= */
+exports.showPackageManagerPage = async (req, res) => {
+  try {
+    const settings = await systemSettingsRepository.getSettings();
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const snapshot = await systemSettingsPackageManagerService.listPackageSnapshot({
+      backendMode: runtimeBackend?.mode || '',
+      packageRootDir: path.join(process.cwd(), 'packages')
+    });
+    const localManifestOptions = (snapshot?.localManifests || []).filter((row) => row.valid === true);
+    const localManifestWarnings = (snapshot?.localManifests || []).filter((row) => row.valid !== true);
+
+    return res.render('systemSettings/packageManagerSettings', {
+      title: 'Package Manager',
+      settings,
+      runtimeBackend,
+      installedPackages: snapshot?.installedPackages || [],
+      localManifestOptions,
+      localManifestWarnings,
+      includeModal: true,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+function buildPackageManagerOptions(req = {}) {
+  const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+  return {
+    backendMode: runtimeBackend?.mode || '',
+    packageRootDir: path.join(process.cwd(), 'packages'),
+    actor: req.user || null,
+    app: req.app || null
+  };
+}
+
+function sendPackageManagerError(res, error, fallbackMessage = 'Package operation failed.') {
+  const code = String(error?.code || '').trim().toUpperCase();
+  const statusCode = code === 'ADMIN_REQUIRED' ? 403 : 400;
+  return res.status(statusCode).json({
+    status: statusCode === 403 ? 'admin_required' : 'error',
+    message: error?.message || fallbackMessage
+  });
+}
+
+exports.installPackageFromManager = async (req, res) => {
+  try {
+    const report = await systemSettingsPackageManagerService.installPackage({
+      installMethod: cleanFormText(req.body?.installMethod, 40),
+      localManifestPath: cleanFormText(req.body?.localManifestPath, 1600),
+      manifestPath: cleanFormText(req.body?.manifestPath, 1600),
+      manifestJson: String(req.body?.manifestJson || '')
+    }, buildPackageManagerOptions(req));
+
+    return res.json({
+      status: 'success',
+      message: `Package "${report.packageId}" installed and enabled.`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package install failed.');
+  }
+};
+
+exports.enablePackageFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.enablePackage(packageId, buildPackageManagerOptions(req));
+    return res.json({
+      status: 'success',
+      message: `Package "${report.packageId}" is enabled.`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package enable failed.');
+  }
+};
+
+exports.pausePackageFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.pausePackage(packageId, buildPackageManagerOptions(req));
+    return res.json({
+      status: 'success',
+      message: `Package "${report.packageId}" is paused (disabled + declaration sync).`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package pause failed.');
+  }
+};
+
+exports.removePackageFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.removePackage(packageId, buildPackageManagerOptions(req));
+    return res.json({
+      status: 'success',
+      message: `Package "${report.packageId}" remove operation completed.`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package remove failed.');
+  }
+};
+
+exports.syncPackageFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.syncPackage(packageId, buildPackageManagerOptions(req));
+    return res.json({
+      status: 'success',
+      message: `Package "${report.packageId}" declaration sync completed.`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package sync failed.');
   }
 };
 

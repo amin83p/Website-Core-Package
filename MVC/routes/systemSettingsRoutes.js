@@ -201,6 +201,63 @@ router.post('/data-backend/restore-backup',
           trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
           ctrl.restoreMongoBackup);
 
+// 7. Package Manager (System Settings)
+router.get('/packages',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE, { keepActive: true }),
+          ctrl.showPackageManagerPage);
+router.post('/packages/install',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.installPackageFromManager);
+router.post('/packages/:packageId/enable',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.enablePackageFromManager);
+router.post('/packages/:packageId/pause',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.pausePackageFromManager);
+router.post('/packages/:packageId/remove',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.removePackageFromManager);
+router.post('/packages/:packageId/sync',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.syncPackageFromManager);
+
 // 7. Data Migration (JSON <-> Mongo)
 router.get('/data-migration',
           requireAuth,

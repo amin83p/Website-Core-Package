@@ -910,7 +910,7 @@
       "createUser": "SYS_ROOT_001",
       "createDateTime": "2026-05-20T00:00:00.000Z",
       "lastUpdateUser": "SYS_ROOT_001",
-      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+      "lastUpdateDateTime": "2026-05-25T22:27:32.981Z"
     },
     "name": "ROLES",
     "orgId": "SYSTEM",
@@ -2303,6 +2303,25 @@
       "createDateTime": "2026-05-02T00:00:00.000Z",
       "lastUpdateUser": "ROOT_001",
       "lastUpdateDateTime": "2026-05-02T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "SYM_SYSTEM_120",
+    "name": "SYSTEM_PACKAGE_MANAGER",
+    "type": "class",
+    "value": "bi bi-boxes",
+    "tags": [
+      "SYSTEM_PACKAGE_MANAGER",
+      "SYSTEM_PACKAGE",
+      "PACKAGE_MANAGER",
+      "731285"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-05-25T22:27:32.981Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-05-25T22:27:32.981Z"
     }
   }
 ]

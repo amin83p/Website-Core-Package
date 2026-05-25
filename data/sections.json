@@ -6690,8 +6690,8 @@
     "audit": {
       "createUser": "ROOT_001",
       "createDateTime": "2026-03-26T18:22:03.689Z",
-      "lastUpdateUser": "ROOT_001",
-      "lastUpdateDateTime": "2026-03-27T06:12:37.423Z"
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-05-25T22:26:38.043Z"
     },
     "category": "SYSTEM",
     "dashboardDisplay": true,
@@ -6717,6 +6717,9 @@
       },
       {
         "id": "265881"
+      },
+      {
+        "id": "731285"
       }
     ],
     "trackState": false
@@ -9374,6 +9377,55 @@
       },
       {
         "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "related": [],
+    "subsections": [],
+    "trackState": true
+  },
+  {
+    "id": "731285",
+    "active": true,
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-05-25T22:26:38.043Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-05-25T22:26:38.043Z"
+    },
+    "category": "SYSTEM",
+    "dashboardDisplay": true,
+    "description": "Install, enable, pause, remove, and sync package lifecycle operations.",
+    "homeURL": "/systemSettings/packages",
+    "inactiveMessage": "",
+    "mainDashboardDisplay": false,
+    "message": "",
+    "minimumAccessRequirement": 5,
+    "name": "SYSTEM_PACKAGE_MANAGER",
+    "navigatorSection": false,
+    "operations": [
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
         "sessionAttempts": 5,
         "sessionTime": 15,
         "active": true
