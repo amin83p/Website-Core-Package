@@ -3,7 +3,6 @@
   "step": 23,
   "status": "mapped",
   "notes": [
-    "Support files remain root-active during this step.",
     "Targets describe the intended package-owned locations for a later physical move.",
     "Most package script entrypoints delegate to root-active scripts until imports are adjusted for package-local execution.",
     "The package enable script is package-safe and uses the package-local manifest directly.",
@@ -11,7 +10,10 @@
     "The package-local mongo-validate-explain script is package-safe and reads settings from core data paths using package-local resolution.",
     "The package-local validate-remaining script is package-safe and reads settings from core data paths using package-local resolution.",
     "The package-local hard-delete-all-pte-attempts script is package-safe and uses core Mongo/repo configuration imports directly.",
-    "Do not run copied tests from package-local paths until their imports are adjusted."
+    "Do not run copied tests from package-local paths until their imports are adjusted.",
+    "Support file root paths remain active during this transition.",
+    "Docs and tests now have package-local mirrors for Pass 4 physical layout finalization.",
+    "Package-local copied tests are inventory mirrors only until their imports are adjusted for package-local execution."
   ],
   "scripts": [
     {
@@ -139,361 +141,428 @@
       "source": "docs/handover-2026-05-22-pte-step9.md",
       "target": "packages/pte/docs/handover-2026-05-22-pte-step9.md",
       "category": "handover",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-activation-step12.md",
       "target": "packages/pte/docs/pte-package-activation-step12.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-assist-controller-boundary-step39.md",
       "target": "packages/pte/docs/pte-package-ai-assist-controller-boundary-step39.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-assist-controller-helper-step43.md",
       "target": "packages/pte/docs/pte-package-ai-assist-controller-helper-step43.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-assist-core-bridge-step31.md",
       "target": "packages/pte/docs/pte-package-ai-assist-core-bridge-step31.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-assist-decryption-core-bridge-step36.md",
       "target": "packages/pte/docs/pte-package-ai-assist-decryption-core-bridge-step36.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-assist-repository-core-bridge-step35.md",
       "target": "packages/pte/docs/pte-package-ai-assist-repository-core-bridge-step35.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-assist-service-boundary-step38.md",
       "target": "packages/pte/docs/pte-package-ai-assist-service-boundary-step38.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-assist-upload-context-step33.md",
       "target": "packages/pte/docs/pte-package-ai-assist-upload-context-step33.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-assist-view-bridge-step40.md",
       "target": "packages/pte/docs/pte-package-ai-assist-view-bridge-step40.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-provider-env-fallback-step41.md",
       "target": "packages/pte/docs/pte-package-ai-provider-env-fallback-step41.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ai-provider-ownership-step30.md",
       "target": "packages/pte/docs/pte-package-ai-provider-ownership-step30.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-completion-roadmap-2026-05-24.md",
       "target": "packages/pte/docs/pte-package-completion-roadmap-2026-05-24.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-controller-core-dependencies-step64.md",
       "target": "packages/pte/docs/pte-package-controller-core-dependencies-step64.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-controller-core-dependency-boundary-step51.md",
       "target": "packages/pte/docs/pte-package-controller-core-dependency-boundary-step51.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-controller-core-helper-shims-step63.md",
       "target": "packages/pte/docs/pte-package-controller-core-helper-shims-step63.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-controller-helper-boundary-step55.md",
       "target": "packages/pte/docs/pte-package-controller-helper-boundary-step55.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-controller-shims-step18.md",
       "target": "packages/pte/docs/pte-package-controller-shims-step18.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-core-dependencies-core-adapter-step49.md",
       "target": "packages/pte/docs/pte-package-core-dependencies-core-adapter-step49.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-core-helper-adapter-step48.md",
       "target": "packages/pte/docs/pte-package-core-helper-adapter-step48.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-core-runtime-shims-step62.md",
       "target": "packages/pte/docs/pte-package-core-runtime-shims-step62.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-enable-script-step25.md",
       "target": "packages/pte/docs/pte-package-enable-script-step25.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-ensure-indexes-step26.md",
       "target": "packages/pte/docs/pte-package-ensure-indexes-step26.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-hard-delete-attempts-step29.md",
       "target": "packages/pte/docs/pte-package-hard-delete-attempts-step29.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-middleware-boundary-step47.md",
       "target": "packages/pte/docs/pte-package-middleware-boundary-step47.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-middleware-utility-shims-step21.md",
       "target": "packages/pte/docs/pte-package-middleware-utility-shims-step21.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-model-core-dependency-boundary-step54.md",
       "target": "packages/pte/docs/pte-package-model-core-dependency-boundary-step54.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-model-repository-shims-step20.md",
       "target": "packages/pte/docs/pte-package-model-repository-shims-step20.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-mongo-index-registration-step66.md",
       "target": "packages/pte/docs/pte-package-mongo-index-registration-step66.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-role-registry-step67.md",
       "target": "packages/pte/docs/pte-package-role-registry-step67.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-mongo-validate-step27.md",
       "target": "packages/pte/docs/pte-package-mongo-validate-step27.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-pass3-finalization-step68.md",
       "target": "packages/pte/docs/pte-package-pass3-finalization-step68.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-physical-move-map-step13.md",
       "target": "packages/pte/docs/pte-package-physical-move-map-step13.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-repository-core-dependency-boundary-step53.md",
       "target": "packages/pte/docs/pte-package-repository-core-dependency-boundary-step53.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-core-dependency-boundary-step52.md",
       "target": "packages/pte/docs/pte-package-route-core-dependency-boundary-step52.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-dependencies-step34.md",
       "target": "packages/pte/docs/pte-package-route-dependencies-step34.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-dependency-adapter-step45.md",
       "target": "packages/pte/docs/pte-package-route-dependency-adapter-step45.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-dependency-boundary-step44.md",
       "target": "packages/pte/docs/pte-package-route-dependency-boundary-step44.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-dependency-surface-step58.md",
       "target": "packages/pte/docs/pte-package-route-dependency-surface-step58.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-entrypoint-step16.md",
       "target": "packages/pte/docs/pte-package-route-entrypoint-step16.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-subroute-ownership-step57.md",
       "target": "packages/pte/docs/pte-package-route-subroute-ownership-step57.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-tree-step17.md",
       "target": "packages/pte/docs/pte-package-route-tree-step17.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-upload-context-invocation-step59.md",
       "target": "packages/pte/docs/pte-package-route-upload-context-invocation-step59.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-route-upload-middleware-contract-step60.md",
       "target": "packages/pte/docs/pte-package-route-upload-middleware-contract-step60.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-script-entrypoints-step24.md",
       "target": "packages/pte/docs/pte-package-script-entrypoints-step24.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-service-core-dependency-boundary-step50.md",
       "target": "packages/pte/docs/pte-package-service-core-dependency-boundary-step50.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-service-shims-step19.md",
       "target": "packages/pte/docs/pte-package-service-shims-step19.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-support-file-map-step23.md",
       "target": "packages/pte/docs/pte-package-support-file-map-step23.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-upload-category-registration-step65.md",
       "target": "packages/pte/docs/pte-package-upload-category-registration-step65.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-upload-context-boundary-step56.md",
       "target": "packages/pte/docs/pte-package-upload-context-boundary-step56.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-upload-context-dependency-step46.md",
       "target": "packages/pte/docs/pte-package-upload-context-dependency-step46.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-upload-middleware-step42.md",
       "target": "packages/pte/docs/pte-package-upload-middleware-step42.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-upload-utils-step32.md",
       "target": "packages/pte/docs/pte-package-upload-utils-step32.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-validate-remaining-step28.md",
       "target": "packages/pte/docs/pte-package-validate-remaining-step28.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-view-asset-ownership-step22.md",
       "target": "packages/pte/docs/pte-package-view-asset-ownership-step22.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-package-view-core-partials-direct-step61.md",
       "target": "packages/pte/docs/pte-package-view-core-partials-direct-step61.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte-preparation-step9.md",
       "target": "packages/pte/docs/pte-preparation-step9.md",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte/postman/README.md",
       "target": "packages/pte/docs/postman/README.md",
       "category": "postman",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte/postman/pte-attempt-runtime.local.postman_environment.json",
       "target": "packages/pte/docs/postman/pte-attempt-runtime.local.postman_environment.json",
       "category": "postman",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "docs/pte/postman/pte-attempt-runtime.postman_collection.json",
       "target": "packages/pte/docs/postman/pte-attempt-runtime.postman_collection.json",
       "category": "postman",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/pte-package-support-file-mirroring-step69.md",
+      "target": "packages/pte/docs/pte-package-support-file-mirroring-step69.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     }
   ],
   "tests": [
@@ -501,439 +570,519 @@
       "source": "test/pte-package-activation-step12.test.js",
       "target": "packages/pte/test/pte-package-activation-step12.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-controller-boundary-step39.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-controller-boundary-step39.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-controller-helper-step37.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-controller-helper-step37.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-controller-helper-step43.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-controller-helper-step43.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-core-bridge-step31.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-core-bridge-step31.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-decryption-core-bridge-step36.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-decryption-core-bridge-step36.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-repository-core-bridge-step35.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-repository-core-bridge-step35.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-service-boundary-step38.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-service-boundary-step38.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-upload-context-step33.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-upload-context-step33.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-assist-view-partials-step40.test.js",
       "target": "packages/pte/test/pte-package-ai-assist-view-partials-step40.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ai-provider-env-fallback-step41.test.js",
       "target": "packages/pte/test/pte-package-ai-provider-env-fallback-step41.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-boundary-step13.test.js",
       "target": "packages/pte/test/pte-package-boundary-step13.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-controller-core-dependencies-step64.test.js",
       "target": "packages/pte/test/pte-package-controller-core-dependencies-step64.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-controller-core-dependency-boundary-step51.test.js",
       "target": "packages/pte/test/pte-package-controller-core-dependency-boundary-step51.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-controller-helper-boundary-step55.test.js",
       "target": "packages/pte/test/pte-package-controller-helper-boundary-step55.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-controller-shims-step18.test.js",
       "target": "packages/pte/test/pte-package-controller-shims-step18.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-core-dependencies-core-adapter-step49.test.js",
       "target": "packages/pte/test/pte-package-core-dependencies-core-adapter-step49.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-core-helper-adapter-step48.test.js",
       "target": "packages/pte/test/pte-package-core-helper-adapter-step48.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-enable-script-step25.test.js",
       "target": "packages/pte/test/pte-package-enable-script-step25.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-ensure-indexes-step26.test.js",
       "target": "packages/pte/test/pte-package-ensure-indexes-step26.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-hard-delete-all-pte-attempts-step29.test.js",
       "target": "packages/pte/test/pte-package-hard-delete-all-pte-attempts-step29.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-middleware-boundary-step47.test.js",
       "target": "packages/pte/test/pte-package-middleware-boundary-step47.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-middleware-utility-shims-step21.test.js",
       "target": "packages/pte/test/pte-package-middleware-utility-shims-step21.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-model-core-dependency-boundary-step54.test.js",
       "target": "packages/pte/test/pte-package-model-core-dependency-boundary-step54.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-model-repository-shims-step20.test.js",
       "target": "packages/pte/test/pte-package-model-repository-shims-step20.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-mongo-index-registration-step66.test.js",
       "target": "packages/pte/test/pte-package-mongo-index-registration-step66.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-role-registry-step67.test.js",
       "target": "packages/pte/test/pte-package-role-registry-step67.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-mongo-validate-step27.test.js",
       "target": "packages/pte/test/pte-package-mongo-validate-step27.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-pass3-finalization-step68.test.js",
       "target": "packages/pte/test/pte-package-pass3-finalization-step68.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-repository-core-dependency-boundary-step53.test.js",
       "target": "packages/pte/test/pte-package-repository-core-dependency-boundary-step53.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-route-core-dependency-boundary-step52.test.js",
       "target": "packages/pte/test/pte-package-route-core-dependency-boundary-step52.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-route-dependencies-step34.test.js",
       "target": "packages/pte/test/pte-package-route-dependencies-step34.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-route-dependency-boundary-step44.test.js",
       "target": "packages/pte/test/pte-package-route-dependency-boundary-step44.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-route-dependency-core-adapter-step45.test.js",
       "target": "packages/pte/test/pte-package-route-dependency-core-adapter-step45.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-route-entrypoint-step16.test.js",
       "target": "packages/pte/test/pte-package-route-entrypoint-step16.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-route-tree-step17.test.js",
       "target": "packages/pte/test/pte-package-route-tree-step17.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-route-upload-context-invocation-step59.test.js",
       "target": "packages/pte/test/pte-package-route-upload-context-invocation-step59.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-route-upload-middleware-contract-step60.test.js",
       "target": "packages/pte/test/pte-package-route-upload-middleware-contract-step60.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-script-entrypoints-step24.test.js",
       "target": "packages/pte/test/pte-package-script-entrypoints-step24.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-service-core-dependency-boundary-step50.test.js",
       "target": "packages/pte/test/pte-package-service-core-dependency-boundary-step50.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-service-shims-step19.test.js",
       "target": "packages/pte/test/pte-package-service-shims-step19.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-step9.test.js",
       "target": "packages/pte/test/pte-package-step9.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-support-files-step23.test.js",
       "target": "packages/pte/test/pte-package-support-files-step23.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-upload-category-registration-step65.test.js",
       "target": "packages/pte/test/pte-package-upload-category-registration-step65.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-upload-context-dependency-step46.test.js",
       "target": "packages/pte/test/pte-package-upload-context-dependency-step46.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-upload-context-middleware-step56.test.js",
       "target": "packages/pte/test/pte-package-upload-context-middleware-step56.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-upload-middleware-step42.test.js",
       "target": "packages/pte/test/pte-package-upload-middleware-step42.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-upload-utils-step32.test.js",
       "target": "packages/pte/test/pte-package-upload-utils-step32.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-validate-remaining-step28.test.js",
       "target": "packages/pte/test/pte-package-validate-remaining-step28.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-package-view-asset-ownership-step22.test.js",
       "target": "packages/pte/test/pte-package-view-asset-ownership-step22.test.js",
       "category": "package-preparation",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte-student-role-token-migration.test.js",
       "target": "packages/pte/test/pte-student-role-token-migration.test.js",
       "category": "migration",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.ai-assist.autofill-private.test.js",
       "target": "packages/pte/test/pte.ai-assist.autofill-private.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.ai-assist.prompt-registry.test.js",
       "target": "packages/pte/test/pte.ai-assist.prompt-registry.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.ai-scoring-settings-help.test.js",
       "target": "packages/pte/test/pte.ai-scoring-settings-help.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.ai-scoring-settings-service.test.js",
       "target": "packages/pte/test/pte.ai-scoring-settings-service.test.js",
       "category": "ai-assist",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.answer-short-question-scoring-service.test.js",
       "target": "packages/pte/test/pte.answer-short-question-scoring-service.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.attempt-ledger-save-timing.test.js",
       "target": "packages/pte/test/pte.attempt-ledger-save-timing.test.js",
       "category": "attempt",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.attempt-lifecycle-analytics.test.js",
       "target": "packages/pte/test/pte.attempt-lifecycle-analytics.test.js",
       "category": "attempt",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.attempt-lifecycle-controller.test.js",
       "target": "packages/pte/test/pte.attempt-lifecycle-controller.test.js",
       "category": "attempt",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.attempt-read-aloud-autoscoring.test.js",
       "target": "packages/pte/test/pte.attempt-read-aloud-autoscoring.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.describe-image-scoring-service.test.js",
       "target": "packages/pte/test/pte.describe-image-scoring-service.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.listening-dictation-scoring-service.test.js",
       "target": "packages/pte/test/pte.listening-dictation-scoring-service.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.practice-coach-rules.test.js",
       "target": "packages/pte/test/pte.practice-coach-rules.test.js",
       "category": "practice",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.question-bank-controller.endpoints.test.js",
       "target": "packages/pte/test/pte.question-bank-controller.endpoints.test.js",
       "category": "question-bank",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.question-bank-data-service.publish-gating.test.js",
       "target": "packages/pte/test/pte.question-bank-data-service.publish-gating.test.js",
       "category": "question-bank",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.question-type-registry.scoring-contracts.test.js",
       "target": "packages/pte/test/pte.question-type-registry.scoring-contracts.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.read-aloud-scoring-service.test.js",
       "target": "packages/pte/test/pte.read-aloud-scoring-service.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.reading-scoring-service.test.js",
       "target": "packages/pte/test/pte.reading-scoring-service.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.repeat-sentence-scoring-service.test.js",
       "target": "packages/pte/test/pte.repeat-sentence-scoring-service.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.respond-situation-scoring-service.test.js",
       "target": "packages/pte/test/pte.respond-situation-scoring-service.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.smart-practice-service.test.js",
       "target": "packages/pte/test/pte.smart-practice-service.test.js",
       "category": "practice",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.speaking-micro-rubric-service.test.js",
       "target": "packages/pte/test/pte.speaking-micro-rubric-service.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     },
     {
       "source": "test/pte.writing-scoring-service.test.js",
       "target": "packages/pte/test/pte.writing-scoring-service.test.js",
       "category": "scoring",
-      "status": "root-active"
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/pte-package-support-file-mirroring-step69.test.js",
+      "target": "packages/pte/test/pte-package-support-file-mirroring-step69.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     }
   ]
 }
