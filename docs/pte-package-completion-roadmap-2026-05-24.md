@@ -35,6 +35,7 @@ This roadmap lists remaining passes to take `Website-Core-Package` from PTE logi
   - upload folder registrations still declared in core helpers
   - query executor bootstrap direct PTE hook points.
 - Keep behavior unchanged by asserting regression tests around `/pte` pages, uploads, symbols/accesses visibility.
+- Completed slice: PTE upload middleware categories now register through a package-owned upload category registration module instead of `coreFilesService` importing PTE upload path utilities directly.
 
 ### Pass 4 - Package-local physical layout finalization
 - Move remaining PTE-owned non-core assets/scripts/files from root/MVC locations into `packages/pte`:

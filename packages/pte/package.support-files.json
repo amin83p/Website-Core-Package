@@ -406,6 +406,12 @@
       "status": "root-active"
     },
     {
+      "source": "docs/pte-package-upload-category-registration-step65.md",
+      "target": "packages/pte/docs/pte-package-upload-category-registration-step65.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
       "source": "docs/pte-package-upload-context-boundary-step56.md",
       "target": "packages/pte/docs/pte-package-upload-context-boundary-step56.md",
       "category": "package-preparation",
@@ -710,6 +716,12 @@
     {
       "source": "test/pte-package-support-files-step23.test.js",
       "target": "packages/pte/test/pte-package-support-files-step23.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-upload-category-registration-step65.test.js",
+      "target": "packages/pte/test/pte-package-upload-category-registration-step65.test.js",
       "category": "package-preparation",
       "status": "root-active"
     },

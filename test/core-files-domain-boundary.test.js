@@ -43,3 +43,13 @@ test('domain-facing modules consume coreFilesService instead of low-level file i
     );
   });
 });
+
+test('core file service does not import package-specific upload utilities', () => {
+  const content = fs.readFileSync(path.join(process.cwd(), 'MVC/services/coreFilesService.js'), 'utf8');
+
+  assert.equal(
+    /pteUploadPathUtils/.test(content),
+    false,
+    'coreFilesService should resolve package upload categories through the upload category resolver registry.'
+  );
+});

@@ -58,6 +58,7 @@ const packageOnlyServiceAdapters = new Set([
   'pteCoreDependenciesCoreAdapter.js',
   'pteRouteCoreDependencies.js',
   'pteRouteDependencies.js',
+  'pteUploadCategoryRegistration.js',
   'pteUploadContextDependencies.js'
 ]);
 

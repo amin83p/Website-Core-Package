@@ -6,6 +6,7 @@ const path = require('path');
 
 const settingService = require('../MVC/services/settingService');
 const adminAuthorityService = require('../MVC/services/adminAuthorityService');
+const uploadCategoryResolverService = require('../MVC/services/uploadCategoryResolverService');
 const coreFilesService = require('../MVC/services/coreFilesService');
 
 const TEST_UPLOAD_ROOT = path.join(process.cwd(), 'tmp', 'core-files-service-test-uploads');
@@ -27,6 +28,7 @@ async function resetFixture() {
 }
 
 test.beforeEach(async () => {
+  uploadCategoryResolverService.resetUploadCategoryResolvers();
   process.env.UPLOAD_MODE = 'local';
   settingService.getValue = (section, key) => {
     if (section === 'app' && key === 'uploadsPath') return TEST_UPLOAD_ROOT;
@@ -44,6 +46,7 @@ test.afterEach(async () => {
   adminAuthorityService.isSuperAdmin = ORIGINAL_IS_SUPER_ADMIN;
   if (ORIGINAL_UPLOAD_MODE === undefined) delete process.env.UPLOAD_MODE;
   else process.env.UPLOAD_MODE = ORIGINAL_UPLOAD_MODE;
+  uploadCategoryResolverService.resetUploadCategoryResolvers();
   await fsp.rm(TEST_UPLOAD_ROOT, { recursive: true, force: true });
 });
 
@@ -53,6 +56,18 @@ test('resolveUploadCategory maps legacy upload categories via core folder config
   });
   assert.match(category, /^tasks\//i);
   assert.match(category, /Task_1|Task_1/i);
+});
+
+test('resolveUploadCategory delegates package categories through registered resolvers', () => {
+  uploadCategoryResolverService.registerUploadCategoryResolver('package-demo', ({ req = {}, isDynamic = false } = {}) => (
+    `package-demo/${req.body?.itemId || 'missing'}/${isDynamic ? 'dynamic' : 'static'}`
+  ));
+
+  const category = coreFilesService.resolveUploadCategory('package-demo', true, {
+    body: { itemId: 'ITEM_42' }
+  });
+
+  assert.equal(category, 'package-demo/ITEM_42/dynamic');
 });
 
 test('resolveContextFromPath rejects traversal attempts', () => {

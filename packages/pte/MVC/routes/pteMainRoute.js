@@ -1,6 +1,7 @@
 const express = require('express');
 
 const router = express.Router();
+const { registerPteUploadCategoryResolvers } = require('../services/pte/pteUploadCategoryRegistration');
 const infoController = require('../controllers/infoController');
 const userDashboardController = require('../controllers/userDashboardController');
 const publicPageSettingsController = require('../controllers/publicPageSettingsController');
@@ -14,6 +15,8 @@ const {
 } = require('./pteRouteDependencies');
 
 const PTE_MOUNT_GUARD_KEY = '__pteMainRouteMounted';
+
+registerPteUploadCategoryResolvers();
 
 router.use((req, _res, next) => {
   if (req?.[PTE_MOUNT_GUARD_KEY]) return next('router');

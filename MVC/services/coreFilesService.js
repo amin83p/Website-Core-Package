@@ -3,8 +3,8 @@ const fsp = require('fs').promises;
 const path = require('path');
 const pathResolver = require('../utils/pathResolver');
 const uploadPathUtils = require('../utils/uploadPathUtils');
-const pteUploadPathUtils = require('../utils/pteUploadPathUtils');
 const uploadFolderSettingsService = require('./uploadFolderSettingsService');
+const uploadCategoryResolverService = require('./uploadCategoryResolverService');
 const { isRailwayProxyMode } = require('../utils/uploadModeUtils');
 const adminAuthorityService = require('./adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
@@ -100,6 +100,11 @@ function resolveUploadCategory(fixedCategory = 'misc', isDynamic = false, req = 
   if (fixedCategory === 'contacts') return uploadFolderSettingsService.resolveUploadFolder('core.contacts');
   if (fixedCategory === 'ielts') return uploadFolderSettingsService.resolveUploadFolder('core.ielts');
   if (fixedCategory === 'reports') return uploadFolderSettingsService.resolveUploadFolder('school.reportTemplates');
+  const registeredCategory = uploadCategoryResolverService.resolveUploadCategory(fixedCategory, {
+    isDynamic,
+    req
+  });
+  if (registeredCategory) return registeredCategory;
   if (fixedCategory === 'tasks') {
     return uploadFolderSettingsService.resolveUploadFolder('core.tasks', {
       taskId: req.body?.taskId
@@ -119,43 +124,6 @@ function resolveUploadCategory(fixedCategory = 'misc', isDynamic = false, req = 
     return uploadFolderSettingsService.resolveUploadFolder('school.examMedia', {
       templateId: req.body?.templateId || req.params?.templateId || 'template_unsaved',
       questionId: req.body?.questionId || req.params?.questionId || '_unsaved'
-    });
-  }
-  if (fixedCategory === 'pte-question-bank') {
-    return pteUploadPathUtils.buildQuestionBankCategory();
-  }
-  if (fixedCategory === 'pte-students') {
-    return pteUploadPathUtils.buildStudentCategory({
-      bucket: req.pteStorageContext?.bucket,
-      itemId:
-        req.params?.id ||
-        req.body?.studentId ||
-        req.body?.mediaItemId ||
-        req.body?.applicantId ||
-        req.body?.personId ||
-        'item_unsaved',
-      includeItemFolder: isDynamic !== false
-    });
-  }
-  if (fixedCategory === 'pte-attempts') {
-    return pteUploadPathUtils.buildAttemptCategory({
-      bucket: req.pteStorageContext?.bucket,
-      userId: req.pteStorageContext?.userId || req.user?.id || req.body?.userId,
-      practiceName: req.pteStorageContext?.practiceName || req.body?.practiceName || req.body?.practiceId,
-      testName: req.pteStorageContext?.testName || req.body?.testName || req.body?.examName,
-      sessionId:
-        req.pteStorageContext?.sessionId ||
-        req.params?.sessionId ||
-        req.body?.sessionId ||
-        req.body?.attemptSessionId ||
-        req.body?.practiceId ||
-        req.body?.examId,
-      itemId:
-        req.pteStorageContext?.itemId ||
-        req.params?.itemId ||
-        req.body?.itemId ||
-        req.body?.attemptItemId ||
-        req.body?.questionId
     });
   }
 

@@ -35,6 +35,7 @@ test('PTE core dependency adapter should expose stable utility exports', () => {
   assert.equal(typeof adapter.adminChekersService, 'object', 'adminChekersService should be exported.');
   assert.equal(typeof adapter.activityQuotaLedgerService, 'object', 'activityQuotaLedgerService should be exported.');
   assert.equal(typeof adapter.coreFilesService, 'object', 'coreFilesService should be exported.');
+  assert.equal(typeof adapter.uploadCategoryResolverService, 'object', 'uploadCategoryResolverService should be exported.');
   assert.equal(typeof adapter.settingService, 'object', 'settingService should be exported.');
   assert.equal(typeof adapter.dataService, 'object', 'dataService should be exported.');
   assert.equal(typeof adapter.normalizeQueryOptions, 'function', 'normalizeQueryOptions should be exported.');
