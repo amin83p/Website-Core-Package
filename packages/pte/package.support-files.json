@@ -322,6 +322,12 @@
       "status": "root-active"
     },
     {
+      "source": "docs/pte-package-pass3-finalization-step68.md",
+      "target": "packages/pte/docs/pte-package-pass3-finalization-step68.md",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
       "source": "docs/pte-package-physical-move-map-step13.md",
       "target": "packages/pte/docs/pte-package-physical-move-map-step13.md",
       "category": "package-preparation",
@@ -656,6 +662,12 @@
     {
       "source": "test/pte-package-mongo-validate-step27.test.js",
       "target": "packages/pte/test/pte-package-mongo-validate-step27.test.js",
+      "category": "package-preparation",
+      "status": "root-active"
+    },
+    {
+      "source": "test/pte-package-pass3-finalization-step68.test.js",
+      "target": "packages/pte/test/pte-package-pass3-finalization-step68.test.js",
       "category": "package-preparation",
       "status": "root-active"
     },

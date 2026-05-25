@@ -7,7 +7,7 @@ const adminChekersService = require('../../services/adminChekersService');
 const pteAttemptLedgerService = require('../../services/pte/pteAttemptLedgerService');
 const pteSmartPracticeService = require('../../services/pte/pteSmartPracticeService');
 const pteQuestionVersionRepository = require('../../repositories/pteQuestionVersionRepository');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../packages/pte/config/accessConstants');
 
 module.exports = {
   paginate,

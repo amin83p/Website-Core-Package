@@ -5,7 +5,7 @@ const {
   buildDataServiceQuery
 } = require('../../utils/generalTools');
 const securityService = require('../../services/security');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../packages/pte/config/accessConstants');
 
 module.exports = {
   isAjax,

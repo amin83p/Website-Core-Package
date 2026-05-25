@@ -6,7 +6,7 @@ const {
 } = require('../../utils/generalTools');
 const securityService = require('../../services/security');
 const pteAttemptLedgerService = require('../../services/pte/pteAttemptLedgerService');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../packages/pte/config/accessConstants');
 
 const FEEDBACK_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['status', 'skill', 'withFeedback'],

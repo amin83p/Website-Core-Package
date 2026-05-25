@@ -8,7 +8,7 @@ const pteSmartPracticeService = require('../../services/pte/pteSmartPracticeServ
 const pteQuestionVersionRepository = require('../../repositories/pteQuestionVersionRepository');
 const paginate = require('../../utils/paginationHelper');
 const { buildDataServiceQuery, isAjax } = require('../../utils/generalTools');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../packages/pte/config/accessConstants');
 const MAX_PTE_PRACTICE_QUESTIONS = 15;
 const PRACTICE_RESCORING_SECTION_CANDIDATES = Object.freeze([
   SECTIONS.PTE_PRACTICE_BY_SKILLS,

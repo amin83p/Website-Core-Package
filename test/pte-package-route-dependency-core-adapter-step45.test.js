@@ -48,10 +48,12 @@ test('PTE route core adapter should re-export route boundary hooks from core', (
   assert.equal(source.includes("require('../../../../../MVC/middleware/authMiddleware')"), true);
   assert.equal(source.includes("require('../../../../../MVC/middleware/accessMiddleware')"), true);
   assert.equal(source.includes("require('../../../../../MVC/middleware/actionStateMiddleware')"), true);
-  assert.equal(source.includes("require('../../../../../config/accessConstants')"), true);
+  assert.equal(source.includes("require('../../../config/accessConstants')"), true);
+  assert.equal(source.includes("require('../../../../../config/accessConstants')"), false);
   assert.equal(typeof routeDeps.requireAuth, 'function', 'requireAuth should be exported.');
   assert.equal(typeof routeDeps.requireAccess, 'function', 'requireAccess should be exported.');
   assert.equal(typeof routeDeps.trackActionState, 'function', 'trackActionState should be exported.');
   assert.equal(typeof routeDeps.SECTIONS, 'object', 'SECTIONS should be exported.');
   assert.equal(typeof routeDeps.OPERATIONS, 'object', 'OPERATIONS should be exported.');
+  assert.equal(routeDeps.SECTIONS.PTE_PRACTICE_BY_SKILLS, 'PTE_PRACTICE_BY_SKILLS');
 });

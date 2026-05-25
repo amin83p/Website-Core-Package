@@ -1,20 +1,14 @@
 const activityQuotaConsumptionDefinitionRepository = require('../../repositories/activityQuotaConsumptionDefinitionRepository');
 const activityQuotaLedgerService = require('../activityQuotaLedgerService');
+const packageQuotaDefinitionService = require('../packageQuotaDefinitionService');
 const { toPublicId, idsEqual } = require('../../utils/idAdapter');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const METRIC_FIELDS = Object.freeze(['call', 'amount', 'token', 'volume']);
 const CONSUME_TIMINGS = Object.freeze(['on_attempt', 'on_success', 'hybrid']);
 const RESOLUTION_ERROR_MESSAGE = 'This section/operation does not have an active Activity Quota definition.';
 const DEFAULT_TIMEZONE = 'UTC';
 
-const MIDDLEWARE_ENABLED_KEYS = Object.freeze([
-  `${SECTIONS.PTE_PRACTICE_BY_SKILLS}::${OPERATIONS.CREATE}`,
-  `${SECTIONS.PTE_PRACTICE_BY_SKILLS}::${OPERATIONS.AI_SCORING}`,
-  `${SECTIONS.PTE_PRACTICE_BY_SKILLS}::${OPERATIONS.UPDATE}`,
-  `${SECTIONS.PTE_PRACTICE_BY_SKILLS}::${OPERATIONS.READ}`,
-  `${SECTIONS.PTE_PRACTICE_BY_SKILLS}::${OPERATIONS.READ_ALL}`
-]);
+const MIDDLEWARE_ENABLED_KEYS = Object.freeze(packageQuotaDefinitionService.buildEnabledQuotaKeys());
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

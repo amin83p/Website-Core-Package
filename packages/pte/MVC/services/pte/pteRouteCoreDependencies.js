@@ -4,7 +4,7 @@ const { trackActionState } = require('../../../../../MVC/middleware/actionStateM
 const upload = require('../../../../../MVC/middleware/upload');
 const pteUploadContext = require('../../middleware/pteUploadContextMiddleware');
 const { resolveActivityQuotaPolicy } = require('../../../../../MVC/middleware/activityQuotaMiddleware');
-const { SECTIONS, OPERATIONS } = require('../../../../../config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 module.exports = {
   requireAuth,

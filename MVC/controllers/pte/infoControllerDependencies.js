@@ -1,4 +1,4 @@
-const { SECTIONS } = require('../../../config/accessConstants');
+const { SECTIONS } = require('../../../packages/pte/config/accessConstants');
 const ptePublicPackageDataService = require('../../services/pte/ptePublicPackageDataService');
 const ptePublicPageSettingsDataService = require('../../services/pte/ptePublicPageSettingsDataService');
 

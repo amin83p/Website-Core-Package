@@ -27,7 +27,7 @@ This roadmap lists remaining passes to take `Website-Core-Package` from PTE logi
 - ✅ Remove the hardcoded `app.use('/pte', ...)` from `app.js`.
 - Keep package runtime mount as the source of truth for `/pte` while validating startup order remains correct.
 
-### Pass 3 - Reduce remaining hardcoded core ties to PTE
+### Pass 3 - Reduce remaining hardcoded core ties to PTE (completed)
 - Move remaining PTE references out of core coupling points:
   - route mounts for domain-specific sections (already prepared; complete the migration for PTE)
   - menu/branding/menu entries
@@ -38,6 +38,7 @@ This roadmap lists remaining passes to take `Website-Core-Package` from PTE logi
 - Completed slice: PTE upload middleware categories now register through a package-owned upload category registration module instead of `coreFilesService` importing PTE upload path utilities directly.
 - Completed slice: PTE Mongo index definitions now live in `packages/pte` and are merged into the core Mongo index startup pipeline through package manifest discovery.
 - Completed slice: PTE system role seeds now come from `packages/pte/package.manifest.json` instead of core role/person fallback constants.
+- Completed slice: PTE route/controller dependency boundaries now consume package-owned PTE access constants, and PTE activity-quota middleware keys are discovered from package quota declarations.
 
 ### Pass 4 - Package-local physical layout finalization
 - Move remaining PTE-owned non-core assets/scripts/files from root/MVC locations into `packages/pte`:

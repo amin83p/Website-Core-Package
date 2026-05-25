@@ -2265,7 +2265,38 @@
       "applyDefault": true
     }
   ],
-  "quotaDefinitions": [],
+  "quotaDefinitions": [
+    {
+      "sectionId": "PTE_PRACTICE_BY_SKILLS",
+      "operationId": "CREATE",
+      "middlewareEnabled": true,
+      "active": true
+    },
+    {
+      "sectionId": "PTE_PRACTICE_BY_SKILLS",
+      "operationId": "AI_SCORING",
+      "middlewareEnabled": true,
+      "active": true
+    },
+    {
+      "sectionId": "PTE_PRACTICE_BY_SKILLS",
+      "operationId": "UPDATE",
+      "middlewareEnabled": true,
+      "active": true
+    },
+    {
+      "sectionId": "PTE_PRACTICE_BY_SKILLS",
+      "operationId": "READ",
+      "middlewareEnabled": true,
+      "active": true
+    },
+    {
+      "sectionId": "PTE_PRACTICE_BY_SKILLS",
+      "operationId": "READ_ALL",
+      "middlewareEnabled": true,
+      "active": true
+    }
+  ],
   "mongoIndexes": [
     {
       "path": "MVC/infrastructure/mongo/pteMongoIndexDefinitions.js",

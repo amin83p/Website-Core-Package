@@ -1,5 +1,5 @@
 const accessUiService = require('../../services/security/accessUiService');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../packages/pte/config/accessConstants');
 
 module.exports = {
   accessUiService,
