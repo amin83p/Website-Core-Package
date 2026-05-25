@@ -1,6 +1,6 @@
 const ptePublicPageSettingRepository = require('../../repositories/ptePublicPageSettingRepository');
 const settingService = require('../../../../../MVC/services/settingService');
-const { DEFAULTS } = require('../../../config/constants');
+const { DEFAULTS } = require('../../../../../config/constants');
 const { toPublicId } = require('../../utils/idAdapter');
 
 const FREE_ORG_ID = Number(DEFAULTS?.FREE_ORG_ID || 900000);

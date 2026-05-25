@@ -4,7 +4,7 @@ const activityQuotaPackageAssignmentRepository = require('../../../../../MVC/rep
 const dataService = require('../../../../../MVC/services/dataService');
 const settingService = require('../../../../../MVC/services/settingService');
 const pteStudentDataService = require('./pteStudentDataService');
-const { DEFAULTS, SYSTEM_CONTEXT } = require('../../../config/constants');
+const { DEFAULTS, SYSTEM_CONTEXT } = require('../../../../../config/constants');
 const { idsEqual, toPublicId } = require('../../utils/idAdapter');
 
 const FREE_ORG_ID = Number(DEFAULTS?.FREE_ORG_ID || 900000);
