@@ -224,7 +224,4 @@ function createPtePublicJoinService(overrides = {}) {
   };
 }
 
-const service = createPtePublicJoinService();
-
-module.exports = service;
-module.exports.createPtePublicJoinService = createPtePublicJoinService;
+module.exports = require('../../../packages/pte/MVC/services/pte/ptePublicJoinService');

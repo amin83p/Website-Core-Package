@@ -9,7 +9,11 @@ const { normalizeQueryOptions } = require('../../../../../MVC/utils/queryOptions
 const { resolveEntity } = require('../../../../../MVC/utils/entityResolver');
 const { applyGenericFilter } = require('../../../../../MVC/utils/queryEngine');
 const { idsEqual, toPublicId } = require('../../../../../MVC/utils/idAdapter');
-const { assertCreateOrgContextOrThrow } = require('../../../../../MVC/utils/orgContextUtils');
+const {
+  assertCreateOrgContextOrThrow,
+  getActiveOrgIdOrThrow,
+  normalizeOrgRoles
+} = require('../../../../../MVC/utils/orgContextUtils');
 const { decrypt } = require('../../../../../MVC/utils/encyptors');
 const paginate = require('../../../../../MVC/utils/paginationHelper');
 const {
@@ -36,6 +40,7 @@ module.exports = {
   normalizeQueryOptions,
   resolveEntity,
   applyGenericFilter,
+  getActiveOrgIdOrThrow,
   idsEqual,
   toPublicId,
   paginate,
@@ -46,7 +51,9 @@ module.exports = {
   getGatewayBaseUrl,
   getGatewayTimeoutMs,
   assertCreateOrgContextOrThrow,
+  normalizeOrgRoles,
   decrypt,
   runByRepositoryBackend,
-  getMongoCollection
+  getMongoCollection,
+  SYSTEM_CONTEXT: require('../../../../../config/constants').SYSTEM_CONTEXT
 };

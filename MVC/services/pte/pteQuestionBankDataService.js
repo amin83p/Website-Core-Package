@@ -1436,4 +1436,4 @@ const pteQuestionBankDataService = {
   }
 };
 
-module.exports = pteQuestionBankDataService;
+module.exports = require('../../../packages/pte/MVC/services/pte/pteQuestionBankDataService');

@@ -1211,4 +1211,4 @@ const pteCourseDataService = {
   }
 };
 
-module.exports = pteCourseDataService;
+module.exports = require('../../../packages/pte/MVC/services/pte/pteCourseDataService');
