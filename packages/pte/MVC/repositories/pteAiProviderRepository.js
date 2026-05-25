@@ -337,6 +337,9 @@ const pteAiProviderRepository = {
   async getDecryptedApiKeyById(id, options = {}) {
     return runByRepositoryBackend(options, {
       json: async () => {
+        if (typeof pteAiProviderModel.getDecryptedApiKeyById === 'function') {
+          return pteAiProviderModel.getDecryptedApiKeyById(id);
+        }
         const row = await pteAiProviderModel.getProviderById(id);
         return resolveApiKeyFromProviderRecord(row);
       },

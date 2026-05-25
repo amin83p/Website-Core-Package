@@ -1,2 +1,1 @@
-module.exports = require('../../../ielts/ai/providers/anthropicService');
-
+module.exports = require('../../../../../packages/pte/MVC/services/pte/ai/providers/anthropicService');

@@ -1,2 +1,1 @@
-module.exports = require('../../../ielts/ai/providers/openaiService');
-
+module.exports = require('../../../../../packages/pte/MVC/services/pte/ai/providers/openaiService');
