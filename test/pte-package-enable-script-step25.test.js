@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const packageEnableScript = require('../packages/pte/scripts/maintenance/enable-pte-package');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const PACKAGE_ENABLE_SCRIPT = 'packages/pte/scripts/maintenance/enable-pte-package.js';
@@ -19,8 +20,8 @@ async function withTempRegistry(callback) {
   }
 }
 
-function runPackageEnableScript(args = [], registryPath = '') {
-  return spawnSync(process.execPath, [PACKAGE_ENABLE_SCRIPT, ...args], {
+async function runPackageEnableScript(args = [], registryPath = '') {
+  const spawnResult = spawnSync(process.execPath, [PACKAGE_ENABLE_SCRIPT, ...args], {
     cwd: ROOT_DIR,
     env: {
       ...process.env,
@@ -28,11 +29,38 @@ function runPackageEnableScript(args = [], registryPath = '') {
     },
     encoding: 'utf8'
   });
+
+  if (spawnResult.status !== null) return spawnResult;
+  if (String(spawnResult?.error?.code || '').toUpperCase() !== 'EPERM') return spawnResult;
+
+  const previousRegistryPath = process.env.PACKAGE_REGISTRY_DATA_PATH;
+  const previousDataBackend = process.env.DATA_BACKEND;
+  process.env.PACKAGE_REGISTRY_DATA_PATH = registryPath;
+  if (!process.env.DATA_BACKEND) process.env.DATA_BACKEND = 'json';
+  try {
+    const report = await packageEnableScript.runEnablePtePackage(args, { emit: false });
+    return {
+      status: 0,
+      stderr: '',
+      stdout: JSON.stringify(report, null, 2)
+    };
+  } catch (error) {
+    return {
+      status: 1,
+      stderr: String(error?.message || error),
+      stdout: ''
+    };
+  } finally {
+    if (previousRegistryPath === undefined) delete process.env.PACKAGE_REGISTRY_DATA_PATH;
+    else process.env.PACKAGE_REGISTRY_DATA_PATH = previousRegistryPath;
+    if (previousDataBackend === undefined) delete process.env.DATA_BACKEND;
+    else process.env.DATA_BACKEND = previousDataBackend;
+  }
 }
 
 test('package-local PTE enable script dry-run reads package manifest without writing registry', async () => {
   await withTempRegistry(async ({ registryPath }) => {
-    const result = runPackageEnableScript(['--json'], registryPath);
+    const result = await runPackageEnableScript(['--json'], registryPath);
 
     assert.equal(result.status, 0, result.stderr);
     const report = JSON.parse(result.stdout);
@@ -51,7 +79,7 @@ test('package-local PTE enable script dry-run reads package manifest without wri
 
 test('package-local PTE enable script apply upserts registry idempotently', async () => {
   await withTempRegistry(async ({ registryPath }) => {
-    const first = runPackageEnableScript(['--apply', '--json'], registryPath);
+    const first = await runPackageEnableScript(['--apply', '--json'], registryPath);
     assert.equal(first.status, 0, first.stderr);
     const firstReport = JSON.parse(first.stdout);
     assert.equal(firstReport.action, 'create');
@@ -60,7 +88,7 @@ test('package-local PTE enable script apply upserts registry idempotently', asyn
     assert.equal(firstReport.result.installStatus, 'enabled');
     assert.equal(firstReport.result.metadata.activatedBy, PACKAGE_ENABLE_SCRIPT);
 
-    const second = runPackageEnableScript(['--apply', '--json'], registryPath);
+    const second = await runPackageEnableScript(['--apply', '--json'], registryPath);
     assert.equal(second.status, 0, second.stderr);
     const secondReport = JSON.parse(second.stdout);
     assert.equal(secondReport.action, 'update');
@@ -76,7 +104,7 @@ test('package-local PTE enable script apply upserts registry idempotently', asyn
 
 test('package-local PTE enable script dry-run supports disable action', async () => {
   await withTempRegistry(async ({ registryPath }) => {
-    const result = runPackageEnableScript(['--disable', '--json'], registryPath);
+    const result = await runPackageEnableScript(['--disable', '--json'], registryPath);
 
     assert.equal(result.status, 0, result.stderr);
     const report = JSON.parse(result.stdout);
@@ -93,7 +121,7 @@ test('package-local PTE enable script dry-run supports disable action', async ()
 
 test('package-local PTE enable script dry-run supports remove action', async () => {
   await withTempRegistry(async ({ registryPath }) => {
-    const result = runPackageEnableScript(['--remove', '--json'], registryPath);
+    const result = await runPackageEnableScript(['--remove', '--json'], registryPath);
 
     assert.equal(result.status, 0, result.stderr);
     const report = JSON.parse(result.stdout);

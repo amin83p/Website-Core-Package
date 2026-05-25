@@ -132,14 +132,17 @@ function printHumanReport(report = {}) {
   }
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
+async function runEnablePtePackage(argv = [], runtimeOptions = {}) {
+  const options = parseArgs(Array.isArray(argv) ? argv : []);
+  const emit = runtimeOptions.emit !== false;
   if (options.help) {
-    console.log('Usage: node scripts/packages/enable-pte-package.js [--apply] [--disable|--remove] [--json]');
-    console.log('Default mode is dry-run. Use --apply to persist changes.');
-    console.log('Use --disable to disable package registry + owned declarations.');
-    console.log('Use --remove to remove package registry row + owned declarations.');
-    return;
+    if (emit) {
+      console.log('Usage: node scripts/packages/enable-pte-package.js [--apply] [--disable|--remove] [--json]');
+      console.log('Default mode is dry-run. Use --apply to persist changes.');
+      console.log('Use --disable to disable package registry + owned declarations.');
+      console.log('Use --remove to remove package registry row + owned declarations.');
+    }
+    return { help: true };
   }
 
   const manifest = loadPteManifest();
@@ -194,12 +197,14 @@ async function main() {
       }
     }
 
-    if (options.json) {
-      console.log(JSON.stringify(report, null, 2));
-      return;
+    if (emit) {
+      if (options.json) {
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        printHumanReport(report);
+      }
     }
-
-    printHumanReport(report);
+    return report;
   } finally {
     if (backendMode === 'mongo') {
       await disconnectMongo();
@@ -207,7 +212,22 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(`[PTE_PACKAGE_ENABLE][ERROR] ${error?.message || error}`);
-  process.exitCode = 1;
-});
+async function main() {
+  await runEnablePtePackage(process.argv.slice(2), { emit: true });
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(`[PTE_PACKAGE_ENABLE][ERROR] ${error?.message || error}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  parseArgs,
+  loadPteManifest,
+  countDeclarations,
+  buildRegistryPayload,
+  initializeRegistryBackend,
+  runEnablePtePackage
+};

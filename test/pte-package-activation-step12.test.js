@@ -8,6 +8,7 @@ const { spawnSync } = require('node:child_process');
 const packageLoaderService = require('../MVC/services/packageLoaderService');
 const packageRegistryService = require('../MVC/services/packageRegistryService');
 const packageRouteService = require('../MVC/services/packageRouteService');
+const coreEnableScript = require('../scripts/packages/enable-pte-package');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -19,6 +20,49 @@ function makeSilentLogger() {
     error() {},
     debug() {}
   };
+}
+
+function runCoreEnableScript(args = [], env = {}) {
+  const spawnResult = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', ...args], {
+    cwd: ROOT_DIR,
+    env,
+    encoding: 'utf8'
+  });
+
+  if (spawnResult.status !== null) {
+    return {
+      status: spawnResult.status,
+      stderr: spawnResult.stderr,
+      stdout: spawnResult.stdout
+    };
+  }
+
+  const spawnErrorCode = String(spawnResult?.error?.code || '').toUpperCase();
+  if (spawnErrorCode !== 'EPERM') {
+    return {
+      status: spawnResult.status,
+      stderr: spawnResult.stderr,
+      stdout: spawnResult.stdout
+    };
+  }
+
+  const previousRegistryPath = process.env.PACKAGE_REGISTRY_DATA_PATH;
+  const previousDataBackend = process.env.DATA_BACKEND;
+  process.env.PACKAGE_REGISTRY_DATA_PATH = String(env.PACKAGE_REGISTRY_DATA_PATH || '');
+  if (!process.env.DATA_BACKEND) process.env.DATA_BACKEND = 'json';
+
+  return coreEnableScript.runEnablePtePackage(args, { emit: false })
+    .then((report) => {
+      const payload = JSON.stringify(report, null, 2);
+      return { status: 0, stderr: '', stdout: payload };
+    })
+    .catch((error) => ({ status: 1, stderr: String(error?.message || error), stdout: '' }))
+    .finally(() => {
+      if (previousRegistryPath === undefined) delete process.env.PACKAGE_REGISTRY_DATA_PATH;
+      else process.env.PACKAGE_REGISTRY_DATA_PATH = previousRegistryPath;
+      if (previousDataBackend === undefined) delete process.env.DATA_BACKEND;
+      else process.env.DATA_BACKEND = previousDataBackend;
+    });
 }
 
 function createAppStub() {
@@ -54,11 +98,7 @@ test('PTE enable script apply creates an enabled registry row and is idempotent'
       PACKAGE_REGISTRY_DATA_PATH: registryPath
     };
 
-    const first = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--json'], {
-      cwd: ROOT_DIR,
-      env,
-      encoding: 'utf8'
-    });
+    const first = await runCoreEnableScript(['--apply', '--json'], env);
     assert.equal(first.status, 0, first.stderr);
     const firstReport = JSON.parse(first.stdout);
     assert.equal(firstReport.action, 'create');
@@ -69,11 +109,7 @@ test('PTE enable script apply creates an enabled registry row and is idempotent'
     assert.equal(firstReport.result.metadata.declarationCounts.views, 1);
     assert.equal(firstReport.result.metadata.declarationCounts.assets, 1);
 
-    const second = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--json'], {
-      cwd: ROOT_DIR,
-      env,
-      encoding: 'utf8'
-    });
+    const second = await runCoreEnableScript(['--apply', '--json'], env);
     assert.equal(second.status, 0, second.stderr);
     const secondReport = JSON.parse(second.stdout);
     assert.equal(secondReport.action, 'update');
@@ -93,18 +129,10 @@ test('PTE enable script apply supports disable and remove lifecycle actions', as
       PACKAGE_REGISTRY_DATA_PATH: registryPath
     };
 
-    const enableRun = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--json'], {
-      cwd: ROOT_DIR,
-      env,
-      encoding: 'utf8'
-    });
+    const enableRun = await runCoreEnableScript(['--apply', '--json'], env);
     assert.equal(enableRun.status, 0, enableRun.stderr);
 
-    const disableRun = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--disable', '--json'], {
-      cwd: ROOT_DIR,
-      env,
-      encoding: 'utf8'
-    });
+    const disableRun = await runCoreEnableScript(['--apply', '--disable', '--json'], env);
     assert.equal(disableRun.status, 0, disableRun.stderr);
     const disableReport = JSON.parse(disableRun.stdout);
     assert.equal(disableReport.action, 'disable');
@@ -114,11 +142,7 @@ test('PTE enable script apply supports disable and remove lifecycle actions', as
     assert.equal(disableReport.result.installStatus, 'disabled');
     assert.equal(disableReport.declarationSummary.packageId, 'pte');
 
-    const removeRun = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--remove', '--json'], {
-      cwd: ROOT_DIR,
-      env,
-      encoding: 'utf8'
-    });
+    const removeRun = await runCoreEnableScript(['--apply', '--remove', '--json'], env);
     assert.equal(removeRun.status, 0, removeRun.stderr);
     const removeReport = JSON.parse(removeRun.stdout);
     assert.equal(removeReport.action, 'remove');

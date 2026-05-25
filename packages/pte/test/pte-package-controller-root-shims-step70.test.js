@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 
 const controllerFileNames = [
   'aiProviderController.js',
@@ -41,10 +41,12 @@ test('root PTE controllers are pure compatibility shims to package-owned control
 
 test('root PTE controller shims export the package-owned controller modules', () => {
   controllerFileNames.forEach((fileName) => {
+    const rootControllerPath = path.join(ROOT_DIR, 'MVC/controllers/pte', fileName);
+    const packageControllerPath = path.join(ROOT_DIR, 'packages/pte/MVC/controllers', fileName);
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    const rootController = require(`../MVC/controllers/pte/${fileName}`);
+    const rootController = require(rootControllerPath);
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    const packageController = require(`../packages/pte/MVC/controllers/${fileName}`);
+    const packageController = require(packageControllerPath);
 
     assert.equal(rootController, packageController, `${fileName} should export the package controller`);
   });

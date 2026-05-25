@@ -4,9 +4,9 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const coreEnableScript = require('../scripts/packages/enable-pte-package');
+const coreEnableScript = require('../../../scripts/packages/enable-pte-package');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 const CORE_ENABLE_SCRIPT = 'scripts/packages/enable-pte-package.js';
 
 async function withTempRegistry(callback) {

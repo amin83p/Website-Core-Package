@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
-const roleRegistryService = require('../MVC/services/person/roleRegistryService');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
+const roleRegistryService = require('../../../MVC/services/person/roleRegistryService');
 const personModelSource = fs.readFileSync(
   path.join(ROOT_DIR, 'MVC/models/personModel.js'),
   'utf8'

@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
-const manifest = require('../packages/pte/package.manifest.json');
-const pteAccessConstants = require('../packages/pte/config/accessConstants');
-const packageQuotaDefinitionService = require('../MVC/services/packageQuotaDefinitionService');
-const policyService = require('../MVC/services/activityQuota/consumptionDefinitionPolicyService');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
+const manifest = require('../../../packages/pte/package.manifest.json');
+const pteAccessConstants = require('../../../packages/pte/config/accessConstants');
+const packageQuotaDefinitionService = require('../../../MVC/services/packageQuotaDefinitionService');
+const policyService = require('../../../MVC/services/activityQuota/consumptionDefinitionPolicyService');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
@@ -32,14 +32,19 @@ test('PTE route dependency boundary uses package access constants', () => {
   assert.match(routeDeps, /require\('\.\.\/\.\.\/\.\.\/config\/accessConstants'\)/);
   assert.doesNotMatch(routeDeps, /\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/config\/accessConstants/);
 
-  [
-    'MVC/controllers/pte/practiceControllerDependencies.js',
-    'MVC/controllers/pte/feedbackControllerCoreDependencies.js',
-    'MVC/controllers/pte/infoControllerDependencies.js',
-    'MVC/controllers/pte/userDashboardControllerCoreDependencies.js'
-  ].forEach((relativePath) => {
-    const source = read(relativePath);
-    assert.match(source, /packages\/pte\/config\/accessConstants/);
+  const controllerPairs = [
+    ['MVC/controllers/pte/practiceControllerDependencies.js', 'packages/pte/MVC/controllers/practiceControllerDependencies.js'],
+    ['MVC/controllers/pte/feedbackControllerCoreDependencies.js', 'packages/pte/MVC/controllers/feedbackControllerCoreDependencies.js'],
+    ['MVC/controllers/pte/infoControllerDependencies.js', 'packages/pte/MVC/controllers/infoControllerDependencies.js'],
+    ['MVC/controllers/pte/userDashboardControllerCoreDependencies.js', 'packages/pte/MVC/controllers/userDashboardControllerCoreDependencies.js']
+  ];
+
+  controllerPairs.forEach(([rootPath, packagePath]) => {
+    const rootSource = read(rootPath);
+    assert.match(rootSource, /packages\/pte\/MVC\/controllers\//);
+
+    const packageSource = read(packagePath);
+    assert.match(packageSource, /config\/accessConstants/);
   });
 });
 

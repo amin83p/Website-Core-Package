@@ -32,14 +32,19 @@ test('PTE route dependency boundary uses package access constants', () => {
   assert.match(routeDeps, /require\('\.\.\/\.\.\/\.\.\/config\/accessConstants'\)/);
   assert.doesNotMatch(routeDeps, /\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/config\/accessConstants/);
 
-  [
-    'MVC/controllers/pte/practiceControllerDependencies.js',
-    'MVC/controllers/pte/feedbackControllerCoreDependencies.js',
-    'MVC/controllers/pte/infoControllerDependencies.js',
-    'MVC/controllers/pte/userDashboardControllerCoreDependencies.js'
-  ].forEach((relativePath) => {
-    const source = read(relativePath);
-    assert.match(source, /packages\/pte\/config\/accessConstants/);
+  const controllerPairs = [
+    ['MVC/controllers/pte/practiceControllerDependencies.js', 'packages/pte/MVC/controllers/practiceControllerDependencies.js'],
+    ['MVC/controllers/pte/feedbackControllerCoreDependencies.js', 'packages/pte/MVC/controllers/feedbackControllerCoreDependencies.js'],
+    ['MVC/controllers/pte/infoControllerDependencies.js', 'packages/pte/MVC/controllers/infoControllerDependencies.js'],
+    ['MVC/controllers/pte/userDashboardControllerCoreDependencies.js', 'packages/pte/MVC/controllers/userDashboardControllerCoreDependencies.js']
+  ];
+
+  controllerPairs.forEach(([rootPath, packagePath]) => {
+    const rootSource = read(rootPath);
+    assert.match(rootSource, /packages\/pte\/MVC\/controllers\//);
+
+    const packageSource = read(packagePath);
+    assert.match(packageSource, /config\/accessConstants/);
   });
 });
 

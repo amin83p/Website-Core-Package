@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 const packageToCoreDependencyMap = [
   {
     packageFile: 'packages/pte/MVC/controllers/attemptControllerCoreDependencies.js',
@@ -47,18 +47,14 @@ const packageToCoreDependencyMap = [
   }
 ];
 
-test('Package controller dependency shims should delegate to MVC core adapters', () => {
+test('Package controller dependency modules should be package-owned implementations', () => {
   packageToCoreDependencyMap.forEach(({ packageFile, expectedCoreTarget }) => {
     const fullPath = path.join(ROOT_DIR, packageFile);
-    const source = fs.readFileSync(fullPath, 'utf8');
-    const expectedSources = [
-      `module.exports = require('${expectedCoreTarget}');`,
-      `module.exports = require("${expectedCoreTarget}");`
-    ];
+    const source = fs.readFileSync(fullPath, 'utf8').trim();
     assert.equal(
-      expectedSources.includes(source.trim()),
-      true,
-      `${packageFile} should delegate to ${expectedCoreTarget}.`
+      source.includes(`require('${expectedCoreTarget}')`) || source.includes(`require(\"${expectedCoreTarget}\")`),
+      false,
+      `${packageFile} should remain package-owned and not delegate to ${expectedCoreTarget}.`
     );
   });
 });

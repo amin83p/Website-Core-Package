@@ -225,6 +225,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "docs/pte-package-ai-service-root-shims-step71.md",
+      "target": "packages/pte/docs/pte-package-ai-service-root-shims-step71.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "docs/pte-package-completion-roadmap-2026-05-24.md",
       "target": "packages/pte/docs/pte-package-completion-roadmap-2026-05-24.md",
       "category": "package-preparation",
@@ -302,6 +309,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "docs/pte-package-handover-2026-05-25.md",
+      "target": "packages/pte/docs/pte-package-handover-2026-05-25.md",
+      "category": "handover",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "docs/pte-package-hard-delete-attempts-step29.md",
       "target": "packages/pte/docs/pte-package-hard-delete-attempts-step29.md",
       "category": "package-preparation",
@@ -330,13 +344,6 @@
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "docs/pte-package-model-repository-shims-step20.md",
-      "target": "packages/pte/docs/pte-package-model-repository-shims-step20.md",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
       "source": "docs/pte-package-model-repository-ownership-step74.md",
       "target": "packages/pte/docs/pte-package-model-repository-ownership-step74.md",
       "category": "package-preparation",
@@ -344,15 +351,15 @@
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "docs/pte-package-mongo-index-registration-step66.md",
-      "target": "packages/pte/docs/pte-package-mongo-index-registration-step66.md",
+      "source": "docs/pte-package-model-repository-shims-step20.md",
+      "target": "packages/pte/docs/pte-package-model-repository-shims-step20.md",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "docs/pte-package-role-registry-step67.md",
-      "target": "packages/pte/docs/pte-package-role-registry-step67.md",
+      "source": "docs/pte-package-mongo-index-registration-step66.md",
+      "target": "packages/pte/docs/pte-package-mongo-index-registration-step66.md",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -388,6 +395,20 @@
     {
       "source": "docs/pte-package-repository-core-dependency-boundary-step53.md",
       "target": "packages/pte/docs/pte-package-repository-core-dependency-boundary-step53.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/pte-package-role-registry-step67.md",
+      "target": "packages/pte/docs/pte-package-role-registry-step67.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/pte-package-root-controller-shims-step70.md",
+      "target": "packages/pte/docs/pte-package-root-controller-shims-step70.md",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -498,6 +519,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "docs/pte-package-support-file-mirroring-step69.md",
+      "target": "packages/pte/docs/pte-package-support-file-mirroring-step69.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "docs/pte-package-upload-category-registration-step65.md",
       "target": "packages/pte/docs/pte-package-upload-category-registration-step65.md",
       "category": "package-preparation",
@@ -561,13 +589,6 @@
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "docs/pte/postman/README.md",
-      "target": "packages/pte/docs/postman/README.md",
-      "category": "postman",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
       "source": "docs/pte/postman/pte-attempt-runtime.local.postman_environment.json",
       "target": "packages/pte/docs/postman/pte-attempt-runtime.local.postman_environment.json",
       "category": "postman",
@@ -582,23 +603,9 @@
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "docs/pte-package-support-file-mirroring-step69.md",
-      "target": "packages/pte/docs/pte-package-support-file-mirroring-step69.md",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "docs/pte-package-root-controller-shims-step70.md",
-      "target": "packages/pte/docs/pte-package-root-controller-shims-step70.md",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "docs/pte-package-ai-service-root-shims-step71.md",
-      "target": "packages/pte/docs/pte-package-ai-service-root-shims-step71.md",
-      "category": "package-preparation",
+      "source": "docs/pte/postman/README.md",
+      "target": "packages/pte/docs/postman/README.md",
+      "category": "postman",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     }
@@ -682,6 +689,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "test/pte-package-ai-service-root-shims-step71.test.js",
+      "target": "packages/pte/test/pte-package-ai-service-root-shims-step71.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "test/pte-package-boundary-step13.test.js",
       "target": "packages/pte/test/pte-package-boundary-step13.test.js",
       "category": "package-preparation",
@@ -710,6 +724,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "test/pte-package-controller-root-shims-step70.test.js",
+      "target": "packages/pte/test/pte-package-controller-root-shims-step70.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "test/pte-package-controller-shims-step18.test.js",
       "target": "packages/pte/test/pte-package-controller-shims-step18.test.js",
       "category": "package-preparation",
@@ -726,6 +747,13 @@
     {
       "source": "test/pte-package-core-helper-adapter-step48.test.js",
       "target": "packages/pte/test/pte-package-core-helper-adapter-step48.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/pte-package-enable-script-core-step26.test.js",
+      "target": "packages/pte/test/pte-package-enable-script-core-step26.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -787,13 +815,6 @@
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "test/pte-package-role-registry-step67.test.js",
-      "target": "packages/pte/test/pte-package-role-registry-step67.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
       "source": "test/pte-package-mongo-validate-step27.test.js",
       "target": "packages/pte/test/pte-package-mongo-validate-step27.test.js",
       "category": "package-preparation",
@@ -817,6 +838,13 @@
     {
       "source": "test/pte-package-repository-core-dependency-boundary-step53.test.js",
       "target": "packages/pte/test/pte-package-repository-core-dependency-boundary-step53.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/pte-package-role-registry-step67.test.js",
+      "target": "packages/pte/test/pte-package-role-registry-step67.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -908,6 +936,13 @@
     {
       "source": "test/pte-package-step9.test.js",
       "target": "packages/pte/test/pte-package-step9.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/pte-package-support-file-mirroring-step69.test.js",
+      "target": "packages/pte/test/pte-package-support-file-mirroring-step69.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -1039,6 +1074,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "test/pte.course-student-picker-strict-role-filter.test.js",
+      "target": "packages/pte/test/pte.course-student-picker-strict-role-filter.test.js",
+      "category": "practice",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "test/pte.describe-image-scoring-service.test.js",
       "target": "packages/pte/test/pte.describe-image-scoring-service.test.js",
       "category": "scoring",
@@ -1126,27 +1168,6 @@
       "source": "test/pte.writing-scoring-service.test.js",
       "target": "packages/pte/test/pte.writing-scoring-service.test.js",
       "category": "scoring",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-support-file-mirroring-step69.test.js",
-      "target": "packages/pte/test/pte-package-support-file-mirroring-step69.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-controller-root-shims-step70.test.js",
-      "target": "packages/pte/test/pte-package-controller-root-shims-step70.test.js",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
-      "source": "test/pte-package-ai-service-root-shims-step71.test.js",
-      "target": "packages/pte/test/pte-package-ai-service-root-shims-step71.test.js",
-      "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
     }

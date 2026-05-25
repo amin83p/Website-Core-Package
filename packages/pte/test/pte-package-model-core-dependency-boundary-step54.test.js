@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 const modelDir = path.join(ROOT_DIR, 'packages/pte/MVC/models/pte');
 
 const shimPattern = /^\s*module\.exports\s*=\s*require\(['"]\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/MVC\/models\/pte\/[^'"]+['"]\)\s*;?\s*$/;

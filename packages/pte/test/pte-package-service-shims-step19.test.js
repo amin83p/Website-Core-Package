@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 const CURRENT_SERVICE_ROOT = path.join(ROOT_DIR, 'MVC/services/pte');
 const PACKAGE_SERVICE_ROOT = path.join(ROOT_DIR, 'packages/pte/MVC/services/pte');
 
@@ -70,25 +70,30 @@ test('PTE package service shims mirror the current recursive PTE service tree', 
   assert.deepEqual(packageFiles, currentFiles);
 });
 
-test('PTE package service shims delegate to current MVC service modules', () => {
+test('PTE package services are either compatibility shims or package-owned implementations', () => {
   listJsFiles(CURRENT_SERVICE_ROOT).forEach((relativeFile) => {
-    if (packageOwnedServices.has(relativeFile)) {
-      return;
-    }
-
     const packageShimPath = path.join(PACKAGE_SERVICE_ROOT, relativeFile);
     const source = readText(packageShimPath);
     const expectedRequire = expectedShimRequirePath(relativeFile);
+    const isShim = source.includes(`require('${expectedRequire}')`);
 
-    assert.ok(
-      source.includes(`require('${expectedRequire}')`),
-      `${relativeFile} should delegate to ${expectedRequire}`
+    if (isShim) return;
+
+    assert.equal(
+      source.includes('../../../../../MVC/services/pte/'),
+      false,
+      `${relativeFile} should not re-import core PTE services when owned by package.`
     );
   });
 });
 
-test('PTE package-owned AI Assist services are not simple shims', () => {
-  packageOwnedServices.forEach((relativeFile) => {
+test('PTE package-owned services are not simple shims', () => {
+  [
+    ...packageOwnedServices,
+    'pteAnswerShortQuestionScoringService.js',
+    'pteAttemptLedgerService.js',
+    'pteScoringEngineService.js'
+  ].forEach((relativeFile) => {
     const packageServicePath = path.join(PACKAGE_SERVICE_ROOT, relativeFile);
     const source = readText(packageServicePath);
     const expectedRequire = expectedShimRequirePath(relativeFile);

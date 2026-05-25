@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 const coreFilesService = require('../MVC/services/coreFilesService');
-const uploadCategoryResolverService = require('../MVC/services/uploadCategoryResolverService');
-const uploadFolderSettingsService = require('../MVC/services/uploadFolderSettingsService');
-const manifest = require('../packages/pte/package.manifest.json');
+const uploadCategoryResolverService = require('../../../MVC/services/uploadCategoryResolverService');
+const uploadFolderSettingsService = require('../../../MVC/services/uploadFolderSettingsService');
+const manifest = require('../../../packages/pte/package.manifest.json');
 
 const registrationPath = path.join(
   ROOT_DIR,

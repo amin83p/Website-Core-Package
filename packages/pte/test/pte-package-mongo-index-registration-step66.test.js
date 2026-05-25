@@ -2,11 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
-const manifest = require('../packages/pte/package.manifest.json');
-const pteIndexDefinitions = require('../packages/pte/MVC/infrastructure/mongo/pteMongoIndexDefinitions');
-const packageMongoIndexRegistry = require('../MVC/infrastructure/mongo/packageMongoIndexRegistry');
-const mongoIndexManager = require('../MVC/infrastructure/mongo/mongoIndexManager');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
+const manifest = require('../../../packages/pte/package.manifest.json');
+const pteIndexDefinitions = require('../../../packages/pte/MVC/infrastructure/mongo/pteMongoIndexDefinitions');
+const packageMongoIndexRegistry = require('../../../MVC/infrastructure/mongo/packageMongoIndexRegistry');
+const mongoIndexManager = require('../../../MVC/infrastructure/mongo/mongoIndexManager');
 
 const PTE_COLLECTIONS = [
   'pteApplicants',

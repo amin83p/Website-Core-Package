@@ -5,9 +5,9 @@ const {
   setQuestionBankContext,
   setStudentContext,
   setRuntimeAttemptContext
-} = require('../packages/pte/MVC/middleware/pteUploadContextMiddleware');
+} = require('../../../packages/pte/MVC/middleware/pteUploadContextMiddleware');
 
-const { pteUploadPathUtils } = require('../packages/pte/MVC/services/pte/pteUploadContextDependencies');
+const { pteUploadPathUtils } = require('../../../packages/pte/MVC/services/pte/pteUploadContextDependencies');
 
 function runMiddleware(mw, req = {}, res = {}, next = () => {}) {
   return new Promise((resolve, reject) => {

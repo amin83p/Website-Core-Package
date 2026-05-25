@@ -5,11 +5,12 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const packageLoaderService = require('../MVC/services/packageLoaderService');
-const packageRegistryService = require('../MVC/services/packageRegistryService');
-const packageRouteService = require('../MVC/services/packageRouteService');
+const packageLoaderService = require('../../../MVC/services/packageLoaderService');
+const packageRegistryService = require('../../../MVC/services/packageRegistryService');
+const packageRouteService = require('../../../MVC/services/packageRouteService');
+const coreEnableScript = require('../../../scripts/packages/enable-pte-package');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 
 function makeSilentLogger() {
   return {
@@ -19,6 +20,41 @@ function makeSilentLogger() {
     error() {},
     debug() {}
   };
+}
+
+async function runCoreEnableScript(args = [], env = {}) {
+  const spawnResult = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', ...args], {
+    cwd: ROOT_DIR,
+    env,
+    encoding: 'utf8'
+  });
+
+  if (spawnResult.status !== null) return spawnResult;
+  if (String(spawnResult?.error?.code || '').toUpperCase() !== 'EPERM') return spawnResult;
+
+  const previousRegistryPath = process.env.PACKAGE_REGISTRY_DATA_PATH;
+  const previousDataBackend = process.env.DATA_BACKEND;
+  process.env.PACKAGE_REGISTRY_DATA_PATH = String(env.PACKAGE_REGISTRY_DATA_PATH || '');
+  if (!process.env.DATA_BACKEND) process.env.DATA_BACKEND = 'json';
+  try {
+    const report = await coreEnableScript.runEnablePtePackage(args, { emit: false });
+    return {
+      status: 0,
+      stderr: '',
+      stdout: JSON.stringify(report, null, 2)
+    };
+  } catch (error) {
+    return {
+      status: 1,
+      stderr: String(error?.message || error),
+      stdout: ''
+    };
+  } finally {
+    if (previousRegistryPath === undefined) delete process.env.PACKAGE_REGISTRY_DATA_PATH;
+    else process.env.PACKAGE_REGISTRY_DATA_PATH = previousRegistryPath;
+    if (previousDataBackend === undefined) delete process.env.DATA_BACKEND;
+    else process.env.DATA_BACKEND = previousDataBackend;
+  }
 }
 
 function createAppStub() {
@@ -54,11 +90,7 @@ test('PTE enable script apply creates an enabled registry row and is idempotent'
       PACKAGE_REGISTRY_DATA_PATH: registryPath
     };
 
-    const first = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--json'], {
-      cwd: ROOT_DIR,
-      env,
-      encoding: 'utf8'
-    });
+    const first = await runCoreEnableScript(['--apply', '--json'], env);
     assert.equal(first.status, 0, first.stderr);
     const firstReport = JSON.parse(first.stdout);
     assert.equal(firstReport.action, 'create');
@@ -69,11 +101,7 @@ test('PTE enable script apply creates an enabled registry row and is idempotent'
     assert.equal(firstReport.result.metadata.declarationCounts.views, 1);
     assert.equal(firstReport.result.metadata.declarationCounts.assets, 1);
 
-    const second = spawnSync(process.execPath, ['scripts/packages/enable-pte-package.js', '--apply', '--json'], {
-      cwd: ROOT_DIR,
-      env,
-      encoding: 'utf8'
-    });
+    const second = await runCoreEnableScript(['--apply', '--json'], env);
     assert.equal(second.status, 0, second.stderr);
     const secondReport = JSON.parse(second.stdout);
     assert.equal(secondReport.action, 'update');

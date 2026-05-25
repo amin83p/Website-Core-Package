@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const packageModuleResolverService = require('../MVC/services/packageModuleResolverService');
-const packageRouteService = require('../MVC/services/packageRouteService');
+const packageModuleResolverService = require('../../../MVC/services/packageModuleResolverService');
+const packageRouteService = require('../../../MVC/services/packageRouteService');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
@@ -66,10 +66,12 @@ test('PTE current MVC route files are pure compatibility shims to package-owned 
     const currentSource = readText(`MVC/routes/pte/${fileName}`).trim();
     assert.equal(currentSource, expectedShim, `${fileName} should be a pure compatibility shim`);
 
+    const packageRoutePath = path.join(ROOT_DIR, 'packages/pte/MVC/routes', fileName);
+    const currentRoutePath = path.join(ROOT_DIR, 'MVC/routes/pte', fileName);
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    const packageRoute = require(`../packages/pte/MVC/routes/${fileName}`);
+    const packageRoute = require(packageRoutePath);
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    const currentRoute = require(`../MVC/routes/pte/${fileName}`);
+    const currentRoute = require(currentRoutePath);
     assert.equal(currentRoute, packageRoute, `${fileName} should export the package-owned route module`);
   });
 });

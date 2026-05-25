@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const packageManifestService = require('../MVC/services/packageManifestService');
-const packageRegistryInstallerService = require('../MVC/services/packageRegistryInstallerService');
+const packageManifestService = require('../../../MVC/services/packageManifestService');
+const packageRegistryInstallerService = require('../../../MVC/services/packageRegistryInstallerService');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 const CURRENT_VIEW_ROOT = path.join(ROOT_DIR, 'MVC/views/pte');
 const PACKAGE_VIEW_ROOT = path.join(ROOT_DIR, 'packages/pte/MVC/views/pte');
 const CURRENT_SCRIPT = path.join(ROOT_DIR, 'public/scripts/ptePracticeCoachRules.js');

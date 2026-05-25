@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 
 test('PTE package middleware files should stay inside package boundary', () => {
   const middlewareDir = path.join(ROOT_DIR, 'packages/pte/MVC/middleware');

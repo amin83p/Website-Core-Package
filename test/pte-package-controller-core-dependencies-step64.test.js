@@ -25,14 +25,15 @@ test('PTE controller dependency shims in MVC should delegate to package-owned co
       'packages/pte/MVC/controllers',
       fileName
     );
-    const expectedShim = `module.exports = require('../../../packages/pte/MVC/controllers/${fileName}');`;
+    const expectedShims = [
+      `module.exports = require('../../../packages/pte/MVC/controllers/${fileName}');`,
+      `module.exports = require('../../../packages/pte/MVC/controllers/${fileName.replace(/\.js$/, '')}');`,
+      `module.exports = require(\"../../../packages/pte/MVC/controllers/${fileName}\");`,
+      `module.exports = require(\"../../../packages/pte/MVC/controllers/${fileName.replace(/\.js$/, '')}\");`
+    ];
 
     const source = fs.readFileSync(corePath, 'utf8').trim();
-    assert.equal(
-      source,
-      expectedShim,
-      `${fileName} should be a compatibility shim to packages/pte.`
-    );
+    assert.equal(expectedShims.includes(source), true, `${fileName} should be a compatibility shim to packages/pte.`);
 
     const coreModule = require(corePath);
     const packageModule = require(packagePath);

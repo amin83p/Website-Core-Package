@@ -64,15 +64,15 @@
             <div class="row g-3">
               <div class="col-md-5">
                 <label class="form-label fw-bold">Course Name *</label>
-                <input type="text" class="form-control size-md" id="pteCourseNameInput" value="<%= c.name || '' %>" maxlength="220" required>
+                <input type="text" class="form-control size-md" id="pteCourseNameInput" name="name" value="<%= c.name || '' %>" maxlength="220" required>
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold">Course Code</label>
-                <input type="text" class="form-control size-md font-monospace" id="pteCourseCodeInput" value="<%= c.code || '' %>" maxlength="120" placeholder="Optional">
+                <input type="text" class="form-control size-md font-monospace" id="pteCourseCodeInput" name="code" value="<%= c.code || '' %>" maxlength="120" placeholder="Optional">
               </div>
               <div class="col-md-2">
                 <label class="form-label fw-bold">Status</label>
-                <select class="form-select size-md text-capitalize" id="pteCourseStatusSelect">
+                <select class="form-select size-md text-capitalize" id="pteCourseStatusSelect" name="status">
                   <% statuses.forEach((st) => { %>
                     <% const selected = String(st.value || '').toLowerCase() === String(c.status || 'draft').toLowerCase(); %>
                     <option value="<%= st.value %>" <%= selected ? 'selected' : '' %>><%= st.label || st.value %></option>
@@ -81,7 +81,7 @@
               </div>
               <div class="col-md-2">
                 <label class="form-label fw-bold">Course Type</label>
-                <select class="form-select size-md text-uppercase" id="pteCourseTypeSelect">
+                <select class="form-select size-md text-uppercase" id="pteCourseTypeSelect" name="courseType">
                   <% courseTypes.forEach((row) => { %>
                     <% const optionValue = String(row.value || '').trim().toUpperCase(); %>
                     <option value="<%= optionValue %>" <%= optionValue === selectedCourseType ? 'selected' : '' %>><%= row.label || optionValue %></option>
@@ -93,15 +93,15 @@
             <div class="row g-3 mt-1">
               <div class="col-md-3">
                 <label class="form-label fw-bold">Start Date</label>
-                <input type="date" class="form-control size-md" id="pteCourseStartDateInput" value="<%= c.startDate || '' %>">
+                <input type="date" class="form-control size-md" id="pteCourseStartDateInput" name="startDate" value="<%= c.startDate || '' %>">
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold">End Date</label>
-                <input type="date" class="form-control size-md" id="pteCourseEndDateInput" value="<%= c.endDate || '' %>">
+                <input type="date" class="form-control size-md" id="pteCourseEndDateInput" name="endDate" value="<%= c.endDate || '' %>">
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold">Max Students</label>
-                <input type="number" class="form-control size-md" id="pteCourseMaxStudentsInput" value="<%= Number(c.maxStudents || 0) %>" min="0" step="1">
+                <input type="number" class="form-control size-md" id="pteCourseMaxStudentsInput" name="maxStudents" value="<%= Number(c.maxStudents || 0) %>" min="0" step="1">
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold">Organization</label>
@@ -112,7 +112,7 @@
             <div class="row g-3 mt-1">
               <div class="col-md-12">
                 <label class="form-label fw-bold">Description</label>
-                <textarea class="form-control size-md" id="pteCourseDescriptionInput" rows="4" maxlength="4000" placeholder="Course overview, notes, and delivery details..."><%= c.description || '' %></textarea>
+                <textarea class="form-control size-md" id="pteCourseDescriptionInput" name="description" rows="4" maxlength="4000" placeholder="Course overview, notes, and delivery details..."><%= c.description || '' %></textarea>
               </div>
             </div>
           </div>
@@ -627,13 +627,20 @@
         return String(form.action || '') + (String(form.action || '').includes('?') ? '&' : '?') + 'actionStateId=' + encodeURIComponent(actionStateId);
       })();
 
+      const formData = new FormData(form);
+      const payload = new URLSearchParams();
+      formData.forEach((value, key) => {
+        payload.append(key, value == null ? '' : String(value));
+      });
+
       const response = await fetch(submitUrl, {
         method: 'POST',
         headers: {
           'X-AJAX-Request': 'true',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
         },
-        body: new FormData(form),
+        body: payload.toString(),
         credentials: 'include'
       });
       const result = await response.json().catch(() => null);
