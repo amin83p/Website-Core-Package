@@ -1,5 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const os = require('node:os');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const PizZip = require('pizzip');
 
 const { createService } = require('../MVC/services/systemSettingsPackageManagerService');
 
@@ -34,6 +39,32 @@ function createManifest(overrides = {}) {
     migrations: [],
     dependencies: [],
     ...overrides
+  };
+}
+
+function createSignedPackageZip(manifest, extras = {}) {
+  const zip = new PizZip();
+  const folderName = String(extras.folderName || manifest.id);
+  const prefix = `${folderName}/`;
+  zip.file(`${prefix}package.manifest.json`, JSON.stringify(manifest, null, 2));
+  zip.file(`${prefix}README.md`, '# package');
+  if (extras.includeUnsafeEntry) {
+    zip.file('../evil.txt', 'bad');
+  }
+  if (extras.includeSecondTopFolder) {
+    zip.file('second-package/info.txt', 'other');
+  }
+  if (extras.omitManifest) {
+    zip.remove(`${prefix}package.manifest.json`);
+  }
+  const zipBuffer = zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+  const signatureBuffer = crypto.sign(null, zipBuffer, privateKey);
+  const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
+  return {
+    zipBuffer,
+    signatureBuffer,
+    publicKeyPem
   };
 }
 
@@ -153,6 +184,28 @@ function createBaseDeps() {
   };
 }
 
+async function createZipInstallDeps() {
+  const setup = createBaseDeps();
+  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-zip-install-test-'));
+  const packageRootDir = path.join(tmpRoot, 'packages');
+  await fs.mkdir(packageRootDir, { recursive: true });
+
+  setup.deps.fs = fs;
+  setup.deps.packageLoaderService.resolveManifestPath = async (packageId, row = {}, rootDir = '') => {
+    const preferred = String(row?.metadata?.manifestPath || '').trim();
+    if (preferred) {
+      return path.isAbsolute(preferred) ? preferred : path.join(process.cwd(), preferred);
+    }
+    return path.join(rootDir || packageRootDir, packageId, 'package.manifest.json');
+  };
+  setup.cleanup = async () => {
+    await fs.rm(tmpRoot, { recursive: true, force: true });
+  };
+  setup.packageRootDir = packageRootDir;
+  setup.tmpRoot = tmpRoot;
+  return setup;
+}
+
 test('listPackageSnapshot includes discovered local manifests and installed rows', async () => {
   const setup = createBaseDeps();
   setup.deps.fs.readdir = async () => [createDirent('pte')];
@@ -255,4 +308,156 @@ test('syncPackage installs declarations and refreshes navigation', async () => {
   assert.equal(report.packageId, 'pte');
   assert.equal(setup.declarationCalls().some((row) => row.type === 'install'), true);
   assert.equal(setup.navigationRefreshCount() >= 1, true);
+});
+
+test('installPackageZip verifies signature and installs package into packages directory', async () => {
+  const setup = await createZipInstallDeps();
+  const manifest = createManifest({ id: 'zip-addon', name: 'ZIP Addon', version: '1.0.0', mountPath: '/zip-addon' });
+  const fixture = createSignedPackageZip(manifest);
+  const service = createService(setup.deps);
+
+  try {
+    const report = await service.installPackageZip({
+      zipBuffer: fixture.zipBuffer,
+      signatureBuffer: fixture.signatureBuffer
+    }, {
+      backendMode: 'json',
+      packageRootDir: setup.packageRootDir,
+      trustedPublicKeys: [fixture.publicKeyPem]
+    });
+
+    assert.equal(report.action, 'install-zip');
+    assert.equal(report.installMethod, 'zip');
+    assert.equal(report.source, 'manual-zip');
+    assert.equal(report.signature?.verified, true);
+    assert.equal(report.registry.enabled, true);
+    assert.equal(report.registry.installStatus, 'enabled');
+    assert.equal(report.packageId, 'zip-addon');
+    assert.equal(report.extractedPath.includes('packages/zip-addon'), true);
+
+    const savedManifest = JSON.parse(
+      await fs.readFile(path.join(setup.packageRootDir, 'zip-addon', 'package.manifest.json'), 'utf8')
+    );
+    assert.equal(savedManifest.id, 'zip-addon');
+    assert.equal(savedManifest.version, '1.0.0');
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test('installPackageZip rejects invalid signature', async () => {
+  const setup = await createZipInstallDeps();
+  const manifest = createManifest({ id: 'zip-addon-bad-sig', version: '1.0.0', mountPath: '/zip-addon-bad-sig' });
+  const fixture = createSignedPackageZip(manifest);
+  const service = createService(setup.deps);
+
+  try {
+    const wrongSignature = Buffer.from(fixture.signatureBuffer);
+    wrongSignature[0] = wrongSignature[0] ^ 0xff;
+    await assert.rejects(
+      () => service.installPackageZip({
+        zipBuffer: fixture.zipBuffer,
+        signatureBuffer: wrongSignature
+      }, {
+        backendMode: 'json',
+        packageRootDir: setup.packageRootDir,
+        trustedPublicKeys: [fixture.publicKeyPem]
+      }),
+      /verification failed/i
+    );
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test('installPackageZip blocks same or older package versions', async () => {
+  const setup = await createZipInstallDeps();
+  const manifest = createManifest({ id: 'zip-addon-upgrade', version: '1.0.0', mountPath: '/zip-addon-upgrade' });
+  const fixture = createSignedPackageZip(manifest);
+  const service = createService(setup.deps);
+
+  try {
+    await service.installPackageZip({
+      zipBuffer: fixture.zipBuffer,
+      signatureBuffer: fixture.signatureBuffer
+    }, {
+      backendMode: 'json',
+      packageRootDir: setup.packageRootDir,
+      trustedPublicKeys: [fixture.publicKeyPem]
+    });
+
+    const sameVersionFixture = createSignedPackageZip(manifest);
+    await assert.rejects(
+      () => service.installPackageZip({
+        zipBuffer: sameVersionFixture.zipBuffer,
+        signatureBuffer: sameVersionFixture.signatureBuffer
+      }, {
+        backendMode: 'json',
+        packageRootDir: setup.packageRootDir,
+        trustedPublicKeys: [sameVersionFixture.publicKeyPem]
+      }),
+      /must be newer/i
+    );
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test('installPackageZip rejects invalid archive layout and folder-manifest mismatch', async () => {
+  const setup = await createZipInstallDeps();
+  const manifest = createManifest({ id: 'zip-addon-layout', version: '1.0.0', mountPath: '/zip-addon-layout' });
+  const service = createService(setup.deps);
+
+  try {
+    const twoTopLevel = createSignedPackageZip(manifest, { includeSecondTopFolder: true });
+    await assert.rejects(
+      () => service.installPackageZip({
+        zipBuffer: twoTopLevel.zipBuffer,
+        signatureBuffer: twoTopLevel.signatureBuffer
+      }, {
+        backendMode: 'json',
+        packageRootDir: setup.packageRootDir,
+        trustedPublicKeys: [twoTopLevel.publicKeyPem]
+      }),
+      /exactly one top-level/i
+    );
+
+    const mismatch = createSignedPackageZip(manifest, { folderName: 'different-folder' });
+    await assert.rejects(
+      () => service.installPackageZip({
+        zipBuffer: mismatch.zipBuffer,
+        signatureBuffer: mismatch.signatureBuffer
+      }, {
+        backendMode: 'json',
+        packageRootDir: setup.packageRootDir,
+        trustedPublicKeys: [mismatch.publicKeyPem]
+      }),
+      /folder identity mismatch/i
+    );
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test('installPackageZip rejects unsafe ZIP entry traversal payloads', async () => {
+  const setup = await createZipInstallDeps();
+  const manifest = createManifest({ id: 'zip-addon-safe', version: '1.0.0', mountPath: '/zip-addon-safe' });
+  const service = createService(setup.deps);
+
+  try {
+    const unsafe = createSignedPackageZip(manifest, { includeUnsafeEntry: true });
+    await assert.rejects(
+      () => service.installPackageZip({
+        zipBuffer: unsafe.zipBuffer,
+        signatureBuffer: unsafe.signatureBuffer
+      }, {
+        backendMode: 'json',
+        packageRootDir: setup.packageRootDir,
+        trustedPublicKeys: [unsafe.publicKeyPem]
+      }),
+      /unsafe path token/i
+    );
+  } finally {
+    await setup.cleanup();
+  }
 });

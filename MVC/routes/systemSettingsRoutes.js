@@ -13,9 +13,17 @@ const accessService = require('../services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
 const restoreLimitMb = Number.parseInt(process.env.MONGO_BACKUP_RESTORE_MAX_MB || '100', 10) || 100;
+const packageZipLimitMb = Number.parseInt(process.env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB || '50', 10) || 50;
 const backupRestoreUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: restoreLimitMb * 1024 * 1024 }
+});
+const packageZipUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: packageZipLimitMb * 1024 * 1024,
+    files: 2
+  }
 });
 
 function handleBackupRestoreUpload(req, res, next) {
@@ -29,6 +37,26 @@ function handleBackupRestoreUpload(req, res, next) {
     }
     return res.status(400).render('error', {
       title: 'Backup Upload Failed',
+      message,
+      user: req.user
+    });
+  });
+}
+
+function handlePackageZipUpload(req, res, next) {
+  packageZipUpload.fields([
+    { name: 'packageZip', maxCount: 1 },
+    { name: 'packageSig', maxCount: 1 }
+  ])(req, res, (error) => {
+    if (!error) return next();
+    const message = error.code === 'LIMIT_FILE_SIZE'
+      ? `Package ZIP/signature file is too large. Maximum upload size is ${packageZipLimitMb} MB.`
+      : (error.message || 'Package ZIP upload failed.');
+    if (req.headers['x-ajax-request'] || req.xhr || req.headers.accept?.includes('json')) {
+      return res.status(400).json({ status: 'error', message });
+    }
+    return res.status(400).render('error', {
+      title: 'Package Upload Failed',
       message,
       user: req.user
     });
@@ -217,6 +245,17 @@ router.post('/packages/install',
           ),
           adminApproval,
           ctrl.installPackageFromManager);
+router.post('/packages/install-zip',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          handlePackageZipUpload,
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.installPackageZipFromManager);
 router.post('/packages/:packageId/enable',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),

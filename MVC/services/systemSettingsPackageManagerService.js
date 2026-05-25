@@ -1,5 +1,8 @@
 const fs = require('fs').promises;
 const path = require('path');
+const os = require('os');
+const crypto = require('crypto');
+const PizZip = require('pizzip');
 
 const packageManifestService = require('./packageManifestService');
 const packageRegistryService = require('./packageRegistryService');
@@ -30,6 +33,140 @@ function normalizeInstallMethod(value = '') {
   if (token === 'path') return 'path';
   if (token === 'json') return 'json';
   return '';
+}
+
+function readPositiveInt(value, fallback) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+function getZipInstallLimits(env = process.env) {
+  const maxUploadMb = readPositiveInt(env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB, 50);
+  const maxExtractedMb = readPositiveInt(env.PACKAGE_ZIP_INSTALL_MAX_EXTRACTED_MB, 250);
+  const maxFiles = readPositiveInt(env.PACKAGE_ZIP_INSTALL_MAX_FILES, 5000);
+  return {
+    maxUploadBytes: maxUploadMb * 1024 * 1024,
+    maxExtractedBytes: maxExtractedMb * 1024 * 1024,
+    maxFiles
+  };
+}
+
+function parseKeyCandidates(value = '') {
+  const token = String(value || '').trim();
+  if (!token) return [];
+  return token
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function loadTrustedPublicKeys(options = {}) {
+  if (Array.isArray(options.trustedPublicKeys) && options.trustedPublicKeys.length) {
+    return options.trustedPublicKeys.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  const envList = [
+    ...parseKeyCandidates(process.env.PACKAGE_INSTALL_ED25519_PUBLIC_KEYS || ''),
+    ...parseKeyCandidates(process.env.PACKAGE_INSTALL_ED25519_PUBLIC_KEY || '')
+  ];
+  return envList;
+}
+
+function parsePublicKey(input = '') {
+  const token = String(input || '').trim();
+  if (!token) throw new Error('Trusted public key is empty.');
+  if (token.includes('BEGIN PUBLIC KEY')) {
+    return crypto.createPublicKey({ key: token, format: 'pem' });
+  }
+  const der = Buffer.from(token.replace(/\s+/g, ''), 'base64');
+  if (!der.length) throw new Error('Trusted public key is invalid.');
+  return crypto.createPublicKey({ key: der, format: 'der', type: 'spki' });
+}
+
+function parseDetachedSignatureBuffer(rawBuffer = Buffer.alloc(0)) {
+  if (!Buffer.isBuffer(rawBuffer) || !rawBuffer.length) {
+    throw new Error('Signature file is empty.');
+  }
+  const text = rawBuffer.toString('utf8').trim();
+  const compact = text.replace(/\s+/g, '');
+  if (compact && /^[A-Za-z0-9+/=]+$/.test(compact) && compact.length % 4 === 0) {
+    try {
+      const decoded = Buffer.from(compact, 'base64');
+      if (decoded.length) return decoded;
+    } catch (_) {
+      // fallback to raw buffer
+    }
+  }
+  return rawBuffer;
+}
+
+function normalizeZipEntryPath(entryName = '') {
+  const token = String(entryName || '').replace(/\\/g, '/').replace(/^\/+/, '').trim();
+  if (!token) return '';
+  const parts = token.split('/').filter(Boolean);
+  if (!parts.length) return '';
+  for (const part of parts) {
+    if (part === '.' || part === '..') {
+      throw new Error(`ZIP entry contains unsafe path token: ${entryName}`);
+    }
+  }
+  return parts.join('/');
+}
+
+function parseSemver(version = '') {
+  const token = cleanText(version, 120);
+  const [coreAndPre] = token.split('+');
+  const [core, prereleaseRaw = ''] = String(coreAndPre || '').split('-');
+  const coreParts = core.split('.').map((item) => Number.parseInt(item, 10));
+  const prerelease = prereleaseRaw ? prereleaseRaw.split('.') : [];
+  return { coreParts, prerelease };
+}
+
+function compareSemver(a = '', b = '') {
+  const left = parseSemver(a);
+  const right = parseSemver(b);
+  for (let index = 0; index < 3; index += 1) {
+    const l = Number.isFinite(left.coreParts[index]) ? left.coreParts[index] : 0;
+    const r = Number.isFinite(right.coreParts[index]) ? right.coreParts[index] : 0;
+    if (l > r) return 1;
+    if (l < r) return -1;
+  }
+
+  if (!left.prerelease.length && !right.prerelease.length) return 0;
+  if (!left.prerelease.length) return 1;
+  if (!right.prerelease.length) return -1;
+
+  const max = Math.max(left.prerelease.length, right.prerelease.length);
+  for (let index = 0; index < max; index += 1) {
+    const l = left.prerelease[index];
+    const r = right.prerelease[index];
+    if (l === undefined) return -1;
+    if (r === undefined) return 1;
+    const lNumeric = /^\d+$/.test(l);
+    const rNumeric = /^\d+$/.test(r);
+    if (lNumeric && rNumeric) {
+      const lNum = Number.parseInt(l, 10);
+      const rNum = Number.parseInt(r, 10);
+      if (lNum > rNum) return 1;
+      if (lNum < rNum) return -1;
+      continue;
+    }
+    if (lNumeric && !rNumeric) return -1;
+    if (!lNumeric && rNumeric) return 1;
+    if (l > r) return 1;
+    if (l < r) return -1;
+  }
+
+  return 0;
+}
+
+async function pathExists(localFs, filePath = '') {
+  try {
+    await localFs.access(filePath);
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function countDeclarations(manifest = {}) {
@@ -93,6 +230,7 @@ function createDependencies(overrides = {}) {
 
 function createService(overrides = {}) {
   const deps = createDependencies(overrides);
+  const zipLimits = getZipInstallLimits(overrides.env || process.env);
 
   async function fileExists(filePath = '') {
     try {
@@ -101,6 +239,195 @@ function createService(overrides = {}) {
     } catch (_) {
       return false;
     }
+  }
+
+  async function verifyZipSignature(zipBuffer = Buffer.alloc(0), signatureBuffer = Buffer.alloc(0), options = {}) {
+    if (!Buffer.isBuffer(zipBuffer) || !zipBuffer.length) {
+      throw new Error('Package ZIP file is required.');
+    }
+    if (!Buffer.isBuffer(signatureBuffer) || !signatureBuffer.length) {
+      throw new Error('Package signature file is required.');
+    }
+
+    const trustedKeys = loadTrustedPublicKeys(options);
+    if (!trustedKeys.length) {
+      const error = new Error('No trusted package public key is configured for ZIP install verification.');
+      error.code = 'ZIP_SIGNATURE_NOT_CONFIGURED';
+      throw error;
+    }
+
+    const signature = parseDetachedSignatureBuffer(signatureBuffer);
+    for (const keyText of trustedKeys) {
+      try {
+        const keyObject = parsePublicKey(keyText);
+        if (crypto.verify(null, zipBuffer, keyObject, signature)) {
+          return { verified: true };
+        }
+      } catch (_) {
+        // Continue to next key and report generic failure below.
+      }
+    }
+
+    const error = new Error('Package signature verification failed.');
+    error.code = 'ZIP_SIGNATURE_INVALID';
+    throw error;
+  }
+
+  function inspectZipArchive(zipBuffer = Buffer.alloc(0)) {
+    let zip;
+    try {
+      zip = new PizZip(zipBuffer);
+    } catch (error) {
+      const wrapped = new Error(`ZIP archive is invalid: ${error.message}`);
+      wrapped.code = 'ZIP_INVALID';
+      throw wrapped;
+    }
+    const entries = Object.entries(zip.files || {});
+    if (!entries.length) {
+      throw new Error('ZIP archive is empty.');
+    }
+
+    const topLevelFolders = new Set();
+    const fileEntries = [];
+    for (const [entryName, entry] of entries) {
+      const safeName = normalizeZipEntryPath(entryName);
+      if (!safeName) continue;
+      const parts = safeName.split('/');
+      if (!parts.length) continue;
+      topLevelFolders.add(parts[0]);
+      if (entry?.dir) continue;
+      fileEntries.push({ safeName, entry });
+    }
+
+    if (topLevelFolders.size !== 1) {
+      throw new Error('ZIP must contain exactly one top-level package folder.');
+    }
+    const [topFolder] = [...topLevelFolders];
+    const manifestEntryPath = `${topFolder}/package.manifest.json`;
+    const hasManifest = fileEntries.some((row) => row.safeName === manifestEntryPath);
+    if (!hasManifest) {
+      throw new Error('ZIP package manifest not found at <package-folder>/package.manifest.json.');
+    }
+
+    return {
+      topFolder,
+      fileEntries,
+      manifestEntryPath
+    };
+  }
+
+  async function extractZipToStaging(zipBuffer = Buffer.alloc(0), stagingDir = '') {
+    const archive = inspectZipArchive(zipBuffer);
+    const fileEntries = archive.fileEntries || [];
+    if (fileEntries.length > zipLimits.maxFiles) {
+      throw new Error(`ZIP contains too many files. Maximum allowed is ${zipLimits.maxFiles}.`);
+    }
+
+    let extractedBytes = 0;
+    for (const row of fileEntries) {
+      const relativeName = row.safeName;
+      const outputPath = path.join(stagingDir, relativeName);
+      const outputRelative = path.relative(stagingDir, outputPath);
+      if (!outputRelative || outputRelative.startsWith('..') || path.isAbsolute(outputRelative)) {
+        throw new Error(`ZIP entry is outside extraction boundary: ${relativeName}`);
+      }
+      const parentDir = path.dirname(outputPath);
+      await deps.fs.mkdir(parentDir, { recursive: true });
+      const payload = row.entry.asNodeBuffer();
+      extractedBytes += payload.length;
+      if (extractedBytes > zipLimits.maxExtractedBytes) {
+        throw new Error('ZIP extracted content exceeds configured maximum size.');
+      }
+      await deps.fs.writeFile(outputPath, payload);
+    }
+
+    return {
+      topFolder: archive.topFolder,
+      manifestPath: path.join(stagingDir, archive.manifestEntryPath),
+      extractedFileCount: fileEntries.length,
+      extractedBytes
+    };
+  }
+
+  async function replacePackageDirectory(sourcePackageDir = '', packageId = '', options = {}) {
+    const packageRootDir = path.resolve(String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages')));
+    const destinationDir = path.join(packageRootDir, packageId);
+    const backupDir = path.join(packageRootDir, `.${packageId}.backup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    let hadExistingDestination = false;
+
+    await deps.fs.mkdir(packageRootDir, { recursive: true });
+    if (await pathExists(deps.fs, destinationDir)) {
+      hadExistingDestination = true;
+      await deps.fs.rename(destinationDir, backupDir);
+    }
+
+    try {
+      await deps.fs.rename(sourcePackageDir, destinationDir);
+    } catch (error) {
+      if (hadExistingDestination && await pathExists(deps.fs, backupDir)) {
+        await deps.fs.rename(backupDir, destinationDir).catch(() => {});
+      }
+      throw error;
+    }
+
+    if (hadExistingDestination && await pathExists(deps.fs, backupDir)) {
+      await deps.fs.rm(backupDir, { recursive: true, force: true });
+    }
+    return destinationDir;
+  }
+
+  async function installResolvedManifest(resolved = {}, options = {}) {
+    const actor = buildActor(options.actor || null);
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const manifest = resolved.manifest;
+    const context = {
+      backendMode,
+      packageId: manifest.id,
+      packageName: manifest.name,
+      manifest,
+      manifestPath: resolved.manifestPath
+    };
+
+    const payload = buildRegistryPayload(manifest, {
+      mode: 'enable',
+      manifestPath: resolved.manifestPath,
+      activationMode: resolved.activationMode,
+      packageSource: resolved.packageSource || ''
+    });
+    const result = await deps.packageRegistryService.upsertPackageRegistry(payload, {
+      backendMode,
+      actor
+    });
+    const declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
+      backendMode
+    });
+    const runtime = await applyRuntimeEnableHooks(context, {
+      backendMode,
+      app: options.app || null
+    });
+    const navigation = await refreshNavigationSnapshot({ backendMode });
+
+    const warnings = [];
+    warnings.push(...runtime.warnings);
+    if (navigation.warning) warnings.push(navigation.warning);
+
+    return {
+      action: resolved.action || 'install',
+      packageId: manifest.id,
+      packageName: manifest.name,
+      version: manifest.version,
+      installMethod: resolved.installMethod || 'path',
+      registry: {
+        enabled: result?.enabled === true,
+        installStatus: cleanText(result?.installStatus, 80),
+        manifestPath: payload?.metadata?.manifestPath || ''
+      },
+      declarationSummary,
+      runtime,
+      navigation,
+      restartRecommended: false,
+      warnings
+    };
   }
 
   async function discoverLocalManifests(options = {}) {
@@ -283,6 +610,7 @@ function createService(overrides = {}) {
 
   function buildRegistryPayload(manifest = {}, options = {}) {
     const mode = cleanText(options.mode, 40).toLowerCase() || 'enable';
+    const packageSource = cleanText(options.packageSource, 120) || 'manual';
     return {
       packageId: manifest.id,
       version: manifest.version,
@@ -294,6 +622,7 @@ function createService(overrides = {}) {
         manifestPath: toStoredManifestPath(options.manifestPath),
         activatedBy: SYSTEM_ACTOR_ID,
         activationMode: cleanText(options.activationMode, 120) || 'manual',
+        packageSource,
         declarationCounts: countDeclarations(manifest)
       }
     };
@@ -350,57 +679,78 @@ function createService(overrides = {}) {
   }
 
   async function installPackage(input = {}, options = {}) {
-    const actor = buildActor(options.actor || null);
-    const backendMode = cleanText(options.backendMode, 30) || undefined;
     const resolved = await resolveInstallManifest(input, options);
-    const manifest = resolved.manifest;
-    const context = {
-      backendMode,
-      packageId: manifest.id,
-      packageName: manifest.name,
-      manifest,
-      manifestPath: resolved.manifestPath
-    };
-
-    const payload = buildRegistryPayload(manifest, {
-      mode: 'enable',
-      manifestPath: resolved.manifestPath,
-      activationMode: resolved.activationMode
-    });
-    const result = await deps.packageRegistryService.upsertPackageRegistry(payload, {
-      backendMode,
-      actor
-    });
-    const declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
-      backendMode
-    });
-    const runtime = await applyRuntimeEnableHooks(context, {
-      backendMode,
-      app: options.app || null
-    });
-    const navigation = await refreshNavigationSnapshot({ backendMode });
-
-    const warnings = [];
-    warnings.push(...runtime.warnings);
-    if (navigation.warning) warnings.push(navigation.warning);
-
-    return {
+    return installResolvedManifest({
+      ...resolved,
       action: 'install',
-      packageId: manifest.id,
-      packageName: manifest.name,
-      version: manifest.version,
-      installMethod: resolved.installMethod,
-      registry: {
-        enabled: result?.enabled === true,
-        installStatus: cleanText(result?.installStatus, 80),
-        manifestPath: payload?.metadata?.manifestPath || ''
-      },
-      declarationSummary,
-      runtime,
-      navigation,
-      restartRecommended: false,
-      warnings
-    };
+      packageSource: 'manual'
+    }, options);
+  }
+
+  async function installPackageZip(input = {}, options = {}) {
+    const zipBuffer = input?.zipBuffer;
+    const signatureBuffer = input?.signatureBuffer;
+    if (!Buffer.isBuffer(zipBuffer) || !zipBuffer.length) {
+      throw new Error('Package ZIP file is required.');
+    }
+    if (!Buffer.isBuffer(signatureBuffer) || !signatureBuffer.length) {
+      throw new Error('Package signature file is required.');
+    }
+    if (zipBuffer.length > zipLimits.maxUploadBytes) {
+      throw new Error('Package ZIP exceeds configured maximum upload size.');
+    }
+
+    await verifyZipSignature(zipBuffer, signatureBuffer, options);
+
+    const packageRootDir = path.resolve(
+      String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages'))
+    );
+    const stagingRootParent = path.join(packageRootDir, '.zip-install-staging');
+    await deps.fs.mkdir(stagingRootParent, { recursive: true });
+
+    const stagingDir = await deps.fs.mkdtemp(path.join(stagingRootParent, 'pkg-'));
+    let report = null;
+    try {
+      const extracted = await extractZipToStaging(zipBuffer, stagingDir);
+      const rawManifest = JSON.parse(await deps.fs.readFile(extracted.manifestPath, 'utf8'));
+      const manifest = deps.packageManifestService.validatePackageManifest(rawManifest, { knownIds: [] });
+
+      const topFolderId = normalizePackageId(extracted.topFolder);
+      if (!topFolderId || topFolderId !== manifest.id) {
+        throw new Error(
+          `ZIP folder identity mismatch. Top-level folder "${extracted.topFolder}" must match manifest id "${manifest.id}".`
+        );
+      }
+
+      const backendMode = cleanText(options.backendMode, 30) || undefined;
+      const existing = await deps.packageRegistryService.getPackageRegistryById(manifest.id, { backendMode });
+      const existingVersion = cleanText(existing?.version, 120);
+      if (existingVersion && compareSemver(manifest.version, existingVersion) <= 0) {
+        throw new Error(`Package version must be newer than installed version ${existingVersion}.`);
+      }
+
+      const extractedPackageDir = path.join(stagingDir, extracted.topFolder);
+      const installedDir = await replacePackageDirectory(extractedPackageDir, manifest.id, { packageRootDir });
+      const installedManifestPath = path.join(installedDir, 'package.manifest.json');
+      report = await installResolvedManifest({
+        action: 'install-zip',
+        installMethod: 'zip',
+        activationMode: 'manual-zip',
+        manifest,
+        manifestPath: installedManifestPath,
+        packageSource: 'manual-zip'
+      }, options);
+      report.signature = { verified: true };
+      report.source = 'manual-zip';
+      report.extractedPath = toStoredManifestPath(installedDir);
+      report.zip = {
+        extractedFiles: extracted.extractedFileCount,
+        extractedBytes: extracted.extractedBytes
+      };
+      return report;
+    } finally {
+      await deps.fs.rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 
   async function enablePackage(packageIdInput = '', options = {}) {
@@ -654,6 +1004,7 @@ function createService(overrides = {}) {
     discoverLocalManifests,
     listPackageSnapshot,
     installPackage,
+    installPackageZip,
     enablePackage,
     pausePackage,
     removePackage,

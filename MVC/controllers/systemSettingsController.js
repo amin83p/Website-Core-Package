@@ -993,6 +993,7 @@ exports.showPackageManagerPage = async (req, res) => {
       installedPackages: snapshot?.installedPackages || [],
       localManifestOptions,
       localManifestWarnings,
+      zipUploadLimitMb: Number.parseInt(process.env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB || '50', 10) || 50,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -1004,9 +1005,20 @@ exports.showPackageManagerPage = async (req, res) => {
 
 function buildPackageManagerOptions(req = {}) {
   const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+  const settings = settingService.get();
+  const appKeys = String(settings?.app?.packageInstallEd25519PublicKeys || '').trim();
+  const envKeys = [
+    String(process.env.PACKAGE_INSTALL_ED25519_PUBLIC_KEYS || '').trim(),
+    String(process.env.PACKAGE_INSTALL_ED25519_PUBLIC_KEY || '').trim()
+  ].filter(Boolean);
+  const trustedPublicKeys = [
+    ...envKeys.join('\n').split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean),
+    ...appKeys.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean)
+  ];
   return {
     backendMode: runtimeBackend?.mode || '',
     packageRootDir: path.join(process.cwd(), 'packages'),
+    trustedPublicKeys,
     actor: req.user || null,
     app: req.app || null
   };
@@ -1037,6 +1049,25 @@ exports.installPackageFromManager = async (req, res) => {
     });
   } catch (error) {
     return sendPackageManagerError(res, error, 'Package install failed.');
+  }
+};
+
+exports.installPackageZipFromManager = async (req, res) => {
+  try {
+    const packageZip = Array.isArray(req.files?.packageZip) ? req.files.packageZip[0] : null;
+    const packageSig = Array.isArray(req.files?.packageSig) ? req.files.packageSig[0] : null;
+    const report = await systemSettingsPackageManagerService.installPackageZip({
+      zipBuffer: packageZip?.buffer,
+      signatureBuffer: packageSig?.buffer
+    }, buildPackageManagerOptions(req));
+
+    return res.json({
+      status: 'success',
+      message: `Package "${report.packageId}" installed from ZIP and enabled.`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'ZIP package install failed.');
   }
 };
 

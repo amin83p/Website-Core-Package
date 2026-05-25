@@ -5,6 +5,9 @@
   const localOptions = Array.isArray(localManifestOptions) ? localManifestOptions : [];
   const localWarnings = Array.isArray(localManifestWarnings) ? localManifestWarnings : [];
   const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
+  const zipLimitValue = Number.isFinite(Number(typeof zipUploadLimitMb !== 'undefined' ? zipUploadLimitMb : 50))
+    ? Number(typeof zipUploadLimitMb !== 'undefined' ? zipUploadLimitMb : 50)
+    : 50;
 %>
 
 <div class="sections-page package-manager-page">
@@ -32,6 +35,7 @@
             <option value="local">Local Discovered Manifest</option>
             <option value="path">Manual Manifest Path</option>
             <option value="json">Manifest JSON</option>
+            <option value="zip">ZIP Upload (Signature Verified)</option>
           </select>
         </div>
         <div class="col-lg-9 col-md-6">
@@ -52,6 +56,13 @@
           <div id="pkgInstallJsonPanel" class="d-none">
             <label class="form-label small fw-bold">Manifest JSON</label>
             <textarea class="form-control font-monospace small" id="pkgManifestJson" rows="8" placeholder='{"id":"my-package","name":"My Package","version":"1.0.0","mountPath":"/my-package"}'></textarea>
+          </div>
+          <div id="pkgInstallZipPanel" class="d-none">
+            <label class="form-label small fw-bold">Package ZIP</label>
+            <input type="file" class="form-control" id="pkgZipFile" accept=".zip,application/zip">
+            <label class="form-label small fw-bold mt-2">Detached Signature (.sig)</label>
+            <input type="file" class="form-control" id="pkgSigFile" accept=".sig,.txt,application/octet-stream,text/plain">
+            <div class="small text-muted mt-1">Max upload size: <b><%= zipLimitValue %> MB</b> per file.</div>
           </div>
         </div>
       </div>
@@ -170,6 +181,7 @@
   const localPanel = document.getElementById('pkgInstallLocalPanel');
   const pathPanel = document.getElementById('pkgInstallPathPanel');
   const jsonPanel = document.getElementById('pkgInstallJsonPanel');
+  const zipPanel = document.getElementById('pkgInstallZipPanel');
 
   const actionMap = {
     enable: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/enable`, label: 'Enable' },
@@ -187,6 +199,7 @@
     localPanel.classList.toggle('d-none', method !== 'local');
     pathPanel.classList.toggle('d-none', method !== 'path');
     jsonPanel.classList.toggle('d-none', method !== 'json');
+    zipPanel.classList.toggle('d-none', method !== 'zip');
   }
 
   async function showModal(options) {
@@ -254,6 +267,25 @@
 
   async function installPackage() {
     const installMethod = String(installMethodEl.value || '').trim();
+    await requireAdminVerification();
+    if (installMethod === 'zip') {
+      const zipFile = document.getElementById('pkgZipFile')?.files?.[0] || null;
+      const sigFile = document.getElementById('pkgSigFile')?.files?.[0] || null;
+      const formData = new FormData();
+      formData.set('actionStateId', actionStateId);
+      if (zipFile) formData.set('packageZip', zipFile);
+      if (sigFile) formData.set('packageSig', sigFile);
+      return runWithWaiting('Installing Package ZIP', async () => fetchJson('/systemSettings/packages/install-zip', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: formData
+      }));
+    }
+
     const payload = {
       installMethod,
       localManifestPath: document.getElementById('pkgLocalManifestPath').value || '',
@@ -261,7 +293,6 @@
       manifestJson: document.getElementById('pkgManifestJson').value || '',
       actionStateId
     };
-    await requireAdminVerification();
     return runWithWaiting('Installing Package', async () => fetchJson('/systemSettings/packages/install', {
       method: 'POST',
       credentials: 'same-origin',

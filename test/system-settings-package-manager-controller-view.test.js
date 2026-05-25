@@ -110,6 +110,55 @@ test('install package controller returns structured success and admin_required e
   }
 });
 
+test('install ZIP package controller returns structured success and admin_required error shape', async () => {
+  const originalInstallZip = systemSettingsPackageManagerService.installPackageZip;
+  const res = makeRenderResponse();
+
+  try {
+    systemSettingsPackageManagerService.installPackageZip = async () => ({
+      action: 'install-zip',
+      packageId: 'addon-pte',
+      warnings: []
+    });
+    await systemSettingsController.installPackageZipFromManager(
+      {
+        files: {
+          packageZip: [{ buffer: Buffer.from('zip') }],
+          packageSig: [{ buffer: Buffer.from('sig') }]
+        },
+        user: { id: 'USER_ZIP_1' },
+        app: {}
+      },
+      res
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonPayload?.status, 'success');
+    assert.equal(res.jsonPayload?.report?.action, 'install-zip');
+
+    systemSettingsPackageManagerService.installPackageZip = async () => {
+      const error = new Error('Admin approval required or session expired.');
+      error.code = 'ADMIN_REQUIRED';
+      throw error;
+    };
+    const res2 = makeRenderResponse();
+    await systemSettingsController.installPackageZipFromManager(
+      {
+        files: {
+          packageZip: [{ buffer: Buffer.from('zip') }],
+          packageSig: [{ buffer: Buffer.from('sig') }]
+        },
+        user: { id: 'USER_ZIP_2' },
+        app: {}
+      },
+      res2
+    );
+    assert.equal(res2.statusCode, 403);
+    assert.equal(res2.jsonPayload?.status, 'admin_required');
+  } finally {
+    systemSettingsPackageManagerService.installPackageZip = originalInstallZip;
+  }
+});
+
 test('package manager EJS compiles and includes expected controls', () => {
   const viewPath = path.join(process.cwd(), 'MVC', 'views', 'systemSettings', 'packageManagerSettings.ejs');
   const template = fs.readFileSync(viewPath, 'utf8');
@@ -143,5 +192,7 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /Package Manager/);
   assert.match(html, /Install \/ Enable Package/);
   assert.match(html, /\/systemSettings\/packages\/install/);
+  assert.match(html, /\/systemSettings\/packages\/install-zip/);
+  assert.match(html, /ZIP Upload/);
   assert.match(html, /Installed Packages/);
 });

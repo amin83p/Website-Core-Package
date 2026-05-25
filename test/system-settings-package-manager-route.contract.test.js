@@ -204,6 +204,67 @@ test('package manager install POST requires actionState token and admin approval
   });
 });
 
+test('package manager ZIP install POST keeps protected middleware contract', async () => {
+  await withStubbedSystemSettingsRoutes(async (router) => {
+    const app = express();
+    app.use('/systemSettings', router);
+
+    await withServer(app, async (baseUrl) => {
+      const missingTokenForm = new FormData();
+      missingTokenForm.set('packageZip', new Blob(['zip-bytes']), 'addon.zip');
+      missingTokenForm.set('packageSig', new Blob(['sig-bytes']), 'addon.sig');
+      const missingToken = await fetch(`${baseUrl}/systemSettings/packages/install-zip`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes'
+        },
+        body: missingTokenForm
+      });
+      assert.equal(missingToken.status, 403);
+      assert.equal((await missingToken.json()).status, 'token_required');
+
+      const missingAdminForm = new FormData();
+      missingAdminForm.set('actionStateId', 'STATE_ZIP_1');
+      missingAdminForm.set('packageZip', new Blob(['zip-bytes']), 'addon.zip');
+      missingAdminForm.set('packageSig', new Blob(['sig-bytes']), 'addon.sig');
+      const missingAdmin = await fetch(`${baseUrl}/systemSettings/packages/install-zip`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes'
+        },
+        body: missingAdminForm
+      });
+      assert.equal(missingAdmin.status, 403);
+      assert.equal((await missingAdmin.json()).status, 'admin_required');
+
+      const allowedForm = new FormData();
+      allowedForm.set('actionStateId', 'STATE_ZIP_2');
+      allowedForm.set('packageZip', new Blob(['zip-bytes']), 'addon.zip');
+      allowedForm.set('packageSig', new Blob(['sig-bytes']), 'addon.sig');
+      const allowed = await fetch(`${baseUrl}/systemSettings/packages/install-zip`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'x-admin-verified': 'yes'
+        },
+        body: allowedForm
+      });
+      assert.equal(allowed.status, 200);
+      const body = await allowed.json();
+      assert.equal(body.handler, 'installPackageZipFromManager');
+      assert.equal(body.actionState.requireToken, true);
+      assert.equal(body.actionState.actionStateId, 'STATE_ZIP_2');
+      assert.deepEqual(body.accessCheck, {
+        sectionId: SECTIONS.SYSTEM_PACKAGE_MANAGER,
+        operationId: OPERATIONS.UPDATE
+      });
+    });
+  });
+});
+
 test('package manager remove POST keeps protected middleware contract', async () => {
   await withStubbedSystemSettingsRoutes(async (router) => {
     const app = express();
