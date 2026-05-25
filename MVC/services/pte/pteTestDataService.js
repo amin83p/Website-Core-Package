@@ -1132,3 +1132,4 @@ const pteTestDataService = {
 };
 
 module.exports = pteTestDataService;
+module.exports = require('../../../packages/pte/MVC/services/pte/pteTestDataService.js');

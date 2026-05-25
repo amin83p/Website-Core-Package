@@ -7071,3 +7071,4 @@ pteAttemptLedgerService.__testables = {
 };
 
 module.exports = pteAttemptLedgerService;
+module.exports = require('../../../packages/pte/MVC/services/pte/pteAttemptLedgerService.js');
