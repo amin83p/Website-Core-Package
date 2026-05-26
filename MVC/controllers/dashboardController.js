@@ -842,6 +842,7 @@ function getBootstrapSetupGroups() {
       items: [
         { label: 'System Settings', href: '/systemSettings', icon: 'bi-sliders2-vertical', note: 'Configure app/backend settings.' },
         { label: 'Core Bootstrap Baseline', href: '/systemSettings/bootstrap/core', icon: 'bi-database-fill-check', note: 'Seed core security baseline into a fresh backend.' },
+        { label: 'Core Reset + Re-Bootstrap', href: '/systemSettings/core-reset', icon: 'bi-arrow-clockwise', note: 'Delete core registry rows and immediately re-apply baseline defaults.' },
         { label: 'File Manager', href: '/files', icon: 'bi-folder2-open', note: 'Upload and manage setup assets.' },
         { label: 'Website Policy', href: '/websitePolicy', icon: 'bi-shield-check', note: 'Review maintenance and access policy.' }
       ]

@@ -22,8 +22,11 @@ test('core bootstrap parity checklist files exist', () => {
     'data/bootstrap/core/accessPolicies.json',
     'data/bootstrap/core/systemSettings.defaults.json',
     'MVC/services/coreBootstrapBaselineService.js',
+    'MVC/services/coreResetRebootstrapService.js',
     'MVC/views/systemSettings/coreBootstrapSettings.ejs',
-    'test/system-settings-core-bootstrap-route.contract.test.js'
+    'MVC/views/systemSettings/coreResetSettings.ejs',
+    'test/system-settings-core-bootstrap-route.contract.test.js',
+    'test/system-settings-core-reset-route.contract.test.js'
   ];
 
   for (const rel of requiredPaths) {

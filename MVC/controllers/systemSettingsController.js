@@ -13,6 +13,7 @@ const { registerCoreEntityQueryExecutors } = require('../models/queryExecutorBoo
 const packageQueryExecutorService = require('../services/packageQueryExecutorService');
 const systemSettingsPackageManagerService = require('../services/systemSettingsPackageManagerService');
 const coreBootstrapBaselineService = require('../services/coreBootstrapBaselineService');
+const coreResetRebootstrapService = require('../services/coreResetRebootstrapService');
 const actionStateRetentionService = require('../services/actionStateRetentionService');
 const jsonToMongoMigrationService = require('../services/migration/jsonToMongoMigrationService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
@@ -1356,6 +1357,73 @@ exports.applyCoreBootstrapBaseline = async (req, res) => {
     return res.status(400).json({
       status: 'error',
       message: error.message || 'Core bootstrap baseline apply failed.'
+    });
+  }
+};
+
+exports.showCoreResetPage = async (req, res) => {
+  try {
+    const settings = await systemSettingsRepository.getSettings();
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const preflight = await coreResetRebootstrapService.preflightReset({
+      actor: req.user,
+      backendMode: runtimeBackend?.mode || 'json'
+    });
+
+    return res.render('systemSettings/coreResetSettings', {
+      title: 'Core Reset + Re-Bootstrap',
+      settings,
+      runtimeBackend,
+      preflight,
+      includeModal: true,
+      confirmTokenHint: coreResetRebootstrapService.CONFIRM_TOKEN,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+exports.preflightCoreReset = async (req, res) => {
+  try {
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const report = await coreResetRebootstrapService.preflightReset({
+      actor: req.user,
+      backendMode: runtimeBackend?.mode || 'json'
+    });
+    return res.json({
+      status: 'success',
+      message: 'Core reset preflight completed.',
+      report
+    });
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      message: error.message || 'Core reset preflight failed.'
+    });
+  }
+};
+
+exports.applyCoreReset = async (req, res) => {
+  try {
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const confirmToken = cleanFormText(req.body?.confirmToken, 120);
+    const report = await coreResetRebootstrapService.applyResetAndBootstrap({
+      actor: req.user,
+      backendMode: runtimeBackend?.mode || 'json',
+      confirmToken
+    });
+    return res.json({
+      status: 'success',
+      message: 'Core reset and re-bootstrap completed.',
+      report
+    });
+  } catch (error) {
+    const statusCode = error?.code === 'confirm_token_invalid' ? 400 : 400;
+    return res.status(statusCode).json({
+      status: 'error',
+      message: error.message || 'Core reset failed.'
     });
   }
 };

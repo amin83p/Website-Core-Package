@@ -343,6 +343,32 @@ router.post('/bootstrap/core/apply',
           adminApproval,
           ctrl.applyCoreBootstrapBaseline);
 
+// 8.5 Core Reset + Re-Bootstrap
+router.get('/core-reset',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_CORE_RESET, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_CORE_RESET, OPERATIONS.UPDATE, { keepActive: true }),
+          ctrl.showCoreResetPage);
+router.post('/core-reset/preflight',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_CORE_RESET, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_CORE_RESET,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          ctrl.preflightCoreReset);
+router.post('/core-reset/apply',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_CORE_RESET, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_CORE_RESET,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.applyCoreReset);
+
 // 9. Data Migration (JSON <-> Mongo)
 router.get('/data-migration',
           requireAuth,

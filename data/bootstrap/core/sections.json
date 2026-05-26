@@ -2096,7 +2096,7 @@
       "createUser": "ROOT_001",
       "createDateTime": "2026-03-26T18:22:03.689Z",
       "lastUpdateUser": "SYS_ROOT_001",
-      "lastUpdateDateTime": "2026-05-25T22:26:38.043Z"
+      "lastUpdateDateTime": "2026-05-26T22:33:27.517Z"
     },
     "category": "SYSTEM",
     "dashboardDisplay": true,
@@ -2125,6 +2125,9 @@
       },
       {
         "id": "731285"
+      },
+      {
+        "id": "731286"
       }
     ],
     "trackState": false
@@ -2475,5 +2478,54 @@
     "related": [],
     "subsections": [],
     "trackState": true
+  },
+  {
+    "id": "731286",
+    "name": "SYSTEM_CORE_RESET",
+    "category": "SYSTEM",
+    "description": "Delete and rebuild core bootstrap registry entities in one protected workflow.",
+    "homeURL": "/systemSettings/core-reset",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-05-26T22:33:27.517Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-05-26T22:33:27.517Z"
+    }
   }
 ]
