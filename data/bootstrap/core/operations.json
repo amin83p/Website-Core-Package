@@ -1,0 +1,282 @@
+[
+  {
+    "name": "AI_SCORING",
+    "active": true,
+    "trackState": true,
+    "keepActive": true,
+    "system": false,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-05-02T00:24:02.746Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-05-02T19:03:16.085Z"
+    },
+    "id": "935362"
+  },
+  {
+    "id": "OP0101",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-01-16T19:33:56.250Z"
+    },
+    "name": "HTTP_POST",
+    "system": true
+  },
+  {
+    "id": "OP0102",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-01-16T19:33:56.250Z"
+    },
+    "name": "HTTP_GET",
+    "system": true
+  },
+  {
+    "id": "OP0103",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-01-16T19:33:56.250Z"
+    },
+    "name": "HTTP_UNKNOWN",
+    "system": true
+  },
+  {
+    "id": "OP0104",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-01-16T19:33:56.250Z"
+    },
+    "name": "HTTP_DELETE",
+    "system": true
+  },
+  {
+    "id": "OP0105",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-01-16T19:33:56.250Z"
+    },
+    "name": "HTTP_PUT",
+    "system": true
+  },
+  {
+    "id": "OP0106",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-01-16T19:33:56.250Z"
+    },
+    "name": "HTTP_PATCH",
+    "system": true
+  },
+  {
+    "id": "OP1001",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-11T22:38:03.982Z"
+    },
+    "keepActive": true,
+    "name": "CREATE",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1002",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-16T19:44:16.202Z"
+    },
+    "keepActive": false,
+    "name": "READ",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1003",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-19T19:31:55.201Z"
+    },
+    "keepActive": false,
+    "name": "READ_ALL",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1004",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-01-16T19:33:56.250Z"
+    },
+    "name": "DELETE",
+    "system": false
+  },
+  {
+    "id": "OP1005",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-16T19:36:01.599Z"
+    },
+    "keepActive": true,
+    "name": "UPDATE",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1006",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-16T19:42:57.251Z"
+    },
+    "keepActive": false,
+    "name": "CONFIGURE",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1010",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-16T19:41:21.658Z"
+    },
+    "keepActive": true,
+    "name": "CONFIGURED",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1012",
+    "active": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2025-11-25T05:02:57.914Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-17T05:13:36.440Z"
+    },
+    "keepActive": false,
+    "name": "EXPORT",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1013",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-18T05:52:39.650Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-18T05:59:43.223Z"
+    },
+    "keepActive": false,
+    "name": "IMPORT",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1021",
+    "active": true,
+    "audit": {
+      "createUser": "1",
+      "createDateTime": "2026-01-18T05:53:57.946Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-18T18:34:46.863Z"
+    },
+    "keepActive": false,
+    "name": "USERS_CHECK_LINKEDPERSON",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1022",
+    "active": true,
+    "audit": {
+      "createUser": "1",
+      "createDateTime": "2026-01-18T05:53:58.002Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-19T03:53:47.365Z"
+    },
+    "keepActive": false,
+    "name": "DELETE_ALL",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "id": "OP1023",
+    "active": true,
+    "audit": {
+      "createUser": "816147",
+      "createDateTime": "2026-01-22T02:16:45.676Z",
+      "lastUpdateUser": "816147",
+      "lastUpdateDateTime": "2026-01-22T02:16:45.676Z"
+    },
+    "keepActive": false,
+    "name": "DOWNLOAD_FILE",
+    "system": false,
+    "trackState": true
+  },
+  {
+    "name": "START",
+    "active": true,
+    "trackState": true,
+    "keepActive": true,
+    "system": false,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-08T03:03:53.745Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-08T03:06:01.843Z"
+    },
+    "id": "OP1024"
+  },
+  {
+    "name": "SAVE",
+    "active": true,
+    "trackState": true,
+    "keepActive": false,
+    "system": false,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-04-08T03:03:53.745Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-04-08T03:03:53.745Z"
+    },
+    "id": "OP1025"
+  }
+]

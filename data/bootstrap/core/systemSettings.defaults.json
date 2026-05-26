@@ -1,0 +1,28 @@
+{
+  "newsletter": {
+    "defaultGroupId": "",
+    "requireDoubleOptIn": false,
+    "sendWelcomeEmail": true
+  },
+  "organization": {
+    "allowFreeRegistration": false,
+    "defaultTrialDays": 0,
+    "freeOrgId": 900000,
+    "freeOrgName": "Free User",
+    "pteJoinOrgId": ""
+  },
+  "access": {
+    "highAccessMin": 8,
+    "highAccessMax": 10,
+    "selfAccessLevel": 1,
+    "immuneSuperAdmins": [
+      "admin@localhost.com",
+      "root@system.local"
+    ]
+  },
+  "app": {
+    "uploadsPath": "uploads",
+    "defaultPageSize": 20,
+    "searchDefaultKeyword": "aaa"
+  }
+}

@@ -317,7 +317,33 @@ router.get('/packages/transactions/:transactionId',
           trackActionState(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE, { keepActive: true }),
           ctrl.getPackageTransactionDetailFromManager);
 
-// 7. Data Migration (JSON <-> Mongo)
+// 8. Core Bootstrap Baseline (First-run)
+router.get('/bootstrap/core',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE, { keepActive: true }),
+          ctrl.showCoreBootstrapPage);
+router.post('/bootstrap/core/preflight',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_SETTINGS,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          ctrl.preflightCoreBootstrapBaseline);
+router.post('/bootstrap/core/apply',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_SETTINGS,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.applyCoreBootstrapBaseline);
+
+// 9. Data Migration (JSON <-> Mongo)
 router.get('/data-migration',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),

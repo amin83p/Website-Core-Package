@@ -1,0 +1,478 @@
+[
+  {
+    "id": "ROL1004",
+    "key": "school_student",
+    "label": "School Student",
+    "description": "School-scoped student role alias for audience targeting.",
+    "domain": "school",
+    "packageName": "SCHOOL",
+    "aliases": [
+      "schoolstudent",
+      "school-student",
+      "schoolstudents",
+      "school-students",
+      "school_students"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1005",
+    "key": "school_teacher",
+    "label": "School Teacher",
+    "description": "School-scoped teacher role alias for audience targeting.",
+    "domain": "school",
+    "packageName": "SCHOOL",
+    "aliases": [
+      "schoolteacher",
+      "school-teacher",
+      "schoolteachers",
+      "school-teachers",
+      "school_teachers"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1006",
+    "key": "school_staff",
+    "label": "School Staff",
+    "description": "School-scoped staff role alias for audience targeting.",
+    "domain": "school",
+    "packageName": "SCHOOL",
+    "aliases": [
+      "schoolstaff",
+      "school-staff",
+      "schoolstaffs",
+      "school-staffs",
+      "school_staffs"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1007",
+    "key": "pte_student",
+    "label": "PTE Student",
+    "description": "PTE domain managed student role.",
+    "domain": "pte",
+    "packageName": "PTE",
+    "aliases": [
+      "ptestudent",
+      "pte-student",
+      "ptestudents",
+      "pte-students",
+      "pte_students"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1009",
+    "key": "pte_student_public",
+    "label": "PTE Student Public",
+    "description": "PTE public applicant role token.",
+    "domain": "pte",
+    "packageName": "PTE",
+    "aliases": [
+      "ptestudentpublic",
+      "pte-student-public",
+      "ptestudentspublic",
+      "pte-students-public",
+      "pte_students_public"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1010",
+    "key": "pte_teacher",
+    "label": "PTE Teacher",
+    "description": "PTE domain managed teacher role.",
+    "domain": "pte",
+    "packageName": "PTE",
+    "aliases": [
+      "pteteacher",
+      "pte-teacher",
+      "pteteachers",
+      "pte-teachers",
+      "pte_teachers"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1011",
+    "key": "pte_instructor",
+    "label": "PTE Instructor",
+    "description": "PTE instructor role.",
+    "domain": "pte",
+    "packageName": "PTE",
+    "aliases": [
+      "pteinstructor",
+      "pte-instructor",
+      "pteinstructors",
+      "pte-instructors",
+      "pte_instructors"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1012",
+    "key": "pte_trainer",
+    "label": "PTE Trainer",
+    "description": "PTE trainer role.",
+    "domain": "pte",
+    "packageName": "PTE",
+    "aliases": [
+      "ptetrainer",
+      "pte-trainer",
+      "ptetrainers",
+      "pte-trainers",
+      "pte_trainers"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1013",
+    "key": "credit_customer",
+    "label": "Credit Customer",
+    "description": "Credit package customer role.",
+    "domain": "credit",
+    "packageName": "CREDIT",
+    "aliases": [
+      "creditcustomer",
+      "credit-customer",
+      "creditcustomers",
+      "credit-customers",
+      "credit_customers"
+    ],
+    "active": true,
+    "system": true,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1101",
+    "key": "user",
+    "label": "User",
+    "description": "General user role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "users",
+      "member",
+      "members"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1102",
+    "key": "admin",
+    "label": "Admin",
+    "description": "General administrative role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "admins"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1103",
+    "key": "developer",
+    "label": "Developer",
+    "description": "General developer role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "developers",
+      "dev"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1104",
+    "key": "support",
+    "label": "Support",
+    "description": "General support role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "supports"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1105",
+    "key": "mentor",
+    "label": "Mentor",
+    "description": "General mentor role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "mentors"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1106",
+    "key": "reviewer",
+    "label": "Reviewer",
+    "description": "General reviewer role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "reviewers"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1107",
+    "key": "finance",
+    "label": "Finance",
+    "description": "General finance role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "finances"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1108",
+    "key": "operations",
+    "label": "Operations",
+    "description": "General operations role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "operation"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1109",
+    "key": "qa",
+    "label": "QA",
+    "description": "General quality assurance role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "quality-assurance"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1110",
+    "key": "content",
+    "label": "Content",
+    "description": "General content role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "contents"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1111",
+    "key": "sample-data",
+    "label": "Sample Data",
+    "description": "Sample data marker role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "sample_data"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1112",
+    "key": "sample-student",
+    "label": "Sample Student",
+    "description": "Sample student marker role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "sample_student"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1113",
+    "key": "sample-teacher",
+    "label": "Sample Teacher",
+    "description": "Sample teacher marker role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "sample_teacher"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1114",
+    "key": "sample-staff",
+    "label": "Sample Staff",
+    "description": "Sample staff marker role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "sample_staff"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  }
+]

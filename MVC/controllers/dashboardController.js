@@ -841,6 +841,7 @@ function getBootstrapSetupGroups() {
       description: 'First-run pages for backend mode, file storage, and global setup.',
       items: [
         { label: 'System Settings', href: '/systemSettings', icon: 'bi-sliders2-vertical', note: 'Configure app/backend settings.' },
+        { label: 'Core Bootstrap Baseline', href: '/systemSettings/bootstrap/core', icon: 'bi-database-fill-check', note: 'Seed core security baseline into a fresh backend.' },
         { label: 'File Manager', href: '/files', icon: 'bi-folder2-open', note: 'Upload and manage setup assets.' },
         { label: 'Website Policy', href: '/websitePolicy', icon: 'bi-shield-check', note: 'Review maintenance and access policy.' }
       ]

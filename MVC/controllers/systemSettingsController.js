@@ -12,6 +12,7 @@ const dataBackendRuntimeService = require('../services/dataBackendRuntimeService
 const { registerCoreEntityQueryExecutors } = require('../models/queryExecutorBootstrap');
 const packageQueryExecutorService = require('../services/packageQueryExecutorService');
 const systemSettingsPackageManagerService = require('../services/systemSettingsPackageManagerService');
+const coreBootstrapBaselineService = require('../services/coreBootstrapBaselineService');
 const actionStateRetentionService = require('../services/actionStateRetentionService');
 const jsonToMongoMigrationService = require('../services/migration/jsonToMongoMigrationService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
@@ -1289,6 +1290,73 @@ exports.syncPackageFromManager = async (req, res) => {
     });
   } catch (error) {
     return sendPackageManagerError(res, error, 'Package sync failed.');
+  }
+};
+
+/* =========================================================
+   CORE BOOTSTRAP BASELINE (First-run)
+========================================================= */
+exports.showCoreBootstrapPage = async (req, res) => {
+  try {
+    const settings = await systemSettingsRepository.getSettings();
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const preflight = await coreBootstrapBaselineService.preflight({
+      actor: req.user,
+      backendMode: runtimeBackend?.mode || 'json'
+    });
+
+    return res.render('systemSettings/coreBootstrapSettings', {
+      title: 'Core Bootstrap Baseline',
+      settings,
+      runtimeBackend,
+      preflight,
+      includeModal: true,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+exports.preflightCoreBootstrapBaseline = async (req, res) => {
+  try {
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const report = await coreBootstrapBaselineService.preflight({
+      actor: req.user,
+      backendMode: runtimeBackend?.mode || 'json'
+    });
+    return res.json({
+      status: 'success',
+      message: 'Core bootstrap preflight completed.',
+      report
+    });
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      message: error.message || 'Core bootstrap preflight failed.'
+    });
+  }
+};
+
+exports.applyCoreBootstrapBaseline = async (req, res) => {
+  try {
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const report = await coreBootstrapBaselineService.apply({
+      actor: req.user,
+      backendMode: runtimeBackend?.mode || 'json',
+      dryRun: String(req.body?.dryRun || '').trim().toLowerCase() === 'true'
+    });
+    return res.json({
+      status: 'success',
+      message: 'Core bootstrap baseline apply completed.',
+      report
+    });
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      message: error.message || 'Core bootstrap baseline apply failed.'
+    });
   }
 };
 

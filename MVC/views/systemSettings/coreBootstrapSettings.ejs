@@ -1,0 +1,290 @@
+<%
+  const backend = runtimeBackend || {};
+  const activeMode = String(backend.mode || 'json').trim().toLowerCase();
+  const preflightReport = (typeof preflight !== 'undefined' && preflight && typeof preflight === 'object') ? preflight : {};
+  const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
+%>
+
+<div class="sections-page core-bootstrap-page">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h1 class="page-heading size-md text-start m-0">Core Bootstrap Baseline</h1>
+      <p class="text-muted mb-0 mt-1">Initialize core security registries for first-run deployments using the versioned baseline pack.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">FIRST-RUN TOOL</span>
+      <span class="badge bg-light text-dark border">Runtime: <%= activeMode.toUpperCase() %></span>
+      <a href="/dashboard/bootstrap-setup" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Bootstrap Setup</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold small">Baseline Source</div>
+    <div class="card-body p-3">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label small fw-bold">Baseline ID</label>
+          <input class="form-control" id="baselineId" readonly value="<%= preflightReport?.baseline?.id || '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-bold">Version</label>
+          <input class="form-control" id="baselineVersion" readonly value="<%= preflightReport?.baseline?.version || '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-bold">Source Root</label>
+          <input class="form-control" id="baselineRoot" readonly value="<%= preflightReport?.baseline?.sourceRoot || '' %>">
+        </div>
+      </div>
+
+      <div class="alert alert-info py-2 px-3 small mt-3 mb-0">
+        <i class="bi bi-shield-check me-2"></i>
+        Apply mode is non-destructive by default: existing records are preserved; missing records are created.
+      </div>
+
+      <div class="d-flex align-items-center gap-2 flex-wrap mt-3">
+        <button type="button" class="btn btn-outline-secondary" id="bootstrapPreflightBtn">
+          <i class="bi bi-search me-1"></i>Refresh Preflight
+        </button>
+        <button type="button" class="btn btn-primary btn-filled" id="bootstrapApplyBtn">
+          <i class="bi bi-database-add me-1"></i>Apply Baseline
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold small">Preflight Summary</div>
+    <div class="card-body p-3">
+      <div class="row g-3">
+        <div class="col-md-3"><div class="small text-muted">Baseline Rows</div><div class="fs-5 fw-bold" id="summaryBaselineRows">0</div></div>
+        <div class="col-md-3"><div class="small text-muted">Planned Creates</div><div class="fs-5 fw-bold text-success" id="summaryPlannedCreates">0</div></div>
+        <div class="col-md-3"><div class="small text-muted">Existing Same</div><div class="fs-5 fw-bold" id="summaryExistingSame">0</div></div>
+        <div class="col-md-3"><div class="small text-muted">Conflicts</div><div class="fs-5 fw-bold text-warning" id="summaryConflicts">0</div></div>
+      </div>
+      <div class="small text-muted mt-2" id="summaryDatabaseMode">Database status unknown.</div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold small">Entity Breakdown</div>
+    <div class="card-body p-3">
+      <div class="table-scroll-wrapper">
+        <table class="table-responsive size-md" id="bootstrapEntityTable">
+          <thead>
+            <tr>
+              <th>Entity</th>
+              <th>Baseline</th>
+              <th>Existing</th>
+              <th>Create</th>
+              <th>Same</th>
+              <th>Conflicts</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="6" class="text-center text-muted py-3">Run preflight to load rows.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between">
+      <span>Operation Output</span>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="bootstrapClearOutputBtn">Clear</button>
+    </div>
+    <div class="card-body">
+      <pre id="bootstrapOutput" class="small bg-dark text-success p-3 rounded mb-0" style="max-height: 320px; overflow:auto;">Ready.</pre>
+    </div>
+  </div>
+
+  <input type="hidden" id="bootstrapActionStateId" value="<%= actionStateValue %>">
+</div>
+
+<script>
+(() => {
+  const initialReport = <%- JSON.stringify(preflightReport || {}) %>;
+  const actionStateId = document.getElementById('bootstrapActionStateId')?.value || '';
+  const preflightBtn = document.getElementById('bootstrapPreflightBtn');
+  const applyBtn = document.getElementById('bootstrapApplyBtn');
+  const outputEl = document.getElementById('bootstrapOutput');
+  const entityTableBody = document.querySelector('#bootstrapEntityTable tbody');
+
+  function setOutput(title, payload) {
+    const stamp = new Date().toISOString();
+    outputEl.textContent = `[${stamp}] ${title}\n${JSON.stringify(payload || {}, null, 2)}`;
+  }
+
+  function readSafeJson(response) {
+    return response.json().catch(() => ({}));
+  }
+
+  function renderSummary(report) {
+    const summary = report?.summary || {};
+    const empty = report?.emptyDatabase === true;
+    document.getElementById('summaryBaselineRows').textContent = Number(summary.baselineRows || 0);
+    document.getElementById('summaryPlannedCreates').textContent = Number(summary.plannedCreates || 0);
+    document.getElementById('summaryExistingSame').textContent = Number(summary.existingSame || 0);
+    document.getElementById('summaryConflicts').textContent = Number(summary.conflicts || 0);
+    document.getElementById('summaryDatabaseMode').textContent = empty
+      ? 'Target appears empty. Safe to apply baseline.'
+      : 'Target contains existing rows. Apply will create only missing records.';
+
+    const entities = Array.isArray(report?.entities) ? report.entities : [];
+    if (!entities.length) {
+      entityTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No entity rows reported.</td></tr>';
+      return;
+    }
+
+    entityTableBody.innerHTML = entities.map((row) => {
+      const entityType = String(row?.entityType || '-');
+      const baseline = Number(row?.baselineCount || 0);
+      const existing = Number(row?.existingCount || 0);
+      const createCount = Number(row?.createCandidateCount || 0);
+      const same = Number(row?.existingSameCount || 0);
+      const conflicts = Number(row?.conflictCount || 0);
+      return `<tr>
+        <td><code>${entityType}</code></td>
+        <td>${baseline}</td>
+        <td>${existing}</td>
+        <td class="text-success fw-semibold">${createCount}</td>
+        <td>${same}</td>
+        <td class="text-warning fw-semibold">${conflicts}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function runPreflight() {
+    const response = await fetch('/systemSettings/bootstrap/core/preflight', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: new URLSearchParams({ actionStateId }).toString()
+    });
+    const payload = await readSafeJson(response);
+    if (!response.ok || payload?.status === 'error') {
+      throw new Error(payload?.message || `Preflight failed (${response.status}).`);
+    }
+    return payload;
+  }
+
+  async function runApply() {
+    if (typeof window.requestProtectedAction === 'function') {
+      await window.requestProtectedAction();
+    }
+
+    const response = await fetch('/systemSettings/bootstrap/core/apply', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: new URLSearchParams({ actionStateId }).toString()
+    });
+    const payload = await readSafeJson(response);
+    if (response.status === 403 && payload?.status === 'admin_required') {
+      if (typeof window.resetAdminVerificationCache === 'function') {
+        window.resetAdminVerificationCache();
+      }
+      throw new Error(payload?.message || 'Admin approval required or session expired.');
+    }
+    if (!response.ok || payload?.status === 'error') {
+      throw new Error(payload?.message || `Apply failed (${response.status}).`);
+    }
+    return payload;
+  }
+
+  async function withWait(title, fn) {
+    let token = null;
+    try {
+      if (typeof window.showLoading === 'function') {
+        token = window.showLoading({ title, note: 'Please wait while baseline operation runs.', operation: 'Core Bootstrap' });
+      }
+      return await fn();
+    } finally {
+      if (token && typeof window.hideLoading === 'function') {
+        window.hideLoading(token);
+      }
+    }
+  }
+
+  async function onPreflightClick() {
+    const original = preflightBtn.innerHTML;
+    preflightBtn.disabled = true;
+    preflightBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Checking...';
+    try {
+      const payload = await withWait('Running Preflight', () => runPreflight());
+      renderSummary(payload.report || {});
+      setOutput('Preflight Completed', payload.report || payload);
+    } catch (error) {
+      setOutput('Preflight Failed', { status: 'error', message: error.message || 'Unknown error' });
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({ title: 'Preflight Failed', icon: 'error', message: error.message || 'Preflight failed.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+      }
+    } finally {
+      preflightBtn.disabled = false;
+      preflightBtn.innerHTML = original;
+    }
+  }
+
+  async function onApplyClick() {
+    const confirmText = 'Apply Baseline';
+    let confirmed = true;
+    if (typeof showMessageModal === 'function') {
+      const selected = await showMessageModal({
+        title: 'Apply Core Baseline',
+        icon: 'warning',
+        message: 'This will create missing core security records in the active backend. Existing records are kept unchanged.',
+        buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: confirmText, class: 'btn-primary' }]
+      });
+      confirmed = selected === confirmText;
+    }
+    if (!confirmed) return;
+
+    const original = applyBtn.innerHTML;
+    applyBtn.disabled = true;
+    applyBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Applying...';
+    try {
+      const payload = await withWait('Applying Baseline', () => runApply());
+      setOutput('Apply Completed', payload.report || payload);
+      const preflightPayload = await withWait('Refreshing Preflight', () => runPreflight());
+      renderSummary(preflightPayload.report || {});
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({ title: 'Bootstrap Completed', icon: 'success', message: 'Core bootstrap baseline was applied successfully.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      }
+    } catch (error) {
+      setOutput('Apply Failed', { status: 'error', message: error.message || 'Unknown error' });
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({ title: 'Apply Failed', icon: 'error', message: error.message || 'Apply failed.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+      }
+    } finally {
+      applyBtn.disabled = false;
+      applyBtn.innerHTML = original;
+    }
+  }
+
+  document.getElementById('bootstrapClearOutputBtn')?.addEventListener('click', () => {
+    outputEl.textContent = 'Ready.';
+  });
+
+  preflightBtn?.addEventListener('click', () => {
+    onPreflightClick().catch((error) => {
+      setOutput('Preflight Failed', { status: 'error', message: error.message || 'Unknown error' });
+    });
+  });
+
+  applyBtn?.addEventListener('click', () => {
+    onApplyClick().catch((error) => {
+      setOutput('Apply Failed', { status: 'error', message: error.message || 'Unknown error' });
+    });
+  });
+
+  renderSummary(initialReport || {});
+})();
+</script>

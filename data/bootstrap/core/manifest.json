@@ -1,0 +1,81 @@
+{
+  "id": "core-bootstrap-security-baseline",
+  "version": "1.0.0",
+  "title": "Core Security Baseline",
+  "generatedAt": "2026-05-26T20:20:51.771Z",
+  "sourceRoot": "data/bootstrap/core",
+  "entities": [
+    {
+      "entityType": "sections",
+      "file": "sections.json",
+      "identityFields": [
+        "id",
+        "name"
+      ],
+      "mode": "upsert-missing"
+    },
+    {
+      "entityType": "operations",
+      "file": "operations.json",
+      "identityFields": [
+        "id",
+        "name"
+      ],
+      "mode": "upsert-missing"
+    },
+    {
+      "entityType": "roles",
+      "file": "roles.json",
+      "identityFields": [
+        "id",
+        "key"
+      ],
+      "mode": "upsert-missing"
+    },
+    {
+      "entityType": "scopes",
+      "file": "scopes.json",
+      "identityFields": [
+        "id",
+        "name"
+      ],
+      "mode": "upsert-missing"
+    },
+    {
+      "entityType": "symbols",
+      "file": "symbols.json",
+      "identityFields": [
+        "id",
+        "name",
+        "orgId"
+      ],
+      "mode": "upsert-missing"
+    },
+    {
+      "entityType": "accesses",
+      "file": "accesses.json",
+      "identityFields": [
+        "id",
+        "name",
+        "orgId"
+      ],
+      "mode": "upsert-missing"
+    },
+    {
+      "entityType": "accessPolicies",
+      "file": "accessPolicies.json",
+      "identityFields": [
+        "id",
+        "userId",
+        "orgId",
+        "sectionId",
+        "operationId"
+      ],
+      "mode": "upsert-missing"
+    }
+  ],
+  "systemSettingsDefaults": {
+    "file": "systemSettings.defaults.json",
+    "mode": "create-if-missing"
+  }
+}
