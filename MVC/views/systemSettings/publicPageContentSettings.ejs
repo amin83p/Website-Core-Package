@@ -71,6 +71,7 @@
   <form id="publicPageContentForm" action="/systemSettings/public-pages" method="POST" class="form-container wide" style="max-width: 1440px;">
     <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
     <input type="hidden" name="contentJson" id="publicPageContentJson" value="<%= contentJson %>">
+    <input type="hidden" name="publicMenuJson" id="publicSurfaceMenuJson" value="<%= publicMenuJson %>">
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
       <ul class="nav nav-tabs" id="publicPageContentTabs" role="tablist">
@@ -111,7 +112,7 @@
           <i class="bi bi-arrow-clockwise me-1"></i>Reload
         </button>
         <button type="submit" class="btn btn-primary btn-sm fw-semibold" id="publicPageContentSaveBtn">
-          <i class="bi bi-save me-1"></i>Save Public Content
+          <i class="bi bi-save me-1"></i>Save Public Page Settings
         </button>
       </div>
     </div>
@@ -587,32 +588,17 @@
           </section>
         </div>
       </div>
-    </div>
-  </form>
 
-  <form id="publicSurfaceSettingsForm" action="/systemSettings/app" method="POST" class="form-container wide mt-4" style="max-width: 1440px;">
-    <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
-    <input type="hidden" name="returnTo" value="/systemSettings/public-pages">
-    <input type="hidden" name="publicMenuJson" id="publicSurfaceMenuJson" value="<%= publicMenuJson %>">
-
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-      <div>
-        <h2 class="h5 mb-1"><i class="bi bi-ui-radios-grid me-2"></i>Public Surface Settings</h2>
-        <div class="text-muted small">Moved from Application Defaults: Contact Page, Public Menu, Header Options.</div>
-      </div>
-      <button type="submit" class="btn btn-primary btn-sm fw-semibold" id="publicSurfaceSaveBtn">
-        <i class="bi bi-save me-1"></i>Save Public Surface Settings
-      </button>
-    </div>
-
-    <div class="tab-content pt-3">
       <div class="tab-pane fade" id="surface-contact-pane" role="tabpanel" aria-labelledby="surface-contact-tab-main" tabindex="0">
-        <div class="card mb-3 border-0 shadow-sm">
-          <div class="card-header bg-white border-0 pb-0">
-            <h5 class="fw-bold mb-1">Contact Page Content</h5>
-            <p class="text-muted small mb-0">Hero, cards, highlight chips, labels, and process images.</p>
-          </div>
-          <div class="card-body p-4">
+        <div class="settings-grid">
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-window-sidebar text-primary me-2"></i>Contact Page Content</h2>
+                <p>Hero, cards, highlight chips, labels, and process images.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
             <div class="row g-3">
               <div class="col-md-4">
                 <label class="form-label fw-bold">Hero Eyebrow</label>
@@ -640,9 +626,9 @@
               </div>
             </div>
 
-            <div class="mt-4">
-              <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                <div>
+              <div class="mt-4">
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                  <div>
                   <label class="form-label fw-bold mb-0">Highlights</label>
                   <div class="form-text">Small highlight cards near the top of the contact page.</div>
                 </div>
@@ -666,17 +652,21 @@
                 <% }) %>
               </div>
             </div>
-          </div>
+            </div>
+          </section>
         </div>
       </div>
 
       <div class="tab-pane fade" id="surface-menu-pane" role="tabpanel" aria-labelledby="surface-menu-tab-main" tabindex="0">
-        <div class="card mb-3 border-0 shadow-sm">
-          <div class="card-header bg-white border-0 pb-0">
-            <h5 class="fw-bold mb-1">Public Main Menu</h5>
-            <p class="text-muted small mb-0">Configure guest/public navigation endpoints.</p>
-          </div>
-          <div class="card-body p-4">
+        <div class="settings-grid">
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-menu-button-wide text-primary me-2"></i>Public Main Menu</h2>
+                <p>Configure guest/public navigation endpoints.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
             <div class="row mb-3">
               <div class="col-md-12 col-lg-8">
                 <label class="form-label fw-bold">Default Home Route</label>
@@ -702,20 +692,25 @@
             <div id="publicSurfaceMenuEmpty" class="alert alert-light border mt-3 d-none">
               No menu items yet. Add a menu item to start building the public menu.
             </div>
-          </div>
+            </div>
+          </section>
         </div>
       </div>
 
       <div class="tab-pane fade" id="surface-header-pane" role="tabpanel" aria-labelledby="surface-header-tab-main" tabindex="0">
-        <div class="card mb-3 border-0 shadow-sm">
-          <div class="card-header bg-white border-0 pb-0">
-            <h5 class="fw-bold mb-1">Header Buy Me A Coffee</h5>
-            <p class="text-muted small mb-0">Controls the guest-only support button in the header.</p>
-          </div>
-          <div class="card-body p-4">
+        <div class="settings-grid">
+          <section class="settings-card">
+            <div class="settings-card-header">
+              <div>
+                <h2><i class="bi bi-cup-hot text-primary me-2"></i>Header Buy Me A Coffee</h2>
+                <p>Controls the guest-only support button in the header.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
             <div class="row g-3">
               <div class="col-12">
                 <div class="form-check form-switch p-3 bg-light rounded border">
+                  <input type="hidden" name="headerShowBuyMeACoffee_present" value="1">
                   <input class="form-check-input" type="checkbox" role="switch" id="surfaceHeaderShowBuyMeACoffee" name="headerShowBuyMeACoffee" value="true" <%= headerShowBuyMeACoffee ? 'checked' : '' %>>
                   <label class="form-check-label fw-bold" for="surfaceHeaderShowBuyMeACoffee">Show Buy Me a Coffee button in header</label>
                 </div>
@@ -737,7 +732,8 @@
                 <input type="text" name="headerBuyMeACoffeeTitle" class="form-control" value="<%= headerBuyMeACoffeeTitle %>" placeholder="Support the work - one coffee at a time.">
               </div>
             </div>
-          </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
@@ -1463,6 +1459,19 @@
   }
 
   const form = document.getElementById('publicPageContentForm');
+  const formDataToObject = (formEl) => {
+    const out = {};
+    const fd = new FormData(formEl);
+    fd.forEach((value, key) => {
+      if (Object.prototype.hasOwnProperty.call(out, key)) {
+        if (!Array.isArray(out[key])) out[key] = [out[key]];
+        out[key].push(value);
+        return;
+      }
+      out[key] = value;
+    });
+    return out;
+  };
   form?.addEventListener('input', syncContentJson);
   form?.addEventListener('change', syncContentJson);
   form?.addEventListener('submit', async (event) => {
@@ -1476,16 +1485,16 @@
 
     try {
       const contentPayload = syncContentJson();
+      const payload = formDataToObject(form);
+      payload.content = contentPayload;
+      payload.actionStateId = form.querySelector('input[name="actionStateId"]')?.value || '';
       const response = await fetch(form.action, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-AJAX-Request': 'true'
         },
-        body: JSON.stringify({
-          content: contentPayload,
-          actionStateId: form.querySelector('input[name="actionStateId"]')?.value || ''
-        })
+        body: JSON.stringify(payload)
       });
       const json = await response.json();
       if (!response.ok || json.status !== 'success') throw new Error(json.message || 'Unable to save public page content.');
@@ -1512,7 +1521,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const surfaceForm = document.getElementById('publicSurfaceSettingsForm');
+  const surfaceForm = document.getElementById('publicPageContentForm');
   const publicMenuInput = document.getElementById('publicSurfaceMenuJson');
   const publicMenuBuilder = document.getElementById('publicSurfaceMenuBuilder');
   const publicMenuEmpty = document.getElementById('publicSurfaceMenuEmpty');
@@ -1763,10 +1772,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  document.querySelectorAll('#publicSurfaceSettingsForm [data-add-contact-page-row]').forEach((btn) => {
+  document.querySelectorAll('#publicPageContentForm [data-add-contact-page-row]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const type = btn.dataset.addContactPageRow;
-      const list = document.querySelector(`#publicSurfaceSettingsForm [data-contact-page-row-list="${type}"]`);
+      const list = document.querySelector(`#publicPageContentForm [data-contact-page-row-list="${type}"]`);
       if (!list) return;
       const wrap = document.createElement('div');
       if (type === 'highlights') {
@@ -1785,7 +1794,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('click', (event) => {
-    const removeBtn = event.target.closest('#publicSurfaceSettingsForm [data-remove-contact-page-row]');
+    const removeBtn = event.target.closest('#publicPageContentForm [data-remove-contact-page-row]');
     if (!removeBtn) return;
     removeBtn.closest('.contact-page-repeat-row')?.remove();
   });

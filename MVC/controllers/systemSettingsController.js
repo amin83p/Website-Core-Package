@@ -520,7 +520,9 @@ exports.updateAppSettings = async (req, res) => {
     const hasPublicMenuPayload = Object.prototype.hasOwnProperty.call(body, 'publicMenuJson')
       || Object.prototype.hasOwnProperty.call(body, 'publicHomePath');
 
-    const hasHeaderBuyCoffeeToggle = Object.prototype.hasOwnProperty.call(body, 'headerShowBuyMeACoffee');
+    const hasHeaderBuyCoffeePresence = Object.prototype.hasOwnProperty.call(body, 'headerShowBuyMeACoffee_present');
+    const hasHeaderBuyCoffeeToggle = hasHeaderBuyCoffeePresence
+      || Object.prototype.hasOwnProperty.call(body, 'headerShowBuyMeACoffee');
     const hasHeaderBuyCoffeePayload = hasHeaderBuyCoffeeToggle
       || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeUrl')
       || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeLabel')
@@ -737,11 +739,116 @@ exports.showPublicPageContentSettings = async (req, res) => {
 
 exports.updatePublicPageContentSettings = async (req, res) => {
   try {
-    const saved = await publicPageContentSettingsDataService.saveSettings(req.body || {}, req.user);
+    const body = req.body || {};
+    const saved = await publicPageContentSettingsDataService.saveSettings(body, req.user);
+
+    const existingSettings = await systemSettingsRepository.getSettings();
+    const existingApp = (existingSettings && existingSettings.app && typeof existingSettings.app === 'object')
+      ? existingSettings.app
+      : {};
+    const existingBrand = (existingApp.brand && typeof existingApp.brand === 'object') ? existingApp.brand : {};
+    const existingContactPage = (existingApp.contactPage && typeof existingApp.contactPage === 'object') ? existingApp.contactPage : {};
+    const existingPublicMenu = (existingApp.publicMenu && typeof existingApp.publicMenu === 'object') ? existingApp.publicMenu : {};
+
+    const hasContactPagePayload = Object.prototype.hasOwnProperty.call(body, 'contactPageHeroEyebrow')
+      || Object.prototype.hasOwnProperty.call(body, 'contactPageHeroTitle')
+      || Object.prototype.hasOwnProperty.call(body, 'contactPageHeroSubtitle')
+      || Object.prototype.hasOwnProperty.call(body, 'contactPageHighlightTitle')
+      || Object.prototype.hasOwnProperty.call(body, 'contactPageHighlightBody')
+      || Object.prototype.hasOwnProperty.call(body, 'contactPageProcessImageUrl')
+      || Object.prototype.hasOwnProperty.call(body, 'contactPageProcessImageAlt')
+      || Object.prototype.hasOwnProperty.call(body, 'contactPageProcessImageCaption');
+    const hasPublicMenuPayload = Object.prototype.hasOwnProperty.call(body, 'publicMenuJson')
+      || Object.prototype.hasOwnProperty.call(body, 'publicHomePath');
+    const hasHeaderBuyCoffeePresence = Object.prototype.hasOwnProperty.call(body, 'headerShowBuyMeACoffee_present');
+    const hasHeaderBuyCoffeeToggle = hasHeaderBuyCoffeePresence
+      || Object.prototype.hasOwnProperty.call(body, 'headerShowBuyMeACoffee');
+    const hasHeaderBuyCoffeePayload = hasHeaderBuyCoffeeToggle
+      || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeUrl')
+      || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeLabel')
+      || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeText')
+      || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeTitle');
+
+    if (hasContactPagePayload || hasPublicMenuPayload || hasHeaderBuyCoffeePayload) {
+      const hasContactPageHighlightsPayload = Object.prototype.hasOwnProperty.call(body, 'contactPageHighlightTitle')
+        || Object.prototype.hasOwnProperty.call(body, 'contactPageHighlightBody');
+      const hasContactPageProcessImagesPayload = Object.prototype.hasOwnProperty.call(body, 'contactPageProcessImageUrl')
+        || Object.prototype.hasOwnProperty.call(body, 'contactPageProcessImageAlt')
+        || Object.prototype.hasOwnProperty.call(body, 'contactPageProcessImageCaption');
+      const contactPageHighlights = hasContactPageHighlightsPayload
+        ? buildContactPageHighlights(body)
+        : (existingContactPage.highlights || []);
+      const contactPageProcessImages = hasContactPageProcessImagesPayload
+        ? buildContactPageProcessImages(body)
+        : (existingContactPage.processImages || []);
+      const readBodyOrExisting = (fieldKey, existingValue = '') => (
+        Object.prototype.hasOwnProperty.call(body, fieldKey) ? body[fieldKey] : existingValue
+      );
+
+      const publicMenu = hasPublicMenuPayload ? parsePublicMenuFromRequest(body) : { ...existingPublicMenu };
+      if (hasPublicMenuPayload) {
+        publicMenu.defaultHomePath = parsePublicDefaultHomePath(body);
+      }
+
+      await systemSettingsRepository.updateSettings({
+        app: {
+          brand: {
+            headerShowBuyMeACoffee: hasHeaderBuyCoffeeToggle
+              ? body.headerShowBuyMeACoffee === 'true'
+              : (existingBrand.headerShowBuyMeACoffee !== false),
+            headerBuyMeACoffeeUrl: hasHeaderBuyCoffeePayload
+              ? body.headerBuyMeACoffeeUrl
+              : existingBrand.headerBuyMeACoffeeUrl,
+            headerBuyMeACoffeeLabel: hasHeaderBuyCoffeePayload
+              ? body.headerBuyMeACoffeeLabel
+              : existingBrand.headerBuyMeACoffeeLabel,
+            headerBuyMeACoffeeText: hasHeaderBuyCoffeePayload
+              ? body.headerBuyMeACoffeeText
+              : existingBrand.headerBuyMeACoffeeText,
+            headerBuyMeACoffeeTitle: hasHeaderBuyCoffeePayload
+              ? body.headerBuyMeACoffeeTitle
+              : existingBrand.headerBuyMeACoffeeTitle
+          },
+          contactPage: {
+            heroEyebrow: hasContactPagePayload ? readBodyOrExisting('contactPageHeroEyebrow', existingContactPage.heroEyebrow) : existingContactPage.heroEyebrow,
+            heroTitle: hasContactPagePayload ? readBodyOrExisting('contactPageHeroTitle', existingContactPage.heroTitle) : existingContactPage.heroTitle,
+            heroSubtitle: hasContactPagePayload ? readBodyOrExisting('contactPageHeroSubtitle', existingContactPage.heroSubtitle) : existingContactPage.heroSubtitle,
+            primaryCtaLabel: hasContactPagePayload ? readBodyOrExisting('contactPagePrimaryCtaLabel', existingContactPage.primaryCtaLabel) : existingContactPage.primaryCtaLabel,
+            emailCtaLabel: hasContactPagePayload ? readBodyOrExisting('contactPageEmailCtaLabel', existingContactPage.emailCtaLabel) : existingContactPage.emailCtaLabel,
+            followUpCtaLabel: hasContactPagePayload ? readBodyOrExisting('contactPageFollowUpCtaLabel', existingContactPage.followUpCtaLabel) : existingContactPage.followUpCtaLabel,
+            highlights: contactPageHighlights,
+            formEyebrow: hasContactPagePayload ? readBodyOrExisting('contactPageFormEyebrow', existingContactPage.formEyebrow) : existingContactPage.formEyebrow,
+            formTitle: hasContactPagePayload ? readBodyOrExisting('contactPageFormTitle', existingContactPage.formTitle) : existingContactPage.formTitle,
+            formSubtitle: hasContactPagePayload ? readBodyOrExisting('contactPageFormSubtitle', existingContactPage.formSubtitle) : existingContactPage.formSubtitle,
+            formHint: hasContactPagePayload ? readBodyOrExisting('contactPageFormHint', existingContactPage.formHint) : existingContactPage.formHint,
+            directContactKicker: hasContactPagePayload ? readBodyOrExisting('contactPageDirectContactKicker', existingContactPage.directContactKicker) : existingContactPage.directContactKicker,
+            directContactTitle: hasContactPagePayload ? readBodyOrExisting('contactPageDirectContactTitle', existingContactPage.directContactTitle) : existingContactPage.directContactTitle,
+            directContactLead: hasContactPagePayload ? readBodyOrExisting('contactPageDirectContactLead', existingContactPage.directContactLead) : existingContactPage.directContactLead,
+            directContactMethodsTitle: hasContactPagePayload ? readBodyOrExisting('contactPageDirectContactMethodsTitle', existingContactPage.directContactMethodsTitle) : existingContactPage.directContactMethodsTitle,
+            directContactMethodsSubtitle: hasContactPagePayload ? readBodyOrExisting('contactPageDirectContactMethodsSubtitle', existingContactPage.directContactMethodsSubtitle) : existingContactPage.directContactMethodsSubtitle,
+            directContactEmailActionLabel: hasContactPagePayload ? readBodyOrExisting('contactPageDirectContactEmailActionLabel', existingContactPage.directContactEmailActionLabel) : existingContactPage.directContactEmailActionLabel,
+            directContactPhoneActionLabel: hasContactPagePayload ? readBodyOrExisting('contactPageDirectContactPhoneActionLabel', existingContactPage.directContactPhoneActionLabel) : existingContactPage.directContactPhoneActionLabel,
+            directContactFaxActionLabel: hasContactPagePayload ? readBodyOrExisting('contactPageDirectContactFaxActionLabel', existingContactPage.directContactFaxActionLabel) : existingContactPage.directContactFaxActionLabel,
+            directContactDefaultActionLabel: hasContactPagePayload ? readBodyOrExisting('contactPageDirectContactDefaultActionLabel', existingContactPage.directContactDefaultActionLabel) : existingContactPage.directContactDefaultActionLabel,
+            aboutCardTitle: hasContactPagePayload ? readBodyOrExisting('contactPageAboutCardTitle', existingContactPage.aboutCardTitle) : existingContactPage.aboutCardTitle,
+            aboutCardBody: hasContactPagePayload ? readBodyOrExisting('contactPageAboutCardBody', existingContactPage.aboutCardBody) : existingContactPage.aboutCardBody,
+            aboutCardButtonLabel: hasContactPagePayload ? readBodyOrExisting('contactPageAboutCardButtonLabel', existingContactPage.aboutCardButtonLabel) : existingContactPage.aboutCardButtonLabel,
+            aboutCardHref: hasContactPagePayload ? readBodyOrExisting('contactPageAboutCardHref', existingContactPage.aboutCardHref) : existingContactPage.aboutCardHref,
+            processEyebrow: hasContactPagePayload ? readBodyOrExisting('contactPageProcessEyebrow', existingContactPage.processEyebrow) : existingContactPage.processEyebrow,
+            processTitle: hasContactPagePayload ? readBodyOrExisting('contactPageProcessTitle', existingContactPage.processTitle) : existingContactPage.processTitle,
+            processImages: contactPageProcessImages
+          },
+          publicMenu
+        }
+      }, req.user);
+
+      await settingService.refresh();
+    }
+
     if (req.headers['x-ajax-request'] || req.xhr || String(req.headers.accept || '').includes('json')) {
       return res.json({
         status: 'success',
-        message: 'Public page content saved.',
+        message: 'Public page settings saved.',
         data: saved
       });
     }
