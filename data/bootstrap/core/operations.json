@@ -1,19 +1,5 @@
 [
   {
-    "name": "AI_SCORING",
-    "active": true,
-    "trackState": true,
-    "keepActive": true,
-    "system": false,
-    "audit": {
-      "createUser": "ROOT_001",
-      "createDateTime": "2026-05-02T00:24:02.746Z",
-      "lastUpdateUser": "ROOT_001",
-      "lastUpdateDateTime": "2026-05-02T19:03:16.085Z"
-    },
-    "id": "935362"
-  },
-  {
     "id": "OP0101",
     "active": true,
     "audit": {

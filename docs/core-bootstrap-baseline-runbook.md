@@ -6,6 +6,7 @@ Use this first-run tool to seed core security metadata into a fresh backend.
 Source pack:
 - `data/bootstrap/core/manifest.json`
 - entity files under `data/bootstrap/core/`
+- binary assets under `data/bootstrap/core/assets/`
 
 ## Included baseline entities
 - `sections`
@@ -16,6 +17,16 @@ Source pack:
 - `accesses`
 - `accessPolicies`
 - `systemSettings` defaults (`create-if-missing`)
+
+## Included baseline assets (v1 curated core set)
+- `/uploads/GLOBAL/logo/Logo1.png`
+- `/uploads/GLOBAL/logo/icon.svg`
+- `/uploads/GLOBAL/symbols/bmc_qr_1772825486683.png`
+
+Asset declarations are defined in `manifest.json -> assets[]` with:
+- `source` (relative to `data/bootstrap/core/assets/`)
+- `targetUploadRef` (`/uploads/...`)
+- optional `required`, `tags`
 
 ## Routes
 - `GET /systemSettings/bootstrap/core`
@@ -33,6 +44,8 @@ Source pack:
 - Existing records are not overwritten.
 - Missing records are created.
 - Conflicts are reported, not auto-fixed.
+- Asset copy is non-destructive: existing target files are skipped.
+- Missing source asset files are reported in output (`missing_source`) and do not abort the whole run.
 - Each preflight/apply writes an audit row to `coreBootstrapRuns`.
 
 ## Mirror parity checklist

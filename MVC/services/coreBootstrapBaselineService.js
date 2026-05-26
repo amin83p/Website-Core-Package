@@ -1,4 +1,5 @@
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -7,11 +8,13 @@ const systemSettingsRepository = require('../repositories/systemSettingsReposito
 const coreBootstrapRunRepository = require('../repositories/coreBootstrapRunRepository');
 const firstRunBootstrapService = require('./firstRunBootstrapService');
 const dataBackendRuntimeService = require('./dataBackendRuntimeService');
+const coreFilesService = require('./coreFilesService');
 const { getMongoCollection } = require('../infrastructure/mongo/mongoConnection');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 
 const BASELINE_ROOT = path.join(process.cwd(), 'data', 'bootstrap', 'core');
 const MANIFEST_PATH = path.join(BASELINE_ROOT, 'manifest.json');
+const ASSET_ROOT = path.join(BASELINE_ROOT, 'assets');
 const JSON_SYSTEM_SETTINGS_PATH = path.join(process.cwd(), 'data', 'systemSettings.json');
 
 const SUPPORTED_ENTITY_TYPES = Object.freeze([
@@ -71,14 +74,26 @@ function normalizeComparableRow(row = {}) {
   return stableSortObject(source);
 }
 
-function assertRelativePackPath(file = '') {
+function assertRelativePackPath(file = '', baselineRoot = BASELINE_ROOT) {
   const token = cleanText(file, 1600).replace(/\\/g, '/');
   if (!token) throw new Error('Baseline entity file is required.');
   if (token.includes('..')) throw new Error(`Invalid baseline file path: ${token}`);
-  const resolved = path.resolve(BASELINE_ROOT, token);
-  const relative = path.relative(BASELINE_ROOT, resolved);
+  const resolved = path.resolve(baselineRoot, token);
+  const relative = path.relative(baselineRoot, resolved);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new Error(`Baseline file escapes root: ${token}`);
+  }
+  return { token, resolved };
+}
+
+function assertRelativeAssetPath(file = '', assetRoot = ASSET_ROOT) {
+  const token = cleanText(file, 1600).replace(/\\/g, '/');
+  if (!token) throw new Error('Baseline asset source path is required.');
+  if (token.includes('..')) throw new Error(`Invalid baseline asset source path: ${token}`);
+  const resolved = path.resolve(assetRoot, token);
+  const relative = path.relative(assetRoot, resolved);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Baseline asset source path escapes root: ${token}`);
   }
   return { token, resolved };
 }
@@ -118,8 +133,37 @@ function normalizeDefaultsSpec(row = {}) {
   };
 }
 
-async function loadBaselineBundle() {
-  const manifest = safeObject(await readJsonFile(MANIFEST_PATH));
+function normalizeManifestAsset(row = {}) {
+  const source = safeObject(row);
+  const sourcePath = cleanText(source.source, 1600);
+  const targetUploadRef = cleanText(source.targetUploadRef, 2000);
+  if (!sourcePath) throw new Error('Manifest asset source is required.');
+  if (!targetUploadRef) throw new Error('Manifest asset targetUploadRef is required.');
+  const relativeTarget = coreFilesService.extractRelativeUploadPath(targetUploadRef);
+  if (!relativeTarget) {
+    throw new Error(`Manifest asset targetUploadRef must be a valid /uploads path: ${targetUploadRef}`);
+  }
+  return {
+    source: sourcePath,
+    targetUploadRef,
+    required: parseBoolean(source.required, false),
+    tags: Array.isArray(source.tags)
+      ? source.tags.map((item) => cleanText(item, 80)).filter(Boolean)
+      : []
+  };
+}
+
+function resolveBaselineRoot(options = {}) {
+  const overrideRoot = cleanText(options.baselineRoot, 2000);
+  if (!overrideRoot) return BASELINE_ROOT;
+  return path.resolve(process.cwd(), overrideRoot);
+}
+
+async function loadBaselineBundle(options = {}) {
+  const baselineRoot = resolveBaselineRoot(options);
+  const baselineManifestPath = path.join(baselineRoot, 'manifest.json');
+  const assetRoot = path.join(baselineRoot, 'assets');
+  const manifest = safeObject(await readJsonFile(baselineManifestPath));
   const baselineId = cleanText(manifest.id, 160) || 'core-bootstrap-security-baseline';
   const baselineVersion = cleanText(manifest.version, 120) || '1.0.0';
   const entities = Array.isArray(manifest.entities)
@@ -130,7 +174,7 @@ async function loadBaselineBundle() {
   const defaultsSpec = normalizeDefaultsSpec(manifest.systemSettingsDefaults || {});
   const loadedEntities = [];
   for (const row of entities) {
-    const { resolved } = assertRelativePackPath(row.file);
+    const { resolved } = assertRelativePackPath(row.file, baselineRoot);
     // eslint-disable-next-line no-await-in-loop
     const parsed = await readJsonFile(resolved);
     if (!Array.isArray(parsed)) {
@@ -144,8 +188,19 @@ async function loadBaselineBundle() {
     });
   }
 
-  const defaultsPath = assertRelativePackPath(defaultsSpec.file).resolved;
+  const defaultsPath = assertRelativePackPath(defaultsSpec.file, baselineRoot).resolved;
   const defaultsPayload = safeObject(await readJsonFile(defaultsPath));
+  const assets = Array.isArray(manifest.assets) ? manifest.assets.map(normalizeManifestAsset) : [];
+  const loadedAssets = [];
+  for (const asset of assets) {
+    const { resolved } = assertRelativeAssetPath(asset.source, assetRoot);
+    const sourceExists = fsSync.existsSync(resolved);
+    loadedAssets.push({
+      ...asset,
+      sourcePath: resolved,
+      sourceExists
+    });
+  }
 
   return {
     baselineId,
@@ -153,12 +208,13 @@ async function loadBaselineBundle() {
     manifest,
     manifestHash: hashPayload(manifest),
     entities: loadedEntities,
+    assets: loadedAssets,
     systemSettingsDefaults: {
       ...defaultsSpec,
       filePath: defaultsPath,
       payload: defaultsPayload
     },
-    sourceRoot: BASELINE_ROOT
+    sourceRoot: baselineRoot
   };
 }
 
@@ -265,10 +321,68 @@ function resolveActor(options = {}) {
   return { id, label: id };
 }
 
+function summarizeAssetItems(items = []) {
+  return (Array.isArray(items) ? items : []).reduce((acc, row) => {
+    const status = cleanText(row?.status, 80).toLowerCase();
+    acc.planned += 1;
+    if (status === 'ready') acc.ready += 1;
+    if (status === 'copy_needed') acc.copyNeeded += 1;
+    if (status === 'missing_source') acc.missingSource += 1;
+    if (status === 'target_exists') acc.targetExists += 1;
+    if (status === 'invalid_target') acc.invalidTarget += 1;
+    return acc;
+  }, {
+    planned: 0,
+    ready: 0,
+    copyNeeded: 0,
+    missingSource: 0,
+    targetExists: 0,
+    invalidTarget: 0
+  });
+}
+
+function resolveAssetPreflightItems(bundle = {}) {
+  const items = [];
+  const assetRows = Array.isArray(bundle.assets) ? bundle.assets : [];
+  for (const asset of assetRows) {
+    const sourceExists = asset.sourceExists === true;
+    const targetPath = coreFilesService.fromUploadsUrlToDiskPath(asset.targetUploadRef || '');
+    const targetValid = Boolean(targetPath);
+    const targetExists = targetValid && fsSync.existsSync(targetPath);
+    let status = 'ready';
+    let reason = '';
+    if (!sourceExists) {
+      status = 'missing_source';
+      reason = 'source_file_not_found';
+    } else if (!targetValid) {
+      status = 'invalid_target';
+      reason = 'target_upload_ref_invalid';
+    } else if (targetExists) {
+      status = 'target_exists';
+      reason = 'skip_existing';
+    } else {
+      status = 'copy_needed';
+      reason = 'target_missing';
+    }
+
+    items.push({
+      source: asset.source,
+      targetUploadRef: asset.targetUploadRef,
+      required: asset.required === true,
+      tags: Array.isArray(asset.tags) ? asset.tags : [],
+      sourceExists,
+      targetExists,
+      status,
+      reason
+    });
+  }
+  return items;
+}
+
 async function preflight(options = {}) {
   const backendMode = resolveBackendMode(options);
   const actor = resolveActor(options);
-  const bundle = await loadBaselineBundle();
+  const bundle = await loadBaselineBundle(options);
   const entities = [];
   const warnings = [];
 
@@ -295,6 +409,8 @@ async function preflight(options = {}) {
 
   const systemSettingsState = await getSystemSettingsState(backendMode);
   const emptyDatabase = totals.existingRows === 0 && !systemSettingsState.exists;
+  const assetItems = resolveAssetPreflightItems(bundle);
+  const assetSummary = summarizeAssetItems(assetItems);
 
   const report = {
     action: 'preflight',
@@ -319,6 +435,8 @@ async function preflight(options = {}) {
       exists: systemSettingsState.exists,
       defaultsMode: bundle.systemSettingsDefaults.mode
     },
+    assetSummary,
+    assetItems,
     summary: {
       baselineRows: totals.baselineRows,
       existingRows: totals.existingRows,
@@ -361,7 +479,7 @@ async function apply(options = {}) {
   const dryRun = parseBoolean(options.dryRun, false);
   const startTime = Date.now();
   const preflightReport = await preflight({ ...options, backendMode });
-  const bundle = await loadBaselineBundle();
+  const bundle = await loadBaselineBundle(options);
 
   const warnings = [];
   const entityReports = [];
@@ -447,6 +565,81 @@ async function apply(options = {}) {
 
   if (systemSettingsResult.skipped) skippedTotal += 1;
 
+  const applyAssetItems = [];
+  const assetSummary = {
+    planned: 0,
+    copied: 0,
+    skippedExisting: 0,
+    missingSource: 0,
+    failed: 0,
+    warnings: 0
+  };
+  const preflightAssetItems = Array.isArray(preflightReport?.assetItems) ? preflightReport.assetItems : [];
+  for (const assetRow of preflightAssetItems) {
+    const row = {
+      source: assetRow.source,
+      targetUploadRef: assetRow.targetUploadRef,
+      required: assetRow.required === true,
+      tags: Array.isArray(assetRow.tags) ? assetRow.tags : [],
+      status: '',
+      reason: ''
+    };
+    assetSummary.planned += 1;
+
+    const sourcePath = path.resolve(path.join(bundle.sourceRoot, 'assets'), row.source || '');
+    if (!fsSync.existsSync(sourcePath)) {
+      row.status = 'missing_source';
+      row.reason = 'source_file_not_found';
+      assetSummary.missingSource += 1;
+      applyAssetItems.push(row);
+      warnings.push(`asset ${row.source}: source file not found.`);
+      continue;
+    }
+
+    const targetPath = coreFilesService.fromUploadsUrlToDiskPath(row.targetUploadRef || '');
+    if (!targetPath) {
+      row.status = 'failed';
+      row.reason = 'target_upload_ref_invalid';
+      assetSummary.failed += 1;
+      applyAssetItems.push(row);
+      warnings.push(`asset ${row.source}: invalid target upload ref ${row.targetUploadRef}.`);
+      continue;
+    }
+
+    if (fsSync.existsSync(targetPath)) {
+      row.status = 'skipped_existing';
+      row.reason = 'target_exists';
+      assetSummary.skippedExisting += 1;
+      applyAssetItems.push(row);
+      continue;
+    }
+
+    if (dryRun) {
+      row.status = 'copied';
+      row.reason = 'dry_run_planned_copy';
+      assetSummary.copied += 1;
+      applyAssetItems.push(row);
+      continue;
+    }
+
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      // eslint-disable-next-line no-await-in-loop
+      await fs.copyFile(sourcePath, targetPath);
+      row.status = 'copied';
+      row.reason = 'copied_to_upload_volume';
+      assetSummary.copied += 1;
+    } catch (error) {
+      row.status = 'failed';
+      row.reason = error.message || 'copy_failed';
+      assetSummary.failed += 1;
+      warnings.push(`asset ${row.source}: ${error.message}`);
+    }
+    applyAssetItems.push(row);
+  }
+  assetSummary.warnings = warnings.length;
+
   firstRunBootstrapService.clearBootstrapStateCache();
 
   const durationMs = Date.now() - startTime;
@@ -463,6 +656,8 @@ async function apply(options = {}) {
     },
     entityReports,
     systemSettings: systemSettingsResult,
+    assetSummary,
+    assetItems: applyAssetItems,
     summary: {
       created: createdTotal,
       updated: 0,
@@ -505,6 +700,8 @@ async function apply(options = {}) {
 module.exports = {
   BASELINE_ROOT,
   MANIFEST_PATH,
+  ASSET_ROOT,
+  resolveBaselineRoot,
   loadBaselineBundle,
   preflight,
   apply

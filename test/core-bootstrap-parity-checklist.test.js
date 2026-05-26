@@ -10,6 +10,9 @@ function exists(relativePath) {
 test('core bootstrap parity checklist files exist', () => {
   const requiredPaths = [
     'data/bootstrap/core/manifest.json',
+    'data/bootstrap/core/assets/logo/Logo1.png',
+    'data/bootstrap/core/assets/logo/icon.svg',
+    'data/bootstrap/core/assets/symbols/bmc_qr_1772825486683.png',
     'data/bootstrap/core/sections.json',
     'data/bootstrap/core/operations.json',
     'data/bootstrap/core/roles.json',
@@ -26,4 +29,9 @@ test('core bootstrap parity checklist files exist', () => {
   for (const rel of requiredPaths) {
     assert.equal(exists(rel), true, `expected file to exist: ${rel}`);
   }
+
+  const manifestPath = path.join(process.cwd(), 'data', 'bootstrap', 'core', 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  assert.equal(Array.isArray(manifest.assets), true, 'expected manifest.assets array');
+  assert.equal(manifest.assets.length >= 1, true, 'expected curated bootstrap assets');
 });

@@ -66,6 +66,20 @@
   </div>
 
   <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold small">Asset Summary</div>
+    <div class="card-body p-3">
+      <div class="row g-3">
+        <div class="col-md-2"><div class="small text-muted">Planned</div><div class="fs-5 fw-bold" id="assetPlanned">0</div></div>
+        <div class="col-md-2"><div class="small text-muted">Copy Needed</div><div class="fs-5 fw-bold text-primary" id="assetCopyNeeded">0</div></div>
+        <div class="col-md-2"><div class="small text-muted">Target Exists</div><div class="fs-5 fw-bold" id="assetTargetExists">0</div></div>
+        <div class="col-md-2"><div class="small text-muted">Missing Source</div><div class="fs-5 fw-bold text-warning" id="assetMissingSource">0</div></div>
+        <div class="col-md-2"><div class="small text-muted">Copied</div><div class="fs-5 fw-bold text-success" id="assetCopied">0</div></div>
+        <div class="col-md-2"><div class="small text-muted">Failed</div><div class="fs-5 fw-bold text-danger" id="assetFailed">0</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-white fw-bold small">Entity Breakdown</div>
     <div class="card-body p-3">
       <div class="table-scroll-wrapper">
@@ -129,6 +143,14 @@
     document.getElementById('summaryDatabaseMode').textContent = empty
       ? 'Target appears empty. Safe to apply baseline.'
       : 'Target contains existing rows. Apply will create only missing records.';
+
+    const assetSummary = report?.assetSummary || {};
+    document.getElementById('assetPlanned').textContent = Number(assetSummary.planned || 0);
+    document.getElementById('assetCopyNeeded').textContent = Number(assetSummary.copyNeeded || 0);
+    document.getElementById('assetTargetExists').textContent = Number(assetSummary.targetExists || 0);
+    document.getElementById('assetMissingSource').textContent = Number(assetSummary.missingSource || 0);
+    document.getElementById('assetCopied').textContent = Number(assetSummary.copied || 0);
+    document.getElementById('assetFailed').textContent = Number(assetSummary.failed || 0);
 
     const entities = Array.isArray(report?.entities) ? report.entities : [];
     if (!entities.length) {

@@ -77,5 +77,34 @@
   "systemSettingsDefaults": {
     "file": "systemSettings.defaults.json",
     "mode": "create-if-missing"
-  }
+  },
+  "assets": [
+    {
+      "source": "logo/Logo1.png",
+      "targetUploadRef": "/uploads/GLOBAL/logo/Logo1.png",
+      "required": true,
+      "tags": [
+        "branding",
+        "logo"
+      ]
+    },
+    {
+      "source": "logo/icon.svg",
+      "targetUploadRef": "/uploads/GLOBAL/logo/icon.svg",
+      "required": true,
+      "tags": [
+        "branding",
+        "icon"
+      ]
+    },
+    {
+      "source": "symbols/bmc_qr_1772825486683.png",
+      "targetUploadRef": "/uploads/GLOBAL/symbols/bmc_qr_1772825486683.png",
+      "required": false,
+      "tags": [
+        "symbol",
+        "support"
+      ]
+    }
+  ]
 }

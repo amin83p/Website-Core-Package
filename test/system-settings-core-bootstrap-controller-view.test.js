@@ -40,7 +40,8 @@ test('core bootstrap page controller renders preflight and action state', async 
     action: 'preflight',
     baseline: { id: 'core-bootstrap-security-baseline', version: '1.0.0', sourceRoot: 'data/bootstrap/core' },
     summary: { baselineRows: 10, plannedCreates: 10, existingSame: 0, conflicts: 0 },
-    entities: []
+    entities: [],
+    assetSummary: { planned: 2, copyNeeded: 1, targetExists: 1, missingSource: 0, copied: 0, failed: 0 }
   });
 
   const res = makeResponse();
@@ -62,8 +63,18 @@ test('core bootstrap preflight/apply controllers return structured payloads', as
   const originalApply = coreBootstrapBaselineService.apply;
 
   dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json', mongo: { ready: false } });
-  coreBootstrapBaselineService.preflight = async () => ({ action: 'preflight', summary: { plannedCreates: 5 }, run: { id: 'RUN_PRE_1' } });
-  coreBootstrapBaselineService.apply = async () => ({ action: 'apply', summary: { created: 5 }, run: { id: 'RUN_APPLY_1' } });
+  coreBootstrapBaselineService.preflight = async () => ({
+    action: 'preflight',
+    summary: { plannedCreates: 5 },
+    assetSummary: { planned: 1, copyNeeded: 1, targetExists: 0, missingSource: 0, copied: 0, failed: 0 },
+    run: { id: 'RUN_PRE_1' }
+  });
+  coreBootstrapBaselineService.apply = async () => ({
+    action: 'apply',
+    summary: { created: 5 },
+    assetSummary: { planned: 2, copied: 1, skippedExisting: 1, missingSource: 0, failed: 0 },
+    run: { id: 'RUN_APPLY_1' }
+  });
 
   try {
     const preRes = makeResponse();
@@ -71,12 +82,14 @@ test('core bootstrap preflight/apply controllers return structured payloads', as
     assert.equal(preRes.statusCode, 200);
     assert.equal(preRes.jsonPayload?.status, 'success');
     assert.equal(preRes.jsonPayload?.report?.run?.id, 'RUN_PRE_1');
+    assert.equal(preRes.jsonPayload?.report?.assetSummary?.planned, 1);
 
     const applyRes = makeResponse();
     await systemSettingsController.applyCoreBootstrapBaseline({ user: { id: 'USER_2' }, body: {} }, applyRes);
     assert.equal(applyRes.statusCode, 200);
     assert.equal(applyRes.jsonPayload?.status, 'success');
     assert.equal(applyRes.jsonPayload?.report?.run?.id, 'RUN_APPLY_1');
+    assert.equal(applyRes.jsonPayload?.report?.assetSummary?.copied, 1);
   } finally {
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntime;
     coreBootstrapBaselineService.preflight = originalPreflight;
@@ -95,7 +108,8 @@ test('core bootstrap EJS compiles and includes expected actions', () => {
     preflight: {
       baseline: { id: 'core-bootstrap-security-baseline', version: '1.0.0', sourceRoot: 'data/bootstrap/core' },
       summary: { baselineRows: 10, plannedCreates: 8, existingSame: 2, conflicts: 0 },
-      entities: []
+      entities: [],
+      assetSummary: { planned: 2, copyNeeded: 1, targetExists: 1, missingSource: 0, copied: 0, failed: 0 }
     },
     actionStateId: 'STATE_VIEW_BOOT',
     user: { id: 'USER_3' }
@@ -104,6 +118,7 @@ test('core bootstrap EJS compiles and includes expected actions', () => {
   assert.match(html, /Core Bootstrap Baseline/);
   assert.match(html, /Refresh Preflight/);
   assert.match(html, /Apply Baseline/);
+  assert.match(html, /Asset Summary/);
   assert.match(html, /\/systemSettings\/bootstrap\/core\/preflight/);
   assert.match(html, /\/systemSettings\/bootstrap\/core\/apply/);
 });
