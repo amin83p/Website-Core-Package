@@ -286,6 +286,16 @@ router.post('/packages/:packageId/remove',
           ),
           adminApproval,
           ctrl.removePackageFromManager);
+router.post('/packages/:packageId/uninstall-preview',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.uninstallPreviewPackageFromManager);
 router.post('/packages/:packageId/sync',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
@@ -296,6 +306,16 @@ router.post('/packages/:packageId/sync',
           ),
           adminApproval,
           ctrl.syncPackageFromManager);
+router.get('/packages/:packageId/transactions',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE, { keepActive: true }),
+          ctrl.listPackageTransactionsFromManager);
+router.get('/packages/transactions/:transactionId',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE, { keepActive: true }),
+          ctrl.getPackageTransactionDetailFromManager);
 
 // 7. Data Migration (JSON <-> Mongo)
 router.get('/data-migration',

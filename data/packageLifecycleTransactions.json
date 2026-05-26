@@ -1,0 +1,2082 @@
+[
+  {
+    "id": "PKG_TXN_1779812228560_ntyl07",
+    "transactionId": "PKG_TXN_1779812228560_ntyl07",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "uninstall-preview",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:08.560Z",
+    "finishedAt": "2026-05-26T16:17:08.588Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T16:17:08.560Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "baselineSnapshots": [],
+      "currentSnapshots": []
+    },
+    "metadata": {
+      "baselineTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:08.569Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:08.615Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779812228622_qdlvqg",
+    "transactionId": "PKG_TXN_1779812228622_qdlvqg",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:08.622Z",
+    "finishedAt": "2026-05-26T16:17:08.708Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:08.622Z",
+        "finishedAt": "2026-05-26T16:17:08.651Z",
+        "details": {
+          "hasRisk": false,
+          "modifiedCount": 0
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:08.664Z",
+        "finishedAt": "2026-05-26T16:17:08.702Z",
+        "details": {
+          "registryRemoved": true
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "removed",
+        "reason": "Registry row removed.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T16:17:08.682Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packageregistry": {
+        "removed": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [],
+      "previewTransactionId": "PKG_TXN_1779812228560_ntyl07"
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "PKG_TXN_1779812228560_ntyl07",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:08.631Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:08.711Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779812228717_qy101w",
+    "transactionId": "PKG_TXN_1779812228717_qy101w",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:08.717Z",
+    "finishedAt": "2026-05-26T16:17:08.750Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:08.717Z",
+        "finishedAt": "2026-05-26T16:17:08.724Z",
+        "details": {
+          "hasRisk": false,
+          "modifiedCount": 0
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:08.733Z",
+        "finishedAt": "2026-05-26T16:17:08.745Z",
+        "details": {
+          "registryRemoved": false
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": ""
+        },
+        "operation": "skipped",
+        "reason": "Registry row not found.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T16:17:08.739Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packageregistry": {
+        "skipped": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [],
+      "previewTransactionId": ""
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:08.718Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:08.756Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779812228842_i4huvj",
+    "transactionId": "PKG_TXN_1779812228842_i4huvj",
+    "packageId": "zip-addon",
+    "packageName": "ZIP Addon",
+    "packageVersion": "1.0.0",
+    "action": "install-zip",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:08.842Z",
+    "finishedAt": "2026-05-26T16:17:09.100Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:08.842Z",
+        "finishedAt": "2026-05-26T16:17:08.986Z",
+        "details": {
+          "packageId": "zip-addon",
+          "previousVersion": "",
+          "nextVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:08.888Z",
+        "finishedAt": "2026-05-26T16:17:09.023Z",
+        "details": {
+          "updatedVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T16:17:09.055Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {
+        "destinationDir": "C:\\Users\\Amin\\AppData\\Local\\Temp\\pkg-zip-install-test-KSQr3t\\packages\\zip-addon",
+        "backupDir": "",
+        "hadExistingDestination": false
+      },
+      "beforeSnapshots": [],
+      "afterSnapshots": []
+    },
+    "metadata": {
+      "installMethod": "zip",
+      "previousVersion": "",
+      "source": "manual-zip"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:08.844Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:09.106Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779812229181_38wgn5",
+    "transactionId": "PKG_TXN_1779812229181_38wgn5",
+    "packageId": "zip-addon-upgrade",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "install-zip",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:09.181Z",
+    "finishedAt": "2026-05-26T16:17:09.245Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:09.181Z",
+        "finishedAt": "2026-05-26T16:17:09.209Z",
+        "details": {
+          "packageId": "zip-addon-upgrade",
+          "previousVersion": "",
+          "nextVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:09.194Z",
+        "finishedAt": "2026-05-26T16:17:09.223Z",
+        "details": {
+          "updatedVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T16:17:09.228Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {
+        "destinationDir": "C:\\Users\\Amin\\AppData\\Local\\Temp\\pkg-zip-install-test-lvW4e8\\packages\\zip-addon-upgrade",
+        "backupDir": "",
+        "hadExistingDestination": false
+      },
+      "beforeSnapshots": [],
+      "afterSnapshots": []
+    },
+    "metadata": {
+      "installMethod": "zip",
+      "previousVersion": "",
+      "source": "manual-zip"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:09.183Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:09.248Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779812247699_ow9o4q",
+    "transactionId": "PKG_TXN_1779812247699_ow9o4q",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "uninstall-preview",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:27.699Z",
+    "finishedAt": "2026-05-26T16:17:27.704Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T16:17:27.699Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "baselineSnapshots": [],
+      "currentSnapshots": []
+    },
+    "metadata": {
+      "baselineTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:27.700Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:27.711Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779812247714_9ivebh",
+    "transactionId": "PKG_TXN_1779812247714_9ivebh",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:27.714Z",
+    "finishedAt": "2026-05-26T16:17:27.745Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:27.714Z",
+        "finishedAt": "2026-05-26T16:17:27.720Z",
+        "details": {
+          "hasRisk": false,
+          "modifiedCount": 0
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:27.724Z",
+        "finishedAt": "2026-05-26T16:17:27.740Z",
+        "details": {
+          "registryRemoved": true
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "removed",
+        "reason": "Registry row removed.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T16:17:27.731Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packageregistry": {
+        "removed": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [],
+      "previewTransactionId": "PKG_TXN_1779812247699_ow9o4q"
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "PKG_TXN_1779812247699_ow9o4q",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:27.715Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:27.748Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779812247751_3mhuj7",
+    "transactionId": "PKG_TXN_1779812247751_3mhuj7",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:27.751Z",
+    "finishedAt": "2026-05-26T16:17:27.777Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:27.751Z",
+        "finishedAt": "2026-05-26T16:17:27.755Z",
+        "details": {
+          "hasRisk": false,
+          "modifiedCount": 0
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:27.759Z",
+        "finishedAt": "2026-05-26T16:17:27.774Z",
+        "details": {
+          "registryRemoved": false
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": ""
+        },
+        "operation": "skipped",
+        "reason": "Registry row not found.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T16:17:27.766Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packageregistry": {
+        "skipped": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [],
+      "previewTransactionId": ""
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:27.752Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:27.780Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779812247820_s1l59j",
+    "transactionId": "PKG_TXN_1779812247820_s1l59j",
+    "packageId": "zip-addon",
+    "packageName": "ZIP Addon",
+    "packageVersion": "1.0.0",
+    "action": "install-zip",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:27.820Z",
+    "finishedAt": "2026-05-26T16:17:27.873Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:27.820Z",
+        "finishedAt": "2026-05-26T16:17:27.844Z",
+        "details": {
+          "packageId": "zip-addon",
+          "previousVersion": "",
+          "nextVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:27.834Z",
+        "finishedAt": "2026-05-26T16:17:27.856Z",
+        "details": {
+          "updatedVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T16:17:27.866Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {
+        "destinationDir": "C:\\Users\\Amin\\AppData\\Local\\Temp\\pkg-zip-install-test-tthcjq\\packages\\zip-addon",
+        "backupDir": "",
+        "hadExistingDestination": false
+      },
+      "beforeSnapshots": [],
+      "afterSnapshots": []
+    },
+    "metadata": {
+      "installMethod": "zip",
+      "previousVersion": "",
+      "source": "manual-zip"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:27.821Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:27.875Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779812247916_2thddu",
+    "transactionId": "PKG_TXN_1779812247916_2thddu",
+    "packageId": "zip-addon-upgrade",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "install-zip",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T16:17:27.916Z",
+    "finishedAt": "2026-05-26T16:17:27.976Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:27.916Z",
+        "finishedAt": "2026-05-26T16:17:27.947Z",
+        "details": {
+          "packageId": "zip-addon-upgrade",
+          "previousVersion": "",
+          "nextVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T16:17:27.939Z",
+        "finishedAt": "2026-05-26T16:17:27.961Z",
+        "details": {
+          "updatedVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T16:17:27.969Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {
+        "destinationDir": "C:\\Users\\Amin\\AppData\\Local\\Temp\\pkg-zip-install-test-H25PQf\\packages\\zip-addon-upgrade",
+        "backupDir": "",
+        "hadExistingDestination": false
+      },
+      "beforeSnapshots": [],
+      "afterSnapshots": []
+    },
+    "metadata": {
+      "installMethod": "zip",
+      "previousVersion": "",
+      "source": "manual-zip"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T16:17:27.917Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T16:17:27.978Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817237024_xgtosb",
+    "transactionId": "PKG_TXN_1779817237024_xgtosb",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.1",
+    "action": "install",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:40:37.023Z",
+    "finishedAt": "2026-05-26T17:40:37.088Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.023Z",
+        "finishedAt": "2026-05-26T17:40:37.044Z",
+        "details": {
+          "packageId": "pte",
+          "previousVersion": "",
+          "nextVersion": "1.0.1"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.054Z",
+        "finishedAt": "2026-05-26T17:40:37.064Z",
+        "details": {
+          "updatedVersion": "1.0.1"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T17:40:37.071Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {},
+      "beforeSnapshots": [],
+      "afterSnapshots": [],
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "installMethod": "path",
+      "activationMode": "manual-path",
+      "manifestPath": "packages/pte/package.manifest.json",
+      "previousVersion": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:40:37.037Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:40:37.096Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817237114_dbdpa1",
+    "transactionId": "PKG_TXN_1779817237114_dbdpa1",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "uninstall-preview",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:40:37.114Z",
+    "finishedAt": "2026-05-26T17:40:37.124Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T17:40:37.114Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "baselineSnapshots": [],
+      "currentSnapshots": [],
+      "dataImpact": {
+        "ownershipCount": 0,
+        "modifiedCount": 0
+      }
+    },
+    "metadata": {
+      "baselineTransactionId": "PKG_TXN_1779817237024_xgtosb"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:40:37.117Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:40:37.137Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817237140_3xekmk",
+    "transactionId": "PKG_TXN_1779817237140_3xekmk",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:40:37.140Z",
+    "finishedAt": "2026-05-26T17:40:37.179Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.140Z",
+        "finishedAt": "2026-05-26T17:40:37.147Z",
+        "details": {
+          "hasRisk": false,
+          "modifiedCount": 0
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.155Z",
+        "finishedAt": "2026-05-26T17:40:37.170Z",
+        "details": {
+          "registryRemoved": true
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packagedatalifecycle",
+        "identityKey": "migration:sample:down",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "skipped",
+        "reason": "Skipped:",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "beforePayload": null,
+        "afterPayload": {},
+        "recordedAt": "2026-05-26T17:40:37.161Z"
+      },
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "removed",
+        "reason": "Registry row removed.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T17:40:37.164Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packagedatalifecycle": {
+        "skipped": 1
+      },
+      "packageregistry": {
+        "removed": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [],
+      "previewTransactionId": "PKG_TXN_1779817237114_dbdpa1",
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 1,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [
+          {
+            "stepId": "sample",
+            "stepType": "migration",
+            "direction": "down",
+            "status": "skipped",
+            "reason": "safe_mode_keep_data"
+          }
+        ],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "dataImpact": {
+          "ownershipCount": 1,
+          "modifiedCount": 1
+        },
+        "warnings": [
+          "Safe uninstall mode keeps package business data."
+        ]
+      }
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "PKG_TXN_1779817237114_dbdpa1",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:40:37.143Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:40:37.181Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817237184_riko97",
+    "transactionId": "PKG_TXN_1779817237184_riko97",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:40:37.184Z",
+    "finishedAt": "2026-05-26T17:40:37.221Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.184Z",
+        "finishedAt": "2026-05-26T17:40:37.193Z",
+        "details": {
+          "hasRisk": false,
+          "modifiedCount": 0
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.200Z",
+        "finishedAt": "2026-05-26T17:40:37.215Z",
+        "details": {
+          "registryRemoved": false
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": ""
+        },
+        "operation": "skipped",
+        "reason": "Registry row not found.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T17:40:37.210Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packageregistry": {
+        "skipped": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [],
+      "previewTransactionId": "",
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "warnings": [],
+        "dataImpact": {}
+      }
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:40:37.186Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:40:37.224Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817237231_crcqyb",
+    "transactionId": "PKG_TXN_1779817237231_crcqyb",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:40:37.231Z",
+    "finishedAt": "2026-05-26T17:40:37.263Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.231Z",
+        "finishedAt": "2026-05-26T17:40:37.244Z",
+        "details": {
+          "hasRisk": true,
+          "modifiedCount": 1
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.248Z",
+        "finishedAt": "2026-05-26T17:40:37.258Z",
+        "details": {
+          "registryRemoved": true
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packagedatalifecycle",
+        "identityKey": "migration:sample:down",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "skipped",
+        "reason": "Skipped:",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "beforePayload": null,
+        "afterPayload": {},
+        "recordedAt": "2026-05-26T17:40:37.252Z"
+      },
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "removed",
+        "reason": "Registry row removed.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T17:40:37.254Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packagedatalifecycle": {
+        "skipped": 1
+      },
+      "packageregistry": {
+        "removed": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [
+      {
+        "entityType": "sections",
+        "identityKey": "name:PTE"
+      }
+    ],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [
+        {
+          "entityType": "sections",
+          "identityKey": "name:PTE"
+        }
+      ],
+      "previewTransactionId": "TXN_PREVIEW",
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 1,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [
+          {
+            "stepId": "sample",
+            "stepType": "migration",
+            "direction": "down",
+            "status": "skipped",
+            "reason": "safe_mode_keep_data"
+          }
+        ],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "dataImpact": {
+          "ownershipCount": 1,
+          "modifiedCount": 1
+        },
+        "warnings": [
+          "Safe uninstall mode keeps package business data."
+        ]
+      }
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "TXN_PREVIEW",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:40:37.232Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:40:37.266Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817237326_c5efq1",
+    "transactionId": "PKG_TXN_1779817237326_c5efq1",
+    "packageId": "zip-addon",
+    "packageName": "ZIP Addon",
+    "packageVersion": "1.0.0",
+    "action": "install-zip",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:40:37.326Z",
+    "finishedAt": "2026-05-26T17:40:37.382Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.326Z",
+        "finishedAt": "2026-05-26T17:40:37.346Z",
+        "details": {
+          "packageId": "zip-addon",
+          "previousVersion": "",
+          "nextVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.338Z",
+        "finishedAt": "2026-05-26T17:40:37.357Z",
+        "details": {
+          "updatedVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T17:40:37.369Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {
+        "destinationDir": "C:\\Users\\Amin\\AppData\\Local\\Temp\\pkg-zip-install-test-DG7hPF\\packages\\zip-addon",
+        "backupDir": "",
+        "hadExistingDestination": false
+      },
+      "beforeSnapshots": [],
+      "afterSnapshots": [],
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "installMethod": "zip",
+      "previousVersion": "",
+      "source": "manual-zip"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:40:37.327Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:40:37.384Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817237428_xm4fzy",
+    "transactionId": "PKG_TXN_1779817237428_xm4fzy",
+    "packageId": "zip-addon-upgrade",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "install-zip",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:40:37.428Z",
+    "finishedAt": "2026-05-26T17:40:37.477Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.428Z",
+        "finishedAt": "2026-05-26T17:40:37.448Z",
+        "details": {
+          "packageId": "zip-addon-upgrade",
+          "previousVersion": "",
+          "nextVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:40:37.440Z",
+        "finishedAt": "2026-05-26T17:40:37.463Z",
+        "details": {
+          "updatedVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T17:40:37.469Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {
+        "destinationDir": "C:\\Users\\Amin\\AppData\\Local\\Temp\\pkg-zip-install-test-zjIDRZ\\packages\\zip-addon-upgrade",
+        "backupDir": "",
+        "hadExistingDestination": false
+      },
+      "beforeSnapshots": [],
+      "afterSnapshots": [],
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "installMethod": "zip",
+      "previousVersion": "",
+      "source": "manual-zip"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:40:37.430Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:40:37.481Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817266794_p69pwh",
+    "transactionId": "PKG_TXN_1779817266794_p69pwh",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.1",
+    "action": "install",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:41:06.794Z",
+    "finishedAt": "2026-05-26T17:41:06.862Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:06.794Z",
+        "finishedAt": "2026-05-26T17:41:06.817Z",
+        "details": {
+          "packageId": "pte",
+          "previousVersion": "",
+          "nextVersion": "1.0.1"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:06.826Z",
+        "finishedAt": "2026-05-26T17:41:06.836Z",
+        "details": {
+          "updatedVersion": "1.0.1"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T17:41:06.844Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {},
+      "beforeSnapshots": [],
+      "afterSnapshots": [],
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "installMethod": "path",
+      "activationMode": "manual-path",
+      "manifestPath": "packages/pte/package.manifest.json",
+      "previousVersion": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:41:06.807Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:41:06.869Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817266947_mc0laf",
+    "transactionId": "PKG_TXN_1779817266947_mc0laf",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "uninstall-preview",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:41:06.947Z",
+    "finishedAt": "2026-05-26T17:41:06.955Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T17:41:06.947Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "baselineSnapshots": [],
+      "currentSnapshots": [],
+      "dataImpact": {
+        "ownershipCount": 0,
+        "modifiedCount": 0
+      }
+    },
+    "metadata": {
+      "baselineTransactionId": "PKG_TXN_1779817266794_p69pwh"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:41:06.948Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:41:06.967Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817266970_18fjry",
+    "transactionId": "PKG_TXN_1779817266970_18fjry",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:41:06.970Z",
+    "finishedAt": "2026-05-26T17:41:07.039Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:06.970Z",
+        "finishedAt": "2026-05-26T17:41:06.981Z",
+        "details": {
+          "hasRisk": false,
+          "modifiedCount": 0
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:06.994Z",
+        "finishedAt": "2026-05-26T17:41:07.028Z",
+        "details": {
+          "registryRemoved": true
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packagedatalifecycle",
+        "identityKey": "migration:sample:down",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "skipped",
+        "reason": "Skipped:",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "beforePayload": null,
+        "afterPayload": {},
+        "recordedAt": "2026-05-26T17:41:07.005Z"
+      },
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "removed",
+        "reason": "Registry row removed.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T17:41:07.009Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packagedatalifecycle": {
+        "skipped": 1
+      },
+      "packageregistry": {
+        "removed": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [],
+      "previewTransactionId": "PKG_TXN_1779817266947_mc0laf",
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 1,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [
+          {
+            "stepId": "sample",
+            "stepType": "migration",
+            "direction": "down",
+            "status": "skipped",
+            "reason": "safe_mode_keep_data"
+          }
+        ],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "dataImpact": {
+          "ownershipCount": 1,
+          "modifiedCount": 1
+        },
+        "warnings": [
+          "Safe uninstall mode keeps package business data."
+        ]
+      }
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "PKG_TXN_1779817266947_mc0laf",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:41:06.977Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:41:07.045Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817267052_uefy1f",
+    "transactionId": "PKG_TXN_1779817267052_uefy1f",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:41:07.052Z",
+    "finishedAt": "2026-05-26T17:41:07.095Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:07.052Z",
+        "finishedAt": "2026-05-26T17:41:07.059Z",
+        "details": {
+          "hasRisk": false,
+          "modifiedCount": 0
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:07.066Z",
+        "finishedAt": "2026-05-26T17:41:07.090Z",
+        "details": {
+          "registryRemoved": false
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": ""
+        },
+        "operation": "skipped",
+        "reason": "Registry row not found.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T17:41:07.075Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packageregistry": {
+        "skipped": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [],
+      "previewTransactionId": "",
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "warnings": [],
+        "dataImpact": {}
+      }
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:41:07.054Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:41:07.098Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817267110_ogk08b",
+    "transactionId": "PKG_TXN_1779817267110_ogk08b",
+    "packageId": "pte",
+    "packageName": "PTE",
+    "packageVersion": "",
+    "action": "remove",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:41:07.110Z",
+    "finishedAt": "2026-05-26T17:41:07.159Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:07.110Z",
+        "finishedAt": "2026-05-26T17:41:07.122Z",
+        "details": {
+          "hasRisk": true,
+          "modifiedCount": 1
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:07.129Z",
+        "finishedAt": "2026-05-26T17:41:07.155Z",
+        "details": {
+          "registryRemoved": true
+        }
+      }
+    ],
+    "entityOperations": [
+      {
+        "entityType": "packagedatalifecycle",
+        "identityKey": "migration:sample:down",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "skipped",
+        "reason": "Skipped:",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "beforePayload": null,
+        "afterPayload": {},
+        "recordedAt": "2026-05-26T17:41:07.139Z"
+      },
+      {
+        "entityType": "packageregistry",
+        "identityKey": "packageId:pte",
+        "ownership": {
+          "packageId": "pte",
+          "packageName": "PTE"
+        },
+        "operation": "removed",
+        "reason": "Registry row removed.",
+        "beforeHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "afterHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "beforePayload": null,
+        "afterPayload": null,
+        "recordedAt": "2026-05-26T17:41:07.142Z"
+      }
+    ],
+    "summaryByEntity": {
+      "packagedatalifecycle": {
+        "skipped": 1
+      },
+      "packageregistry": {
+        "removed": 1
+      }
+    },
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [
+      {
+        "entityType": "sections",
+        "identityKey": "name:PTE"
+      }
+    ],
+    "rollback": {},
+    "artifacts": {
+      "modifiedRecords": [
+        {
+          "entityType": "sections",
+          "identityKey": "name:PTE"
+        }
+      ],
+      "previewTransactionId": "TXN_PREVIEW",
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 1,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [
+          {
+            "stepId": "sample",
+            "stepType": "migration",
+            "direction": "down",
+            "status": "skipped",
+            "reason": "safe_mode_keep_data"
+          }
+        ],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "dataImpact": {
+          "ownershipCount": 1,
+          "modifiedCount": 1
+        },
+        "warnings": [
+          "Safe uninstall mode keeps package business data."
+        ]
+      }
+    },
+    "metadata": {
+      "force": false,
+      "previewTransactionId": "TXN_PREVIEW",
+      "providedPreviewTransactionId": ""
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:41:07.112Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:41:07.162Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817267215_v5oibo",
+    "transactionId": "PKG_TXN_1779817267215_v5oibo",
+    "packageId": "zip-addon",
+    "packageName": "ZIP Addon",
+    "packageVersion": "1.0.0",
+    "action": "install-zip",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:41:07.215Z",
+    "finishedAt": "2026-05-26T17:41:07.303Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:07.215Z",
+        "finishedAt": "2026-05-26T17:41:07.249Z",
+        "details": {
+          "packageId": "zip-addon",
+          "previousVersion": "",
+          "nextVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:07.236Z",
+        "finishedAt": "2026-05-26T17:41:07.274Z",
+        "details": {
+          "updatedVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T17:41:07.292Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {
+        "destinationDir": "C:\\Users\\Amin\\AppData\\Local\\Temp\\pkg-zip-install-test-s8EOwa\\packages\\zip-addon",
+        "backupDir": "",
+        "hadExistingDestination": false
+      },
+      "beforeSnapshots": [],
+      "afterSnapshots": [],
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "installMethod": "zip",
+      "previousVersion": "",
+      "source": "manual-zip"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:41:07.217Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:41:07.306Z"
+    }
+  },
+  {
+    "id": "PKG_TXN_1779817267359_b3kch4",
+    "transactionId": "PKG_TXN_1779817267359_b3kch4",
+    "packageId": "zip-addon-upgrade",
+    "packageName": "PTE",
+    "packageVersion": "1.0.0",
+    "action": "install-zip",
+    "status": "success",
+    "phase": "commit",
+    "startedAt": "2026-05-26T17:41:07.359Z",
+    "finishedAt": "2026-05-26T17:41:07.429Z",
+    "actor": {
+      "id": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "username": "SYSTEM_SETTINGS_PACKAGE_MANAGER"
+    },
+    "backendMode": "json",
+    "phases": [
+      {
+        "name": "preflight",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:07.359Z",
+        "finishedAt": "2026-05-26T17:41:07.389Z",
+        "details": {
+          "packageId": "zip-addon-upgrade",
+          "previousVersion": "",
+          "nextVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "apply",
+        "status": "completed",
+        "startedAt": "2026-05-26T17:41:07.377Z",
+        "finishedAt": "2026-05-26T17:41:07.405Z",
+        "details": {
+          "updatedVersion": "1.0.0"
+        }
+      },
+      {
+        "name": "commit",
+        "status": "in_progress",
+        "startedAt": "2026-05-26T17:41:07.414Z",
+        "finishedAt": "",
+        "details": {}
+      }
+    ],
+    "entityOperations": [],
+    "summaryByEntity": {},
+    "warnings": [],
+    "blockedReasons": [],
+    "modifiedRecords": [],
+    "rollback": {},
+    "artifacts": {
+      "previousRegistry": null,
+      "fileMutation": {
+        "destinationDir": "C:\\Users\\Amin\\AppData\\Local\\Temp\\pkg-zip-install-test-z23QxX\\packages\\zip-addon-upgrade",
+        "backupDir": "",
+        "hadExistingDestination": false
+      },
+      "beforeSnapshots": [],
+      "afterSnapshots": [],
+      "dataLifecycleReport": {
+        "dataSummary": {
+          "migrations": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          },
+          "seeders": {
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0
+          }
+        },
+        "appliedSteps": [],
+        "skippedSteps": [],
+        "failedStep": null,
+        "rollbackApplied": false,
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "installMethod": "zip",
+      "previousVersion": "",
+      "source": "manual-zip"
+    },
+    "audit": {
+      "createUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "createDateTime": "2026-05-26T17:41:07.361Z",
+      "lastUpdateUser": "SYSTEM_SETTINGS_PACKAGE_MANAGER",
+      "lastUpdateDateTime": "2026-05-26T17:41:07.433Z"
+    }
+  }
+]

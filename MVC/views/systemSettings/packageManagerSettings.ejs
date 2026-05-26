@@ -145,6 +145,7 @@
                   <div class="d-flex flex-wrap justify-content-end gap-1">
                     <button class="btn btn-outline-success btn-sm pkg-action-btn" data-action="enable" data-package-id="<%= row.packageId %>">Enable</button>
                     <button class="btn btn-outline-warning btn-sm pkg-action-btn" data-action="pause" data-package-id="<%= row.packageId %>">Pause</button>
+                    <button class="btn btn-outline-secondary btn-sm pkg-action-btn" data-action="preview-remove" data-package-id="<%= row.packageId %>">Impact Preview</button>
                     <button class="btn btn-outline-danger btn-sm pkg-action-btn" data-action="remove" data-package-id="<%= row.packageId %>">Remove</button>
                     <button class="btn btn-outline-primary btn-sm pkg-action-btn" data-action="sync" data-package-id="<%= row.packageId %>">Sync</button>
                   </div>
@@ -167,6 +168,31 @@
     </div>
   </div>
 
+  <div class="card border-0 shadow-sm mt-3">
+    <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between">
+      <span>Recent Lifecycle Transactions</span>
+      <span class="text-muted fw-normal" id="pkgTxnLabel">Select a package row</span>
+    </div>
+    <div class="card-body p-3">
+      <div class="table-scroll-wrapper">
+        <table class="table-responsive size-md mb-0" id="pkgTransactionTable">
+          <thead>
+            <tr>
+              <th>Transaction</th>
+              <th>Action</th>
+              <th>Status</th>
+              <th>Phase</th>
+              <th>Finished</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5" class="text-center text-muted py-3">No package selected.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <input type="hidden" id="pkgActionStateId" value="<%= actionStateValue %>">
 </div>
 
@@ -177,6 +203,8 @@
   const installMethodEl = document.getElementById('pkgInstallMethod');
   const installBtn = document.getElementById('pkgInstallBtn');
   const tableEl = document.getElementById('packageManagerTable');
+  const transactionTableEl = document.getElementById('pkgTransactionTable');
+  const transactionLabelEl = document.getElementById('pkgTxnLabel');
 
   const localPanel = document.getElementById('pkgInstallLocalPanel');
   const pathPanel = document.getElementById('pkgInstallPathPanel');
@@ -186,6 +214,7 @@
   const actionMap = {
     enable: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/enable`, label: 'Enable' },
     pause: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/pause`, label: 'Pause', dangerous: true },
+    'preview-remove': { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/uninstall-preview`, label: 'Impact Preview', dangerous: true },
     remove: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/remove`, label: 'Remove', dangerous: true },
     sync: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/sync`, label: 'Sync Declarations' }
   };
@@ -232,6 +261,47 @@
       throw error;
     }
     return payload;
+  }
+
+  function renderTransactions(packageId, rows = []) {
+    if (!transactionTableEl) return;
+    const tbody = transactionTableEl.querySelector('tbody');
+    if (!tbody) return;
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No transactions.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.slice(0, 20).map((row) => {
+      const txId = String(row?.id || row?.transactionId || '');
+      const action = String(row?.action || '-');
+      const status = String(row?.status || '-');
+      const phase = String(row?.phase || '-');
+      const finishedAt = String(row?.finishedAt || row?.audit?.lastUpdateDateTime || '-');
+      const txLabel = txId ? `<code>${txId}</code>` : '-';
+      return `<tr><td>${txLabel}</td><td>${action}</td><td>${status}</td><td>${phase}</td><td class="small">${finishedAt}</td></tr>`;
+    }).join('');
+    if (transactionLabelEl) {
+      transactionLabelEl.textContent = `${packageId} (${list.length})`;
+    }
+  }
+
+  async function loadTransactions(packageId) {
+    if (!packageId) return;
+    try {
+      const payload = await fetchJson(`/systemSettings/packages/${encodeURIComponent(packageId)}/transactions?limit=20`, {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        }
+      });
+      renderTransactions(packageId, payload.rows || []);
+    } catch (error) {
+      renderTransactions(packageId, []);
+      setOutput('Transaction Load Failed', { packageId, message: error.message || 'Unknown error' });
+    }
   }
 
   async function runWithWaiting(title, fn) {
@@ -308,12 +378,86 @@
   async function runRowAction(action, packageId) {
     const config = actionMap[action];
     if (!config) throw new Error('Unknown action.');
+    if (action === 'preview-remove') {
+      await requireAdminVerification();
+      const result = await runWithWaiting('Preview Uninstall Impact', async () => fetchJson(config.endpoint(packageId), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams({ actionStateId }).toString()
+      }));
+      await loadTransactions(packageId);
+      return result;
+    }
+
+    if (action === 'remove') {
+      await requireAdminVerification();
+      const previewResult = await runWithWaiting('Preview Uninstall Impact', async () => fetchJson(
+        `/systemSettings/packages/${encodeURIComponent(packageId)}/uninstall-preview`,
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'X-AJAX-Request': 'true'
+          },
+          body: new URLSearchParams({ actionStateId }).toString()
+        }
+      ));
+      const preview = previewResult.report || {};
+      const modifiedCount = Array.isArray(preview.modifiedRecords) ? preview.modifiedRecords.length : 0;
+      let removeUrl = config.endpoint(packageId);
+      const bodyPayload = {
+        actionStateId
+      };
+
+      if (preview.blocked === true || modifiedCount > 0) {
+        const selected = await showModal({
+          title: 'Customization Risk Detected',
+          icon: 'warning',
+          message: `Impact preview found <b>${modifiedCount}</b> modified records for <code>${packageId}</code>. Default remove keeps package data and removes declarations/registry only. Force remove also runs data rollback scripts and can permanently remove customized package data.`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Remove (Keep Data)', class: 'btn-warning' },
+            { text: 'Force Remove', class: 'btn-danger' }
+          ]
+        });
+        if (selected === 'Cancel') return { status: 'cancelled', report: preview };
+        if (selected === 'Force Remove') {
+          removeUrl += '?force=true';
+          bodyPayload.previewTransactionId = preview.previewTransactionId || '';
+          bodyPayload.forceToken = `REMOVE ${packageId}`;
+        }
+      } else {
+        const confirmed = await confirmDanger(config.label, packageId);
+        if (!confirmed) return { status: 'cancelled', report: preview };
+      }
+
+      const removeResult = await runWithWaiting('Removing Package', async () => fetchJson(removeUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams(bodyPayload).toString()
+      }));
+      await loadTransactions(packageId);
+      return removeResult;
+    }
+
     if (config.dangerous) {
       const confirmed = await confirmDanger(config.label, packageId);
       if (!confirmed) return { status: 'cancelled' };
     }
     await requireAdminVerification();
-    return runWithWaiting(`${config.label} Package`, async () => fetchJson(config.endpoint(packageId), {
+    const response = await runWithWaiting(`${config.label} Package`, async () => fetchJson(config.endpoint(packageId), {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
@@ -323,6 +467,8 @@
       },
       body: new URLSearchParams({ actionStateId }).toString()
     }));
+    await loadTransactions(packageId);
+    return response;
   }
 
   async function showSuccess(message) {
@@ -381,6 +527,7 @@
       }
       setOutput(`${actionMap[action]?.label || action} ${packageId}`, result.report || result);
       await showSuccess(result.message || 'Package operation completed.');
+      if (action === 'preview-remove') return;
       window.location.reload();
     } catch (error) {
       setOutput('Action Failed', { action, packageId, message: error.message || 'Unknown error' });
@@ -397,5 +544,10 @@
   document.getElementById('pkgClearOutputBtn')?.addEventListener('click', () => {
     outputEl.textContent = 'Ready.';
   });
+
+  const firstPackageRow = tableEl?.querySelector('tbody tr[data-package-id]');
+  if (firstPackageRow?.dataset?.packageId) {
+    loadTransactions(firstPackageRow.dataset.packageId);
+  }
 })();
 </script>

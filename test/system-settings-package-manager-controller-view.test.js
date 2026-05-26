@@ -159,6 +159,63 @@ test('install ZIP package controller returns structured success and admin_requir
   }
 });
 
+test('remove package controller forwards force options and preview token', async () => {
+  const originalRemove = systemSettingsPackageManagerService.removePackage;
+  const res = makeRenderResponse();
+  let captured = null;
+
+  try {
+    systemSettingsPackageManagerService.removePackage = async (packageId, options) => {
+      captured = { packageId, options };
+      return { action: 'remove', packageId: 'pte' };
+    };
+    await systemSettingsController.removePackageFromManager(
+      {
+        params: { packageId: 'pte' },
+        query: { force: 'true' },
+        body: { forceToken: 'REMOVE pte', previewTransactionId: 'TXN_1' },
+        user: { id: 'USER_7' },
+        app: {}
+      },
+      res
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(captured?.packageId, 'pte');
+    assert.equal(captured?.options?.force, true);
+    assert.equal(captured?.options?.previewTransactionId, 'TXN_1');
+  } finally {
+    systemSettingsPackageManagerService.removePackage = originalRemove;
+  }
+});
+
+test('uninstall preview controller returns success payload', async () => {
+  const originalPreview = systemSettingsPackageManagerService.previewPackageUninstallImpact;
+  const res = makeRenderResponse();
+
+  try {
+    systemSettingsPackageManagerService.previewPackageUninstallImpact = async () => ({
+      packageId: 'pte',
+      blocked: true,
+      modifiedRecords: [{ entityType: 'sections', identityKey: 'name:PTE' }],
+      previewTransactionId: 'TXN_PREVIEW_1',
+      blockedReasons: ['customized records']
+    });
+    await systemSettingsController.uninstallPreviewPackageFromManager(
+      {
+        params: { packageId: 'pte' },
+        user: { id: 'USER_8' },
+        app: {}
+      },
+      res
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonPayload?.status, 'success');
+    assert.equal(res.jsonPayload?.report?.previewTransactionId, 'TXN_PREVIEW_1');
+  } finally {
+    systemSettingsPackageManagerService.previewPackageUninstallImpact = originalPreview;
+  }
+});
+
 test('package manager EJS compiles and includes expected controls', () => {
   const viewPath = path.join(process.cwd(), 'MVC', 'views', 'systemSettings', 'packageManagerSettings.ejs');
   const template = fs.readFileSync(viewPath, 'utf8');
@@ -195,4 +252,6 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /\/systemSettings\/packages\/install-zip/);
   assert.match(html, /ZIP Upload/);
   assert.match(html, /Installed Packages/);
+  assert.match(html, /Impact Preview/);
+  assert.match(html, /Recent Lifecycle Transactions/);
 });

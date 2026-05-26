@@ -9,6 +9,15 @@ const packageRegistryService = require('./packageRegistryService');
 const packageRegistryInstallerService = require('./packageRegistryInstallerService');
 const packageLoaderService = require('./packageLoaderService');
 const packageNavigationService = require('./packageNavigationService');
+const packageLifecycleTransactionService = require('./packageLifecycleTransactionService');
+const packageDataLifecycleService = require('./packageDataLifecycleService');
+const operationRepository = require('../repositories/operationRepository');
+const roleRepository = require('../repositories/roleRepository');
+const sectionRepository = require('../repositories/sectionRepository');
+const symbolRepository = require('../repositories/symbolRepository');
+const accessRepository = require('../repositories/accessRepository');
+const systemSettingsRepository = require('../repositories/systemSettingsRepository');
+const uploadFolderSettingsService = require('./uploadFolderSettingsService');
 
 const SYSTEM_ACTOR_ID = 'SYSTEM_SETTINGS_PACKAGE_MANAGER';
 
@@ -216,6 +225,27 @@ function buildActor(actor = null) {
   };
 }
 
+function sanitizeObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function sanitizeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function getOwnershipFromRow(row = {}) {
+  const source = sanitizeObject(row);
+  return {
+    packageId: normalizePackageId(source.packageId || source?.package?.id || source?.metadata?.packageId || ''),
+    packageName: cleanText(source.packageName || source?.package?.name || source?.metadata?.packageName || '', 200)
+  };
+}
+
+function normalizeOrgToken(value) {
+  const token = cleanText(value, 120);
+  return token || '';
+}
+
 function createDependencies(overrides = {}) {
   return {
     fs: overrides.fs || fs,
@@ -224,7 +254,16 @@ function createDependencies(overrides = {}) {
     packageRegistryService: overrides.packageRegistryService || packageRegistryService,
     packageRegistryInstallerService: overrides.packageRegistryInstallerService || packageRegistryInstallerService,
     packageLoaderService: overrides.packageLoaderService || packageLoaderService,
-    packageNavigationService: overrides.packageNavigationService || packageNavigationService
+    packageNavigationService: overrides.packageNavigationService || packageNavigationService,
+    packageLifecycleTransactionService: overrides.packageLifecycleTransactionService || packageLifecycleTransactionService,
+    packageDataLifecycleService: overrides.packageDataLifecycleService || packageDataLifecycleService,
+    operationRepository: overrides.operationRepository || operationRepository,
+    roleRepository: overrides.roleRepository || roleRepository,
+    sectionRepository: overrides.sectionRepository || sectionRepository,
+    symbolRepository: overrides.symbolRepository || symbolRepository,
+    accessRepository: overrides.accessRepository || accessRepository,
+    systemSettingsRepository: overrides.systemSettingsRepository || systemSettingsRepository,
+    uploadFolderSettingsService: overrides.uploadFolderSettingsService || uploadFolderSettingsService
   };
 }
 
@@ -239,6 +278,276 @@ function createService(overrides = {}) {
     } catch (_) {
       return false;
     }
+  }
+
+  function hashPayload(value) {
+    if (deps.packageLifecycleTransactionService && typeof deps.packageLifecycleTransactionService.hashPayload === 'function') {
+      return deps.packageLifecycleTransactionService.hashPayload(value);
+    }
+    return crypto.createHash('sha256').update(JSON.stringify(value === undefined ? null : value)).digest('hex');
+  }
+
+  function createLifecycleSummaryByEntity(entityOperations = []) {
+    if (
+      deps.packageLifecycleTransactionService
+      && typeof deps.packageLifecycleTransactionService.summarizeEntityOperations === 'function'
+    ) {
+      return deps.packageLifecycleTransactionService.summarizeEntityOperations(entityOperations);
+    }
+    const rows = sanitizeArray(entityOperations);
+    const summary = {};
+    rows.forEach((row) => {
+      const entityType = cleanText(row?.entityType, 80).toLowerCase() || 'other';
+      const operation = cleanText(row?.operation, 80).toLowerCase() || 'recorded';
+      if (!summary[entityType]) summary[entityType] = {};
+      summary[entityType][operation] = Number(summary[entityType][operation] || 0) + 1;
+    });
+    return summary;
+  }
+
+  async function startLifecycleTransaction(input = {}, options = {}) {
+    if (!deps.packageLifecycleTransactionService || typeof deps.packageLifecycleTransactionService.startTransaction !== 'function') {
+      return null;
+    }
+    const actor = buildActor(options.actor || null);
+    return deps.packageLifecycleTransactionService.startTransaction(input, {
+      backendMode: options.backendMode,
+      actor
+    });
+  }
+
+  async function markLifecyclePhase(transactionId = '', phaseName = '', status = 'in_progress', details = {}, options = {}) {
+    if (!transactionId) return null;
+    if (!deps.packageLifecycleTransactionService || typeof deps.packageLifecycleTransactionService.markPhase !== 'function') {
+      return null;
+    }
+    const actor = buildActor(options.actor || null);
+    return deps.packageLifecycleTransactionService.markPhase(transactionId, phaseName, status, details, {
+      backendMode: options.backendMode,
+      actor
+    });
+  }
+
+  async function appendLifecycleOperations(transactionId = '', rows = [], options = {}) {
+    if (!transactionId) return null;
+    if (!deps.packageLifecycleTransactionService || typeof deps.packageLifecycleTransactionService.appendEntityOperations !== 'function') {
+      return null;
+    }
+    const actor = buildActor(options.actor || null);
+    return deps.packageLifecycleTransactionService.appendEntityOperations(transactionId, rows, {
+      backendMode: options.backendMode,
+      actor
+    });
+  }
+
+  async function completeLifecycleTransaction(transactionId = '', patch = {}, options = {}) {
+    if (!transactionId) return null;
+    if (!deps.packageLifecycleTransactionService || typeof deps.packageLifecycleTransactionService.completeTransaction !== 'function') {
+      return null;
+    }
+    const actor = buildActor(options.actor || null);
+    return deps.packageLifecycleTransactionService.completeTransaction(transactionId, patch, {
+      backendMode: options.backendMode,
+      actor
+    });
+  }
+
+  function mapDeclarationResultToEntityType(category = '') {
+    const token = cleanText(category, 80).toLowerCase();
+    if (token === 'uploadfolders') return 'uploadFolders';
+    if (['operations', 'roles', 'sections', 'symbols', 'accesses'].includes(token)) return token;
+    return token || 'other';
+  }
+
+  function mapDeclarationResultToOperation(status = '') {
+    const token = cleanText(status, 80).toLowerCase();
+    if (['created', 'updated', 'skipped', 'deactivated', 'removed', 'failed'].includes(token)) return token;
+    return 'recorded';
+  }
+
+  function declarationSummaryToLifecycleOperations(summary = {}, options = {}) {
+    const rows = sanitizeArray(summary?.results);
+    const now = new Date().toISOString();
+    return rows.map((row) => {
+      const afterPayload = sanitizeObject(row);
+      const beforePayload = options.beforePayload || null;
+      const entityType = mapDeclarationResultToEntityType(row?.category);
+      return {
+        entityType,
+        identityKey: cleanText(row?.key || row?.id || `${entityType}:${row?.message || ''}`, 400),
+        ownership: sanitizeObject(options.ownership),
+        operation: mapDeclarationResultToOperation(row?.status),
+        reason: cleanText(row?.message || '', 1200),
+        beforePayload,
+        afterPayload,
+        beforeHash: hashPayload(beforePayload),
+        afterHash: hashPayload(afterPayload),
+        recordedAt: now
+      };
+    }).filter((row) => row.identityKey);
+  }
+
+  function dataLifecycleSummaryToOperations(report = {}, options = {}) {
+    const rows = [];
+    const now = new Date().toISOString();
+    const ownership = sanitizeObject(options.ownership);
+    const pushStep = (step = {}, operation = 'applied', reasonPrefix = '') => {
+      const stepId = cleanText(step?.stepId, 200);
+      const stepType = cleanText(step?.stepType, 40).toLowerCase();
+      const direction = cleanText(step?.direction, 40).toLowerCase();
+      if (!stepId || !stepType) return;
+      rows.push({
+        entityType: 'packageDataLifecycle',
+        identityKey: `${stepType}:${stepId}:${direction || operation}`,
+        ownership,
+        operation,
+        reason: cleanText(`${reasonPrefix}${step?.message || ''}`, 1200),
+        beforePayload: null,
+        afterPayload: sanitizeObject(step?.artifacts),
+        beforeHash: hashPayload(null),
+        afterHash: hashPayload(sanitizeObject(step?.artifacts)),
+        recordedAt: now
+      });
+    };
+
+    sanitizeArray(report?.appliedSteps).forEach((step) => pushStep(step, 'applied'));
+    sanitizeArray(report?.skippedSteps).forEach((step) => pushStep(step, 'skipped', 'Skipped: '));
+    if (report?.failedStep) {
+      pushStep(report.failedStep, 'failed', 'Failed: ');
+    }
+    return rows;
+  }
+
+  function getManifestDeclarationTargets(manifest = {}) {
+    const targets = [];
+    const operations = sanitizeArray(manifest?.operations);
+    operations.forEach((row) => {
+      const name = cleanText(row?.name, 180).toUpperCase();
+      if (!name) return;
+      targets.push({ entityType: 'operations', identityKey: `name:${name}`, payload: { name } });
+    });
+
+    const roles = sanitizeArray(manifest?.roles);
+    roles.forEach((row) => {
+      const key = cleanText(row?.key, 180).toLowerCase();
+      if (!key) return;
+      targets.push({ entityType: 'roles', identityKey: `key:${key}`, payload: { key } });
+    });
+
+    const sections = sanitizeArray(manifest?.sections);
+    sections.forEach((row) => {
+      const name = cleanText(row?.name, 180).toUpperCase();
+      if (!name) return;
+      targets.push({ entityType: 'sections', identityKey: `name:${name}`, payload: { name } });
+    });
+
+    const symbols = sanitizeArray(manifest?.symbols);
+    symbols.forEach((row) => {
+      const name = cleanText(row?.name, 200).toUpperCase();
+      const orgId = normalizeOrgToken(row?.orgId || 'SYSTEM') || 'SYSTEM';
+      if (!name) return;
+      targets.push({
+        entityType: 'symbols',
+        identityKey: `name:${name}|org:${orgId}`,
+        payload: { name, orgId }
+      });
+    });
+
+    const accesses = sanitizeArray(manifest?.accesses);
+    accesses.forEach((row) => {
+      const name = cleanText(row?.name, 200).toUpperCase();
+      const orgId = normalizeOrgToken(row?.orgId || '');
+      if (!name) return;
+      targets.push({
+        entityType: 'accesses',
+        identityKey: `name:${name}|org:${orgId || 'GLOBAL'}`,
+        payload: { name, orgId }
+      });
+    });
+
+    const uploadFolders = sanitizeArray(manifest?.uploadFolders);
+    uploadFolders.forEach((row) => {
+      const key = cleanText(row?.key, 220);
+      if (!key) return;
+      targets.push({ entityType: 'uploadFolders', identityKey: `key:${key}`, payload: { key } });
+    });
+    return targets;
+  }
+
+  async function resolveCurrentEntityRecord(target = {}, options = {}) {
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const entityType = target.entityType;
+    if (entityType === 'operations') {
+      return deps.operationRepository.getByName(target?.payload?.name, { backendMode });
+    }
+    if (entityType === 'roles') {
+      return deps.roleRepository.getByKey(target?.payload?.key, { backendMode });
+    }
+    if (entityType === 'sections') {
+      return deps.sectionRepository.getByName(target?.payload?.name, { backendMode });
+    }
+    if (entityType === 'symbols') {
+      const rows = await deps.symbolRepository.list({
+        backendMode,
+        query: {
+          name__eq: target?.payload?.name,
+          orgId__eq: target?.payload?.orgId,
+          limit: 1
+        }
+      });
+      return Array.isArray(rows) && rows[0] ? rows[0] : null;
+    }
+    if (entityType === 'accesses') {
+      const rows = await deps.accessRepository.list({
+        backendMode,
+        query: {
+          name__eq: target?.payload?.name,
+          orgId__eq: target?.payload?.orgId || '',
+          limit: 1
+        }
+      });
+      return Array.isArray(rows) && rows[0] ? rows[0] : null;
+    }
+    if (entityType === 'uploadFolders') {
+      const settings = await deps.systemSettingsRepository.getSettings({ backendMode });
+      const currentFolders = settings?.app?.uploadFolders || {};
+      const definitions = deps.uploadFolderSettingsService.getUploadFolderDefinitions();
+      const definition = sanitizeArray(definitions).find((row) => cleanText(row?.key, 220) === target?.payload?.key) || null;
+      return {
+        key: target?.payload?.key,
+        value: cleanText(currentFolders[target?.payload?.key], 800),
+        definition
+      };
+    }
+    return null;
+  }
+
+  async function captureManifestSnapshots(manifest = {}, options = {}) {
+    const targets = getManifestDeclarationTargets(manifest);
+    const rows = [];
+    for (const target of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      const current = await resolveCurrentEntityRecord(target, options).catch(() => null);
+      const ownership = getOwnershipFromRow(current || {});
+      const payload = current ? sanitizeObject(current) : null;
+      rows.push({
+        entityType: target.entityType,
+        identityKey: target.identityKey,
+        ownership,
+        hash: hashPayload(payload),
+        payload
+      });
+    }
+    return rows;
+  }
+
+  function buildSnapshotLookup(rows = []) {
+    const map = new Map();
+    sanitizeArray(rows).forEach((row) => {
+      const key = `${cleanText(row?.entityType, 80)}::${cleanText(row?.identityKey, 400)}`;
+      map.set(key, row);
+    });
+    return map;
   }
 
   async function verifyZipSignature(zipBuffer = Buffer.alloc(0), signatureBuffer = Buffer.alloc(0), options = {}) {
@@ -370,16 +679,78 @@ function createService(overrides = {}) {
       throw error;
     }
 
-    if (hadExistingDestination && await pathExists(deps.fs, backupDir)) {
-      await deps.fs.rm(backupDir, { recursive: true, force: true });
+    return {
+      destinationDir,
+      backupDir: hadExistingDestination ? backupDir : '',
+      hadExistingDestination
+    };
+  }
+
+  async function cleanupPackageBackup(backupDir = '') {
+    const token = cleanText(backupDir, 1600);
+    if (!token) return;
+    if (!(await pathExists(deps.fs, token))) return;
+    await deps.fs.rm(token, { recursive: true, force: true }).catch(() => {});
+  }
+
+  async function restorePackageDirectoryFromBackup(packageId = '', backupDir = '', options = {}) {
+    const packageRootDir = path.resolve(String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages')));
+    const destinationDir = path.join(packageRootDir, packageId);
+    const backupPath = cleanText(backupDir, 1600);
+    if (!backupPath) return false;
+    if (!(await pathExists(deps.fs, backupPath))) return false;
+
+    if (await pathExists(deps.fs, destinationDir)) {
+      await deps.fs.rm(destinationDir, { recursive: true, force: true }).catch(() => {});
     }
-    return destinationDir;
+    await deps.fs.rename(backupPath, destinationDir);
+    return true;
   }
 
   async function installResolvedManifest(resolved = {}, options = {}) {
     const actor = buildActor(options.actor || null);
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const manifest = resolved.manifest;
+    const packageId = normalizePackageId(manifest?.id);
+    if (!packageId) throw new Error('Manifest package id is required.');
+    const previousRegistry = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
+    const previousVersion = cleanText(previousRegistry?.version, 120);
+    const nextVersion = cleanText(manifest?.version, 120);
+    if (previousVersion && compareSemver(nextVersion, previousVersion) <= 0) {
+      throw new Error(`Package version must be newer than installed version ${previousVersion}.`);
+    }
+    const isUpgrade = Boolean(previousRegistry);
+    const txAction = cleanText(resolved.action, 80) || (isUpgrade ? 'upgrade' : 'install');
+    const transaction = resolved.transactionId
+      ? { id: cleanText(resolved.transactionId, 160) }
+      : await startLifecycleTransaction({
+        packageId,
+        packageName: cleanText(manifest?.name, 200),
+        packageVersion: nextVersion,
+        action: txAction,
+        metadata: {
+          installMethod: cleanText(resolved.installMethod, 80),
+          activationMode: cleanText(resolved.activationMode, 120),
+          manifestPath: toStoredManifestPath(resolved.manifestPath || ''),
+          previousVersion
+        },
+        artifacts: {
+          previousRegistry,
+          fileMutation: sanitizeObject(resolved.fileMutation)
+        }
+      }, { backendMode, actor });
+    const transactionId = cleanText(transaction?.id, 160);
+    const beforeSnapshots = await captureManifestSnapshots(manifest, { backendMode });
+
+    await markLifecyclePhase(transactionId, 'preflight', 'completed', {
+      packageId,
+      previousVersion: previousVersion || '',
+      nextVersion
+    }, { backendMode, actor });
+    await markLifecyclePhase(transactionId, 'apply', 'in_progress', {}, { backendMode, actor });
+
+    const warnings = [];
+    const lifecycleOperations = [];
     const context = {
       backendMode,
       packageId: manifest.id,
@@ -387,47 +758,260 @@ function createService(overrides = {}) {
       manifest,
       manifestPath: resolved.manifestPath
     };
-
-    const payload = buildRegistryPayload(manifest, {
-      mode: 'enable',
-      manifestPath: resolved.manifestPath,
-      activationMode: resolved.activationMode,
-      packageSource: resolved.packageSource || ''
-    });
-    const result = await deps.packageRegistryService.upsertPackageRegistry(payload, {
-      backendMode,
-      actor
-    });
-    const declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
-      backendMode
-    });
-    const runtime = await applyRuntimeEnableHooks(context, {
-      backendMode,
-      app: options.app || null
-    });
-    const navigation = await refreshNavigationSnapshot({ backendMode });
-
-    const warnings = [];
-    warnings.push(...runtime.warnings);
-    if (navigation.warning) warnings.push(navigation.warning);
-
-    return {
-      action: resolved.action || 'install',
-      packageId: manifest.id,
-      packageName: manifest.name,
-      version: manifest.version,
-      installMethod: resolved.installMethod || 'path',
-      registry: {
-        enabled: result?.enabled === true,
-        installStatus: cleanText(result?.installStatus, 80),
-        manifestPath: payload?.metadata?.manifestPath || ''
-      },
-      declarationSummary,
-      runtime,
-      navigation,
-      restartRecommended: false,
-      warnings
+    let result = null;
+    let declarationSummary = null;
+    let runtime = { attempted: false, warnings: [], hooks: {} };
+    let navigation = { refreshed: false };
+    let dataLifecycleReport = {
+      dataSummary: { migrations: { applied: 0, skipped: 0, failed: 0 }, seeders: { applied: 0, skipped: 0, failed: 0 } },
+      appliedSteps: [],
+      skippedSteps: [],
+      failedStep: null,
+      rollbackApplied: false,
+      warnings: []
     };
+    let installationSucceeded = false;
+
+    try {
+      if (isUpgrade && resolved.previousResolved?.manifest) {
+        const previousContext = {
+          backendMode,
+          packageId,
+          packageName: cleanText(resolved.previousResolved.manifest.name, 200) || cleanText(previousRegistry?.metadata?.packageName, 200),
+          manifest: resolved.previousResolved.manifest,
+          manifestPath: resolved.previousResolved.manifestPath || ''
+        };
+        const removeSummary = await deps.packageRegistryInstallerService.removePackageRegistryDeclarations(previousContext, {
+          action: 'remove',
+          backendMode
+        });
+        lifecycleOperations.push(...declarationSummaryToLifecycleOperations(removeSummary, {
+          ownership: { packageId, packageName: previousContext.packageName }
+        }));
+      }
+
+      if (
+        deps.packageDataLifecycleService
+        && (
+          typeof deps.packageDataLifecycleService.runPackageDataInstallLifecycle === 'function'
+          || typeof deps.packageDataLifecycleService.runPackageDataUpgradeLifecycle === 'function'
+        )
+      ) {
+        const dataContext = {
+          backendMode,
+          packageId: manifest.id,
+          packageVersion: manifest.version,
+          previousVersion,
+          packageName: manifest.name,
+          manifest,
+          manifestPath: resolved.manifestPath
+        };
+        dataLifecycleReport = isUpgrade
+          // eslint-disable-next-line no-await-in-loop
+          ? await deps.packageDataLifecycleService.runPackageDataUpgradeLifecycle(dataContext, {
+              backendMode,
+              actor,
+              transactionId
+            })
+          : await deps.packageDataLifecycleService.runPackageDataInstallLifecycle(dataContext, {
+              backendMode,
+              actor,
+              transactionId
+            });
+        warnings.push(...sanitizeArray(dataLifecycleReport?.warnings));
+        lifecycleOperations.push(...dataLifecycleSummaryToOperations(dataLifecycleReport, {
+          ownership: { packageId, packageName: cleanText(manifest?.name, 200) }
+        }));
+        if (dataLifecycleReport?.failedStep) {
+          throw new Error(cleanText(dataLifecycleReport.failedStep.message, 1600) || 'Package data lifecycle failed.');
+        }
+      }
+
+      const payload = buildRegistryPayload(manifest, {
+        mode: 'enable',
+        manifestPath: resolved.manifestPath,
+        activationMode: resolved.activationMode,
+        packageSource: resolved.packageSource || ''
+      });
+      result = await deps.packageRegistryService.upsertPackageRegistry(payload, {
+        backendMode,
+        actor
+      });
+      declarationSummary = await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(context, {
+        backendMode
+      });
+      lifecycleOperations.push(...declarationSummaryToLifecycleOperations(declarationSummary, {
+        ownership: { packageId, packageName: cleanText(manifest?.name, 200) }
+      }));
+      runtime = await applyRuntimeEnableHooks(context, {
+        backendMode,
+        app: options.app || null
+      });
+      navigation = await refreshNavigationSnapshot({ backendMode });
+      warnings.push(...runtime.warnings);
+      if (navigation.warning) warnings.push(navigation.warning);
+
+      const afterSnapshots = await captureManifestSnapshots(manifest, { backendMode });
+      await markLifecyclePhase(transactionId, 'apply', 'completed', {
+        updatedVersion: nextVersion
+      }, { backendMode, actor });
+      await markLifecyclePhase(transactionId, 'commit', 'in_progress', {}, { backendMode, actor });
+      await appendLifecycleOperations(transactionId, lifecycleOperations, { backendMode, actor });
+      await completeLifecycleTransaction(transactionId, {
+        status: 'success',
+        phase: 'commit',
+        warnings,
+        artifacts: {
+          previousRegistry,
+          fileMutation: sanitizeObject(resolved.fileMutation),
+          beforeSnapshots,
+          afterSnapshots,
+          dataLifecycleReport
+        },
+        summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations)
+      }, { backendMode, actor });
+
+      const report = {
+        action: isUpgrade ? 'upgrade' : (resolved.action || 'install'),
+        packageId: manifest.id,
+        packageName: manifest.name,
+        version: manifest.version,
+        installMethod: resolved.installMethod || 'path',
+        transactionId,
+        phase: 'commit',
+        summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations),
+        dataSummary: sanitizeObject(dataLifecycleReport?.dataSummary),
+        appliedSteps: sanitizeArray(dataLifecycleReport?.appliedSteps),
+        skippedSteps: sanitizeArray(dataLifecycleReport?.skippedSteps),
+        failedStep: dataLifecycleReport?.failedStep || null,
+        rollbackApplied: dataLifecycleReport?.rollbackApplied === true,
+        registry: {
+          enabled: result?.enabled === true,
+          installStatus: cleanText(result?.installStatus, 80),
+          manifestPath: payload?.metadata?.manifestPath || ''
+        },
+        declarationSummary,
+        runtime,
+        navigation,
+        restartRecommended: false,
+        warnings
+      };
+      installationSucceeded = true;
+      return report;
+    } catch (error) {
+      const rollbackWarnings = [];
+      let rollbackApplied = false;
+      let dataRollbackApplied = false;
+      try {
+        await markLifecyclePhase(transactionId, 'rollback', 'in_progress', {
+          reason: cleanText(error?.message || String(error), 1200)
+        }, { backendMode, actor });
+      } catch (_) {
+        // Continue rollback best-effort.
+      }
+
+      try {
+        if (
+          deps.packageDataLifecycleService
+          && typeof deps.packageDataLifecycleService.runPackageDataUninstallLifecycle === 'function'
+          && sanitizeArray(dataLifecycleReport?.appliedSteps).length
+        ) {
+          const dataRollback = await deps.packageDataLifecycleService.runPackageDataUninstallLifecycle({
+            backendMode,
+            packageId: manifest.id,
+            packageVersion: manifest.version,
+            packageName: manifest.name,
+            manifest,
+            manifestPath: resolved.manifestPath
+          }, {
+            backendMode,
+            actor,
+            transactionId,
+            force: true
+          });
+          dataRollbackApplied = dataRollback?.rollbackApplied === true;
+          rollbackWarnings.push(...sanitizeArray(dataRollback?.warnings));
+          lifecycleOperations.push(...dataLifecycleSummaryToOperations(dataRollback, {
+            ownership: { packageId, packageName: cleanText(manifest?.name, 200) }
+          }));
+        }
+
+        const removeNewContext = {
+          backendMode,
+          packageId,
+          packageName: manifest.name,
+          manifest,
+          manifestPath: resolved.manifestPath
+        };
+        await deps.packageRegistryInstallerService.removePackageRegistryDeclarations(removeNewContext, {
+          action: 'remove',
+          backendMode
+        }).catch(() => null);
+
+        if (isUpgrade && resolved.previousResolved?.manifest) {
+          const restoreContext = {
+            backendMode,
+            packageId,
+            packageName: cleanText(resolved.previousResolved.manifest.name, 200),
+            manifest: resolved.previousResolved.manifest,
+            manifestPath: resolved.previousResolved.manifestPath || ''
+          };
+          await deps.packageRegistryInstallerService.installPackageRegistryDeclarations(restoreContext, { backendMode }).catch(() => null);
+        }
+
+        if (previousRegistry) {
+          await deps.packageRegistryService.upsertPackageRegistry(previousRegistry, { backendMode, actor }).catch(() => null);
+        } else {
+          await deps.packageRegistryService.removePackageRegistry(packageId, { backendMode }).catch(() => null);
+        }
+
+        const fileMutation = sanitizeObject(resolved.fileMutation);
+        if (fileMutation.backupDir) {
+          await restorePackageDirectoryFromBackup(packageId, fileMutation.backupDir, {
+            packageRootDir: options.packageRootDir
+          }).catch((restoreError) => {
+            rollbackWarnings.push(cleanText(restoreError?.message || String(restoreError), 1200));
+          });
+        }
+        rollbackApplied = true;
+      } catch (rollbackError) {
+        rollbackWarnings.push(cleanText(rollbackError?.message || String(rollbackError), 1200));
+      } finally {
+        const fileMutation = sanitizeObject(resolved.fileMutation);
+        if (fileMutation.backupDir && rollbackApplied) {
+          await cleanupPackageBackup(fileMutation.backupDir).catch(() => {});
+        }
+      }
+
+      const failureMessage = cleanText(error?.message || String(error), 2000);
+      await completeLifecycleTransaction(transactionId, {
+        status: rollbackApplied ? 'rollback_applied' : 'rollback_failed',
+        phase: 'rollback',
+        warnings: [...warnings, ...rollbackWarnings],
+        blockedReasons: [failureMessage],
+        rollback: {
+          applied: rollbackApplied,
+          dataRollbackApplied,
+          warnings: rollbackWarnings
+        },
+        artifacts: {
+          previousRegistry,
+          fileMutation: sanitizeObject(resolved.fileMutation),
+          beforeSnapshots,
+          dataLifecycleReport
+        },
+        summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations)
+      }, { backendMode, actor }).catch(() => null);
+      if (transactionId) {
+        error.transactionId = transactionId;
+      }
+      throw error;
+    } finally {
+      const fileMutation = sanitizeObject(resolved.fileMutation);
+      if (fileMutation.backupDir && installationSucceeded) {
+        await cleanupPackageBackup(fileMutation.backupDir).catch(() => {});
+      }
+    }
   }
 
   async function discoverLocalManifests(options = {}) {
@@ -680,10 +1264,20 @@ function createService(overrides = {}) {
 
   async function installPackage(input = {}, options = {}) {
     const resolved = await resolveInstallManifest(input, options);
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const packageId = normalizePackageId(resolved?.manifest?.id || '');
+    let previousResolved = null;
+    if (packageId) {
+      const existing = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
+      if (existing) {
+        previousResolved = await resolveManifestForRegistryRow(existing, options).catch(() => null);
+      }
+    }
     return installResolvedManifest({
       ...resolved,
       action: 'install',
-      packageSource: 'manual'
+      packageSource: 'manual',
+      previousResolved
     }, options);
   }
 
@@ -728,21 +1322,50 @@ function createService(overrides = {}) {
       if (existingVersion && compareSemver(manifest.version, existingVersion) <= 0) {
         throw new Error(`Package version must be newer than installed version ${existingVersion}.`);
       }
+      const previousResolved = existing
+        ? await resolveManifestForRegistryRow(existing, options).catch(() => null)
+        : null;
+      const transaction = await startLifecycleTransaction({
+        packageId: manifest.id,
+        packageName: cleanText(manifest?.name, 200),
+        packageVersion: cleanText(manifest?.version, 120),
+        action: existing ? 'upgrade-zip' : 'install-zip',
+        metadata: {
+          installMethod: 'zip',
+          previousVersion: existingVersion || '',
+          source: 'manual-zip'
+        },
+        artifacts: {
+          previousRegistry: existing || null
+        }
+      }, { backendMode, actor: options.actor || null });
+      const transactionId = cleanText(transaction?.id, 160);
+      await markLifecyclePhase(transactionId, 'preflight', 'completed', {
+        packageId: manifest.id,
+        previousVersion: existingVersion || '',
+        nextVersion: cleanText(manifest?.version, 120)
+      }, { backendMode, actor: options.actor || null });
+      await markLifecyclePhase(transactionId, 'apply', 'in_progress', {
+        stage: 'extract-and-replace-directory'
+      }, { backendMode, actor: options.actor || null });
 
       const extractedPackageDir = path.join(stagingDir, extracted.topFolder);
-      const installedDir = await replacePackageDirectory(extractedPackageDir, manifest.id, { packageRootDir });
-      const installedManifestPath = path.join(installedDir, 'package.manifest.json');
+      const fileMutation = await replacePackageDirectory(extractedPackageDir, manifest.id, { packageRootDir });
+      const installedManifestPath = path.join(fileMutation.destinationDir, 'package.manifest.json');
       report = await installResolvedManifest({
         action: 'install-zip',
         installMethod: 'zip',
         activationMode: 'manual-zip',
         manifest,
         manifestPath: installedManifestPath,
-        packageSource: 'manual-zip'
+        packageSource: 'manual-zip',
+        transactionId,
+        previousResolved,
+        fileMutation
       }, options);
       report.signature = { verified: true };
       report.source = 'manual-zip';
-      report.extractedPath = toStoredManifestPath(installedDir);
+      report.extractedPath = toStoredManifestPath(fileMutation.destinationDir);
       report.zip = {
         extractedFiles: extracted.extractedFileCount,
         extractedBytes: extracted.extractedBytes
@@ -886,16 +1509,236 @@ function createService(overrides = {}) {
     };
   }
 
-  async function removePackage(packageIdInput = '', options = {}) {
+  async function findLatestSuccessfulInstallTransaction(packageId = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    if (!deps.packageLifecycleTransactionService || typeof deps.packageLifecycleTransactionService.listPackageTransactions !== 'function') {
+      return null;
+    }
+    const rows = await deps.packageLifecycleTransactionService.listPackageTransactions(packageId, {
+      backendMode,
+      query: {
+        packageId__eq: packageId,
+        limit: 200
+      }
+    });
+    const list = sanitizeArray(rows);
+    const installLike = new Set(['install', 'install-zip', 'upgrade', 'upgrade-zip']);
+    return list
+      .filter((row) => row && installLike.has(cleanText(row.action, 80).toLowerCase()) && cleanText(row.status, 80).toLowerCase() === 'success')
+      .sort((a, b) => String(b.finishedAt || b.audit?.lastUpdateDateTime || '').localeCompare(String(a.finishedAt || a.audit?.lastUpdateDateTime || '')))[0] || null;
+  }
+
+  async function previewPackageUninstallImpact(packageIdInput = '', options = {}) {
+    const actor = buildActor(options.actor || null);
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const packageId = normalizePackageId(packageIdInput);
     if (!packageId) throw new Error('Package id is required.');
+
+    const existing = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
+    const dataOnlyPreview = (
+      deps.packageDataLifecycleService
+      && typeof deps.packageDataLifecycleService.previewPackageDataUninstallImpact === 'function'
+    )
+      ? await deps.packageDataLifecycleService.previewPackageDataUninstallImpact({
+          backendMode,
+          packageId
+        }, {
+          backendMode,
+          actor
+        }).catch(() => null)
+      : null;
+    if (!existing) {
+      return {
+        packageId,
+        blocked: Boolean(dataOnlyPreview?.blocked),
+        blockedReasons: sanitizeArray(dataOnlyPreview?.blockedReasons),
+        modifiedRecords: sanitizeArray(dataOnlyPreview?.modifiedRecords),
+        dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact),
+        summaryByEntity: {},
+        warnings: [
+          'Package registry row was not found. Remove action can proceed as no-op.',
+          ...sanitizeArray(dataOnlyPreview?.warnings)
+        ],
+        previewTransactionId: ''
+      };
+    }
+
+    const resolved = await resolveManifestForRegistryRow(existing, options);
+    if (!resolved || !resolved.manifest) {
+      throw new Error('Manifest file was not found for this package.');
+    }
+
+    const latestInstallTx = await findLatestSuccessfulInstallTransaction(packageId, { backendMode });
+    const baselineRows = sanitizeArray(latestInstallTx?.artifacts?.afterSnapshots);
+    const currentRows = await captureManifestSnapshots(resolved.manifest, { backendMode });
+    const baselineMap = buildSnapshotLookup(baselineRows);
+    const currentMap = buildSnapshotLookup(currentRows);
+    const keys = new Set([...baselineMap.keys(), ...currentMap.keys()]);
+    const modifiedRecords = [];
+
+    keys.forEach((key) => {
+      const baseline = baselineMap.get(key) || null;
+      const current = currentMap.get(key) || null;
+      const baselineHash = cleanText(baseline?.hash, 120) || hashPayload(baseline?.payload || null);
+      const currentHash = cleanText(current?.hash, 120) || hashPayload(current?.payload || null);
+      if (baselineHash === currentHash) return;
+      modifiedRecords.push({
+        entityType: cleanText(current?.entityType || baseline?.entityType, 80),
+        identityKey: cleanText(current?.identityKey || baseline?.identityKey, 400),
+        ownership: sanitizeObject(current?.ownership || baseline?.ownership),
+        installedHash: baselineHash,
+        currentHash,
+        installedPayload: baseline?.payload || null,
+        currentPayload: current?.payload || null
+      });
+    });
+
+    const blockedReasons = modifiedRecords.length
+      ? ['Detected customized package-owned records modified since install baseline.']
+      : [];
+    const previewWarnings = [];
+    if (!latestInstallTx) {
+      previewWarnings.push('No successful install baseline transaction was found. Review impact details carefully before force removal.');
+    }
+    if (dataOnlyPreview) {
+      previewWarnings.push(...sanitizeArray(dataOnlyPreview.warnings));
+      blockedReasons.push(...sanitizeArray(dataOnlyPreview.blockedReasons));
+    }
+    const mergedModifiedRecords = [
+      ...modifiedRecords,
+      ...sanitizeArray(dataOnlyPreview?.modifiedRecords)
+    ];
+    const mergedBlockedReasons = Array.from(new Set(blockedReasons.filter(Boolean)));
+
+    const previewTransaction = await startLifecycleTransaction({
+      packageId,
+      packageName: cleanText(existing?.metadata?.packageName, 200) || packageId.toUpperCase(),
+      packageVersion: cleanText(existing?.version, 120),
+      action: 'uninstall-preview',
+      metadata: {
+        baselineTransactionId: cleanText(latestInstallTx?.id, 160)
+      },
+      artifacts: {
+        baselineSnapshots: baselineRows,
+        currentSnapshots: currentRows
+      }
+    }, { backendMode, actor });
+    const previewTransactionId = cleanText(previewTransaction?.id, 160);
+    await completeLifecycleTransaction(previewTransactionId, {
+      status: mergedBlockedReasons.length ? 'blocked' : 'success',
+      phase: 'commit',
+      warnings: previewWarnings,
+      blockedReasons: mergedBlockedReasons,
+      modifiedRecords: mergedModifiedRecords,
+      artifacts: {
+        baselineSnapshots: baselineRows,
+        currentSnapshots: currentRows,
+        dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact)
+      }
+    }, { backendMode, actor });
+
+    const operationRows = mergedModifiedRecords.map((row) => ({
+      entityType: row.entityType,
+      identityKey: row.identityKey,
+      ownership: row.ownership,
+      operation: 'updated',
+      reason: 'modified_since_install',
+      beforePayload: row.installedPayload,
+      afterPayload: row.currentPayload,
+      beforeHash: row.installedHash,
+      afterHash: row.currentHash
+    }));
+    await appendLifecycleOperations(previewTransactionId, operationRows, { backendMode, actor }).catch(() => null);
+
+    return {
+      packageId,
+      packageName: cleanText(existing?.metadata?.packageName, 200) || packageId.toUpperCase(),
+      version: cleanText(existing?.version, 120),
+      blocked: mergedBlockedReasons.length > 0,
+      blockedReasons: mergedBlockedReasons,
+      modifiedRecords: mergedModifiedRecords,
+      dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact),
+      summaryByEntity: createLifecycleSummaryByEntity(operationRows),
+      warnings: previewWarnings,
+      previewTransactionId
+    };
+  }
+
+  async function removePackage(packageIdInput = '', options = {}) {
+    const actor = buildActor(options.actor || null);
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const packageId = normalizePackageId(packageIdInput);
+    if (!packageId) throw new Error('Package id is required.');
+    const forceRemove = options.force === true;
+    const previewTransactionId = cleanText(options.previewTransactionId, 160);
+    const forceToken = cleanText(options.forceToken, 200);
+    const expectedForceToken = `REMOVE ${packageId}`.toUpperCase();
+
+    const preview = options.preview && typeof options.preview === 'object'
+      ? options.preview
+      : await previewPackageUninstallImpact(packageId, options);
+    const hasRisk = sanitizeArray(preview?.modifiedRecords).length > 0;
+    if (forceRemove) {
+      if (!previewTransactionId) {
+        const error = new Error('Force remove requires a valid uninstall preview transaction id.');
+        error.code = 'UNINSTALL_FORCE_TOKEN_REQUIRED';
+        throw error;
+      }
+      if (forceToken.toUpperCase() !== expectedForceToken) {
+        const error = new Error(`Force remove confirmation token mismatch. Expected "${expectedForceToken}".`);
+        error.code = 'UNINSTALL_FORCE_TOKEN_REQUIRED';
+        throw error;
+      }
+      if (
+        deps.packageLifecycleTransactionService
+        && typeof deps.packageLifecycleTransactionService.getTransactionById === 'function'
+      ) {
+        const previewTx = await deps.packageLifecycleTransactionService.getTransactionById(previewTransactionId, { backendMode });
+        const previewPackageId = normalizePackageId(previewTx?.packageId || '');
+        if (!previewTx || previewPackageId !== packageId) {
+          const error = new Error('Force remove preview token is invalid or belongs to another package.');
+          error.code = 'UNINSTALL_FORCE_TOKEN_REQUIRED';
+          throw error;
+        }
+      }
+    }
+
+    const lifecycleTx = await startLifecycleTransaction({
+      packageId,
+      packageName: cleanText(preview?.packageName, 200) || packageId.toUpperCase(),
+      packageVersion: cleanText(preview?.version, 120),
+      action: forceRemove ? 'remove-force' : 'remove',
+      metadata: {
+        force: forceRemove,
+        previewTransactionId: cleanText(preview?.previewTransactionId, 160),
+        providedPreviewTransactionId: previewTransactionId
+      },
+      artifacts: {
+        modifiedRecords: sanitizeArray(preview?.modifiedRecords)
+      }
+    }, { backendMode, actor });
+    const transactionId = cleanText(lifecycleTx?.id, 160);
+    await markLifecyclePhase(transactionId, 'preflight', 'completed', {
+      hasRisk,
+      modifiedCount: sanitizeArray(preview?.modifiedRecords).length
+    }, { backendMode, actor });
+    await markLifecyclePhase(transactionId, 'apply', 'in_progress', {}, { backendMode, actor });
 
     const warnings = [];
     const existing = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
     let declarationSummary = null;
     let manifest = null;
     let manifestPath = '';
+    const lifecycleOperations = [];
+    let dataLifecycleReport = {
+      dataSummary: { migrations: { applied: 0, skipped: 0, failed: 0 }, seeders: { applied: 0, skipped: 0, failed: 0 } },
+      appliedSteps: [],
+      skippedSteps: [],
+      failedStep: null,
+      rollbackApplied: false,
+      warnings: [],
+      dataImpact: {}
+    };
 
     if (existing) {
       try {
@@ -917,25 +1760,81 @@ function createService(overrides = {}) {
         manifest,
         manifestPath
       };
+      if (
+        deps.packageDataLifecycleService
+        && typeof deps.packageDataLifecycleService.runPackageDataUninstallLifecycle === 'function'
+      ) {
+        dataLifecycleReport = await deps.packageDataLifecycleService.runPackageDataUninstallLifecycle(context, {
+          backendMode,
+          actor,
+          transactionId,
+          force: forceRemove,
+          preview
+        });
+        warnings.push(...sanitizeArray(dataLifecycleReport?.warnings));
+        lifecycleOperations.push(...dataLifecycleSummaryToOperations(dataLifecycleReport, {
+          ownership: { packageId, packageName: cleanText(manifest?.name, 200) }
+        }));
+        if (dataLifecycleReport?.failedStep) {
+          throw new Error(cleanText(dataLifecycleReport.failedStep.message, 1600) || 'Package data uninstall lifecycle failed.');
+        }
+      }
+
       declarationSummary = await deps.packageRegistryInstallerService.removePackageRegistryDeclarations(context, {
         action: 'remove',
         backendMode
       });
+      lifecycleOperations.push(...declarationSummaryToLifecycleOperations(declarationSummary, {
+        ownership: { packageId, packageName: cleanText(manifest?.name, 200) }
+      }));
     } else {
       warnings.push('Declaration remove sync was skipped because manifest was unavailable.');
     }
 
     const removed = await deps.packageRegistryService.removePackageRegistry(packageId, { backendMode });
+    lifecycleOperations.push({
+      entityType: 'packageRegistry',
+      identityKey: `packageId:${packageId}`,
+      ownership: { packageId, packageName: cleanText(manifest?.name || existing?.metadata?.packageName, 200) },
+      operation: removed === true ? 'removed' : 'skipped',
+      reason: removed === true ? 'Registry row removed.' : 'Registry row not found.'
+    });
     const navigation = await refreshNavigationSnapshot({ backendMode });
     if (navigation.warning) warnings.push(navigation.warning);
 
     warnings.push('Runtime route unmount is not supported in-process; restart the app to fully remove mounted service routes.');
+    await appendLifecycleOperations(transactionId, lifecycleOperations, { backendMode, actor }).catch(() => null);
+    await markLifecyclePhase(transactionId, 'apply', 'completed', {
+      registryRemoved: removed === true
+    }, { backendMode, actor }).catch(() => null);
+    await completeLifecycleTransaction(transactionId, {
+      status: 'success',
+      phase: 'commit',
+      warnings,
+      modifiedRecords: sanitizeArray(preview?.modifiedRecords),
+      artifacts: {
+        previewTransactionId: cleanText(preview?.previewTransactionId, 160),
+        dataLifecycleReport
+      },
+      summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations)
+    }, { backendMode, actor }).catch(() => null);
 
     return {
       action: 'remove',
       packageId,
       packageName: cleanText(manifest?.name || existing?.metadata?.packageName || packageId.toUpperCase(), 200),
       version: cleanText(existing?.version || manifest?.version, 120),
+      transactionId,
+      phase: 'commit',
+      summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations),
+      blockedReasons: sanitizeArray(preview?.blockedReasons),
+      modifiedRecords: sanitizeArray(preview?.modifiedRecords),
+      dataImpact: sanitizeObject(dataLifecycleReport?.dataImpact),
+      dataSummary: sanitizeObject(dataLifecycleReport?.dataSummary),
+      appliedSteps: sanitizeArray(dataLifecycleReport?.appliedSteps),
+      skippedSteps: sanitizeArray(dataLifecycleReport?.skippedSteps),
+      failedStep: dataLifecycleReport?.failedStep || null,
+      rollbackApplied: dataLifecycleReport?.rollbackApplied === true,
       registry: {
         removed: removed === true
       },
@@ -1000,6 +1899,33 @@ function createService(overrides = {}) {
     };
   }
 
+  async function listPackageTransactions(packageIdInput = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const packageId = normalizePackageId(packageIdInput);
+    if (!packageId) throw new Error('Package id is required.');
+    if (!deps.packageLifecycleTransactionService || typeof deps.packageLifecycleTransactionService.listPackageTransactions !== 'function') {
+      return [];
+    }
+    const rows = await deps.packageLifecycleTransactionService.listPackageTransactions(packageId, {
+      backendMode,
+      query: {
+        packageId__eq: packageId,
+        limit: readPositiveInt(options.limit, 50)
+      }
+    });
+    return sanitizeArray(rows);
+  }
+
+  async function getPackageTransactionById(transactionIdInput = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const transactionId = cleanText(transactionIdInput, 160);
+    if (!transactionId) throw new Error('Transaction id is required.');
+    if (!deps.packageLifecycleTransactionService || typeof deps.packageLifecycleTransactionService.getTransactionById !== 'function') {
+      return null;
+    }
+    return deps.packageLifecycleTransactionService.getTransactionById(transactionId, { backendMode });
+  }
+
   return {
     discoverLocalManifests,
     listPackageSnapshot,
@@ -1008,7 +1934,10 @@ function createService(overrides = {}) {
     enablePackage,
     pausePackage,
     removePackage,
-    syncPackage
+    syncPackage,
+    previewPackageUninstallImpact,
+    listPackageTransactions,
+    getPackageTransactionById
   };
 }
 

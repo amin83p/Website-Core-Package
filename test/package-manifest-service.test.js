@@ -141,3 +141,133 @@ test('dependencies must be valid package ids and cannot self-reference', () => {
     });
   }, /cannot depend on itself/i);
 });
+
+test('manifest accepts valid migration and seeder declarations', () => {
+  const out = manifestService.validatePackageManifest({
+    id: 'addon',
+    name: 'Addon',
+    version: '1.2.0',
+    mountPath: '/addon',
+    migrations: [
+      {
+        id: 'm001_init',
+        version: '1.0.0',
+        description: 'init',
+        up: 'migrations/001-init-up.js',
+        down: 'migrations/001-init-down.js',
+        dependsOn: [],
+        backendModes: ['json', 'mongo'],
+        safeToRollback: true
+      }
+    ],
+    seeders: [
+      {
+        id: 's001_seed',
+        version: '1.0.0',
+        description: 'seed',
+        run: 'seeders/001-seed-run.js',
+        revert: 'seeders/001-seed-revert.js',
+        mode: 'upsert',
+        backendModes: ['json'],
+        idempotencyKey: 'addon.seed.001'
+      }
+    ]
+  });
+
+  assert.equal(out.migrations.length, 1);
+  assert.equal(out.seeders.length, 1);
+  assert.equal(out.migrations[0].up, 'migrations/001-init-up.js');
+  assert.equal(out.seeders[0].mode, 'upsert');
+});
+
+test('manifest rejects invalid lifecycle script paths and duplicate lifecycle ids', () => {
+  assert.throws(() => {
+    manifestService.validatePackageManifest({
+      id: 'addon',
+      name: 'Addon',
+      version: '1.0.0',
+      mountPath: '/addon',
+      migrations: [
+        {
+          id: 'step-1',
+          version: '1.0.0',
+          up: '../outside.js',
+          down: 'migrations/down.js'
+        }
+      ]
+    });
+  }, /inside package folder/i);
+
+  assert.throws(() => {
+    manifestService.validatePackageManifest({
+      id: 'addon',
+      name: 'Addon',
+      version: '1.0.0',
+      mountPath: '/addon',
+      migrations: [
+        {
+          id: 'dup-step',
+          version: '1.0.0',
+          up: 'migrations/up.js',
+          down: 'migrations/down.js'
+        }
+      ],
+      seeders: [
+        {
+          id: 'dup-step',
+          version: '1.0.0',
+          run: 'seeders/run.js',
+          revert: 'seeders/revert.js',
+          idempotencyKey: 'dup-step'
+        }
+      ]
+    });
+  }, /must be unique/i);
+});
+
+test('manifest rejects invalid lifecycle ordering and backend/seed mode values', () => {
+  assert.throws(() => {
+    manifestService.validatePackageManifest({
+      id: 'addon',
+      name: 'Addon',
+      version: '1.0.0',
+      mountPath: '/addon',
+      migrations: [
+        {
+          id: 'm2',
+          version: '1.1.0',
+          up: 'migrations/up-2.js',
+          down: 'migrations/down-2.js',
+          backendModes: ['json']
+        },
+        {
+          id: 'm1',
+          version: '1.0.0',
+          up: 'migrations/up-1.js',
+          down: 'migrations/down-1.js',
+          backendModes: ['json']
+        }
+      ]
+    });
+  }, /ordered by non-decreasing semantic version/i);
+
+  assert.throws(() => {
+    manifestService.validatePackageManifest({
+      id: 'addon',
+      name: 'Addon',
+      version: '1.0.0',
+      mountPath: '/addon',
+      seeders: [
+        {
+          id: 'seed-1',
+          version: '1.0.0',
+          run: 'seeders/run.js',
+          revert: 'seeders/revert.js',
+          mode: 'truncate',
+          backendModes: ['sqlite'],
+          idempotencyKey: 'seed-1'
+        }
+      ]
+    });
+  }, /unsupported backend mode|mode is invalid/i);
+});

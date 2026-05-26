@@ -1182,9 +1182,13 @@ function buildPackageManagerOptions(req = {}) {
 function sendPackageManagerError(res, error, fallbackMessage = 'Package operation failed.') {
   const code = String(error?.code || '').trim().toUpperCase();
   const statusCode = code === 'ADMIN_REQUIRED' ? 403 : 400;
+  const blocked = code === 'UNINSTALL_BLOCKED_MODIFIED';
   return res.status(statusCode).json({
-    status: statusCode === 403 ? 'admin_required' : 'error',
-    message: error?.message || fallbackMessage
+    status: statusCode === 403 ? 'admin_required' : (blocked ? 'blocked' : 'error'),
+    message: error?.message || fallbackMessage,
+    blockedReasons: blocked ? (error?.blockedReasons || []) : [],
+    modifiedRecords: blocked ? (error?.modifiedRecords || []) : [],
+    previewTransactionId: blocked ? (error?.previewTransactionId || '') : ''
   });
 }
 
@@ -1257,7 +1261,13 @@ exports.pausePackageFromManager = async (req, res) => {
 exports.removePackageFromManager = async (req, res) => {
   try {
     const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
-    const report = await systemSettingsPackageManagerService.removePackage(packageId, buildPackageManagerOptions(req));
+    const force = String(req.query?.force || req.body?.force || '').trim().toLowerCase() === 'true';
+    const report = await systemSettingsPackageManagerService.removePackage(packageId, {
+      ...buildPackageManagerOptions(req),
+      force,
+      forceToken: cleanFormText(req.body?.forceToken, 200),
+      previewTransactionId: cleanFormText(req.body?.previewTransactionId, 160)
+    });
     return res.json({
       status: 'success',
       message: `Package "${report.packageId}" remove operation completed.`,
@@ -1279,6 +1289,61 @@ exports.syncPackageFromManager = async (req, res) => {
     });
   } catch (error) {
     return sendPackageManagerError(res, error, 'Package sync failed.');
+  }
+};
+
+exports.uninstallPreviewPackageFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const report = await systemSettingsPackageManagerService.previewPackageUninstallImpact(
+      packageId,
+      buildPackageManagerOptions(req)
+    );
+    return res.json({
+      status: 'success',
+      message: report.blocked
+        ? `Impact preview found modified records for "${report.packageId}".`
+        : `Impact preview completed for "${report.packageId}".`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package uninstall preview failed.');
+  }
+};
+
+exports.listPackageTransactionsFromManager = async (req, res) => {
+  try {
+    const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
+    const rows = await systemSettingsPackageManagerService.listPackageTransactions(packageId, {
+      ...buildPackageManagerOptions(req),
+      limit: Number.parseInt(String(req.query?.limit || '50'), 10) || 50
+    });
+    return res.json({
+      status: 'success',
+      packageId,
+      rows
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package transaction list failed.');
+  }
+};
+
+exports.getPackageTransactionDetailFromManager = async (req, res) => {
+  try {
+    const transactionId = cleanFormText(req.params?.transactionId, 160);
+    const row = await systemSettingsPackageManagerService.getPackageTransactionById(transactionId, buildPackageManagerOptions(req));
+    if (!row) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Transaction not found.'
+      });
+    }
+    return res.json({
+      status: 'success',
+      row
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package transaction detail failed.');
   }
 };
 

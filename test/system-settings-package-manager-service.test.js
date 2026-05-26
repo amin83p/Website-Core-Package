@@ -173,6 +173,64 @@ function createBaseDeps() {
         navigationRefreshCount += 1;
         return { packages: [...registry.values()] };
       }
+    },
+    packageDataLifecycleService: {
+      async runPackageDataInstallLifecycle() {
+        return {
+          dataSummary: {
+            migrations: { applied: 0, skipped: 0, failed: 0 },
+            seeders: { applied: 0, skipped: 0, failed: 0 }
+          },
+          appliedSteps: [],
+          skippedSteps: [],
+          failedStep: null,
+          rollbackApplied: false,
+          warnings: []
+        };
+      },
+      async runPackageDataUpgradeLifecycle() {
+        return {
+          dataSummary: {
+            migrations: { applied: 0, skipped: 0, failed: 0 },
+            seeders: { applied: 0, skipped: 0, failed: 0 }
+          },
+          appliedSteps: [],
+          skippedSteps: [],
+          failedStep: null,
+          rollbackApplied: false,
+          warnings: []
+        };
+      },
+      async previewPackageDataUninstallImpact() {
+        return {
+          blocked: false,
+          blockedReasons: [],
+          modifiedRecords: [],
+          dataImpact: {
+            ownershipCount: 0,
+            modifiedCount: 0
+          },
+          warnings: []
+        };
+      },
+      async runPackageDataUninstallLifecycle(_context = {}, options = {}) {
+        const force = options.force === true;
+        return {
+          dataSummary: {
+            migrations: { applied: force ? 1 : 0, skipped: force ? 0 : 1, failed: 0 },
+            seeders: { applied: 0, skipped: 0, failed: 0 }
+          },
+          appliedSteps: force ? [{ stepId: 'sample', stepType: 'migration', direction: 'down', status: 'success', artifacts: {} }] : [],
+          skippedSteps: force ? [] : [{ stepId: 'sample', stepType: 'migration', direction: 'down', status: 'skipped', reason: 'safe_mode_keep_data' }],
+          failedStep: null,
+          rollbackApplied: force,
+          dataImpact: {
+            ownershipCount: 1,
+            modifiedCount: force ? 0 : 1
+          },
+          warnings: force ? [] : ['Safe uninstall mode keeps package business data.']
+        };
+      }
     }
   };
 
@@ -243,6 +301,21 @@ test('installPackage rejects invalid manifest JSON payload', async () => {
   );
 });
 
+test('installPackage returns data lifecycle summary fields', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  setup.deps.fs.readFile = async () => JSON.stringify(createManifest({ id: 'pte', name: 'PTE', version: '1.0.1' }));
+  const report = await service.installPackage({
+    installMethod: 'path',
+    manifestPath: 'packages/pte/package.manifest.json'
+  }, { backendMode: 'json' });
+
+  assert.equal(report.action, 'install');
+  assert.equal(typeof report.dataSummary, 'object');
+  assert.equal(Array.isArray(report.appliedSteps), true);
+  assert.equal(Array.isArray(report.skippedSteps), true);
+});
+
 test('pausePackage is idempotent and returns restart recommendation', async () => {
   const setup = createBaseDeps();
   const service = createService(setup.deps);
@@ -308,6 +381,60 @@ test('syncPackage installs declarations and refreshes navigation', async () => {
   assert.equal(report.packageId, 'pte');
   assert.equal(setup.declarationCalls().some((row) => row.type === 'install'), true);
   assert.equal(setup.navigationRefreshCount() >= 1, true);
+});
+
+test('removePackage defaults to safe keep-data mode when uninstall preview reports modified records', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.removePackage('pte', {
+    backendMode: 'json',
+    preview: {
+      blocked: true,
+      blockedReasons: ['customized'],
+      modifiedRecords: [{ entityType: 'sections', identityKey: 'name:PTE' }],
+      previewTransactionId: 'TXN_PREVIEW'
+    }
+  });
+
+  assert.equal(report.action, 'remove');
+  assert.equal(report.registry.removed, true);
+  assert.equal(report.dataSummary?.migrations?.skipped >= 1, true);
+});
+
+test('removePackage force mode requires confirmation token when preview has modifications', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  await assert.rejects(
+    () => service.removePackage('pte', {
+      backendMode: 'json',
+      force: true,
+      preview: {
+        blocked: true,
+        blockedReasons: ['customized'],
+        modifiedRecords: [{ entityType: 'sections', identityKey: 'name:PTE' }],
+        previewTransactionId: 'TXN_PREVIEW'
+      },
+      previewTransactionId: 'TXN_PREVIEW',
+      forceToken: 'WRONG TOKEN'
+    }),
+    /token mismatch/i
+  );
 });
 
 test('installPackageZip verifies signature and installs package into packages directory', async () => {
