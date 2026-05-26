@@ -44,6 +44,11 @@
        const headerLogoUrl = headerBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
        const headerLogoAlt = (headerBrand.appName || headerBrand.ownerDisplayName || 'Amin Paknejad') + ' Logo';
        const headerTagline = headerBrand.tagline || 'Learn, work, and thrive in new places.';
+       const headerShowBuyMeACoffee = headerBrand.headerShowBuyMeACoffee !== false;
+       const headerBuyMeACoffeeUrl = String(headerBrand.headerBuyMeACoffeeUrl || 'https://www.buymeacoffee.com/paknejad').trim();
+       const headerBuyMeACoffeeLabel = String(headerBrand.headerBuyMeACoffeeLabel || 'Support').trim();
+       const headerBuyMeACoffeeText = String(headerBrand.headerBuyMeACoffeeText || 'Buy me a coffee').trim();
+       const headerBuyMeACoffeeTitle = String(headerBrand.headerBuyMeACoffeeTitle || 'Support the work - one coffee at a time.').trim();
        const headerChatAccess = (typeof chatAccess !== 'undefined' && chatAccess && typeof chatAccess === 'object') ? chatAccess : {};
        const canUseHeaderChat = !!(headerChatAccess.canRead || headerChatAccess.canReadAll);
        const headerFallbackPublicMenu = [
@@ -253,19 +258,19 @@
                     </div>
 
                 <% } %>
-                <% if (!(typeof user !== 'undefined' && user)) { %>
+                <% if (!(typeof user !== 'undefined' && user) && headerShowBuyMeACoffee && headerBuyMeACoffeeUrl) { %>
 
 
-                <a class="nav-pill-btn d-none d-xl-flex bmac-pill" href="https://www.buymeacoffee.com/paknejad"
+                <a class="nav-pill-btn d-none d-xl-flex bmac-pill" href="<%= headerBuyMeACoffeeUrl %>"
                    target="_blank" rel="noopener noreferrer"
-                   title="Support the work — one coffee at a time."
+                   title="<%= headerBuyMeACoffeeTitle %>"
                    aria-label="Buy me a coffee (opens in a new tab)">
                     <span class="nav-pill-icon bmac-pill-icon">
                         <i class="bi bi-cup-hot-fill"></i>
                     </span>
                     <span class="nav-pill-info">
-                        <span class="nav-pill-label">Support</span>
-                        <span class="nav-pill-text">Buy me a coffee</span>
+                        <span class="nav-pill-label"><%= headerBuyMeACoffeeLabel %></span>
+                        <span class="nav-pill-text"><%= headerBuyMeACoffeeText %></span>
                     </span>
                 </a>
                 <% } %>

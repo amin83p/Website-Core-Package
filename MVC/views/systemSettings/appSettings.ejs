@@ -42,6 +42,11 @@
   const publicDefaultHomePath = typeof publicMenu.defaultHomePath === 'string' && publicMenu.defaultHomePath.trim()
     ? publicMenu.defaultHomePath.trim()
     : '/';
+  const headerShowBuyMeACoffee = brand.headerShowBuyMeACoffee !== false;
+  const headerBuyMeACoffeeUrl = String(brand.headerBuyMeACoffeeUrl || 'https://www.buymeacoffee.com/paknejad').trim();
+  const headerBuyMeACoffeeLabel = String(brand.headerBuyMeACoffeeLabel || 'Support').trim();
+  const headerBuyMeACoffeeText = String(brand.headerBuyMeACoffeeText || 'Buy me a coffee').trim();
+  const headerBuyMeACoffeeTitle = String(brand.headerBuyMeACoffeeTitle || 'Support the work - one coffee at a time.').trim();
   const fallbackEndpointOptions = [
     { label: 'Home', href: '/', icon: 'bi-house', visibility: 'all', target: '_self', category: 'Core' },
     { label: 'What I Offer', href: '/whatIOffer', icon: 'bi-stars', visibility: 'all', target: '_self', category: 'Core' },
@@ -84,6 +89,11 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link fw-semibold" id="app-public-menu-tab" data-bs-toggle="tab" data-bs-target="#app-public-menu-pane" type="button" role="tab" aria-controls="app-public-menu-pane" aria-selected="false">
             <i class="bi bi-menu-button-wide me-1"></i> Public Menu
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="app-header-options-tab" data-bs-toggle="tab" data-bs-target="#app-header-options-pane" type="button" role="tab" aria-controls="app-header-options-pane" aria-selected="false">
+            <i class="bi bi-cup-hot me-1"></i> Header Options
           </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -527,6 +537,42 @@
               <div id="publicMenuBuilder" class="vstack gap-2"></div>
               <div id="publicMenuEmpty" class="alert alert-light border mt-3 d-none">
                 No menu items yet. Add a menu item to start building the public menu.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="app-header-options-pane" role="tabpanel" aria-labelledby="app-header-options-tab" tabindex="0">
+          <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white border-0 pb-0">
+              <h5 class="fw-bold mb-1"><i class="bi bi-cup-hot text-primary me-2"></i>Header Buy Me A Coffee</h5>
+              <p class="text-muted small mb-0">Controls the public header support button shown to guests.</p>
+            </div>
+            <div class="card-body p-4">
+              <div class="row g-3">
+                <div class="col-12">
+                  <div class="form-check form-switch p-3 bg-light rounded border">
+                    <input class="form-check-input" type="checkbox" role="switch" id="headerShowBuyMeACoffee" name="headerShowBuyMeACoffee" value="true" <%= headerShowBuyMeACoffee ? 'checked' : '' %>>
+                    <label class="form-check-label fw-bold" for="headerShowBuyMeACoffee">Show Buy Me a Coffee button in header</label>
+                    <div class="form-text">Turn this off to hide the button on the public header.</div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Button URL</label>
+                  <input type="url" name="headerBuyMeACoffeeUrl" class="form-control" value="<%= headerBuyMeACoffeeUrl %>" placeholder="https://www.buymeacoffee.com/paknejad">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Badge Label</label>
+                  <input type="text" name="headerBuyMeACoffeeLabel" class="form-control" value="<%= headerBuyMeACoffeeLabel %>" placeholder="Support">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Button Text</label>
+                  <input type="text" name="headerBuyMeACoffeeText" class="form-control" value="<%= headerBuyMeACoffeeText %>" placeholder="Buy me a coffee">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Hover Title</label>
+                  <input type="text" name="headerBuyMeACoffeeTitle" class="form-control" value="<%= headerBuyMeACoffeeTitle %>" placeholder="Support the work - one coffee at a time.">
+                </div>
               </div>
             </div>
           </div>

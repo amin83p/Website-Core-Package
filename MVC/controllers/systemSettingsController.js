@@ -532,7 +532,12 @@ exports.updateAppSettings = async (req, res) => {
           instagramUrl: req.body.instagramUrl,
           facebookUrl: req.body.facebookUrl,
           linkedinUrl: req.body.linkedinUrl,
-          youtubeUrl: req.body.youtubeUrl
+          youtubeUrl: req.body.youtubeUrl,
+          headerShowBuyMeACoffee: req.body.headerShowBuyMeACoffee === 'true',
+          headerBuyMeACoffeeUrl: req.body.headerBuyMeACoffeeUrl,
+          headerBuyMeACoffeeLabel: req.body.headerBuyMeACoffeeLabel,
+          headerBuyMeACoffeeText: req.body.headerBuyMeACoffeeText,
+          headerBuyMeACoffeeTitle: req.body.headerBuyMeACoffeeTitle
         },
         contact: {
           emails: contactEmails,

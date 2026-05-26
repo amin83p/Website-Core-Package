@@ -17,7 +17,12 @@ const DEFAULT_BRAND = Object.freeze({
   instagramUrl: '',
   facebookUrl: '',
   linkedinUrl: '',
-  youtubeUrl: ''
+  youtubeUrl: '',
+  headerShowBuyMeACoffee: true,
+  headerBuyMeACoffeeUrl: 'https://www.buymeacoffee.com/paknejad',
+  headerBuyMeACoffeeLabel: 'Support',
+  headerBuyMeACoffeeText: 'Buy me a coffee',
+  headerBuyMeACoffeeTitle: 'Support the work - one coffee at a time.'
 });
 
 const DEFAULT_CONTACT = Object.freeze({
@@ -299,7 +304,12 @@ function getBrand() {
     instagramUrl: cleanUrl(merged.instagramUrl, ''),
     facebookUrl: cleanUrl(merged.facebookUrl, ''),
     linkedinUrl: cleanUrl(merged.linkedinUrl, ''),
-    youtubeUrl: cleanUrl(merged.youtubeUrl, '')
+    youtubeUrl: cleanUrl(merged.youtubeUrl, ''),
+    headerShowBuyMeACoffee: merged.headerShowBuyMeACoffee !== false,
+    headerBuyMeACoffeeUrl: cleanUrl(merged.headerBuyMeACoffeeUrl, DEFAULT_BRAND.headerBuyMeACoffeeUrl),
+    headerBuyMeACoffeeLabel: cleanText(merged.headerBuyMeACoffeeLabel, { max: 80, fallback: DEFAULT_BRAND.headerBuyMeACoffeeLabel }),
+    headerBuyMeACoffeeText: cleanText(merged.headerBuyMeACoffeeText, { max: 120, fallback: DEFAULT_BRAND.headerBuyMeACoffeeText }),
+    headerBuyMeACoffeeTitle: cleanText(merged.headerBuyMeACoffeeTitle, { max: 220, fallback: DEFAULT_BRAND.headerBuyMeACoffeeTitle })
   };
 }
 
