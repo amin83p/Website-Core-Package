@@ -104,6 +104,9 @@ const PUBLIC_MENU_ENDPOINT_OPTIONS = Object.freeze([
   { label: 'Newsletter Unsubscribe', href: '/newsletter/unsubscribe', icon: 'bi-envelope-x', visibility: 'all', target: '_self', category: 'Newsletter' }
 ]);
 
+const REMOVED_PUBLIC_MENU_HREFS = new Set(['/pte/test-info', '/pte/join', '/pte/packages']);
+const REMOVED_PUBLIC_MENU_LABELS = new Set(['pte test info', 'join pte practice', 'pte packages']);
+
 function cleanText(value, { max = 4000, fallback = '' } = {}) {
   const token = String(value ?? '').replace(/\0/g, '').trim();
   const out = token || fallback || '';
@@ -461,16 +464,30 @@ function dedupeMenuItems(items = []) {
   return out;
 }
 
+function removeDeprecatedPublicMenuItems(items = []) {
+  return (Array.isArray(items) ? items : []).filter((item) => {
+    const source = item && typeof item === 'object' ? item : {};
+    const href = cleanMenuHref(source.href || '');
+    const label = cleanText(source.label, { max: 120, fallback: '' }).toLowerCase();
+    if (href && REMOVED_PUBLIC_MENU_HREFS.has(href)) return false;
+    if (label && REMOVED_PUBLIC_MENU_LABELS.has(label)) return false;
+    return true;
+  });
+}
+
 function getPublicMenu(user = null) {
   const raw = getRawPublicMenuSettings();
   const sourceItems = Array.isArray(raw.items) && raw.items.length ? raw.items : DEFAULT_PUBLIC_MENU_ITEMS;
   const filteredBaseItems = packageNavigationService.filterMenuItemsAgainstDisabledPackages(sourceItems);
+  const cleanedBaseItems = removeDeprecatedPublicMenuItems(filteredBaseItems);
   const packageItems = packageNavigationService.getPublicMenuEntries(user);
-  const mergedItems = dedupeMenuItems([...(filteredBaseItems || []), ...(packageItems || [])]);
+  const cleanedPackageItems = removeDeprecatedPublicMenuItems(packageItems);
+  const mergedItems = dedupeMenuItems([...(cleanedBaseItems || []), ...(cleanedPackageItems || [])]);
   const normalized = normalizePublicMenuItems(mergedItems, user, 0);
   if (normalized.length) return normalized;
   const fallbackItems = packageNavigationService.filterMenuItemsAgainstDisabledPackages(DEFAULT_PUBLIC_MENU_ITEMS);
-  return normalizePublicMenuItems(fallbackItems, user, 0);
+  const cleanedFallbackItems = removeDeprecatedPublicMenuItems(fallbackItems);
+  return normalizePublicMenuItems(cleanedFallbackItems, user, 0);
 }
 
 function getPublicDefaultHomePath() {
@@ -489,6 +506,7 @@ function getPublicMenuEndpointOptions() {
     category: cleanText(item.category, { max: 80, fallback: 'Public' })
   })).filter((item) => item.label && item.href);
   const filteredStatic = packageNavigationService.filterMenuItemsAgainstDisabledPackages(staticOptions);
+  const cleanedStatic = removeDeprecatedPublicMenuItems(filteredStatic);
   const packageOptions = packageNavigationService.getPublicMenuEntries(null).map((row) => ({
     label: cleanText(row.label, { max: 120, fallback: '' }),
     href: cleanMenuHref(row.href),
@@ -497,7 +515,8 @@ function getPublicMenuEndpointOptions() {
     target: row.target === '_blank' ? '_blank' : '_self',
     category: cleanText(row.sourcePackageName || row.category || 'Package', { max: 80, fallback: 'Package' })
   })).filter((item) => item.label && item.href);
-  const deduped = dedupeMenuItems([...filteredStatic, ...packageOptions]);
+  const cleanedPackageOptions = removeDeprecatedPublicMenuItems(packageOptions);
+  const deduped = dedupeMenuItems([...cleanedStatic, ...cleanedPackageOptions]);
   return deduped.map((item) => ({
     label: cleanText(item.label, { max: 120, fallback: '' }),
     href: cleanMenuHref(item.href),
