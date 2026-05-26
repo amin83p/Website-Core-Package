@@ -2,6 +2,52 @@
   const pageData = (typeof data !== 'undefined' && data && typeof data === 'object') ? data : {};
   const content = pageData.content && typeof pageData.content === 'object' ? pageData.content : {};
   const defaults = pageData.defaults && typeof pageData.defaults === 'object' ? pageData.defaults : {};
+  const appSettings = settings && settings.app ? settings.app : {};
+  const brand = appSettings.brand || {};
+  const contactPage = appSettings.contactPage || {};
+  const publicMenu = appSettings.publicMenu && typeof appSettings.publicMenu === 'object' ? appSettings.publicMenu : {};
+  const publicMenuItems = Array.isArray(publicMenu.items) ? publicMenu.items : [];
+  const publicMenuJson = JSON.stringify(publicMenuItems).replace(/</g, '\\u003c');
+  const publicDefaultHomePath = typeof publicMenu.defaultHomePath === 'string' && publicMenu.defaultHomePath.trim()
+    ? publicMenu.defaultHomePath.trim()
+    : '/';
+  const rowValue = (row, key) => row && typeof row === 'object' ? String(row[key] || row.value || '').trim() : '';
+  const rowTitle = (row, fallback) => row && typeof row === 'object' ? String(row.title || row.label || fallback || '').trim() : (fallback || '');
+  const fallbackContactHighlights = [
+    { title: 'Clear Context', body: 'Share goals, files, links, and constraints in one place.' },
+    { title: 'Follow-Up Code', body: 'Track your submitted message later with your private code.' },
+    { title: 'Direct Route', body: 'Use email if your request is urgent or already documented.' }
+  ];
+  const fallbackContactProcessImages = [
+    {
+      imageUrl: '/uploads/GLOBAL/misc/Engineering.jpg',
+      alt: 'Mega dust collector system with high efficiency fan.',
+      caption: 'Mega dust collector system with a high-efficiency fan for lower energy consumption.'
+    },
+    {
+      imageUrl: '/uploads/GLOBAL/misc/Software.jpeg',
+      alt: 'Industrial software interface.',
+      caption: 'Industrial and heavy-duty software packages.'
+    }
+  ];
+  const contactPageHighlights = Array.isArray(contactPage.highlights) && contactPage.highlights.length ? contactPage.highlights : fallbackContactHighlights;
+  const contactPageProcessImages = Array.isArray(contactPage.processImages) && contactPage.processImages.length ? contactPage.processImages : fallbackContactProcessImages;
+  const endpointOptionsFromServer = (typeof publicMenuEndpointOptions !== 'undefined' && Array.isArray(publicMenuEndpointOptions)) ? publicMenuEndpointOptions : [];
+  const endpointOptions = endpointOptionsFromServer.length ? endpointOptionsFromServer : [
+    { label: 'Home', href: '/', icon: 'bi-house', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'What I Offer', href: '/whatIOffer', icon: 'bi-stars', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'News', href: '/news', icon: 'bi-newspaper', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'Biography', href: '/biography', icon: 'bi-person-badge', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'Contact', href: '/contact', icon: 'bi-envelope', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'About', href: '/about', icon: 'bi-info-circle', visibility: 'all', target: '_self', category: 'Core' },
+    { label: 'Sign In', href: '/login', icon: 'bi-box-arrow-in-right', visibility: 'guest', target: '_self', category: 'Account' }
+  ];
+  const endpointOptionsJson = JSON.stringify(endpointOptions).replace(/</g, '\\u003c');
+  const headerShowBuyMeACoffee = brand.headerShowBuyMeACoffee !== false;
+  const headerBuyMeACoffeeUrl = String(brand.headerBuyMeACoffeeUrl || 'https://www.buymeacoffee.com/paknejad').trim();
+  const headerBuyMeACoffeeLabel = String(brand.headerBuyMeACoffeeLabel || 'Support').trim();
+  const headerBuyMeACoffeeText = String(brand.headerBuyMeACoffeeText || 'Buy me a coffee').trim();
+  const headerBuyMeACoffeeTitle = String(brand.headerBuyMeACoffeeTitle || 'Support the work - one coffee at a time.').trim();
   const contentJson = JSON.stringify(content).replace(/</g, '\\u003c');
   const defaultsJson = JSON.stringify(defaults).replace(/</g, '\\u003c');
 %>
@@ -41,6 +87,21 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link fw-semibold" id="about-content-tab" data-bs-toggle="tab" data-bs-target="#about-content-pane" type="button" role="tab" aria-controls="about-content-pane" aria-selected="false">
             <i class="bi bi-person-workspace me-1"></i>About
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="surface-contact-tab-main" data-bs-toggle="tab" data-bs-target="#surface-contact-pane" type="button" role="tab" aria-controls="surface-contact-pane" aria-selected="false">
+            <i class="bi bi-window-sidebar me-1"></i>Contact Page
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="surface-menu-tab-main" data-bs-toggle="tab" data-bs-target="#surface-menu-pane" type="button" role="tab" aria-controls="surface-menu-pane" aria-selected="false">
+            <i class="bi bi-menu-button-wide me-1"></i>Public Menu
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="surface-header-tab-main" data-bs-toggle="tab" data-bs-target="#surface-header-pane" type="button" role="tab" aria-controls="surface-header-pane" aria-selected="false">
+            <i class="bi bi-cup-hot me-1"></i>Header Options
           </button>
         </li>
       </ul>
@@ -524,6 +585,159 @@
               </div>
             </div>
           </section>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <form id="publicSurfaceSettingsForm" action="/systemSettings/app" method="POST" class="form-container wide mt-4" style="max-width: 1440px;">
+    <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+    <input type="hidden" name="returnTo" value="/systemSettings/public-pages">
+    <input type="hidden" name="publicMenuJson" id="publicSurfaceMenuJson" value="<%= publicMenuJson %>">
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+      <div>
+        <h2 class="h5 mb-1"><i class="bi bi-ui-radios-grid me-2"></i>Public Surface Settings</h2>
+        <div class="text-muted small">Moved from Application Defaults: Contact Page, Public Menu, Header Options.</div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm fw-semibold" id="publicSurfaceSaveBtn">
+        <i class="bi bi-save me-1"></i>Save Public Surface Settings
+      </button>
+    </div>
+
+    <div class="tab-content pt-3">
+      <div class="tab-pane fade" id="surface-contact-pane" role="tabpanel" aria-labelledby="surface-contact-tab-main" tabindex="0">
+        <div class="card mb-3 border-0 shadow-sm">
+          <div class="card-header bg-white border-0 pb-0">
+            <h5 class="fw-bold mb-1">Contact Page Content</h5>
+            <p class="text-muted small mb-0">Hero, cards, highlight chips, labels, and process images.</p>
+          </div>
+          <div class="card-body p-4">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label fw-bold">Hero Eyebrow</label>
+                <input type="text" name="contactPageHeroEyebrow" class="form-control" value="<%= contactPage.heroEyebrow || '' %>">
+              </div>
+              <div class="col-md-8">
+                <label class="form-label fw-bold">Hero Title</label>
+                <input type="text" name="contactPageHeroTitle" class="form-control" value="<%= contactPage.heroTitle || '' %>">
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-bold">Hero Subtitle</label>
+                <textarea name="contactPageHeroSubtitle" class="form-control" rows="2"><%= contactPage.heroSubtitle || '' %></textarea>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-bold">Primary CTA Label</label>
+                <input type="text" name="contactPagePrimaryCtaLabel" class="form-control" value="<%= contactPage.primaryCtaLabel || '' %>">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-bold">Email CTA Label</label>
+                <input type="text" name="contactPageEmailCtaLabel" class="form-control" value="<%= contactPage.emailCtaLabel || '' %>">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-bold">Follow-Up CTA Label</label>
+                <input type="text" name="contactPageFollowUpCtaLabel" class="form-control" value="<%= contactPage.followUpCtaLabel || '' %>">
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <div>
+                  <label class="form-label fw-bold mb-0">Highlights</label>
+                  <div class="form-text">Small highlight cards near the top of the contact page.</div>
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-add-contact-page-row="highlights">
+                  <i class="bi bi-plus-lg me-1"></i>Add Highlight
+                </button>
+              </div>
+              <div class="vstack gap-2" data-contact-page-row-list="highlights">
+                <% contactPageHighlights.forEach((row) => { %>
+                  <div class="contact-page-repeat-row row g-2 align-items-start">
+                    <div class="col-md-4">
+                      <input type="text" name="contactPageHighlightTitle" class="form-control" value="<%= rowTitle(row, 'Clear Context') %>" placeholder="Clear Context">
+                    </div>
+                    <div class="col-md-7">
+                      <textarea name="contactPageHighlightBody" class="form-control" rows="2"><%= rowValue(row, 'body') %></textarea>
+                    </div>
+                    <div class="col-md-1 d-grid">
+                      <button type="button" class="btn btn-outline-danger" data-remove-contact-page-row title="Remove highlight"><i class="bi bi-trash"></i></button>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="surface-menu-pane" role="tabpanel" aria-labelledby="surface-menu-tab-main" tabindex="0">
+        <div class="card mb-3 border-0 shadow-sm">
+          <div class="card-header bg-white border-0 pb-0">
+            <h5 class="fw-bold mb-1">Public Main Menu</h5>
+            <p class="text-muted small mb-0">Configure guest/public navigation endpoints.</p>
+          </div>
+          <div class="card-body p-4">
+            <div class="row mb-3">
+              <div class="col-md-12 col-lg-8">
+                <label class="form-label fw-bold">Default Home Route</label>
+                <input type="text" name="publicHomePath" class="form-control" list="publicSurfaceHomePathOptions" value="<%= publicDefaultHomePath %>" placeholder="/">
+                <div class="form-text">Internal route beginning with <code>/</code>.</div>
+              </div>
+            </div>
+
+            <datalist id="publicSurfaceHomePathOptions">
+              <% endpointOptions.forEach((option) => { %>
+                <option value="<%= option.href || '' %>">
+              <% }) %>
+            </datalist>
+
+            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+              <div class="small text-muted">Choose from available endpoints, or set a valid custom URL.</div>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="publicSurfaceAddRootBtn">
+                <i class="bi bi-plus-lg me-1"></i>Add Menu Item
+              </button>
+            </div>
+
+            <div id="publicSurfaceMenuBuilder" class="vstack gap-2"></div>
+            <div id="publicSurfaceMenuEmpty" class="alert alert-light border mt-3 d-none">
+              No menu items yet. Add a menu item to start building the public menu.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="surface-header-pane" role="tabpanel" aria-labelledby="surface-header-tab-main" tabindex="0">
+        <div class="card mb-3 border-0 shadow-sm">
+          <div class="card-header bg-white border-0 pb-0">
+            <h5 class="fw-bold mb-1">Header Buy Me A Coffee</h5>
+            <p class="text-muted small mb-0">Controls the guest-only support button in the header.</p>
+          </div>
+          <div class="card-body p-4">
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="form-check form-switch p-3 bg-light rounded border">
+                  <input class="form-check-input" type="checkbox" role="switch" id="surfaceHeaderShowBuyMeACoffee" name="headerShowBuyMeACoffee" value="true" <%= headerShowBuyMeACoffee ? 'checked' : '' %>>
+                  <label class="form-check-label fw-bold" for="surfaceHeaderShowBuyMeACoffee">Show Buy Me a Coffee button in header</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold">Button URL</label>
+                <input type="url" name="headerBuyMeACoffeeUrl" class="form-control" value="<%= headerBuyMeACoffeeUrl %>" placeholder="https://www.buymeacoffee.com/paknejad">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold">Badge Label</label>
+                <input type="text" name="headerBuyMeACoffeeLabel" class="form-control" value="<%= headerBuyMeACoffeeLabel %>" placeholder="Support">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold">Button Text</label>
+                <input type="text" name="headerBuyMeACoffeeText" class="form-control" value="<%= headerBuyMeACoffeeText %>" placeholder="Buy me a coffee">
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-bold">Hover Title</label>
+                <input type="text" name="headerBuyMeACoffeeTitle" class="form-control" value="<%= headerBuyMeACoffeeTitle %>" placeholder="Support the work - one coffee at a time.">
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1294,4 +1508,294 @@
   renderAllRows();
   syncContentJson();
 })();
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const surfaceForm = document.getElementById('publicSurfaceSettingsForm');
+  const publicMenuInput = document.getElementById('publicSurfaceMenuJson');
+  const publicMenuBuilder = document.getElementById('publicSurfaceMenuBuilder');
+  const publicMenuEmpty = document.getElementById('publicSurfaceMenuEmpty');
+  const publicMenuAddRootBtn = document.getElementById('publicSurfaceAddRootBtn');
+  const endpointOptions = <%- endpointOptionsJson %>;
+  let publicMenuItems = [];
+
+  try {
+    publicMenuItems = JSON.parse(publicMenuInput?.value || '[]');
+    if (!Array.isArray(publicMenuItems)) publicMenuItems = [];
+  } catch (_) {
+    publicMenuItems = [];
+  }
+
+  function createMenuItem() {
+    const firstEndpoint = Array.isArray(endpointOptions) && endpointOptions.length ? endpointOptions[0] : null;
+    return {
+      id: 'menu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      label: firstEndpoint?.label || 'New Menu Item',
+      href: firstEndpoint?.href || '/',
+      icon: firstEndpoint?.icon || '',
+      visibility: firstEndpoint?.visibility || 'all',
+      target: firstEndpoint?.target || '_self',
+      active: true,
+      children: []
+    };
+  }
+
+  function getListByPath(path) {
+    let list = publicMenuItems;
+    for (const index of path) {
+      const item = list[index];
+      if (!item) return null;
+      if (!Array.isArray(item.children)) item.children = [];
+      list = item.children;
+    }
+    return list;
+  }
+
+  function findEndpoint(href) {
+    const token = String(href || '').trim();
+    return (Array.isArray(endpointOptions) ? endpointOptions : [])
+      .find((option) => String(option.href || '').trim() === token) || null;
+  }
+
+  function syncMenuJson() {
+    if (publicMenuInput) publicMenuInput.value = JSON.stringify(publicMenuItems);
+  }
+
+  function renderBuilder() {
+    if (!publicMenuBuilder) return;
+    publicMenuBuilder.innerHTML = '';
+    if (publicMenuEmpty) publicMenuEmpty.classList.toggle('d-none', publicMenuItems.length > 0);
+
+    function renderItems(items, depth, parentPath) {
+      items.forEach((item, index) => {
+        const path = parentPath.concat(index);
+        const row = document.createElement('div');
+        row.className = 'public-menu-row border rounded bg-light p-2';
+        row.style.marginLeft = depth ? `${Math.min(depth * 28, 84)}px` : '0';
+
+        const header = document.createElement('div');
+        header.className = 'row g-2 align-items-center';
+
+        const labelCol = document.createElement('div');
+        labelCol.className = 'col-lg-2 col-md-4';
+        const labelInput = document.createElement('input');
+        labelInput.type = 'text';
+        labelInput.className = 'form-control form-control-sm';
+        labelInput.value = item.label || '';
+        labelInput.addEventListener('input', () => { item.label = labelInput.value; syncMenuJson(); });
+        labelCol.appendChild(labelInput);
+
+        const hrefCol = document.createElement('div');
+        hrefCol.className = 'col-lg-3 col-md-8';
+        const endpointSelect = document.createElement('select');
+        endpointSelect.className = 'form-select form-select-sm mb-1';
+        const selectPlaceholder = document.createElement('option');
+        selectPlaceholder.value = '';
+        selectPlaceholder.textContent = 'Select an available endpoint...';
+        endpointSelect.appendChild(selectPlaceholder);
+        const groupOption = document.createElement('option');
+        groupOption.value = '__group__';
+        groupOption.textContent = 'Navigation group (no URL)';
+        endpointSelect.appendChild(groupOption);
+        (Array.isArray(endpointOptions) ? endpointOptions : []).forEach((option) => {
+          const opt = document.createElement('option');
+          opt.value = option.href || '';
+          opt.textContent = `${option.category || 'Public'} - ${option.label || option.href || ''}`;
+          endpointSelect.appendChild(opt);
+        });
+        const customOption = document.createElement('option');
+        customOption.value = '__custom__';
+        customOption.textContent = 'Custom URL / not listed';
+        endpointSelect.appendChild(customOption);
+
+        const hrefInput = document.createElement('input');
+        hrefInput.type = 'text';
+        hrefInput.className = 'form-control form-control-sm font-monospace';
+        hrefInput.value = item.href || '';
+
+        function refreshSelect() {
+          endpointSelect.value = findEndpoint(item.href) ? item.href : (item.href ? '__custom__' : '__group__');
+        }
+
+        endpointSelect.addEventListener('change', () => {
+          if (!endpointSelect.value) return;
+          if (endpointSelect.value === '__group__') {
+            item.href = '';
+            hrefInput.value = '';
+            syncMenuJson();
+            return;
+          }
+          if (endpointSelect.value === '__custom__') {
+            hrefInput.focus();
+            return;
+          }
+          const selectedEndpoint = findEndpoint(endpointSelect.value);
+          if (!selectedEndpoint) return;
+          item.href = selectedEndpoint.href;
+          hrefInput.value = item.href;
+          if (!item.label || item.label === 'New Menu Item') {
+            item.label = selectedEndpoint.label || item.label;
+            labelInput.value = item.label;
+          }
+          item.icon = selectedEndpoint.icon || item.icon || '';
+          iconInput.value = item.icon;
+          item.visibility = selectedEndpoint.visibility || 'all';
+          visibilitySelect.value = item.visibility;
+          item.target = selectedEndpoint.target || '_self';
+          targetSelect.value = item.target === '_blank' ? '_blank' : '_self';
+          syncMenuJson();
+        });
+
+        hrefInput.addEventListener('input', () => {
+          item.href = hrefInput.value;
+          refreshSelect();
+          syncMenuJson();
+        });
+
+        refreshSelect();
+        hrefCol.appendChild(endpointSelect);
+        hrefCol.appendChild(hrefInput);
+
+        const iconCol = document.createElement('div');
+        iconCol.className = 'col-lg-2 col-md-4';
+        const iconInput = document.createElement('input');
+        iconInput.type = 'text';
+        iconInput.className = 'form-control form-control-sm';
+        iconInput.value = item.icon || '';
+        iconInput.addEventListener('input', () => { item.icon = iconInput.value; syncMenuJson(); });
+        iconCol.appendChild(iconInput);
+
+        const visibilityCol = document.createElement('div');
+        visibilityCol.className = 'col-lg-2 col-md-5';
+        const visibilitySelect = document.createElement('select');
+        visibilitySelect.className = 'form-select form-select-sm';
+        [['all', 'All Users'], ['guest', 'Guests Only'], ['authenticated', 'Logged In Only']].forEach(([value, label]) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          visibilitySelect.appendChild(option);
+        });
+        visibilitySelect.value = item.visibility || 'all';
+        visibilitySelect.addEventListener('change', () => { item.visibility = visibilitySelect.value; syncMenuJson(); });
+        visibilityCol.appendChild(visibilitySelect);
+
+        const targetCol = document.createElement('div');
+        targetCol.className = 'col-lg-1 col-md-3';
+        const targetSelect = document.createElement('select');
+        targetSelect.className = 'form-select form-select-sm';
+        [['_self', 'Same'], ['_blank', 'New']].forEach(([value, label]) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          targetSelect.appendChild(option);
+        });
+        targetSelect.value = item.target === '_blank' ? '_blank' : '_self';
+        targetSelect.addEventListener('change', () => { item.target = targetSelect.value; syncMenuJson(); });
+        targetCol.appendChild(targetSelect);
+
+        const activeCol = document.createElement('div');
+        activeCol.className = 'col-lg-1 col-md-4';
+        const activeWrap = document.createElement('div');
+        activeWrap.className = 'form-check form-switch pt-1 public-menu-active-wrap';
+        const activeInput = document.createElement('input');
+        activeInput.type = 'checkbox';
+        activeInput.className = 'form-check-input';
+        activeInput.checked = item.active !== false;
+        activeInput.addEventListener('change', () => { item.active = activeInput.checked; syncMenuJson(); });
+        activeWrap.appendChild(activeInput);
+        activeCol.appendChild(activeWrap);
+
+        const actionCol = document.createElement('div');
+        actionCol.className = 'col-12 col-lg-auto ms-lg-auto d-flex gap-1 justify-content-end flex-wrap public-menu-actions';
+        [['up', 'bi-arrow-up'], ['down', 'bi-arrow-down'], ['child', 'bi-diagram-2'], ['remove', 'bi-trash']].forEach(([action, icon]) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = action === 'remove' ? 'btn btn-outline-danger btn-sm' : 'btn btn-outline-secondary btn-sm';
+          btn.dataset.publicMenuAction = action;
+          btn.dataset.path = path.join('.');
+          btn.innerHTML = `<i class="bi ${icon}"></i>`;
+          if (action === 'child' && depth >= 2) btn.disabled = true;
+          actionCol.appendChild(btn);
+        });
+
+        [labelCol, hrefCol, iconCol, visibilityCol, targetCol, activeCol, actionCol].forEach((col) => header.appendChild(col));
+        row.appendChild(header);
+        publicMenuBuilder.appendChild(row);
+
+        if (Array.isArray(item.children) && item.children.length) renderItems(item.children, depth + 1, path);
+      });
+    }
+
+    renderItems(publicMenuItems, 0, []);
+    syncMenuJson();
+  }
+
+  if (publicMenuAddRootBtn) {
+    publicMenuAddRootBtn.addEventListener('click', () => {
+      publicMenuItems.push(createMenuItem());
+      renderBuilder();
+    });
+  }
+
+  if (publicMenuBuilder) {
+    publicMenuBuilder.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-public-menu-action]');
+      if (!btn) return;
+      const path = String(btn.dataset.path || '').split('.').filter(Boolean).map((value) => Number(value));
+      const action = btn.dataset.publicMenuAction;
+      const list = getListByPath(path.slice(0, -1));
+      const index = path[path.length - 1];
+      if (!list || !Number.isInteger(index) || !list[index]) return;
+
+      if (action === 'up' && index > 0) {
+        [list[index - 1], list[index]] = [list[index], list[index - 1]];
+      } else if (action === 'down' && index < list.length - 1) {
+        [list[index + 1], list[index]] = [list[index], list[index + 1]];
+      } else if (action === 'child') {
+        if (!Array.isArray(list[index].children)) list[index].children = [];
+        list[index].children.push(createMenuItem());
+      } else if (action === 'remove') {
+        list.splice(index, 1);
+      }
+
+      renderBuilder();
+    });
+  }
+
+  document.querySelectorAll('#publicSurfaceSettingsForm [data-add-contact-page-row]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.addContactPageRow;
+      const list = document.querySelector(`#publicSurfaceSettingsForm [data-contact-page-row-list="${type}"]`);
+      if (!list) return;
+      const wrap = document.createElement('div');
+      if (type === 'highlights') {
+        wrap.innerHTML = `
+          <div class="contact-page-repeat-row row g-2 align-items-start">
+            <div class="col-md-4"><input type="text" name="contactPageHighlightTitle" class="form-control" placeholder="Clear Context"></div>
+            <div class="col-md-7"><textarea name="contactPageHighlightBody" class="form-control" rows="2" placeholder="Short chip text."></textarea></div>
+            <div class="col-md-1 d-grid"><button type="button" class="btn btn-outline-danger" data-remove-contact-page-row title="Remove highlight"><i class="bi bi-trash"></i></button></div>
+          </div>`;
+      }
+      const row = wrap.firstElementChild;
+      if (!row) return;
+      list.appendChild(row);
+      row.querySelector('input, textarea')?.focus();
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('#publicSurfaceSettingsForm [data-remove-contact-page-row]');
+    if (!removeBtn) return;
+    removeBtn.closest('.contact-page-repeat-row')?.remove();
+  });
+
+  if (surfaceForm) {
+    surfaceForm.addEventListener('submit', () => {
+      syncMenuJson();
+    });
+  }
+
+  renderBuilder();
+});
 </script>

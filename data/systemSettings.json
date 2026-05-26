@@ -33,11 +33,15 @@
       "core.chat": "chat/{conversationId}",
       "core.contacts": "contacts",
       "core.ielts": "ielts",
+      "core.emailTemplates": "email-templates",
       "school.students": "students/{personId}",
       "school.reportTemplates": "reports",
       "school.examMedia": "school-exams/{templateId}/{questionId}",
       "school.classWorkspace": "school/classes/{classId}",
       "school.subjectWorkspace": "school/subjects/{subjectId}",
+      "generated.heic": "heic-converter/{jobDate}/{jobId}",
+      "generated.importReports": "importReports",
+      "generated.benchpathReports": "benchpath/reports",
       "pte.questionBank": "PTE/Question_Bank",
       "pte.students": "PTE/Students",
       "pte.studentItem": "PTE/Students/{itemId}",
@@ -46,9 +50,7 @@
       "pte.practiceAttempt": "PTE/Practice_By_Skills/{userId}/{practiceName}/{sessionId}/{itemId}",
       "pte.smartPracticeAttempt": "PTE/Smart_Practice/{userId}/{practiceName}/{sessionId}/{itemId}",
       "pte.mockExamAttempt": "PTE/Mock_Exams/{userId}/{testName}/{sessionId}/{itemId}",
-      "generated.heic": "heic-converter/{jobDate}/{jobId}",
-      "generated.importReports": "importReports",
-      "generated.benchpathReports": "benchpath/reports"
+      "pte.packageAssets": "PTE/Package_Assets"
     },
     "schoolCanonicalEnrollmentRead": false,
     "schoolCanonicalEnrollmentWrite": false,
@@ -70,7 +72,12 @@
       "instagramUrl": "https://www.instagram.com/amin83/",
       "facebookUrl": "",
       "linkedinUrl": "https://www.linkedin.com/in/amin-paknejad/",
-      "youtubeUrl": ""
+      "youtubeUrl": "",
+      "headerShowBuyMeACoffee": false,
+      "headerBuyMeACoffeeUrl": "https://www.buymeacoffee.com/paknejad",
+      "headerBuyMeACoffeeLabel": "Support",
+      "headerBuyMeACoffeeText": "Buy me a coffee",
+      "headerBuyMeACoffeeTitle": "Support the work - one coffee at a time."
     },
     "contact": {
       "email": "paknejad@live.com",
@@ -178,7 +185,7 @@
         },
         {
           "id": "what-i-offer",
-          "label": "Projects",
+          "label": "What I Offer",
           "href": "/whatIOffer",
           "icon": "bi-stars",
           "visibility": "all",
@@ -251,6 +258,6 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-05-20T04:03:34.597Z"
+    "lastUpdateDateTime": "2026-05-26T02:28:09.173Z"
   }
 }

@@ -500,15 +500,41 @@ function parsePublicDefaultHomePath(body = {}) {
 
 exports.updateAppSettings = async (req, res) => {
   try {
+    const existingSettings = await systemSettingsRepository.getSettings();
+    const existingApp = (existingSettings && existingSettings.app && typeof existingSettings.app === 'object')
+      ? existingSettings.app
+      : {};
+    const existingBrand = (existingApp.brand && typeof existingApp.brand === 'object') ? existingApp.brand : {};
+    const existingContactPage = (existingApp.contactPage && typeof existingApp.contactPage === 'object') ? existingApp.contactPage : {};
+    const existingPublicMenu = (existingApp.publicMenu && typeof existingApp.publicMenu === 'object') ? existingApp.publicMenu : {};
+    const body = req.body || {};
+
     const contactEmails = buildContactRows(req.body, 'contactEmailTitle', 'contactEmailValue', 'email', 'Email');
     const contactPhones = buildContactRows(req.body, 'contactPhoneTitle', 'contactPhoneValue', 'number', 'Phone');
     const contactFaxes = buildContactRows(req.body, 'contactFaxTitle', 'contactFaxValue', 'number', 'Fax');
     const contactAddresses = buildContactRows(req.body, 'contactAddressTitle', 'contactAddressValue', 'address', 'Address');
-    const contactPageHighlights = buildContactPageHighlights(req.body || {});
-    const contactPageProcessImages = buildContactPageProcessImages(req.body || {});
-    const publicMenu = parsePublicMenuFromRequest(req.body || {});
-    const publicHomePath = parsePublicDefaultHomePath(req.body || {});
-    publicMenu.defaultHomePath = publicHomePath;
+
+    const hasContactPagePayload = Object.prototype.hasOwnProperty.call(body, 'contactPageHeroEyebrow')
+      || Object.prototype.hasOwnProperty.call(body, 'contactPageHeroTitle')
+      || Object.prototype.hasOwnProperty.call(body, 'contactPageHeroSubtitle');
+    const hasPublicMenuPayload = Object.prototype.hasOwnProperty.call(body, 'publicMenuJson')
+      || Object.prototype.hasOwnProperty.call(body, 'publicHomePath');
+
+    const hasHeaderBuyCoffeeToggle = Object.prototype.hasOwnProperty.call(body, 'headerShowBuyMeACoffee');
+    const hasHeaderBuyCoffeePayload = hasHeaderBuyCoffeeToggle
+      || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeUrl')
+      || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeLabel')
+      || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeText')
+      || Object.prototype.hasOwnProperty.call(body, 'headerBuyMeACoffeeTitle');
+
+    const contactPageHighlights = hasContactPagePayload ? buildContactPageHighlights(body) : (existingContactPage.highlights || []);
+    const contactPageProcessImages = hasContactPagePayload ? buildContactPageProcessImages(body) : (existingContactPage.processImages || []);
+
+    const publicMenu = hasPublicMenuPayload ? parsePublicMenuFromRequest(body) : { ...existingPublicMenu };
+    if (hasPublicMenuPayload) {
+      const publicHomePath = parsePublicDefaultHomePath(body);
+      publicMenu.defaultHomePath = publicHomePath;
+    }
 
     const formData = {
       app: {
@@ -533,11 +559,21 @@ exports.updateAppSettings = async (req, res) => {
           facebookUrl: req.body.facebookUrl,
           linkedinUrl: req.body.linkedinUrl,
           youtubeUrl: req.body.youtubeUrl,
-          headerShowBuyMeACoffee: req.body.headerShowBuyMeACoffee === 'true',
-          headerBuyMeACoffeeUrl: req.body.headerBuyMeACoffeeUrl,
-          headerBuyMeACoffeeLabel: req.body.headerBuyMeACoffeeLabel,
-          headerBuyMeACoffeeText: req.body.headerBuyMeACoffeeText,
-          headerBuyMeACoffeeTitle: req.body.headerBuyMeACoffeeTitle
+          headerShowBuyMeACoffee: hasHeaderBuyCoffeeToggle
+            ? req.body.headerShowBuyMeACoffee === 'true'
+            : (existingBrand.headerShowBuyMeACoffee !== false),
+          headerBuyMeACoffeeUrl: hasHeaderBuyCoffeePayload
+            ? req.body.headerBuyMeACoffeeUrl
+            : existingBrand.headerBuyMeACoffeeUrl,
+          headerBuyMeACoffeeLabel: hasHeaderBuyCoffeePayload
+            ? req.body.headerBuyMeACoffeeLabel
+            : existingBrand.headerBuyMeACoffeeLabel,
+          headerBuyMeACoffeeText: hasHeaderBuyCoffeePayload
+            ? req.body.headerBuyMeACoffeeText
+            : existingBrand.headerBuyMeACoffeeText,
+          headerBuyMeACoffeeTitle: hasHeaderBuyCoffeePayload
+            ? req.body.headerBuyMeACoffeeTitle
+            : existingBrand.headerBuyMeACoffeeTitle
         },
         contact: {
           emails: contactEmails,
@@ -551,32 +587,32 @@ exports.updateAppSettings = async (req, res) => {
           address: contactAddresses[0]?.address || ''
         },
         contactPage: {
-          heroEyebrow: req.body.contactPageHeroEyebrow,
-          heroTitle: req.body.contactPageHeroTitle,
-          heroSubtitle: req.body.contactPageHeroSubtitle,
-          primaryCtaLabel: req.body.contactPagePrimaryCtaLabel,
-          emailCtaLabel: req.body.contactPageEmailCtaLabel,
-          followUpCtaLabel: req.body.contactPageFollowUpCtaLabel,
+          heroEyebrow: hasContactPagePayload ? req.body.contactPageHeroEyebrow : existingContactPage.heroEyebrow,
+          heroTitle: hasContactPagePayload ? req.body.contactPageHeroTitle : existingContactPage.heroTitle,
+          heroSubtitle: hasContactPagePayload ? req.body.contactPageHeroSubtitle : existingContactPage.heroSubtitle,
+          primaryCtaLabel: hasContactPagePayload ? req.body.contactPagePrimaryCtaLabel : existingContactPage.primaryCtaLabel,
+          emailCtaLabel: hasContactPagePayload ? req.body.contactPageEmailCtaLabel : existingContactPage.emailCtaLabel,
+          followUpCtaLabel: hasContactPagePayload ? req.body.contactPageFollowUpCtaLabel : existingContactPage.followUpCtaLabel,
           highlights: contactPageHighlights,
-          formEyebrow: req.body.contactPageFormEyebrow,
-          formTitle: req.body.contactPageFormTitle,
-          formSubtitle: req.body.contactPageFormSubtitle,
-          formHint: req.body.contactPageFormHint,
-          directContactKicker: req.body.contactPageDirectContactKicker,
-          directContactTitle: req.body.contactPageDirectContactTitle,
-          directContactLead: req.body.contactPageDirectContactLead,
-          directContactMethodsTitle: req.body.contactPageDirectContactMethodsTitle,
-          directContactMethodsSubtitle: req.body.contactPageDirectContactMethodsSubtitle,
-          directContactEmailActionLabel: req.body.contactPageDirectContactEmailActionLabel,
-          directContactPhoneActionLabel: req.body.contactPageDirectContactPhoneActionLabel,
-          directContactFaxActionLabel: req.body.contactPageDirectContactFaxActionLabel,
-          directContactDefaultActionLabel: req.body.contactPageDirectContactDefaultActionLabel,
-          aboutCardTitle: req.body.contactPageAboutCardTitle,
-          aboutCardBody: req.body.contactPageAboutCardBody,
-          aboutCardButtonLabel: req.body.contactPageAboutCardButtonLabel,
-          aboutCardHref: req.body.contactPageAboutCardHref,
-          processEyebrow: req.body.contactPageProcessEyebrow,
-          processTitle: req.body.contactPageProcessTitle,
+          formEyebrow: hasContactPagePayload ? req.body.contactPageFormEyebrow : existingContactPage.formEyebrow,
+          formTitle: hasContactPagePayload ? req.body.contactPageFormTitle : existingContactPage.formTitle,
+          formSubtitle: hasContactPagePayload ? req.body.contactPageFormSubtitle : existingContactPage.formSubtitle,
+          formHint: hasContactPagePayload ? req.body.contactPageFormHint : existingContactPage.formHint,
+          directContactKicker: hasContactPagePayload ? req.body.contactPageDirectContactKicker : existingContactPage.directContactKicker,
+          directContactTitle: hasContactPagePayload ? req.body.contactPageDirectContactTitle : existingContactPage.directContactTitle,
+          directContactLead: hasContactPagePayload ? req.body.contactPageDirectContactLead : existingContactPage.directContactLead,
+          directContactMethodsTitle: hasContactPagePayload ? req.body.contactPageDirectContactMethodsTitle : existingContactPage.directContactMethodsTitle,
+          directContactMethodsSubtitle: hasContactPagePayload ? req.body.contactPageDirectContactMethodsSubtitle : existingContactPage.directContactMethodsSubtitle,
+          directContactEmailActionLabel: hasContactPagePayload ? req.body.contactPageDirectContactEmailActionLabel : existingContactPage.directContactEmailActionLabel,
+          directContactPhoneActionLabel: hasContactPagePayload ? req.body.contactPageDirectContactPhoneActionLabel : existingContactPage.directContactPhoneActionLabel,
+          directContactFaxActionLabel: hasContactPagePayload ? req.body.contactPageDirectContactFaxActionLabel : existingContactPage.directContactFaxActionLabel,
+          directContactDefaultActionLabel: hasContactPagePayload ? req.body.contactPageDirectContactDefaultActionLabel : existingContactPage.directContactDefaultActionLabel,
+          aboutCardTitle: hasContactPagePayload ? req.body.contactPageAboutCardTitle : existingContactPage.aboutCardTitle,
+          aboutCardBody: hasContactPagePayload ? req.body.contactPageAboutCardBody : existingContactPage.aboutCardBody,
+          aboutCardButtonLabel: hasContactPagePayload ? req.body.contactPageAboutCardButtonLabel : existingContactPage.aboutCardButtonLabel,
+          aboutCardHref: hasContactPagePayload ? req.body.contactPageAboutCardHref : existingContactPage.aboutCardHref,
+          processEyebrow: hasContactPagePayload ? req.body.contactPageProcessEyebrow : existingContactPage.processEyebrow,
+          processTitle: hasContactPagePayload ? req.body.contactPageProcessTitle : existingContactPage.processTitle,
           processImages: contactPageProcessImages
         },
         publicMenu
@@ -590,6 +626,10 @@ exports.updateAppSettings = async (req, res) => {
     await settingService.refresh();
 
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Application defaults saved.' });
+    const returnTo = cleanFormText(req.body?.returnTo, 240);
+    if (returnTo && /^\/systemSettings\/[a-z0-9\-_/]+$/i.test(returnTo)) {
+      return res.redirect(returnTo);
+    }
     res.redirect('/systemSettings/app');
   } catch (error) {
     if (req.headers['x-ajax-request']) return res.status(400).json({ status: 'error', message: error.message });
@@ -680,12 +720,15 @@ exports.uploadPublicPageMedia = async (req, res) => {
 exports.showPublicPageContentSettings = async (req, res) => {
   try {
     const data = await publicPageContentSettingsDataService.getSettingsForManagement();
+    const settings = await systemSettingsRepository.getSettings();
     res.render('systemSettings/publicPageContentSettings', {
       title: 'Public Page Content',
       data,
+      settings,
       includeModal: true,
       user: req.user,
-      actionStateId: req.actionStateId
+      actionStateId: req.actionStateId,
+      publicMenuEndpointOptions: appBrandingService.getPublicMenuEndpointOptions()
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
