@@ -21,6 +21,8 @@
     "core:ensure:indexes": "node scripts/core/ensure-core-list-indexes.js",
     "core:validate:explain": "node scripts/core/mongo-validate-explain.js",
     "core:timing:routes": "node scripts/core/route-timing-pass.js",
+    "core:baseline:check": "node scripts/core/sync-core-bootstrap-baseline.js",
+    "core:baseline:sync": "node scripts/core/sync-core-bootstrap-baseline.js --apply",
     "smoke:mongo:core": "node scripts/mongo-core-smoke.js",
     "benchpath:reference:audit": "node scripts/benchpath/reference/referenceIntegrityAudit.js",
     "benchpath:reference:backfill": "node scripts/benchpath/reference/backfillCanonicalReferenceText.js",

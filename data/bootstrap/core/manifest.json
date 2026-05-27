@@ -1,8 +1,8 @@
 {
   "id": "core-bootstrap-security-baseline",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Core Security Baseline",
-  "generatedAt": "2026-05-26T20:20:51.771Z",
+  "generatedAt": "2026-05-27T03:29:24.889Z",
   "sourceRoot": "data/bootstrap/core",
   "entities": [
     {

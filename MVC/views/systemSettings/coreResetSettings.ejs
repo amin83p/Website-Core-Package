@@ -6,41 +6,58 @@
   const confirmTokenHintValue = typeof confirmTokenHint !== 'undefined' && confirmTokenHint ? String(confirmTokenHint) : 'RESET CORE';
 %>
 
-<div class="sections-page core-reset-page">
-  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+<div class="sections-page core-bootstrap-page core-reset-page">
+  <div class="d-flex align-items-start justify-content-between mb-3 gap-2 flex-column flex-xl-row">
     <div>
-      <h1 class="page-heading size-md text-start m-0">Core Reset + Re-Bootstrap</h1>
-      <p class="text-muted mb-0 mt-1">Delete current core registry entities and immediately rebuild them from the Core Bootstrap baseline pack.</p>
+      <h1 class="page-heading size-md text-start m-0">Core Reset</h1>
+      <p class="text-muted mb-0 mt-1">Delete only core baseline-matched registry rows. Re-bootstrap is now a separate manual step.</p>
     </div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
+    <div class="d-flex align-items-center gap-2 flex-wrap flex-xl-nowrap ms-xl-auto justify-content-xl-end">
       <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">DESTRUCTIVE TOOL</span>
       <span class="badge bg-light text-dark border">Runtime: <%= activeMode.toUpperCase() %></span>
-      <a href="/systemSettings/bootstrap/core" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Core Bootstrap</a>
+      <a href="/systemSettings/bootstrap/core" class="btn btn-outline-secondary btn-sm text-nowrap"><i class="bi bi-database-fill-check me-1"></i>Core Bootstrap Baseline</a>
+      <a href="/dashboard/bootstrap-setup" class="btn btn-outline-secondary btn-sm text-nowrap"><i class="bi bi-arrow-left me-1"></i>Bootstrap Setup</a>
     </div>
   </div>
 
   <div class="card border-0 shadow-sm mb-3">
-    <div class="card-header bg-white fw-bold small">Reset Scope</div>
+    <div class="card-header bg-white fw-bold small">Reset Source</div>
     <div class="card-body p-3">
-      <div class="alert alert-warning py-2 px-3 small mb-3">
-        <i class="bi bi-exclamation-triangle me-2"></i>
-        This operation deletes core bootstrap entities only: sections, operations, roles, scopes, symbols, accesses, and access policies. It does not remove users, persons, organizations, or package domain data.
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label small fw-bold">Baseline ID</label>
+          <input class="form-control" id="coreResetBaselineIdInput" readonly value="<%= preflightReport?.baseline?.id || '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-bold">Version</label>
+          <input class="form-control" id="coreResetBaselineVersionInput" readonly value="<%= preflightReport?.baseline?.version || '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-bold">Source Root</label>
+          <input class="form-control" id="coreResetBaselineRootInput" readonly value="<%= preflightReport?.baseline?.sourceRoot || '' %>">
+        </div>
       </div>
 
-      <div class="row g-3 align-items-end">
+      <div class="alert alert-warning py-2 px-3 small mt-3 mb-0">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        This operation targets only rows that match the core baseline identities in sections, operations, roles, scopes, symbols, accesses, and access policies. Package-owned rows are preserved.
+      </div>
+
+      <div class="row g-3 align-items-end mt-1">
         <div class="col-md-6 col-lg-5">
           <label class="form-label small fw-bold">Type Confirmation Token</label>
           <input class="form-control" id="coreResetConfirmToken" placeholder="<%= confirmTokenHintValue %>">
           <div class="form-text">Required phrase: <code><%= confirmTokenHintValue %></code></div>
         </div>
-        <div class="col-md-6 col-lg-7 d-flex align-items-center gap-2 flex-wrap">
-          <button type="button" class="btn btn-outline-secondary" id="coreResetPreflightBtn">
-            <i class="bi bi-search me-1"></i>Refresh Preflight
-          </button>
-          <button type="button" class="btn btn-danger btn-filled" id="coreResetApplyBtn">
-            <i class="bi bi-arrow-repeat me-1"></i>Reset + Re-Bootstrap
-          </button>
-        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2 flex-wrap mt-3">
+        <button type="button" class="btn btn-outline-secondary" id="coreResetPreflightBtn">
+          <i class="bi bi-search me-1"></i>Refresh Preflight
+        </button>
+        <button type="button" class="btn btn-danger btn-filled" id="coreResetApplyBtn">
+          <i class="bi bi-trash3 me-1"></i>Apply Core Reset
+        </button>
       </div>
     </div>
   </div>
@@ -49,11 +66,12 @@
     <div class="card-header bg-white fw-bold small">Preflight Summary</div>
     <div class="card-body p-3">
       <div class="row g-3">
-        <div class="col-md-3"><div class="small text-muted">Entity Count</div><div class="fs-5 fw-bold" id="coreResetEntityCount">0</div></div>
+        <div class="col-md-3"><div class="small text-muted">Matched Core Rows</div><div class="fs-5 fw-bold" id="coreResetMatchedRows">0</div></div>
         <div class="col-md-3"><div class="small text-muted">Rows To Delete</div><div class="fs-5 fw-bold text-danger" id="coreResetRowsToDelete">0</div></div>
-        <div class="col-md-3"><div class="small text-muted">Baseline ID</div><div class="fs-6 fw-bold text-break" id="coreResetBaselineId">-</div></div>
-        <div class="col-md-3"><div class="small text-muted">Baseline Version</div><div class="fs-6 fw-bold" id="coreResetBaselineVersion">-</div></div>
+        <div class="col-md-3"><div class="small text-muted">Preserved (Package)</div><div class="fs-5 fw-bold text-warning" id="coreResetProtectedRows">0</div></div>
+        <div class="col-md-3"><div class="small text-muted">No-ID Skips</div><div class="fs-5 fw-bold" id="coreResetSkippedNoId">0</div></div>
       </div>
+      <div class="small text-muted mt-2" id="coreResetDatabaseMode">Database status unknown.</div>
     </div>
   </div>
 
@@ -65,11 +83,15 @@
           <thead>
             <tr>
               <th>Entity</th>
-              <th>Current Rows</th>
+              <th>Baseline Rows</th>
+              <th>Collection Rows</th>
+              <th>Matched Core</th>
+              <th>Delete Candidates</th>
+              <th>Preserved (Package)</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="2" class="text-center text-muted py-3">Run preflight to load rows.</td></tr>
+            <tr><td colspan="6" class="text-center text-muted py-3">Run preflight to load rows.</td></tr>
           </tbody>
         </table>
       </div>
@@ -113,20 +135,32 @@
   function renderSummary(report) {
     const summary = report?.summary || {};
     const entities = Array.isArray(report?.entities) ? report.entities : [];
-    document.getElementById('coreResetEntityCount').textContent = Number(summary.entityCount || entities.length || 0);
-    document.getElementById('coreResetRowsToDelete').textContent = Number(summary.totalRows || 0);
-    document.getElementById('coreResetBaselineId').textContent = String(report?.baseline?.id || '-');
-    document.getElementById('coreResetBaselineVersion').textContent = String(report?.baseline?.version || '-');
+    const matchedRows = Number(summary.totalMatchedRows || 0);
+    const deleteRows = Number(summary.totalDeleteCandidates || 0);
+    const protectedRows = Number(summary.totalProtected || 0);
+    const skippedNoIdRows = Number(summary.totalSkippedNoId || 0);
+    const collectionRows = Number(summary.totalCollectionRows || 0);
+    const entityCount = Number(summary.entityCount || entities.length || 0);
+    document.getElementById('coreResetMatchedRows').textContent = Number(summary.totalMatchedRows || 0);
+    document.getElementById('coreResetRowsToDelete').textContent = Number(summary.totalDeleteCandidates || 0);
+    document.getElementById('coreResetProtectedRows').textContent = Number(summary.totalProtected || 0);
+    document.getElementById('coreResetSkippedNoId').textContent = Number(summary.totalSkippedNoId || 0);
+    document.getElementById('coreResetDatabaseMode').textContent =
+      `Scanned ${collectionRows} rows across ${entityCount} entities. ${matchedRows} rows match core baseline identities; ${deleteRows} are delete candidates; ${protectedRows} package-owned rows are preserved; ${skippedNoIdRows} rows skipped due to missing id.`;
 
     if (!entities.length) {
-      entityTableBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-3">No entity rows reported.</td></tr>';
+      entityTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No entity rows reported.</td></tr>';
       return;
     }
 
     entityTableBody.innerHTML = entities.map((row) => `
       <tr>
         <td><code>${String(row?.entityType || '-')}</code></td>
-        <td class="fw-semibold text-danger">${Number(row?.rowCount || 0)}</td>
+        <td>${Number(row?.baselineRowCount || 0)}</td>
+        <td>${Number(row?.collectionRowCount || 0)}</td>
+        <td>${Number(row?.matchedRowCount || 0)}</td>
+        <td class="text-danger fw-semibold">${Number(row?.deleteCandidateCount || 0)}</td>
+        <td class="text-warning fw-semibold">${Number(row?.protectedCount || 0)}</td>
       </tr>
     `).join('');
   }
@@ -181,7 +215,7 @@
     let token = null;
     try {
       if (typeof window.showLoading === 'function') {
-        token = window.showLoading({ title, note: 'Please wait while reset and bootstrap are running.', operation: 'Core Reset' });
+        token = window.showLoading({ title, note: 'Please wait while core reset operation runs.', operation: 'Core Reset' });
       }
       return await fn();
     } finally {
@@ -196,7 +230,7 @@
     preflightBtn.disabled = true;
     preflightBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Checking...';
     try {
-      const payload = await withWait('Running Reset Preflight', () => runPreflight());
+      const payload = await withWait('Running Core Reset Preflight', () => runPreflight());
       renderSummary(payload.report || {});
       setOutput('Preflight Completed', payload.report || payload);
     } catch (error) {
@@ -224,13 +258,13 @@
       return;
     }
 
-    const confirmText = 'Reset + Re-Bootstrap';
+    const confirmText = 'Apply Core Reset';
     let confirmed = true;
     if (typeof showMessageModal === 'function') {
       const selected = await showMessageModal({
         title: 'Confirm Core Reset',
         icon: 'warning',
-        message: 'This will delete current core registry entities and immediately recreate defaults from baseline.',
+        message: 'This will delete core baseline-matched registry rows. It will not run re-bootstrap automatically.',
         buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: confirmText, class: 'btn-danger' }]
       });
       confirmed = selected === confirmText;
@@ -242,11 +276,16 @@
     applyBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running...';
     try {
       const payload = await withWait('Running Core Reset', () => runApply(tokenValue));
-      setOutput('Reset + Re-Bootstrap Completed', payload.report || payload);
+      setOutput('Core Reset Completed', payload.report || payload);
       const preflightPayload = await withWait('Refreshing Preflight', () => runPreflight());
       renderSummary(preflightPayload.report || {});
       if (typeof showMessageModal === 'function') {
-        await showMessageModal({ title: 'Operation Completed', icon: 'success', message: 'Core reset and re-bootstrap completed.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+        await showMessageModal({
+          title: 'Operation Completed',
+          icon: 'success',
+          message: 'Core reset completed. Use Core Bootstrap Baseline if you want to seed core defaults again.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
       }
     } catch (error) {
       setOutput('Apply Failed', { status: 'error', message: error.message || 'Unknown error' });

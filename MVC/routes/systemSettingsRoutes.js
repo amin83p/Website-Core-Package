@@ -343,7 +343,7 @@ router.post('/bootstrap/core/apply',
           adminApproval,
           ctrl.applyCoreBootstrapBaseline);
 
-// 8.5 Core Reset + Re-Bootstrap
+// 8.5 Core Reset
 router.get('/core-reset',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_CORE_RESET, OPERATIONS.UPDATE),

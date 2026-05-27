@@ -19,7 +19,7 @@ function withTempRunPath() {
   };
 }
 
-test('preflightReset derives purge scope from bootstrap manifest entities only', async () => {
+test('preflightReset derives deletion candidates from baseline identities only', async () => {
   const restoreRunPath = withTempRunPath();
   const originalLoadBundle = coreBootstrapBaselineService.loadBaselineBundle;
   const originalFetch = dataService.fetchData;
@@ -31,15 +31,23 @@ test('preflightReset derives purge scope from bootstrap manifest entities only',
     manifestHash: 'HASH_1',
     sourceRoot: 'data/bootstrap/core',
     entities: [
-      { entityType: 'sections' },
-      { entityType: 'roles' },
+      {
+        entityType: 'sections',
+        identityFields: ['id', 'name'],
+        rows: [{ id: '1', name: 'Section One' }, { id: '2', name: 'Section Two' }]
+      },
+      {
+        entityType: 'roles',
+        identityFields: ['id', 'key'],
+        rows: [{ id: '3', key: 'role_one' }]
+      },
       { entityType: 'pteStudents' }
     ]
   });
   dataService.fetchData = async (entityType) => {
     fetchCalls.push(entityType);
-    if (entityType === 'sections') return [{ id: '1' }, { id: '2' }];
-    if (entityType === 'roles') return [{ id: '3' }];
+    if (entityType === 'sections') return [{ id: '1', name: 'Section One' }, { id: '2', name: 'Section Two' }, { id: '9', name: 'Other' }];
+    if (entityType === 'roles') return [{ id: '3', key: 'role_one' }, { id: '4', key: 'role_two' }];
     return [];
   };
 
@@ -51,7 +59,8 @@ test('preflightReset derives purge scope from bootstrap manifest entities only',
       report.entities.map((row) => row.entityType),
       ['roles', 'sections']
     );
-    assert.equal(report.summary.totalRows, 3);
+    assert.equal(report.summary.totalDeleteCandidates, 3);
+    assert.equal(report.summary.totalProtected, 0);
   } finally {
     coreBootstrapBaselineService.loadBaselineBundle = originalLoadBundle;
     dataService.fetchData = originalFetch;
@@ -59,9 +68,9 @@ test('preflightReset derives purge scope from bootstrap manifest entities only',
   }
 });
 
-test('applyResetAndBootstrap rejects invalid confirmation token', async () => {
+test('applyCoreReset rejects invalid confirmation token', async () => {
   await assert.rejects(
-    () => coreResetRebootstrapService.applyResetAndBootstrap({
+    () => coreResetRebootstrapService.applyCoreReset({
       backendMode: 'json',
       actor: { id: 'TEST_USER' },
       confirmToken: 'WRONG TOKEN'
@@ -70,7 +79,7 @@ test('applyResetAndBootstrap rejects invalid confirmation token', async () => {
   );
 });
 
-test('applyResetAndBootstrap purges scoped entities then runs bootstrap apply', async () => {
+test('applyCoreReset deletes only baseline-matched rows and preserves package-owned rows', async () => {
   const restoreRunPath = withTempRunPath();
   const originalLoadBundle = coreBootstrapBaselineService.loadBaselineBundle;
   const originalFetch = dataService.fetchData;
@@ -86,13 +95,27 @@ test('applyResetAndBootstrap purges scoped entities then runs bootstrap apply', 
     manifestHash: 'HASH_2',
     sourceRoot: 'data/bootstrap/core',
     entities: [
-      { entityType: 'sections' },
-      { entityType: 'accesses' }
+      {
+        entityType: 'sections',
+        identityFields: ['id', 'name'],
+        rows: [{ id: 'SEC_1', name: 'One' }, { id: 'SEC_2', name: 'Two' }]
+      },
+      {
+        entityType: 'accesses',
+        identityFields: ['id', 'name', 'orgId'],
+        rows: [{ id: 'ACC_1', name: 'Access One', orgId: '' }]
+      }
     ]
   });
   dataService.fetchData = async (entityType) => {
-    if (entityType === 'sections') return [{ id: 'SEC_1' }, { id: 'SEC_2' }];
-    if (entityType === 'accesses') return [{ id: 'ACC_1' }];
+    if (entityType === 'sections') {
+      return [
+        { id: 'SEC_1', name: 'One' },
+        { id: 'SEC_2', name: 'Two', packageId: 'pte' },
+        { id: 'SEC_3', name: 'Three' }
+      ];
+    }
+    if (entityType === 'accesses') return [{ id: 'ACC_1', name: 'Access One', orgId: '' }];
     return [];
   };
   dataService.deleteData = async (entityType, id) => {
@@ -101,26 +124,22 @@ test('applyResetAndBootstrap purges scoped entities then runs bootstrap apply', 
   };
   coreBootstrapBaselineService.apply = async () => {
     bootstrapApplyCalls += 1;
-    return {
-      action: 'apply',
-      summary: { failed: 0, created: 10 },
-      run: { id: 'BOOTSTRAP_RUN_1' },
-      baseline: { id: 'core-bootstrap-security-baseline', version: '1.0.0', manifestHash: 'HASH_2' }
-    };
+    throw new Error('bootstrap apply must not be called in core reset');
   };
 
   try {
-    const report = await coreResetRebootstrapService.applyResetAndBootstrap({
+    const report = await coreResetRebootstrapService.applyCoreReset({
       backendMode: 'json',
       actor: { id: 'TEST_USER' },
       confirmToken: 'RESET CORE'
     });
-    assert.equal(bootstrapApplyCalls, 1);
-    assert.deepEqual(deleted, ['accesses:ACC_1', 'sections:SEC_1', 'sections:SEC_2']);
+    assert.equal(bootstrapApplyCalls, 0);
+    assert.deepEqual(deleted, ['accesses:ACC_1', 'sections:SEC_1']);
     assert.equal(report.overallStatus, 'success');
-    assert.equal(report.resetSummary.summary.deleted, 3);
-    assert.equal(report.runIds.bootstrapRunId, 'BOOTSTRAP_RUN_1');
+    assert.equal(report.resetSummary.summary.deleted, 2);
+    assert.equal(report.runIds.resetPreflightRunId !== '', true);
     assert.equal(Boolean(report.runIds.resetApplyRunId), true);
+    assert.equal(report.warnings.some((row) => String(row).includes('owned by package "pte"')), true);
   } finally {
     coreBootstrapBaselineService.loadBaselineBundle = originalLoadBundle;
     dataService.fetchData = originalFetch;

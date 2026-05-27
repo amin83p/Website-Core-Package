@@ -800,6 +800,9 @@
         "id": "611802"
       },
       {
+        "id": "920100"
+      },
+      {
         "id": "920200"
       }
     ],
@@ -1953,6 +1956,9 @@
       },
       {
         "id": "920300"
+      },
+      {
+        "id": "581340"
       }
     ],
     "trackState": false
@@ -2131,6 +2137,563 @@
       }
     ],
     "trackState": false
+  },
+  {
+    "id": "920100",
+    "name": "ACTIVITY_QUOTA",
+    "category": "SECURITY",
+    "description": "Navigator for Activity Quota management, ledger visibility, and quota rules.",
+    "homeURL": "",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": false,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": true,
+    "subsections": [
+      {
+        "id": "920101"
+      },
+      {
+        "id": "920106"
+      },
+      {
+        "id": "920102"
+      },
+      {
+        "id": "920103"
+      },
+      {
+        "id": "920104"
+      },
+      {
+        "id": "920105"
+      },
+      {
+        "id": "920107"
+      }
+    ],
+    "related": [],
+    "operations": [],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T17:03:27.427Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "920101",
+    "name": "ACTIVITY_QUOTA_OVERVIEW",
+    "category": "SECURITY",
+    "description": "Overview dashboard for activity quota balances, trends, and availability.",
+    "homeURL": "/activity-quota/overview",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T17:03:27.427Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "920102",
+    "name": "ACTIVITY_QUOTA_LEDGER",
+    "category": "SECURITY",
+    "description": "Ledger list for activity quota credit and consumption records.",
+    "homeURL": "/activity-quota/ledger",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T17:03:27.427Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "920103",
+    "name": "ACTIVITY_QUOTA_RULES",
+    "category": "SECURITY",
+    "description": "Activity quota consumption definition and resolution rules.",
+    "homeURL": "/activity-quota/rules",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T17:03:27.427Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "920104",
+    "name": "ACTIVITY_QUOTA_ADD_CREDIT",
+    "category": "SECURITY",
+    "description": "Add or adjust user credit allocations in the activity quota ledger.",
+    "homeURL": "/activity-quota/add-credit",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T20:53:44.719Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "920105",
+    "name": "ACTIVITY_QUOTA_PACKAGE",
+    "category": "SECURITY",
+    "description": "Package catalog for reusable activity quota configurations.",
+    "homeURL": "/activity-quota/packages",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-19T08:37:35.726Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "920106",
+    "name": "ACTIVITY_QUOTA_CREDIT_CHECK",
+    "category": "SECURITY",
+    "description": "User-facing credit check view for remaining balances and consumption history.",
+    "homeURL": "/activity-quota/credit-check",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-30T04:27:02.214Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "920107",
+    "name": "ACTIVITY_QUOTA_PACKAGE_MANAGER",
+    "category": "SECURITY",
+    "description": "Generic role-gated package assignment manager for user-level quota package lifecycle.",
+    "homeURL": "/activity-quota/package-manager",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "navigatorSection": false,
+    "subsections": [],
+    "related": [],
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-30T22:27:30.261Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
   },
   {
     "id": "920200",

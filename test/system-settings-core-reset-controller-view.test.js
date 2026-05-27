@@ -59,7 +59,7 @@ test('core reset page controller renders preflight and action state', async () =
 test('core reset preflight/apply controllers return structured payloads', async () => {
   const originalRuntime = dataBackendRuntimeService.getPublicBackendStatus;
   const originalPreflight = coreResetRebootstrapService.preflightReset;
-  const originalApply = coreResetRebootstrapService.applyResetAndBootstrap;
+  const originalApply = coreResetRebootstrapService.applyCoreReset;
 
   dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json', mongo: { ready: false } });
   coreResetRebootstrapService.preflightReset = async () => ({
@@ -67,7 +67,7 @@ test('core reset preflight/apply controllers return structured payloads', async 
     summary: { totalRows: 7 },
     run: { id: 'RUN_RESET_PRE_1' }
   });
-  coreResetRebootstrapService.applyResetAndBootstrap = async () => ({
+  coreResetRebootstrapService.applyCoreReset = async () => ({
     action: 'reset-apply',
     overallStatus: 'success',
     runIds: { resetApplyRunId: 'RUN_RESET_APPLY_1' }
@@ -88,16 +88,16 @@ test('core reset preflight/apply controllers return structured payloads', async 
   } finally {
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntime;
     coreResetRebootstrapService.preflightReset = originalPreflight;
-    coreResetRebootstrapService.applyResetAndBootstrap = originalApply;
+    coreResetRebootstrapService.applyCoreReset = originalApply;
   }
 });
 
 test('core reset apply controller rejects invalid token', async () => {
   const originalRuntime = dataBackendRuntimeService.getPublicBackendStatus;
-  const originalApply = coreResetRebootstrapService.applyResetAndBootstrap;
+  const originalApply = coreResetRebootstrapService.applyCoreReset;
 
   dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json' });
-  coreResetRebootstrapService.applyResetAndBootstrap = async () => {
+  coreResetRebootstrapService.applyCoreReset = async () => {
     const error = new Error('Confirmation token mismatch.');
     error.code = 'confirm_token_invalid';
     throw error;
@@ -111,7 +111,7 @@ test('core reset apply controller rejects invalid token', async () => {
     assert.match(String(res.jsonPayload?.message || ''), /confirmation token/i);
   } finally {
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntime;
-    coreResetRebootstrapService.applyResetAndBootstrap = originalApply;
+    coreResetRebootstrapService.applyCoreReset = originalApply;
   }
 });
 
@@ -121,7 +121,7 @@ test('core reset EJS compiles and includes expected actions', () => {
   const render = ejs.compile(template, { filename: viewPath });
 
   const html = render({
-    title: 'Core Reset + Re-Bootstrap',
+    title: 'Core Reset',
     runtimeBackend: { mode: 'json', mongo: { ready: false } },
     preflight: {
       baseline: { id: 'core-bootstrap-security-baseline', version: '1.0.0' },
@@ -133,9 +133,9 @@ test('core reset EJS compiles and includes expected actions', () => {
     user: { id: 'USER_3' }
   });
 
-  assert.match(html, /Core Reset \+ Re-Bootstrap/);
+  assert.match(html, /Core Reset/);
   assert.match(html, /Refresh Preflight/);
-  assert.match(html, /Reset \+ Re-Bootstrap/);
+  assert.match(html, /Apply Core Reset/);
   assert.match(html, /RESET CORE/);
   assert.match(html, /\/systemSettings\/core-reset\/preflight/);
   assert.match(html, /\/systemSettings\/core-reset\/apply/);

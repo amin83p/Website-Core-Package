@@ -191,5 +191,81 @@
       "lastUpdateUser": "SYSTEM",
       "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
     }
+  },
+  {
+    "id": "ROL1111",
+    "key": "sample-data",
+    "label": "Sample Data",
+    "description": "Sample data marker role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "sample_data"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1112",
+    "key": "sample-student",
+    "label": "Sample Student",
+    "description": "Sample student marker role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "sample_student"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1113",
+    "key": "sample-teacher",
+    "label": "Sample Teacher",
+    "description": "Sample teacher marker role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "sample_teacher"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "ROL1114",
+    "key": "sample-staff",
+    "label": "Sample Staff",
+    "description": "Sample staff marker role.",
+    "domain": "core",
+    "packageName": "CORE",
+    "aliases": [
+      "sample_staff"
+    ],
+    "active": true,
+    "system": false,
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-20T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-20T00:00:00.000Z"
+    }
   }
 ]

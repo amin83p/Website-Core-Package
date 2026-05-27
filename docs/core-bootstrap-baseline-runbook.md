@@ -3,6 +3,9 @@
 ## Purpose
 Use this first-run tool to seed core security metadata into a fresh backend.
 
+Maintenance policy:
+- Follow [Core Bootstrap Baseline Maintenance Procedure](./core-bootstrap-baseline-maintenance.md) for every core-data change.
+
 Source pack:
 - `data/bootstrap/core/manifest.json`
 - entity files under `data/bootstrap/core/`
@@ -52,7 +55,11 @@ Asset declarations are defined in `manifest.json -> assets[]` with:
 Run in both repositories:
 
 ```powershell
+npm run core:baseline:check
+# If drift is reported:
+npm run core:baseline:sync
 node test/core-bootstrap-parity-checklist.test.js
 node test/system-settings-core-bootstrap-route.contract.test.js
 node test/system-settings-core-bootstrap-controller-view.test.js
+node test/system-settings-core-reset-route.contract.test.js
 ```

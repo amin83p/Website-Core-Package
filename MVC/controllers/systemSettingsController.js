@@ -1371,7 +1371,7 @@ exports.showCoreResetPage = async (req, res) => {
     });
 
     return res.render('systemSettings/coreResetSettings', {
-      title: 'Core Reset + Re-Bootstrap',
+      title: 'Core Reset',
       settings,
       runtimeBackend,
       preflight,
@@ -1409,14 +1409,14 @@ exports.applyCoreReset = async (req, res) => {
   try {
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const confirmToken = cleanFormText(req.body?.confirmToken, 120);
-    const report = await coreResetRebootstrapService.applyResetAndBootstrap({
+    const report = await coreResetRebootstrapService.applyCoreReset({
       actor: req.user,
       backendMode: runtimeBackend?.mode || 'json',
       confirmToken
     });
     return res.json({
       status: 'success',
-      message: 'Core reset and re-bootstrap completed.',
+      message: 'Core reset completed.',
       report
     });
   } catch (error) {

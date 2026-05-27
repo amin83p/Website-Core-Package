@@ -17,6 +17,142 @@
     "value": "bi bi-pc"
   },
   {
+    "id": "SYM_ACTIVITY_QUOTA_920100",
+    "name": "ACTIVITY_QUOTA",
+    "type": "class",
+    "value": "bi bi-speedometer2",
+    "tags": [
+      "ACTIVITY_QUOTA",
+      "920100"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T17:08:50.656Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "SYM_ACTIVITY_QUOTA_920101",
+    "name": "ACTIVITY_QUOTA_OVERVIEW",
+    "type": "class",
+    "value": "bi bi-bar-chart-line-fill",
+    "tags": [
+      "ACTIVITY_QUOTA_OVERVIEW",
+      "920101"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T17:08:50.656Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "SYM_ACTIVITY_QUOTA_920102",
+    "name": "ACTIVITY_QUOTA_LEDGER",
+    "type": "class",
+    "value": "bi bi-journal-text",
+    "tags": [
+      "ACTIVITY_QUOTA_LEDGER",
+      "920102"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T17:08:50.656Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "SYM_ACTIVITY_QUOTA_920103",
+    "name": "ACTIVITY_QUOTA_RULES",
+    "type": "class",
+    "value": "bi bi-sliders",
+    "tags": [
+      "ACTIVITY_QUOTA_RULES",
+      "920103"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T17:08:50.656Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "SYM_ACTIVITY_QUOTA_920104",
+    "name": "ACTIVITY_QUOTA_ADD_CREDIT",
+    "type": "class",
+    "value": "bi bi-patch-plus-fill",
+    "tags": [
+      "ACTIVITY_QUOTA_ADD_CREDIT",
+      "920104"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-18T20:54:36.624Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "SYM_ACTIVITY_QUOTA_920105",
+    "name": "ACTIVITY_QUOTA_PACKAGE",
+    "type": "class",
+    "value": "bi bi-box-seam-fill",
+    "tags": [
+      "ACTIVITY_QUOTA_PACKAGE",
+      "920105"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-19T08:37:43.152Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "SYM_ACTIVITY_QUOTA_920106",
+    "name": "ACTIVITY_QUOTA_CREDIT_CHECK",
+    "type": "class",
+    "value": "bi bi-patch-check-fill",
+    "tags": [
+      "ACTIVITY_QUOTA_CREDIT_CHECK",
+      "920106"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-30T04:27:05.799Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
+    "id": "SYM_ACTIVITY_QUOTA_920107",
+    "name": "ACTIVITY_QUOTA_PACKAGE_MANAGER",
+    "type": "class",
+    "value": "bi bi-people-fill",
+    "tags": [
+      "ACTIVITY_QUOTA_PACKAGE_MANAGER",
+      "920107"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-04-30T22:27:30.261Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-04-30T22:27:30.261Z"
+    }
+  },
+  {
     "id": "SYM_EMAIL_LEDGER_920212",
     "name": "EMAIL_LEDGER",
     "type": "class",
@@ -262,6 +398,24 @@
     ],
     "type": "class",
     "value": "bi bi-building-fill"
+  },
+  {
+    "id": "SYM_SYSTEM_011",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-02-01T08:08:56.212Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-03-28T03:06:11.640Z"
+    },
+    "name": "PERSONS",
+    "orgId": "SYSTEM",
+    "tags": [
+      "PERSONS",
+      "PERSON",
+      "SCHOOL_PEOPLE"
+    ],
+    "type": "class",
+    "value": "bi bi-file-person-fill"
   },
   {
     "id": "SYM_SYSTEM_012",
