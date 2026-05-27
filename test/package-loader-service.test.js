@@ -130,6 +130,36 @@ test('loader skips invalid package manifest without crashing when continueOnErro
   });
 });
 
+test('loader auto-disables enabled package when manifest file is missing', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'missing-pte',
+      enabled: true,
+      installStatus: 'enabled',
+      metadata: {
+        manifestPath: path.join(packageRootDir, 'missing-pte', 'package.manifest.json')
+      }
+    }, { backendMode: 'json' });
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      continueOnError: true,
+      logger: makeSilentLogger()
+    });
+
+    const registryRow = await packageRegistryService.getPackageRegistryById('missing-pte', { backendMode: 'json' });
+
+    assert.equal(summary.enabledCount, 1);
+    assert.equal(summary.failedCount, 1);
+    assert.equal(summary.failed[0].packageId, 'missing-pte');
+    assert.equal(summary.failed[0].autoDisabled, true);
+    assert.equal(Boolean(registryRow?.enabled), false);
+    assert.equal(String(registryRow?.installStatus || ''), 'failed');
+    assert.match(String(registryRow?.lastWarning || ''), /Auto-disabled at startup/i);
+  });
+});
+
 test('loader uses manifestPath metadata when provided', async () => {
   await withTempPackageWorkspace(async ({ tempRoot, packageRootDir }) => {
     const externalDir = path.join(tempRoot, 'custom-manifests');

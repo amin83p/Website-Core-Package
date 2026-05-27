@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 
 const packageLifecycleExecutionLedgerService = require('./packageLifecycleExecutionLedgerService');
 const packageDataOwnershipService = require('./packageDataOwnershipService');
@@ -91,7 +92,7 @@ function buildActor(actor = null) {
 
 function resolvePackageDir(input = {}, options = {}) {
   const packageId = normalizePackageId(input.packageId || input.manifest?.id || '');
-  const packageRootDir = path.resolve(String(options.packageRootDir || path.join(process.cwd(), 'packages')));
+  const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
   const declaredManifestPath = cleanText(input.manifestPath, 1800);
   if (declaredManifestPath) {
     const absManifestPath = path.resolve(declaredManifestPath);

@@ -4,6 +4,7 @@ const packageRegistryService = require('./packageRegistryService');
 const packageLoaderService = require('./packageLoaderService');
 const packageManifestService = require('./packageManifestService');
 const startupLogger = require('../utils/startupLogger');
+const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 
 const CACHE_TTL_MS = 60 * 1000;
 
@@ -295,9 +296,7 @@ function seedCompatEnabledPackages(registryRows = []) {
 async function resolveManifestFromRegistryRow(registryRow = {}, options = {}) {
   const packageId = normalizePackageId(registryRow?.packageId || registryRow?.id || '');
   if (!packageId) return null;
-  const packageRootDir = path.resolve(
-    String(options.packageRootDir || path.join(path.resolve(__dirname, '../../'), 'packages'))
-  );
+  const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
   const manifestPath = await packageLoaderService.resolveManifestPath(packageId, registryRow, packageRootDir);
   if (!manifestPath) return null;
   const rawManifest = await packageLoaderService.readManifestFile(manifestPath);
@@ -333,9 +332,7 @@ function rebuildCache(next = {}) {
 
 async function refreshNavigationRegistry(options = {}) {
   const backendMode = cleanText(options.backendMode, 30) || undefined;
-  const packageRootDir = path.resolve(
-    String(options.packageRootDir || path.join(path.resolve(__dirname, '../../'), 'packages'))
-  );
+  const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
   const registryRows = await packageRegistryService.listPackageRegistry({
     backendMode
   });

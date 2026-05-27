@@ -33,6 +33,7 @@ test('package manager page controller renders snapshot and action state', async 
   const originalGetSettings = systemSettingsRepository.getSettings;
   const originalRuntimeStatus = dataBackendRuntimeService.getPublicBackendStatus;
   const originalListSnapshot = systemSettingsPackageManagerService.listPackageSnapshot;
+  const originalPackageStorageRoot = process.env.PACKAGE_STORAGE_ROOT;
   const res = makeRenderResponse();
 
   systemSettingsRepository.getSettings = async () => ({ app: {} });
@@ -48,8 +49,19 @@ test('package manager page controller renders snapshot and action state', async 
   });
 
   try {
+    process.env.PACKAGE_STORAGE_ROOT = '/tmp/railway-packages';
     await systemSettingsController.showPackageManagerPage(
-      { user: { id: 'USER_1' }, actionStateId: 'STATE_801' },
+      {
+        user: { id: 'USER_1' },
+        actionStateId: 'STATE_801',
+        app: {
+          locals: {
+            packageLoadSummary: {
+              failed: [{ packageId: 'pte', message: 'No manifest file found for this enabled package.' }]
+            }
+          }
+        }
+      },
       res
     );
 
@@ -61,7 +73,12 @@ test('package manager page controller renders snapshot and action state', async 
     assert.equal(Array.isArray(res.rendered?.payload?.localManifestWarnings), true);
     assert.equal(res.rendered?.payload?.localManifestOptions.length, 1);
     assert.equal(typeof res.rendered?.payload?.zipTrustedKeysConfigured, 'boolean');
+    assert.match(String(res.rendered?.payload?.packageStorageRoot || ''), /railway-packages/i);
+    assert.equal(Array.isArray(res.rendered?.payload?.startupPackageWarnings), true);
+    assert.equal(res.rendered?.payload?.startupPackageWarnings.length, 1);
   } finally {
+    if (originalPackageStorageRoot === undefined) delete process.env.PACKAGE_STORAGE_ROOT;
+    else process.env.PACKAGE_STORAGE_ROOT = originalPackageStorageRoot;
     systemSettingsRepository.getSettings = originalGetSettings;
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
     systemSettingsPackageManagerService.listPackageSnapshot = originalListSnapshot;

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getPackageStorageRootAbsolute } = require('../../utils/packageStoragePathUtils');
 
 const registeredDefinitions = new Map();
 
@@ -112,8 +113,7 @@ function loadMongoIndexDefinitionsFromManifest(manifestPath = '') {
 }
 
 function loadMongoIndexDefinitionsFromPackageManifests(options = {}) {
-  const projectRoot = path.resolve(options.projectRoot || resolveProjectRoot());
-  const packageRootDir = path.resolve(options.packageRootDir || path.join(projectRoot, 'packages'));
+  const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
   if (!fs.existsSync(packageRootDir)) return [];
 
   const loaded = [];

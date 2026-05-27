@@ -2,9 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 const packageManifestService = require('./packageManifestService');
+const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
-const DEFAULT_PACKAGE_ROOT = path.join(PROJECT_ROOT, 'packages');
+const DEFAULT_PACKAGE_ROOT = getPackageStorageRootAbsolute();
 
 function cleanText(value, max = 4000) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -18,7 +18,7 @@ function buildKey(sectionId = '', operationId = '') {
   return section && operation ? `${section}::${operation}` : '';
 }
 
-function readPackageManifestsSync(packageRoot = DEFAULT_PACKAGE_ROOT) {
+function readPackageManifestsSync(packageRoot = getPackageStorageRootAbsolute()) {
   try {
     return fs.readdirSync(packageRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -51,7 +51,7 @@ function normalizeQuotaMiddlewareKey(row = {}) {
 function buildEnabledQuotaKeys(options = {}) {
   const manifests = Array.isArray(options.manifests)
     ? options.manifests
-    : readPackageManifestsSync(options.packageRoot || DEFAULT_PACKAGE_ROOT);
+    : readPackageManifestsSync(options.packageRoot || getPackageStorageRootAbsolute());
 
   const keys = [];
   manifests.forEach((manifest) => {

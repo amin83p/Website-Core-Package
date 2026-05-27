@@ -20,6 +20,7 @@ const uploadFolderSettingsService = require('../services/uploadFolderSettingsSer
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
+const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 
 const PUBLIC_PAGE_MEDIA_FOLDER = 'misc/public-pages';
 const MONGO_RESTORE_MAX_UPLOAD_MB = Number.parseInt(process.env.MONGO_BACKUP_RESTORE_MAX_MB || '100', 10) || 100;
@@ -1137,10 +1138,15 @@ exports.showPackageManagerPage = async (req, res) => {
     const settings = await systemSettingsRepository.getSettings();
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const keyContext = buildPackageTrustedKeyContext(settings);
+    const packageStorageRoot = getPackageStorageRootAbsolute();
     const snapshot = await systemSettingsPackageManagerService.listPackageSnapshot({
       backendMode: runtimeBackend?.mode || '',
-      packageRootDir: path.join(process.cwd(), 'packages')
+      packageRootDir: packageStorageRoot
     });
+    const startupLoadSummary = req?.app?.locals?.packageLoadSummary || null;
+    const startupPackageWarnings = Array.isArray(startupLoadSummary?.failed)
+      ? startupLoadSummary.failed.map((row) => String(row?.message || '').trim()).filter(Boolean)
+      : [];
     const localManifestOptions = (snapshot?.localManifests || []).filter((row) => row.valid === true);
     const localManifestWarnings = (snapshot?.localManifests || []).filter((row) => row.valid !== true);
 
@@ -1154,6 +1160,8 @@ exports.showPackageManagerPage = async (req, res) => {
       zipTrustedKeysConfigured: keyContext.trustedPublicKeys.length > 0,
       zipTrustedKeysCount: keyContext.trustedPublicKeys.length,
       zipUploadLimitMb: Number.parseInt(process.env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB || '50', 10) || 50,
+      packageStorageRoot,
+      startupPackageWarnings,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -1182,7 +1190,7 @@ function buildPackageManagerOptions(req = {}) {
   const keyContext = buildPackageTrustedKeyContext();
   return {
     backendMode: runtimeBackend?.mode || '',
-    packageRootDir: path.join(process.cwd(), 'packages'),
+    packageRootDir: getPackageStorageRootAbsolute(),
     trustedPublicKeys: keyContext.trustedPublicKeys,
     actor: req.user || null,
     app: req.app || null

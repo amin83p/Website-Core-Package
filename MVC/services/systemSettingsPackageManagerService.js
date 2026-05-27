@@ -18,6 +18,7 @@ const symbolRepository = require('../repositories/symbolRepository');
 const accessRepository = require('../repositories/accessRepository');
 const systemSettingsRepository = require('../repositories/systemSettingsRepository');
 const uploadFolderSettingsService = require('./uploadFolderSettingsService');
+const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 
 const SYSTEM_ACTOR_ID = 'SYSTEM_SETTINGS_PACKAGE_MANAGER';
 
@@ -664,7 +665,7 @@ function createService(overrides = {}) {
   }
 
   async function replacePackageDirectory(sourcePackageDir = '', packageId = '', options = {}) {
-    const packageRootDir = path.resolve(String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages')));
+    const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir, ensureExists: true });
     const destinationDir = path.join(packageRootDir, packageId);
     const backupDir = path.join(packageRootDir, `.${packageId}.backup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     let hadExistingDestination = false;
@@ -699,7 +700,7 @@ function createService(overrides = {}) {
   }
 
   async function restorePackageDirectoryFromBackup(packageId = '', backupDir = '', options = {}) {
-    const packageRootDir = path.resolve(String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages')));
+    const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir, ensureExists: true });
     const destinationDir = path.join(packageRootDir, packageId);
     const backupPath = cleanText(backupDir, 1600);
     if (!backupPath) return false;
@@ -1020,9 +1021,7 @@ function createService(overrides = {}) {
   }
 
   async function discoverLocalManifests(options = {}) {
-    const packageRootDir = path.resolve(
-      String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages'))
-    );
+    const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
     let dirEntries = [];
     try {
       dirEntries = await deps.fs.readdir(packageRootDir, { withFileTypes: true });
@@ -1087,9 +1086,7 @@ function createService(overrides = {}) {
   async function resolveManifestForRegistryRow(row = {}, options = {}) {
     const packageId = normalizePackageId(row?.packageId || row?.id || '');
     if (!packageId) return null;
-    const packageRootDir = path.resolve(
-      String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages'))
-    );
+    const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
     let manifestPath = await deps.packageLoaderService.resolveManifestPath(packageId, row, packageRootDir);
     let manifest = null;
     if (manifestPath) {
@@ -1315,9 +1312,7 @@ function createService(overrides = {}) {
 
     await verifyZipSignature(zipBuffer, signatureBuffer, options);
 
-    const packageRootDir = path.resolve(
-      String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages'))
-    );
+    const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir, ensureExists: true });
     const stagingRootParent = path.join(packageRootDir, '.zip-install-staging');
     await deps.fs.mkdir(stagingRootParent, { recursive: true });
 

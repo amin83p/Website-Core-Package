@@ -6,6 +6,7 @@ const { registerEntityQueryExecutor } = require('../models/queryExecutionBridge'
 const packageRegistryService = require('./packageRegistryService');
 const packageLoaderService = require('./packageLoaderService');
 const packageManifestService = require('./packageManifestService');
+const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 
 const BUILTIN_REPOSITORY_MODULES = Object.freeze({
   school: '../repositories/school',
@@ -254,9 +255,7 @@ function mergeSummaryTotals(target = {}, source = {}) {
 async function refreshEnabledPackageQueryExecutors(options = {}) {
   const logger = options?.logger || startupLogger;
   const backendMode = normalizeBackendMode(options?.backendMode || 'json');
-  const packageRootDir = path.resolve(
-    String(options?.packageRootDir || path.join(resolveProjectRoot(), 'packages'))
-  );
+  const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options?.packageRootDir });
   const summary = createAggregateSummary(backendMode);
   if (backendMode !== 'json') return summary;
 

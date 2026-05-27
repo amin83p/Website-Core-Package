@@ -54,6 +54,7 @@ const dataBackendRecoveryMiddleware = require('./MVC/middleware/dataBackendRecov
 const packageLoaderService = require('./MVC/services/packageLoaderService');
 const packageRegistryInstallerService = require('./MVC/services/packageRegistryInstallerService');
 const packageNavigationService = require('./MVC/services/packageNavigationService');
+const { getPackageStorageRootAbsolute } = require('./MVC/utils/packageStoragePathUtils');
 const startupLogger = require('./MVC/utils/startupLogger');
 const actionStateRetentionService = require('./MVC/services/actionStateRetentionService');
 const { runWithRequestContext } = require('./MVC/utils/requestContextStore');
@@ -326,9 +327,11 @@ async function startServer() {
       const packageLoaderHooks = packageRegistryInstallerService.createLoaderHooks({
         backendMode: dataBackend.mode
       });
+      const packageRootDir = getPackageStorageRootAbsolute();
       const packageLoadSummary = await packageLoaderService.loadEnabledPackages({
         app,
         backendMode: dataBackend.mode,
+        packageRootDir,
         hooks: packageLoaderHooks
       });
       app.locals.packageLoadSummary = packageLoadSummary;

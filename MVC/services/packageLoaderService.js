@@ -4,6 +4,7 @@ const path = require('path');
 const startupLogger = require('../utils/startupLogger');
 const packageRegistryService = require('./packageRegistryService');
 const packageManifestService = require('./packageManifestService');
+const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 
 const DEFAULT_MANIFEST_FILES = Object.freeze([
   'package.manifest.json',
@@ -110,9 +111,7 @@ function summarizeRegistryRows(rows = []) {
 async function loadEnabledPackages(options = {}) {
   const startedAt = new Date().toISOString();
   const backendMode = cleanText(options.backendMode, 30) || undefined;
-  const packageRootDir = path.resolve(
-    String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages'))
-  );
+  const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
   const hooks = createLoaderHooks(options.hooks || {});
   const logger = options.logger || startupLogger;
   const continueOnError = options.continueOnError !== false;
@@ -148,7 +147,9 @@ async function loadEnabledPackages(options = {}) {
       packageManifestService.assertValidPackageId(packageId, 'packageId');
       const manifestPath = await resolveManifestPath(packageId, row, packageRootDir);
       if (!manifestPath) {
-        throw new Error('No manifest file found for this enabled package.');
+        const missingManifestError = new Error('No manifest file found for this enabled package.');
+        missingManifestError.code = 'PACKAGE_MANIFEST_NOT_FOUND';
+        throw missingManifestError;
       }
 
       const rawManifest = await readManifestFile(manifestPath);
@@ -185,9 +186,24 @@ async function loadEnabledPackages(options = {}) {
       }
     } catch (error) {
       const reason = cleanText(error?.message || String(error), 4000) || 'Unknown package load error.';
+      const isMissingManifest = cleanText(error?.code, 80) === 'PACKAGE_MANIFEST_NOT_FOUND';
+      if (isMissingManifest && packageId) {
+        await packageRegistryService.upsertPackageRegistry({
+          packageId,
+          enabled: false,
+          installStatus: 'failed',
+          lastError: '',
+          lastWarning: `Auto-disabled at startup: ${reason}`,
+          metadata: row?.metadata && typeof row.metadata === 'object' ? row.metadata : {}
+        }, {
+          backendMode,
+          actor: { id: 'SYSTEM', username: 'SYSTEM' }
+        }).catch(() => null);
+      }
       const failure = {
         packageId,
-        message: reason
+        message: reason,
+        autoDisabled: isMissingManifest
       };
       summary.failed.push(failure);
       if (logger && typeof logger.warn === 'function') {

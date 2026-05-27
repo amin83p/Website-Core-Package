@@ -4,7 +4,11 @@
   const installedRows = Array.isArray(installedPackages) ? installedPackages : [];
   const localOptions = Array.isArray(localManifestOptions) ? localManifestOptions : [];
   const localWarnings = Array.isArray(localManifestWarnings) ? localManifestWarnings : [];
+  const startupWarnings = Array.isArray(typeof startupPackageWarnings !== 'undefined' ? startupPackageWarnings : [])
+    ? (typeof startupPackageWarnings !== 'undefined' ? startupPackageWarnings : [])
+    : [];
   const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
+  const storageRoot = String(typeof packageStorageRoot !== 'undefined' ? packageStorageRoot : '').trim();
   const trustedZipKeysCount = Number.isFinite(Number(typeof zipTrustedKeysCount !== 'undefined' ? zipTrustedKeysCount : 0))
     ? Number(typeof zipTrustedKeysCount !== 'undefined' ? zipTrustedKeysCount : 0)
     : 0;
@@ -30,6 +34,21 @@
       </a>
     </div>
   </div>
+  <% if (storageRoot) { %>
+    <div class="alert alert-info border-0 shadow-sm py-2 px-3 mb-3 small">
+      <strong>Package Storage Root:</strong> <code><%= storageRoot %></code>
+    </div>
+  <% } %>
+  <% if (startupWarnings.length) { %>
+    <div class="alert alert-warning border-0 shadow-sm py-2 px-3 mb-3 small">
+      <div class="fw-semibold mb-1">Startup Package Warnings</div>
+      <ul class="mb-0 ps-3">
+        <% startupWarnings.slice(0, 8).forEach((msg) => { %>
+          <li><%= msg %></li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
 
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-white fw-bold small">Install / Enable Package</div>
@@ -53,7 +72,10 @@
                 <option value="<%= row.storedManifestPath %>"><%= row.packageId %> - <%= row.version %> (<%= row.storedManifestPath %>)</option>
               <% }) %>
             </select>
-            <div class="small text-muted mt-1">Detected from <code>packages/*/package.manifest.json</code>.</div>
+            <div class="small text-muted mt-1">
+              Detected from
+              <code><%= storageRoot || 'packages' %>/*/package.manifest.json</code>.
+            </div>
           </div>
           <div id="pkgInstallPathPanel" class="d-none">
             <label class="form-label small fw-bold">Manifest Path</label>

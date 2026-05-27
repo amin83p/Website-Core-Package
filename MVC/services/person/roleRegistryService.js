@@ -3,10 +3,9 @@ const path = require('path');
 const { resolveRepositoryBackendMode } = require('../../repositories/backend/repositoryBackendSelector');
 const { getMongoCollection } = require('../../infrastructure/mongo/mongoConnection');
 const packageManifestService = require('../packageManifestService');
+const { getPackageStorageRootAbsolute } = require('../../utils/packageStoragePathUtils');
 
-const PROJECT_ROOT = path.join(__dirname, '../../..');
 const ROLE_DATA_PATH = path.join(__dirname, '../../../data/roles.json');
-const PACKAGE_ROOT = path.join(PROJECT_ROOT, 'packages');
 const CACHE_TTL_MS = 2000;
 
 const LEGACY_SYSTEM_ROLE_KEYS = Object.freeze([
@@ -127,7 +126,7 @@ function createBuiltInRoleRow(key, overrides = {}) {
   };
 }
 
-function readPackageManifestRowsSync(packageRoot = PACKAGE_ROOT) {
+function readPackageManifestRowsSync(packageRoot = getPackageStorageRootAbsolute()) {
   try {
     return fs.readdirSync(packageRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
