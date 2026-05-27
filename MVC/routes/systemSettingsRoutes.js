@@ -331,7 +331,6 @@ router.post('/package-builder/preflight',
             OPERATIONS.UPDATE,
             { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
           ),
-          adminApproval,
           ctrl.preflightPackageBuilder);
 router.post('/package-builder/build',
           requireAuth,

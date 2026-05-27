@@ -1150,6 +1150,10 @@ exports.showPackageManagerPage = async (req, res) => {
       : [];
     const localManifestOptions = (snapshot?.localManifests || []).filter((row) => row.valid === true);
     const localManifestWarnings = (snapshot?.localManifests || []).filter((row) => row.valid !== true);
+    const organizations = await dataService.fetchData('organizations', {}, req.user, {
+      backendMode: runtimeBackend?.mode || ''
+    }).catch(() => []);
+    const activeOrgId = cleanFormText(req.user?.activeOrgId || req.user?.primaryOrgId || '', 120);
 
     return res.render('systemSettings/packageManagerSettings', {
       title: 'Package Manager',
@@ -1163,6 +1167,8 @@ exports.showPackageManagerPage = async (req, res) => {
       zipUploadLimitMb: Number.parseInt(process.env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB || '50', 10) || 50,
       packageStorageRoot,
       startupPackageWarnings,
+      organizations: Array.isArray(organizations) ? organizations : [],
+      activeOrgId,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -1341,8 +1347,8 @@ exports.showPackageBuilderPage = async (req, res) => {
       settings,
       runtimeBackend,
       packageStorageRoot,
-      packages: discovered.filter((row) => row.valid),
-      packageWarnings: discovered.filter((row) => !row.valid),
+      packages: discovered,
+      packageWarnings: discovered.filter((row) => row.valid !== true || row.manifestResolved !== true),
       organizations: Array.isArray(organizations) ? organizations : [],
       includeModal: true,
       user: req.user,
@@ -1358,6 +1364,7 @@ exports.preflightPackageBuilder = async (req, res) => {
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const report = await systemSettingsPackageBuilderService.preflightBuild({
       packageId: cleanFormText(req.body?.packageId, 120),
+      originOrgId: cleanFormText(req.body?.originOrgId, 160),
       selectedDataEntities: Array.isArray(req.body?.selectedDataEntities)
         ? req.body.selectedDataEntities
         : (req.body?.selectedDataEntities ? [req.body.selectedDataEntities] : []),
@@ -1389,6 +1396,7 @@ exports.buildPackageFromBuilder = async (req, res) => {
     const report = await systemSettingsPackageBuilderService.buildPackage({
       packageId: cleanFormText(req.body?.packageId, 120),
       version: cleanFormText(req.body?.version, 120),
+      originOrgId: cleanFormText(req.body?.originOrgId, 160),
       selectedDataEntities: Array.isArray(req.body?.selectedDataEntities)
         ? req.body.selectedDataEntities
         : (req.body?.selectedDataEntities ? [req.body.selectedDataEntities] : []),

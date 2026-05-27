@@ -2265,6 +2265,24 @@
       "applyDefault": true
     }
   ],
+  "dataEntities": [
+    { "entityType": "pteAiProviders", "label": "PTE AI Providers" },
+    { "entityType": "pteAiScoringSettings", "label": "PTE AI Scoring Settings" },
+    { "entityType": "pteAiTokenUsages", "label": "PTE AI Token Usage" },
+    { "entityType": "pteApplicantPackageAssignments", "label": "PTE Applicant Package Assignments" },
+    { "entityType": "pteApplicants", "label": "PTE Applicants" },
+    { "entityType": "pteAttemptArtifacts", "label": "PTE Attempt Artifacts" },
+    { "entityType": "pteAttemptItems", "label": "PTE Attempt Items" },
+    { "entityType": "pteAttemptLedgerEvents", "label": "PTE Attempt Ledger Events" },
+    { "entityType": "pteAttemptSessions", "label": "PTE Attempt Sessions" },
+    { "entityType": "pteCourses", "label": "PTE Courses" },
+    { "entityType": "ptePublicPageSettings", "label": "PTE Public Page Settings" },
+    { "entityType": "pteQuestionTypeScoringProfileHistory", "label": "PTE Question Type Scoring Profile History" },
+    { "entityType": "pteQuestionTypeScoringProfiles", "label": "PTE Question Type Scoring Profiles" },
+    { "entityType": "pteQuestionVersions", "label": "PTE Question Versions" },
+    { "entityType": "pteTeachers", "label": "PTE Teachers" },
+    { "entityType": "pteTestVersions", "label": "PTE Test Versions" }
+  ],
   "quotaDefinitions": [
     {
       "sectionId": "PTE_PRACTICE_BY_SKILLS",

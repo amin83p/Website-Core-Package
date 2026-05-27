@@ -6,8 +6,10 @@ const crypto = require('crypto');
 const PizZip = require('pizzip');
 
 const dataService = require('./dataService');
+const packageRegistryService = require('./packageRegistryService');
 const packageManifestService = require('./packageManifestService');
 const packageDataOwnershipService = require('./packageDataOwnershipService');
+const { getMongoCollection, getMongoDbOrNull } = require('../infrastructure/mongo/mongoConnection');
 const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 const uploadPathUtils = require('../utils/uploadPathUtils');
 
@@ -25,6 +27,8 @@ const REMAP_ORG_FIELDS = new Set([
   'primaryorgid',
   'targetorgid'
 ]);
+const ORG_TOKEN_EXACT_REGEX = /^ORG_[A-Za-z0-9_-]+$/i;
+const ORG_UPLOAD_SEGMENT_REGEX = /\/uploads\/(ORG_[^/]+)/ig;
 
 function cleanText(value, max = 4000) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -138,6 +142,73 @@ function normalizeOrgToken(raw = '') {
   return '';
 }
 
+function isUnknownEntityTypeError(error = null) {
+  const message = cleanText(error?.message || String(error || ''), 600).toLowerCase();
+  if (!message) return false;
+  return message.includes('unknown entity type');
+}
+
+function collectOrgTokensFromNode(node, collector = null, keyName = '') {
+  const state = collector && typeof collector === 'object'
+    ? collector
+    : { field: new Set(), token: new Set(), upload: new Set() };
+
+  if (typeof node === 'string') {
+    const token = cleanText(node, 4000);
+    const fieldKey = cleanText(keyName, 200).toLowerCase();
+    if (REMAP_ORG_FIELDS.has(fieldKey)) {
+      const normalized = normalizeOrgToken(token);
+      if (normalized) state.field.add(normalized);
+    }
+
+    let match = ORG_UPLOAD_SEGMENT_REGEX.exec(token);
+    while (match) {
+      const normalized = normalizeOrgToken(match[1]);
+      if (normalized) state.upload.add(normalized);
+      match = ORG_UPLOAD_SEGMENT_REGEX.exec(token);
+    }
+    ORG_UPLOAD_SEGMENT_REGEX.lastIndex = 0;
+
+    if (ORG_TOKEN_EXACT_REGEX.test(token)) {
+      const normalized = normalizeOrgToken(token);
+      if (normalized) state.token.add(normalized);
+    }
+    return state;
+  }
+  if (Array.isArray(node)) {
+    node.forEach((item) => collectOrgTokensFromNode(item, state, keyName));
+    return state;
+  }
+  if (node && typeof node === 'object') {
+    Object.entries(node).forEach(([childKey, childValue]) => collectOrgTokensFromNode(childValue, state, childKey));
+  }
+  return state;
+}
+
+function evaluateRowOriginScope(row = {}, originOrgId = '') {
+  const normalizedOriginOrgId = normalizeOrgToken(originOrgId);
+  const collected = collectOrgTokensFromNode(row, { field: new Set(), token: new Set(), upload: new Set() });
+  const businessTokens = new Set([...Array.from(collected.field), ...Array.from(collected.token)]);
+  const uploadTokens = Array.from(collected.upload);
+  const orgTokens = Array.from(new Set([...Array.from(businessTokens), ...uploadTokens]));
+  const hasBusinessOrgMarkers = businessTokens.size > 0;
+  const includesUnscoped = !hasBusinessOrgMarkers;
+  const businessTokenList = Array.from(businessTokens);
+  const hasOrigin = normalizedOriginOrgId ? businessTokenList.includes(normalizedOriginOrgId) : false;
+  const hasOther = normalizedOriginOrgId
+    ? businessTokenList.some((token) => token !== normalizedOriginOrgId)
+    : false;
+
+  const include = includesUnscoped || (hasOrigin && !hasOther);
+  return {
+    include,
+    includesUnscoped,
+    hasOrigin,
+    hasOther,
+    orgTokens
+  };
+}
+
 function readJsonFile(filePath = '') {
   const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
   return JSON.parse(raw);
@@ -212,10 +283,17 @@ function transformForOrgRemap(node, state = {}, keyName = '') {
     if (/\/uploads\/ORG_[^/]+/i.test(next)) {
       next = next.replace(/\/uploads\/ORG_[^/]+/ig, '/uploads/{{ORG_ID}}');
       state.rewrittenUrlCount = Number(state.rewrittenUrlCount || 0) + 1;
+      if (Array.isArray(state.pathHits)) state.pathHits.push({ type: 'upload_url', key: String(keyName || '') });
     }
     if (REMAP_ORG_FIELDS.has(String(keyName || '').toLowerCase()) && normalizeOrgToken(next)) {
       next = '{{ORG_ID}}';
       state.rewrittenFieldCount = Number(state.rewrittenFieldCount || 0) + 1;
+      if (Array.isArray(state.pathHits)) state.pathHits.push({ type: 'org_field', key: String(keyName || '') });
+    }
+    if (ORG_TOKEN_EXACT_REGEX.test(next)) {
+      next = '{{ORG_ID}}';
+      state.rewrittenExactTokenCount = Number(state.rewrittenExactTokenCount || 0) + 1;
+      if (Array.isArray(state.pathHits)) state.pathHits.push({ type: 'org_token', key: String(keyName || '') });
     }
     return next;
   }
@@ -230,6 +308,19 @@ function transformForOrgRemap(node, state = {}, keyName = '') {
     return out;
   }
   return node;
+}
+
+function extractSymbolUploadRefs(manifest = {}) {
+  const refs = new Set();
+  const symbols = sanitizeArray(manifest?.symbols);
+  symbols.forEach((row) => {
+    if (!row || typeof row !== 'object') return;
+    const value = row.value;
+    if (typeof value === 'string' || Array.isArray(value) || (value && typeof value === 'object')) {
+      extractUploadUrls(value, refs);
+    }
+  });
+  return Array.from(refs);
 }
 
 function applyOrgRemap(node, targetOrgId = '') {
@@ -279,65 +370,223 @@ function createDependencies(overrides = {}) {
     os: overrides.os || os,
     crypto: overrides.crypto || crypto,
     dataService: overrides.dataService || dataService,
+    packageRegistryService: overrides.packageRegistryService || packageRegistryService,
     packageManifestService: overrides.packageManifestService || packageManifestService,
-    packageDataOwnershipService: overrides.packageDataOwnershipService || packageDataOwnershipService
+    packageDataOwnershipService: overrides.packageDataOwnershipService || packageDataOwnershipService,
+    getMongoCollection: overrides.getMongoCollection || getMongoCollection,
+    getMongoDbOrNull: overrides.getMongoDbOrNull || getMongoDbOrNull
   };
 }
 
 function createService(overrides = {}) {
   const deps = createDependencies(overrides);
 
-  async function discoverLocalPackages(options = {}) {
-    const packageRootDir = getPackageStorageRootAbsolute({
-      packageRootDir: options.packageRootDir,
-      ensureExists: true
-    });
+  function toStoredManifestPath(absPath = '') {
+    const token = cleanText(absPath, 2000);
+    if (!token) return '';
+    const relative = deps.path.relative(process.cwd(), token).replace(/\\/g, '/');
+    if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) return relative;
+    return token.replace(/\\/g, '/');
+  }
+
+  function sourcePriority(source = '') {
+    const token = cleanText(source, 80).toLowerCase();
+    if (token === 'configured_root') return 3;
+    if (token === 'default_root') return 2;
+    if (token === 'registry') return 1;
+    return 0;
+  }
+
+  function selectBetterCandidate(current = null, next = null) {
+    if (!current) return next;
+    if (!next) return current;
+    const currentResolved = current?.manifestResolved === true;
+    const nextResolved = next?.manifestResolved === true;
+    if (currentResolved !== nextResolved) return nextResolved ? next : current;
+    const currentValid = current?.valid === true;
+    const nextValid = next?.valid === true;
+    if (currentValid !== nextValid) return nextValid ? next : current;
+    const currentPriority = sourcePriority(current?.source);
+    const nextPriority = sourcePriority(next?.source);
+    if (currentPriority !== nextPriority) return nextPriority > currentPriority ? next : current;
+    const currentPath = cleanText(current?.manifestPath, 2000);
+    const nextPath = cleanText(next?.manifestPath, 2000);
+    if (!currentPath && nextPath) return next;
+    return current;
+  }
+
+  async function readManifestCandidate(manifestPath = '', baseRow = {}) {
+    const candidatePath = cleanText(manifestPath, 2000);
+    if (!candidatePath) return null;
+    if (!(await pathExists(candidatePath))) return null;
+    const row = {
+      ...baseRow,
+      manifestPath: candidatePath,
+      storedManifestPath: toStoredManifestPath(candidatePath),
+      manifestResolved: true,
+      availability: 'available',
+      warning: ''
+    };
+    try {
+      const parsed = readJsonFile(candidatePath);
+      const manifest = deps.packageManifestService.validatePackageManifest(parsed);
+      row.packageId = manifest.id;
+      row.packageName = manifest.name;
+      row.version = manifest.version;
+      row.mountPath = manifest.mountPath;
+      row.packageDir = deps.path.dirname(candidatePath);
+      row.manifest = manifest;
+      row.valid = true;
+      return row;
+    } catch (error) {
+      row.manifest = null;
+      row.valid = false;
+      row.availability = 'missing_manifest';
+      row.warning = cleanText(error?.message || String(error), 1200) || 'Manifest is invalid.';
+      row.error = row.warning;
+      return row;
+    }
+  }
+
+  async function discoverPackagesFromRoot(rootDir = '', source = '') {
+    const root = cleanText(rootDir, 2000);
+    if (!root) return [];
     const rows = [];
-    const entries = await deps.fs.readdir(packageRootDir, { withFileTypes: true }).catch(() => []);
+    const entries = await deps.fs.readdir(root, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
       if (!entry?.isDirectory?.()) continue;
-      const packageDir = deps.path.join(packageRootDir, entry.name);
+      const packageDir = deps.path.join(root, entry.name);
       const manifestPath = deps.path.join(packageDir, 'package.manifest.json');
-      if (!(await pathExists(manifestPath))) continue;
-      const storedManifestPath = cleanText(deps.path.relative(process.cwd(), manifestPath), 2000).replace(/\\/g, '/');
-      try {
-        const parsed = readJsonFile(manifestPath);
-        const manifest = deps.packageManifestService.validatePackageManifest(parsed);
-        rows.push({
-          packageId: manifest.id,
-          packageName: manifest.name,
-          version: manifest.version,
-          mountPath: manifest.mountPath,
-          manifestPath,
-          storedManifestPath,
-          packageDir,
-          manifest,
-          valid: true
-        });
-      } catch (error) {
-        rows.push({
-          packageId: normalizePackageId(entry.name),
-          packageName: entry.name,
-          version: '',
-          mountPath: '',
-          manifestPath,
-          storedManifestPath,
-          packageDir,
-          manifest: null,
-          valid: false,
-          error: cleanText(error?.message || String(error), 1200)
-        });
-      }
+      const candidate = await readManifestCandidate(manifestPath, {
+        source,
+        packageId: normalizePackageId(entry.name),
+        packageName: entry.name,
+        version: '',
+        mountPath: '',
+        packageDir
+      });
+      if (candidate) rows.push(candidate);
     }
-    return rows.sort((a, b) => String(a.packageId || '').localeCompare(String(b.packageId || '')));
+    return rows;
+  }
+
+  async function discoverRegistryPackages(options = {}) {
+    const rows = [];
+    if (!deps.packageRegistryService || typeof deps.packageRegistryService.listPackageRegistry !== 'function') return rows;
+    const registryRows = await deps.packageRegistryService.listPackageRegistry({
+      backendMode: options.backendMode
+    }).catch(() => []);
+    const list = sanitizeArray(registryRows);
+    const configuredRoot = getPackageStorageRootAbsolute({
+      packageRootDir: options.packageRootDir,
+      ensureExists: false
+    });
+    const defaultRoot = deps.path.resolve(process.cwd(), 'packages');
+
+    for (const row of list) {
+      const packageId = normalizePackageId(row?.packageId || row?.id || '');
+      if (!packageId) continue;
+      const packageName = cleanText(row?.metadata?.packageName || row?.packageName || packageId, 200) || packageId;
+      const explicitMetaPath = cleanText(row?.metadata?.manifestPath || row?.manifestPath || '', 2000);
+      const explicitCandidate = explicitMetaPath
+        ? (deps.path.isAbsolute(explicitMetaPath)
+          ? explicitMetaPath
+          : deps.path.resolve(process.cwd(), explicitMetaPath))
+        : '';
+      const fallbackCandidates = [
+        explicitCandidate,
+        deps.path.join(configuredRoot, packageId, 'package.manifest.json'),
+        deps.path.join(defaultRoot, packageId, 'package.manifest.json')
+      ]
+        .map((item) => cleanText(item, 2000))
+        .filter(Boolean)
+        .filter((item, index, arr) => arr.findIndex((x) => x.toLowerCase() === item.toLowerCase()) === index);
+
+      let resolved = null;
+      for (const candidatePath of fallbackCandidates) {
+        // eslint-disable-next-line no-await-in-loop
+        resolved = await readManifestCandidate(candidatePath, {
+          source: 'registry',
+          packageId,
+          packageName,
+          version: cleanText(row?.version, 120),
+          mountPath: cleanText(row?.metadata?.mountPath || '', 200),
+          packageDir: deps.path.dirname(candidatePath)
+        });
+        if (resolved && resolved.valid === true) break;
+      }
+
+      if (resolved) {
+        rows.push(resolved);
+        continue;
+      }
+
+      rows.push({
+        source: 'registry',
+        packageId,
+        packageName,
+        version: cleanText(row?.version, 120),
+        mountPath: cleanText(row?.metadata?.mountPath || '', 200),
+        manifestPath: explicitCandidate || '',
+        storedManifestPath: toStoredManifestPath(explicitCandidate || ''),
+        packageDir: '',
+        manifest: null,
+        valid: false,
+        manifestResolved: false,
+        availability: 'missing_manifest',
+        warning: 'Manifest file was not found for this installed package in configured/default package roots.',
+        error: 'Manifest file was not found for this installed package in configured/default package roots.'
+      });
+    }
+    return rows;
+  }
+
+  async function discoverLocalPackages(options = {}) {
+    const configuredRoot = getPackageStorageRootAbsolute({
+      packageRootDir: options.packageRootDir,
+      ensureExists: false
+    });
+    const defaultRoot = deps.path.resolve(process.cwd(), 'packages');
+    const candidates = [];
+    const configuredRows = await discoverPackagesFromRoot(configuredRoot, 'configured_root');
+    candidates.push(...configuredRows);
+    if (configuredRoot.toLowerCase() !== defaultRoot.toLowerCase()) {
+      const defaultRows = await discoverPackagesFromRoot(defaultRoot, 'default_root');
+      candidates.push(...defaultRows);
+    }
+    const registryRows = await discoverRegistryPackages(options);
+    candidates.push(...registryRows);
+
+    const byPackageId = new Map();
+    candidates.forEach((row) => {
+      const key = normalizePackageId(row?.packageId || '');
+      if (!key) return;
+      const current = byPackageId.get(key) || null;
+      byPackageId.set(key, selectBetterCandidate(current, row));
+    });
+
+    return Array.from(byPackageId.values())
+      .map((row) => ({
+        ...row,
+        source: cleanText(row?.source, 80).toLowerCase() || 'configured_root',
+        manifestResolved: row?.manifestResolved === true,
+        availability: row?.manifestResolved === true && row?.valid === true ? 'available' : 'missing_manifest',
+        warning: cleanText(row?.warning || row?.error || '', 1200)
+      }))
+      .sort((a, b) => String(a.packageId || '').localeCompare(String(b.packageId || '')));
   }
 
   async function findPackageById(packageId = '', options = {}) {
     const token = normalizePackageId(packageId);
     if (!token) throw new Error('packageId is required.');
     const rows = await discoverLocalPackages(options);
-    const match = rows.find((row) => row.packageId === token && row.valid);
+    const match = rows.find((row) => row.packageId === token);
     if (!match) throw new Error(`Package "${token}" was not found in local package storage.`);
+    if (match.manifestResolved !== true || match.valid !== true) {
+      const reason = cleanText(match.warning || match.error || '', 800)
+        || 'Manifest file is missing or unreadable for this package.';
+      throw new Error(`Package "${token}" is unavailable for build: ${reason}`);
+    }
     return match;
   }
 
@@ -397,54 +646,243 @@ function createService(overrides = {}) {
     }
     if (normalizedRows.length) return normalizedRows;
 
-    if (cleanText(options.backendMode, 40).toLowerCase() === 'json') {
-      const inferred = await inferDataEntitiesFromDataDirectory(packageId);
-      inferred.forEach((row) => pushEntity(row.entityType, row.source, row.label));
-    }
+    const inferred = await inferDataEntitiesFromDataDirectory(packageId);
+    inferred.forEach((row) => pushEntity(row.entityType, row.source, row.label));
     return normalizedRows;
   }
 
   async function fetchEntityRows(entityType = '', options = {}) {
-    const rows = await deps.dataService.fetchData(entityType, {}, SYSTEM_CONTEXT, {
-      backendMode: options.backendMode
+    try {
+      const rows = await deps.dataService.fetchData(entityType, {}, SYSTEM_CONTEXT, {
+        backendMode: options.backendMode
+      });
+      return Array.isArray(rows) ? rows : [];
+    } catch (error) {
+      if (!isUnknownEntityTypeError(error)) throw error;
+
+      const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+      if (backendMode === 'json') {
+        const filePath = deps.path.join(process.cwd(), 'data', `${entityType}.json`);
+        if (!(await pathExists(filePath))) return [];
+        const payload = readJsonFile(filePath);
+        return Array.isArray(payload) ? payload : [];
+      }
+
+      if (backendMode === 'mongo') {
+        if (typeof deps.getMongoDbOrNull === 'function' && !deps.getMongoDbOrNull()) {
+          throw new Error(`Mongo is not connected for fallback entity read: ${entityType}`);
+        }
+        if (typeof deps.getMongoCollection !== 'function') {
+          throw new Error(`Mongo collection resolver is unavailable for fallback entity read: ${entityType}`);
+        }
+        const collection = deps.getMongoCollection(entityType);
+        const docs = await collection.find({}).toArray();
+        return Array.isArray(docs) ? docs.map((row) => {
+          if (!row || typeof row !== 'object') return row;
+          if (row._id !== undefined && row.id === undefined) {
+            return { ...row, id: String(row._id) };
+          }
+          return row;
+        }) : [];
+      }
+
+      throw error;
+    }
+  }
+
+  async function resolveOriginOrgId(inputOriginOrgId = '', options = {}) {
+    const inputText = cleanText(inputOriginOrgId, 160);
+    const originOrgId = normalizeOrgToken(inputText);
+    if (!inputText) {
+      throw new Error('Origin organization is required. Select an origin org before preflight/build.');
+    }
+
+    const candidateTokens = new Set([
+      inputText,
+      originOrgId,
+      originOrgId.replace(/^ORG_/i, '')
+    ].filter(Boolean));
+
+    let organizations = [];
+    const actorContext = options.actor || SYSTEM_CONTEXT;
+    if (deps.dataService && typeof deps.dataService.fetchData === 'function') {
+      organizations = await deps.dataService.fetchData('organizations', {}, actorContext, {
+        backendMode: options.backendMode
+      }).catch(() => []);
+    }
+
+    if (!Array.isArray(organizations) || !organizations.length) {
+      // Fallback path for environments where organization listing is unavailable.
+      if (deps.dataService && typeof deps.dataService.getDataById === 'function') {
+        let resolved = null;
+        for (const candidate of Array.from(candidateTokens)) {
+          // eslint-disable-next-line no-await-in-loop
+          resolved = await deps.dataService.getDataById('organizations', candidate, actorContext, {
+            backendMode: options.backendMode
+          }).catch(() => null);
+          if (resolved) break;
+        }
+        if (!resolved) {
+          throw new Error(`Origin organization "${originOrgId || inputText}" was not found.`);
+        }
+      } else {
+        throw new Error(`Origin organization "${originOrgId || inputText}" was not found.`);
+      }
+      return originOrgId || inputText;
+    }
+
+    const match = organizations.find((row) => {
+      const rowId = cleanText(row?.id, 160);
+      const rowOrgId = cleanText(row?.orgId, 160);
+      const rowTokens = new Set([
+        rowId,
+        rowOrgId,
+        normalizeOrgToken(rowId),
+        normalizeOrgToken(rowOrgId)
+      ].filter(Boolean));
+      return Array.from(candidateTokens).some((token) => rowTokens.has(token));
     });
-    return Array.isArray(rows) ? rows : [];
+    if (!match) {
+      throw new Error(`Origin organization "${originOrgId || inputText}" was not found.`);
+    }
+
+    const normalizedMatch = normalizeOrgToken(cleanText(match?.orgId, 160))
+      || normalizeOrgToken(cleanText(match?.id, 160))
+      || originOrgId
+      || inputText;
+    return normalizedMatch;
+  }
+
+  function filterRowsByOriginScope(rows = [], originOrgId = '') {
+    const includedRows = [];
+    const summary = {
+      inspectedRows: 0,
+      includedRows: 0,
+      excludedOtherOrgRows: 0,
+      includedUnscopedRows: 0
+    };
+    sanitizeArray(rows).forEach((row) => {
+      summary.inspectedRows += 1;
+      const scope = evaluateRowOriginScope(row, originOrgId);
+      if (scope.include) {
+        includedRows.push(row);
+        summary.includedRows += 1;
+        if (scope.includesUnscoped) summary.includedUnscopedRows += 1;
+      } else {
+        summary.excludedOtherOrgRows += 1;
+      }
+    });
+    return { rows: includedRows, summary };
   }
 
   async function preflightBuild(input = {}, options = {}) {
     const packageId = normalizePackageId(input.packageId);
     if (!packageId) throw new Error('packageId is required.');
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    const originOrgId = await resolveOriginOrgId(input.originOrgId, {
+      backendMode,
+      actor: options.actor || null
+    });
     const packageRow = await findPackageById(packageId, options);
     const availableDataEntities = await resolveDataEntities(packageRow.manifest, packageId, { backendMode });
-    const selectedDataEntityTokens = sanitizeArray(input.selectedDataEntities)
-      .map((item) => cleanText(item, 200))
-      .filter(Boolean);
-    const selectedDataEntities = selectedDataEntityTokens.length
-      ? availableDataEntities.filter((row) => selectedDataEntityTokens.includes(row.entityType) || selectedDataEntityTokens.includes(row.id))
-      : availableDataEntities;
-
+    const selectedDataEntityTokens = new Set(
+      sanitizeArray(input.selectedDataEntities)
+        .map((item) => cleanText(item, 200))
+        .filter(Boolean)
+    );
     const detectedUploadUrls = new Set();
+    const detectedSymbolUploadUrls = new Set(extractSymbolUploadRefs(packageRow.manifest));
+    const entityCatalog = [];
     const warnings = [];
     let selectedRowCount = 0;
-    for (const entity of selectedDataEntities) {
+    const originScopeSummary = {
+      inspectedRows: 0,
+      includedRows: 0,
+      excludedOtherOrgRows: 0,
+      includedUnscopedRows: 0
+    };
+    const remapImpactPreview = {
+      rewrittenOrgFields: 0,
+      rewrittenUploadUrls: 0,
+      rewrittenExactOrgTokens: 0
+    };
+
+    for (const entity of availableDataEntities) {
+      const isSelected = selectedDataEntityTokens.size === 0
+        ? true
+        : (selectedDataEntityTokens.has(entity.entityType) || selectedDataEntityTokens.has(entity.id));
       try {
         // eslint-disable-next-line no-await-in-loop
-        const rows = await fetchEntityRows(entity.entityType, { backendMode });
-        selectedRowCount += rows.length;
-        rows.forEach((row) => extractUploadUrls(row, detectedUploadUrls));
+        const rowsRaw = await fetchEntityRows(entity.entityType, { backendMode });
+        const scoped = filterRowsByOriginScope(rowsRaw, originOrgId);
+        const rows = scoped.rows;
+        originScopeSummary.inspectedRows += scoped.summary.inspectedRows;
+        originScopeSummary.includedRows += scoped.summary.includedRows;
+        originScopeSummary.excludedOtherOrgRows += scoped.summary.excludedOtherOrgRows;
+        originScopeSummary.includedUnscopedRows += scoped.summary.includedUnscopedRows;
+        const entityUploads = new Set();
+        const remapEntityState = { rewrittenFieldCount: 0, rewrittenUrlCount: 0, rewrittenExactTokenCount: 0, pathHits: [] };
+        rows.forEach((row) => {
+          extractUploadUrls(row, entityUploads);
+          transformForOrgRemap(row, remapEntityState);
+        });
+        if (isSelected) {
+          selectedRowCount += rows.length;
+          entityUploads.forEach((url) => detectedUploadUrls.add(url));
+          remapImpactPreview.rewrittenOrgFields += remapEntityState.rewrittenFieldCount;
+          remapImpactPreview.rewrittenUploadUrls += remapEntityState.rewrittenUrlCount;
+          remapImpactPreview.rewrittenExactOrgTokens += remapEntityState.rewrittenExactTokenCount;
+        }
+        entityCatalog.push({
+          ...entity,
+          rowCount: rows.length,
+          detectedUploadRefCount: entityUploads.size,
+          remapCandidates: {
+            orgFieldCount: remapEntityState.rewrittenFieldCount,
+            uploadUrlCount: remapEntityState.rewrittenUrlCount,
+            exactOrgTokenCount: remapEntityState.rewrittenExactTokenCount
+          },
+          originScope: scoped.summary,
+          selected: isSelected
+        });
       } catch (error) {
         warnings.push(`Failed to inspect data entity "${entity.entityType}": ${cleanText(error?.message || String(error), 400)}`);
+        entityCatalog.push({
+          ...entity,
+          rowCount: 0,
+          detectedUploadRefCount: 0,
+          remapCandidates: {
+            orgFieldCount: 0,
+            uploadUrlCount: 0,
+            exactOrgTokenCount: 0
+          },
+          originScope: {
+            inspectedRows: 0,
+            includedRows: 0,
+            excludedOtherOrgRows: 0,
+            includedUnscopedRows: 0
+          },
+          inspectionError: true,
+          selected: isSelected
+        });
       }
     }
 
+    const selectedDataEntities = entityCatalog.filter((row) => row.selected);
+
     const manualFileRefs = parseManualFileRefs(input.selectedFileRefs || []);
-    const combinedFileRefs = Array.from(new Set([...Array.from(detectedUploadUrls), ...manualFileRefs]));
+    const combinedFileRefs = Array.from(new Set([
+      ...Array.from(detectedUploadUrls),
+      ...Array.from(detectedSymbolUploadUrls),
+      ...manualFileRefs
+    ]));
     const normalizedFileRefs = combinedFileRefs.map((item) => {
       const uploadRelative = uploadPathUtils.extractRelativeUploadPath(item);
       return {
         ref: item,
-        type: uploadRelative ? 'upload-url' : 'manual',
+        type: uploadRelative
+          ? (detectedSymbolUploadUrls.has(item) ? 'symbol-upload-url' : 'upload-url')
+          : 'manual',
         uploadRelativePath: uploadRelative || '',
         exists: uploadRelative ? fs.existsSync(uploadPathUtils.fromUploadsUrlToDiskPath(item) || '') : true
       };
@@ -459,11 +897,16 @@ function createService(overrides = {}) {
         manifestPath: packageRow.storedManifestPath
       },
       backendMode,
+      originOrgId,
+      originScopeSummary,
       availableDataEntities,
+      entityCatalog,
       selectedDataEntities,
       selectedRowCount,
+      remapImpactPreview,
       filePlan: {
         detectedFromData: Array.from(detectedUploadUrls),
+        detectedFromSymbols: Array.from(detectedSymbolUploadUrls),
         manualRefs: manualFileRefs,
         normalizedRefs: normalizedFileRefs
       },
@@ -538,13 +981,26 @@ function createService(overrides = {}) {
     }
     const preflight = await preflightBuild(input, { ...options, backendMode });
     const selectedEntityRows = sanitizeArray(preflight.selectedDataEntities);
-    const dataPayload = {};
-    const remapState = { rewrittenUrlCount: 0, rewrittenFieldCount: 0 };
+    const originOrgId = cleanText(preflight.originOrgId, 160);
+    const tablePayload = {};
+    const remapState = { rewrittenUrlCount: 0, rewrittenFieldCount: 0, rewrittenExactTokenCount: 0 };
+    const originScopeSummary = {
+      inspectedRows: 0,
+      includedRows: 0,
+      excludedOtherOrgRows: 0,
+      includedUnscopedRows: 0
+    };
 
     for (const entity of selectedEntityRows) {
       // eslint-disable-next-line no-await-in-loop
-      const rows = await fetchEntityRows(entity.entityType, { backendMode });
-      dataPayload[entity.entityType] = rows.map((row) => transformForOrgRemap(row, remapState));
+      const rowsRaw = await fetchEntityRows(entity.entityType, { backendMode });
+      const scoped = filterRowsByOriginScope(rowsRaw, originOrgId);
+      const rows = scoped.rows;
+      originScopeSummary.inspectedRows += scoped.summary.inspectedRows;
+      originScopeSummary.includedRows += scoped.summary.includedRows;
+      originScopeSummary.excludedOtherOrgRows += scoped.summary.excludedOtherOrgRows;
+      originScopeSummary.includedUnscopedRows += scoped.summary.includedUnscopedRows;
+      tablePayload[entity.entityType] = rows.map((row) => transformForOrgRemap(row, remapState));
     }
 
     const fileRefs = sanitizeArray(preflight.filePlan?.normalizedRefs).map((row) => ({
@@ -556,7 +1012,8 @@ function createService(overrides = {}) {
     const stageRoot = await deps.fs.mkdtemp(deps.path.join(deps.os.tmpdir(), `pkg-build-${packageId}-`));
     const stagedPackageDir = deps.path.join(stageRoot, packageId);
     const payloadDir = deps.path.join(stagedPackageDir, '__builder_payload__');
-    const payloadFilesDir = deps.path.join(payloadDir, 'files');
+    const payloadFilesDir = deps.path.join(payloadDir, 'artifacts');
+    const payloadTablesDir = deps.path.join(payloadDir, 'tables');
     let copiedFileReport = { copied: [], warnings: [] };
     let artifactPaths = null;
 
@@ -568,29 +1025,53 @@ function createService(overrides = {}) {
       await deps.fs.writeFile(stagedManifestPath, JSON.stringify(stagedManifest, null, 2));
 
       await deps.fs.mkdir(payloadFilesDir, { recursive: true });
+      await deps.fs.mkdir(payloadTablesDir, { recursive: true });
       copiedFileReport = await copySelectedRefs(fileRefs, payloadFilesDir);
+      const tableIndex = [];
+      for (const entity of selectedEntityRows) {
+        const entityType = cleanText(entity?.entityType, 200);
+        if (!entityType) continue;
+        const rows = sanitizeArray(tablePayload[entityType]);
+        const fileName = `${entityType}.json`;
+        // eslint-disable-next-line no-await-in-loop
+        await deps.fs.writeFile(deps.path.join(payloadTablesDir, fileName), JSON.stringify(rows, null, 2));
+        tableIndex.push({
+          entityType,
+          file: `tables/${fileName}`,
+          rowCount: rows.length
+        });
+      }
+
       const payload = {
-        schema: 'core.package-builder.payload.v1',
+        schema: 'core.package-builder.payload.v2',
         buildId: `PKG_BUILD_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         packageId,
         packageName: packageRow.packageName,
         packageVersion: requestedVersion,
         backendMode,
+        originOrgId,
         createdAt: new Date().toISOString(),
         orgRemapRequired: remapState.rewrittenFieldCount > 0 || remapState.rewrittenUrlCount > 0,
         remapSummary: {
           rewrittenOrgFields: remapState.rewrittenFieldCount,
-          rewrittenUploadUrls: remapState.rewrittenUrlCount
+          rewrittenUploadUrls: remapState.rewrittenUrlCount,
+          rewrittenExactOrgTokens: remapState.rewrittenExactTokenCount
         },
-        selectedDataEntities: selectedEntityRows,
-        data: dataPayload,
+        selectedDataEntities: selectedEntityRows.map((row) => ({
+          id: row?.id,
+          entityType: row?.entityType,
+          label: row?.label,
+          rowCount: Number(row?.rowCount || 0)
+        })),
+        tables: tableIndex,
+        artifactsRoot: 'artifacts',
         fileRefs,
         copiedFiles: copiedFileReport.copied.map((row) => ({
           relativePath: row.relativePath,
           type: row.type
         }))
       };
-      await deps.fs.writeFile(deps.path.join(payloadDir, 'payload.json'), JSON.stringify(payload, null, 2));
+      await deps.fs.writeFile(deps.path.join(payloadDir, 'manifest.json'), JSON.stringify(payload, null, 2));
 
       const zip = new PizZip();
       const stagedFiles = walkFiles(stagedPackageDir);
@@ -621,9 +1102,11 @@ function createService(overrides = {}) {
         buildId: payload.buildId,
         packageId,
         version: requestedVersion,
+        originOrgId,
+        originScopeSummary,
         dataSummary: {
           entityCount: selectedEntityRows.length,
-          rowCount: Object.values(dataPayload).reduce((sum, rows) => sum + sanitizeArray(rows).length, 0)
+          rowCount: Object.values(tablePayload).reduce((sum, rows) => sum + sanitizeArray(rows).length, 0)
         },
         fileSummary: {
           selectedRefCount: fileRefs.length,
@@ -643,6 +1126,45 @@ function createService(overrides = {}) {
     }
   }
 
+  async function loadBuilderPayload(packageDir = '') {
+    const payloadRoot = path.join(packageDir, '__builder_payload__');
+    const manifestPath = path.join(payloadRoot, 'manifest.json');
+    if (await pathExists(manifestPath)) {
+      const manifest = readJsonFile(manifestPath);
+      const tables = sanitizeArray(manifest?.tables);
+      const data = {};
+      for (const row of tables) {
+        const entityType = cleanText(row?.entityType, 200);
+        const relativeFile = cleanText(row?.file, 1000);
+        if (!entityType || !relativeFile) continue;
+        const absoluteFile = path.resolve(payloadRoot, relativeFile);
+        if (!(await pathExists(absoluteFile))) {
+          throw new Error(`Builder payload table file is missing: ${relativeFile}`);
+        }
+        // eslint-disable-next-line no-await-in-loop
+        data[entityType] = sanitizeArray(readJsonFile(absoluteFile));
+      }
+      return {
+        format: 'v2',
+        manifest,
+        data,
+        orgRemapRequired: manifest?.orgRemapRequired === true,
+        artifactsRoot: cleanText(manifest?.artifactsRoot, 200) || 'artifacts'
+      };
+    }
+
+    const legacyPayloadPath = path.join(payloadRoot, 'payload.json');
+    if (!(await pathExists(legacyPayloadPath))) return null;
+    const payload = readJsonFile(legacyPayloadPath);
+    return {
+      format: 'v1',
+      manifest: payload,
+      data: sanitizeObject(payload?.data),
+      orgRemapRequired: payload?.orgRemapRequired === true,
+      artifactsRoot: 'files'
+    };
+  }
+
   async function applyBuilderPayloadIfPresent(context = {}, options = {}) {
     const manifestPath = cleanText(context.manifestPath, 2000);
     if (!manifestPath) {
@@ -655,8 +1177,8 @@ function createService(overrides = {}) {
       };
     }
     const packageDir = path.dirname(path.resolve(manifestPath));
-    const payloadPath = path.join(packageDir, '__builder_payload__', 'payload.json');
-    if (!(await pathExists(payloadPath))) {
+    const loadedPayload = await loadBuilderPayload(packageDir);
+    if (!loadedPayload) {
       return {
         applied: false,
         orgRemapRequired: false,
@@ -665,8 +1187,9 @@ function createService(overrides = {}) {
         warnings: []
       };
     }
-    const payload = readJsonFile(payloadPath);
-    const orgRemapRequired = payload?.orgRemapRequired === true;
+    const payload = loadedPayload.manifest;
+    const payloadData = sanitizeObject(loadedPayload.data);
+    const orgRemapRequired = loadedPayload.orgRemapRequired === true;
     const targetOrgId = normalizeOrgToken(options.targetOrgId || '');
     if (orgRemapRequired && !targetOrgId) {
       const error = new Error('Target organization is required for this package install because exported data contains org-bound fields/URLs.');
@@ -679,7 +1202,7 @@ function createService(overrides = {}) {
         orgRemapRequired,
         targetOrgId: targetOrgId || '',
         dataSummary: {
-          entityCount: Object.keys(sanitizeObject(payload?.data)).length,
+          entityCount: Object.keys(payloadData).length,
           upserted: 0
         },
         fileSummary: {
@@ -692,9 +1215,9 @@ function createService(overrides = {}) {
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
     let upserted = 0;
     const warnings = [];
-    const entityNames = Object.keys(sanitizeObject(payload?.data));
+    const entityNames = Object.keys(payloadData);
     for (const entityType of entityNames) {
-      const rows = sanitizeArray(payload.data[entityType]).map((row) => (
+      const rows = sanitizeArray(payloadData[entityType]).map((row) => (
         orgRemapRequired ? applyOrgRemap(row, targetOrgId) : row
       ));
       for (const row of rows) {
@@ -719,7 +1242,7 @@ function createService(overrides = {}) {
       }
     }
 
-    const sourceFilesRoot = path.join(packageDir, '__builder_payload__', 'files');
+    const sourceFilesRoot = path.join(packageDir, '__builder_payload__', loadedPayload.artifactsRoot || 'files');
     let copiedFiles = 0;
     if (await pathExists(sourceFilesRoot)) {
       const uploadRoot = uploadPathUtils.getUploadRootAbsolute();

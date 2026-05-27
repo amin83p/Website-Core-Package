@@ -41,8 +41,8 @@ test('package builder page controller renders package rows and action state', as
     systemSettingsRepository.getSettings = async () => ({ app: {} });
     dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json', mongo: { ready: false } });
     systemSettingsPackageBuilderService.discoverLocalPackages = async () => ([
-      { packageId: 'pte', packageName: 'PTE', version: '1.0.0', storedManifestPath: 'packages/pte/package.manifest.json', valid: true },
-      { packageId: 'broken', storedManifestPath: 'packages/broken/package.manifest.json', valid: false, error: 'Invalid manifest' }
+      { packageId: 'pte', packageName: 'PTE', version: '1.0.0', storedManifestPath: 'packages/pte/package.manifest.json', valid: true, manifestResolved: true },
+      { packageId: 'broken', storedManifestPath: 'packages/broken/package.manifest.json', valid: false, manifestResolved: false, error: 'Invalid manifest' }
     ]);
     dataService.fetchData = async () => ([
       { id: 'ORG_900000', name: 'Primary Org' }
@@ -59,7 +59,8 @@ test('package builder page controller renders package rows and action state', as
     assert.equal(Array.isArray(res.rendered?.payload?.packages), true);
     assert.equal(Array.isArray(res.rendered?.payload?.packageWarnings), true);
     assert.equal(Array.isArray(res.rendered?.payload?.organizations), true);
-    assert.equal(res.rendered?.payload?.packages.length, 1);
+    assert.equal(res.rendered?.payload?.packages.length, 2);
+    assert.equal(res.rendered?.payload?.packageWarnings.length, 1);
   } finally {
     systemSettingsRepository.getSettings = originalGetSettings;
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
@@ -77,6 +78,7 @@ test('package builder preflight/build controllers return structured payloads', a
     dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json' });
     systemSettingsPackageBuilderService.preflightBuild = async () => ({
       package: { packageId: 'pte' },
+      originOrgId: 'ORG_900000',
       selectedDataEntities: [{ entityType: 'pteApplicants' }]
     });
     systemSettingsPackageBuilderService.buildPackage = async () => ({
@@ -88,7 +90,7 @@ test('package builder preflight/build controllers return structured payloads', a
     const preflightRes = makeRenderResponse();
     await systemSettingsController.preflightPackageBuilder(
       {
-        body: { packageId: 'pte', selectedDataEntities: 'pteApplicants' },
+        body: { packageId: 'pte', originOrgId: 'ORG_900000', selectedDataEntities: 'pteApplicants' },
         user: { id: 'USER_PRE_1' }
       },
       preflightRes
@@ -100,7 +102,7 @@ test('package builder preflight/build controllers return structured payloads', a
     const buildRes = makeRenderResponse();
     await systemSettingsController.buildPackageFromBuilder(
       {
-        body: { packageId: 'pte', version: '1.0.1' },
+        body: { packageId: 'pte', version: '1.0.1', originOrgId: 'ORG_900000' },
         user: { id: 'USER_BUILD_1' }
       },
       buildRes
@@ -108,6 +110,43 @@ test('package builder preflight/build controllers return structured payloads', a
     assert.equal(buildRes.statusCode, 200);
     assert.equal(buildRes.jsonPayload?.status, 'success');
     assert.equal(buildRes.jsonPayload?.report?.version, '1.0.1');
+  } finally {
+    dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
+    systemSettingsPackageBuilderService.preflightBuild = originalPreflight;
+    systemSettingsPackageBuilderService.buildPackage = originalBuild;
+  }
+});
+
+test('package builder controllers reject missing origin org', async () => {
+  const originalRuntimeStatus = dataBackendRuntimeService.getPublicBackendStatus;
+  const originalPreflight = systemSettingsPackageBuilderService.preflightBuild;
+  const originalBuild = systemSettingsPackageBuilderService.buildPackage;
+  try {
+    dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json' });
+    systemSettingsPackageBuilderService.preflightBuild = async () => {
+      throw new Error('Origin organization is required. Select an origin org before preflight/build.');
+    };
+    systemSettingsPackageBuilderService.buildPackage = async () => {
+      throw new Error('Origin organization is required. Select an origin org before preflight/build.');
+    };
+
+    const preflightRes = makeRenderResponse();
+    await systemSettingsController.preflightPackageBuilder(
+      { body: { packageId: 'pte' }, user: { id: 'USER_PRE_2' } },
+      preflightRes
+    );
+    assert.equal(preflightRes.statusCode, 400);
+    assert.equal(preflightRes.jsonPayload?.status, 'error');
+    assert.match(String(preflightRes.jsonPayload?.message || ''), /origin organization is required/i);
+
+    const buildRes = makeRenderResponse();
+    await systemSettingsController.buildPackageFromBuilder(
+      { body: { packageId: 'pte', version: '1.0.1' }, user: { id: 'USER_BUILD_2' } },
+      buildRes
+    );
+    assert.equal(buildRes.statusCode, 400);
+    assert.equal(buildRes.jsonPayload?.status, 'error');
+    assert.match(String(buildRes.jsonPayload?.message || ''), /origin organization is required/i);
   } finally {
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
     systemSettingsPackageBuilderService.preflightBuild = originalPreflight;
@@ -124,9 +163,10 @@ test('package builder EJS compiles and includes expected controls', () => {
     runtimeBackend: { mode: 'json' },
     packageStorageRoot: '/tmp/pkgs',
     packages: [
-      { packageId: 'pte', version: '1.0.0', storedManifestPath: 'packages/pte/package.manifest.json', valid: true }
+      { packageId: 'pte', version: '1.0.0', storedManifestPath: 'packages/pte/package.manifest.json', valid: true, manifestResolved: true },
+      { packageId: 'broken', version: '1.0.0', storedManifestPath: 'packages/broken/package.manifest.json', valid: false, manifestResolved: false, warning: 'Manifest missing' }
     ],
-    packageWarnings: [],
+    packageWarnings: [{ packageId: 'broken', warning: 'Manifest missing' }],
     organizations: [{ id: 'ORG_900000', name: 'Primary Org' }],
     actionStateId: 'STATE_VIEW_BUILDER'
   });
@@ -136,5 +176,10 @@ test('package builder EJS compiles and includes expected controls', () => {
   assert.match(html, /\/systemSettings\/package-builder\/preflight/);
   assert.match(html, /\/systemSettings\/package-builder\/build/);
   assert.match(html, /Target Version/);
+  assert.match(html, /Origin Org/);
+  assert.match(html, /Package-Owned Tables \/ Collections/);
+  assert.match(html, /Select All/);
   assert.match(html, /Manual File\/Folder Refs/);
+  assert.match(html, /Package Storage Root/);
+  assert.match(html, /Unavailable: Missing\/Invalid Manifest/);
 });

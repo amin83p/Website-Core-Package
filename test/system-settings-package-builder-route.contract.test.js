@@ -132,7 +132,7 @@ test('package builder GET route reaches controller with dedicated section access
   });
 });
 
-test('package builder preflight/build POST routes require token and admin approval', async () => {
+test('package builder preflight/build POST routes enforce token and build admin approval', async () => {
   await withStubbedSystemSettingsRoutes(async (router) => {
     const app = express();
     app.use(express.urlencoded({ extended: false }));
@@ -146,10 +146,25 @@ test('package builder preflight/build POST routes require token and admin approv
           'x-allow-access': 'yes',
           'content-type': 'application/x-www-form-urlencoded'
         },
-        body: new URLSearchParams({ packageId: 'pte' }).toString()
+        body: new URLSearchParams({ packageId: 'pte', originOrgId: 'ORG_900000' }).toString()
       });
       assert.equal(missingToken.status, 403);
       assert.equal((await missingToken.json()).status, 'token_required');
+
+      const preflightAllowed = await fetch(`${baseUrl}/systemSettings/package-builder/preflight`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ packageId: 'pte', originOrgId: 'ORG_900000', actionStateId: 'STATE_PRE_1' }).toString()
+      });
+      assert.equal(preflightAllowed.status, 200);
+      const preflightBody = await preflightAllowed.json();
+      assert.equal(preflightBody.handler, 'preflightPackageBuilder');
+      assert.equal(preflightBody.actionState.requireToken, true);
+      assert.equal(preflightBody.actionState.actionStateId, 'STATE_PRE_1');
 
       const missingAdmin = await fetch(`${baseUrl}/systemSettings/package-builder/build`, {
         method: 'POST',
@@ -158,7 +173,7 @@ test('package builder preflight/build POST routes require token and admin approv
           'x-allow-access': 'yes',
           'content-type': 'application/x-www-form-urlencoded'
         },
-        body: new URLSearchParams({ packageId: 'pte', version: '1.0.1', actionStateId: 'STATE_1' }).toString()
+        body: new URLSearchParams({ packageId: 'pte', version: '1.0.1', originOrgId: 'ORG_900000', actionStateId: 'STATE_1' }).toString()
       });
       assert.equal(missingAdmin.status, 403);
       assert.equal((await missingAdmin.json()).status, 'admin_required');
@@ -171,7 +186,7 @@ test('package builder preflight/build POST routes require token and admin approv
           'x-admin-verified': 'yes',
           'content-type': 'application/x-www-form-urlencoded'
         },
-        body: new URLSearchParams({ packageId: 'pte', version: '1.0.1', actionStateId: 'STATE_2' }).toString()
+        body: new URLSearchParams({ packageId: 'pte', version: '1.0.1', originOrgId: 'ORG_900000', actionStateId: 'STATE_2' }).toString()
       });
       assert.equal(allowed.status, 200);
       const body = await allowed.json();

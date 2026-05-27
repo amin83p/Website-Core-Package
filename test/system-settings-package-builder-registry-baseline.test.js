@@ -33,3 +33,30 @@ test('json baseline includes SYSTEM_PACKAGE_BUILDER symbol', () => {
   const tags = Array.isArray(symbol.tags) ? symbol.tags.map((t) => String(t)) : [];
   assert.ok(tags.includes('731287'), 'SYSTEM_PACKAGE_BUILDER symbol tags should include section id.');
 });
+
+test('core bootstrap baseline includes SYSTEM_PACKAGE_BUILDER section and navigator linkage', () => {
+  const sectionsPath = path.join(process.cwd(), 'data', 'bootstrap', 'core', 'sections.json');
+  const sections = JSON.parse(fs.readFileSync(sectionsPath, 'utf8'));
+
+  const section = sections.find((row) => String(row?.name || '').trim().toUpperCase() === 'SYSTEM_PACKAGE_BUILDER');
+  assert.ok(section, 'Core bootstrap sections baseline must include SYSTEM_PACKAGE_BUILDER.');
+  assert.equal(String(section.id), '731287');
+  assert.equal(String(section.homeURL || '').trim(), '/systemSettings/package-builder');
+
+  const parent = sections.find((row) => String(row?.id || '') === '883303');
+  assert.ok(parent, 'Core bootstrap SYSTEM_SETTING parent section (id=883303) must exist.');
+  const refs = Array.isArray(parent.subsections) ? parent.subsections : [];
+  const ids = refs.map((row) => String(row?.id || row || '').trim()).filter(Boolean);
+  assert.equal(ids.filter((id) => id === '731287').length, 1, 'Core bootstrap SYSTEM_SETTING should include one SYSTEM_PACKAGE_BUILDER ref.');
+});
+
+test('core bootstrap baseline includes SYSTEM_PACKAGE_BUILDER symbol', () => {
+  const symbolsPath = path.join(process.cwd(), 'data', 'bootstrap', 'core', 'symbols.json');
+  const symbols = JSON.parse(fs.readFileSync(symbolsPath, 'utf8'));
+
+  const symbol = symbols.find((row) => String(row?.name || '').trim().toUpperCase() === 'SYSTEM_PACKAGE_BUILDER');
+  assert.ok(symbol, 'Core bootstrap symbols baseline must include SYSTEM_PACKAGE_BUILDER.');
+  assert.equal(String(symbol.id), 'SYM_SYSTEM_122');
+  assert.equal(String(symbol.type || '').toLowerCase(), 'class');
+  assert.equal(String(symbol.value || '').trim(), 'bi bi-box-seam');
+});

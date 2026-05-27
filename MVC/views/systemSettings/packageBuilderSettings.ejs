@@ -26,6 +26,7 @@
   <% if (packageRoot) { %>
     <div class="alert alert-info border-0 shadow-sm py-2 px-3 mb-3 small">
       <strong>Package Storage Root:</strong> <code><%= packageRoot %></code>
+      <div class="mt-1 text-muted">Discovery also checks default <code>./packages</code> and installed registry metadata to surface missing-package diagnostics.</div>
     </div>
   <% } %>
 
@@ -38,8 +39,15 @@
           <select id="builderPackageId" class="form-select">
             <option value="">Select package</option>
             <% packageRows.forEach((row) => { %>
-              <option value="<%= row.packageId %>" data-version="<%= row.version %>">
-                <%= row.packageId %> - <%= row.version %> (<%= row.storedManifestPath %>)
+              <% const isAvailable = row && row.valid === true && row.manifestResolved === true; %>
+              <% const sourceLabel = row?.source ? String(row.source).replace(/_/g, ' ') : 'configured root'; %>
+              <option
+                value="<%= row.packageId %>"
+                data-version="<%= row.version %>"
+                <%= isAvailable ? '' : 'disabled' %>>
+                <%= row.packageId %> - <%= row.version || '-' %>
+                (<%= row.storedManifestPath || row.manifestPath || sourceLabel %>)
+                <%= isAvailable ? '' : ' [Unavailable: Missing/Invalid Manifest]' %>
               </option>
             <% }) %>
           </select>
@@ -49,9 +57,9 @@
           <input id="builderVersion" type="text" class="form-control" placeholder="1.0.1">
         </div>
         <div class="col-lg-3">
-          <label class="form-label small fw-bold">Install Target Org</label>
-          <select id="builderTargetOrgId" class="form-select">
-            <option value="">(Optional at build time)</option>
+          <label class="form-label small fw-bold">Origin Org</label>
+          <select id="builderOriginOrgId" class="form-select">
+            <option value="">Select origin org</option>
             <% orgRows.forEach((org) => { %>
               <option value="<%= org.id || org.orgId %>"><%= org.name || org.displayName || org.id || org.orgId %> (<%= org.id || org.orgId %>)</option>
             <% }) %>
@@ -61,9 +69,17 @@
 
       <div class="row g-3 mt-1">
         <div class="col-lg-6">
-          <label class="form-label small fw-bold">Selected Data Entities (optional, comma-separated)</label>
-          <input id="builderSelectedDataEntities" type="text" class="form-control" placeholder="pteApplicants,pteCourses,pteAttemptLedger">
-          <div class="small text-muted mt-1">Leave empty to include all package-owned entities discovered by preflight.</div>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <label class="form-label small fw-bold mb-0">Package-Owned Tables / Collections</label>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllEntitiesBtn">Select All</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearEntitiesBtn">Clear</button>
+            </div>
+          </div>
+          <div class="border rounded p-2" style="max-height: 220px; overflow:auto;" id="builderEntityList">
+            <div class="small text-muted">Select a package to load entity list.</div>
+          </div>
+          <div class="small text-muted mt-1">Select origin org first, then tables are discovered and scoped to that org (unscoped rows are included).</div>
         </div>
         <div class="col-lg-6">
           <label class="form-label small fw-bold">Manual File/Folder Refs (one per line)</label>
@@ -85,10 +101,13 @@
 
   <% if (packageWarningsRows.length) { %>
     <div class="alert alert-warning border-0 shadow-sm py-2 px-3 mb-3 small">
-      <div class="fw-semibold mb-1">Some local manifests are invalid:</div>
+      <div class="fw-semibold mb-1">Some packages are unavailable for build:</div>
       <ul class="mb-0 ps-3">
         <% packageWarningsRows.slice(0, 8).forEach((row) => { %>
-          <li><code><%= row.storedManifestPath || row.manifestPath %></code> - <%= row.error || 'Invalid manifest' %></li>
+          <li>
+            <code><%= row.packageId || row.storedManifestPath || row.manifestPath %></code>
+            - <%= row.warning || row.error || 'Missing or invalid manifest' %>
+          </li>
         <% }) %>
       </ul>
     </div>
@@ -112,10 +131,11 @@
   const actionStateId = document.getElementById('builderActionStateId')?.value || '';
   const packageEl = document.getElementById('builderPackageId');
   const versionEl = document.getElementById('builderVersion');
-  const targetOrgEl = document.getElementById('builderTargetOrgId');
-  const dataEntitiesEl = document.getElementById('builderSelectedDataEntities');
+  const originOrgEl = document.getElementById('builderOriginOrgId');
+  const entityListEl = document.getElementById('builderEntityList');
   const fileRefsEl = document.getElementById('builderSelectedFileRefs');
   const outputEl = document.getElementById('builderOutput');
+  let entityCatalog = [];
 
   function setOutput(title, payload) {
     const stamp = new Date().toISOString();
@@ -135,13 +155,6 @@
     return payload;
   }
 
-  function parseCsv(value) {
-    return String(value || '')
-      .split(',')
-      .map((row) => row.trim())
-      .filter(Boolean);
-  }
-
   function parseLines(value) {
     return String(value || '')
       .split(/\r?\n/)
@@ -149,8 +162,54 @@
       .filter(Boolean);
   }
 
+  function getSelectedEntities() {
+    return Array.from(document.querySelectorAll('.builder-entity-checkbox:checked'))
+      .map((node) => String(node.value || '').trim())
+      .filter(Boolean);
+  }
+
+  function setAllEntitiesChecked(checked) {
+    document.querySelectorAll('.builder-entity-checkbox').forEach((node) => {
+      node.checked = checked;
+    });
+  }
+
+  function renderEntityList(rows = []) {
+    entityCatalog = Array.isArray(rows) ? rows : [];
+    if (!entityListEl) return;
+    if (!entityCatalog.length) {
+      entityListEl.innerHTML = '<div class="small text-muted">No package-owned tables found.</div>';
+      return;
+    }
+    entityListEl.innerHTML = entityCatalog.map((row) => {
+      const entityType = String(row?.entityType || row?.id || '').trim();
+      const rowCount = Number(row?.rowCount || 0);
+      const uploadCount = Number(row?.detectedUploadRefCount || 0);
+      const remap = row?.remapCandidates || {};
+      const selected = row?.selected !== false;
+      return `
+        <label class="d-flex align-items-start gap-2 py-1 border-bottom">
+          <input type="checkbox" class="form-check-input mt-1 builder-entity-checkbox" value="${entityType.replace(/"/g, '&quot;')}" ${selected ? 'checked' : ''}>
+          <span class="small">
+            <span class="fw-semibold">${entityType}</span>
+            <span class="text-muted ms-1">(${rowCount} row${rowCount === 1 ? '' : 's'})</span>
+            <div class="text-muted">
+              Upload refs: ${uploadCount} | Remap fields: ${Number(remap.orgFieldCount || 0)} | Upload URLs: ${Number(remap.uploadUrlCount || 0)} | ORG tokens: ${Number(remap.exactOrgTokenCount || 0)}
+            </div>
+          </span>
+        </label>
+      `;
+    }).join('');
+  }
+
   async function runWithWaiting(label, action) {
-    if (typeof showLoading === 'function') showLoading(label || 'Please wait...');
+    if (typeof showLoading === 'function') {
+      showLoading({
+        title: label || 'Please wait...',
+        note: 'Loading package metadata...',
+        operation: 'Package Builder'
+      });
+    }
     try {
       return await action();
     } finally {
@@ -161,7 +220,12 @@
   function showError(error) {
     const message = error?.message || 'Operation failed.';
     if (typeof showMessageModal === 'function') {
-      showMessageModal('Operation Failed', message, 'danger');
+      showMessageModal({
+        title: 'Operation Failed',
+        message,
+        icon: 'error',
+        buttons: [{ text: 'Close', class: 'btn-danger' }]
+      });
       return;
     }
     alert(message);
@@ -169,8 +233,18 @@
 
   async function preflightBuild() {
     const packageId = String(packageEl?.value || '').trim();
+    const originOrgId = String(originOrgEl?.value || '').trim();
     if (!packageId) {
       showError(new Error('Select a package first.'));
+      return;
+    }
+    if (!originOrgId) {
+      showError(new Error('Select origin organization first.'));
+      return;
+    }
+    const selectedDataEntities = getSelectedEntities();
+    if (!selectedDataEntities.length) {
+      showError(new Error('Select at least one table/collection to package.'));
       return;
     }
     const payload = await runWithWaiting('Running package preflight...', async () => fetchJson('/systemSettings/package-builder/preflight', {
@@ -181,26 +255,45 @@
       },
       body: JSON.stringify({
         packageId,
+        originOrgId,
         actionStateId,
-        selectedDataEntities: parseCsv(dataEntitiesEl?.value || ''),
+        selectedDataEntities,
         selectedFileRefs: parseLines(fileRefsEl?.value || '')
       })
     }));
+    if (Array.isArray(payload?.report?.entityCatalog)) {
+      renderEntityList(payload.report.entityCatalog);
+    }
     setOutput('Preflight Result', payload);
     if (typeof showMessageModal === 'function') {
-      showMessageModal('Preflight Complete', payload.message || 'Preflight completed successfully.', 'success');
+      showMessageModal({
+        title: 'Preflight Complete',
+        message: payload.message || 'Preflight completed successfully.',
+        icon: 'success',
+        buttons: [{ text: 'OK', class: 'btn-success' }]
+      });
     }
   }
 
   async function buildPackage() {
     const packageId = String(packageEl?.value || '').trim();
     const version = String(versionEl?.value || '').trim();
+    const originOrgId = String(originOrgEl?.value || '').trim();
     if (!packageId) {
       showError(new Error('Select a package first.'));
       return;
     }
+    if (!originOrgId) {
+      showError(new Error('Select origin organization first.'));
+      return;
+    }
     if (!version) {
       showError(new Error('Enter target version.'));
+      return;
+    }
+    const selectedDataEntities = getSelectedEntities();
+    if (!selectedDataEntities.length) {
+      showError(new Error('Select at least one table/collection to package.'));
       return;
     }
     const payload = await runWithWaiting('Building signed package...', async () => fetchJson('/systemSettings/package-builder/build', {
@@ -212,16 +305,56 @@
       body: JSON.stringify({
         packageId,
         version,
-        targetOrgId: String(targetOrgEl?.value || '').trim(),
+        originOrgId,
         actionStateId,
-        selectedDataEntities: parseCsv(dataEntitiesEl?.value || ''),
+        selectedDataEntities,
         selectedFileRefs: parseLines(fileRefsEl?.value || '')
       })
     }));
     setOutput('Build Result', payload);
     if (typeof showMessageModal === 'function') {
-      showMessageModal('Build Completed', payload.message || 'Package build completed successfully.', 'success');
+      showMessageModal({
+        title: 'Build Completed',
+        message: payload.message || 'Package build completed successfully.',
+        icon: 'success',
+        buttons: [{ text: 'OK', class: 'btn-success' }]
+      });
     }
+  }
+
+  async function loadEntityCatalog() {
+    const packageId = String(packageEl?.value || '').trim();
+    const originOrgId = String(originOrgEl?.value || '').trim();
+    if (!packageId) {
+      renderEntityList([]);
+      return;
+    }
+    if (!originOrgId) {
+      renderEntityList([]);
+      if (entityListEl) {
+        entityListEl.innerHTML = '<div class="small text-muted">Select origin org to load package tables.</div>';
+      }
+      return;
+    }
+    const payload = await runWithWaiting('Loading package tables...', async () => fetchJson('/systemSettings/package-builder/preflight', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-ajax-request': 'yes'
+      },
+      body: JSON.stringify({
+        packageId,
+        originOrgId,
+        actionStateId,
+        selectedDataEntities: [],
+        selectedFileRefs: parseLines(fileRefsEl?.value || '')
+      })
+    }));
+    const catalog = (Array.isArray(payload?.report?.entityCatalog) && payload.report.entityCatalog.length)
+      ? payload.report.entityCatalog
+      : (Array.isArray(payload?.report?.availableDataEntities) ? payload.report.availableDataEntities : []);
+    renderEntityList(catalog);
+    setOutput('Entity Catalog Loaded', payload);
   }
 
   document.getElementById('builderPreflightBtn')?.addEventListener('click', () => {
@@ -230,6 +363,8 @@
   document.getElementById('builderBuildBtn')?.addEventListener('click', () => {
     buildPackage().catch(showError);
   });
+  document.getElementById('builderSelectAllEntitiesBtn')?.addEventListener('click', () => setAllEntitiesChecked(true));
+  document.getElementById('builderClearEntitiesBtn')?.addEventListener('click', () => setAllEntitiesChecked(false));
   document.getElementById('builderClearOutputBtn')?.addEventListener('click', () => {
     outputEl.textContent = 'Ready.';
   });
@@ -238,6 +373,13 @@
     if (!selected) return;
     const version = String(selected.getAttribute('data-version') || '').trim();
     if (version && !versionEl.value.trim()) versionEl.value = version;
+    loadEntityCatalog().catch(showError);
   });
+  originOrgEl?.addEventListener('change', () => {
+    if (packageEl?.value) loadEntityCatalog().catch(showError);
+  });
+  if (packageEl?.value) {
+    loadEntityCatalog().catch(showError);
+  }
 })();
 </script>

@@ -26,8 +26,9 @@ function writeJson(filePath, payload) {
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
 }
 
-function createBaseManifest(version = '1.0.0') {
-  return {
+function createBaseManifest(version = '1.0.0', options = {}) {
+  const includeDataEntities = options.includeDataEntities !== false;
+  const manifest = {
     id: 'pte',
     name: 'PTE',
     version,
@@ -36,13 +37,23 @@ function createBaseManifest(version = '1.0.0') {
     operations: [],
     roles: [],
     sections: [],
-    symbols: [],
+    symbols: [
+      {
+        id: 'SYM1',
+        name: 'PTE_SYMBOL',
+        type: 'path',
+        value: '/uploads/ORG_900000/symbols/logo.png'
+      }
+    ],
     accesses: [],
-    uploadFolders: [],
-    dataEntities: [
-      { entityType: 'pteApplicants', label: 'PTE Applicants' }
-    ]
+    uploadFolders: []
   };
+  if (includeDataEntities) {
+    manifest.dataEntities = [
+      { entityType: 'pteApplicants', label: 'PTE Applicants' }
+    ];
+  }
+  return manifest;
 }
 
 test('preflightBuild discovers manifest data entities and upload refs', async () => {
@@ -56,9 +67,13 @@ test('preflightBuild discovers manifest data entities and upload refs', async ()
       dataService: {
         async fetchData(entityType) {
           if (entityType === 'pteApplicants') {
-            return [{ id: 'A1', orgId: 'ORG_900000', avatarUrl: '/uploads/ORG_900000/symbols/logo.png' }];
+            return [{ id: 'A1', orgId: 'ORG_900000', orgAlias: 'ORG_900000', avatarUrl: '/uploads/ORG_900000/symbols/logo.png' }];
           }
           return [];
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
         }
       },
       packageDataOwnershipService: {
@@ -70,6 +85,7 @@ test('preflightBuild discovers manifest data entities and upload refs', async ()
 
     const report = await service.preflightBuild({
       packageId: 'pte',
+      originOrgId: 'ORG_900000',
       selectedDataEntities: ['pteApplicants']
     }, {
       backendMode: 'json',
@@ -78,7 +94,11 @@ test('preflightBuild discovers manifest data entities and upload refs', async ()
 
     assert.equal(report.package.packageId, 'pte');
     assert.equal(report.selectedDataEntities.length, 1);
+    assert.equal(Array.isArray(report.entityCatalog), true);
+    assert.equal(report.entityCatalog.length, 1);
     assert.equal(report.filePlan.detectedFromData.length, 1);
+    assert.equal(report.filePlan.detectedFromSymbols.length, 1);
+    assert.ok(Number(report.remapImpactPreview?.rewrittenExactOrgTokens || 0) >= 1);
     assert.match(String(report.filePlan.detectedFromData[0]), /\/uploads\/ORG_900000\/symbols\/logo\.png/);
   });
 });
@@ -105,6 +125,10 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
             return [{ id: 'A1', orgId: 'ORG_900000', avatarUrl: '/uploads/ORG_900000/symbols/logo.png' }];
           }
           return [];
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
         }
       },
       packageDataOwnershipService: {
@@ -118,6 +142,7 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
       const report = await service.buildPackage({
         packageId: 'pte',
         version: '1.0.1',
+        originOrgId: 'ORG_900000',
         selectedDataEntities: ['pteApplicants'],
         selectedFileRefs: []
       }, {
@@ -137,10 +162,14 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
       const zip = new PizZip(zipBuffer);
       const names = Object.keys(zip.files || {});
       assert.equal(names.includes('pte/package.manifest.json'), true);
-      assert.equal(names.includes('pte/__builder_payload__/payload.json'), true);
-      const payload = JSON.parse(zip.file('pte/__builder_payload__/payload.json').asText());
+      assert.equal(names.includes('pte/__builder_payload__/manifest.json'), true);
+      assert.equal(names.includes('pte/__builder_payload__/tables/pteApplicants.json'), true);
+      const payload = JSON.parse(zip.file('pte/__builder_payload__/manifest.json').asText());
       assert.equal(payload.orgRemapRequired, true);
       assert.equal(payload.packageVersion, '1.0.1');
+      assert.equal(Array.isArray(payload.tables), true);
+      assert.equal(payload.artifactsRoot, 'artifacts');
+      assert.equal(names.includes('pte/__builder_payload__/artifacts/ORG_900000/symbols/logo.png'), true);
     } finally {
       if (originalKeyFile === undefined) delete process.env.PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE;
       else process.env.PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE = originalKeyFile;
@@ -151,16 +180,17 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
 test('applyBuilderPayloadIfPresent enforces target org for remap and applies data/files when provided', async () => {
   await withTempCwd('pkg-builder-apply-', async (tempRoot) => {
     const packageDir = path.join(tempRoot, 'packages', 'pte');
-    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'files', 'ORG_900000', 'symbols'), { recursive: true });
-    fs.writeFileSync(path.join(packageDir, '__builder_payload__', 'files', 'ORG_900000', 'symbols', 'logo.png'), 'png', 'utf8');
-    writeJson(path.join(packageDir, '__builder_payload__', 'payload.json'), {
-      schema: 'core.package-builder.payload.v1',
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'artifacts', 'ORG_900000', 'symbols'), { recursive: true });
+    fs.writeFileSync(path.join(packageDir, '__builder_payload__', 'artifacts', 'ORG_900000', 'symbols', 'logo.png'), 'png', 'utf8');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
+    writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'pteApplicants.json'), [
+      { id: 'A1', orgId: '{{ORG_ID}}', avatarUrl: '/uploads/{{ORG_ID}}/symbols/logo.png' }
+    ]);
+    writeJson(path.join(packageDir, '__builder_payload__', 'manifest.json'), {
+      schema: 'core.package-builder.payload.v2',
       orgRemapRequired: true,
-      data: {
-        pteApplicants: [
-          { id: 'A1', orgId: '{{ORG_ID}}', avatarUrl: '/uploads/{{ORG_ID}}/symbols/logo.png' }
-        ]
-      }
+      artifactsRoot: 'artifacts',
+      tables: [{ entityType: 'pteApplicants', file: 'tables/pteApplicants.json', rowCount: 1 }]
     });
 
     const updates = [];
@@ -206,6 +236,313 @@ test('applyBuilderPayloadIfPresent enforces target org for remap and applies dat
     assert.equal(updates[0].row.orgId, 'ORG_123');
     assert.equal(updates[0].row.avatarUrl, '/uploads/ORG_123/symbols/logo.png');
     const copiedPath = path.join(tempRoot, 'uploads', 'ORG_123', 'symbols', 'logo.png');
+    assert.equal(await fsp.access(copiedPath).then(() => true).catch(() => false), true);
+  });
+});
+
+test('discoverLocalPackages falls back to default ./packages when configured storage root misses package files', async () => {
+  await withTempCwd('pkg-builder-discovery-fallback-', async (tempRoot) => {
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest('1.2.3'));
+    const originalStorageRoot = process.env.PACKAGE_STORAGE_ROOT;
+    process.env.PACKAGE_STORAGE_ROOT = path.join(tempRoot, 'uploads', 'packages').replace(/\\/g, '/');
+    try {
+      const service = packageBuilderModule.createService({
+        packageRegistryService: {
+          async listPackageRegistry() {
+            return [];
+          }
+        }
+      });
+      const rows = await service.discoverLocalPackages({ backendMode: 'json' });
+      const pte = rows.find((row) => String(row?.packageId || '') === 'pte');
+      assert.ok(pte);
+      assert.equal(pte.source, 'default_root');
+      assert.equal(pte.manifestResolved, true);
+      assert.equal(pte.valid, true);
+    } finally {
+      if (originalStorageRoot === undefined) delete process.env.PACKAGE_STORAGE_ROOT;
+      else process.env.PACKAGE_STORAGE_ROOT = originalStorageRoot;
+    }
+  });
+});
+
+test('discoverLocalPackages includes unresolved registry rows as unavailable with warning', async () => {
+  await withTempCwd('pkg-builder-discovery-registry-', async (tempRoot) => {
+    const packageId = 'ghostpkg';
+    const service = packageBuilderModule.createService({
+      packageRegistryService: {
+        async listPackageRegistry() {
+          return [{
+            packageId,
+            version: '1.0.0',
+            metadata: {
+              packageName: 'Ghost Package',
+              manifestPath: path.join(tempRoot, 'missing', packageId, 'package.manifest.json')
+            }
+          }];
+        }
+      }
+    });
+    const rows = await service.discoverLocalPackages({
+      backendMode: 'json',
+      packageRootDir: path.join(tempRoot, 'configured-root')
+    });
+    const pte = rows.find((row) => String(row?.packageId || '') === packageId);
+    assert.ok(pte);
+    assert.equal(pte.source, 'registry');
+    assert.equal(pte.manifestResolved, false);
+    assert.equal(pte.valid, false);
+    assert.equal(pte.availability, 'missing_manifest');
+    assert.match(String(pte.warning || ''), /manifest file was not found/i);
+  });
+});
+
+test('preflightBuild falls back to package-prefixed data files when manifest and ownership catalog are empty', async () => {
+  await withTempCwd('pkg-builder-data-fallback-', async (tempRoot) => {
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest('1.0.0', {
+      includeDataEntities: false
+    }));
+    writeJson(path.join(tempRoot, 'data', 'pteApplicants.json'), []);
+    writeJson(path.join(tempRoot, 'data', 'pteCourses.json'), []);
+    writeJson(path.join(tempRoot, 'data', 'users.json'), []);
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async fetchData(entityType) {
+          if (entityType === 'pteApplicants') return [{ id: 'A1' }];
+          if (entityType === 'pteCourses') return [{ id: 'C1' }];
+          return [];
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      },
+      packageDataOwnershipService: {
+        async listOwnershipByPackage() {
+          return [];
+        }
+      }
+    });
+
+    const report = await service.preflightBuild({
+      packageId: 'pte',
+      originOrgId: 'ORG_900000',
+      selectedDataEntities: []
+    }, {
+      backendMode: 'mongo',
+      packageRootDir: path.join(tempRoot, 'packages')
+    });
+
+    const entityTypes = report.availableDataEntities.map((row) => String(row?.entityType || ''));
+    assert.equal(entityTypes.includes('pteApplicants'), true);
+    assert.equal(entityTypes.includes('pteCourses'), true);
+    assert.equal(entityTypes.includes('users'), false);
+  });
+});
+
+test('fetchEntityRows falls back to JSON data file when core dataService reports unknown entity type', async () => {
+  await withTempCwd('pkg-builder-json-raw-fallback-', async (tempRoot) => {
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest('1.0.0'));
+    writeJson(path.join(tempRoot, 'data', 'pteApplicants.json'), [
+      { id: 'A1', orgId: 'ORG_900000' },
+      { id: 'A2', orgId: 'ORG_777777' },
+      { id: 'A3', notes: 'unscoped' }
+    ]);
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async fetchData() {
+          throw new Error('Unknown entity type: pteApplicants');
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      },
+      packageDataOwnershipService: {
+        async listOwnershipByPackage() { return []; }
+      }
+    });
+
+    const report = await service.preflightBuild({
+      packageId: 'pte',
+      originOrgId: 'ORG_900000',
+      selectedDataEntities: ['pteApplicants']
+    }, {
+      backendMode: 'json',
+      packageRootDir: path.join(tempRoot, 'packages')
+    });
+
+    const entity = report.entityCatalog.find((row) => row.entityType === 'pteApplicants');
+    assert.ok(entity);
+    assert.equal(entity.rowCount, 2);
+    assert.equal(report.originScopeSummary.excludedOtherOrgRows, 1);
+    assert.equal(report.originScopeSummary.includedUnscopedRows, 1);
+  });
+});
+
+test('fetchEntityRows falls back to Mongo collection when core dataService reports unknown entity type', async () => {
+  await withTempCwd('pkg-builder-mongo-raw-fallback-', async (tempRoot) => {
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest('1.0.0'));
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async fetchData() {
+          throw new Error('Unknown entity type: pteApplicants');
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      },
+      getMongoDbOrNull: () => ({}),
+      getMongoCollection: () => ({
+        find: () => ({
+          toArray: async () => ([
+            { _id: 'A1', orgId: 'ORG_900000' },
+            { _id: 'A2', orgId: 'ORG_777777' },
+            { _id: 'A3', title: 'unscoped' }
+          ])
+        })
+      }),
+      packageDataOwnershipService: {
+        async listOwnershipByPackage() { return []; }
+      }
+    });
+
+    const report = await service.preflightBuild({
+      packageId: 'pte',
+      originOrgId: 'ORG_900000',
+      selectedDataEntities: ['pteApplicants']
+    }, {
+      backendMode: 'mongo',
+      packageRootDir: path.join(tempRoot, 'packages')
+    });
+
+    const entity = report.entityCatalog.find((row) => row.entityType === 'pteApplicants');
+    assert.ok(entity);
+    assert.equal(entity.rowCount, 2);
+    assert.equal(report.originScopeSummary.excludedOtherOrgRows, 1);
+  });
+});
+
+test('preflightBuild rejects package selection when manifest is unresolved', async () => {
+  await withTempCwd('pkg-builder-unavailable-preflight-', async (tempRoot) => {
+    const packageId = 'ghostpkg';
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      },
+      packageRegistryService: {
+        async listPackageRegistry() {
+          return [{ packageId, version: '1.0.0', metadata: { manifestPath: 'packages/ghostpkg/package.manifest.json' } }];
+        }
+      }
+    });
+    await assert.rejects(
+      () => service.preflightBuild({
+        packageId,
+        originOrgId: 'ORG_900000'
+      }, {
+        backendMode: 'json',
+        packageRootDir: path.join(tempRoot, 'configured-root')
+      }),
+      /unavailable for build/i
+    );
+  });
+});
+
+test('preflightBuild requires origin org and scopes rows to selected origin while keeping unscoped rows', async () => {
+  await withTempCwd('pkg-builder-origin-scope-', async (tempRoot) => {
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest('1.0.0'));
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async fetchData(entityType) {
+          if (entityType !== 'pteApplicants') return [];
+          return [
+            { id: 'A1', orgId: 'ORG_900000', avatarUrl: '/uploads/ORG_900000/symbols/a.png' },
+            { id: 'A2', orgId: 'ORG_777777', avatarUrl: '/uploads/ORG_777777/symbols/b.png' },
+            { id: 'A3', title: 'unscoped-row', avatarUrl: '/uploads/GLOBAL/symbols/c.png' },
+            { id: 'A4', orgId: 'ORG_900000', avatarUrl: '/uploads/ORG_777777/symbols/d.png' }
+          ];
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      },
+      packageDataOwnershipService: {
+        async listOwnershipByPackage() { return []; }
+      }
+    });
+
+    await assert.rejects(
+      () => service.preflightBuild({ packageId: 'pte' }, {
+        backendMode: 'json',
+        packageRootDir: path.join(tempRoot, 'packages')
+      }),
+      /origin organization is required/i
+    );
+
+    const report = await service.preflightBuild({
+      packageId: 'pte',
+      originOrgId: 'ORG_900000',
+      selectedDataEntities: ['pteApplicants']
+    }, {
+      backendMode: 'json',
+      packageRootDir: path.join(tempRoot, 'packages')
+    });
+
+    assert.equal(report.originOrgId, 'ORG_900000');
+    assert.equal(report.originScopeSummary.inspectedRows, 4);
+    assert.equal(report.originScopeSummary.includedRows, 3);
+    assert.equal(report.originScopeSummary.excludedOtherOrgRows, 1);
+    assert.equal(report.originScopeSummary.includedUnscopedRows, 1);
+    const catalogRow = report.entityCatalog.find((row) => row.entityType === 'pteApplicants');
+    assert.ok(catalogRow);
+    assert.equal(catalogRow.rowCount, 3);
+  });
+});
+
+test('applyBuilderPayloadIfPresent keeps backward compatibility with legacy payload.json format', async () => {
+  await withTempCwd('pkg-builder-apply-legacy-', async (tempRoot) => {
+    const packageDir = path.join(tempRoot, 'packages', 'pte');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'files', 'ORG_900000', 'symbols'), { recursive: true });
+    fs.writeFileSync(path.join(packageDir, '__builder_payload__', 'files', 'ORG_900000', 'symbols', 'logo.png'), 'png', 'utf8');
+    writeJson(path.join(packageDir, '__builder_payload__', 'payload.json'), {
+      schema: 'core.package-builder.payload.v1',
+      orgRemapRequired: true,
+      data: {
+        pteApplicants: [{ id: 'A1', orgId: '{{ORG_ID}}', avatarUrl: '/uploads/{{ORG_ID}}/symbols/logo.png' }]
+      }
+    });
+
+    const updates = [];
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async getDataById() { return { id: 'A1' }; },
+        async updateData(entityType, id, row) {
+          updates.push({ entityType, id, row });
+          return row;
+        },
+        async addData() { return null; }
+      }
+    });
+
+    const report = await service.applyBuilderPayloadIfPresent({
+      manifestPath: path.join(packageDir, 'package.manifest.json')
+    }, {
+      backendMode: 'json',
+      targetOrgId: 'ORG_777'
+    });
+
+    assert.equal(report.applied, true);
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].row.orgId, 'ORG_777');
+    const copiedPath = path.join(tempRoot, 'uploads', 'ORG_777', 'symbols', 'logo.png');
     assert.equal(await fsp.access(copiedPath).then(() => true).catch(() => false), true);
   });
 });
