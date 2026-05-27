@@ -224,3 +224,43 @@ test('action-state middleware can mint runtime state after target-token mismatch
   assert.equal(calls[1].targetKey, 'S-1');
   assert.equal(calls[1].context.actionStateFallback.reason, 'target_token_mismatch');
 });
+
+test('action-state middleware falls back when inbound token throws target mismatch validation', async () => {
+  const calls = [];
+  dataService.logActionStateAttempt = async (userId, sectionId, operationId, targetKey, limits, forceId, context) => {
+    calls.push({ userId, sectionId, operationId, targetKey, forceId, context });
+    if (forceId === 'OLD-READ-TOKEN') {
+      throw new Error('Action State Token is not valid for this record.');
+    }
+    return {
+      id: 'NEW-TARGET-VALIDATION-TOKEN',
+      targetKey,
+      attemptCount: 1
+    };
+  };
+  dataService.updateActionStateProgress = async () => {};
+  dataService.completeActionState = async () => {};
+  dataService.failActionState = async () => {};
+  dataService.recordActionStateRetryableError = async () => {};
+
+  const req = createReq();
+  const res = createRes();
+  let nextCalled = false;
+  const middleware = trackActionState(SECTIONS.TASKS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true
+  });
+
+  await middleware(req, res, () => {
+    nextCalled = true;
+  });
+
+  assert.equal(nextCalled, true);
+  assert.equal(res.statusCode, 200);
+  assert.equal(req.actionStateId, 'NEW-TARGET-VALIDATION-TOKEN');
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].forceId, 'OLD-READ-TOKEN');
+  assert.equal(calls[1].forceId, null);
+  assert.equal(calls[1].targetKey, 'S-1');
+  assert.equal(calls[1].context.actionStateFallback.reason, 'target_token_mismatch');
+});

@@ -200,6 +200,7 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                 const isLookupMiss = /Action state not found/i.test(errorMessage);
                 const allowInactiveTokenFallback = options.allowInactiveTokenFallback === true;
                 const isOperationMismatch = /Action State Token does not belong to this operation/i.test(errorMessage);
+                const isTargetMismatch = /Action State Token is not valid for this record/i.test(errorMessage);
                 const isInactiveOrExpiredToken =
                     /Action State is no longer active/i.test(errorMessage) ||
                     /Action Session has expired/i.test(errorMessage) ||
@@ -210,7 +211,7 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                     requiresToken &&
                     clientProvidedId &&
                     options.allowOperationTokenFallback === true &&
-                    (isOperationMismatch || (allowInactiveTokenFallback && isInactiveOrExpiredToken));
+                    (isOperationMismatch || isTargetMismatch || (allowInactiveTokenFallback && isInactiveOrExpiredToken));
 
                 if (canFallbackOperationToken) {
                     try {
@@ -224,7 +225,9 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                             {
                                 ...requestContext,
                                 actionStateFallback: {
-                                    reason: isOperationMismatch ? 'operation_token_mismatch' : 'inactive_or_expired_token',
+                                    reason: isOperationMismatch
+                                        ? 'operation_token_mismatch'
+                                        : (isTargetMismatch ? 'target_token_mismatch' : 'inactive_or_expired_token'),
                                     inboundActionStateId: String(clientProvidedId || '').trim()
                                 }
                             }
