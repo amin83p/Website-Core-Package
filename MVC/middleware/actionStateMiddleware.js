@@ -263,9 +263,41 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
             // If the client provided an ActionStateId, ensure it belongs to the same target.
             // This prevents using a valid token from Student A to mutate Student B.
             if (clientProvidedId && state?.targetKey && String(state.targetKey) !== String(targetKey)) {
-                // best-effort mark failed
-                dataService.failActionState(state.id, 0, requestContext).catch(console.error);
-                return sendError(403, "<b>Security Violation</b><br>Action State Token is not valid for this record.");
+                const canFallbackTargetToken =
+                    isMutatingRequest &&
+                    requiresToken &&
+                    options.allowOperationTokenFallback === true;
+                if (canFallbackTargetToken) {
+                    try {
+                        state = await dataService.logActionStateAttempt(
+                            user.id,
+                            section.id,
+                            operation.id,
+                            targetKey,
+                            limits,
+                            null,
+                            {
+                                ...requestContext,
+                                actionStateFallback: {
+                                    reason: 'target_token_mismatch',
+                                    inboundActionStateId: String(clientProvidedId || '').trim(),
+                                    inboundTargetKey: String(state.targetKey || '').trim(),
+                                    resolvedTargetKey: String(targetKey || '').trim()
+                                }
+                            }
+                        );
+                    } catch (fallbackTargetError) {
+                        return sendError(
+                            403,
+                            "<b>Security Violation</b><br>Session Validation Failed: " +
+                                (String(fallbackTargetError?.message || '').trim() || 'Action State Token is not valid for this record.')
+                        );
+                    }
+                } else {
+                    // best-effort mark failed
+                    dataService.failActionState(state.id, 0, requestContext).catch(console.error);
+                    return sendError(403, "<b>Security Violation</b><br>Action State Token is not valid for this record.");
+                }
             }
 
             if (limits.maxAttempts && state.attemptCount > limits.maxAttempts) {
