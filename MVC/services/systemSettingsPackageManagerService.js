@@ -170,6 +170,26 @@ function compareSemver(a = '', b = '') {
   return 0;
 }
 
+function evaluateInstallVersionGate(incomingVersion = '', existingVersion = '', options = {}) {
+  const nextVersion = cleanText(incomingVersion, 120);
+  const previousVersion = cleanText(existingVersion, 120);
+  if (!previousVersion) {
+    return { allowed: true, reinstallRecovery: false, reason: '' };
+  }
+  const semverOrder = compareSemver(nextVersion, previousVersion);
+  if (semverOrder > 0) {
+    return { allowed: true, reinstallRecovery: false, reason: '' };
+  }
+  if (semverOrder === 0 && options.allowSameVersionRecovery === true) {
+    return { allowed: true, reinstallRecovery: true, reason: 'missing_files_recovery' };
+  }
+  return {
+    allowed: false,
+    reinstallRecovery: false,
+    reason: semverOrder === 0 ? 'same_version_blocked' : 'older_version_blocked'
+  };
+}
+
 async function pathExists(localFs, filePath = '') {
   try {
     await localFs.access(filePath);
@@ -722,9 +742,13 @@ function createService(overrides = {}) {
     const previousRegistry = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
     const previousVersion = cleanText(previousRegistry?.version, 120);
     const nextVersion = cleanText(manifest?.version, 120);
-    if (previousVersion && compareSemver(nextVersion, previousVersion) <= 0) {
+    const versionDecision = evaluateInstallVersionGate(nextVersion, previousVersion, {
+      allowSameVersionRecovery: resolved.allowSameVersionRecovery === true
+    });
+    if (!versionDecision.allowed) {
       throw new Error(`Package version must be newer than installed version ${previousVersion}.`);
     }
+    const reinstallRecovery = versionDecision.reinstallRecovery === true;
     const isUpgrade = Boolean(previousRegistry);
     const txAction = cleanText(resolved.action, 80) || (isUpgrade ? 'upgrade' : 'install');
     const transaction = resolved.transactionId
@@ -738,7 +762,8 @@ function createService(overrides = {}) {
           installMethod: cleanText(resolved.installMethod, 80),
           activationMode: cleanText(resolved.activationMode, 120),
           manifestPath: toStoredManifestPath(resolved.manifestPath || ''),
-          previousVersion
+          previousVersion,
+          reinstallRecovery
         },
         artifacts: {
           previousRegistry,
@@ -756,6 +781,9 @@ function createService(overrides = {}) {
     await markLifecyclePhase(transactionId, 'apply', 'in_progress', {}, { backendMode, actor });
 
     const warnings = [];
+    if (reinstallRecovery) {
+      warnings.push('Missing package files were detected. Same-version reinstall recovery mode was applied.');
+    }
     const lifecycleOperations = [];
     const context = {
       backendMode,
@@ -879,6 +907,7 @@ function createService(overrides = {}) {
 
       const report = {
         action: isUpgrade ? 'upgrade' : (resolved.action || 'install'),
+        mode: reinstallRecovery ? 'reinstall_recovery' : 'normal',
         packageId: manifest.id,
         packageName: manifest.name,
         version: manifest.version,
@@ -1111,6 +1140,53 @@ function createService(overrides = {}) {
     };
   }
 
+  async function inspectPackagePresence(packageIdInput = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const packageId = normalizePackageId(packageIdInput);
+    if (!packageId) {
+      return {
+        packageId: '',
+        hasRegistryRow: false,
+        manifestResolved: false,
+        missingFilesRecoveryEligible: false,
+        existing: null,
+        resolved: null,
+        manifestResolutionError: ''
+      };
+    }
+
+    const existing = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
+    if (!existing) {
+      return {
+        packageId,
+        hasRegistryRow: false,
+        manifestResolved: false,
+        missingFilesRecoveryEligible: false,
+        existing: null,
+        resolved: null,
+        manifestResolutionError: ''
+      };
+    }
+
+    let resolved = null;
+    let manifestResolutionError = '';
+    try {
+      resolved = await resolveManifestForRegistryRow(existing, options);
+    } catch (error) {
+      manifestResolutionError = cleanText(error?.message || String(error), 1200);
+    }
+    const manifestResolved = Boolean(resolved?.manifest);
+    return {
+      packageId,
+      hasRegistryRow: true,
+      manifestResolved,
+      missingFilesRecoveryEligible: !manifestResolved,
+      existing,
+      resolved,
+      manifestResolutionError
+    };
+  }
+
   async function listPackageSnapshot(options = {}) {
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const localManifests = await discoverLocalManifests(options);
@@ -1282,18 +1358,15 @@ function createService(overrides = {}) {
     const resolved = await resolveInstallManifest(input, options);
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const packageId = normalizePackageId(resolved?.manifest?.id || '');
-    let previousResolved = null;
-    if (packageId) {
-      const existing = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
-      if (existing) {
-        previousResolved = await resolveManifestForRegistryRow(existing, options).catch(() => null);
-      }
-    }
+    const presence = packageId
+      ? await inspectPackagePresence(packageId, { ...options, backendMode })
+      : { resolved: null, missingFilesRecoveryEligible: false };
     return installResolvedManifest({
       ...resolved,
       action: 'install',
       packageSource: 'manual',
-      previousResolved
+      previousResolved: presence.resolved || null,
+      allowSameVersionRecovery: presence.missingFilesRecoveryEligible === true
     }, options);
   }
 
@@ -1331,14 +1404,10 @@ function createService(overrides = {}) {
       }
 
       const backendMode = cleanText(options.backendMode, 30) || undefined;
-      const existing = await deps.packageRegistryService.getPackageRegistryById(manifest.id, { backendMode });
+      const presence = await inspectPackagePresence(manifest.id, { ...options, backendMode });
+      const existing = presence.existing;
       const existingVersion = cleanText(existing?.version, 120);
-      if (existingVersion && compareSemver(manifest.version, existingVersion) <= 0) {
-        throw new Error(`Package version must be newer than installed version ${existingVersion}.`);
-      }
-      const previousResolved = existing
-        ? await resolveManifestForRegistryRow(existing, options).catch(() => null)
-        : null;
+      const previousResolved = presence.resolved || null;
       const transaction = await startLifecycleTransaction({
         packageId: manifest.id,
         packageName: cleanText(manifest?.name, 200),
@@ -1347,7 +1416,8 @@ function createService(overrides = {}) {
         metadata: {
           installMethod: 'zip',
           previousVersion: existingVersion || '',
-          source: 'manual-zip'
+          source: 'manual-zip',
+          missingFilesRecoveryEligible: presence.missingFilesRecoveryEligible === true
         },
         artifacts: {
           previousRegistry: existing || null
@@ -1375,7 +1445,8 @@ function createService(overrides = {}) {
         packageSource: 'manual-zip',
         transactionId,
         previousResolved,
-        fileMutation
+        fileMutation,
+        allowSameVersionRecovery: presence.missingFilesRecoveryEligible === true
       }, options);
       report.signature = { verified: true };
       report.source = 'manual-zip';
@@ -1548,7 +1619,8 @@ function createService(overrides = {}) {
     const packageId = normalizePackageId(packageIdInput);
     if (!packageId) throw new Error('Package id is required.');
 
-    const existing = await deps.packageRegistryService.getPackageRegistryById(packageId, { backendMode });
+    const presence = await inspectPackagePresence(packageId, { ...options, backendMode });
+    const existing = presence.existing;
     const dataOnlyPreview = (
       deps.packageDataLifecycleService
       && typeof deps.packageDataLifecycleService.previewPackageDataUninstallImpact === 'function'
@@ -1564,6 +1636,7 @@ function createService(overrides = {}) {
     if (!existing) {
       return {
         packageId,
+        mode: 'registry_only_remove',
         blocked: Boolean(dataOnlyPreview?.blocked),
         blockedReasons: sanitizeArray(dataOnlyPreview?.blockedReasons),
         modifiedRecords: sanitizeArray(dataOnlyPreview?.modifiedRecords),
@@ -1577,10 +1650,59 @@ function createService(overrides = {}) {
       };
     }
 
-    const resolved = await resolveManifestForRegistryRow(existing, options);
-    if (!resolved || !resolved.manifest) {
-      throw new Error('Manifest file was not found for this package.');
+    if (!presence.manifestResolved) {
+      const blockedReasons = sanitizeArray(dataOnlyPreview?.blockedReasons);
+      const modifiedRecords = sanitizeArray(dataOnlyPreview?.modifiedRecords);
+      const previewWarnings = [
+        cleanText(
+          presence.manifestResolutionError || 'Manifest file was not found for this package. Registry-only remove is available.',
+          1200
+        ),
+        'Declaration and manifest-based data rollback preview was skipped because package files are missing.',
+        ...sanitizeArray(dataOnlyPreview?.warnings)
+      ];
+      const previewTransaction = await startLifecycleTransaction({
+        packageId,
+        packageName: cleanText(existing?.metadata?.packageName, 200) || packageId.toUpperCase(),
+        packageVersion: cleanText(existing?.version, 120),
+        action: 'uninstall-preview',
+        metadata: {
+          mode: 'registry_only_remove',
+          manifestResolved: false
+        },
+        artifacts: {
+          dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact)
+        }
+      }, { backendMode, actor });
+      const previewTransactionId = cleanText(previewTransaction?.id, 160);
+      await completeLifecycleTransaction(previewTransactionId, {
+        status: blockedReasons.length ? 'blocked' : 'success',
+        phase: 'commit',
+        warnings: previewWarnings,
+        blockedReasons,
+        modifiedRecords,
+        artifacts: {
+          dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact)
+        },
+        summaryByEntity: {}
+      }, { backendMode, actor });
+
+      return {
+        packageId,
+        packageName: cleanText(existing?.metadata?.packageName, 200) || packageId.toUpperCase(),
+        version: cleanText(existing?.version, 120),
+        mode: 'registry_only_remove',
+        blocked: blockedReasons.length > 0,
+        blockedReasons,
+        modifiedRecords,
+        dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact),
+        summaryByEntity: {},
+        warnings: previewWarnings,
+        previewTransactionId
+      };
     }
+
+    const resolved = presence.resolved;
 
     const latestInstallTx = await findLatestSuccessfulInstallTransaction(packageId, { backendMode });
     const baselineRows = sanitizeArray(latestInstallTx?.artifacts?.afterSnapshots);
@@ -1668,6 +1790,7 @@ function createService(overrides = {}) {
       packageId,
       packageName: cleanText(existing?.metadata?.packageName, 200) || packageId.toUpperCase(),
       version: cleanText(existing?.version, 120),
+      mode: 'normal',
       blocked: mergedBlockedReasons.length > 0,
       blockedReasons: mergedBlockedReasons,
       modifiedRecords: mergedModifiedRecords,
@@ -1743,6 +1866,7 @@ function createService(overrides = {}) {
     let declarationSummary = null;
     let manifest = null;
     let manifestPath = '';
+    let mode = cleanText(preview?.mode, 80).toLowerCase() || 'normal';
     const lifecycleOperations = [];
     let dataLifecycleReport = {
       dataSummary: { migrations: { applied: 0, skipped: 0, failed: 0 }, seeders: { applied: 0, skipped: 0, failed: 0 } },
@@ -1764,6 +1888,9 @@ function createService(overrides = {}) {
       }
     } else {
       warnings.push('Package registry row was not found. Remove action ran in no-op mode.');
+    }
+    if (!manifest) {
+      mode = 'registry_only_remove';
     }
 
     if (manifest) {
@@ -1803,6 +1930,14 @@ function createService(overrides = {}) {
       }));
     } else {
       warnings.push('Declaration remove sync was skipped because manifest was unavailable.');
+      warnings.push('Package data rollback was skipped because manifest-backed declarations were unavailable.');
+      lifecycleOperations.push({
+        entityType: 'packageManifest',
+        identityKey: `packageId:${packageId}`,
+        ownership: { packageId, packageName: cleanText(existing?.metadata?.packageName, 200) || packageId.toUpperCase() },
+        operation: 'skipped',
+        reason: 'Manifest unavailable; declaration/data rollback skipped.'
+      });
     }
 
     const removed = await deps.packageRegistryService.removePackageRegistry(packageId, { backendMode });
@@ -1835,6 +1970,7 @@ function createService(overrides = {}) {
 
     return {
       action: 'remove',
+      mode,
       packageId,
       packageName: cleanText(manifest?.name || existing?.metadata?.packageName || packageId.toUpperCase(), 200),
       version: cleanText(existing?.version || manifest?.version, 120),

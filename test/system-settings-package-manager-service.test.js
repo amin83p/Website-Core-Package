@@ -462,6 +462,90 @@ test('removePackage force mode requires confirmation token when preview has modi
   );
 });
 
+test('previewPackageUninstallImpact falls back to registry-only mode when manifest is missing', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  setup.deps.packageLoaderService.resolveManifestPath = async () => '';
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.previewPackageUninstallImpact('pte', { backendMode: 'json' });
+
+  assert.equal(report.mode, 'registry_only_remove');
+  assert.equal(report.blocked, false);
+  assert.equal(Array.isArray(report.warnings), true);
+  assert.equal(report.warnings.some((msg) => /manifest file was not found/i.test(String(msg || ''))), true);
+});
+
+test('removePackage succeeds in registry-only mode when manifest is missing', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  setup.deps.packageLoaderService.resolveManifestPath = async () => '';
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.removePackage('pte', { backendMode: 'json' });
+  const registryAfter = await setup.deps.packageRegistryService.getPackageRegistryById('pte');
+
+  assert.equal(report.action, 'remove');
+  assert.equal(report.mode, 'registry_only_remove');
+  assert.equal(report.registry.removed, true);
+  assert.equal(registryAfter, null);
+  assert.equal(report.warnings.some((msg) => /declaration remove sync was skipped/i.test(String(msg || ''))), true);
+});
+
+test('installPackage allows same-version reinstall only for missing-files recovery', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  setup.deps.packageLoaderService.resolveManifestPath = async () => '';
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: false,
+    installStatus: 'disabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.installPackage({
+    installMethod: 'json',
+    manifestJson: JSON.stringify(createManifest({ id: 'pte', version: '1.0.0', mountPath: '/pte' }))
+  }, { backendMode: 'json' });
+
+  assert.equal(report.mode, 'reinstall_recovery');
+  assert.equal(report.packageId, 'pte');
+  assert.equal(report.registry.enabled, true);
+});
+
+test('installPackage rejects same-version reinstall when manifest is available', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  await assert.rejects(
+    () => service.installPackage({
+      installMethod: 'json',
+      manifestJson: JSON.stringify(createManifest({ id: 'pte', version: '1.0.0', mountPath: '/pte' }))
+    }, { backendMode: 'json' }),
+    /must be newer/i
+  );
+});
+
 test('installPackageZip verifies signature and installs package into packages directory', async () => {
   const setup = await createZipInstallDeps();
   const manifest = createManifest({ id: 'zip-addon', name: 'ZIP Addon', version: '1.0.0', mountPath: '/zip-addon' });
@@ -550,6 +634,43 @@ test('installPackageZip blocks same or older package versions', async () => {
       }),
       /must be newer/i
     );
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test('installPackageZip allows same-version reinstall only when package files are missing', async () => {
+  const setup = await createZipInstallDeps();
+  const manifest = createManifest({ id: 'zip-addon-recovery', version: '1.0.0', mountPath: '/zip-addon-recovery' });
+  const fixture = createSignedPackageZip(manifest);
+  const service = createService(setup.deps);
+
+  try {
+    await service.installPackageZip({
+      zipBuffer: fixture.zipBuffer,
+      signatureBuffer: fixture.signatureBuffer
+    }, {
+      backendMode: 'json',
+      packageRootDir: setup.packageRootDir,
+      trustedPublicKeys: [fixture.publicKeyPem]
+    });
+
+    await fs.rm(path.join(setup.packageRootDir, 'zip-addon-recovery'), { recursive: true, force: true });
+    setup.deps.packageLoaderService.resolveManifestPath = async () => '';
+
+    const sameVersionFixture = createSignedPackageZip(manifest);
+    const report = await service.installPackageZip({
+      zipBuffer: sameVersionFixture.zipBuffer,
+      signatureBuffer: sameVersionFixture.signatureBuffer
+    }, {
+      backendMode: 'json',
+      packageRootDir: setup.packageRootDir,
+      trustedPublicKeys: [sameVersionFixture.publicKeyPem]
+    });
+
+    assert.equal(report.mode, 'reinstall_recovery');
+    assert.equal(report.packageId, 'zip-addon-recovery');
+    assert.equal(report.registry.enabled, true);
   } finally {
     await setup.cleanup();
   }

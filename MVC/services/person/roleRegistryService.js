@@ -150,7 +150,7 @@ function readPackageManifestRowsSync(packageRoot = getPackageStorageRootAbsolute
 }
 
 function buildPackageRoleSeedRows(options = {}) {
-  const packageRoot = options.packageRoot || PACKAGE_ROOT;
+  const packageRoot = options.packageRoot || getPackageStorageRootAbsolute();
   return readPackageManifestRowsSync(packageRoot)
     .flatMap((manifest) => (
       Array.isArray(manifest.roles)
