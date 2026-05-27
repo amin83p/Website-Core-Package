@@ -546,6 +546,49 @@ test('installPackage rejects same-version reinstall when manifest is available',
   );
 });
 
+test('installPackage requires target org when builder payload marks remap as required', async () => {
+  const setup = createBaseDeps();
+  const service = createService({
+    ...setup.deps,
+    packageBuilderService: {
+      async applyBuilderPayloadIfPresent(_context = {}, options = {}) {
+        if (!String(options?.targetOrgId || '').trim()) {
+          const error = new Error('Target organization is required for this package install because exported data contains org-bound fields/URLs.');
+          error.code = 'TARGET_ORG_REQUIRED';
+          throw error;
+        }
+        return {
+          applied: false,
+          orgRemapRequired: true,
+          targetOrgId: String(options.targetOrgId),
+          dataSummary: { entityCount: 0, upserted: 0 },
+          fileSummary: { copied: 0 },
+          warnings: []
+        };
+      }
+    }
+  });
+
+  await assert.rejects(
+    () => service.installPackage({
+      installMethod: 'json',
+      manifestJson: JSON.stringify(createManifest({ id: 'pte', version: '1.0.0', mountPath: '/pte' }))
+    }, { backendMode: 'json' }),
+    /Target organization is required/i
+  );
+
+  const report = await service.installPackage({
+    installMethod: 'json',
+    manifestJson: JSON.stringify(createManifest({ id: 'pte', version: '1.0.0', mountPath: '/pte' }))
+  }, {
+    backendMode: 'json',
+    targetOrgId: 'ORG_900000'
+  });
+  assert.equal(report.packageId, 'pte');
+  assert.equal(report.payloadSummary.orgRemapRequired, true);
+  assert.equal(report.payloadSummary.targetOrgId, 'ORG_900000');
+});
+
 test('installPackageZip verifies signature and installs package into packages directory', async () => {
   const setup = await createZipInstallDeps();
   const manifest = createManifest({ id: 'zip-addon', name: 'ZIP Addon', version: '1.0.0', mountPath: '/zip-addon' });

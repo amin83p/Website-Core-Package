@@ -12,6 +12,7 @@ const DECLARATION_ARRAY_KEYS = Object.freeze([
   'settings',
   'menuEntries',
   'dashboardEntries',
+  'dataEntities',
   'seeders',
   'migrations',
   'dependencies'

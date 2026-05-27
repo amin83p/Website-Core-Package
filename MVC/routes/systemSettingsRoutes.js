@@ -317,6 +317,33 @@ router.get('/packages/transactions/:transactionId',
           trackActionState(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE, { keepActive: true }),
           ctrl.getPackageTransactionDetailFromManager);
 
+// 7.5 Package Builder (System Settings)
+router.get('/package-builder',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_BUILDER, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_BUILDER, OPERATIONS.UPDATE, { keepActive: true }),
+          ctrl.showPackageBuilderPage);
+router.post('/package-builder/preflight',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_BUILDER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_BUILDER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.preflightPackageBuilder);
+router.post('/package-builder/build',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_BUILDER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_BUILDER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.buildPackageFromBuilder);
+
 // 8. Core Bootstrap Baseline (First-run)
 router.get('/bootstrap/core',
           requireAuth,

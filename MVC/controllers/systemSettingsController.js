@@ -12,6 +12,7 @@ const dataBackendRuntimeService = require('../services/dataBackendRuntimeService
 const { registerCoreEntityQueryExecutors } = require('../models/queryExecutorBootstrap');
 const packageQueryExecutorService = require('../services/packageQueryExecutorService');
 const systemSettingsPackageManagerService = require('../services/systemSettingsPackageManagerService');
+const systemSettingsPackageBuilderService = require('../services/systemSettingsPackageBuilderService');
 const coreBootstrapBaselineService = require('../services/coreBootstrapBaselineService');
 const coreResetRebootstrapService = require('../services/coreResetRebootstrapService');
 const actionStateRetentionService = require('../services/actionStateRetentionService');
@@ -1192,6 +1193,7 @@ function buildPackageManagerOptions(req = {}) {
     backendMode: runtimeBackend?.mode || '',
     packageRootDir: getPackageStorageRootAbsolute(),
     trustedPublicKeys: keyContext.trustedPublicKeys,
+    targetOrgId: cleanFormText(req.body?.targetOrgId || req.query?.targetOrgId || '', 120),
     actor: req.user || null,
     app: req.app || null
   };
@@ -1206,6 +1208,8 @@ function sendPackageManagerError(res, error, fallbackMessage = 'Package operatio
     message = 'ZIP signature verification is not configured. Set PACKAGE_INSTALL_ED25519_PUBLIC_KEYS in the core .env, restart the app, and try again.';
   } else if (code === 'ZIP_SIGNATURE_INVALID') {
     message = 'Package signature verification failed. Rebuild the ZIP using the configured signing key, then upload the matching ZIP and SIG files.';
+  } else if (code === 'TARGET_ORG_REQUIRED') {
+    message = 'This package includes org-bound exported data/files. Select a target organization and retry install.';
   }
   return res.status(statusCode).json({
     status: statusCode === 403 ? 'admin_required' : (blocked ? 'blocked' : 'error'),
@@ -1313,6 +1317,100 @@ exports.syncPackageFromManager = async (req, res) => {
     });
   } catch (error) {
     return sendPackageManagerError(res, error, 'Package sync failed.');
+  }
+};
+
+/* =========================================================
+   PACKAGE BUILDER (System Settings)
+========================================================= */
+exports.showPackageBuilderPage = async (req, res) => {
+  try {
+    const settings = await systemSettingsRepository.getSettings();
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const packageStorageRoot = getPackageStorageRootAbsolute();
+    const discovered = await systemSettingsPackageBuilderService.discoverLocalPackages({
+      backendMode: runtimeBackend?.mode || '',
+      packageRootDir: packageStorageRoot
+    });
+    const organizations = await dataService.fetchData('organizations', {}, req.user, {
+      backendMode: runtimeBackend?.mode || ''
+    }).catch(() => []);
+
+    return res.render('systemSettings/packageBuilderSettings', {
+      title: 'Package Builder',
+      settings,
+      runtimeBackend,
+      packageStorageRoot,
+      packages: discovered.filter((row) => row.valid),
+      packageWarnings: discovered.filter((row) => !row.valid),
+      organizations: Array.isArray(organizations) ? organizations : [],
+      includeModal: true,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+exports.preflightPackageBuilder = async (req, res) => {
+  try {
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const report = await systemSettingsPackageBuilderService.preflightBuild({
+      packageId: cleanFormText(req.body?.packageId, 120),
+      selectedDataEntities: Array.isArray(req.body?.selectedDataEntities)
+        ? req.body.selectedDataEntities
+        : (req.body?.selectedDataEntities ? [req.body.selectedDataEntities] : []),
+      selectedFileRefs: Array.isArray(req.body?.selectedFileRefs)
+        ? req.body.selectedFileRefs
+        : (req.body?.selectedFileRefs ? [req.body.selectedFileRefs] : [])
+    }, {
+      backendMode: runtimeBackend?.mode || '',
+      packageRootDir: getPackageStorageRootAbsolute(),
+      actor: req.user || null
+    });
+
+    return res.json({
+      status: 'success',
+      message: `Preflight completed for package "${report?.package?.packageId || ''}".`,
+      report
+    });
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      message: error?.message || 'Package build preflight failed.'
+    });
+  }
+};
+
+exports.buildPackageFromBuilder = async (req, res) => {
+  try {
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const report = await systemSettingsPackageBuilderService.buildPackage({
+      packageId: cleanFormText(req.body?.packageId, 120),
+      version: cleanFormText(req.body?.version, 120),
+      selectedDataEntities: Array.isArray(req.body?.selectedDataEntities)
+        ? req.body.selectedDataEntities
+        : (req.body?.selectedDataEntities ? [req.body.selectedDataEntities] : []),
+      selectedFileRefs: Array.isArray(req.body?.selectedFileRefs)
+        ? req.body.selectedFileRefs
+        : (req.body?.selectedFileRefs ? [req.body.selectedFileRefs] : [])
+    }, {
+      backendMode: runtimeBackend?.mode || '',
+      packageRootDir: getPackageStorageRootAbsolute(),
+      actor: req.user || null
+    });
+
+    return res.json({
+      status: 'success',
+      message: `Package "${report.packageId}" build completed.`,
+      report
+    });
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      message: error?.message || 'Package build failed.'
+    });
   }
 };
 

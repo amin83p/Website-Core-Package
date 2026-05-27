@@ -11,6 +11,7 @@ const packageLoaderService = require('./packageLoaderService');
 const packageNavigationService = require('./packageNavigationService');
 const packageLifecycleTransactionService = require('./packageLifecycleTransactionService');
 const packageDataLifecycleService = require('./packageDataLifecycleService');
+const systemSettingsPackageBuilderService = require('./systemSettingsPackageBuilderService');
 const operationRepository = require('../repositories/operationRepository');
 const roleRepository = require('../repositories/roleRepository');
 const sectionRepository = require('../repositories/sectionRepository');
@@ -278,6 +279,7 @@ function createDependencies(overrides = {}) {
     packageNavigationService: overrides.packageNavigationService || packageNavigationService,
     packageLifecycleTransactionService: overrides.packageLifecycleTransactionService || packageLifecycleTransactionService,
     packageDataLifecycleService: overrides.packageDataLifecycleService || packageDataLifecycleService,
+    packageBuilderService: overrides.packageBuilderService || systemSettingsPackageBuilderService,
     operationRepository: overrides.operationRepository || operationRepository,
     roleRepository: overrides.roleRepository || roleRepository,
     sectionRepository: overrides.sectionRepository || sectionRepository,
@@ -804,9 +806,33 @@ function createService(overrides = {}) {
       rollbackApplied: false,
       warnings: []
     };
+    let builderPayloadReport = {
+      applied: false,
+      orgRemapRequired: false,
+      dataSummary: { entityCount: 0, upserted: 0 },
+      fileSummary: { copied: 0 },
+      warnings: []
+    };
     let installationSucceeded = false;
 
     try {
+      if (
+        deps.packageBuilderService
+        && typeof deps.packageBuilderService.applyBuilderPayloadIfPresent === 'function'
+      ) {
+        builderPayloadReport = await deps.packageBuilderService.applyBuilderPayloadIfPresent({
+          packageId: manifest.id,
+          packageName: manifest.name,
+          packageVersion: manifest.version,
+          manifestPath: resolved.manifestPath
+        }, {
+          backendMode,
+          dryRun: true,
+          targetOrgId: normalizeOrgToken(options.targetOrgId || ''),
+          actor
+        });
+      }
+
       if (isUpgrade && resolved.previousResolved?.manifest) {
         const previousContext = {
           backendMode,
@@ -885,6 +911,23 @@ function createService(overrides = {}) {
       warnings.push(...runtime.warnings);
       if (navigation.warning) warnings.push(navigation.warning);
 
+      if (
+        deps.packageBuilderService
+        && typeof deps.packageBuilderService.applyBuilderPayloadIfPresent === 'function'
+      ) {
+        builderPayloadReport = await deps.packageBuilderService.applyBuilderPayloadIfPresent({
+          packageId: manifest.id,
+          packageName: manifest.name,
+          packageVersion: manifest.version,
+          manifestPath: resolved.manifestPath
+        }, {
+          backendMode,
+          targetOrgId: normalizeOrgToken(options.targetOrgId || ''),
+          actor
+        });
+        warnings.push(...sanitizeArray(builderPayloadReport?.warnings));
+      }
+
       const afterSnapshots = await captureManifestSnapshots(manifest, { backendMode });
       await markLifecyclePhase(transactionId, 'apply', 'completed', {
         updatedVersion: nextVersion
@@ -900,7 +943,8 @@ function createService(overrides = {}) {
           fileMutation: sanitizeObject(resolved.fileMutation),
           beforeSnapshots,
           afterSnapshots,
-          dataLifecycleReport
+          dataLifecycleReport,
+          builderPayloadReport
         },
         summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations)
       }, { backendMode, actor });
@@ -916,6 +960,13 @@ function createService(overrides = {}) {
         phase: 'commit',
         summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations),
         dataSummary: sanitizeObject(dataLifecycleReport?.dataSummary),
+        payloadSummary: {
+          applied: builderPayloadReport?.applied === true,
+          orgRemapRequired: builderPayloadReport?.orgRemapRequired === true,
+          targetOrgId: cleanText(builderPayloadReport?.targetOrgId, 120),
+          dataSummary: sanitizeObject(builderPayloadReport?.dataSummary),
+          fileSummary: sanitizeObject(builderPayloadReport?.fileSummary)
+        },
         appliedSteps: sanitizeArray(dataLifecycleReport?.appliedSteps),
         skippedSteps: sanitizeArray(dataLifecycleReport?.skippedSteps),
         failedStep: dataLifecycleReport?.failedStep || null,

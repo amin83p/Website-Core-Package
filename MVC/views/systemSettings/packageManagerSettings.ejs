@@ -63,7 +63,12 @@
             <option value="zip">ZIP Upload (Signature Verified)</option>
           </select>
         </div>
-        <div class="col-lg-9 col-md-6">
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label small fw-bold">Target Organization (optional)</label>
+          <input type="text" class="form-control" id="pkgTargetOrgId" placeholder="ORG_12345">
+          <div class="small text-muted mt-1">Required only for remap-enabled package payloads.</div>
+        </div>
+        <div class="col-lg-6 col-md-12">
           <div id="pkgInstallLocalPanel">
             <label class="form-label small fw-bold">Local Manifest</label>
             <select class="form-select" id="pkgLocalManifestPath">
@@ -238,6 +243,7 @@
   const actionStateId = document.getElementById('pkgActionStateId')?.value || '';
   const outputEl = document.getElementById('pkgOutput');
   const installMethodEl = document.getElementById('pkgInstallMethod');
+  const targetOrgEl = document.getElementById('pkgTargetOrgId');
   const installBtn = document.getElementById('pkgInstallBtn');
   const tableEl = document.getElementById('packageManagerTable');
   const transactionTableEl = document.getElementById('pkgTransactionTable');
@@ -374,12 +380,14 @@
 
   async function installPackage() {
     const installMethod = String(installMethodEl.value || '').trim();
+    const targetOrgId = String(targetOrgEl?.value || '').trim();
     await requireAdminVerification();
     if (installMethod === 'zip') {
       const zipFile = document.getElementById('pkgZipFile')?.files?.[0] || null;
       const sigFile = document.getElementById('pkgSigFile')?.files?.[0] || null;
       const formData = new FormData();
       formData.set('actionStateId', actionStateId);
+      if (targetOrgId) formData.set('targetOrgId', targetOrgId);
       if (zipFile) formData.set('packageZip', zipFile);
       if (sigFile) formData.set('packageSig', sigFile);
       return runWithWaiting('Installing Package ZIP', async () => fetchJson('/systemSettings/packages/install-zip', {
@@ -400,6 +408,7 @@
       manifestJson: document.getElementById('pkgManifestJson').value || '',
       actionStateId
     };
+    if (targetOrgId) payload.targetOrgId = targetOrgId;
     return runWithWaiting('Installing Package', async () => fetchJson('/systemSettings/packages/install', {
       method: 'POST',
       credentials: 'same-origin',

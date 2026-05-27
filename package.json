@@ -34,6 +34,7 @@
     "email-management:symbols:seed": "node scripts/seed-email-management-symbols.js --db app",
     "chat:seed": "node scripts/seed-chat-section.js --db app",
     "system:upload-folders:seed": "node scripts/seed-system-upload-folders-section.js --db app",
+    "system:package-builder:seed": "node scripts/seed-system-package-builder-section.js --db app",
     "activity-quota:reset-transactions": "node scripts/activity-quota/reset-quota-transactions.js",
     "activity-quota:reconcile-projections": "node scripts/activity-quota/reconcile-projections.js",
     "pte:students:seed": "node scripts/seed-pte-students-section.js --db app",

@@ -823,5 +823,24 @@
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-26T22:33:27.517Z"
     }
+  },
+  {
+    "id": "SYM_SYSTEM_122",
+    "name": "SYSTEM_PACKAGE_BUILDER",
+    "type": "class",
+    "value": "bi bi-box-seam",
+    "tags": [
+      "SYSTEM_PACKAGE_BUILDER",
+      "SYSTEM_PACKAGE_BUILDER",
+      "PACKAGE_BUILDER",
+      "731287"
+    ],
+    "orgId": "SYSTEM",
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-05-27T21:12:31.281Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-05-27T21:12:31.281Z"
+    }
   }
 ]
