@@ -289,6 +289,31 @@ test('listPackageSnapshot includes discovered local manifests and installed rows
   assert.equal(snapshot.installedPackages[0].enabled, true);
 });
 
+test('enablePackage recovers from stale registry manifest path by local package-id discovery', async () => {
+  const setup = createBaseDeps();
+  setup.deps.fs.readdir = async () => [createDirent('pte')];
+  setup.deps.fs.readFile = async () => JSON.stringify(createManifest({ id: 'pte', name: 'PTE', version: '1.0.1' }));
+  setup.deps.packageLoaderService.resolveManifestPath = async () => '';
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: false,
+    installStatus: 'disabled',
+    metadata: {
+      packageName: 'PTE',
+      manifestPath: 'packages/missing/package.manifest.json',
+      mountPath: '/pte'
+    }
+  });
+  const service = createService(setup.deps);
+  const report = await service.enablePackage('pte', { backendMode: 'json' });
+
+  assert.equal(report.action, 'enable');
+  assert.equal(report.packageId, 'pte');
+  assert.equal(report.registry.enabled, true);
+  assert.equal(report.registry.manifestPath.includes('/pte/package.manifest.json') || report.registry.manifestPath.includes('\\pte\\package.manifest.json'), true);
+});
+
 test('installPackage rejects invalid manifest JSON payload', async () => {
   const setup = createBaseDeps();
   const service = createService(setup.deps);

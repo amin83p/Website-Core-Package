@@ -1090,10 +1090,24 @@ function createService(overrides = {}) {
     const packageRootDir = path.resolve(
       String(options.packageRootDir || path.join(resolveProjectRoot(), 'packages'))
     );
-    const manifestPath = await deps.packageLoaderService.resolveManifestPath(packageId, row, packageRootDir);
-    if (!manifestPath) return null;
-    const rawManifest = await deps.packageLoaderService.readManifestFile(manifestPath);
-    const manifest = deps.packageManifestService.validatePackageManifest(rawManifest, { knownIds: [] });
+    let manifestPath = await deps.packageLoaderService.resolveManifestPath(packageId, row, packageRootDir);
+    let manifest = null;
+    if (manifestPath) {
+      const rawManifest = await deps.packageLoaderService.readManifestFile(manifestPath);
+      manifest = deps.packageManifestService.validatePackageManifest(rawManifest, { knownIds: [] });
+    }
+    if (!manifestPath || !manifest) {
+      const localRows = await discoverLocalManifests({ ...options, packageRootDir });
+      const localMatch = localRows.find((entry) => (
+        normalizePackageId(entry?.packageId) === packageId && entry?.valid === true
+      ));
+      if (localMatch?.manifestPath) {
+        const resolved = await resolveManifestFromPath(localMatch.manifestPath);
+        manifestPath = resolved.manifestPath;
+        manifest = resolved.manifest;
+      }
+    }
+    if (!manifestPath || !manifest) return null;
     return {
       manifest,
       manifestPath
