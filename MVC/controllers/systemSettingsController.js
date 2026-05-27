@@ -1136,6 +1136,7 @@ exports.showPackageManagerPage = async (req, res) => {
   try {
     const settings = await systemSettingsRepository.getSettings();
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const keyContext = buildPackageTrustedKeyContext(settings);
     const snapshot = await systemSettingsPackageManagerService.listPackageSnapshot({
       backendMode: runtimeBackend?.mode || '',
       packageRootDir: path.join(process.cwd(), 'packages')
@@ -1150,6 +1151,8 @@ exports.showPackageManagerPage = async (req, res) => {
       installedPackages: snapshot?.installedPackages || [],
       localManifestOptions,
       localManifestWarnings,
+      zipTrustedKeysConfigured: keyContext.trustedPublicKeys.length > 0,
+      zipTrustedKeysCount: keyContext.trustedPublicKeys.length,
       zipUploadLimitMb: Number.parseInt(process.env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB || '50', 10) || 50,
       includeModal: true,
       user: req.user,
@@ -1160,9 +1163,8 @@ exports.showPackageManagerPage = async (req, res) => {
   }
 };
 
-function buildPackageManagerOptions(req = {}) {
-  const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
-  const settings = settingService.get();
+function buildPackageTrustedKeyContext(settingsInput = null) {
+  const settings = settingsInput || settingService.get();
   const appKeys = String(settings?.app?.packageInstallEd25519PublicKeys || '').trim();
   const envKeys = [
     String(process.env.PACKAGE_INSTALL_ED25519_PUBLIC_KEYS || '').trim(),
@@ -1172,10 +1174,16 @@ function buildPackageManagerOptions(req = {}) {
     ...envKeys.join('\n').split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean),
     ...appKeys.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean)
   ];
+  return { trustedPublicKeys };
+}
+
+function buildPackageManagerOptions(req = {}) {
+  const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+  const keyContext = buildPackageTrustedKeyContext();
   return {
     backendMode: runtimeBackend?.mode || '',
     packageRootDir: path.join(process.cwd(), 'packages'),
-    trustedPublicKeys,
+    trustedPublicKeys: keyContext.trustedPublicKeys,
     actor: req.user || null,
     app: req.app || null
   };
@@ -1185,9 +1193,15 @@ function sendPackageManagerError(res, error, fallbackMessage = 'Package operatio
   const code = String(error?.code || '').trim().toUpperCase();
   const statusCode = code === 'ADMIN_REQUIRED' ? 403 : 400;
   const blocked = code === 'UNINSTALL_BLOCKED_MODIFIED';
+  let message = error?.message || fallbackMessage;
+  if (code === 'ZIP_SIGNATURE_NOT_CONFIGURED') {
+    message = 'ZIP signature verification is not configured. Set PACKAGE_INSTALL_ED25519_PUBLIC_KEYS in the core .env, restart the app, and try again.';
+  } else if (code === 'ZIP_SIGNATURE_INVALID') {
+    message = 'Package signature verification failed. Rebuild the ZIP using the configured signing key, then upload the matching ZIP and SIG files.';
+  }
   return res.status(statusCode).json({
     status: statusCode === 403 ? 'admin_required' : (blocked ? 'blocked' : 'error'),
-    message: error?.message || fallbackMessage,
+    message,
     blockedReasons: blocked ? (error?.blockedReasons || []) : [],
     modifiedRecords: blocked ? (error?.modifiedRecords || []) : [],
     previewTransactionId: blocked ? (error?.previewTransactionId || '') : ''

@@ -560,7 +560,10 @@ function createService(overrides = {}) {
 
     const trustedKeys = loadTrustedPublicKeys(options);
     if (!trustedKeys.length) {
-      const error = new Error('No trusted package public key is configured for ZIP install verification.');
+      const error = new Error(
+        'No trusted package public key is configured for ZIP install verification. ' +
+        'Set PACKAGE_INSTALL_ED25519_PUBLIC_KEYS in the core .env (or app.packageInstallEd25519PublicKeys), then restart.'
+      );
       error.code = 'ZIP_SIGNATURE_NOT_CONFIGURED';
       throw error;
     }
@@ -577,7 +580,9 @@ function createService(overrides = {}) {
       }
     }
 
-    const error = new Error('Package signature verification failed.');
+    const error = new Error(
+      'Package signature verification failed. Ensure the ZIP was signed with the private key paired to configured trusted public key(s).'
+    );
     error.code = 'ZIP_SIGNATURE_INVALID';
     throw error;
   }

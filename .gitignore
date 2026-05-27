@@ -6,3 +6,5 @@ node_modules/
 /data/logs.json
 /data/sessions.json
 .env
+install_packages/*
+install_packages/signing/*.private.pem

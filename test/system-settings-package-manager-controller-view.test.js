@@ -60,6 +60,7 @@ test('package manager page controller renders snapshot and action state', async 
     assert.equal(Array.isArray(res.rendered?.payload?.localManifestOptions), true);
     assert.equal(Array.isArray(res.rendered?.payload?.localManifestWarnings), true);
     assert.equal(res.rendered?.payload?.localManifestOptions.length, 1);
+    assert.equal(typeof res.rendered?.payload?.zipTrustedKeysConfigured, 'boolean');
   } finally {
     systemSettingsRepository.getSettings = originalGetSettings;
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
@@ -159,6 +160,37 @@ test('install ZIP package controller returns structured success and admin_requir
   }
 });
 
+test('install ZIP package controller returns clear message when trusted key is missing', async () => {
+  const originalInstallZip = systemSettingsPackageManagerService.installPackageZip;
+  const res = makeRenderResponse();
+
+  try {
+    systemSettingsPackageManagerService.installPackageZip = async () => {
+      const error = new Error('No trusted package public key is configured for ZIP install verification.');
+      error.code = 'ZIP_SIGNATURE_NOT_CONFIGURED';
+      throw error;
+    };
+
+    await systemSettingsController.installPackageZipFromManager(
+      {
+        files: {
+          packageZip: [{ buffer: Buffer.from('zip') }],
+          packageSig: [{ buffer: Buffer.from('sig') }]
+        },
+        user: { id: 'USER_ZIP_3' },
+        app: {}
+      },
+      res
+    );
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.jsonPayload?.status, 'error');
+    assert.match(String(res.jsonPayload?.message || ''), /PACKAGE_INSTALL_ED25519_PUBLIC_KEYS/i);
+  } finally {
+    systemSettingsPackageManagerService.installPackageZip = originalInstallZip;
+  }
+});
+
 test('remove package controller forwards force options and preview token', async () => {
   const originalRemove = systemSettingsPackageManagerService.removePackage;
   const res = makeRenderResponse();
@@ -243,7 +275,9 @@ test('package manager EJS compiles and includes expected controls', () => {
       }
     ],
     localManifestWarnings: [],
-    actionStateId: 'STATE_VIEW'
+    actionStateId: 'STATE_VIEW',
+    zipTrustedKeysConfigured: true,
+    zipTrustedKeysCount: 1
   });
 
   assert.match(html, /Package Manager/);
@@ -251,6 +285,7 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /\/systemSettings\/packages\/install/);
   assert.match(html, /\/systemSettings\/packages\/install-zip/);
   assert.match(html, /ZIP Upload/);
+  assert.match(html, /Trusted signature keys configured/i);
   assert.match(html, /Installed Packages/);
   assert.match(html, /Impact Preview/);
   assert.match(html, /Recent Lifecycle Transactions/);

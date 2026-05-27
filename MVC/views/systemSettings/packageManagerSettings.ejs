@@ -5,6 +5,12 @@
   const localOptions = Array.isArray(localManifestOptions) ? localManifestOptions : [];
   const localWarnings = Array.isArray(localManifestWarnings) ? localManifestWarnings : [];
   const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
+  const trustedZipKeysCount = Number.isFinite(Number(typeof zipTrustedKeysCount !== 'undefined' ? zipTrustedKeysCount : 0))
+    ? Number(typeof zipTrustedKeysCount !== 'undefined' ? zipTrustedKeysCount : 0)
+    : 0;
+  const trustedZipKeysConfigured = Boolean(typeof zipTrustedKeysConfigured !== 'undefined'
+    ? zipTrustedKeysConfigured
+    : (trustedZipKeysCount > 0));
   const zipLimitValue = Number.isFinite(Number(typeof zipUploadLimitMb !== 'undefined' ? zipUploadLimitMb : 50))
     ? Number(typeof zipUploadLimitMb !== 'undefined' ? zipUploadLimitMb : 50)
     : 50;
@@ -63,6 +69,15 @@
             <label class="form-label small fw-bold mt-2">Detached Signature (.sig)</label>
             <input type="file" class="form-control" id="pkgSigFile" accept=".sig,.txt,application/octet-stream,text/plain">
             <div class="small text-muted mt-1">Max upload size: <b><%= zipLimitValue %> MB</b> per file.</div>
+            <% if (trustedZipKeysConfigured) { %>
+              <div class="alert alert-success mt-2 mb-0 py-2 px-3 small">
+                Trusted signature keys configured: <b><%= trustedZipKeysCount %></b>. ZIP upload will verify automatically.
+              </div>
+            <% } else { %>
+              <div class="alert alert-warning mt-2 mb-0 py-2 px-3 small">
+                No trusted signature key configured yet. Set <code>PACKAGE_INSTALL_ED25519_PUBLIC_KEYS</code> in core <code>.env</code>, then restart the app.
+              </div>
+            <% } %>
           </div>
         </div>
       </div>
