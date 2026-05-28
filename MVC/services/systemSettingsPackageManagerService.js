@@ -255,6 +255,60 @@ function sanitizeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function countExpectedRuntimeUseRouteDeclarations(manifest = {}) {
+  const declarations = Array.isArray(manifest?.routes) ? manifest.routes : [];
+  return declarations.filter((row) => {
+    if (!row || typeof row !== 'object') return false;
+    if (row.active === false) return false;
+    if (row.metadataOnly === true) return false;
+    const method = cleanText(row.method || 'USE', 20).toUpperCase();
+    const router = cleanText(row.router || row.routerModule || row.routerModulePath || row.routerPath || '', 1200);
+    return method === 'USE' && Boolean(router);
+  }).length;
+}
+
+function buildRuntimeRouteMountError(context = {}, runtime = {}, reason = '') {
+  const manifest = context?.manifest && typeof context.manifest === 'object' ? context.manifest : {};
+  const routeSummary = runtime?.hooks?.routes || {};
+  const error = new Error(
+    reason || 'Runtime route mount failed for this package. Declarations were applied but runtime routes were not mounted correctly.'
+  );
+  error.code = 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED';
+  error.details = {
+    packageId: cleanText(context?.packageId || manifest?.id, 120),
+    packageName: cleanText(context?.packageName || manifest?.name, 200),
+    mountPath: cleanText(manifest?.mountPath, 500),
+    expectedUseRoutes: countExpectedRuntimeUseRouteDeclarations(manifest),
+    runtimeRoutes: {
+      requested: Number(routeSummary?.requested || 0),
+      prepared: Number(routeSummary?.prepared || 0),
+      mounted: Number(routeSummary?.mounted || 0),
+      failed: Number(routeSummary?.failed || 0),
+      results: sanitizeArray(routeSummary?.results)
+    }
+  };
+  return error;
+}
+
+function assertRuntimeRouteMountHealth(context = {}, runtime = {}, options = {}) {
+  const strict = options.strict === true;
+  if (!strict) return;
+
+  const manifest = context?.manifest && typeof context.manifest === 'object' ? context.manifest : {};
+  const expectedUseRoutes = countExpectedRuntimeUseRouteDeclarations(manifest);
+  if (expectedUseRoutes <= 0) return;
+
+  const routesReport = runtime?.hooks?.routes || {};
+  const failed = Number(routesReport?.failed || 0);
+  const mounted = Number(routesReport?.mounted || 0);
+  if (failed > 0) {
+    throw buildRuntimeRouteMountError(context, runtime, 'Runtime route mount reported failed route declarations.');
+  }
+  if (mounted <= 0) {
+    throw buildRuntimeRouteMountError(context, runtime, 'Runtime route mount reported zero mounted routes for active USE declarations.');
+  }
+}
+
 function getOwnershipFromRow(row = {}) {
   const source = sanitizeObject(row);
   return {
@@ -907,6 +961,9 @@ function createService(overrides = {}) {
         backendMode,
         app: options.app || null
       });
+      assertRuntimeRouteMountHealth(context, runtime, {
+        strict: Boolean(options?.app && typeof options.app.use === 'function')
+      });
       navigation = await refreshNavigationSnapshot({ backendMode });
       warnings.push(...runtime.warnings);
       if (navigation.warning) warnings.push(navigation.warning);
@@ -1552,6 +1609,17 @@ function createService(overrides = {}) {
       backendMode,
       app: options.app || null
     });
+    try {
+      assertRuntimeRouteMountHealth(context, runtime, {
+        strict: Boolean(options?.app && typeof options.app.use === 'function')
+      });
+    } catch (runtimeError) {
+      await deps.packageRegistryService.setPackageEnabled(packageId, false, {
+        backendMode,
+        actor
+      }).catch(() => null);
+      throw runtimeError;
+    }
     const navigation = await refreshNavigationSnapshot({ backendMode });
 
     const warnings = [];
@@ -2078,6 +2146,17 @@ function createService(overrides = {}) {
       backendMode,
       app: options.app || null
     });
+    try {
+      assertRuntimeRouteMountHealth(context, runtime, {
+        strict: Boolean(options?.app && typeof options.app.use === 'function')
+      });
+    } catch (runtimeError) {
+      await deps.packageRegistryService.setPackageEnabled(packageId, false, {
+        backendMode,
+        actor: buildActor(options.actor || null)
+      }).catch(() => null);
+      throw runtimeError;
+    }
     const navigation = await refreshNavigationSnapshot({ backendMode });
     const warnings = [];
     warnings.push(...runtime.warnings);

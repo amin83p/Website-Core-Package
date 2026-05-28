@@ -42,6 +42,17 @@ function createManifest(overrides = {}) {
   };
 }
 
+function createUseRouteDeclaration(overrides = {}) {
+  return {
+    id: 'ROUTE_USE_1',
+    method: 'USE',
+    path: '/students',
+    router: 'MVC/routes/pte/studentRoutes.js',
+    active: true,
+    ...overrides
+  };
+}
+
 function createSignedPackageZip(manifest, extras = {}) {
   const zip = new PizZip();
   const folderName = String(extras.folderName || manifest.id);
@@ -341,6 +352,67 @@ test('installPackage returns data lifecycle summary fields', async () => {
   assert.equal(Array.isArray(report.skippedSteps), true);
 });
 
+test('installPackage succeeds with runtime USE declarations when routes mount is healthy', async () => {
+  const setup = createBaseDeps();
+  setup.deps.packageRegistryInstallerService.createLoaderHooks = () => ({
+    async registerRoutes() { return { requested: 1, prepared: 1, mounted: 1, failed: 0, results: [] }; },
+    async registerViews() { return { requested: 0, registered: 0, failed: 0 }; },
+    async registerAssets() { return { requested: 0, mounted: 0, failed: 0 }; },
+    async registerQueryExecutors() { return { requested: 0, registered: 0, failed: 0 }; }
+  });
+  const service = createService(setup.deps);
+  const report = await service.installPackage({
+    installMethod: 'json',
+    manifestJson: JSON.stringify(createManifest({
+      id: 'pte-runtime-ok',
+      version: '1.0.0',
+      mountPath: '/pte',
+      routes: [createUseRouteDeclaration()]
+    }))
+  }, {
+    backendMode: 'json',
+    app: { use() {} }
+  });
+
+  assert.equal(report.action, 'install');
+  assert.equal(report.packageId, 'pte-runtime-ok');
+  assert.equal(report.runtime?.hooks?.routes?.mounted, 1);
+});
+
+test('installPackage fails and rolls back when runtime route mount health is not satisfied', async () => {
+  const setup = createBaseDeps();
+  setup.deps.packageRegistryInstallerService.createLoaderHooks = () => ({
+    async registerRoutes() { return { requested: 1, prepared: 1, mounted: 0, failed: 1, results: [{ ok: false }] }; },
+    async registerViews() { return { requested: 0, registered: 0, failed: 0 }; },
+    async registerAssets() { return { requested: 0, mounted: 0, failed: 0 }; },
+    async registerQueryExecutors() { return { requested: 0, registered: 0, failed: 0 }; }
+  });
+  const service = createService(setup.deps);
+
+  await assert.rejects(
+    () => service.installPackage({
+      installMethod: 'json',
+      manifestJson: JSON.stringify(createManifest({
+        id: 'pte-runtime-fail',
+        version: '1.0.0',
+        mountPath: '/pte',
+        routes: [createUseRouteDeclaration()]
+      }))
+    }, {
+      backendMode: 'json',
+      app: { use() {} }
+    }),
+    (error) => {
+      assert.equal(error?.code, 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED');
+      assert.equal(Number(error?.details?.runtimeRoutes?.failed || 0) > 0, true);
+      return true;
+    }
+  );
+
+  const registryAfter = await setup.deps.packageRegistryService.getPackageRegistryById('pte-runtime-fail');
+  assert.equal(registryAfter, null);
+});
+
 test('pausePackage is idempotent and returns restart recommendation', async () => {
   const setup = createBaseDeps();
   const service = createService(setup.deps);
@@ -406,6 +478,70 @@ test('syncPackage installs declarations and refreshes navigation', async () => {
   assert.equal(report.packageId, 'pte');
   assert.equal(setup.declarationCalls().some((row) => row.type === 'install'), true);
   assert.equal(setup.navigationRefreshCount() >= 1, true);
+});
+
+test('enablePackage auto-disables package when runtime route mount health fails', async () => {
+  const setup = createBaseDeps();
+  setup.deps.packageLoaderService.readManifestFile = async () => createManifest({
+    id: 'pte',
+    version: '1.0.0',
+    mountPath: '/pte',
+    routes: [createUseRouteDeclaration()]
+  });
+  setup.deps.packageRegistryInstallerService.createLoaderHooks = () => ({
+    async registerRoutes() { return { requested: 1, prepared: 1, mounted: 0, failed: 1, results: [] }; },
+    async registerViews() { return { requested: 0, registered: 0, failed: 0 }; },
+    async registerAssets() { return { requested: 0, mounted: 0, failed: 0 }; },
+    async registerQueryExecutors() { return { requested: 0, registered: 0, failed: 0 }; }
+  });
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: false,
+    installStatus: 'disabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+  const service = createService(setup.deps);
+
+  await assert.rejects(
+    () => service.enablePackage('pte', { backendMode: 'json', app: { use() {} } }),
+    /PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED|Runtime route mount/i
+  );
+
+  const registryAfter = await setup.deps.packageRegistryService.getPackageRegistryById('pte');
+  assert.equal(registryAfter?.enabled, false);
+});
+
+test('syncPackage auto-disables package when runtime route mount health fails', async () => {
+  const setup = createBaseDeps();
+  setup.deps.packageLoaderService.readManifestFile = async () => createManifest({
+    id: 'pte',
+    version: '1.0.0',
+    mountPath: '/pte',
+    routes: [createUseRouteDeclaration()]
+  });
+  setup.deps.packageRegistryInstallerService.createLoaderHooks = () => ({
+    async registerRoutes() { return { requested: 1, prepared: 1, mounted: 0, failed: 1, results: [] }; },
+    async registerViews() { return { requested: 0, registered: 0, failed: 0 }; },
+    async registerAssets() { return { requested: 0, mounted: 0, failed: 0 }; },
+    async registerQueryExecutors() { return { requested: 0, registered: 0, failed: 0 }; }
+  });
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+  const service = createService(setup.deps);
+
+  await assert.rejects(
+    () => service.syncPackage('pte', { backendMode: 'json', app: { use() {} } }),
+    /PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED|Runtime route mount/i
+  );
+
+  const registryAfter = await setup.deps.packageRegistryService.getPackageRegistryById('pte');
+  assert.equal(registryAfter?.enabled, false);
 });
 
 test('removePackage defaults to safe keep-data mode when uninstall preview reports modified records', async () => {

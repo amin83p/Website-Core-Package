@@ -21,7 +21,7 @@ const uploadFolderSettingsService = require('../services/uploadFolderSettingsSer
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
-const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
+const { getPackageStorageRootAbsolute, getPackageStorageRootResolution } = require('../utils/packageStoragePathUtils');
 
 const PUBLIC_PAGE_MEDIA_FOLDER = 'misc/public-pages';
 const MONGO_RESTORE_MAX_UPLOAD_MB = Number.parseInt(process.env.MONGO_BACKUP_RESTORE_MAX_MB || '100', 10) || 100;
@@ -1170,7 +1170,8 @@ exports.showPackageManagerPage = async (req, res) => {
     const settings = await systemSettingsRepository.getSettings();
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const keyContext = buildPackageTrustedKeyContext(settings);
-    const packageStorageRoot = getPackageStorageRootAbsolute();
+    const storageResolution = getPackageStorageRootResolution({ ensureExists: false });
+    const packageStorageRoot = storageResolution.effectiveRoot;
     const snapshot = await systemSettingsPackageManagerService.listPackageSnapshot({
       backendMode: runtimeBackend?.mode || '',
       packageRootDir: packageStorageRoot
@@ -1197,6 +1198,8 @@ exports.showPackageManagerPage = async (req, res) => {
       zipTrustedKeysCount: keyContext.trustedPublicKeys.length,
       zipUploadLimitMb: getPackageZipUploadLimitMb(),
       packageStorageRoot,
+      packageStorageRootSource: storageResolution.source,
+      packageStorageRootWarnings: Array.isArray(storageResolution.warnings) ? storageResolution.warnings : [],
       startupPackageWarnings,
       organizations: Array.isArray(organizations) ? organizations : [],
       activeOrgId,
@@ -1228,7 +1231,6 @@ function buildPackageManagerOptions(req = {}) {
   const keyContext = buildPackageTrustedKeyContext();
   return {
     backendMode: runtimeBackend?.mode || '',
-    packageRootDir: getPackageStorageRootAbsolute(),
     trustedPublicKeys: keyContext.trustedPublicKeys,
     targetOrgId: cleanFormText(req.body?.targetOrgId || req.query?.targetOrgId || '', 120),
     actor: req.user || null,
@@ -1245,6 +1247,8 @@ function sendPackageManagerError(res, error, fallbackMessage = 'Package operatio
     message = 'ZIP signature verification is not configured. Set PACKAGE_INSTALL_ED25519_PUBLIC_KEYS in the core .env, restart the app, and try again.';
   } else if (code === 'ZIP_SIGNATURE_INVALID') {
     message = 'Package signature verification failed. Rebuild the ZIP using the configured signing key, then upload the matching ZIP and SIG files.';
+  } else if (code === 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED') {
+    message = 'Package runtime route mount failed. The package was not left enabled. Review runtime route details and package root configuration, then retry.';
   } else if (code === 'TARGET_ORG_REQUIRED') {
     message = 'This package includes org-bound exported data/files. Select a target organization and retry install.';
   } else if (code === 'BUILDER_PAYLOAD_IMPORT_FAILED') {

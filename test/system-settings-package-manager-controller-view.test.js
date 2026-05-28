@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const ejs = require('ejs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -49,7 +50,7 @@ test('package manager page controller renders snapshot and action state', async 
   });
 
   try {
-    process.env.PACKAGE_STORAGE_ROOT = '/tmp/railway-packages';
+    process.env.PACKAGE_STORAGE_ROOT = path.join(os.tmpdir(), 'railway-packages');
     await systemSettingsController.showPackageManagerPage(
       {
         user: { id: 'USER_1' },
@@ -74,6 +75,8 @@ test('package manager page controller renders snapshot and action state', async 
     assert.equal(res.rendered?.payload?.localManifestOptions.length, 1);
     assert.equal(typeof res.rendered?.payload?.zipTrustedKeysConfigured, 'boolean');
     assert.match(String(res.rendered?.payload?.packageStorageRoot || ''), /railway-packages/i);
+    assert.equal(typeof res.rendered?.payload?.packageStorageRootSource, 'string');
+    assert.equal(Array.isArray(res.rendered?.payload?.packageStorageRootWarnings), true);
     assert.equal(Array.isArray(res.rendered?.payload?.startupPackageWarnings), true);
     assert.equal(res.rendered?.payload?.startupPackageWarnings.length, 1);
   } finally {
@@ -238,6 +241,38 @@ test('install package controller returns structured payload import failure detai
     assert.equal(res.jsonPayload?.status, 'error');
     assert.equal(res.jsonPayload?.code, 'BUILDER_PAYLOAD_IMPORT_FAILED');
     assert.equal(res.jsonPayload?.details?.entityType, 'pteApplicants');
+  } finally {
+    systemSettingsPackageManagerService.installPackage = originalInstall;
+  }
+});
+
+test('install package controller maps runtime route mount failures to actionable message', async () => {
+  const originalInstall = systemSettingsPackageManagerService.installPackage;
+  const res = makeRenderResponse();
+
+  try {
+    systemSettingsPackageManagerService.installPackage = async () => {
+      const error = new Error('Runtime route mount reported failed route declarations.');
+      error.code = 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED';
+      error.details = {
+        runtimeRoutes: { requested: 1, mounted: 0, failed: 1 }
+      };
+      throw error;
+    };
+
+    await systemSettingsController.installPackageFromManager(
+      {
+        body: { installMethod: 'path', manifestPath: 'packages/pte/package.manifest.json' },
+        user: { id: 'USER_RUNTIME_FAIL_1' },
+        app: {}
+      },
+      res
+    );
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.jsonPayload?.status, 'error');
+    assert.equal(res.jsonPayload?.code, 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED');
+    assert.match(String(res.jsonPayload?.message || ''), /runtime route mount failed/i);
   } finally {
     systemSettingsPackageManagerService.installPackage = originalInstall;
   }

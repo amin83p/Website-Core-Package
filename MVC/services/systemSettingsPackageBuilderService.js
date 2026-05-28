@@ -1847,6 +1847,23 @@ function createService(overrides = {}) {
     return allowList;
   }
 
+  function summarizeRequiredSymbolAssets(manifest = {}) {
+    const fileRefs = sanitizeArray(manifest?.fileRefs);
+    const requiredRefs = fileRefs.filter((row) => {
+      const requiredFlag = row?.requiredSymbolAsset === true;
+      const symbolNames = sanitizeArray(row?.symbolNames)
+        .map((item) => cleanText(item, 200))
+        .filter(Boolean);
+      return requiredFlag || symbolNames.length > 0;
+    });
+    return {
+      requiredSymbolAssetCount: requiredRefs.length,
+      requiredSymbolRefs: requiredRefs
+        .map((row) => cleanText(row?.ref, 2000))
+        .filter(Boolean)
+    };
+  }
+
   function assertUnknownEntityFallbackAllowed(entityType = '', allowList = new Set()) {
     const normalizedEntityType = cleanText(entityType, 200);
     if (!normalizedEntityType || !allowList.has(normalizedEntityType)) {
@@ -1958,6 +1975,7 @@ function createService(overrides = {}) {
     const payload = loadedPayload.manifest;
     const payloadData = sanitizeObject(loadedPayload.data);
     const payloadTableAllowList = collectPayloadTableAllowList(payload);
+    const requiredSymbolSummary = summarizeRequiredSymbolAssets(payload);
     const orgRemapRequired = loadedPayload.orgRemapRequired === true;
     const targetOrgId = normalizeOrgToken(options.targetOrgId || '');
     if (orgRemapRequired && !targetOrgId) {
@@ -1975,7 +1993,9 @@ function createService(overrides = {}) {
           upserted: 0
         },
         fileSummary: {
-          copied: 0
+          copied: 0,
+          requiredSymbolAssetCount: requiredSymbolSummary.requiredSymbolAssetCount,
+          copiedRequiredSymbolAssetCount: 0
         },
         warnings: []
       };
@@ -2039,6 +2059,7 @@ function createService(overrides = {}) {
 
     const sourceFilesRoot = path.join(packageDir, '__builder_payload__', loadedPayload.artifactsRoot || 'files');
     let copiedFiles = 0;
+    let copiedRequiredSymbolAssets = 0;
     if (await pathExists(sourceFilesRoot)) {
       const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
       const files = walkFiles(sourceFilesRoot);
@@ -2056,7 +2077,17 @@ function createService(overrides = {}) {
         // eslint-disable-next-line no-await-in-loop
         await copyFileSafe(sourcePath, destinationPath);
         copiedFiles += 1;
+        const mappedRef = `/${path.join('uploads', mappedRel).replace(/\\/g, '/')}`;
+        if (requiredSymbolSummary.requiredSymbolRefs.includes(mappedRef)) {
+          copiedRequiredSymbolAssets += 1;
+        }
       }
+    }
+
+    if (requiredSymbolSummary.requiredSymbolAssetCount > 0 && copiedRequiredSymbolAssets <= 0) {
+      warnings.push(
+        `Payload declared ${requiredSymbolSummary.requiredSymbolAssetCount} required symbol assets, but none were copied during install.`
+      );
     }
 
     return {
@@ -2068,7 +2099,9 @@ function createService(overrides = {}) {
         upserted
       },
       fileSummary: {
-        copied: copiedFiles
+        copied: copiedFiles,
+        requiredSymbolAssetCount: requiredSymbolSummary.requiredSymbolAssetCount,
+        copiedRequiredSymbolAssetCount: copiedRequiredSymbolAssets
       },
       warnings
     };

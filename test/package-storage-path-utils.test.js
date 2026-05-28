@@ -6,7 +6,10 @@ const os = require('node:os');
 
 const {
   DEFAULT_PACKAGE_ROOT,
-  getPackageStorageRootAbsolute
+  RAILWAY_PACKAGE_ROOT,
+  getPackageStorageRootAbsolute,
+  getPackageStorageRootResolution,
+  validateRootToken
 } = require('../MVC/utils/packageStoragePathUtils');
 
 test('package storage root defaults to project packages directory when env is not set', () => {
@@ -51,3 +54,26 @@ test('explicit packageRootDir option overrides env config', async () => {
   }
 });
 
+test('validateRootToken rejects Windows token for linux runtime and accepts for win32', () => {
+  const windowsToken = 'C:\\app\\uploads\\packages';
+  const linuxCheck = validateRootToken(windowsToken, 'linux');
+  const windowsCheck = validateRootToken(windowsToken, 'win32');
+  assert.equal(linuxCheck.valid, false);
+  assert.equal(linuxCheck.reason, 'windows_path_on_non_windows');
+  assert.equal(windowsCheck.valid, true);
+});
+
+test('getPackageStorageRootResolution falls back to railway/default when configured token is invalid for runtime platform', () => {
+  const previous = process.env.PACKAGE_STORAGE_ROOT;
+  process.env.PACKAGE_STORAGE_ROOT = 'C:\\app\\uploads\\packages';
+  try {
+    const resolved = getPackageStorageRootResolution({ ensureExists: false, platform: 'linux' });
+    assert.equal(resolved.source === 'railway-default' || resolved.source === 'default', true);
+    assert.equal(path.resolve(resolved.effectiveRoot), path.resolve(resolved.source === 'railway-default' ? RAILWAY_PACKAGE_ROOT : DEFAULT_PACKAGE_ROOT));
+    assert.equal(Array.isArray(resolved.warnings), true);
+    assert.equal(resolved.warnings.some((msg) => /windows_path_on_non_windows/i.test(String(msg || ''))), true);
+  } finally {
+    if (previous === undefined) delete process.env.PACKAGE_STORAGE_ROOT;
+    else process.env.PACKAGE_STORAGE_ROOT = previous;
+  }
+});

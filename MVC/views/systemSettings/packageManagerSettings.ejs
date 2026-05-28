@@ -9,6 +9,10 @@
     : [];
   const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
   const storageRoot = String(typeof packageStorageRoot !== 'undefined' ? packageStorageRoot : '').trim();
+  const storageRootSource = String(typeof packageStorageRootSource !== 'undefined' ? packageStorageRootSource : '').trim();
+  const storageRootWarnings = Array.isArray(typeof packageStorageRootWarnings !== 'undefined' ? packageStorageRootWarnings : [])
+    ? (typeof packageStorageRootWarnings !== 'undefined' ? packageStorageRootWarnings : [])
+    : [];
   const orgRows = Array.isArray(typeof organizations !== 'undefined' ? organizations : [])
     ? (typeof organizations !== 'undefined' ? organizations : [])
     : [];
@@ -41,6 +45,19 @@
   <% if (storageRoot) { %>
     <div class="alert alert-info border-0 shadow-sm py-2 px-3 mb-3 small">
       <strong>Package Storage Root:</strong> <code><%= storageRoot %></code>
+      <% if (storageRootSource) { %>
+        <span class="ms-2 text-muted">(source: <%= storageRootSource %>)</span>
+      <% } %>
+    </div>
+  <% } %>
+  <% if (storageRootWarnings.length) { %>
+    <div class="alert alert-warning border-0 shadow-sm py-2 px-3 mb-3 small">
+      <div class="fw-semibold mb-1">Package Root Warnings</div>
+      <ul class="mb-0 ps-3">
+        <% storageRootWarnings.forEach((msg) => { %>
+          <li><%= msg %></li>
+        <% }) %>
+      </ul>
     </div>
   <% } %>
   <% if (startupWarnings.length) { %>
