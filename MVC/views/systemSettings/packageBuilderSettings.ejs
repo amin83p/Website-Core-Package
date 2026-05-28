@@ -231,6 +231,13 @@
     alert(message);
   }
 
+  async function requireAdminVerification() {
+    if (typeof window.requestProtectedAction !== 'function') {
+      throw new Error('Admin verification modal is unavailable. Refresh and try again.');
+    }
+    await window.requestProtectedAction();
+  }
+
   async function preflightBuild() {
     const packageId = String(packageEl?.value || '').trim();
     const originOrgId = String(originOrgEl?.value || '').trim();
@@ -296,6 +303,7 @@
       showError(new Error('Select at least one table/collection to package.'));
       return;
     }
+    await requireAdminVerification();
     const payload = await runWithWaiting('Building signed package...', async () => fetchJson('/systemSettings/package-builder/build', {
       method: 'POST',
       headers: {
