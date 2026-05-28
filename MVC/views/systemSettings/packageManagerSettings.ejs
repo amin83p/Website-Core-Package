@@ -381,18 +381,119 @@
     }
   }
 
-  async function runWithWaiting(title, fn) {
+  function clampProgress(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return null;
+    return Math.max(0, Math.min(100, Math.round(numeric)));
+  }
+
+  function waitMs(ms) {
+    return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+  }
+
+  function getInstallProgressSteps(method) {
+    const normalizedMethod = String(method || '').trim().toLowerCase();
+    const isZip = normalizedMethod === 'zip';
+    return [
+      {
+        progress: 6,
+        note: 'Validating request and access permissions...',
+        operation: 'Validation'
+      },
+      {
+        progress: 20,
+        note: isZip ? 'Preparing ZIP and signature payload...' : 'Preparing install request payload...',
+        operation: 'Preparation'
+      },
+      {
+        progress: isZip ? 38 : 34,
+        note: isZip ? 'Uploading package artifacts...' : 'Submitting package install request...',
+        operation: isZip ? 'Upload' : 'Submission'
+      },
+      {
+        progress: 58,
+        note: 'Verifying manifest and security constraints...',
+        operation: 'Verification'
+      },
+      {
+        progress: 78,
+        note: 'Applying package declarations and data...',
+        operation: 'Apply'
+      },
+      {
+        progress: 92,
+        note: 'Finalizing installation...',
+        operation: 'Finalize'
+      }
+    ];
+  }
+
+  function buildLoadingState(title, fallbackNote, fallbackOperation, step = null) {
+    const state = {
+      title: String(title || '').trim() || 'Please wait',
+      note: String(fallbackNote || '').trim() || 'Processing your request...',
+      operation: String(fallbackOperation || '').trim(),
+      progress: null
+    };
+    if (!step || typeof step !== 'object') return state;
+    if (typeof step.note === 'string' && step.note.trim()) state.note = step.note.trim();
+    if (typeof step.operation === 'string' && step.operation.trim()) state.operation = step.operation.trim();
+    const nextProgress = clampProgress(step.progress);
+    if (nextProgress !== null) state.progress = nextProgress;
+    return state;
+  }
+
+  async function runWithWaiting(title, fn, options = {}) {
     let token = null;
+    const note = String(options?.note || 'Please wait while package lifecycle operation completes.').trim();
+    const operation = String(options?.operation || 'Package Lifecycle').trim();
+    const progressSteps = Array.isArray(options?.progressSteps) ? options.progressSteps.filter((item) => item && typeof item === 'object') : [];
+    const stepIntervalMs = Math.max(450, Number(options?.stepIntervalMs) || 1400);
+    let stepIndex = 0;
+    let stepTimer = null;
+
+    const applyStep = (index) => {
+      if (!progressSteps.length) return;
+      const safeIndex = Math.max(0, Math.min(progressSteps.length - 1, index));
+      stepIndex = safeIndex;
+      if (typeof window.updateLoading === 'function') {
+        window.updateLoading(buildLoadingState(title, note, operation, progressSteps[safeIndex]));
+      }
+    };
+
     try {
       if (typeof window.showLoading === 'function') {
-        token = window.showLoading({
-          title,
-          note: 'Please wait while package lifecycle operation completes.',
-          operation: 'Package Lifecycle'
-        });
+        if (progressSteps.length) {
+          token = window.showLoading(buildLoadingState(title, note, operation, progressSteps[0]));
+        } else {
+          token = window.showLoading({
+            title,
+            note,
+            operation
+          });
+        }
       }
-      return await fn();
+      if (progressSteps.length > 1) {
+        stepTimer = window.setInterval(() => {
+          if (stepIndex >= progressSteps.length - 1) return;
+          applyStep(stepIndex + 1);
+        }, stepIntervalMs);
+      }
+      const result = await fn();
+      if (progressSteps.length && typeof window.updateLoading === 'function') {
+        window.updateLoading({
+          title: String(title || '').trim() || 'Please wait',
+          note: 'Operation completed successfully.',
+          operation: 'Completed',
+          progress: 100
+        });
+        await waitMs(220);
+      }
+      return result;
     } finally {
+      if (stepTimer) {
+        window.clearInterval(stepTimer);
+      }
       if (typeof window.hideLoading === 'function' && token) {
         window.hideLoading(token);
       }
@@ -415,6 +516,7 @@
   async function installPackage() {
     const installMethod = String(installMethodEl.value || '').trim();
     const targetOrgId = String(targetOrgEl?.value || '').trim();
+    const progressSteps = getInstallProgressSteps(installMethod);
     await requireAdminVerification();
     if (installMethod === 'zip') {
       const zipFile = document.getElementById('pkgZipFile')?.files?.[0] || null;
@@ -432,7 +534,11 @@
           'X-AJAX-Request': 'true'
         },
         body: formData
-      }));
+      }), {
+        note: 'Preparing secure package upload...',
+        operation: 'ZIP Install',
+        progressSteps
+      });
     }
 
     const payload = {
@@ -452,7 +558,11 @@
         'X-AJAX-Request': 'true'
       },
       body: new URLSearchParams(payload).toString()
-    }));
+    }), {
+      note: 'Preparing package installation...',
+      operation: 'Install',
+      progressSteps
+    });
   }
 
   async function runRowAction(action, packageId) {

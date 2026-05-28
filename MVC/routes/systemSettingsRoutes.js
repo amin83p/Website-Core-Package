@@ -12,8 +12,22 @@ const adminApproval = require('../middleware/adminApproval');
 const accessService = require('../services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
-const restoreLimitMb = Number.parseInt(process.env.MONGO_BACKUP_RESTORE_MAX_MB || '100', 10) || 100;
-const packageZipLimitMb = Number.parseInt(process.env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB || '50', 10) || 50;
+function parsePositiveMb(...values) {
+  for (const raw of values) {
+    const parsed = Number.parseInt(String(raw || '').trim(), 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+const restoreLimitMb = parsePositiveMb(process.env.MONGO_BACKUP_RESTORE_MAX_MB, 100) || 100;
+const packageZipLimitMb = parsePositiveMb(
+  process.env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB,
+  process.env.APP_UPLOAD_MAX_FILE_MB,
+  process.env.FILE_UPLOAD_MAX_MB,
+  process.env.FILE_GATEWAY_MAX_FILE_MB,
+  50
+) || 50;
 const backupRestoreUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: restoreLimitMb * 1024 * 1024 }

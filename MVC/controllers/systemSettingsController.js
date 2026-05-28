@@ -26,6 +26,24 @@ const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUt
 const PUBLIC_PAGE_MEDIA_FOLDER = 'misc/public-pages';
 const MONGO_RESTORE_MAX_UPLOAD_MB = Number.parseInt(process.env.MONGO_BACKUP_RESTORE_MAX_MB || '100', 10) || 100;
 
+function parsePositiveMb(...values) {
+  for (const raw of values) {
+    const parsed = Number.parseInt(String(raw || '').trim(), 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+function getPackageZipUploadLimitMb() {
+  return parsePositiveMb(
+    process.env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB,
+    process.env.APP_UPLOAD_MAX_FILE_MB,
+    process.env.FILE_UPLOAD_MAX_MB,
+    process.env.FILE_GATEWAY_MAX_FILE_MB,
+    50
+  ) || 50;
+}
+
 function normalizeScopeToken(value = '') {
   const token = cleanFormText(value, 120).toUpperCase();
   if (!token || token === 'SYSTEM' || token === 'GLOBAL') return 'GLOBAL';
@@ -1177,7 +1195,7 @@ exports.showPackageManagerPage = async (req, res) => {
       localManifestWarnings,
       zipTrustedKeysConfigured: keyContext.trustedPublicKeys.length > 0,
       zipTrustedKeysCount: keyContext.trustedPublicKeys.length,
-      zipUploadLimitMb: Number.parseInt(process.env.PACKAGE_ZIP_INSTALL_MAX_UPLOAD_MB || '50', 10) || 50,
+      zipUploadLimitMb: getPackageZipUploadLimitMb(),
       packageStorageRoot,
       startupPackageWarnings,
       organizations: Array.isArray(organizations) ? organizations : [],
