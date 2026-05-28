@@ -426,6 +426,10 @@ function extractUploadUrls(node, intoSet) {
   }
 }
 
+function normalizeSymbolName(value = '') {
+  return cleanText(value, 200).toUpperCase();
+}
+
 function transformForOrgRemap(node, state = {}, keyName = '') {
   if (typeof node === 'string') {
     const current = String(node);
@@ -460,17 +464,26 @@ function transformForOrgRemap(node, state = {}, keyName = '') {
   return node;
 }
 
-function extractSymbolUploadRefs(manifest = {}) {
-  const refs = new Set();
-  const symbols = sanitizeArray(manifest?.symbols);
-  symbols.forEach((row) => {
+function extractSymbolUploadRefRows(symbolCatalog = []) {
+  const rows = [];
+  sanitizeArray(symbolCatalog).forEach((row) => {
     if (!row || typeof row !== 'object') return;
+    const symbolName = normalizeSymbolName(row.name || row.id || '');
+    if (!symbolName) return;
+    const refs = new Set();
     const value = row.value;
     if (typeof value === 'string' || Array.isArray(value) || (value && typeof value === 'object')) {
       extractUploadUrls(value, refs);
     }
+    Array.from(refs).forEach((ref) => {
+      rows.push({
+        symbolName,
+        ref: cleanText(ref, 2000),
+        detectedOrgTokens: extractOrgTokensFromUploadRef(ref)
+      });
+    });
   });
-  return Array.from(refs);
+  return rows;
 }
 
 function applyOrgRemap(node, targetOrgId = '') {
@@ -805,6 +818,98 @@ function createService(overrides = {}) {
     return normalizedRows;
   }
 
+  function normalizeSymbolCatalogRow(row = {}) {
+    const name = normalizeSymbolName(row?.name || row?.id || '');
+    if (!name) return null;
+    const type = cleanText(row?.type, 40).toLowerCase() || 'class';
+    const tags = Array.from(new Set(
+      sanitizeArray(row?.tags)
+        .map((item) => cleanText(item, 200))
+        .filter(Boolean)
+    ));
+    return {
+      id: cleanText(row?.id, 160) || '',
+      name,
+      type,
+      value: cleanText(row?.value, 6000),
+      tags,
+      orgId: cleanText(row?.orgId, 160) || ''
+    };
+  }
+
+  function selectBestLiveSymbolCandidate(candidates = [], originOrgId = '') {
+    const origin = normalizeOrgToken(originOrgId);
+    if (!origin) return sanitizeArray(candidates)[0] || null;
+    const normalizedRows = sanitizeArray(candidates);
+    const direct = normalizedRows.find((row) => normalizeOrgToken(row?.orgId || '') === origin);
+    if (direct) return direct;
+    const system = normalizedRows.find((row) => cleanText(row?.orgId, 160).toUpperCase() === 'SYSTEM');
+    if (system) return system;
+    return normalizedRows[0] || null;
+  }
+
+  async function resolveSymbolInstallCatalog(manifest = {}, options = {}) {
+    const manifestSymbols = sanitizeArray(manifest?.symbols)
+      .map((row) => normalizeSymbolCatalogRow(row))
+      .filter(Boolean);
+    if (!manifestSymbols.length) return [];
+
+    const manifestNames = new Set(manifestSymbols.map((row) => row.name));
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    const originOrgId = normalizeOrgToken(options.originOrgId || '');
+    const liveRows = await deps.dataService.fetchData('symbols', {}, SYSTEM_CONTEXT, { backendMode }).catch(() => []);
+    const grouped = new Map();
+    sanitizeArray(liveRows).forEach((row) => {
+      const normalized = normalizeSymbolCatalogRow(row);
+      if (!normalized || !manifestNames.has(normalized.name)) return;
+      if (!grouped.has(normalized.name)) grouped.set(normalized.name, []);
+      grouped.get(normalized.name).push(normalized);
+    });
+
+    return manifestSymbols.map((base) => {
+      const candidates = grouped.get(base.name) || [];
+      const selected = selectBestLiveSymbolCandidate(candidates, originOrgId);
+      if (!selected) {
+        return {
+          ...base,
+          source: 'manifest'
+        };
+      }
+      return {
+        ...base,
+        type: selected.type || base.type,
+        value: selected.value || base.value,
+        tags: selected.tags.length ? selected.tags : base.tags,
+        orgId: selected.orgId || base.orgId,
+        source: 'live'
+      };
+    });
+  }
+
+  function applyResolvedSymbolCatalogToManifest(manifest = {}, symbolCatalog = []) {
+    const base = manifest && typeof manifest === 'object' ? { ...manifest } : {};
+    const existingSymbols = sanitizeArray(base.symbols);
+    const resolvedByName = new Map(
+      sanitizeArray(symbolCatalog)
+        .map((row) => [normalizeSymbolName(row?.name || row?.id || ''), row])
+        .filter((entry) => entry[0] && entry[1])
+    );
+
+    base.symbols = existingSymbols.map((row) => {
+      if (!row || typeof row !== 'object') return row;
+      const key = normalizeSymbolName(row?.name || row?.id || '');
+      const resolved = resolvedByName.get(key);
+      if (!resolved) return row;
+      return {
+        ...row,
+        type: resolved.type || row.type,
+        value: resolved.value || row.value,
+        tags: sanitizeArray(resolved.tags).length ? sanitizeArray(resolved.tags) : row.tags
+      };
+    });
+    return base;
+  }
+
   async function fetchEntityRows(entityType = '', options = {}) {
     try {
       const rows = await deps.dataService.fetchData(entityType, {}, SYSTEM_CONTEXT, {
@@ -973,7 +1078,12 @@ function createService(overrides = {}) {
     );
     const requestedFileFieldSelection = normalizeFileFieldSelection(input.fileFieldSelection || {});
     const detectedUploadUrls = new Set();
-    const detectedSymbolUploadUrls = new Set(extractSymbolUploadRefs(packageRow.manifest));
+    const symbolCatalog = await resolveSymbolInstallCatalog(packageRow.manifest, {
+      backendMode,
+      originOrgId
+    });
+    const symbolRefRows = extractSymbolUploadRefRows(symbolCatalog);
+    const detectedSymbolUploadUrls = new Set(symbolRefRows.map((row) => row.ref));
     const fileProvenance = [];
     const entityCatalog = [];
     const warnings = [];
@@ -1163,12 +1273,16 @@ function createService(overrides = {}) {
       ...manualFileRefs
     ]));
     const normalizedFileRefs = combinedFileRefs.map((item) => {
+      const symbolRows = symbolRefRows.filter((row) => row.ref === item);
+      const symbolNames = Array.from(new Set(symbolRows.map((row) => row.symbolName).filter(Boolean)));
       const uploadRelative = uploadPathUtils.extractRelativeUploadPath(item);
       return {
         ref: item,
         type: uploadRelative
           ? (detectedSymbolUploadUrls.has(item) ? 'symbol-upload-url' : 'upload-url')
           : 'manual',
+        symbolNames,
+        requiredSymbolAsset: symbolNames.length > 0,
         uploadRelativePath: uploadRelative || '',
         exists: uploadRelative ? fs.existsSync(uploadPathUtils.fromUploadsUrlToDiskPath(item) || '') : true,
         detectedOrgTokens: extractOrgTokensFromUploadRef(item)
@@ -1189,6 +1303,7 @@ function createService(overrides = {}) {
       availableDataEntities,
       entityCatalog,
       selectedDataEntities,
+      symbolCatalog,
       selectedRowCount,
       remapImpactPreview,
       scopeValidation: scopeViolations,
@@ -1196,6 +1311,8 @@ function createService(overrides = {}) {
       filePlan: {
         detectedFromData: Array.from(detectedUploadUrls),
         detectedFromSymbols: Array.from(detectedSymbolUploadUrls),
+        symbolRefs: symbolRefRows,
+        requiredSymbolAssetCount: symbolRefRows.length,
         provenance: fileProvenance,
         manualRefs: manualFileRefs,
         normalizedRefs: normalizedFileRefs
@@ -1225,10 +1342,12 @@ function createService(overrides = {}) {
     return uploadPathUtils.isInsideUploadRoot(candidate, uploadRoot) ? candidate : '';
   }
 
-  async function copySelectedRefs(refRows = [], targetRoot = '') {
+  async function copySelectedRefs(refRows = [], targetRoot = '', options = {}) {
     const copied = [];
     const warnings = [];
     const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    const originOrgId = normalizeOrgToken(options.originOrgId || '');
     const canUseGatewayFallback = Boolean(
       deps.isRailwayProxyMode()
       && cleanText(deps.getGatewayBaseUrl(), 2000)
@@ -1264,9 +1383,23 @@ function createService(overrides = {}) {
 
     for (const row of sanitizeArray(refRows)) {
       const ref = cleanText(row?.ref || row, 2000);
+      const symbolNames = sanitizeArray(row?.symbolNames).map((item) => normalizeSymbolName(item)).filter(Boolean);
+      const requiredSymbolAsset = row?.requiredSymbolAsset === true || symbolNames.length > 0;
       const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(ref);
       const absolutePath = resolveReferenceToAbsolutePath(ref);
       if (!absolutePath) {
+        if (requiredSymbolAsset) {
+          const error = new Error(`Required symbol asset path is invalid or outside upload root: ${ref}`);
+          error.code = 'BUILDER_SYMBOL_ASSET_MISSING';
+          error.details = {
+            symbolName: symbolNames.join(','),
+            ref,
+            reason: 'invalid_or_outside_upload_root',
+            backendMode,
+            originOrgId
+          };
+          throw error;
+        }
         warnings.push(`Skipped file ref "${ref}" because it is outside upload root or invalid.`);
         continue;
       }
@@ -1275,6 +1408,18 @@ function createService(overrides = {}) {
         // eslint-disable-next-line no-await-in-loop
         const gatewayFallback = await tryCopyFromGateway(ref, relativeUploadPath, destinationFromRef);
         if (!gatewayFallback.copied) {
+          if (requiredSymbolAsset) {
+            const error = new Error(`Required symbol asset is missing: ${ref}`);
+            error.code = 'BUILDER_SYMBOL_ASSET_MISSING';
+            error.details = {
+              symbolName: symbolNames.join(','),
+              ref,
+              reason: gatewayFallback.reason || 'source_missing',
+              backendMode,
+              originOrgId
+            };
+            throw error;
+          }
           const reasonSuffix = gatewayFallback.reason ? ` (${gatewayFallback.reason})` : '';
           warnings.push(`Skipped file ref "${ref}" because source path does not exist.${reasonSuffix}`);
           continue;
@@ -1474,6 +1619,7 @@ function createService(overrides = {}) {
       throw error;
     }
     const selectedEntityRows = sanitizeArray(preflight.selectedDataEntities);
+    const resolvedSymbolCatalog = sanitizeArray(preflight.symbolCatalog);
     const originOrgId = cleanText(preflight.originOrgId, 160);
     const fileFieldSelection = sanitizeObject(preflight.fileFieldSelection);
     const tablePayload = {};
@@ -1500,6 +1646,8 @@ function createService(overrides = {}) {
     const fileRefs = sanitizeArray(preflight.filePlan?.normalizedRefs).map((row) => ({
       ref: cleanText(row.ref, 2000),
       type: cleanText(row.type, 40),
+      symbolNames: sanitizeArray(row.symbolNames),
+      requiredSymbolAsset: row?.requiredSymbolAsset === true,
       uploadRelativePath: cleanText(row.uploadRelativePath, 2000)
     }));
 
@@ -1515,13 +1663,17 @@ function createService(overrides = {}) {
     try {
       await copyDirectorySafe(packageRow.packageDir, stagedPackageDir);
       const stagedManifestPath = deps.path.join(stagedPackageDir, 'package.manifest.json');
-      const stagedManifest = readJsonFile(stagedManifestPath);
+      const stagedManifestSource = readJsonFile(stagedManifestPath);
+      const stagedManifest = applyResolvedSymbolCatalogToManifest(stagedManifestSource, resolvedSymbolCatalog);
       stagedManifest.version = requestedVersion;
       await deps.fs.writeFile(stagedManifestPath, JSON.stringify(stagedManifest, null, 2));
 
       await deps.fs.mkdir(payloadFilesDir, { recursive: true });
       await deps.fs.mkdir(payloadTablesDir, { recursive: true });
-      copiedFileReport = await copySelectedRefs(fileRefs, payloadFilesDir);
+      copiedFileReport = await copySelectedRefs(fileRefs, payloadFilesDir, {
+        backendMode,
+        originOrgId
+      });
       const tableIndex = [];
       for (const entity of selectedEntityRows) {
         const entityType = cleanText(entity?.entityType, 200);
@@ -1627,6 +1779,7 @@ function createService(overrides = {}) {
           selectedRefCount: fileRefs.length,
           copiedCount: copiedFileReport.copied.length
         },
+        symbolCatalog: resolvedSymbolCatalog,
         fileFieldSelection,
         remapSummary: payload.remapSummary,
         orgRemapRequired: payload.orgRemapRequired,
@@ -1685,6 +1838,101 @@ function createService(overrides = {}) {
     };
   }
 
+  function collectPayloadTableAllowList(manifest = {}) {
+    const allowList = new Set();
+    sanitizeArray(manifest?.tables).forEach((row) => {
+      const entityType = cleanText(row?.entityType, 200);
+      if (entityType) allowList.add(entityType);
+    });
+    return allowList;
+  }
+
+  function assertUnknownEntityFallbackAllowed(entityType = '', allowList = new Set()) {
+    const normalizedEntityType = cleanText(entityType, 200);
+    if (!normalizedEntityType || !allowList.has(normalizedEntityType)) {
+      throw new Error(
+        `Unknown entity fallback blocked for "${normalizedEntityType || entityType}" because it is not declared in builder payload manifest tables.`
+      );
+    }
+  }
+
+  async function upsertUnknownEntityJson(entityType = '', row = {}, rowId = '') {
+    const filePath = path.join(process.cwd(), 'data', `${entityType}.json`);
+    const exists = await pathExists(filePath);
+    let rows = [];
+    if (exists) {
+      const payload = readJsonFile(filePath);
+      if (!Array.isArray(payload)) {
+        throw new Error(`Fallback JSON store is not an array for entity "${entityType}".`);
+      }
+      rows = payload;
+    }
+    const matchIndex = rows.findIndex((candidate) => {
+      const candidateId = cleanText(candidate?.id || candidate?._id || '', 200);
+      return candidateId && candidateId === rowId;
+    });
+    const normalizedRow = row && typeof row === 'object'
+      ? { ...row, id: rowId }
+      : { id: rowId };
+    const operation = matchIndex >= 0 ? 'update' : 'insert';
+    if (operation === 'update') rows[matchIndex] = normalizedRow;
+    else rows.push(normalizedRow);
+
+    await fsp.mkdir(path.dirname(filePath), { recursive: true });
+    await fsp.writeFile(filePath, `${JSON.stringify(rows, null, 2)}\n`, 'utf8');
+    return operation;
+  }
+
+  async function upsertUnknownEntityMongo(entityType = '', row = {}, rowId = '') {
+    if (typeof deps.getMongoDbOrNull === 'function' && !deps.getMongoDbOrNull()) {
+      throw new Error(`Mongo is not connected for fallback entity write: ${entityType}`);
+    }
+    if (typeof deps.getMongoCollection !== 'function') {
+      throw new Error(`Mongo collection resolver is unavailable for fallback entity write: ${entityType}`);
+    }
+    const collection = deps.getMongoCollection(entityType);
+    if (!collection) {
+      throw new Error(`Mongo collection was not resolved for fallback entity write: ${entityType}`);
+    }
+
+    const normalizedRow = row && typeof row === 'object'
+      ? { ...row, id: rowId }
+      : { id: rowId };
+    delete normalizedRow._id;
+
+    let existing = await collection.findOne({ id: rowId });
+    if (!existing) existing = await collection.findOne({ _id: rowId });
+    if (existing) {
+      const updateQuery = existing?._id !== undefined ? { _id: existing._id } : { id: rowId };
+      await collection.updateOne(updateQuery, { $set: normalizedRow }, { upsert: false });
+      return 'update';
+    }
+
+    await collection.insertOne({
+      ...normalizedRow,
+      _id: rowId
+    });
+    return 'insert';
+  }
+
+  async function upsertUnknownEntityRow(entityType = '', row = {}, options = {}) {
+    const normalizedEntityType = cleanText(entityType, 200);
+    const rowId = cleanText(row?.id || '', 200);
+    if (!rowId) {
+      throw new Error(
+        `Unknown entity fallback requires a stable row.id for "${normalizedEntityType || entityType}".`
+      );
+    }
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    if (backendMode === 'json') {
+      return upsertUnknownEntityJson(normalizedEntityType, row, rowId);
+    }
+    if (backendMode === 'mongo') {
+      return upsertUnknownEntityMongo(normalizedEntityType, row, rowId);
+    }
+    throw new Error(`Unsupported backend mode "${backendMode}" for unknown entity fallback.`);
+  }
+
   async function applyBuilderPayloadIfPresent(context = {}, options = {}) {
     const manifestPath = cleanText(context.manifestPath, 2000);
     if (!manifestPath) {
@@ -1709,6 +1957,7 @@ function createService(overrides = {}) {
     }
     const payload = loadedPayload.manifest;
     const payloadData = sanitizeObject(loadedPayload.data);
+    const payloadTableAllowList = collectPayloadTableAllowList(payload);
     const orgRemapRequired = loadedPayload.orgRemapRequired === true;
     const targetOrgId = normalizeOrgToken(options.targetOrgId || '');
     if (orgRemapRequired && !targetOrgId) {
@@ -1759,7 +2008,20 @@ function createService(overrides = {}) {
           await deps.dataService.addData(entityType, row, SYSTEM_CONTEXT, { backendMode });
           upserted += 1;
         } catch (error) {
-          const message = cleanText(error?.message || String(error), 500) || 'Unknown payload import error.';
+          let resolvedError = error;
+          if (isUnknownEntityTypeError(error)) {
+            try {
+              assertUnknownEntityFallbackAllowed(entityType, payloadTableAllowList);
+              // eslint-disable-next-line no-await-in-loop
+              operation = await upsertUnknownEntityRow(entityType, row, { backendMode });
+              upserted += 1;
+              continue;
+            } catch (fallbackError) {
+              resolvedError = fallbackError;
+            }
+          }
+
+          const message = cleanText(resolvedError?.message || String(resolvedError), 500) || 'Unknown payload import error.';
           const importError = new Error(`Builder payload import failed for ${entityType}${rowId ? `#${rowId}` : ''}: ${message}`);
           importError.code = 'BUILDER_PAYLOAD_IMPORT_FAILED';
           importError.details = {

@@ -101,8 +101,59 @@ test('preflightBuild discovers manifest data entities and upload refs', async ()
     assert.equal(report.entityCatalog.length, 1);
     assert.equal(report.filePlan.detectedFromData.length, 1);
     assert.equal(report.filePlan.detectedFromSymbols.length, 1);
+    assert.equal(Array.isArray(report.symbolCatalog), true);
+    assert.equal(Array.isArray(report.filePlan.symbolRefs), true);
+    assert.ok(Number(report.filePlan.requiredSymbolAssetCount || 0) >= 1);
     assert.ok(Number(report.remapImpactPreview?.rewrittenExactOrgTokens || 0) >= 1);
     assert.match(String(report.filePlan.detectedFromData[0]), /\/uploads\/ORG_900000\/symbols\/logo\.png/);
+  });
+});
+
+test('preflightBuild resolves symbol catalog with live symbol value overlay', async () => {
+  await withTempCwd('pkg-builder-symbol-catalog-overlay-', async (tempRoot) => {
+    const manifest = createBaseManifest();
+    manifest.symbols[0].value = '/uploads/ORG_900000/symbols/stale.png';
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), manifest);
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async fetchData(entityType) {
+          if (entityType === 'symbols') {
+            return [{
+              id: 'SYM1',
+              name: 'PTE_SYMBOL',
+              type: 'path',
+              value: '/uploads/ORG_900000/symbols/live.png',
+              orgId: 'ORG_900000',
+              tags: ['PTE']
+            }];
+          }
+          if (entityType === 'pteApplicants') return [];
+          return [];
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      }
+    });
+
+    const report = await service.preflightBuild({
+      packageId: 'pte',
+      originOrgId: 'ORG_900000',
+      selectedDataEntities: []
+    }, {
+      backendMode: 'json',
+      packageRootDir: path.join(tempRoot, 'packages')
+    });
+
+    assert.equal(Array.isArray(report.symbolCatalog), true);
+    assert.ok(report.symbolCatalog.length > 0);
+    const pteSymbol = report.symbolCatalog[0];
+    assert.equal(pteSymbol.source, 'live');
+    assert.equal(pteSymbol.value, '/uploads/ORG_900000/symbols/live.png');
+    assert.equal(report.filePlan.detectedFromSymbols.includes('/uploads/ORG_900000/symbols/live.png'), true);
+    assert.equal(report.filePlan.detectedFromSymbols.includes('/uploads/ORG_900000/symbols/stale.png'), false);
   });
 });
 
@@ -245,6 +296,233 @@ test('applyBuilderPayloadIfPresent enforces target org for remap and applies dat
     assert.equal(updates[0].row.avatarUrl, '/uploads/ORG_123/symbols/logo.png');
     const copiedPath = path.join(tempRoot, 'uploads', 'ORG_123', 'symbols', 'logo.png');
     assert.equal(await fsp.access(copiedPath).then(() => true).catch(() => false), true);
+  });
+});
+
+test('buildPackage fails when required symbol upload asset is missing', async () => {
+  await withTempCwd('pkg-builder-symbol-asset-missing-', async (tempRoot) => {
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest('1.0.0'));
+    fs.writeFileSync(path.join(tempRoot, 'packages', 'pte', 'README.md'), '# PTE', 'utf8');
+
+    const { privateKey } = crypto.generateKeyPairSync('ed25519');
+    const signingDir = path.join(tempRoot, 'install_packages', 'signing');
+    fs.mkdirSync(signingDir, { recursive: true });
+    const privatePath = path.join(signingDir, 'package-install-ed25519.private.pem');
+    fs.writeFileSync(privatePath, privateKey.export({ type: 'pkcs8', format: 'pem' }), 'utf8');
+    const originalKeyFile = process.env.PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE;
+    process.env.PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE = 'install_packages/signing/package-install-ed25519.private.pem';
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async fetchData(entityType) {
+          if (entityType === 'pteApplicants') return [];
+          if (entityType === 'symbols') return [];
+          return [];
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      }
+    });
+
+    try {
+      await assert.rejects(
+        () => service.buildPackage({
+          packageId: 'pte',
+          version: '1.0.0',
+          originOrgId: 'ORG_900000',
+          selectedDataEntities: []
+        }, {
+          backendMode: 'json',
+          packageRootDir: path.join(tempRoot, 'packages')
+        }),
+        (error) => {
+          assert.equal(error?.code, 'BUILDER_SYMBOL_ASSET_MISSING');
+          assert.match(String(error?.details?.symbolName || ''), /PTE/i);
+          assert.match(String(error?.details?.ref || ''), /\/uploads\/ORG_900000\/symbols\/logo\.png/i);
+          return true;
+        }
+      );
+    } finally {
+      if (originalKeyFile === undefined) delete process.env.PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE;
+      else process.env.PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE = originalKeyFile;
+    }
+  });
+});
+
+test('applyBuilderPayloadIfPresent falls back to allow-listed JSON upsert for unknown entity types', async () => {
+  await withTempCwd('pkg-builder-apply-json-fallback-', async (tempRoot) => {
+    const packageDir = path.join(tempRoot, 'packages', 'pte');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
+    writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'pteAiProviders.json'), [
+      { id: 'PTEAIP1', orgId: '{{ORG_ID}}', providerName: 'Provider A' }
+    ]);
+    writeJson(path.join(packageDir, '__builder_payload__', 'manifest.json'), {
+      schema: 'core.package-builder.payload.v2',
+      orgRemapRequired: true,
+      artifactsRoot: 'artifacts',
+      tables: [{ entityType: 'pteAiProviders', file: 'tables/pteAiProviders.json', rowCount: 1 }]
+    });
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async getDataById() { throw new Error('Unknown entity type for ID: pteAiProviders'); },
+        async updateData() { throw new Error('Unknown entity type for update: pteAiProviders'); },
+        async addData() { throw new Error('Unknown entity type for add: pteAiProviders'); }
+      }
+    });
+
+    const report = await service.applyBuilderPayloadIfPresent({
+      manifestPath: path.join(packageDir, 'package.manifest.json')
+    }, {
+      backendMode: 'json',
+      targetOrgId: 'ORG_900000'
+    });
+
+    assert.equal(report.applied, true);
+    assert.equal(report.dataSummary.upserted, 1);
+    const storedRows = JSON.parse(fs.readFileSync(path.join(tempRoot, 'data', 'pteAiProviders.json'), 'utf8'));
+    assert.equal(Array.isArray(storedRows), true);
+    assert.equal(storedRows.length, 1);
+    assert.equal(storedRows[0].id, 'PTEAIP1');
+    assert.equal(storedRows[0].orgId, 'ORG_900000');
+  });
+});
+
+test('applyBuilderPayloadIfPresent falls back to allow-listed Mongo upsert for unknown entity types', async () => {
+  await withTempCwd('pkg-builder-apply-mongo-fallback-', async (tempRoot) => {
+    const packageDir = path.join(tempRoot, 'packages', 'pte');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
+    writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'pteAiProviders.json'), [
+      { id: 'PTEAIP1', providerName: 'Provider Updated' }
+    ]);
+    writeJson(path.join(packageDir, '__builder_payload__', 'manifest.json'), {
+      schema: 'core.package-builder.payload.v2',
+      orgRemapRequired: false,
+      artifactsRoot: 'artifacts',
+      tables: [{ entityType: 'pteAiProviders', file: 'tables/pteAiProviders.json', rowCount: 1 }]
+    });
+
+    const store = new Map();
+    store.set('PTEAIP1', { _id: 'PTEAIP1', id: 'PTEAIP1', providerName: 'Provider Old' });
+    const collection = {
+      async findOne(query = {}) {
+        if (query.id) return store.get(String(query.id)) || null;
+        if (query._id !== undefined) return store.get(String(query._id)) || null;
+        return null;
+      },
+      async updateOne(query = {}, payload = {}) {
+        const key = query._id !== undefined ? String(query._id) : String(query.id || '');
+        const current = store.get(key) || { _id: key };
+        const next = { ...current, ...(payload?.$set || {}) };
+        store.set(key, next);
+        return { matchedCount: 1, modifiedCount: 1 };
+      },
+      async insertOne(doc = {}) {
+        const key = String(doc?._id || doc?.id || '');
+        store.set(key, doc);
+        return { acknowledged: true };
+      }
+    };
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async getDataById() { throw new Error('Unknown entity type for ID: pteAiProviders'); },
+        async updateData() { throw new Error('Unknown entity type for update: pteAiProviders'); },
+        async addData() { throw new Error('Unknown entity type for add: pteAiProviders'); }
+      },
+      getMongoDbOrNull: () => ({}),
+      getMongoCollection: () => collection
+    });
+
+    const report = await service.applyBuilderPayloadIfPresent({
+      manifestPath: path.join(packageDir, 'package.manifest.json')
+    }, {
+      backendMode: 'mongo'
+    });
+
+    assert.equal(report.applied, true);
+    assert.equal(report.dataSummary.upserted, 1);
+    const row = store.get('PTEAIP1');
+    assert.ok(row);
+    assert.equal(row.providerName, 'Provider Updated');
+    assert.equal(row.id, 'PTEAIP1');
+  });
+});
+
+test('applyBuilderPayloadIfPresent blocks unknown-entity fallback when payload manifest tables do not allow entity', async () => {
+  await withTempCwd('pkg-builder-apply-blocked-fallback-', async (tempRoot) => {
+    const packageDir = path.join(tempRoot, 'packages', 'pte');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__'), { recursive: true });
+    writeJson(path.join(packageDir, '__builder_payload__', 'payload.json'), {
+      schema: 'core.package-builder.payload.v1',
+      orgRemapRequired: false,
+      data: {
+        pteAiProviders: [{ id: 'PTEAIP1', providerName: 'Provider A' }]
+      }
+    });
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async getDataById() { throw new Error('Unknown entity type for ID: pteAiProviders'); },
+        async updateData() { throw new Error('Unknown entity type for update: pteAiProviders'); },
+        async addData() { throw new Error('Unknown entity type for add: pteAiProviders'); }
+      }
+    });
+
+    await assert.rejects(
+      () => service.applyBuilderPayloadIfPresent({
+        manifestPath: path.join(packageDir, 'package.manifest.json')
+      }, {
+        backendMode: 'json'
+      }),
+      (error) => {
+        assert.equal(error?.code, 'BUILDER_PAYLOAD_IMPORT_FAILED');
+        assert.equal(error?.details?.entityType, 'pteAiProviders');
+        assert.match(String(error?.details?.message || ''), /fallback blocked/i);
+        return true;
+      }
+    );
+  });
+});
+
+test('applyBuilderPayloadIfPresent requires row.id for unknown-entity fallback upsert', async () => {
+  await withTempCwd('pkg-builder-apply-missing-id-fallback-', async (tempRoot) => {
+    const packageDir = path.join(tempRoot, 'packages', 'pte');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
+    writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'pteAiProviders.json'), [
+      { providerName: 'Provider Without Id' }
+    ]);
+    writeJson(path.join(packageDir, '__builder_payload__', 'manifest.json'), {
+      schema: 'core.package-builder.payload.v2',
+      orgRemapRequired: false,
+      artifactsRoot: 'artifacts',
+      tables: [{ entityType: 'pteAiProviders', file: 'tables/pteAiProviders.json', rowCount: 1 }]
+    });
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async getDataById() { throw new Error('Unknown entity type for ID: pteAiProviders'); },
+        async updateData() { throw new Error('Unknown entity type for update: pteAiProviders'); },
+        async addData() { throw new Error('Unknown entity type for add: pteAiProviders'); }
+      }
+    });
+
+    await assert.rejects(
+      () => service.applyBuilderPayloadIfPresent({
+        manifestPath: path.join(packageDir, 'package.manifest.json')
+      }, {
+        backendMode: 'json'
+      }),
+      (error) => {
+        assert.equal(error?.code, 'BUILDER_PAYLOAD_IMPORT_FAILED');
+        assert.equal(error?.details?.entityType, 'pteAiProviders');
+        assert.equal(error?.details?.rowId, '');
+        assert.match(String(error?.details?.message || ''), /requires a stable row\.id/i);
+        return true;
+      }
+    );
   });
 });
 
