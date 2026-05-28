@@ -434,6 +434,51 @@ test('installPackage accepts runtime route already-mounted skip as healthy', asy
   assert.equal(report.runtime?.hooks?.routes?.failed, 0);
 });
 
+test('installPackage prefers package runtime router for routes/assets when available', async () => {
+  const setup = createBaseDeps();
+  let routeAppRef = null;
+  let viewAppRef = null;
+  let assetAppRef = null;
+  setup.deps.packageRegistryInstallerService.createLoaderHooks = () => ({
+    async registerRoutes(context = {}) {
+      routeAppRef = context?.app || null;
+      return { requested: 1, prepared: 1, mounted: 1, failed: 0, results: [] };
+    },
+    async registerViews(context = {}) {
+      viewAppRef = context?.app || null;
+      return { requested: 0, registered: 0, failed: 0 };
+    },
+    async registerAssets(context = {}) {
+      assetAppRef = context?.app || null;
+      return { requested: 0, mounted: 0, failed: 0 };
+    },
+    async registerQueryExecutors() { return { requested: 0, registered: 0, failed: 0 }; }
+  });
+  const service = createService(setup.deps);
+  const runtimeRouter = { use() {} };
+  const app = { use() {}, get() {}, set() {}, locals: { packageRuntimeRouter: runtimeRouter } };
+
+  const report = await service.installPackage({
+    installMethod: 'json',
+    manifestJson: JSON.stringify(createManifest({
+      id: 'pte-runtime-container',
+      version: '1.0.0',
+      mountPath: '/pte',
+      routes: [createUseRouteDeclaration()]
+    }))
+  }, {
+    backendMode: 'json',
+    app
+  });
+
+  assert.equal(routeAppRef, runtimeRouter);
+  assert.equal(assetAppRef, runtimeRouter);
+  assert.equal(viewAppRef, app);
+  assert.equal(report.runtime?.mountTarget?.routes, 'packageRuntimeRouter');
+  assert.equal(report.runtime?.mountTarget?.assets, 'packageRuntimeRouter');
+  assert.equal(report.runtime?.mountTarget?.views, 'app');
+});
+
 test('installPackage fails and rolls back when runtime route mount health is not satisfied', async () => {
   const setup = createBaseDeps();
   setup.deps.packageRegistryInstallerService.createLoaderHooks = () => ({

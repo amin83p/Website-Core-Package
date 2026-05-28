@@ -301,6 +301,11 @@ app.use('/credit', require('./MVC/routes/credit/creditRoutes'));
 app.use('/school', require('./MVC/routes/school/schoolMainRoute'));
 app.use('/internal/file-gateway', fileGatewayRoutes);
 
+// Package runtime container stays mounted before 404 so package actions can activate routes live.
+const packageRuntimeRouter = express.Router();
+app.locals.packageRuntimeRouter = packageRuntimeRouter;
+app.use(packageRuntimeRouter);
+
 // --- Background Tasks ---
 // setInterval(() => {
 //     actionStateModel.cleanupExpiredStates().catch(console.error);
@@ -336,6 +341,7 @@ async function startServer() {
       const packageRootDir = getPackageStorageRootAbsolute();
       const packageLoadSummary = await packageLoaderService.loadEnabledPackages({
         app,
+        packageRuntimeRouter,
         backendMode: dataBackend.mode,
         packageRootDir,
         hooks: packageLoaderHooks

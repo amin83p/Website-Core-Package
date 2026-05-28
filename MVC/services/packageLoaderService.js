@@ -95,9 +95,23 @@ async function readManifestFile(manifestPath = '') {
 }
 
 async function runLoaderHooks(hooks, context = {}) {
-  await hooks.registerRoutes(context);
-  await hooks.registerViews(context);
-  await hooks.registerAssets(context);
+  const app = context?.app && typeof context.app === 'object' ? context.app : null;
+  const runtimeRouter = context?.packageRuntimeRouter && typeof context.packageRuntimeRouter === 'object'
+    ? context.packageRuntimeRouter
+    : (app?.locals?.packageRuntimeRouter && typeof app.locals.packageRuntimeRouter === 'object'
+      ? app.locals.packageRuntimeRouter
+      : null);
+  const routesApp = runtimeRouter && typeof runtimeRouter.use === 'function' ? runtimeRouter : app;
+  const assetsApp = runtimeRouter && typeof runtimeRouter.use === 'function' ? runtimeRouter : app;
+  const viewsApp = app && typeof app.get === 'function' && typeof app.set === 'function'
+    ? app
+    : ((runtimeRouter && typeof runtimeRouter.get === 'function' && typeof runtimeRouter.set === 'function')
+      ? runtimeRouter
+      : app);
+
+  await hooks.registerRoutes({ ...context, app: routesApp });
+  await hooks.registerViews({ ...context, app: viewsApp });
+  await hooks.registerAssets({ ...context, app: assetsApp });
   await hooks.registerRegistryData(context);
   await hooks.registerUploadFolders(context);
   await hooks.registerQueryExecutors(context);
@@ -162,6 +176,7 @@ async function loadEnabledPackages(options = {}) {
 
       await runLoaderHooks(hooks, {
         app: options.app || null,
+        packageRuntimeRouter: options.packageRuntimeRouter || options.app?.locals?.packageRuntimeRouter || null,
         backendMode,
         packageId,
         manifest,

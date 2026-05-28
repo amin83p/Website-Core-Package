@@ -1427,27 +1427,48 @@ function createService(overrides = {}) {
   async function applyRuntimeEnableHooks(context = {}, options = {}) {
     const warnings = [];
     const app = options?.app || null;
-    if (!app || typeof app.use !== 'function') {
+    const packageRuntimeRouter = options?.packageRuntimeRouter
+      || app?.locals?.packageRuntimeRouter
+      || null;
+    const routesApp = packageRuntimeRouter && typeof packageRuntimeRouter.use === 'function'
+      ? packageRuntimeRouter
+      : app;
+    const assetsApp = routesApp;
+    const viewsApp = app && typeof app.get === 'function' && typeof app.set === 'function'
+      ? app
+      : routesApp;
+    if (!routesApp || typeof routesApp.use !== 'function') {
       warnings.push('Runtime hook registration skipped because Express app context is unavailable in this request.');
       return {
         attempted: false,
         warnings,
-        hooks: {}
+        hooks: {},
+        mountTarget: {
+          routes: 'none',
+          views: 'none',
+          assets: 'none'
+        }
       };
     }
 
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const hooks = deps.packageRegistryInstallerService.createLoaderHooks({ backendMode });
-    const runtimeContext = {
-      ...sanitizeObject(context),
-      app
-    };
+    const runtimeContext = sanitizeObject(context);
     const report = {};
 
     try {
-      report.routes = await hooks.registerRoutes(runtimeContext);
-      report.views = await hooks.registerViews(runtimeContext);
-      report.assets = await hooks.registerAssets(runtimeContext);
+      report.routes = await hooks.registerRoutes({
+        ...runtimeContext,
+        app: routesApp
+      });
+      report.views = await hooks.registerViews({
+        ...runtimeContext,
+        app: viewsApp
+      });
+      report.assets = await hooks.registerAssets({
+        ...runtimeContext,
+        app: assetsApp
+      });
       report.queryExecutors = await hooks.registerQueryExecutors(runtimeContext);
     } catch (error) {
       warnings.push(cleanText(error?.message || String(error), 1200) || 'Runtime hooks reported an error.');
@@ -1456,7 +1477,12 @@ function createService(overrides = {}) {
     return {
       attempted: true,
       warnings,
-      hooks: report
+      hooks: report,
+      mountTarget: {
+        routes: routesApp === packageRuntimeRouter ? 'packageRuntimeRouter' : 'app',
+        views: viewsApp === app ? 'app' : (viewsApp === packageRuntimeRouter ? 'packageRuntimeRouter' : 'none'),
+        assets: assetsApp === packageRuntimeRouter ? 'packageRuntimeRouter' : 'app'
+      }
     };
   }
 

@@ -228,7 +228,12 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
       assert.equal(Array.isArray(payload.tables), true);
       assert.equal(payload.artifactsRoot, 'artifacts');
       assert.equal(typeof payload.fileFieldSelection, 'object');
-      assert.equal(names.includes('pte/__builder_payload__/artifacts/ORG_900000/symbols/logo.png'), true);
+      assert.equal(Array.isArray(payload.tableArtifacts), true);
+      assert.equal(Array.isArray(payload.globalArtifacts), true);
+      assert.equal(payload.tableArtifacts.length, 0);
+      assert.equal(payload.globalArtifacts.length > 0, true);
+      assert.equal(names.includes('pte/__builder_payload__/artifacts/tables/symbols/logo.png'), false);
+      assert.equal(names.includes('pte/__builder_payload__/artifacts/global/symbols/logo.png'), true);
     } finally {
       if (originalKeyFile === undefined) delete process.env.PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE;
       else process.env.PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE = originalKeyFile;
@@ -236,20 +241,44 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
   });
 });
 
-test('applyBuilderPayloadIfPresent enforces target org for remap and applies data/files when provided', async () => {
+test('applyBuilderPayloadIfPresent applies table artifacts to target org and global artifacts to GLOBAL', async () => {
   await withTempCwd('pkg-builder-apply-', async (tempRoot) => {
     const packageDir = path.join(tempRoot, 'packages', 'pte');
-    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'artifacts', 'ORG_900000', 'symbols'), { recursive: true });
-    fs.writeFileSync(path.join(packageDir, '__builder_payload__', 'artifacts', 'ORG_900000', 'symbols', 'logo.png'), 'png', 'utf8');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'artifacts', 'tables', 'symbols'), { recursive: true });
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'artifacts', 'global', 'symbols'), { recursive: true });
+    fs.writeFileSync(path.join(packageDir, '__builder_payload__', 'artifacts', 'tables', 'logo.png'), 'png', 'utf8');
+    fs.writeFileSync(path.join(packageDir, '__builder_payload__', 'artifacts', 'global', 'symbols', 'logo.png'), 'png', 'utf8');
     fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
     writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'pteApplicants.json'), [
-      { id: 'A1', orgId: '{{ORG_ID}}', avatarUrl: '/uploads/{{ORG_ID}}/symbols/logo.png' }
+      { id: 'A1', orgId: '{{ORG_ID}}', avatarUrl: '/uploads/{{ORG_ID}}/logo.png' }
+    ]);
+    writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'symbols.json'), [
+      { id: 'S1', name: 'PTE', value: '/uploads/ORG_900000/symbols/logo.png' }
     ]);
     writeJson(path.join(packageDir, '__builder_payload__', 'manifest.json'), {
       schema: 'core.package-builder.payload.v2',
       orgRemapRequired: true,
       artifactsRoot: 'artifacts',
-      tables: [{ entityType: 'pteApplicants', file: 'tables/pteApplicants.json', rowCount: 1 }]
+      tables: [
+        { entityType: 'pteApplicants', file: 'tables/pteApplicants.json', rowCount: 1 },
+        { entityType: 'symbols', file: 'tables/symbols.json', rowCount: 1 }
+      ],
+      tableArtifacts: [
+        {
+          ref: '/uploads/ORG_900000/logo.png',
+          payloadPath: 'artifacts/tables/logo.png',
+          storageRelativePath: 'logo.png',
+          remapToTargetOrg: true
+        }
+      ],
+      globalArtifacts: [
+        {
+          ref: '/uploads/ORG_900000/symbols/logo.png',
+          payloadPath: 'artifacts/global/symbols/logo.png',
+          storageRelativePath: 'symbols/logo.png',
+          remapToTargetOrg: false
+        }
+      ]
     });
 
     const updates = [];
@@ -258,6 +287,7 @@ test('applyBuilderPayloadIfPresent enforces target org for remap and applies dat
       dataService: {
         async getDataById(entityType, id) {
           if (entityType === 'pteApplicants' && id === 'A1') return { id: 'A1' };
+          if (entityType === 'symbols' && id === 'S1') return { id: 'S1', name: 'PTE' };
           return null;
         },
         async updateData(entityType, id, row) {
@@ -289,13 +319,24 @@ test('applyBuilderPayloadIfPresent enforces target org for remap and applies dat
 
     assert.equal(report.applied, true);
     assert.equal(report.targetOrgId, 'ORG_123');
-    assert.equal(report.dataSummary.upserted, 1);
-    assert.equal(updates.length, 1);
+    assert.equal(report.dataSummary.upserted, 2);
+    assert.equal(updates.length, 2);
     assert.equal(creates.length, 0);
-    assert.equal(updates[0].row.orgId, 'ORG_123');
-    assert.equal(updates[0].row.avatarUrl, '/uploads/ORG_123/symbols/logo.png');
-    const copiedPath = path.join(tempRoot, 'uploads', 'ORG_123', 'symbols', 'logo.png');
-    assert.equal(await fsp.access(copiedPath).then(() => true).catch(() => false), true);
+    const applicantUpdate = updates.find((row) => row.entityType === 'pteApplicants');
+    const symbolUpdate = updates.find((row) => row.entityType === 'symbols');
+    assert.ok(applicantUpdate);
+    assert.ok(symbolUpdate);
+    assert.equal(applicantUpdate.row.orgId, 'ORG_123');
+    assert.equal(applicantUpdate.row.avatarUrl, '/uploads/ORG_123/logo.png');
+    assert.equal(symbolUpdate.row.value, '/uploads/GLOBAL/symbols/logo.png');
+
+    const copiedTablePath = path.join(tempRoot, 'uploads', 'ORG_123', 'logo.png');
+    const copiedGlobalPath = path.join(tempRoot, 'uploads', 'GLOBAL', 'symbols', 'logo.png');
+    assert.equal(await fsp.access(copiedTablePath).then(() => true).catch(() => false), true);
+    assert.equal(await fsp.access(copiedGlobalPath).then(() => true).catch(() => false), true);
+    assert.equal(report.fileSummary.tableCopiedCount >= 1, true);
+    assert.equal(report.fileSummary.globalCopiedCount >= 1, true);
+    assert.equal(report.symbolSummary.rewrittenToGlobalCount >= 1, true);
   });
 });
 

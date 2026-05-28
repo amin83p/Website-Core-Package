@@ -184,6 +184,41 @@ function extractOrgTokensFromUploadRef(uploadRef = '') {
   return Array.from(new Set(rows));
 }
 
+function splitScopedUploadRelativePath(relativePath = '') {
+  const token = cleanText(relativePath, 2000).replace(/\\/g, '/');
+  if (!token) return { scopeFolder: '', storageRelativePath: '' };
+  const parts = token.split('/').filter(Boolean);
+  if (!parts.length) return { scopeFolder: '', storageRelativePath: '' };
+  const first = cleanText(parts[0], 160).toUpperCase();
+  if (first === 'GLOBAL' || /^ORG_[A-Z0-9_-]+$/i.test(first)) {
+    const storageRelativePath = parts.slice(1).join('/');
+    return { scopeFolder: first, storageRelativePath: cleanText(storageRelativePath, 2000) };
+  }
+  return { scopeFolder: '', storageRelativePath: token };
+}
+
+function buildScopedUploadsRelativePath(storageRelativePath = '', scopeToken = '') {
+  const cleanedStorage = cleanText(storageRelativePath, 2000).replace(/\\/g, '/').replace(/^\/+/, '');
+  const normalizedScope = cleanText(scopeToken, 160).toUpperCase();
+  if (!cleanedStorage || !normalizedScope) return '';
+  return `${normalizedScope}/${cleanedStorage}`;
+}
+
+function rewriteUploadsOrgSegmentToGlobal(node) {
+  if (typeof node === 'string') {
+    return String(node).replace(/\/uploads\/ORG_[^/]+/ig, '/uploads/GLOBAL');
+  }
+  if (Array.isArray(node)) return node.map((row) => rewriteUploadsOrgSegmentToGlobal(row));
+  if (node && typeof node === 'object') {
+    const out = {};
+    Object.entries(node).forEach(([key, value]) => {
+      out[key] = rewriteUploadsOrgSegmentToGlobal(value);
+    });
+    return out;
+  }
+  return node;
+}
+
 function collectStringLeafRows(node, pathParts = [], out = []) {
   if (typeof node === 'string') {
     const value = cleanText(node, 4000);
@@ -886,6 +921,16 @@ function createService(overrides = {}) {
     });
   }
 
+  function rewriteSymbolCatalogToGlobal(symbolCatalog = []) {
+    return sanitizeArray(symbolCatalog).map((row) => {
+      if (!row || typeof row !== 'object') return row;
+      return {
+        ...row,
+        value: rewriteUploadsOrgSegmentToGlobal(row.value)
+      };
+    });
+  }
+
   function applyResolvedSymbolCatalogToManifest(manifest = {}, symbolCatalog = []) {
     const base = manifest && typeof manifest === 'object' ? { ...manifest } : {};
     const existingSymbols = sanitizeArray(base.symbols);
@@ -1267,20 +1312,33 @@ function createService(overrides = {}) {
       warnings.push('Blocking origin-scope violations were detected. Resolve scope violations before running build.');
     }
 
-    const combinedFileRefs = Array.from(new Set([
-      ...Array.from(detectedUploadUrls),
+    const tableArtifactRefSet = new Set(Array.from(detectedUploadUrls));
+    const globalArtifactRefSet = new Set([
       ...Array.from(detectedSymbolUploadUrls),
       ...manualFileRefs
+    ]);
+
+    const combinedFileRefs = Array.from(new Set([
+      ...Array.from(tableArtifactRefSet),
+      ...Array.from(globalArtifactRefSet)
     ]));
     const normalizedFileRefs = combinedFileRefs.map((item) => {
       const symbolRows = symbolRefRows.filter((row) => row.ref === item);
       const symbolNames = Array.from(new Set(symbolRows.map((row) => row.symbolName).filter(Boolean)));
       const uploadRelative = uploadPathUtils.extractRelativeUploadPath(item);
+      const inTableGroup = tableArtifactRefSet.has(item);
+      const inGlobalGroup = globalArtifactRefSet.has(item);
+      const artifactGroup = inTableGroup && inGlobalGroup
+        ? 'both'
+        : (inTableGroup ? 'table' : 'global');
       return {
         ref: item,
         type: uploadRelative
           ? (detectedSymbolUploadUrls.has(item) ? 'symbol-upload-url' : 'upload-url')
           : 'manual',
+        artifactGroup,
+        inTableGroup,
+        inGlobalGroup,
         symbolNames,
         requiredSymbolAsset: symbolNames.length > 0,
         uploadRelativePath: uploadRelative || '',
@@ -1311,6 +1369,10 @@ function createService(overrides = {}) {
       filePlan: {
         detectedFromData: Array.from(detectedUploadUrls),
         detectedFromSymbols: Array.from(detectedSymbolUploadUrls),
+        tableArtifactRefs: Array.from(tableArtifactRefSet),
+        globalArtifactRefs: Array.from(globalArtifactRefSet),
+        tableArtifactCount: tableArtifactRefSet.size,
+        globalArtifactCount: globalArtifactRefSet.size,
         symbolRefs: symbolRefRows,
         requiredSymbolAssetCount: symbolRefRows.length,
         provenance: fileProvenance,
@@ -1354,6 +1416,7 @@ function createService(overrides = {}) {
       && deps.fileGatewayClientService
       && typeof deps.fileGatewayClientService.downloadRemoteUploadFile === 'function'
     );
+    const scopeAgnostic = options.scopeAgnostic !== false;
 
     const tryCopyFromGateway = async (ref = '', relativePath = '', destinationPath = '') => {
       if (!canUseGatewayFallback || !relativePath || !destinationPath) return { copied: false, reason: '' };
@@ -1386,6 +1449,11 @@ function createService(overrides = {}) {
       const symbolNames = sanitizeArray(row?.symbolNames).map((item) => normalizeSymbolName(item)).filter(Boolean);
       const requiredSymbolAsset = row?.requiredSymbolAsset === true || symbolNames.length > 0;
       const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(ref);
+      const splitRelative = splitScopedUploadRelativePath(relativeUploadPath);
+      const storageRelativePath = scopeAgnostic
+        ? cleanText(splitRelative.storageRelativePath || relativeUploadPath, 2000)
+        : cleanText(relativeUploadPath, 2000);
+      const destinationRelativePath = cleanText(storageRelativePath || relativeUploadPath, 2000);
       const absolutePath = resolveReferenceToAbsolutePath(ref);
       if (!absolutePath) {
         if (requiredSymbolAsset) {
@@ -1404,7 +1472,7 @@ function createService(overrides = {}) {
         continue;
       }
       if (!(await pathExists(absolutePath))) {
-        const destinationFromRef = relativeUploadPath ? deps.path.join(targetRoot, relativeUploadPath) : '';
+        const destinationFromRef = destinationRelativePath ? deps.path.join(targetRoot, destinationRelativePath) : '';
         // eslint-disable-next-line no-await-in-loop
         const gatewayFallback = await tryCopyFromGateway(ref, relativeUploadPath, destinationFromRef);
         if (!gatewayFallback.copied) {
@@ -1427,18 +1495,40 @@ function createService(overrides = {}) {
         copied.push({
           ref,
           absolutePath: '',
-          relativePath: relativeUploadPath,
+          relativePath: destinationRelativePath,
+          storageRelativePath: cleanText(storageRelativePath, 2000),
           type: 'file',
-          source: 'gateway'
+          source: 'gateway',
+          scopeFolder: cleanText(splitRelative.scopeFolder, 160)
         });
         continue;
       }
       const relativePath = path.relative(uploadRoot, absolutePath).replace(/\\/g, '/');
-      const destinationPath = path.join(targetRoot, relativePath);
+      const sourceSplit = splitScopedUploadRelativePath(relativePath);
+      const finalStorageRelative = cleanText(storageRelativePath || sourceSplit.storageRelativePath || relativePath, 2000);
+      const finalRelativePath = cleanText(destinationRelativePath || finalStorageRelative, 2000);
+      const destinationPath = path.join(targetRoot, finalRelativePath);
       const stat = await fsp.stat(absolutePath);
       if (stat.isDirectory()) {
         // eslint-disable-next-line no-await-in-loop
         await copyDirectorySafe(absolutePath, destinationPath);
+        const nestedFiles = walkFiles(absolutePath);
+        nestedFiles.forEach((nestedSourcePath) => {
+          const nestedRel = path.relative(absolutePath, nestedSourcePath).replace(/\\/g, '/');
+          const nestedStorageRel = cleanText(
+            path.posix.join(finalStorageRelative || '', nestedRel).replace(/\\/g, '/'),
+            2000
+          );
+          copied.push({
+            ref,
+            absolutePath: nestedSourcePath,
+            relativePath: nestedStorageRel,
+            storageRelativePath: nestedStorageRel,
+            type: 'file',
+            scopeFolder: cleanText(sourceSplit.scopeFolder, 160)
+          });
+        });
+        continue;
       } else {
         // eslint-disable-next-line no-await-in-loop
         await copyFileSafe(absolutePath, destinationPath);
@@ -1446,8 +1536,10 @@ function createService(overrides = {}) {
       copied.push({
         ref,
         absolutePath,
-        relativePath,
-        type: stat.isDirectory() ? 'directory' : 'file'
+        relativePath: finalRelativePath,
+        storageRelativePath: finalStorageRelative,
+        type: stat.isDirectory() ? 'directory' : 'file',
+        scopeFolder: cleanText(sourceSplit.scopeFolder, 160)
       });
     }
     return { copied, warnings };
@@ -1620,6 +1712,7 @@ function createService(overrides = {}) {
     }
     const selectedEntityRows = sanitizeArray(preflight.selectedDataEntities);
     const resolvedSymbolCatalog = sanitizeArray(preflight.symbolCatalog);
+    const globalSymbolCatalog = rewriteSymbolCatalogToGlobal(resolvedSymbolCatalog);
     const originOrgId = cleanText(preflight.originOrgId, 160);
     const fileFieldSelection = sanitizeObject(preflight.fileFieldSelection);
     const tablePayload = {};
@@ -1646,17 +1739,25 @@ function createService(overrides = {}) {
     const fileRefs = sanitizeArray(preflight.filePlan?.normalizedRefs).map((row) => ({
       ref: cleanText(row.ref, 2000),
       type: cleanText(row.type, 40),
+      artifactGroup: cleanText(row.artifactGroup, 40).toLowerCase() || 'global',
+      inTableGroup: row?.inTableGroup === true,
+      inGlobalGroup: row?.inGlobalGroup === true,
       symbolNames: sanitizeArray(row.symbolNames),
       requiredSymbolAsset: row?.requiredSymbolAsset === true,
       uploadRelativePath: cleanText(row.uploadRelativePath, 2000)
     }));
+    const tableFileRefs = fileRefs.filter((row) => row.inTableGroup === true);
+    const globalFileRefs = fileRefs.filter((row) => row.inGlobalGroup === true);
 
     const stageRoot = await deps.fs.mkdtemp(deps.path.join(deps.os.tmpdir(), `pkg-build-${packageId}-`));
     const stagedPackageDir = deps.path.join(stageRoot, packageId);
     const payloadDir = deps.path.join(stagedPackageDir, '__builder_payload__');
     const payloadFilesDir = deps.path.join(payloadDir, 'artifacts');
+    const payloadTableArtifactsDir = deps.path.join(payloadFilesDir, 'tables');
+    const payloadGlobalArtifactsDir = deps.path.join(payloadFilesDir, 'global');
     const payloadTablesDir = deps.path.join(payloadDir, 'tables');
-    let copiedFileReport = { copied: [], warnings: [] };
+    let copiedTableFileReport = { copied: [], warnings: [] };
+    let copiedGlobalFileReport = { copied: [], warnings: [] };
     let artifactPaths = null;
     let publishedArtifacts = null;
 
@@ -1664,13 +1765,18 @@ function createService(overrides = {}) {
       await copyDirectorySafe(packageRow.packageDir, stagedPackageDir);
       const stagedManifestPath = deps.path.join(stagedPackageDir, 'package.manifest.json');
       const stagedManifestSource = readJsonFile(stagedManifestPath);
-      const stagedManifest = applyResolvedSymbolCatalogToManifest(stagedManifestSource, resolvedSymbolCatalog);
+      const stagedManifest = applyResolvedSymbolCatalogToManifest(stagedManifestSource, globalSymbolCatalog);
       stagedManifest.version = requestedVersion;
       await deps.fs.writeFile(stagedManifestPath, JSON.stringify(stagedManifest, null, 2));
 
-      await deps.fs.mkdir(payloadFilesDir, { recursive: true });
+      await deps.fs.mkdir(payloadTableArtifactsDir, { recursive: true });
+      await deps.fs.mkdir(payloadGlobalArtifactsDir, { recursive: true });
       await deps.fs.mkdir(payloadTablesDir, { recursive: true });
-      copiedFileReport = await copySelectedRefs(fileRefs, payloadFilesDir, {
+      copiedTableFileReport = await copySelectedRefs(tableFileRefs, payloadTableArtifactsDir, {
+        backendMode,
+        originOrgId
+      });
+      copiedGlobalFileReport = await copySelectedRefs(globalFileRefs, payloadGlobalArtifactsDir, {
         backendMode,
         originOrgId
       });
@@ -1688,6 +1794,23 @@ function createService(overrides = {}) {
           rowCount: rows.length
         });
       }
+
+      const tableArtifacts = copiedTableFileReport.copied.map((row) => ({
+        ref: cleanText(row?.ref, 2000),
+        type: cleanText(row?.type, 40),
+        provenance: 'table',
+        payloadPath: `artifacts/tables/${cleanText(row?.relativePath, 2000).replace(/^\/+/, '')}`,
+        storageRelativePath: cleanText(row?.storageRelativePath, 2000),
+        remapToTargetOrg: true
+      }));
+      const globalArtifacts = copiedGlobalFileReport.copied.map((row) => ({
+        ref: cleanText(row?.ref, 2000),
+        type: cleanText(row?.type, 40),
+        provenance: 'global',
+        payloadPath: `artifacts/global/${cleanText(row?.relativePath, 2000).replace(/^\/+/, '')}`,
+        storageRelativePath: cleanText(row?.storageRelativePath, 2000),
+        remapToTargetOrg: false
+      }));
 
       const payload = {
         schema: 'core.package-builder.payload.v2',
@@ -1713,11 +1836,19 @@ function createService(overrides = {}) {
         fileFieldSelection,
         tables: tableIndex,
         artifactsRoot: 'artifacts',
+        tableArtifacts,
+        globalArtifacts,
         fileRefs,
-        copiedFiles: copiedFileReport.copied.map((row) => ({
-          relativePath: row.relativePath,
-          type: row.type
-        }))
+        copiedFiles: [
+          ...copiedTableFileReport.copied.map((row) => ({
+            relativePath: `tables/${row.relativePath}`,
+            type: row.type
+          })),
+          ...copiedGlobalFileReport.copied.map((row) => ({
+            relativePath: `global/${row.relativePath}`,
+            type: row.type
+          }))
+        ]
       };
       await deps.fs.writeFile(deps.path.join(payloadDir, 'manifest.json'), JSON.stringify(payload, null, 2));
 
@@ -1760,7 +1891,7 @@ function createService(overrides = {}) {
           selectedDataEntities: payload.selectedDataEntities,
           tableCount: tableIndex.length,
           rowCount: Object.values(tablePayload).reduce((sum, rows) => sum + sanitizeArray(rows).length, 0),
-          copiedFileCount: copiedFileReport.copied.length
+          copiedFileCount: copiedTableFileReport.copied.length + copiedGlobalFileReport.copied.length
         }
       });
 
@@ -1777,9 +1908,17 @@ function createService(overrides = {}) {
         },
         fileSummary: {
           selectedRefCount: fileRefs.length,
-          copiedCount: copiedFileReport.copied.length
+          tableSelectedRefCount: tableFileRefs.length,
+          globalSelectedRefCount: globalFileRefs.length,
+          copiedCount: copiedTableFileReport.copied.length + copiedGlobalFileReport.copied.length,
+          tableCopiedCount: copiedTableFileReport.copied.length,
+          globalCopiedCount: copiedGlobalFileReport.copied.length
         },
-        symbolCatalog: resolvedSymbolCatalog,
+        artifactSummary: {
+          tableArtifactCount: tableArtifacts.length,
+          globalArtifactCount: globalArtifacts.length
+        },
+        symbolCatalog: globalSymbolCatalog,
         fileFieldSelection,
         remapSummary: payload.remapSummary,
         orgRemapRequired: payload.orgRemapRequired,
@@ -1792,7 +1931,7 @@ function createService(overrides = {}) {
         downloadLinks: sanitizeArray(publishedArtifacts?.files)
           .map((row) => row.uploadsUrl)
           .filter(Boolean),
-        warnings: copiedFileReport.warnings
+        warnings: [...copiedTableFileReport.warnings, ...copiedGlobalFileReport.warnings]
       };
     } finally {
       await deps.fs.rm(stageRoot, { recursive: true, force: true }).catch(() => {});
@@ -1822,7 +1961,9 @@ function createService(overrides = {}) {
         manifest,
         data,
         orgRemapRequired: manifest?.orgRemapRequired === true,
-        artifactsRoot: cleanText(manifest?.artifactsRoot, 200) || 'artifacts'
+        artifactsRoot: cleanText(manifest?.artifactsRoot, 200) || 'artifacts',
+        tableArtifacts: sanitizeArray(manifest?.tableArtifacts),
+        globalArtifacts: sanitizeArray(manifest?.globalArtifacts)
       };
     }
 
@@ -1834,7 +1975,9 @@ function createService(overrides = {}) {
       manifest: payload,
       data: sanitizeObject(payload?.data),
       orgRemapRequired: payload?.orgRemapRequired === true,
-      artifactsRoot: 'files'
+      artifactsRoot: 'files',
+      tableArtifacts: [],
+      globalArtifacts: []
     };
   }
 
@@ -1847,22 +1990,30 @@ function createService(overrides = {}) {
     return allowList;
   }
 
-  function summarizeRequiredSymbolAssets(manifest = {}) {
-    const fileRefs = sanitizeArray(manifest?.fileRefs);
-    const requiredRefs = fileRefs.filter((row) => {
+function summarizeRequiredSymbolAssets(manifest = {}) {
+  const fileRefs = sanitizeArray(manifest?.fileRefs);
+  const requiredRefs = fileRefs.filter((row) => {
       const requiredFlag = row?.requiredSymbolAsset === true;
       const symbolNames = sanitizeArray(row?.symbolNames)
         .map((item) => cleanText(item, 200))
         .filter(Boolean);
       return requiredFlag || symbolNames.length > 0;
     });
-    return {
-      requiredSymbolAssetCount: requiredRefs.length,
-      requiredSymbolRefs: requiredRefs
-        .map((row) => cleanText(row?.ref, 2000))
-        .filter(Boolean)
-    };
-  }
+  return {
+    requiredSymbolAssetCount: requiredRefs.length,
+    requiredSymbolRefs: requiredRefs
+      .map((row) => cleanText(row?.ref, 2000))
+      .filter(Boolean),
+    requiredSymbolStoragePaths: requiredRefs
+      .map((row) => {
+        const ref = cleanText(row?.ref, 2000);
+        const relative = uploadPathUtils.extractRelativeUploadPath(ref);
+        const split = splitScopedUploadRelativePath(relative);
+        return cleanText(split.storageRelativePath || relative, 2000);
+      })
+      .filter(Boolean)
+  };
+}
 
   function assertUnknownEntityFallbackAllowed(entityType = '', allowList = new Set()) {
     const normalizedEntityType = cleanText(entityType, 200);
@@ -1994,8 +2145,13 @@ function createService(overrides = {}) {
         },
         fileSummary: {
           copied: 0,
+          tableCopiedCount: 0,
+          globalCopiedCount: 0,
           requiredSymbolAssetCount: requiredSymbolSummary.requiredSymbolAssetCount,
           copiedRequiredSymbolAssetCount: 0
+        },
+        symbolSummary: {
+          rewrittenToGlobalCount: 0
         },
         warnings: []
       };
@@ -2004,11 +2160,18 @@ function createService(overrides = {}) {
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
     let upserted = 0;
     const warnings = [];
+    let symbolGlobalRewriteCount = 0;
     const entityNames = Object.keys(payloadData);
     for (const entityType of entityNames) {
-      const rows = sanitizeArray(payloadData[entityType]).map((row) => (
-        orgRemapRequired ? applyOrgRemap(row, targetOrgId) : row
-      ));
+      const rows = sanitizeArray(payloadData[entityType]).map((row) => {
+        let mapped = orgRemapRequired ? applyOrgRemap(row, targetOrgId) : row;
+        if (cleanText(entityType, 200).toLowerCase() === 'symbols') {
+          const rewritten = rewriteUploadsOrgSegmentToGlobal(mapped);
+          if (JSON.stringify(rewritten) !== JSON.stringify(mapped)) symbolGlobalRewriteCount += 1;
+          mapped = rewritten;
+        }
+        return mapped;
+      });
       for (const row of rows) {
         const rowId = cleanText(row?.id, 200);
         let operation = 'insert';
@@ -2060,7 +2223,56 @@ function createService(overrides = {}) {
     const sourceFilesRoot = path.join(packageDir, '__builder_payload__', loadedPayload.artifactsRoot || 'files');
     let copiedFiles = 0;
     let copiedRequiredSymbolAssets = 0;
-    if (await pathExists(sourceFilesRoot)) {
+    let tableCopiedCount = 0;
+    let globalCopiedCount = 0;
+    const tableArtifacts = sanitizeArray(loadedPayload?.tableArtifacts);
+    const globalArtifacts = sanitizeArray(loadedPayload?.globalArtifacts);
+    const hasGroupedArtifacts = tableArtifacts.length > 0 || globalArtifacts.length > 0;
+
+    if (hasGroupedArtifacts) {
+      const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
+      const copyGroupedArtifactRows = async (rows = [], scopeMode = 'target') => {
+        for (const row of sanitizeArray(rows)) {
+          const payloadPath = cleanText(row?.payloadPath, 2000).replace(/\\/g, '/').replace(/^\/+/, '');
+          const storageRelativePath = cleanText(row?.storageRelativePath, 2000).replace(/\\/g, '/').replace(/^\/+/, '');
+          if (!payloadPath || !storageRelativePath) continue;
+          const sourcePath = path.resolve(path.join(packageDir, '__builder_payload__'), payloadPath);
+          if (!sourcePath.startsWith(path.resolve(path.join(packageDir, '__builder_payload__')))) {
+            warnings.push(`Skipped payload artifact outside payload boundary: ${payloadPath}`);
+            continue;
+          }
+          if (!(await pathExists(sourcePath))) {
+            warnings.push(`Skipped payload artifact because source file is missing: ${payloadPath}`);
+            continue;
+          }
+          const destinationScope = scopeMode === 'global'
+            ? 'GLOBAL'
+            : (targetOrgId || 'GLOBAL');
+          const destinationRel = buildScopedUploadsRelativePath(storageRelativePath, destinationScope);
+          if (!destinationRel) continue;
+          const destinationPath = path.resolve(uploadRoot, destinationRel);
+          if (!uploadPathUtils.isInsideUploadRoot(destinationPath, uploadRoot)) {
+            warnings.push(`Skipped payload artifact outside upload root boundary: ${payloadPath}`);
+            continue;
+          }
+          // eslint-disable-next-line no-await-in-loop
+          await copyFileSafe(sourcePath, destinationPath);
+          copiedFiles += 1;
+          if (scopeMode === 'global') globalCopiedCount += 1;
+          else tableCopiedCount += 1;
+          const mappedRef = `/${path.join('uploads', destinationRel).replace(/\\/g, '/')}`;
+          if (
+            requiredSymbolSummary.requiredSymbolRefs.includes(mappedRef)
+            || requiredSymbolSummary.requiredSymbolStoragePaths.includes(storageRelativePath)
+          ) {
+            copiedRequiredSymbolAssets += 1;
+          }
+        }
+      };
+
+      await copyGroupedArtifactRows(tableArtifacts, 'target');
+      await copyGroupedArtifactRows(globalArtifacts, 'global');
+    } else if (await pathExists(sourceFilesRoot)) {
       const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
       const files = walkFiles(sourceFilesRoot);
       for (const sourcePath of files) {
@@ -2077,8 +2289,13 @@ function createService(overrides = {}) {
         // eslint-disable-next-line no-await-in-loop
         await copyFileSafe(sourcePath, destinationPath);
         copiedFiles += 1;
+        tableCopiedCount += 1;
         const mappedRef = `/${path.join('uploads', mappedRel).replace(/\\/g, '/')}`;
-        if (requiredSymbolSummary.requiredSymbolRefs.includes(mappedRef)) {
+        const mappedStoragePath = splitScopedUploadRelativePath(mappedRel).storageRelativePath || mappedRel;
+        if (
+          requiredSymbolSummary.requiredSymbolRefs.includes(mappedRef)
+          || requiredSymbolSummary.requiredSymbolStoragePaths.includes(mappedStoragePath)
+        ) {
           copiedRequiredSymbolAssets += 1;
         }
       }
@@ -2100,8 +2317,13 @@ function createService(overrides = {}) {
       },
       fileSummary: {
         copied: copiedFiles,
+        tableCopiedCount,
+        globalCopiedCount,
         requiredSymbolAssetCount: requiredSymbolSummary.requiredSymbolAssetCount,
         copiedRequiredSymbolAssetCount: copiedRequiredSymbolAssets
+      },
+      symbolSummary: {
+        rewrittenToGlobalCount: symbolGlobalRewriteCount
       },
       warnings
     };

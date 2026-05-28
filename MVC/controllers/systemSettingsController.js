@@ -1234,7 +1234,8 @@ function buildPackageManagerOptions(req = {}) {
     trustedPublicKeys: keyContext.trustedPublicKeys,
     targetOrgId: cleanFormText(req.body?.targetOrgId || req.query?.targetOrgId || '', 120),
     actor: req.user || null,
-    app: req.app || null
+    app: req.app || null,
+    packageRuntimeRouter: req.app?.locals?.packageRuntimeRouter || null
   };
 }
 
