@@ -1,4 +1,5 @@
 const path = require('path');
+const Module = require('module');
 
 const startupLogger = require('../utils/startupLogger');
 const packageModuleResolverService = require('./packageModuleResolverService');
@@ -7,6 +8,9 @@ const ROUTE_METHODS = Object.freeze(['USE', 'GET', 'POST', 'PUT', 'PATCH', 'DELE
 const ROUTE_METHOD_SET = new Set(ROUTE_METHODS);
 
 let mountedRouteKeys = new Set();
+const legacyCoreBridgeRoots = new Set();
+let legacyCoreBridgeInstalled = false;
+const LEGACY_CORE_IMPORT_PATTERN = /^(\.\.\/){3,}(MVC|config)\//i;
 
 function cleanText(value, max = 2000) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -20,6 +24,59 @@ function normalizePackageId(value = '') {
 
 function resolveProjectRoot() {
   return path.resolve(__dirname, '../../');
+}
+
+function normalizePathForCompare(value = '') {
+  return cleanText(value, 2000).replace(/\\/g, '/').toLowerCase();
+}
+
+function isInsideRoot(filePath = '', rootPath = '') {
+  if (!filePath || !rootPath) return false;
+  const relative = path.relative(path.resolve(rootPath), path.resolve(filePath));
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function registerLegacyCoreBridgeRoots(context = {}, options = {}) {
+  const roots = packageModuleResolverService.resolvePackageRootCandidates(context, options);
+  roots.forEach((rootPath) => {
+    const resolved = path.resolve(rootPath);
+    if (resolved) legacyCoreBridgeRoots.add(resolved);
+  });
+}
+
+function shouldApplyLegacyCoreBridge(request = '', parentFileName = '') {
+  if (!LEGACY_CORE_IMPORT_PATTERN.test(String(request || ''))) return false;
+  const parentPath = cleanText(parentFileName, 4000);
+  if (!parentPath) return false;
+  for (const rootPath of legacyCoreBridgeRoots) {
+    if (isInsideRoot(parentPath, rootPath)) return true;
+  }
+  return false;
+}
+
+function resolveLegacyCoreBridgePath(request = '') {
+  const projectRoot = resolveProjectRoot();
+  const normalized = cleanText(request, 2000).replace(/\\/g, '/');
+  const trimmed = normalized.replace(/^(\.\.\/)+/, '');
+  return path.resolve(projectRoot, trimmed);
+}
+
+function ensureLegacyCoreBridgeInstalled() {
+  if (legacyCoreBridgeInstalled) return;
+  legacyCoreBridgeInstalled = true;
+  const originalResolveFilename = Module._resolveFilename;
+  Module._resolveFilename = function patchedResolveFilename(request, parent, ...rest) {
+    const parentFileName = cleanText(parent?.filename, 4000);
+    if (typeof request === 'string' && shouldApplyLegacyCoreBridge(request, parentFileName)) {
+      const bridgedPath = resolveLegacyCoreBridgePath(request);
+      try {
+        return originalResolveFilename.call(this, bridgedPath, parent, ...rest);
+      } catch (_) {
+        // Fall through to default resolver for original request.
+      }
+    }
+    return originalResolveFilename.call(this, request, parent, ...rest);
+  };
 }
 
 function normalizeMethod(value = 'USE') {
@@ -125,6 +182,8 @@ async function registerManifestRoutes(context = {}, options = {}) {
   if (!packageId || !declarations.length) {
     return summary;
   }
+  registerLegacyCoreBridgeRoots(context, options);
+  ensureLegacyCoreBridgeInstalled();
 
   for (let index = 0; index < declarations.length; index += 1) {
     const declaration = declarations[index];
@@ -242,6 +301,7 @@ async function registerManifestRoutes(context = {}, options = {}) {
 
 function resetMountedRoutes() {
   mountedRouteKeys = new Set();
+  legacyCoreBridgeRoots.clear();
 }
 
 function createLoaderHooks(options = {}) {

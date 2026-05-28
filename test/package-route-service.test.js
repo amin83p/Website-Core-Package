@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs/promises');
+const os = require('node:os');
 
 const packageRouteService = require('../MVC/services/packageRouteService');
 
@@ -149,6 +151,50 @@ test('route service can mount package-root relative router modules', async () =>
   assert.equal(app.calls.length, 1);
   assert.equal(app.calls[0][0], '/pte-fixture');
   assert.equal(typeof app.calls[0][1], 'function');
+});
+
+test('route service bridges legacy relative core imports for packages mounted from uploads root', async () => {
+  packageRouteService.resetMountedRoutes();
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-route-legacy-'));
+  const packageRootDir = path.join(tempRoot, 'uploads', 'packages');
+  const packageDir = path.join(packageRootDir, 'pte');
+  const routeDir = path.join(packageDir, 'MVC', 'routes');
+  const routeFile = path.join(routeDir, 'legacyBridgeRoute.js');
+  const relativeCoreImport = '../../../../../MVC/services/adminChekersService';
+
+  try {
+    await fs.mkdir(routeDir, { recursive: true });
+    await fs.writeFile(routeFile, `const coreSvc = require('${relativeCoreImport}');\nmodule.exports = (req, res, next) => { if (coreSvc) return next && next(); };`, 'utf8');
+
+    const app = createAppStub();
+    const summary = await packageRouteService.registerManifestRoutes({
+      app,
+      packageId: 'pte',
+      packageRootDir,
+      manifestPath: path.join(packageDir, 'package.manifest.json'),
+      manifest: {
+        id: 'pte',
+        name: 'PTE',
+        version: '1.0.0',
+        mountPath: '/pte',
+        routes: [
+          {
+            id: 'pte-legacy-bridge',
+            method: 'USE',
+            path: '/pte',
+            router: 'MVC/routes/legacyBridgeRoute.js',
+            metadataOnly: false
+          }
+        ]
+      }
+    }, { logger: makeSilentLogger() });
+
+    assert.equal(summary.failed, 0);
+    assert.equal(summary.mounted, 1);
+    assert.equal(app.calls.length, 1);
+  } finally {
+    await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 test('route service reports invalid declarations as failures without throwing', async () => {
