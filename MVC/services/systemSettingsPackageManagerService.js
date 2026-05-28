@@ -19,7 +19,7 @@ const symbolRepository = require('../repositories/symbolRepository');
 const accessRepository = require('../repositories/accessRepository');
 const systemSettingsRepository = require('../repositories/systemSettingsRepository');
 const uploadFolderSettingsService = require('./uploadFolderSettingsService');
-const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
+const { DEFAULT_PACKAGE_ROOT, getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 
 const SYSTEM_ACTOR_ID = 'SYSTEM_SETTINGS_PACKAGE_MANAGER';
 
@@ -789,6 +789,62 @@ function createService(overrides = {}) {
     return true;
   }
 
+  function buildPackageFilePurgePaths(packageId = '', options = {}) {
+    const normalizedPackageId = normalizePackageId(packageId);
+    if (!normalizedPackageId) {
+      return [];
+    }
+    const configuredRoot = getPackageStorageRootAbsolute({
+      packageRootDir: options.packageRootDir,
+      ensureExists: false
+    });
+    const roots = [configuredRoot, DEFAULT_PACKAGE_ROOT]
+      .map((root) => cleanText(root, 2000))
+      .filter(Boolean)
+      .filter((root, index, list) => list.findIndex((item) => item.toLowerCase() === root.toLowerCase()) === index);
+
+    return roots.map((root) => ({
+      root,
+      path: deps.path.join(root, normalizedPackageId)
+    }));
+  }
+
+  async function purgePackageFiles(packageId = '', options = {}) {
+    const rows = buildPackageFilePurgePaths(packageId, options);
+    const summary = {
+      attemptedRoots: rows.map((row) => row.root),
+      deletedPaths: [],
+      missingPaths: [],
+      failedPaths: []
+    };
+    for (const row of rows) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const exists = await pathExists(deps.fs, row.path);
+        if (!exists) {
+          summary.missingPaths.push(row.path);
+          continue;
+        }
+        if (typeof deps.fs.rm !== 'function') {
+          summary.failedPaths.push({
+            path: row.path,
+            message: 'File system rm() is unavailable in current runtime.'
+          });
+          continue;
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await deps.fs.rm(row.path, { recursive: true, force: true });
+        summary.deletedPaths.push(row.path);
+      } catch (error) {
+        summary.failedPaths.push({
+          path: row.path,
+          message: cleanText(error?.message || String(error), 500) || 'Unknown delete error.'
+        });
+      }
+    }
+    return summary;
+  }
+
   async function installResolvedManifest(resolved = {}, options = {}) {
     const actor = buildActor(options.actor || null);
     const backendMode = cleanText(options.backendMode, 30) || undefined;
@@ -1374,13 +1430,17 @@ function createService(overrides = {}) {
 
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const hooks = deps.packageRegistryInstallerService.createLoaderHooks({ backendMode });
+    const runtimeContext = {
+      ...sanitizeObject(context),
+      app
+    };
     const report = {};
 
     try {
-      report.routes = await hooks.registerRoutes(context);
-      report.views = await hooks.registerViews(context);
-      report.assets = await hooks.registerAssets(context);
-      report.queryExecutors = await hooks.registerQueryExecutors(context);
+      report.routes = await hooks.registerRoutes(runtimeContext);
+      report.views = await hooks.registerViews(runtimeContext);
+      report.assets = await hooks.registerAssets(runtimeContext);
+      report.queryExecutors = await hooks.registerQueryExecutors(runtimeContext);
     } catch (error) {
       warnings.push(cleanText(error?.message || String(error), 1200) || 'Runtime hooks reported an error.');
     }
@@ -1996,6 +2056,12 @@ function createService(overrides = {}) {
       warnings: [],
       dataImpact: {}
     };
+    let filePurgeSummary = {
+      attemptedRoots: [],
+      deletedPaths: [],
+      missingPaths: [],
+      failedPaths: []
+    };
 
     if (existing) {
       try {
@@ -2067,6 +2133,35 @@ function createService(overrides = {}) {
       operation: removed === true ? 'removed' : 'skipped',
       reason: removed === true ? 'Registry row removed.' : 'Registry row not found.'
     });
+    filePurgeSummary = await purgePackageFiles(packageId, options);
+    filePurgeSummary.deletedPaths.forEach((targetPath) => {
+      lifecycleOperations.push({
+        entityType: 'packageFiles',
+        identityKey: `path:${targetPath}`,
+        ownership: { packageId, packageName: cleanText(manifest?.name || existing?.metadata?.packageName, 200) },
+        operation: 'removed',
+        reason: 'Package source folder removed as part of package uninstall.'
+      });
+    });
+    filePurgeSummary.missingPaths.forEach((targetPath) => {
+      lifecycleOperations.push({
+        entityType: 'packageFiles',
+        identityKey: `path:${targetPath}`,
+        ownership: { packageId, packageName: cleanText(manifest?.name || existing?.metadata?.packageName, 200) },
+        operation: 'skipped',
+        reason: 'Package source folder was not found.'
+      });
+    });
+    filePurgeSummary.failedPaths.forEach((row) => {
+      warnings.push(`Failed to delete package folder "${row.path}": ${row.message}`);
+      lifecycleOperations.push({
+        entityType: 'packageFiles',
+        identityKey: `path:${cleanText(row.path, 2000)}`,
+        ownership: { packageId, packageName: cleanText(manifest?.name || existing?.metadata?.packageName, 200) },
+        operation: 'skipped',
+        reason: `Delete failed: ${cleanText(row.message, 500)}`
+      });
+    });
     const navigation = await refreshNavigationSnapshot({ backendMode });
     if (navigation.warning) warnings.push(navigation.warning);
 
@@ -2082,7 +2177,8 @@ function createService(overrides = {}) {
       modifiedRecords: sanitizeArray(preview?.modifiedRecords),
       artifacts: {
         previewTransactionId: cleanText(preview?.previewTransactionId, 160),
-        dataLifecycleReport
+        dataLifecycleReport,
+        filePurgeSummary
       },
       summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations)
     }, { backendMode, actor }).catch(() => null);
@@ -2104,6 +2200,7 @@ function createService(overrides = {}) {
       skippedSteps: sanitizeArray(dataLifecycleReport?.skippedSteps),
       failedStep: dataLifecycleReport?.failedStep || null,
       rollbackApplied: dataLifecycleReport?.rollbackApplied === true,
+      filePurgeSummary: sanitizeObject(filePurgeSummary),
       registry: {
         removed: removed === true
       },

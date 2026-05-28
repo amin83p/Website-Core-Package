@@ -91,6 +91,7 @@ function createBaseDeps() {
         return [];
       },
       async access() {},
+      async rm() {},
       async readFile() {
         return JSON.stringify(manifest);
       }
@@ -355,7 +356,16 @@ test('installPackage returns data lifecycle summary fields', async () => {
 test('installPackage succeeds with runtime USE declarations when routes mount is healthy', async () => {
   const setup = createBaseDeps();
   setup.deps.packageRegistryInstallerService.createLoaderHooks = () => ({
-    async registerRoutes() { return { requested: 1, prepared: 1, mounted: 1, failed: 0, results: [] }; },
+    async registerRoutes(context = {}) {
+      const hasExpressAppContext = Boolean(context?.app && typeof context.app.use === 'function');
+      return {
+        requested: 1,
+        prepared: 1,
+        mounted: hasExpressAppContext ? 1 : 0,
+        failed: 0,
+        results: []
+      };
+    },
     async registerViews() { return { requested: 0, registered: 0, failed: 0 }; },
     async registerAssets() { return { requested: 0, mounted: 0, failed: 0 }; },
     async registerQueryExecutors() { return { requested: 0, registered: 0, failed: 0 }; }
@@ -459,6 +469,66 @@ test('removePackage is idempotent and refreshes navigation', async () => {
   assert.equal(second.action, 'remove');
   assert.equal(second.registry.removed, false);
   assert.equal(setup.navigationRefreshCount() >= 2, true);
+});
+
+test('removePackage purges package folders from configured and default roots', async () => {
+  const setup = createBaseDeps();
+  const removedPaths = [];
+  setup.deps.fs = {
+    ...setup.deps.fs,
+    async access() {},
+    async rm(targetPath) {
+      removedPaths.push(String(targetPath || ''));
+    }
+  };
+  const service = createService(setup.deps);
+  const customRoot = path.join(os.tmpdir(), `pkg-remove-root-${Date.now()}`);
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.removePackage('pte', { backendMode: 'json', packageRootDir: customRoot });
+
+  assert.equal(report.action, 'remove');
+  assert.equal(Array.isArray(report.filePurgeSummary?.attemptedRoots), true);
+  assert.equal(report.filePurgeSummary.attemptedRoots.some((root) => path.resolve(root) === path.resolve(customRoot)), true);
+  assert.equal(report.filePurgeSummary.deletedPaths.some((targetPath) => path.resolve(targetPath) === path.resolve(path.join(customRoot, 'pte'))), true);
+  assert.equal(report.filePurgeSummary.deletedPaths.some((targetPath) => path.resolve(targetPath) === path.resolve(path.join(process.cwd(), 'packages', 'pte'))), true);
+  assert.equal(removedPaths.some((targetPath) => path.resolve(targetPath) === path.resolve(path.join(customRoot, 'pte'))), true);
+});
+
+test('removePackage keeps success and reports warning when package folder purge fails', async () => {
+  const setup = createBaseDeps();
+  const failRoot = path.join(os.tmpdir(), `pkg-remove-fail-${Date.now()}`);
+  setup.deps.fs = {
+    ...setup.deps.fs,
+    async access() {},
+    async rm(targetPath) {
+      if (String(targetPath || '').toLowerCase().includes(path.resolve(failRoot).toLowerCase())) {
+        throw new Error('simulated delete failure');
+      }
+    }
+  };
+  const service = createService(setup.deps);
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.removePackage('pte', { backendMode: 'json', packageRootDir: failRoot });
+
+  assert.equal(report.action, 'remove');
+  assert.equal(Array.isArray(report.filePurgeSummary?.failedPaths), true);
+  assert.equal(report.filePurgeSummary.failedPaths.length >= 1, true);
+  assert.equal(report.warnings.some((msg) => /failed to delete package folder/i.test(String(msg || ''))), true);
+  assert.equal(report.registry.removed, true);
 });
 
 test('syncPackage installs declarations and refreshes navigation', async () => {
