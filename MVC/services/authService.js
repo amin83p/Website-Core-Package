@@ -226,17 +226,18 @@ async function getUserFromToken(token) {
   let allowedOrgs = [];
   
   if (isVirtualSuperAdmin || hasSystemProfile) {
-      // System/Admin users can see all orgs, but switchability is still gated by active + contract.
+      // System/Admin users can see all orgs.
+      // Superusers can switch into any active org even when contract rows are not configured yet.
       const allOrgs = await dataService.fetchData('organizations', {}, SYSTEM_CONTEXT);
       allowedOrgs = await Promise.all(allOrgs.map(async (o) => {
           const orgIsActive = Boolean(o?.active);
           const hasActiveContract = orgIsActive
             ? await dataService.OrgHasActiveContract(o.id, SYSTEM_CONTEXT)
             : false;
-          const isSelectable = Boolean(orgIsActive && hasActiveContract);
+          const isSelectable = Boolean(orgIsActive);
           const disabledReason = !orgIsActive
             ? 'Organization is inactive.'
-            : (!hasActiveContract ? 'Organization has no active contract.' : '');
+            : '';
           let orgObj = {
               orgId: o.id,
               name: o.identity?.displayName || o.identity?.legalName || o.name || `Org #${o.id}`,
@@ -458,7 +459,7 @@ async function switchOrganization(userId, targetOrgId, currentSessionId) {
       return { success: false, message: 'Cannot switch.<br>This organization is inactive.' };
   }
   const targetHasActiveContract = await dataService.OrgHasActiveContract(target.id, SYSTEM_CONTEXT);
-  if (!targetHasActiveContract) {
+  if (!isSystemUser && !targetHasActiveContract) {
       return { success: false, message: 'Cannot switch.<br>This organization has no active subscription/contract.' };
   }
 
@@ -470,12 +471,10 @@ async function switchOrganization(userId, targetOrgId, currentSessionId) {
       }
   }
 
-  // ✅ VALIDATE TARGET ORG CONTRACT
-  // System Admins (entering as local) AND Standard Users are both subject to this check
-  // when "entering" the org context to do work.
+  // Non-system users remain contract-gated for tenant org contexts.
  
     if(!isSystemUser){
-        if (!target.active || !targetHasActiveContract) {
+        if (!targetHasActiveContract) {
             return { success: false, message: 'Access Denied<br>This Organization has no active subscription/contract.' };
         }
     }
