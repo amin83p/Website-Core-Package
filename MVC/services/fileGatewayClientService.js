@@ -143,11 +143,23 @@ async function fetchJson(routePath = '', options = {}) {
       headers,
       signal: controller.signal
     });
-    const result = await response.json().catch(() => ({}));
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    let result = {};
+    let responseText = '';
+    if (contentType.includes('application/json')) {
+      result = await response.json().catch(() => ({}));
+    } else {
+      responseText = await response.text().catch(() => '');
+    }
+
     if (!response.ok || result?.status === 'error') {
-      const error = new Error(result?.message || `Gateway request failed (${response.status}).`);
+      const fallback = `Gateway request failed (${response.status}).`;
+      const message = result?.message
+        || summarizeGatewayTextError(responseText, response.status, fallback);
+      const error = new Error(message);
       error.statusCode = response.status;
       error.gatewayPayload = result;
+      error.routePath = route;
       throw error;
     }
     return result;

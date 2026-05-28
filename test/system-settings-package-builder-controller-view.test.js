@@ -199,9 +199,26 @@ test('package builder EJS compiles and includes expected controls', () => {
   assert.match(html, /Origin Org/);
   assert.match(html, /Package-Owned Tables \/ Collections/);
   assert.match(html, /File Fields By Table/);
-  assert.match(html, /Select All/);
+  assert.match(html, /Add All Detected/);
+  assert.match(html, /Clear Selected/);
+  assert.match(html, /builderAddAllFileFieldsBtn/);
+  assert.match(html, /builderClearSelectedFileFieldsBtn/);
+  assert.match(html, /builder-file-field-picker/);
+  assert.match(html, /builder-file-field-add-btn/);
+  assert.match(html, /builder-file-field-remove-btn/);
+  assert.match(html, /addSelectedFileField/);
+  assert.match(html, /removeSelectedFileField/);
+  assert.match(html, /getFileFieldSelection/);
   assert.match(html, /Manual File\/Folder Refs/);
   assert.match(html, /Published Artifacts/);
   assert.match(html, /Package Storage Root/);
   assert.match(html, /Unavailable: Missing\/Invalid Manifest/);
+
+  const packageIdx = html.indexOf('Package-Owned Tables / Collections');
+  const fileFieldsIdx = html.indexOf('File Fields By Table');
+  const versionIdx = html.indexOf('Target Version');
+  const manualIdx = html.indexOf('Manual File/Folder Refs (one per line)');
+  assert.ok(packageIdx > -1 && fileFieldsIdx > packageIdx);
+  assert.ok(versionIdx > fileFieldsIdx);
+  assert.ok(manualIdx > versionIdx);
 });

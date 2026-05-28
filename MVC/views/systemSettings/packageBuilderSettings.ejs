@@ -52,11 +52,7 @@
             <% }) %>
           </select>
         </div>
-        <div class="col-lg-3">
-          <label class="form-label small fw-bold">Target Version</label>
-          <input id="builderVersion" type="text" class="form-control" placeholder="1.0.1">
-        </div>
-        <div class="col-lg-3">
+        <div class="col-lg-6">
           <label class="form-label small fw-bold">Origin Org</label>
           <select id="builderOriginOrgId" class="form-select">
             <option value="">Select origin org</option>
@@ -68,31 +64,77 @@
       </div>
 
       <div class="row g-3 mt-1">
-        <div class="col-lg-6">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <label class="form-label small fw-bold mb-0">Package-Owned Tables / Collections</label>
-            <div class="d-flex gap-2">
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllEntitiesBtn">Select All</button>
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearEntitiesBtn">Clear</button>
+        <div class="col-12">
+          <div class="card border-0 bg-light-subtle">
+            <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between py-2">
+              <button
+                type="button"
+                class="btn btn-link text-decoration-none text-dark fw-bold small p-0 d-inline-flex align-items-center gap-2"
+                data-bs-toggle="collapse"
+                data-bs-target="#builderEntitiesCollapse"
+                aria-expanded="true"
+                aria-controls="builderEntitiesCollapse">
+                <i class="bi bi-chevron-down small"></i>
+                <span>Package-Owned Tables / Collections</span>
+              </button>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllEntitiesBtn">Select All</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearEntitiesBtn">Clear</button>
+              </div>
+            </div>
+            <div class="collapse show" id="builderEntitiesCollapse">
+              <div class="card-body pt-0">
+                <div class="border rounded p-2" style="min-height: 300px; max-height: 360px; overflow:auto;" id="builderEntityList">
+                  <div class="small text-muted">Select a package to load entity list.</div>
+                </div>
+                <div class="small text-muted mt-1">Select origin org first, then tables are discovered and scoped to that org (unscoped rows are included).</div>
+              </div>
             </div>
           </div>
-          <div class="border rounded p-2" style="max-height: 220px; overflow:auto;" id="builderEntityList">
-            <div class="small text-muted">Select a package to load entity list.</div>
-          </div>
-          <div class="small text-muted mt-1">Select origin org first, then tables are discovered and scoped to that org (unscoped rows are included).</div>
-          <div class="d-flex align-items-center justify-content-between mt-3 mb-2">
-            <label class="form-label small fw-bold mb-0">File Fields By Table</label>
-            <div class="d-flex gap-2">
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllFileFieldsBtn">Select All</button>
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearFileFieldsBtn">Clear</button>
-            </div>
-          </div>
-          <div class="border rounded p-2" style="max-height: 220px; overflow:auto;" id="builderFileFieldList">
-            <div class="small text-muted">File field candidates load after entity preflight.</div>
-          </div>
-          <div class="small text-muted mt-1">Only selected fields are scanned for upload refs during preflight/build.</div>
         </div>
-        <div class="col-lg-6">
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-12">
+          <div class="card border-0 bg-light-subtle">
+            <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between py-2">
+              <button
+                type="button"
+                class="btn btn-link text-decoration-none text-dark fw-bold small p-0 d-inline-flex align-items-center gap-2"
+                data-bs-toggle="collapse"
+                data-bs-target="#builderFileFieldsCollapse"
+                aria-expanded="true"
+                aria-controls="builderFileFieldsCollapse">
+                <i class="bi bi-chevron-down small"></i>
+                <span>File Fields By Table</span>
+              </button>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderAddAllFileFieldsBtn">Add All Detected</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearSelectedFileFieldsBtn">Clear Selected</button>
+              </div>
+            </div>
+            <div class="collapse show" id="builderFileFieldsCollapse">
+              <div class="card-body pt-0">
+                <div class="border rounded p-2" style="min-height: 300px; max-height: 360px; overflow:auto;" id="builderFileFieldList">
+                  <div class="small text-muted">File field candidates load after entity preflight.</div>
+                </div>
+                <div class="small text-muted mt-1">Only selected fields are scanned for upload refs during preflight/build.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-12">
+          <label class="form-label small fw-bold">Target Version</label>
+          <input id="builderVersion" type="text" class="form-control" placeholder="1.0.1">
+          <div class="small text-muted mt-1">Set the package version in this final step before adding any manual refs.</div>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-12">
           <label class="form-label small fw-bold">Manual File/Folder Refs (one per line)</label>
           <textarea id="builderSelectedFileRefs" rows="4" class="form-control font-monospace small" placeholder="/uploads/ORG_900000/symbols/logo.png"></textarea>
           <div class="small text-muted mt-1">Auto-detected upload refs from selected data are included automatically.</div>
@@ -133,7 +175,8 @@
       <pre id="builderOutput" class="small bg-dark text-success p-3 rounded mb-0" style="max-height: 360px; overflow:auto;">Ready.</pre>
       <div id="builderArtifactLinks" class="mt-3 d-none">
         <div class="small fw-semibold mb-1">Published Artifacts</div>
-        <div id="builderArtifactLinksList" class="d-flex flex-wrap gap-2"></div>
+        <div id="builderArtifactHealthAlert" class="alert alert-warning py-2 px-3 small mb-2 d-none"></div>
+        <div id="builderArtifactLinksList"></div>
       </div>
     </div>
   </div>
@@ -152,8 +195,29 @@
   const fileRefsEl = document.getElementById('builderSelectedFileRefs');
   const outputEl = document.getElementById('builderOutput');
   const artifactLinksWrapEl = document.getElementById('builderArtifactLinks');
+  const artifactHealthAlertEl = document.getElementById('builderArtifactHealthAlert');
   const artifactLinksListEl = document.getElementById('builderArtifactLinksList');
   let entityCatalog = [];
+  let selectedFileFieldsByEntity = {};
+
+  function escapeHtml(value = '') {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatBytes(value = 0) {
+    const size = Number(value || 0);
+    if (!Number.isFinite(size) || size <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const power = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+    const scaled = size / (1024 ** power);
+    const rounded = power === 0 ? scaled.toFixed(0) : scaled.toFixed(2);
+    return `${rounded} ${units[power]}`;
+  }
 
   function setOutput(title, payload) {
     const stamp = new Date().toISOString();
@@ -191,6 +255,7 @@
     document.querySelectorAll('.builder-entity-checkbox').forEach((node) => {
       node.checked = checked;
     });
+    renderFileFieldList(entityCatalog);
   }
 
   function renderEntityList(rows = []) {
@@ -221,69 +286,150 @@
     }).join('');
   }
 
+  function getCurrentSelectedEntitySet() {
+    const values = Array.from(document.querySelectorAll('.builder-entity-checkbox:checked'))
+      .map((node) => String(node.value || '').trim())
+      .filter(Boolean);
+    return new Set(values);
+  }
+
+  function getEntityCandidates(entityType) {
+    const row = entityCatalog.find((item) => String(item?.entityType || item?.id || '').trim() === entityType);
+    return Array.isArray(row?.fileFieldCandidates) ? row.fileFieldCandidates.map((token) => String(token || '').trim()).filter(Boolean) : [];
+  }
+
+  function normalizeSelectedFileFields(entityType, fields) {
+    const candidates = new Set(getEntityCandidates(entityType));
+    return Array.from(new Set((Array.isArray(fields) ? fields : [])
+      .map((token) => String(token || '').trim())
+      .filter((token) => token && candidates.has(token))));
+  }
+
+  function seedSelectedFileFieldState(rows = []) {
+    const next = {};
+    const selectedEntities = getCurrentSelectedEntitySet();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      const entityType = String(row?.entityType || row?.id || '').trim();
+      if (!entityType || !selectedEntities.has(entityType)) return;
+      const current = Array.isArray(selectedFileFieldsByEntity[entityType]) ? selectedFileFieldsByEntity[entityType] : [];
+      const fallback = Array.isArray(row?.fileFieldSelected) ? row.fileFieldSelected : [];
+      next[entityType] = normalizeSelectedFileFields(entityType, current.length ? current : fallback);
+    });
+    selectedFileFieldsByEntity = next;
+  }
+
+  function addSelectedFileField(entityType, fieldPath) {
+    const token = String(fieldPath || '').trim();
+    if (!entityType || !token) return;
+    const next = normalizeSelectedFileFields(entityType, [
+      ...(Array.isArray(selectedFileFieldsByEntity[entityType]) ? selectedFileFieldsByEntity[entityType] : []),
+      token
+    ]);
+    selectedFileFieldsByEntity[entityType] = next;
+  }
+
+  function removeSelectedFileField(entityType, fieldPath) {
+    const token = String(fieldPath || '').trim();
+    if (!entityType || !token) return;
+    const rows = Array.isArray(selectedFileFieldsByEntity[entityType]) ? selectedFileFieldsByEntity[entityType] : [];
+    selectedFileFieldsByEntity[entityType] = rows.filter((row) => row !== token);
+  }
+
+  function clearSelectedFileFields(entityType) {
+    if (!entityType) return;
+    selectedFileFieldsByEntity[entityType] = [];
+  }
+
+  function addAllDetectedFileFields() {
+    const selectedEntities = getCurrentSelectedEntitySet();
+    selectedEntities.forEach((entityType) => {
+      selectedFileFieldsByEntity[entityType] = normalizeSelectedFileFields(entityType, getEntityCandidates(entityType));
+    });
+    renderFileFieldList(entityCatalog);
+  }
+
+  function clearAllSelectedFileFields() {
+    const selectedEntities = getCurrentSelectedEntitySet();
+    selectedEntities.forEach((entityType) => {
+      selectedFileFieldsByEntity[entityType] = [];
+    });
+    renderFileFieldList(entityCatalog);
+  }
+
   function renderFileFieldList(rows = []) {
     if (!fileFieldListEl) return;
     const catalog = Array.isArray(rows) ? rows : [];
-    const selectedRows = catalog.filter((row) => row?.selected !== false);
+    seedSelectedFileFieldState(catalog);
+    const selectedEntities = getCurrentSelectedEntitySet();
+    const selectedRows = catalog.filter((row) => {
+      const entityType = String(row?.entityType || row?.id || '').trim();
+      return entityType && selectedEntities.has(entityType);
+    });
     if (!selectedRows.length) {
-      fileFieldListEl.innerHTML = '<div class="small text-muted">No selected tables available for file-field scan.</div>';
+      fileFieldListEl.innerHTML = '<div class="small text-muted">Select at least one table above to configure file field extraction.</div>';
       return;
     }
-    const cards = selectedRows.map((row) => {
+    const selectableRows = selectedRows.filter((row) => {
       const entityType = String(row?.entityType || row?.id || '').trim();
-      const candidates = Array.isArray(row?.fileFieldCandidates) ? row.fileFieldCandidates : [];
-      const selected = Array.isArray(row?.fileFieldSelected) && row.fileFieldSelected.length
-        ? row.fileFieldSelected
-        : candidates;
-      if (!candidates.length) {
-        return `
-          <div class="border rounded p-2 mb-2">
-            <div class="small fw-semibold">${entityType}</div>
-            <div class="small text-muted">No candidate file fields detected.</div>
-          </div>
-        `;
-      }
-      const selectedSet = new Set(selected.map((token) => String(token || '').trim()).filter(Boolean));
+      return entityType && getEntityCandidates(entityType).length > 0;
+    });
+    if (!selectableRows.length) {
+      fileFieldListEl.innerHTML = '<div class="small text-muted">No upload-address fields detected in selected tables. Use Manual File/Folder Refs if needed.</div>';
+      return;
+    }
+
+    const cards = selectableRows.map((row) => {
+      const entityType = String(row?.entityType || row?.id || '').trim();
+      const rowCount = Number(row?.rowCount || 0);
+      const candidates = getEntityCandidates(entityType);
+      const selected = Array.isArray(selectedFileFieldsByEntity[entityType]) ? selectedFileFieldsByEntity[entityType] : [];
+      const hasCandidates = candidates.length > 0;
+      const selectedMarkup = selected.length
+        ? selected.map((fieldPath) => `
+          <span class="badge bg-light text-dark border d-inline-flex align-items-center gap-2">
+            <code>${fieldPath.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>
+            <button
+              type="button"
+              class="btn btn-sm p-0 text-danger builder-file-field-remove-btn"
+              data-entity-type="${entityType.replace(/"/g, '&quot;')}"
+              data-field-path="${fieldPath.replace(/"/g, '&quot;')}"
+              title="Remove field">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </span>
+        `).join('')
+        : '<span class="small text-muted">No selected file fields.</span>';
+
       return `
-        <div class="border rounded p-2 mb-2">
-          <div class="small fw-semibold mb-1">${entityType}</div>
-          <div class="d-flex flex-column gap-1">
-            ${candidates.map((fieldPath) => {
-              const safeField = String(fieldPath || '').trim();
-              if (!safeField) return '';
-              return `
-                <label class="small d-flex align-items-center gap-2">
-                  <input
-                    type="checkbox"
-                    class="form-check-input builder-file-field-checkbox"
-                    data-entity-type="${entityType.replace(/"/g, '&quot;')}"
-                    value="${safeField.replace(/"/g, '&quot;')}"
-                    ${selectedSet.has(safeField) ? 'checked' : ''}>
-                  <code>${safeField}</code>
-                </label>
-              `;
-            }).join('')}
+        <div class="border rounded p-2 mb-2" data-file-field-card="${entityType.replace(/"/g, '&quot;')}">
+          <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+            <div>
+              <div class="small fw-semibold">${entityType}</div>
+              <div class="small text-muted">${rowCount} row${rowCount === 1 ? '' : 's'} | ${candidates.length} upload field candidate${candidates.length === 1 ? '' : 's'}</div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <select class="form-select form-select-sm builder-file-field-picker" data-entity-type="${entityType.replace(/"/g, '&quot;')}" style="min-width: 320px;" ${hasCandidates ? '' : 'disabled'}>
+                ${hasCandidates
+                  ? (`<option value="">Select upload field</option>${candidates.map((fieldPath) => `<option value="${fieldPath.replace(/"/g, '&quot;')}">${fieldPath.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`).join('')}`)
+                  : '<option value="">No upload fields detected</option>'}
+              </select>
+              <button type="button" class="btn btn-outline-secondary btn-sm builder-file-field-add-btn" data-entity-type="${entityType.replace(/"/g, '&quot;')}" ${hasCandidates ? '' : 'disabled'}>Add</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm builder-file-field-clear-btn" data-entity-type="${entityType.replace(/"/g, '&quot;')}">Clear</button>
+            </div>
           </div>
+          <div class="d-flex flex-wrap gap-2 mt-2">${selectedMarkup}</div>
         </div>
       `;
     });
     fileFieldListEl.innerHTML = cards.join('');
   }
 
-  function setAllFileFieldsChecked(checked) {
-    document.querySelectorAll('.builder-file-field-checkbox').forEach((node) => {
-      node.checked = checked;
-    });
-  }
-
   function getFileFieldSelection() {
     const map = {};
-    document.querySelectorAll('.builder-file-field-checkbox:checked').forEach((node) => {
-      const entityType = String(node.getAttribute('data-entity-type') || '').trim();
-      const fieldPath = String(node.value || '').trim();
-      if (!entityType || !fieldPath) return;
-      if (!Array.isArray(map[entityType])) map[entityType] = [];
-      if (!map[entityType].includes(fieldPath)) map[entityType].push(fieldPath);
+    const selectedEntities = getCurrentSelectedEntitySet();
+    selectedEntities.forEach((entityType) => {
+      const rows = normalizeSelectedFileFields(entityType, selectedFileFieldsByEntity[entityType] || []);
+      map[entityType] = rows;
     });
     return map;
   }
@@ -291,6 +437,10 @@
   function clearArtifactLinks() {
     if (!artifactLinksWrapEl || !artifactLinksListEl) return;
     artifactLinksListEl.innerHTML = '';
+    if (artifactHealthAlertEl) {
+      artifactHealthAlertEl.classList.add('d-none');
+      artifactHealthAlertEl.textContent = '';
+    }
     artifactLinksWrapEl.classList.add('d-none');
   }
 
@@ -300,31 +450,107 @@
     const links = rows
       .map((row) => ({
         fileName: String(row?.fileName || '').trim(),
-        url: String(row?.uploadsUrl || '').trim()
+        url: String(row?.uploadsUrl || '').trim(),
+        size: Number(row?.size || 0),
+        sha256: String(row?.sha256 || '').trim()
       }))
       .filter((row) => row.fileName && row.url);
     if (!links.length) {
       clearArtifactLinks();
       return;
     }
-    artifactLinksListEl.innerHTML = links.map((row) => (
-      `<a class="btn btn-outline-primary btn-sm" href="${row.url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener">${row.fileName}</a>`
-    )).join('');
+    artifactLinksListEl.innerHTML = `
+      <div class="list-group">
+        ${links.map((row) => `
+          <div class="list-group-item d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div class="small">
+              <div class="fw-semibold">${escapeHtml(row.fileName)}</div>
+              <div class="text-muted">Size: ${escapeHtml(formatBytes(row.size))}${row.sha256 ? ` | SHA-256: <code>${escapeHtml(row.sha256)}</code>` : ''}</div>
+            </div>
+            <a class="btn btn-outline-primary btn-sm" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">
+              <i class="bi bi-download me-1"></i>Download
+            </a>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    const selectedRefCount = Number(report?.fileSummary?.selectedRefCount || 0);
+    const copiedCount = Number(report?.fileSummary?.copiedCount || 0);
+    if (artifactHealthAlertEl) {
+      if (selectedRefCount > 0 && copiedCount === 0) {
+        artifactHealthAlertEl.className = 'alert alert-warning py-2 px-3 small mb-2';
+        artifactHealthAlertEl.textContent = 'No referenced upload files were copied into the package payload. Check upload paths or gateway availability, then rebuild.';
+        artifactHealthAlertEl.classList.remove('d-none');
+      } else if (selectedRefCount > copiedCount) {
+        artifactHealthAlertEl.className = 'alert alert-info py-2 px-3 small mb-2';
+        artifactHealthAlertEl.textContent = `Only ${copiedCount} of ${selectedRefCount} referenced upload file(s) were copied. Review warnings before install.`;
+        artifactHealthAlertEl.classList.remove('d-none');
+      } else {
+        artifactHealthAlertEl.classList.add('d-none');
+        artifactHealthAlertEl.textContent = '';
+      }
+    }
     artifactLinksWrapEl.classList.remove('d-none');
   }
 
-  async function runWithWaiting(label, action) {
+  async function runWithWaiting(label, action, options = {}) {
+    const config = options && typeof options === 'object' ? options : {};
+    const initialProgress = Number.isFinite(Number(config.initialProgress))
+      ? Math.max(0, Math.min(100, Number(config.initialProgress)))
+      : 8;
+    const maxProgress = Number.isFinite(Number(config.maxProgress))
+      ? Math.max(initialProgress, Math.min(99, Number(config.maxProgress)))
+      : 88;
+    const progressStep = Number.isFinite(Number(config.progressStep))
+      ? Math.max(1, Math.min(20, Number(config.progressStep)))
+      : 3;
+    const tickMs = Number.isFinite(Number(config.tickMs))
+      ? Math.max(200, Number(config.tickMs))
+      : 700;
+
+    let loadingToken = null;
+    let progressTimer = null;
+    let currentProgress = initialProgress;
     if (typeof showLoading === 'function') {
-      showLoading({
+      loadingToken = showLoading({
         title: label || 'Please wait...',
-        note: 'Loading package metadata...',
-        operation: 'Package Builder'
+        note: config.initialNote || 'Preparing request...',
+        operation: config.operation || 'Package Builder',
+        progress: currentProgress
       });
+      progressTimer = window.setInterval(() => {
+        currentProgress = Math.min(maxProgress, currentProgress + progressStep);
+        if (typeof updateLoading === 'function') {
+          updateLoading({
+            note: config.runningNote || 'Processing package request...',
+            progress: currentProgress
+          });
+        } else if (typeof setLoadingProgress === 'function') {
+          setLoadingProgress(currentProgress);
+        }
+      }, tickMs);
     }
     try {
+      if (typeof updateLoading === 'function') {
+        updateLoading({
+          note: config.startNote || 'Sending request...',
+          progress: Math.min(maxProgress, initialProgress + progressStep)
+        });
+      }
       return await action();
     } finally {
-      if (typeof hideLoading === 'function') hideLoading();
+      if (progressTimer) window.clearInterval(progressTimer);
+      if (typeof updateLoading === 'function') {
+        updateLoading({
+          note: config.finishNote || 'Finalizing response...',
+          progress: 100
+        });
+      } else if (typeof setLoadingProgress === 'function') {
+        setLoadingProgress(100);
+      }
+      if (typeof hideLoading === 'function') {
+        window.setTimeout(() => hideLoading(loadingToken || undefined), 180);
+      }
     }
   }
 
@@ -385,7 +611,13 @@
         selectedFileRefs: parseLines(fileRefsEl?.value || ''),
         fileFieldSelection: getFileFieldSelection()
       })
-    }));
+    }), {
+      initialNote: 'Preparing preflight payload...',
+      runningNote: 'Evaluating selected tables and upload references...',
+      finishNote: 'Preparing preflight report...',
+      initialProgress: 10,
+      maxProgress: 86
+    });
     if (Array.isArray(payload?.report?.entityCatalog)) {
       renderEntityList(payload.report.entityCatalog);
       renderFileFieldList(payload.report.entityCatalog);
@@ -442,7 +674,15 @@
         selectedFileRefs: parseLines(fileRefsEl?.value || ''),
         fileFieldSelection: getFileFieldSelection()
       })
-    }));
+    }), {
+      initialNote: 'Preparing package build request...',
+      runningNote: 'Building package payload and publishing artifacts...',
+      finishNote: 'Completing build response...',
+      initialProgress: 12,
+      maxProgress: 92,
+      progressStep: 2,
+      tickMs: 800
+    });
     setOutput('Build Result', payload);
     renderArtifactLinks(payload?.report || {});
     if (typeof showMessageModal === 'function') {
@@ -459,11 +699,15 @@
     const packageId = String(packageEl?.value || '').trim();
     const originOrgId = String(originOrgEl?.value || '').trim();
     if (!packageId) {
+      selectedFileFieldsByEntity = {};
       renderEntityList([]);
+      renderFileFieldList([]);
       return;
     }
     if (!originOrgId) {
+      selectedFileFieldsByEntity = {};
       renderEntityList([]);
+      renderFileFieldList([]);
       if (entityListEl) {
         entityListEl.innerHTML = '<div class="small text-muted">Select origin org to load package tables.</div>';
       }
@@ -483,7 +727,13 @@
         selectedFileRefs: parseLines(fileRefsEl?.value || ''),
         fileFieldSelection: getFileFieldSelection()
       })
-    }));
+    }), {
+      initialNote: 'Loading table catalog...',
+      runningNote: 'Reading package-owned entities...',
+      finishNote: 'Finalizing table list...',
+      initialProgress: 10,
+      maxProgress: 84
+    });
     const catalog = (Array.isArray(payload?.report?.entityCatalog) && payload.report.entityCatalog.length)
       ? payload.report.entityCatalog
       : (Array.isArray(payload?.report?.availableDataEntities) ? payload.report.availableDataEntities : []);
@@ -501,8 +751,42 @@
   });
   document.getElementById('builderSelectAllEntitiesBtn')?.addEventListener('click', () => setAllEntitiesChecked(true));
   document.getElementById('builderClearEntitiesBtn')?.addEventListener('click', () => setAllEntitiesChecked(false));
-  document.getElementById('builderSelectAllFileFieldsBtn')?.addEventListener('click', () => setAllFileFieldsChecked(true));
-  document.getElementById('builderClearFileFieldsBtn')?.addEventListener('click', () => setAllFileFieldsChecked(false));
+  document.getElementById('builderAddAllFileFieldsBtn')?.addEventListener('click', () => addAllDetectedFileFields());
+  document.getElementById('builderClearSelectedFileFieldsBtn')?.addEventListener('click', () => clearAllSelectedFileFields());
+  entityListEl?.addEventListener('change', (event) => {
+    if (!event.target?.classList?.contains('builder-entity-checkbox')) return;
+    renderFileFieldList(entityCatalog);
+  });
+  fileFieldListEl?.addEventListener('click', (event) => {
+    const addBtn = event.target.closest('.builder-file-field-add-btn');
+    if (addBtn) {
+      const entityType = String(addBtn.getAttribute('data-entity-type') || '').trim();
+      if (!entityType) return;
+      const card = addBtn.closest('[data-file-field-card]');
+      const selectNode = card?.querySelector('.builder-file-field-picker');
+      const fieldPath = String(selectNode?.value || '').trim();
+      if (!fieldPath) return;
+      addSelectedFileField(entityType, fieldPath);
+      renderFileFieldList(entityCatalog);
+      return;
+    }
+
+    const removeBtn = event.target.closest('.builder-file-field-remove-btn');
+    if (removeBtn) {
+      const entityType = String(removeBtn.getAttribute('data-entity-type') || '').trim();
+      const fieldPath = String(removeBtn.getAttribute('data-field-path') || '').trim();
+      removeSelectedFileField(entityType, fieldPath);
+      renderFileFieldList(entityCatalog);
+      return;
+    }
+
+    const clearBtn = event.target.closest('.builder-file-field-clear-btn');
+    if (clearBtn) {
+      const entityType = String(clearBtn.getAttribute('data-entity-type') || '').trim();
+      clearSelectedFileFields(entityType);
+      renderFileFieldList(entityCatalog);
+    }
+  });
   document.getElementById('builderClearOutputBtn')?.addEventListener('click', () => {
     outputEl.textContent = 'Ready.';
     clearArtifactLinks();

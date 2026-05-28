@@ -86,7 +86,10 @@ test('preflightBuild discovers manifest data entities and upload refs', async ()
     const report = await service.preflightBuild({
       packageId: 'pte',
       originOrgId: 'ORG_900000',
-      selectedDataEntities: ['pteApplicants']
+      selectedDataEntities: ['pteApplicants'],
+      fileFieldSelection: {
+        pteApplicants: ['avatarUrl']
+      }
     }, {
       backendMode: 'json',
       packageRootDir: path.join(tempRoot, 'packages')
@@ -373,7 +376,10 @@ test('fetchEntityRows falls back to JSON data file when core dataService reports
     const report = await service.preflightBuild({
       packageId: 'pte',
       originOrgId: 'ORG_900000',
-      selectedDataEntities: ['pteApplicants']
+      selectedDataEntities: ['pteApplicants'],
+      fileFieldSelection: {
+        pteApplicants: ['avatarUrl']
+      }
     }, {
       backendMode: 'json',
       packageRootDir: path.join(tempRoot, 'packages')
@@ -495,7 +501,10 @@ test('preflightBuild requires origin org and scopes rows to selected origin whil
     const report = await service.preflightBuild({
       packageId: 'pte',
       originOrgId: 'ORG_900000',
-      selectedDataEntities: ['pteApplicants']
+      selectedDataEntities: ['pteApplicants'],
+      fileFieldSelection: {
+        pteApplicants: ['avatarUrl']
+      }
     }, {
       backendMode: 'json',
       packageRootDir: path.join(tempRoot, 'packages')
@@ -555,6 +564,53 @@ test('preflightBuild respects fileFieldSelection when extracting upload refs', a
     assert.equal(Array.isArray(report.filePlan.provenance), true);
     assert.equal(report.filePlan.provenance.every((row) => String(row?.fieldPath || '') === 'resumePath'), true);
     assert.deepEqual(report.fileFieldSelection?.pteApplicants, ['resumePath']);
+  });
+});
+
+test('preflightBuild exposes upload-address-only file field candidates', async () => {
+  await withTempCwd('pkg-builder-upload-field-candidates-', async (tempRoot) => {
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest('1.0.0'));
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async fetchData(entityType) {
+          if (entityType !== 'pteApplicants') return [];
+          return [
+            {
+              id: 'A1',
+              orgId: 'ORG_900000',
+              avatarUrl: '/uploads/ORG_900000/symbols/avatar.png',
+              fileName: 'avatar.png',
+              notes: 'candidate notes',
+              meta: {
+                localPath: 'C:/temp/local-file.png',
+                previewUrl: 'https://example.com/preview.png'
+              }
+            }
+          ];
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      }
+    });
+
+    const report = await service.preflightBuild({
+      packageId: 'pte',
+      originOrgId: 'ORG_900000',
+      selectedDataEntities: ['pteApplicants'],
+      fileFieldSelection: {
+        pteApplicants: ['avatarUrl']
+      }
+    }, {
+      backendMode: 'json',
+      packageRootDir: path.join(tempRoot, 'packages')
+    });
+
+    const entity = report.entityCatalog.find((row) => row.entityType === 'pteApplicants');
+    assert.ok(entity);
+    assert.deepEqual(entity.fileFieldCandidates, ['avatarUrl']);
+    assert.deepEqual(report.fileFieldSelection?.pteApplicants, ['avatarUrl']);
   });
 });
 

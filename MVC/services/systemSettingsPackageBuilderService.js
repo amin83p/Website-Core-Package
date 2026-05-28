@@ -10,9 +10,11 @@ const packageRegistryService = require('./packageRegistryService');
 const packageManifestService = require('./packageManifestService');
 const packageDataOwnershipService = require('./packageDataOwnershipService');
 const coreFilesService = require('./coreFilesService');
+const fileGatewayClientService = require('./fileGatewayClientService');
 const { getMongoCollection, getMongoDbOrNull } = require('../infrastructure/mongo/mongoConnection');
 const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 const uploadPathUtils = require('../utils/uploadPathUtils');
+const { isRailwayProxyMode, getGatewayBaseUrl } = require('../utils/uploadModeUtils');
 
 const SYSTEM_CONTEXT = Object.freeze({
   id: 'SYSTEM',
@@ -31,7 +33,6 @@ const REMAP_ORG_FIELDS = new Set([
 const ORG_TOKEN_EXACT_REGEX = /^ORG_[A-Za-z0-9_-]+$/i;
 const ORG_UPLOAD_SEGMENT_REGEX = /\/uploads\/(ORG_[^/]+)/ig;
 const UPLOAD_URL_MATCH_REGEX = /\/uploads\/[^"'` ]+/ig;
-const FILE_FIELD_HINT_REGEX = /(file|url|path|image|audio|video|document|attachment|logo|avatar|icon|pdf|media|thumbnail|banner|cover)/i;
 
 function cleanText(value, max = 4000) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -206,21 +207,16 @@ function collectStringLeafRows(node, pathParts = [], out = []) {
 }
 
 function collectFileFieldCandidates(rows = []) {
-  const fromHint = new Set();
   const fromUpload = new Set();
   sanitizeArray(rows).forEach((row) => {
     const leafRows = collectStringLeafRows(row, [], []);
     leafRows.forEach((leaf) => {
       const fieldPath = normalizeFieldPathToken(leaf?.fieldPath || '');
       if (!fieldPath) return;
-      if (FILE_FIELD_HINT_REGEX.test(fieldPath)) fromHint.add(fieldPath);
       if (listUploadRefsInText(leaf.value).length) fromUpload.add(fieldPath);
     });
   });
-  return Array.from(new Set([
-    ...Array.from(fromUpload),
-    ...Array.from(fromHint)
-  ]));
+  return Array.from(fromUpload);
 }
 
 function normalizeFileFieldSelection(input = {}) {
@@ -246,11 +242,11 @@ function resolveSelectedFileFields(entityType = '', requestedSelection = {}, can
   const entity = cleanText(entityType, 200);
   if (!entity) return [];
   const requested = sanitizeArray(requestedSelection[entity]).map((row) => normalizeFieldPathToken(row)).filter(Boolean);
-  const uniqueCandidates = Array.from(new Set(sanitizeArray(candidates).map((row) => normalizeFieldPathToken(row)).filter(Boolean)));
+  const uniqueCandidates = new Set(sanitizeArray(candidates).map((row) => normalizeFieldPathToken(row)).filter(Boolean));
   if (requested.length) {
-    return Array.from(new Set(requested));
+    return Array.from(new Set(requested.filter((row) => uniqueCandidates.has(row))));
   }
-  return uniqueCandidates;
+  return [];
 }
 
 function deriveRowId(row = {}, index = 0) {
@@ -268,12 +264,13 @@ function collectUploadRefProvenanceFromRow(row = {}, options = {}) {
       .map((item) => normalizeFieldPathToken(item))
       .filter(Boolean)
   );
+  if (!selectedFields.size) return [];
   const leafRows = collectStringLeafRows(row, [], []);
   const rows = [];
   leafRows.forEach((leaf) => {
     const fieldPath = normalizeFieldPathToken(leaf?.fieldPath || '');
     if (!fieldPath) return;
-    if (selectedFields.size && !selectedFields.has(fieldPath)) return;
+    if (!selectedFields.has(fieldPath)) return;
     const refs = listUploadRefsInText(leaf.value);
     refs.forEach((ref) => {
       rows.push({
@@ -527,6 +524,9 @@ function createDependencies(overrides = {}) {
     packageManifestService: overrides.packageManifestService || packageManifestService,
     packageDataOwnershipService: overrides.packageDataOwnershipService || packageDataOwnershipService,
     coreFilesService: overrides.coreFilesService || coreFilesService,
+    fileGatewayClientService: overrides.fileGatewayClientService || fileGatewayClientService,
+    isRailwayProxyMode: overrides.isRailwayProxyMode || isRailwayProxyMode,
+    getGatewayBaseUrl: overrides.getGatewayBaseUrl || getGatewayBaseUrl,
     getMongoCollection: overrides.getMongoCollection || getMongoCollection,
     getMongoDbOrNull: overrides.getMongoDbOrNull || getMongoDbOrNull
   };
@@ -1229,15 +1229,63 @@ function createService(overrides = {}) {
     const copied = [];
     const warnings = [];
     const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
+    const canUseGatewayFallback = Boolean(
+      deps.isRailwayProxyMode()
+      && cleanText(deps.getGatewayBaseUrl(), 2000)
+      && deps.fileGatewayClientService
+      && typeof deps.fileGatewayClientService.downloadRemoteUploadFile === 'function'
+    );
+
+    const tryCopyFromGateway = async (ref = '', relativePath = '', destinationPath = '') => {
+      if (!canUseGatewayFallback || !relativePath || !destinationPath) return { copied: false, reason: '' };
+      const segments = String(relativePath).split('/').filter(Boolean);
+      if (segments.length < 2) {
+        return { copied: false, reason: 'upload reference is missing file path segments.' };
+      }
+      const scopeFolder = String(segments.shift() || '').toUpperCase();
+      const scopeKey = scopeFolder === 'GLOBAL' ? 'GLOBAL' : scopeFolder.replace(/^ORG_/, '');
+      const remoteRelativePath = segments.join('/');
+      if (!remoteRelativePath) return { copied: false, reason: 'upload reference is missing file path.' };
+      try {
+        const downloaded = await deps.fileGatewayClientService.downloadRemoteUploadFile(scopeKey, remoteRelativePath);
+        const blob = downloaded?.blob;
+        if (!blob || typeof blob.arrayBuffer !== 'function') {
+          return { copied: false, reason: 'gateway download did not return a valid file payload.' };
+        }
+        const buffer = Buffer.from(await blob.arrayBuffer());
+        if (!buffer.length) return { copied: false, reason: 'gateway download returned an empty file payload.' };
+        await deps.fs.mkdir(deps.path.dirname(destinationPath), { recursive: true });
+        await deps.fs.writeFile(destinationPath, buffer);
+        return { copied: true, size: buffer.length };
+      } catch (error) {
+        return { copied: false, reason: cleanText(error?.message, 300) || 'gateway download failed.' };
+      }
+    };
+
     for (const row of sanitizeArray(refRows)) {
       const ref = cleanText(row?.ref || row, 2000);
+      const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(ref);
       const absolutePath = resolveReferenceToAbsolutePath(ref);
       if (!absolutePath) {
         warnings.push(`Skipped file ref "${ref}" because it is outside upload root or invalid.`);
         continue;
       }
       if (!(await pathExists(absolutePath))) {
-        warnings.push(`Skipped file ref "${ref}" because source path does not exist.`);
+        const destinationFromRef = relativeUploadPath ? deps.path.join(targetRoot, relativeUploadPath) : '';
+        // eslint-disable-next-line no-await-in-loop
+        const gatewayFallback = await tryCopyFromGateway(ref, relativeUploadPath, destinationFromRef);
+        if (!gatewayFallback.copied) {
+          const reasonSuffix = gatewayFallback.reason ? ` (${gatewayFallback.reason})` : '';
+          warnings.push(`Skipped file ref "${ref}" because source path does not exist.${reasonSuffix}`);
+          continue;
+        }
+        copied.push({
+          ref,
+          absolutePath: '',
+          relativePath: relativeUploadPath,
+          type: 'file',
+          source: 'gateway'
+        });
         continue;
       }
       const relativePath = path.relative(uploadRoot, absolutePath).replace(/\\/g, '/');
@@ -1269,35 +1317,97 @@ function createService(overrides = {}) {
     const packageId = normalizePackageId(options.packageId);
     const buildId = cleanText(options.buildId, 200);
     if (!packageId || !buildId) return null;
-    const globalRoot = deps.coreFilesService.getRootPath('GLOBAL');
-    const packagesRoot = deps.coreFilesService.resolveSafePath(globalRoot, 'packages');
-    deps.coreFilesService.ensureDir(packagesRoot);
-    const packageRoot = deps.coreFilesService.resolveSafePath(packagesRoot, packageId);
-    deps.coreFilesService.ensureDir(packageRoot);
-    const buildRoot = deps.coreFilesService.resolveSafePath(packageRoot, buildId);
-    deps.coreFilesService.ensureDir(buildRoot);
+    const gatewayPublishOnly = Boolean(
+      deps.isRailwayProxyMode()
+      && cleanText(deps.getGatewayBaseUrl(), 2000)
+      && deps.fileGatewayClientService
+      && typeof deps.fileGatewayClientService.gatewayUploadFile === 'function'
+    );
+
+    let buildRoot = '';
+    if (!gatewayPublishOnly) {
+      const globalRoot = deps.coreFilesService.getRootPath('GLOBAL');
+      const packagesRoot = deps.coreFilesService.resolveSafePath(globalRoot, 'packages');
+      deps.coreFilesService.ensureDir(packagesRoot);
+      const packageRoot = deps.coreFilesService.resolveSafePath(packagesRoot, packageId);
+      deps.coreFilesService.ensureDir(packageRoot);
+      buildRoot = deps.coreFilesService.resolveSafePath(packageRoot, buildId);
+      deps.coreFilesService.ensureDir(buildRoot);
+    }
+    const gatewayRelativeDir = `packages/${packageId}/${buildId}`;
 
     const publishRows = [];
-    const publishFile = async (sourcePath = '', targetName = '') => {
+    const publishFile = async (sourcePath = '', targetName = '', mimeType = 'application/octet-stream') => {
       const source = cleanText(sourcePath, 2000);
       const fileName = cleanText(targetName, 260);
       if (!source || !fileName) return;
+      const stat = await deps.fs.stat(source);
+      const sha256 = await hashFileSha256(source);
+
+      if (gatewayPublishOnly) {
+        try {
+          const result = await deps.fileGatewayClientService.gatewayUploadFile({
+            scopeKey: 'GLOBAL',
+            relativeDir: gatewayRelativeDir,
+            desiredName: fileName,
+            localFilePath: source,
+            mimeType
+          });
+          const uploadsUrl = cleanText(result?.url || result?.uploadUrl || '', 2000);
+          if (!uploadsUrl) {
+            const uploadUrlError = new Error(`Gateway upload failed for artifact "${fileName}": missing upload URL.`);
+            uploadUrlError.code = 'PACKAGE_ARTIFACT_GATEWAY_UPLOAD_URL_MISSING';
+            throw uploadUrlError;
+          }
+          publishRows.push({
+            fileName,
+            absolutePath: '',
+            uploadsUrl,
+            size: Number(stat?.size || 0),
+            sha256
+          });
+          return;
+        } catch (error) {
+          const wrapped = new Error(
+            `Failed to publish artifact "${fileName}" to Railway gateway: ${cleanText(error?.message, 300) || 'gateway upload failed.'}`
+          );
+          const sizeBytes = Number(stat?.size || 0);
+          const sizeMb = sizeBytes > 0 ? (sizeBytes / (1024 * 1024)) : 0;
+          const limitMb = Number.parseInt(String(process.env.FILE_GATEWAY_MAX_FILE_MB || '25').trim(), 10);
+          const likelySizeLimit = Number.isFinite(limitMb) && limitMb > 0 && sizeMb > limitMb;
+          if (likelySizeLimit) {
+            wrapped.message += ` Artifact size is ${sizeMb.toFixed(2)} MB, above FILE_GATEWAY_MAX_FILE_MB (${limitMb} MB). Increase FILE_GATEWAY_MAX_FILE_MB on Railway and redeploy/restart.`;
+          }
+          wrapped.code = cleanText(error?.code || '', 120) || 'PACKAGE_ARTIFACT_GATEWAY_UPLOAD_FAILED';
+          wrapped.details = {
+            fileName,
+            gatewayRelativeDir,
+            sizeBytes,
+            sizeMb: Number(sizeMb.toFixed(3)),
+            fileGatewayMaxMb: Number.isFinite(limitMb) ? limitMb : null,
+            statusCode: Number(error?.statusCode || 0) || null,
+            routePath: cleanText(error?.routePath || '', 200) || null,
+            gatewayPayload: sanitizeObject(error?.gatewayPayload)
+          };
+          throw wrapped;
+        }
+      }
+
       const destinationPath = deps.path.join(buildRoot, fileName);
       await copyFileSafe(source, destinationPath);
-      const stat = await deps.fs.stat(destinationPath);
       publishRows.push({
         fileName,
         absolutePath: destinationPath,
         uploadsUrl: deps.coreFilesService.fromDiskPathToUploadsUrl(destinationPath) || '',
         size: Number(stat?.size || 0),
-        sha256: await hashFileSha256(destinationPath)
+        sha256
       });
     };
 
-    await publishFile(options?.zipPath, 'package.zip');
-    await publishFile(options?.sigPath, 'package.sig');
+    await publishFile(options?.zipPath, 'package.zip', 'application/zip');
+    await publishFile(options?.sigPath, 'package.sig', 'application/octet-stream');
     if (cleanText(options?.publicPath, 2000)) {
-      await publishFile(options.publicPath, 'package.public.pem');
+      await publishFile(options.publicPath, 'package.public.pem', 'application/x-pem-file');
     }
 
     const details = {
@@ -1316,20 +1426,33 @@ function createService(overrides = {}) {
       })),
       fileFieldSelection: sanitizeObject(options.fileFieldSelection)
     };
-    const detailPath = deps.path.join(buildRoot, 'build-detail.json');
-    await deps.fs.writeFile(detailPath, JSON.stringify(details, null, 2));
-    const detailStat = await deps.fs.stat(detailPath);
-    publishRows.push({
-      fileName: 'build-detail.json',
-      absolutePath: detailPath,
-      uploadsUrl: deps.coreFilesService.fromDiskPathToUploadsUrl(detailPath) || '',
-      size: Number(detailStat?.size || 0),
-      sha256: await hashFileSha256(detailPath)
-    });
+    if (gatewayPublishOnly) {
+      const tempDir = await deps.fs.mkdtemp(deps.path.join(deps.os.tmpdir(), `pkg-build-detail-${packageId}-`));
+      const detailPath = deps.path.join(tempDir, 'build-detail.json');
+      try {
+        await deps.fs.writeFile(detailPath, JSON.stringify(details, null, 2));
+        await publishFile(detailPath, 'build-detail.json', 'application/json');
+      } finally {
+        await deps.fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
+      }
+    } else {
+      const detailPath = deps.path.join(buildRoot, 'build-detail.json');
+      await deps.fs.writeFile(detailPath, JSON.stringify(details, null, 2));
+      const detailStat = await deps.fs.stat(detailPath);
+      publishRows.push({
+        fileName: 'build-detail.json',
+        absolutePath: detailPath,
+        uploadsUrl: deps.coreFilesService.fromDiskPathToUploadsUrl(detailPath) || '',
+        size: Number(detailStat?.size || 0),
+        sha256: await hashFileSha256(detailPath)
+      });
+    }
 
     return {
       rootAbsolutePath: buildRoot,
-      rootUploadsUrl: deps.coreFilesService.fromDiskPathToUploadsUrl(buildRoot) || '',
+      rootUploadsUrl: gatewayPublishOnly
+        ? `/uploads/GLOBAL/packages/${packageId}/${buildId}`
+        : (deps.coreFilesService.fromDiskPathToUploadsUrl(buildRoot) || ''),
       files: publishRows
     };
   }

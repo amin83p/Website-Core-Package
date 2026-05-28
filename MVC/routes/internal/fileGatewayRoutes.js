@@ -35,7 +35,17 @@ function handleBackupRestoreUpload(req, res, next) {
   });
 }
 
-router.post('/upload', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/upload'), upload.single('file'), controller.upload);
+function handleGatewayUpload(req, res, next) {
+  upload.single('file')(req, res, (error) => {
+    if (!error) return next();
+    const message = error.code === 'LIMIT_FILE_SIZE'
+      ? `Gateway upload file is too large. Maximum upload size is ${uploadLimitMb} MB. Increase FILE_GATEWAY_MAX_FILE_MB and restart the service.`
+      : (error.message || 'Gateway upload failed.');
+    return res.status(400).json({ status: 'error', message });
+  });
+}
+
+router.post('/upload', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/upload'), handleGatewayUpload, controller.upload);
 router.post('/mkdir', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/mkdir'), controller.mkdir);
 router.post('/delete', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/delete'), controller.delete);
 router.post('/move', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/move'), controller.move);

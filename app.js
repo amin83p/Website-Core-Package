@@ -112,6 +112,15 @@ const uploadsStaticContext = {
   middleware: null
 };
 app.use('/uploads', (req, res, next) => {
+  const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
+  if (!uploadsStaticContext.middleware || uploadsStaticContext.root !== uploadRoot) {
+    uploadsStaticContext.root = uploadRoot;
+    uploadsStaticContext.middleware = express.static(uploadRoot);
+  }
+
+  const requestedDiskPath = uploadPathUtils.fromUploadsUrlToDiskPath(req.originalUrl || req.url, uploadRoot);
+  const hasLocalArtifact = Boolean(requestedDiskPath && fs.existsSync(requestedDiskPath));
+
   if (isRailwayProxyMode()) {
     const gatewayBaseUrl = getGatewayBaseUrl();
     if (gatewayBaseUrl) {
@@ -123,7 +132,9 @@ app.use('/uploads', (req, res, next) => {
       } catch (_) {
         isSameHost = false;
       }
-      if (!isSameHost) {
+      // In local/dev flows we may have build artifacts on local disk while proxy mode is still enabled.
+      // Prefer serving local files when they exist; otherwise keep gateway redirect behavior.
+      if (!isSameHost && !hasLocalArtifact) {
         const suffix = String(req.originalUrl || '').replace(/^\/uploads/, '');
         const targetUrl = `${gatewayBaseUrl}/uploads${suffix}`;
         return res.redirect(307, targetUrl);
@@ -131,11 +142,6 @@ app.use('/uploads', (req, res, next) => {
     }
   }
 
-  const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
-  if (!uploadsStaticContext.middleware || uploadsStaticContext.root !== uploadRoot) {
-    uploadsStaticContext.root = uploadRoot;
-    uploadsStaticContext.middleware = express.static(uploadRoot);
-  }
   return uploadsStaticContext.middleware(req, res, next);
 });
 //Middle wares
