@@ -722,12 +722,14 @@
     }
   });
 
-  tableEl?.addEventListener('click', async (event) => {
+  document.addEventListener('click', async (event) => {
     const btn = event.target.closest('.pkg-action-btn');
     if (!btn) return;
+    if (!btn.closest('.row-actions-menu')) return;
     const action = String(btn.dataset.action || '').trim();
     const packageId = String(btn.dataset.packageId || '').trim();
     if (!action || !packageId) return;
+    if (!actionMap[action]) return;
     const original = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
