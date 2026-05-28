@@ -301,10 +301,18 @@ function assertRuntimeRouteMountHealth(context = {}, runtime = {}, options = {})
   const routesReport = runtime?.hooks?.routes || {};
   const failed = Number(routesReport?.failed || 0);
   const mounted = Number(routesReport?.mounted || 0);
+  const alreadyMountedSkipped = sanitizeArray(routesReport?.results).filter((row) => {
+    if (!row || typeof row !== 'object') return false;
+    const status = cleanText(row.status, 60).toLowerCase();
+    if (status !== 'skipped') return false;
+    const message = cleanText(row.message, 300).toLowerCase();
+    return message.includes('already mounted in this process');
+  }).length;
+  const effectiveMounted = mounted + alreadyMountedSkipped;
   if (failed > 0) {
     throw buildRuntimeRouteMountError(context, runtime, 'Runtime route mount reported failed route declarations.');
   }
-  if (mounted <= 0) {
+  if (effectiveMounted <= 0) {
     throw buildRuntimeRouteMountError(context, runtime, 'Runtime route mount reported zero mounted routes for active USE declarations.');
   }
 }

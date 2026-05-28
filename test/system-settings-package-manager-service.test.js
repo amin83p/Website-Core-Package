@@ -389,6 +389,51 @@ test('installPackage succeeds with runtime USE declarations when routes mount is
   assert.equal(report.runtime?.hooks?.routes?.mounted, 1);
 });
 
+test('installPackage accepts runtime route already-mounted skip as healthy', async () => {
+  const setup = createBaseDeps();
+  setup.deps.packageRegistryInstallerService.createLoaderHooks = () => ({
+    async registerRoutes() {
+      return {
+        requested: 1,
+        prepared: 1,
+        mounted: 0,
+        failed: 0,
+        results: [
+          {
+            id: 'route-1',
+            method: 'USE',
+            path: '/pte',
+            router: 'MVC/routes/pteMainRoute.js',
+            metadataOnly: false,
+            status: 'skipped',
+            message: 'Route already mounted in this process.'
+          }
+        ]
+      };
+    },
+    async registerViews() { return { requested: 0, registered: 0, failed: 0 }; },
+    async registerAssets() { return { requested: 0, mounted: 0, failed: 0 }; },
+    async registerQueryExecutors() { return { requested: 0, registered: 0, failed: 0 }; }
+  });
+  const service = createService(setup.deps);
+  const report = await service.installPackage({
+    installMethod: 'json',
+    manifestJson: JSON.stringify(createManifest({
+      id: 'pte-runtime-already-mounted',
+      version: '1.0.0',
+      mountPath: '/pte',
+      routes: [createUseRouteDeclaration()]
+    }))
+  }, {
+    backendMode: 'json',
+    app: { use() {} }
+  });
+
+  assert.equal(report.action, 'install');
+  assert.equal(report.packageId, 'pte-runtime-already-mounted');
+  assert.equal(report.runtime?.hooks?.routes?.failed, 0);
+});
+
 test('installPackage fails and rolls back when runtime route mount health is not satisfied', async () => {
   const setup = createBaseDeps();
   setup.deps.packageRegistryInstallerService.createLoaderHooks = () => ({
