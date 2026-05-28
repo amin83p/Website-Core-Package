@@ -73,24 +73,37 @@ test('package builder preflight/build controllers return structured payloads', a
   const originalRuntimeStatus = dataBackendRuntimeService.getPublicBackendStatus;
   const originalPreflight = systemSettingsPackageBuilderService.preflightBuild;
   const originalBuild = systemSettingsPackageBuilderService.buildPackage;
+  let capturedPreflightInput = null;
+  let capturedBuildInput = null;
 
   try {
     dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json' });
-    systemSettingsPackageBuilderService.preflightBuild = async () => ({
+    systemSettingsPackageBuilderService.preflightBuild = async (input) => {
+      capturedPreflightInput = input;
+      return ({
       package: { packageId: 'pte' },
       originOrgId: 'ORG_900000',
       selectedDataEntities: [{ entityType: 'pteApplicants' }]
-    });
-    systemSettingsPackageBuilderService.buildPackage = async () => ({
+      });
+    };
+    systemSettingsPackageBuilderService.buildPackage = async (input) => {
+      capturedBuildInput = input;
+      return ({
       packageId: 'pte',
       version: '1.0.1',
       artifacts: { zip: 'install_packages/pte-1.0.1-xxx.zip' }
-    });
+      });
+    };
 
     const preflightRes = makeRenderResponse();
     await systemSettingsController.preflightPackageBuilder(
       {
-        body: { packageId: 'pte', originOrgId: 'ORG_900000', selectedDataEntities: 'pteApplicants' },
+        body: {
+          packageId: 'pte',
+          originOrgId: 'ORG_900000',
+          selectedDataEntities: 'pteApplicants',
+          fileFieldSelection: JSON.stringify({ pteApplicants: ['avatarUrl'] })
+        },
         user: { id: 'USER_PRE_1' }
       },
       preflightRes
@@ -98,11 +111,17 @@ test('package builder preflight/build controllers return structured payloads', a
     assert.equal(preflightRes.statusCode, 200);
     assert.equal(preflightRes.jsonPayload?.status, 'success');
     assert.equal(preflightRes.jsonPayload?.report?.package?.packageId, 'pte');
+    assert.deepEqual(capturedPreflightInput?.fileFieldSelection, { pteApplicants: ['avatarUrl'] });
 
     const buildRes = makeRenderResponse();
     await systemSettingsController.buildPackageFromBuilder(
       {
-        body: { packageId: 'pte', version: '1.0.1', originOrgId: 'ORG_900000' },
+        body: {
+          packageId: 'pte',
+          version: '1.0.1',
+          originOrgId: 'ORG_900000',
+          fileFieldSelection: { pteApplicants: ['avatarUrl'] }
+        },
         user: { id: 'USER_BUILD_1' }
       },
       buildRes
@@ -110,6 +129,7 @@ test('package builder preflight/build controllers return structured payloads', a
     assert.equal(buildRes.statusCode, 200);
     assert.equal(buildRes.jsonPayload?.status, 'success');
     assert.equal(buildRes.jsonPayload?.report?.version, '1.0.1');
+    assert.deepEqual(capturedBuildInput?.fileFieldSelection, { pteApplicants: ['avatarUrl'] });
   } finally {
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
     systemSettingsPackageBuilderService.preflightBuild = originalPreflight;
@@ -178,8 +198,10 @@ test('package builder EJS compiles and includes expected controls', () => {
   assert.match(html, /Target Version/);
   assert.match(html, /Origin Org/);
   assert.match(html, /Package-Owned Tables \/ Collections/);
+  assert.match(html, /File Fields By Table/);
   assert.match(html, /Select All/);
   assert.match(html, /Manual File\/Folder Refs/);
+  assert.match(html, /Published Artifacts/);
   assert.match(html, /Package Storage Root/);
   assert.match(html, /Unavailable: Missing\/Invalid Manifest/);
 });

@@ -208,6 +208,41 @@ test('install ZIP package controller returns clear message when trusted key is m
   }
 });
 
+test('install package controller returns structured payload import failure details', async () => {
+  const originalInstall = systemSettingsPackageManagerService.installPackage;
+  const res = makeRenderResponse();
+
+  try {
+    systemSettingsPackageManagerService.installPackage = async () => {
+      const error = new Error('Builder payload import failed for pteApplicants#A1');
+      error.code = 'BUILDER_PAYLOAD_IMPORT_FAILED';
+      error.details = {
+        entityType: 'pteApplicants',
+        rowId: 'A1',
+        operation: 'update',
+        message: 'duplicate key conflict'
+      };
+      throw error;
+    };
+
+    await systemSettingsController.installPackageFromManager(
+      {
+        body: { installMethod: 'path', manifestPath: 'packages/pte/package.manifest.json' },
+        user: { id: 'USER_IMPORT_FAIL_1' },
+        app: {}
+      },
+      res
+    );
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.jsonPayload?.status, 'error');
+    assert.equal(res.jsonPayload?.code, 'BUILDER_PAYLOAD_IMPORT_FAILED');
+    assert.equal(res.jsonPayload?.details?.entityType, 'pteApplicants');
+  } finally {
+    systemSettingsPackageManagerService.installPackage = originalInstall;
+  }
+});
+
 test('remove package controller forwards force options and preview token', async () => {
   const originalRemove = systemSettingsPackageManagerService.removePackage;
   const res = makeRenderResponse();

@@ -9,6 +9,7 @@ const dataService = require('./dataService');
 const packageRegistryService = require('./packageRegistryService');
 const packageManifestService = require('./packageManifestService');
 const packageDataOwnershipService = require('./packageDataOwnershipService');
+const coreFilesService = require('./coreFilesService');
 const { getMongoCollection, getMongoDbOrNull } = require('../infrastructure/mongo/mongoConnection');
 const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 const uploadPathUtils = require('../utils/uploadPathUtils');
@@ -29,6 +30,8 @@ const REMAP_ORG_FIELDS = new Set([
 ]);
 const ORG_TOKEN_EXACT_REGEX = /^ORG_[A-Za-z0-9_-]+$/i;
 const ORG_UPLOAD_SEGMENT_REGEX = /\/uploads\/(ORG_[^/]+)/ig;
+const UPLOAD_URL_MATCH_REGEX = /\/uploads\/[^"'` ]+/ig;
+const FILE_FIELD_HINT_REGEX = /(file|url|path|image|audio|video|document|attachment|logo|avatar|icon|pdf|media|thumbnail|banner|cover)/i;
 
 function cleanText(value, max = 4000) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -134,6 +137,158 @@ function parseManualFileRefs(input = []) {
   return Array.from(new Set(rows));
 }
 
+function normalizeFieldPathToken(value = '') {
+  const token = cleanText(value, 500);
+  if (!token) return '';
+  return token
+    .replace(/\[\d+\]/g, '[]')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^\.+/, '')
+    .replace(/\.+$/, '')
+    .replace(/^\[\]\.?/, '[]');
+}
+
+function formatFieldPath(parts = []) {
+  let pathToken = '';
+  sanitizeArray(parts).forEach((partRaw) => {
+    const part = cleanText(partRaw, 200);
+    if (!part) return;
+    if (part === '[]') {
+      pathToken += '[]';
+      return;
+    }
+    pathToken = pathToken ? `${pathToken}.${part}` : part;
+  });
+  return normalizeFieldPathToken(pathToken);
+}
+
+function listUploadRefsInText(value = '') {
+  const token = cleanText(value, 4000);
+  if (!token) return [];
+  const matches = token.match(UPLOAD_URL_MATCH_REGEX) || [];
+  return Array.from(new Set(matches.map((row) => cleanText(row, 2000)).filter(Boolean)));
+}
+
+function extractOrgTokensFromUploadRef(uploadRef = '') {
+  const ref = cleanText(uploadRef, 2000);
+  if (!ref) return [];
+  const rows = [];
+  const regex = /\/uploads\/(ORG_[^/]+)/ig;
+  let match = regex.exec(ref);
+  while (match) {
+    const normalized = normalizeOrgToken(match[1]);
+    if (normalized) rows.push(normalized);
+    match = regex.exec(ref);
+  }
+  return Array.from(new Set(rows));
+}
+
+function collectStringLeafRows(node, pathParts = [], out = []) {
+  if (typeof node === 'string') {
+    const value = cleanText(node, 4000);
+    if (!value) return out;
+    out.push({
+      fieldPath: formatFieldPath(pathParts),
+      value
+    });
+    return out;
+  }
+  if (Array.isArray(node)) {
+    node.forEach((item) => collectStringLeafRows(item, [...pathParts, '[]'], out));
+    return out;
+  }
+  if (node && typeof node === 'object') {
+    Object.entries(node).forEach(([key, value]) => {
+      collectStringLeafRows(value, [...pathParts, cleanText(key, 160)], out);
+    });
+  }
+  return out;
+}
+
+function collectFileFieldCandidates(rows = []) {
+  const fromHint = new Set();
+  const fromUpload = new Set();
+  sanitizeArray(rows).forEach((row) => {
+    const leafRows = collectStringLeafRows(row, [], []);
+    leafRows.forEach((leaf) => {
+      const fieldPath = normalizeFieldPathToken(leaf?.fieldPath || '');
+      if (!fieldPath) return;
+      if (FILE_FIELD_HINT_REGEX.test(fieldPath)) fromHint.add(fieldPath);
+      if (listUploadRefsInText(leaf.value).length) fromUpload.add(fieldPath);
+    });
+  });
+  return Array.from(new Set([
+    ...Array.from(fromUpload),
+    ...Array.from(fromHint)
+  ]));
+}
+
+function normalizeFileFieldSelection(input = {}) {
+  const out = {};
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return out;
+  Object.entries(input).forEach(([entityTypeRaw, value]) => {
+    const entityType = cleanText(entityTypeRaw, 200);
+    if (!entityType) return;
+    const source = Array.isArray(value)
+      ? value
+      : String(value || '').split(/\r?\n|,/);
+    const fields = Array.from(new Set(
+      source
+        .map((row) => normalizeFieldPathToken(row))
+        .filter(Boolean)
+    ));
+    out[entityType] = fields;
+  });
+  return out;
+}
+
+function resolveSelectedFileFields(entityType = '', requestedSelection = {}, candidates = []) {
+  const entity = cleanText(entityType, 200);
+  if (!entity) return [];
+  const requested = sanitizeArray(requestedSelection[entity]).map((row) => normalizeFieldPathToken(row)).filter(Boolean);
+  const uniqueCandidates = Array.from(new Set(sanitizeArray(candidates).map((row) => normalizeFieldPathToken(row)).filter(Boolean)));
+  if (requested.length) {
+    return Array.from(new Set(requested));
+  }
+  return uniqueCandidates;
+}
+
+function deriveRowId(row = {}, index = 0) {
+  const id = cleanText(row?.id || row?._id || '', 200);
+  if (id) return id;
+  return `ROW_${index + 1}`;
+}
+
+function collectUploadRefProvenanceFromRow(row = {}, options = {}) {
+  const entityType = cleanText(options.entityType, 200);
+  const rowIndex = Number.isFinite(Number(options.rowIndex)) ? Number(options.rowIndex) : 0;
+  const rowId = cleanText(options.rowId, 200) || deriveRowId(row, rowIndex);
+  const selectedFields = new Set(
+    sanitizeArray(options.selectedFields)
+      .map((item) => normalizeFieldPathToken(item))
+      .filter(Boolean)
+  );
+  const leafRows = collectStringLeafRows(row, [], []);
+  const rows = [];
+  leafRows.forEach((leaf) => {
+    const fieldPath = normalizeFieldPathToken(leaf?.fieldPath || '');
+    if (!fieldPath) return;
+    if (selectedFields.size && !selectedFields.has(fieldPath)) return;
+    const refs = listUploadRefsInText(leaf.value);
+    refs.forEach((ref) => {
+      rows.push({
+        entityType,
+        rowId,
+        rowIndex,
+        fieldPath,
+        ref,
+        detectedOrgTokens: extractOrgTokensFromUploadRef(ref)
+      });
+    });
+  });
+  return rows;
+}
+
 function normalizeOrgToken(raw = '') {
   const token = cleanText(raw, 160);
   if (!token) return '';
@@ -189,14 +344,14 @@ function evaluateRowOriginScope(row = {}, originOrgId = '') {
   const normalizedOriginOrgId = normalizeOrgToken(originOrgId);
   const collected = collectOrgTokensFromNode(row, { field: new Set(), token: new Set(), upload: new Set() });
   const businessTokens = new Set([...Array.from(collected.field), ...Array.from(collected.token)]);
-  const uploadTokens = Array.from(collected.upload);
-  const orgTokens = Array.from(new Set([...Array.from(businessTokens), ...uploadTokens]));
-  const hasBusinessOrgMarkers = businessTokens.size > 0;
-  const includesUnscoped = !hasBusinessOrgMarkers;
   const businessTokenList = Array.from(businessTokens);
-  const hasOrigin = normalizedOriginOrgId ? businessTokenList.includes(normalizedOriginOrgId) : false;
+  const uploadTokens = Array.from(collected.upload);
+  const orgTokens = Array.from(new Set([...businessTokenList, ...uploadTokens]));
+  const hasScopedMarkers = orgTokens.length > 0;
+  const includesUnscoped = !hasScopedMarkers;
+  const hasOrigin = normalizedOriginOrgId ? orgTokens.includes(normalizedOriginOrgId) : false;
   const hasOther = normalizedOriginOrgId
-    ? businessTokenList.some((token) => token !== normalizedOriginOrgId)
+    ? orgTokens.some((token) => token !== normalizedOriginOrgId)
     : false;
 
   const include = includesUnscoped || (hasOrigin && !hasOther);
@@ -205,7 +360,9 @@ function evaluateRowOriginScope(row = {}, originOrgId = '') {
     includesUnscoped,
     hasOrigin,
     hasOther,
-    orgTokens
+    orgTokens,
+    businessTokens: businessTokenList,
+    uploadTokens
   };
 }
 
@@ -260,11 +417,7 @@ function loadSigningPrivateKey(projectRoot = process.cwd()) {
 
 function extractUploadUrls(node, intoSet) {
   if (typeof node === 'string') {
-    const token = cleanText(node, 4000);
-    if (/\/uploads\/[^"'` ]+/i.test(token)) {
-      const match = token.match(/\/uploads\/[^"'` ]+/ig) || [];
-      match.forEach((item) => intoSet.add(item));
-    }
+    listUploadRefsInText(node).forEach((item) => intoSet.add(item));
     return;
   }
   if (Array.isArray(node)) {
@@ -373,6 +526,7 @@ function createDependencies(overrides = {}) {
     packageRegistryService: overrides.packageRegistryService || packageRegistryService,
     packageManifestService: overrides.packageManifestService || packageManifestService,
     packageDataOwnershipService: overrides.packageDataOwnershipService || packageDataOwnershipService,
+    coreFilesService: overrides.coreFilesService || coreFilesService,
     getMongoCollection: overrides.getMongoCollection || getMongoCollection,
     getMongoDbOrNull: overrides.getMongoDbOrNull || getMongoDbOrNull
   };
@@ -755,24 +909,51 @@ function createService(overrides = {}) {
 
   function filterRowsByOriginScope(rows = [], originOrgId = '') {
     const includedRows = [];
+    const rejectedRows = [];
+    const evaluatedRows = [];
     const summary = {
       inspectedRows: 0,
       includedRows: 0,
       excludedOtherOrgRows: 0,
       includedUnscopedRows: 0
     };
-    sanitizeArray(rows).forEach((row) => {
+    sanitizeArray(rows).forEach((row, index) => {
       summary.inspectedRows += 1;
       const scope = evaluateRowOriginScope(row, originOrgId);
+      const rowId = deriveRowId(row, index);
+      const reason = scope.include
+        ? (scope.includesUnscoped ? 'included_unscoped' : 'included_origin_scope')
+        : 'excluded_cross_org_scope';
+      const evaluated = {
+        row,
+        rowId,
+        rowIndex: index,
+        scope,
+        reason
+      };
+      evaluatedRows.push(evaluated);
       if (scope.include) {
         includedRows.push(row);
         summary.includedRows += 1;
         if (scope.includesUnscoped) summary.includedUnscopedRows += 1;
       } else {
         summary.excludedOtherOrgRows += 1;
+        rejectedRows.push({
+          rowId,
+          rowIndex: index,
+          reason,
+          orgTokens: scope.orgTokens,
+          businessTokens: scope.businessTokens,
+          uploadTokens: scope.uploadTokens
+        });
       }
     });
-    return { rows: includedRows, summary };
+    return {
+      rows: includedRows,
+      summary,
+      rejectedRows,
+      evaluatedRows
+    };
   }
 
   async function preflightBuild(input = {}, options = {}) {
@@ -790,11 +971,19 @@ function createService(overrides = {}) {
         .map((item) => cleanText(item, 200))
         .filter(Boolean)
     );
+    const requestedFileFieldSelection = normalizeFileFieldSelection(input.fileFieldSelection || {});
     const detectedUploadUrls = new Set();
     const detectedSymbolUploadUrls = new Set(extractSymbolUploadRefs(packageRow.manifest));
+    const fileProvenance = [];
     const entityCatalog = [];
     const warnings = [];
     let selectedRowCount = 0;
+    const scopeViolations = {
+      blocking: false,
+      rows: [],
+      files: [],
+      manualRefs: []
+    };
     const originScopeSummary = {
       inspectedRows: 0,
       includedRows: 0,
@@ -816,11 +1005,19 @@ function createService(overrides = {}) {
         const rowsRaw = await fetchEntityRows(entity.entityType, { backendMode });
         const scoped = filterRowsByOriginScope(rowsRaw, originOrgId);
         const rows = scoped.rows;
+        const fileFieldCandidates = collectFileFieldCandidates(rowsRaw);
+        const selectedFields = resolveSelectedFileFields(
+          entity.entityType,
+          requestedFileFieldSelection,
+          fileFieldCandidates
+        );
+        const selectedFieldSet = new Set(selectedFields);
         originScopeSummary.inspectedRows += scoped.summary.inspectedRows;
         originScopeSummary.includedRows += scoped.summary.includedRows;
         originScopeSummary.excludedOtherOrgRows += scoped.summary.excludedOtherOrgRows;
         originScopeSummary.includedUnscopedRows += scoped.summary.includedUnscopedRows;
         const entityUploads = new Set();
+        const entityFileProvenance = [];
         const remapEntityState = { rewrittenFieldCount: 0, rewrittenUrlCount: 0, rewrittenExactTokenCount: 0, pathHits: [] };
         rows.forEach((row) => {
           extractUploadUrls(row, entityUploads);
@@ -828,7 +1025,65 @@ function createService(overrides = {}) {
         });
         if (isSelected) {
           selectedRowCount += rows.length;
-          entityUploads.forEach((url) => detectedUploadUrls.add(url));
+          sanitizeArray(scoped.evaluatedRows).forEach((rowMeta) => {
+            const rowRefs = collectUploadRefProvenanceFromRow(rowMeta?.row, {
+              entityType: entity.entityType,
+              rowId: rowMeta?.rowId,
+              rowIndex: rowMeta?.rowIndex,
+              selectedFields: Array.from(selectedFieldSet)
+            });
+            rowRefs.forEach((rowRef) => {
+              const detectedTokens = sanitizeArray(rowRef.detectedOrgTokens)
+                .map((token) => normalizeOrgToken(token))
+                .filter(Boolean);
+              const hasOtherDetectedOrg = detectedTokens.some((token) => token !== originOrgId);
+              const hasOriginBusinessToken = sanitizeArray(rowMeta?.scope?.businessTokens).includes(originOrgId);
+              const mixedOriginFileRef = hasOriginBusinessToken && hasOtherDetectedOrg;
+
+              if (mixedOriginFileRef) {
+                scopeViolations.files.push({
+                  entityType: entity.entityType,
+                  rowId: rowMeta?.rowId,
+                  rowIndex: Number(rowMeta?.rowIndex || 0),
+                  fieldPath: rowRef.fieldPath,
+                  ref: rowRef.ref,
+                  detectedOrgTokens: detectedTokens,
+                  reason: 'Cross-org upload reference detected in origin-scoped row.'
+                });
+              }
+
+              if (rowMeta?.scope?.include) {
+                const provenanceRow = {
+                  entityType: entity.entityType,
+                  rowId: rowMeta?.rowId,
+                  rowIndex: Number(rowMeta?.rowIndex || 0),
+                  fieldPath: rowRef.fieldPath,
+                  ref: rowRef.ref,
+                  detectedOrgTokens: detectedTokens,
+                  rowOrgTokens: sanitizeArray(rowMeta?.scope?.orgTokens),
+                  include: true
+                };
+                entityFileProvenance.push(provenanceRow);
+                fileProvenance.push(provenanceRow);
+                if (!mixedOriginFileRef) {
+                  detectedUploadUrls.add(rowRef.ref);
+                }
+              }
+            });
+          });
+
+          sanitizeArray(scoped.rejectedRows).forEach((row) => {
+            scopeViolations.rows.push({
+              entityType: entity.entityType,
+              rowId: row.rowId,
+              rowIndex: Number(row.rowIndex || 0),
+              reason: row.reason,
+              orgTokens: sanitizeArray(row.orgTokens),
+              businessTokens: sanitizeArray(row.businessTokens),
+              uploadTokens: sanitizeArray(row.uploadTokens)
+            });
+          });
+
           remapImpactPreview.rewrittenOrgFields += remapEntityState.rewrittenFieldCount;
           remapImpactPreview.rewrittenUploadUrls += remapEntityState.rewrittenUrlCount;
           remapImpactPreview.rewrittenExactOrgTokens += remapEntityState.rewrittenExactTokenCount;
@@ -842,6 +1097,10 @@ function createService(overrides = {}) {
             uploadUrlCount: remapEntityState.rewrittenUrlCount,
             exactOrgTokenCount: remapEntityState.rewrittenExactTokenCount
           },
+          fileFieldCandidates,
+          fileFieldSelected: selectedFields,
+          rejectedRows: sanitizeArray(scoped.rejectedRows),
+          fileProvenanceCount: entityFileProvenance.length,
           originScope: scoped.summary,
           selected: isSelected
         });
@@ -856,6 +1115,10 @@ function createService(overrides = {}) {
             uploadUrlCount: 0,
             exactOrgTokenCount: 0
           },
+          fileFieldCandidates: [],
+          fileFieldSelected: [],
+          rejectedRows: [],
+          fileProvenanceCount: 0,
           originScope: {
             inspectedRows: 0,
             includedRows: 0,
@@ -871,6 +1134,29 @@ function createService(overrides = {}) {
     const selectedDataEntities = entityCatalog.filter((row) => row.selected);
 
     const manualFileRefs = parseManualFileRefs(input.selectedFileRefs || []);
+    manualFileRefs.forEach((ref) => {
+      const detectedOrgTokens = extractOrgTokensFromUploadRef(ref);
+      if (detectedOrgTokens.length && detectedOrgTokens.some((token) => token !== originOrgId)) {
+        scopeViolations.manualRefs.push({
+          ref,
+          detectedOrgTokens,
+          reason: 'Manual file reference points to a different organization scope.'
+        });
+      }
+    });
+
+    const fileFieldSelection = {};
+    selectedDataEntities.forEach((row) => {
+      const entityType = cleanText(row?.entityType, 200);
+      if (!entityType) return;
+      fileFieldSelection[entityType] = sanitizeArray(row.fileFieldSelected);
+    });
+
+    scopeViolations.blocking = scopeViolations.files.length > 0 || scopeViolations.manualRefs.length > 0;
+    if (scopeViolations.blocking) {
+      warnings.push('Blocking origin-scope violations were detected. Resolve scope violations before running build.');
+    }
+
     const combinedFileRefs = Array.from(new Set([
       ...Array.from(detectedUploadUrls),
       ...Array.from(detectedSymbolUploadUrls),
@@ -884,7 +1170,8 @@ function createService(overrides = {}) {
           ? (detectedSymbolUploadUrls.has(item) ? 'symbol-upload-url' : 'upload-url')
           : 'manual',
         uploadRelativePath: uploadRelative || '',
-        exists: uploadRelative ? fs.existsSync(uploadPathUtils.fromUploadsUrlToDiskPath(item) || '') : true
+        exists: uploadRelative ? fs.existsSync(uploadPathUtils.fromUploadsUrlToDiskPath(item) || '') : true,
+        detectedOrgTokens: extractOrgTokensFromUploadRef(item)
       };
     });
 
@@ -904,9 +1191,12 @@ function createService(overrides = {}) {
       selectedDataEntities,
       selectedRowCount,
       remapImpactPreview,
+      scopeValidation: scopeViolations,
+      fileFieldSelection,
       filePlan: {
         detectedFromData: Array.from(detectedUploadUrls),
         detectedFromSymbols: Array.from(detectedSymbolUploadUrls),
+        provenance: fileProvenance,
         manualRefs: manualFileRefs,
         normalizedRefs: normalizedFileRefs
       },
@@ -970,6 +1260,80 @@ function createService(overrides = {}) {
     return { copied, warnings };
   }
 
+  async function hashFileSha256(filePath = '') {
+    const buffer = await deps.fs.readFile(filePath);
+    return deps.crypto.createHash('sha256').update(buffer).digest('hex');
+  }
+
+  async function publishBuildArtifacts(options = {}) {
+    const packageId = normalizePackageId(options.packageId);
+    const buildId = cleanText(options.buildId, 200);
+    if (!packageId || !buildId) return null;
+    const globalRoot = deps.coreFilesService.getRootPath('GLOBAL');
+    const packagesRoot = deps.coreFilesService.resolveSafePath(globalRoot, 'packages');
+    deps.coreFilesService.ensureDir(packagesRoot);
+    const packageRoot = deps.coreFilesService.resolveSafePath(packagesRoot, packageId);
+    deps.coreFilesService.ensureDir(packageRoot);
+    const buildRoot = deps.coreFilesService.resolveSafePath(packageRoot, buildId);
+    deps.coreFilesService.ensureDir(buildRoot);
+
+    const publishRows = [];
+    const publishFile = async (sourcePath = '', targetName = '') => {
+      const source = cleanText(sourcePath, 2000);
+      const fileName = cleanText(targetName, 260);
+      if (!source || !fileName) return;
+      const destinationPath = deps.path.join(buildRoot, fileName);
+      await copyFileSafe(source, destinationPath);
+      const stat = await deps.fs.stat(destinationPath);
+      publishRows.push({
+        fileName,
+        absolutePath: destinationPath,
+        uploadsUrl: deps.coreFilesService.fromDiskPathToUploadsUrl(destinationPath) || '',
+        size: Number(stat?.size || 0),
+        sha256: await hashFileSha256(destinationPath)
+      });
+    };
+
+    await publishFile(options?.zipPath, 'package.zip');
+    await publishFile(options?.sigPath, 'package.sig');
+    if (cleanText(options?.publicPath, 2000)) {
+      await publishFile(options.publicPath, 'package.public.pem');
+    }
+
+    const details = {
+      buildId,
+      packageId,
+      packageName: cleanText(options.packageName, 200),
+      version: cleanText(options.version, 120),
+      originOrgId: cleanText(options.originOrgId, 160),
+      createdAt: new Date().toISOString(),
+      summary: sanitizeObject(options.summary),
+      files: publishRows.map((row) => ({
+        fileName: row.fileName,
+        uploadsUrl: row.uploadsUrl,
+        size: row.size,
+        sha256: row.sha256
+      })),
+      fileFieldSelection: sanitizeObject(options.fileFieldSelection)
+    };
+    const detailPath = deps.path.join(buildRoot, 'build-detail.json');
+    await deps.fs.writeFile(detailPath, JSON.stringify(details, null, 2));
+    const detailStat = await deps.fs.stat(detailPath);
+    publishRows.push({
+      fileName: 'build-detail.json',
+      absolutePath: detailPath,
+      uploadsUrl: deps.coreFilesService.fromDiskPathToUploadsUrl(detailPath) || '',
+      size: Number(detailStat?.size || 0),
+      sha256: await hashFileSha256(detailPath)
+    });
+
+    return {
+      rootAbsolutePath: buildRoot,
+      rootUploadsUrl: deps.coreFilesService.fromDiskPathToUploadsUrl(buildRoot) || '',
+      files: publishRows
+    };
+  }
+
   async function buildPackage(input = {}, options = {}) {
     const packageId = normalizePackageId(input.packageId);
     if (!packageId) throw new Error('packageId is required.');
@@ -980,8 +1344,15 @@ function createService(overrides = {}) {
       throw new Error(`Requested version "${requestedVersion}" must be >= package current version "${packageRow.version}".`);
     }
     const preflight = await preflightBuild(input, { ...options, backendMode });
+    if (preflight?.scopeValidation?.blocking) {
+      const error = new Error('Blocking origin-scope violations were detected in selected rows/files. Resolve violations and rerun build.');
+      error.code = 'ORIGIN_SCOPE_VIOLATION';
+      error.details = sanitizeObject(preflight.scopeValidation);
+      throw error;
+    }
     const selectedEntityRows = sanitizeArray(preflight.selectedDataEntities);
     const originOrgId = cleanText(preflight.originOrgId, 160);
+    const fileFieldSelection = sanitizeObject(preflight.fileFieldSelection);
     const tablePayload = {};
     const remapState = { rewrittenUrlCount: 0, rewrittenFieldCount: 0, rewrittenExactTokenCount: 0 };
     const originScopeSummary = {
@@ -1016,6 +1387,7 @@ function createService(overrides = {}) {
     const payloadTablesDir = deps.path.join(payloadDir, 'tables');
     let copiedFileReport = { copied: [], warnings: [] };
     let artifactPaths = null;
+    let publishedArtifacts = null;
 
     try {
       await copyDirectorySafe(packageRow.packageDir, stagedPackageDir);
@@ -1063,6 +1435,7 @@ function createService(overrides = {}) {
           label: row?.label,
           rowCount: Number(row?.rowCount || 0)
         })),
+        fileFieldSelection,
         tables: tableIndex,
         artifactsRoot: 'artifacts',
         fileRefs,
@@ -1096,6 +1469,25 @@ function createService(overrides = {}) {
       await deps.fs.writeFile(sigPath, signatureBuffer);
       await deps.fs.writeFile(publicPath, publicPem);
       artifactPaths = { zipPath, sigPath, publicPath, signingSource: signing.source };
+      publishedArtifacts = await publishBuildArtifacts({
+        packageId,
+        packageName: packageRow.packageName,
+        version: requestedVersion,
+        buildId: payload.buildId,
+        originOrgId,
+        zipPath,
+        sigPath,
+        publicPath,
+        fileFieldSelection,
+        summary: {
+          backendMode,
+          originScopeSummary,
+          selectedDataEntities: payload.selectedDataEntities,
+          tableCount: tableIndex.length,
+          rowCount: Object.values(tablePayload).reduce((sum, rows) => sum + sanitizeArray(rows).length, 0),
+          copiedFileCount: copiedFileReport.copied.length
+        }
+      });
 
       return {
         status: 'success',
@@ -1112,6 +1504,7 @@ function createService(overrides = {}) {
           selectedRefCount: fileRefs.length,
           copiedCount: copiedFileReport.copied.length
         },
+        fileFieldSelection,
         remapSummary: payload.remapSummary,
         orgRemapRequired: payload.orgRemapRequired,
         artifacts: {
@@ -1119,6 +1512,10 @@ function createService(overrides = {}) {
           signature: artifactPaths.sigPath,
           publicKeyPem: artifactPaths.publicPath
         },
+        publishedArtifacts,
+        downloadLinks: sanitizeArray(publishedArtifacts?.files)
+          .map((row) => row.uploadsUrl)
+          .filter(Boolean),
         warnings: copiedFileReport.warnings
       };
     } finally {
@@ -1222,11 +1619,13 @@ function createService(overrides = {}) {
       ));
       for (const row of rows) {
         const rowId = cleanText(row?.id, 200);
+        let operation = 'insert';
         try {
           if (rowId) {
             // eslint-disable-next-line no-await-in-loop
             const existing = await deps.dataService.getDataById(entityType, rowId, SYSTEM_CONTEXT, { backendMode });
             if (existing) {
+              operation = 'update';
               // eslint-disable-next-line no-await-in-loop
               await deps.dataService.updateData(entityType, rowId, row, SYSTEM_CONTEXT, { backendMode });
               upserted += 1;
@@ -1237,7 +1636,18 @@ function createService(overrides = {}) {
           await deps.dataService.addData(entityType, row, SYSTEM_CONTEXT, { backendMode });
           upserted += 1;
         } catch (error) {
-          warnings.push(`Failed to import ${entityType}${rowId ? `#${rowId}` : ''}: ${cleanText(error?.message || String(error), 300)}`);
+          const message = cleanText(error?.message || String(error), 500) || 'Unknown payload import error.';
+          const importError = new Error(`Builder payload import failed for ${entityType}${rowId ? `#${rowId}` : ''}: ${message}`);
+          importError.code = 'BUILDER_PAYLOAD_IMPORT_FAILED';
+          importError.details = {
+            entityType,
+            rowId: rowId || '',
+            operation,
+            targetOrgId: targetOrgId || '',
+            backendMode,
+            message
+          };
+          throw importError;
         }
       }
     }

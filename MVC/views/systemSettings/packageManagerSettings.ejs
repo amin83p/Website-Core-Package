@@ -333,6 +333,8 @@
       if (response.status === 403 && payload.status === 'admin_required') {
         error.code = 'ADMIN_REQUIRED';
       }
+      if (payload?.code) error.code = payload.code;
+      error.payload = payload;
       throw error;
     }
     return payload;
@@ -580,7 +582,12 @@
       await showSuccess(result.message || 'Package operation completed.');
       window.location.reload();
     } catch (error) {
-      setOutput('Install Failed', { status: 'error', message: error.message || 'Unknown error' });
+      setOutput('Install Failed', {
+        status: 'error',
+        message: error.message || 'Unknown error',
+        code: error?.code || '',
+        details: error?.payload?.details || null
+      });
       await showError(error.message || 'Package install failed.');
     } finally {
       installBtn.disabled = false;
@@ -608,7 +615,13 @@
       if (action === 'preview-remove') return;
       window.location.reload();
     } catch (error) {
-      setOutput('Action Failed', { action, packageId, message: error.message || 'Unknown error' });
+      setOutput('Action Failed', {
+        action,
+        packageId,
+        message: error.message || 'Unknown error',
+        code: error?.code || '',
+        details: error?.payload?.details || null
+      });
       await showError(error.message || 'Package action failed.');
     } finally {
       btn.disabled = false;

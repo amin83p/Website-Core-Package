@@ -80,6 +80,17 @@
             <div class="small text-muted">Select a package to load entity list.</div>
           </div>
           <div class="small text-muted mt-1">Select origin org first, then tables are discovered and scoped to that org (unscoped rows are included).</div>
+          <div class="d-flex align-items-center justify-content-between mt-3 mb-2">
+            <label class="form-label small fw-bold mb-0">File Fields By Table</label>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllFileFieldsBtn">Select All</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearFileFieldsBtn">Clear</button>
+            </div>
+          </div>
+          <div class="border rounded p-2" style="max-height: 220px; overflow:auto;" id="builderFileFieldList">
+            <div class="small text-muted">File field candidates load after entity preflight.</div>
+          </div>
+          <div class="small text-muted mt-1">Only selected fields are scanned for upload refs during preflight/build.</div>
         </div>
         <div class="col-lg-6">
           <label class="form-label small fw-bold">Manual File/Folder Refs (one per line)</label>
@@ -120,6 +131,10 @@
     </div>
     <div class="card-body">
       <pre id="builderOutput" class="small bg-dark text-success p-3 rounded mb-0" style="max-height: 360px; overflow:auto;">Ready.</pre>
+      <div id="builderArtifactLinks" class="mt-3 d-none">
+        <div class="small fw-semibold mb-1">Published Artifacts</div>
+        <div id="builderArtifactLinksList" class="d-flex flex-wrap gap-2"></div>
+      </div>
     </div>
   </div>
 
@@ -133,8 +148,11 @@
   const versionEl = document.getElementById('builderVersion');
   const originOrgEl = document.getElementById('builderOriginOrgId');
   const entityListEl = document.getElementById('builderEntityList');
+  const fileFieldListEl = document.getElementById('builderFileFieldList');
   const fileRefsEl = document.getElementById('builderSelectedFileRefs');
   const outputEl = document.getElementById('builderOutput');
+  const artifactLinksWrapEl = document.getElementById('builderArtifactLinks');
+  const artifactLinksListEl = document.getElementById('builderArtifactLinksList');
   let entityCatalog = [];
 
   function setOutput(title, payload) {
@@ -149,6 +167,7 @@
     if (!response.ok || payload.status === 'error') {
       const message = payload.message || `Request failed (${response.status}).`;
       const error = new Error(message);
+      if (payload?.code) error.code = payload.code;
       error.payload = payload;
       throw error;
     }
@@ -202,6 +221,98 @@
     }).join('');
   }
 
+  function renderFileFieldList(rows = []) {
+    if (!fileFieldListEl) return;
+    const catalog = Array.isArray(rows) ? rows : [];
+    const selectedRows = catalog.filter((row) => row?.selected !== false);
+    if (!selectedRows.length) {
+      fileFieldListEl.innerHTML = '<div class="small text-muted">No selected tables available for file-field scan.</div>';
+      return;
+    }
+    const cards = selectedRows.map((row) => {
+      const entityType = String(row?.entityType || row?.id || '').trim();
+      const candidates = Array.isArray(row?.fileFieldCandidates) ? row.fileFieldCandidates : [];
+      const selected = Array.isArray(row?.fileFieldSelected) && row.fileFieldSelected.length
+        ? row.fileFieldSelected
+        : candidates;
+      if (!candidates.length) {
+        return `
+          <div class="border rounded p-2 mb-2">
+            <div class="small fw-semibold">${entityType}</div>
+            <div class="small text-muted">No candidate file fields detected.</div>
+          </div>
+        `;
+      }
+      const selectedSet = new Set(selected.map((token) => String(token || '').trim()).filter(Boolean));
+      return `
+        <div class="border rounded p-2 mb-2">
+          <div class="small fw-semibold mb-1">${entityType}</div>
+          <div class="d-flex flex-column gap-1">
+            ${candidates.map((fieldPath) => {
+              const safeField = String(fieldPath || '').trim();
+              if (!safeField) return '';
+              return `
+                <label class="small d-flex align-items-center gap-2">
+                  <input
+                    type="checkbox"
+                    class="form-check-input builder-file-field-checkbox"
+                    data-entity-type="${entityType.replace(/"/g, '&quot;')}"
+                    value="${safeField.replace(/"/g, '&quot;')}"
+                    ${selectedSet.has(safeField) ? 'checked' : ''}>
+                  <code>${safeField}</code>
+                </label>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    });
+    fileFieldListEl.innerHTML = cards.join('');
+  }
+
+  function setAllFileFieldsChecked(checked) {
+    document.querySelectorAll('.builder-file-field-checkbox').forEach((node) => {
+      node.checked = checked;
+    });
+  }
+
+  function getFileFieldSelection() {
+    const map = {};
+    document.querySelectorAll('.builder-file-field-checkbox:checked').forEach((node) => {
+      const entityType = String(node.getAttribute('data-entity-type') || '').trim();
+      const fieldPath = String(node.value || '').trim();
+      if (!entityType || !fieldPath) return;
+      if (!Array.isArray(map[entityType])) map[entityType] = [];
+      if (!map[entityType].includes(fieldPath)) map[entityType].push(fieldPath);
+    });
+    return map;
+  }
+
+  function clearArtifactLinks() {
+    if (!artifactLinksWrapEl || !artifactLinksListEl) return;
+    artifactLinksListEl.innerHTML = '';
+    artifactLinksWrapEl.classList.add('d-none');
+  }
+
+  function renderArtifactLinks(report = {}) {
+    if (!artifactLinksWrapEl || !artifactLinksListEl) return;
+    const rows = Array.isArray(report?.publishedArtifacts?.files) ? report.publishedArtifacts.files : [];
+    const links = rows
+      .map((row) => ({
+        fileName: String(row?.fileName || '').trim(),
+        url: String(row?.uploadsUrl || '').trim()
+      }))
+      .filter((row) => row.fileName && row.url);
+    if (!links.length) {
+      clearArtifactLinks();
+      return;
+    }
+    artifactLinksListEl.innerHTML = links.map((row) => (
+      `<a class="btn btn-outline-primary btn-sm" href="${row.url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener">${row.fileName}</a>`
+    )).join('');
+    artifactLinksWrapEl.classList.remove('d-none');
+  }
+
   async function runWithWaiting(label, action) {
     if (typeof showLoading === 'function') {
       showLoading({
@@ -219,6 +330,12 @@
 
   function showError(error) {
     const message = error?.message || 'Operation failed.';
+    setOutput('Operation Failed', {
+      status: 'error',
+      message,
+      code: error?.code || '',
+      details: error?.payload?.details || null
+    });
     if (typeof showMessageModal === 'function') {
       showMessageModal({
         title: 'Operation Failed',
@@ -265,19 +382,25 @@
         originOrgId,
         actionStateId,
         selectedDataEntities,
-        selectedFileRefs: parseLines(fileRefsEl?.value || '')
+        selectedFileRefs: parseLines(fileRefsEl?.value || ''),
+        fileFieldSelection: getFileFieldSelection()
       })
     }));
     if (Array.isArray(payload?.report?.entityCatalog)) {
       renderEntityList(payload.report.entityCatalog);
+      renderFileFieldList(payload.report.entityCatalog);
     }
+    clearArtifactLinks();
     setOutput('Preflight Result', payload);
     if (typeof showMessageModal === 'function') {
+      const blocking = payload?.report?.scopeValidation?.blocking === true;
       showMessageModal({
-        title: 'Preflight Complete',
-        message: payload.message || 'Preflight completed successfully.',
-        icon: 'success',
-        buttons: [{ text: 'OK', class: 'btn-success' }]
+        title: blocking ? 'Preflight Blocked' : 'Preflight Complete',
+        message: blocking
+          ? 'Blocking scope violations were found. Review Builder Output and fix violations before build.'
+          : (payload.message || 'Preflight completed successfully.'),
+        icon: blocking ? 'warning' : 'success',
+        buttons: [{ text: 'OK', class: blocking ? 'btn-warning' : 'btn-success' }]
       });
     }
   }
@@ -316,10 +439,12 @@
         originOrgId,
         actionStateId,
         selectedDataEntities,
-        selectedFileRefs: parseLines(fileRefsEl?.value || '')
+        selectedFileRefs: parseLines(fileRefsEl?.value || ''),
+        fileFieldSelection: getFileFieldSelection()
       })
     }));
     setOutput('Build Result', payload);
+    renderArtifactLinks(payload?.report || {});
     if (typeof showMessageModal === 'function') {
       showMessageModal({
         title: 'Build Completed',
@@ -355,13 +480,16 @@
         originOrgId,
         actionStateId,
         selectedDataEntities: [],
-        selectedFileRefs: parseLines(fileRefsEl?.value || '')
+        selectedFileRefs: parseLines(fileRefsEl?.value || ''),
+        fileFieldSelection: getFileFieldSelection()
       })
     }));
     const catalog = (Array.isArray(payload?.report?.entityCatalog) && payload.report.entityCatalog.length)
       ? payload.report.entityCatalog
       : (Array.isArray(payload?.report?.availableDataEntities) ? payload.report.availableDataEntities : []);
     renderEntityList(catalog);
+    renderFileFieldList(catalog);
+    clearArtifactLinks();
     setOutput('Entity Catalog Loaded', payload);
   }
 
@@ -373,8 +501,11 @@
   });
   document.getElementById('builderSelectAllEntitiesBtn')?.addEventListener('click', () => setAllEntitiesChecked(true));
   document.getElementById('builderClearEntitiesBtn')?.addEventListener('click', () => setAllEntitiesChecked(false));
+  document.getElementById('builderSelectAllFileFieldsBtn')?.addEventListener('click', () => setAllFileFieldsChecked(true));
+  document.getElementById('builderClearFileFieldsBtn')?.addEventListener('click', () => setAllFileFieldsChecked(false));
   document.getElementById('builderClearOutputBtn')?.addEventListener('click', () => {
     outputEl.textContent = 'Ready.';
+    clearArtifactLinks();
   });
   packageEl?.addEventListener('change', () => {
     const selected = packageEl.options[packageEl.selectedIndex];

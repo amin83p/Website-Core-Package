@@ -154,9 +154,13 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
       assert.equal(report.packageId, 'pte');
       assert.equal(report.version, '1.0.1');
       assert.equal(report.orgRemapRequired, true);
+      assert.equal(Array.isArray(report.downloadLinks), true);
       assert.equal(fs.existsSync(report.artifacts.zip), true);
       assert.equal(fs.existsSync(report.artifacts.signature), true);
       assert.equal(fs.existsSync(report.artifacts.publicKeyPem), true);
+      assert.equal(typeof report.publishedArtifacts?.rootAbsolutePath, 'string');
+      assert.equal(Array.isArray(report.publishedArtifacts?.files), true);
+      assert.equal(report.publishedArtifacts.files.some((row) => String(row?.fileName || '') === 'build-detail.json'), true);
 
       const zipBuffer = fs.readFileSync(report.artifacts.zip);
       const zip = new PizZip(zipBuffer);
@@ -169,6 +173,7 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
       assert.equal(payload.packageVersion, '1.0.1');
       assert.equal(Array.isArray(payload.tables), true);
       assert.equal(payload.artifactsRoot, 'artifacts');
+      assert.equal(typeof payload.fileFieldSelection, 'object');
       assert.equal(names.includes('pte/__builder_payload__/artifacts/ORG_900000/symbols/logo.png'), true);
     } finally {
       if (originalKeyFile === undefined) delete process.env.PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE;
@@ -498,12 +503,58 @@ test('preflightBuild requires origin org and scopes rows to selected origin whil
 
     assert.equal(report.originOrgId, 'ORG_900000');
     assert.equal(report.originScopeSummary.inspectedRows, 4);
-    assert.equal(report.originScopeSummary.includedRows, 3);
-    assert.equal(report.originScopeSummary.excludedOtherOrgRows, 1);
+    assert.equal(report.originScopeSummary.includedRows, 2);
+    assert.equal(report.originScopeSummary.excludedOtherOrgRows, 2);
     assert.equal(report.originScopeSummary.includedUnscopedRows, 1);
+    assert.equal(report.scopeValidation?.blocking, true);
+    assert.equal(Array.isArray(report.scopeValidation?.files), true);
+    assert.equal(report.scopeValidation.files.length, 1);
     const catalogRow = report.entityCatalog.find((row) => row.entityType === 'pteApplicants');
     assert.ok(catalogRow);
-    assert.equal(catalogRow.rowCount, 3);
+    assert.equal(catalogRow.rowCount, 2);
+  });
+});
+
+test('preflightBuild respects fileFieldSelection when extracting upload refs', async () => {
+  await withTempCwd('pkg-builder-file-fields-', async (tempRoot) => {
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest('1.0.0'));
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async fetchData(entityType) {
+          if (entityType !== 'pteApplicants') return [];
+          return [
+            {
+              id: 'A1',
+              orgId: 'ORG_900000',
+              avatarUrl: '/uploads/ORG_900000/symbols/avatar.png',
+              resumePath: '/uploads/ORG_900000/docs/resume.pdf'
+            }
+          ];
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      }
+    });
+
+    const report = await service.preflightBuild({
+      packageId: 'pte',
+      originOrgId: 'ORG_900000',
+      selectedDataEntities: ['pteApplicants'],
+      fileFieldSelection: {
+        pteApplicants: ['resumePath']
+      }
+    }, {
+      backendMode: 'json',
+      packageRootDir: path.join(tempRoot, 'packages')
+    });
+
+    assert.equal(report.filePlan.detectedFromData.length, 1);
+    assert.match(String(report.filePlan.detectedFromData[0]), /resume\.pdf/i);
+    assert.equal(Array.isArray(report.filePlan.provenance), true);
+    assert.equal(report.filePlan.provenance.every((row) => String(row?.fieldPath || '') === 'resumePath'), true);
+    assert.deepEqual(report.fileFieldSelection?.pteApplicants, ['resumePath']);
   });
 });
 
@@ -544,5 +595,50 @@ test('applyBuilderPayloadIfPresent keeps backward compatibility with legacy payl
     assert.equal(updates[0].row.orgId, 'ORG_777');
     const copiedPath = path.join(tempRoot, 'uploads', 'ORG_777', 'symbols', 'logo.png');
     assert.equal(await fsp.access(copiedPath).then(() => true).catch(() => false), true);
+  });
+});
+
+test('applyBuilderPayloadIfPresent fails fast with structured details on import error', async () => {
+  await withTempCwd('pkg-builder-apply-failfast-', async (tempRoot) => {
+    const packageDir = path.join(tempRoot, 'packages', 'pte');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
+    writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'pteApplicants.json'), [
+      { id: 'A1', orgId: 'ORG_900000' }
+    ]);
+    writeJson(path.join(packageDir, '__builder_payload__', 'manifest.json'), {
+      schema: 'core.package-builder.payload.v2',
+      orgRemapRequired: false,
+      artifactsRoot: 'artifacts',
+      tables: [{ entityType: 'pteApplicants', file: 'tables/pteApplicants.json', rowCount: 1 }]
+    });
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async getDataById() {
+          return { id: 'A1' };
+        },
+        async updateData() {
+          throw new Error('duplicate key conflict');
+        },
+        async addData() {
+          throw new Error('should not run add path');
+        }
+      }
+    });
+
+    await assert.rejects(
+      () => service.applyBuilderPayloadIfPresent({
+        manifestPath: path.join(packageDir, 'package.manifest.json')
+      }, {
+        backendMode: 'json'
+      }),
+      (error) => {
+        assert.equal(error?.code, 'BUILDER_PAYLOAD_IMPORT_FAILED');
+        assert.equal(error?.details?.entityType, 'pteApplicants');
+        assert.equal(error?.details?.rowId, 'A1');
+        assert.match(String(error?.message || ''), /duplicate key conflict/i);
+        return true;
+      }
+    );
   });
 });

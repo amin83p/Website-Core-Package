@@ -233,6 +233,19 @@ function cleanFormText(value, max = 500) {
   return token.length > max ? token.slice(0, max) : token;
 }
 
+function parseFileFieldSelectionInput(value) {
+  if (!value) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) return value;
+  const raw = cleanFormText(value, 200000);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
 function normalizePublicPageRelativeFolder(value, max = 800) {
   const token = cleanFormText(value, max).replace(/\\/g, '/');
   if (!token || token === '/' || token === '.') return '';
@@ -1216,10 +1229,14 @@ function sendPackageManagerError(res, error, fallbackMessage = 'Package operatio
     message = 'Package signature verification failed. Rebuild the ZIP using the configured signing key, then upload the matching ZIP and SIG files.';
   } else if (code === 'TARGET_ORG_REQUIRED') {
     message = 'This package includes org-bound exported data/files. Select a target organization and retry install.';
+  } else if (code === 'BUILDER_PAYLOAD_IMPORT_FAILED') {
+    message = 'Package install stopped because payload data import failed. Review details and retry after fixing the record conflict.';
   }
   return res.status(statusCode).json({
     status: statusCode === 403 ? 'admin_required' : (blocked ? 'blocked' : 'error'),
     message,
+    code,
+    details: error?.details || null,
     blockedReasons: blocked ? (error?.blockedReasons || []) : [],
     modifiedRecords: blocked ? (error?.modifiedRecords || []) : [],
     previewTransactionId: blocked ? (error?.previewTransactionId || '') : ''
@@ -1370,7 +1387,8 @@ exports.preflightPackageBuilder = async (req, res) => {
         : (req.body?.selectedDataEntities ? [req.body.selectedDataEntities] : []),
       selectedFileRefs: Array.isArray(req.body?.selectedFileRefs)
         ? req.body.selectedFileRefs
-        : (req.body?.selectedFileRefs ? [req.body.selectedFileRefs] : [])
+        : (req.body?.selectedFileRefs ? [req.body.selectedFileRefs] : []),
+      fileFieldSelection: parseFileFieldSelectionInput(req.body?.fileFieldSelection)
     }, {
       backendMode: runtimeBackend?.mode || '',
       packageRootDir: getPackageStorageRootAbsolute(),
@@ -1385,7 +1403,9 @@ exports.preflightPackageBuilder = async (req, res) => {
   } catch (error) {
     return res.status(400).json({
       status: 'error',
-      message: error?.message || 'Package build preflight failed.'
+      message: error?.message || 'Package build preflight failed.',
+      code: cleanFormText(error?.code || '', 120),
+      details: error?.details || null
     });
   }
 };
@@ -1402,7 +1422,8 @@ exports.buildPackageFromBuilder = async (req, res) => {
         : (req.body?.selectedDataEntities ? [req.body.selectedDataEntities] : []),
       selectedFileRefs: Array.isArray(req.body?.selectedFileRefs)
         ? req.body.selectedFileRefs
-        : (req.body?.selectedFileRefs ? [req.body.selectedFileRefs] : [])
+        : (req.body?.selectedFileRefs ? [req.body.selectedFileRefs] : []),
+      fileFieldSelection: parseFileFieldSelectionInput(req.body?.fileFieldSelection)
     }, {
       backendMode: runtimeBackend?.mode || '',
       packageRootDir: getPackageStorageRootAbsolute(),
@@ -1417,7 +1438,9 @@ exports.buildPackageFromBuilder = async (req, res) => {
   } catch (error) {
     return res.status(400).json({
       status: 'error',
-      message: error?.message || 'Package build failed.'
+      message: error?.message || 'Package build failed.',
+      code: cleanFormText(error?.code || '', 120),
+      details: error?.details || null
     });
   }
 };
