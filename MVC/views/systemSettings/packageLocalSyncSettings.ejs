@@ -1,0 +1,391 @@
+<%
+  const backend = runtimeBackend || {};
+  const activeMode = String(backend.mode || 'json').trim().toLowerCase();
+  const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
+  const localModeEnabled = Boolean(typeof localPackageDevModeEnabled !== 'undefined' ? localPackageDevModeEnabled : false);
+  const targetRootValue = String(typeof targetRootDefault !== 'undefined' ? targetRootDefault : '').trim();
+  const localRegistryPath = String(typeof localRegistryFilePath !== 'undefined' ? localRegistryFilePath : '').trim();
+  const localRegistryGeneratedAtValue = String(
+    typeof localRegistryGeneratedAt !== 'undefined' ? localRegistryGeneratedAt : ''
+  ).trim();
+%>
+
+<div class="sections-page package-local-sync-page">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h1 class="page-heading size-md text-start m-0">Package Sync Locally</h1>
+      <p class="text-muted mb-0 mt-1">Scan Railway runtime package storage via gateway and sync selected packages into local package root.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="badge <%= localModeEnabled ? 'bg-success-subtle text-success-emphasis border border-success-subtle' : 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' %>">
+        Local Mode: <%= localModeEnabled ? 'ON' : 'OFF' %>
+      </span>
+      <span class="badge bg-light text-dark border">Runtime: <%= activeMode.toUpperCase() %></span>
+      <a href="/systemSettings/packages" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-box-seam me-1"></i>Package Manager
+      </a>
+      <a href="/systemSettings" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Settings Home
+      </a>
+    </div>
+  </div>
+
+  <% if (!localModeEnabled) { %>
+    <div class="alert alert-warning border-0 shadow-sm py-3 px-3 mb-3">
+      <div class="fw-semibold">Local package sync mode is disabled.</div>
+      <div class="small mt-1">Set <code>PACKAGE_LOCAL_DEV_MODE=true</code> in <code>.env</code> and restart app.</div>
+    </div>
+  <% } %>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold small">Runtime Source and Local Target</div>
+    <div class="card-body p-3">
+      <div class="alert alert-info border-0 shadow-sm py-2 px-3 mb-3 small">
+        Runtime source is read from Railway package storage through signed gateway requests.
+        Ensure <code>RAILWAY_GATEWAY_BASE_URL</code> and <code>FILE_GATEWAY_SHARED_KEY</code> are configured.
+      </div>
+      <div class="row g-3">
+        <div class="col-lg-12">
+          <label class="form-label small fw-bold">Local Package Target Root</label>
+          <input type="text" id="localSyncTargetRoot" class="form-control" value="<%= targetRootValue %>" placeholder="packages">
+          <div class="small text-muted mt-1">Default from <code>PACKAGE_LOCAL_TARGET_ROOT</code> (fallback: <code>./packages</code>).</div>
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2 flex-wrap mt-3">
+        <button type="button" class="btn btn-primary btn-filled" id="localSyncScanBtn" <%= localModeEnabled ? '' : 'disabled' %>>
+          <i class="bi bi-search me-1"></i>Scan Railway Runtime
+        </button>
+        <button type="button" class="btn btn-outline-success" id="localSyncSelectedBtn" <%= localModeEnabled ? '' : 'disabled' %>>
+          <i class="bi bi-download me-1"></i>Sync Selected Package
+        </button>
+        <button type="button" class="btn btn-outline-success" id="localSyncAllBtn" <%= localModeEnabled ? '' : 'disabled' %>>
+          <i class="bi bi-download me-1"></i>Sync All Selected
+        </button>
+      </div>
+      <div class="small text-muted mt-2">
+        Local cache: <code id="localSyncCachePath"><%= localRegistryPath || 'data/localPackageRegistry.json' %></code>
+        <% if (localRegistryGeneratedAtValue) { %>
+          <span class="ms-2">Last generated: <%= localRegistryGeneratedAtValue %></span>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between gap-2 flex-wrap">
+      <span>Detected Packages</span>
+      <span class="text-muted fw-normal" id="localSyncDetectedCount">0 item(s)</span>
+    </div>
+    <div class="card-body p-3">
+      <div class="table-scroll-wrapper">
+        <table class="table-responsive size-md" id="localSyncTable">
+          <thead>
+            <tr>
+              <th style="width:44px;"><input type="checkbox" id="localSyncSelectAll"></th>
+              <th>Package</th>
+              <th>Version</th>
+              <th>Mount</th>
+              <th>Status</th>
+              <th>Manifest</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="6" class="text-center text-muted py-4">Run scan to detect packages from Railway runtime storage.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mt-3">
+    <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between">
+      <span>Operation Output</span>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="localSyncClearOutputBtn">Clear</button>
+    </div>
+    <div class="card-body">
+      <pre id="localSyncOutput" class="small bg-dark text-success p-3 rounded mb-0" style="max-height: 320px; overflow:auto;">Ready.</pre>
+    </div>
+  </div>
+
+  <input type="hidden" id="localSyncActionStateId" value="<%= actionStateValue %>">
+</div>
+
+<script>
+(() => {
+  const modeEnabled = <%= localModeEnabled ? 'true' : 'false' %>;
+  const targetRootEl = document.getElementById('localSyncTargetRoot');
+  const actionStateId = document.getElementById('localSyncActionStateId')?.value || '';
+  const outputEl = document.getElementById('localSyncOutput');
+  const tableBodyEl = document.querySelector('#localSyncTable tbody');
+  const detectedCountEl = document.getElementById('localSyncDetectedCount');
+  const selectAllEl = document.getElementById('localSyncSelectAll');
+  const cachePathEl = document.getElementById('localSyncCachePath');
+  const scanBtn = document.getElementById('localSyncScanBtn');
+  const syncSelectedBtn = document.getElementById('localSyncSelectedBtn');
+  const syncAllBtn = document.getElementById('localSyncAllBtn');
+
+  let scannedRows = [];
+
+  function setOutput(title, payload) {
+    const stamp = new Date().toISOString();
+    outputEl.textContent = `[${stamp}] ${title}\n${JSON.stringify(payload || {}, null, 2)}`;
+  }
+
+  async function showModal(options) {
+    if (typeof window.showMessageModal === 'function') return window.showMessageModal(options);
+    return options?.buttons?.[options.buttons.length - 1]?.text || 'OK';
+  }
+
+  async function fetchJson(url, options = {}) {
+    const response = await fetch(url, options);
+    const text = await response.text();
+    let payload = {};
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch (_) {
+      payload = { status: 'error', message: text || `Invalid response (${response.status})` };
+    }
+    if (!response.ok || payload.status === 'error' || payload.status === 'admin_required') {
+      const error = new Error(payload.message || `Request failed (${response.status}).`);
+      error.payload = payload;
+      error.statusCode = response.status;
+      throw error;
+    }
+    return payload;
+  }
+
+  async function requireAdminVerification() {
+    if (typeof window.requestProtectedAction !== 'function') {
+      throw new Error('Admin verification modal is unavailable. Refresh and try again.');
+    }
+    await window.requestProtectedAction();
+  }
+
+  async function runWithWaiting(title, fn) {
+    let token = null;
+    try {
+      if (typeof window.showLoading === 'function') {
+        token = window.showLoading({
+          title,
+          note: 'Please wait while local package sync operation completes.',
+          operation: 'Package Sync',
+          progress: 15
+        });
+      }
+      const result = await fn();
+      if (typeof window.updateLoading === 'function') {
+        window.updateLoading({ title, note: 'Finalizing sync output...', operation: 'Finalize', progress: 100 });
+      }
+      return result;
+    } finally {
+      if (typeof window.hideLoading === 'function' && token) {
+        window.hideLoading(token);
+      }
+    }
+  }
+
+  function normalizeRows(report = {}) {
+    return Array.isArray(report?.packages) ? report.packages : [];
+  }
+
+  function renderRows(rows = []) {
+    scannedRows = Array.isArray(rows) ? rows : [];
+    const validRows = scannedRows.filter((row) => row && row.valid === true);
+    detectedCountEl.textContent = `${scannedRows.length} item(s)`;
+    selectAllEl.checked = false;
+    selectAllEl.disabled = validRows.length === 0;
+
+    if (!scannedRows.length) {
+      tableBodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No packages were detected from source root.</td></tr>';
+      return;
+    }
+
+    tableBodyEl.innerHTML = scannedRows.map((row, index) => {
+      const pkgId = String(row?.packageId || row?.folderName || '').trim();
+      const statusBadge = row?.valid
+        ? '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Valid</span>'
+        : '<span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">Invalid</span>';
+      const reason = String(row?.reason || '').trim();
+      const details = reason ? `<div class="small text-danger mt-1">${reason}</div>` : '';
+      const checkbox = row?.valid
+        ? `<input type="checkbox" class="local-sync-row-checkbox" data-package-id="${pkgId}" data-index="${index}">`
+        : '';
+      return `
+        <tr>
+          <td>${checkbox}</td>
+          <td>
+            <div class="fw-semibold">${pkgId || '-'}</div>
+            <div class="small text-muted">${String(row?.name || '').trim() || '-'}</div>
+            ${details}
+          </td>
+          <td>${String(row?.version || '-')}</td>
+          <td><code>${String(row?.mountPath || '-')}</code></td>
+          <td>${statusBadge}</td>
+          <td class="small"><code>${String(row?.manifestPath || '-')}</code></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function getSelectedPackageIds() {
+    const checked = Array.from(document.querySelectorAll('.local-sync-row-checkbox:checked'));
+    const ids = checked
+      .map((el) => String(el.getAttribute('data-package-id') || '').trim().toLowerCase())
+      .filter(Boolean);
+    return Array.from(new Set(ids));
+  }
+
+  async function runScan() {
+    if (!modeEnabled) throw new Error('Local package sync mode is disabled.');
+    const targetRoot = String(targetRootEl.value || '').trim();
+
+    return runWithWaiting('Scanning Railway Runtime Packages', async () => fetchJson('/systemSettings/packages/local-sync/scan', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: new URLSearchParams({
+        targetRoot
+      }).toString()
+    }));
+  }
+
+  async function runSync(syncAll = false) {
+    if (!modeEnabled) throw new Error('Local package sync mode is disabled.');
+    await requireAdminVerification();
+
+    const targetRoot = String(targetRootEl.value || '').trim();
+    const selectedPackageIds = getSelectedPackageIds();
+
+    if (!selectedPackageIds.length) {
+      throw new Error('Select at least one valid package before sync.');
+    }
+
+    const payload = new URLSearchParams();
+    payload.set('targetRoot', targetRoot);
+    payload.set('syncAll', syncAll ? 'true' : 'false');
+    payload.set('actionStateId', actionStateId);
+    selectedPackageIds.forEach((id) => payload.append('selectedPackageIds', id));
+
+    return runWithWaiting(syncAll ? 'Syncing All Selected Packages' : 'Syncing Selected Package', async () => fetchJson('/systemSettings/packages/local-sync/sync', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: payload.toString()
+    }));
+  }
+
+  selectAllEl?.addEventListener('change', () => {
+    const shouldCheck = Boolean(selectAllEl.checked);
+    document.querySelectorAll('.local-sync-row-checkbox').forEach((el) => {
+      el.checked = shouldCheck;
+    });
+  });
+
+  scanBtn?.addEventListener('click', async () => {
+    const original = scanBtn.innerHTML;
+    scanBtn.disabled = true;
+    scanBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Scanning...';
+    try {
+      const result = await runScan();
+      renderRows(normalizeRows(result.report));
+      setOutput('Scan Result', result.report || result);
+    } catch (error) {
+      setOutput('Scan Failed', {
+        status: 'error',
+        message: error.message || 'Scan failed.',
+        details: error?.payload?.details || null
+      });
+      await showModal({
+        title: 'Operation Failed',
+        icon: 'error',
+        message: error.message || 'Local package scan failed.',
+        buttons: [{ text: 'Close', class: 'btn-danger' }]
+      });
+    } finally {
+      scanBtn.disabled = false;
+      scanBtn.innerHTML = original;
+    }
+  });
+
+  syncSelectedBtn?.addEventListener('click', async () => {
+    const original = syncSelectedBtn.innerHTML;
+    syncSelectedBtn.disabled = true;
+    syncSelectedBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Syncing...';
+    try {
+      const result = await runSync(false);
+      if (result?.report?.cache?.filePath && cachePathEl) {
+        cachePathEl.textContent = String(result.report.cache.filePath);
+      }
+      setOutput('Sync Result', result.report || result);
+      await showModal({
+        title: 'Completed',
+        icon: result.status === 'warning' ? 'warning' : 'success',
+        message: result.message || 'Local package sync completed.',
+        buttons: [{ text: 'OK', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+      });
+    } catch (error) {
+      setOutput('Sync Failed', {
+        status: 'error',
+        message: error.message || 'Sync failed.',
+        details: error?.payload?.details || null
+      });
+      await showModal({
+        title: 'Operation Failed',
+        icon: 'error',
+        message: error.message || 'Local package sync failed.',
+        buttons: [{ text: 'Close', class: 'btn-danger' }]
+      });
+    } finally {
+      syncSelectedBtn.disabled = false;
+      syncSelectedBtn.innerHTML = original;
+    }
+  });
+
+  syncAllBtn?.addEventListener('click', async () => {
+    const original = syncAllBtn.innerHTML;
+    syncAllBtn.disabled = true;
+    syncAllBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Syncing...';
+    try {
+      const result = await runSync(true);
+      if (result?.report?.cache?.filePath && cachePathEl) {
+        cachePathEl.textContent = String(result.report.cache.filePath);
+      }
+      setOutput('Sync All Result', result.report || result);
+      await showModal({
+        title: 'Completed',
+        icon: result.status === 'warning' ? 'warning' : 'success',
+        message: result.message || 'Local package sync completed.',
+        buttons: [{ text: 'OK', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+      });
+    } catch (error) {
+      setOutput('Sync Failed', {
+        status: 'error',
+        message: error.message || 'Sync failed.',
+        details: error?.payload?.details || null
+      });
+      await showModal({
+        title: 'Operation Failed',
+        icon: 'error',
+        message: error.message || 'Local package sync failed.',
+        buttons: [{ text: 'Close', class: 'btn-danger' }]
+      });
+    } finally {
+      syncAllBtn.disabled = false;
+      syncAllBtn.innerHTML = original;
+    }
+  });
+
+  document.getElementById('localSyncClearOutputBtn')?.addEventListener('click', () => {
+    outputEl.textContent = 'Ready.';
+  });
+})();
+</script>

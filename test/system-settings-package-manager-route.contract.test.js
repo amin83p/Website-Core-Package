@@ -354,3 +354,87 @@ test('package manager transactions GET uses package manager access scope', async
     });
   });
 });
+
+test('local package sync GET route reaches controller with package manager scope', async () => {
+  await withStubbedSystemSettingsRoutes(async (router) => {
+    const app = express();
+    app.use('/systemSettings', router);
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/systemSettings/packages/local-sync`, {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes'
+        }
+      });
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.handler, 'showPackageLocalSyncPage');
+      assert.deepEqual(body.accessCheck, {
+        sectionId: SECTIONS.SYSTEM_PACKAGE_MANAGER,
+        operationId: OPERATIONS.UPDATE
+      });
+    });
+  });
+});
+
+test('local package sync POST route keeps token/admin middleware contract', async () => {
+  await withStubbedSystemSettingsRoutes(async (router) => {
+    const app = express();
+    app.use(express.urlencoded({ extended: false }));
+    app.use('/systemSettings', router);
+
+    await withServer(app, async (baseUrl) => {
+      const missingToken = await fetch(`${baseUrl}/systemSettings/packages/local-sync/sync`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ selectedPackageIds: 'pte' }).toString()
+      });
+      assert.equal(missingToken.status, 403);
+      assert.equal((await missingToken.json()).status, 'token_required');
+
+      const missingAdmin = await fetch(`${baseUrl}/systemSettings/packages/local-sync/sync`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          actionStateId: 'STATE_SYNC_1',
+          selectedPackageIds: 'pte'
+        }).toString()
+      });
+      assert.equal(missingAdmin.status, 403);
+      assert.equal((await missingAdmin.json()).status, 'admin_required');
+
+      const allowed = await fetch(`${baseUrl}/systemSettings/packages/local-sync/sync`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'x-admin-verified': 'yes',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          actionStateId: 'STATE_SYNC_2',
+          selectedPackageIds: 'pte'
+        }).toString()
+      });
+      assert.equal(allowed.status, 200);
+      const body = await allowed.json();
+      assert.equal(body.handler, 'syncLocalPackagesFromManager');
+      assert.equal(body.actionState.requireToken, true);
+      assert.equal(body.actionState.actionStateId, 'STATE_SYNC_2');
+      assert.deepEqual(body.accessCheck, {
+        sectionId: SECTIONS.SYSTEM_PACKAGE_MANAGER,
+        operationId: OPERATIONS.UPDATE
+      });
+    });
+  });
+});

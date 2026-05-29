@@ -4,12 +4,15 @@ const path = require('path');
 const startupLogger = require('../utils/startupLogger');
 const packageRegistryService = require('./packageRegistryService');
 const packageManifestService = require('./packageManifestService');
+const localPackageSyncService = require('./localPackageSyncService');
 const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 
 const DEFAULT_MANIFEST_FILES = Object.freeze([
   'package.manifest.json',
   'manifest.json'
 ]);
+const DEFAULT_MANIFEST_RETRY_MS = 15000;
+const DEFAULT_MANIFEST_RETRY_INTERVAL_MS = 1000;
 
 function cleanText(value, max = 2000) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -19,6 +22,30 @@ function cleanText(value, max = 2000) {
 
 function normalizePackageId(value = '') {
   return cleanText(value, 80).toLowerCase();
+}
+
+function readPositiveInt(value, fallback = 0) {
+  const parsed = Number.parseInt(String(value || '').trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+function resolveManifestRetrySettings(env = process.env) {
+  const retryMs = readPositiveInt(env.PACKAGE_STARTUP_MANIFEST_RETRY_MS, DEFAULT_MANIFEST_RETRY_MS);
+  const retryIntervalMs = readPositiveInt(
+    env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS,
+    DEFAULT_MANIFEST_RETRY_INTERVAL_MS
+  );
+  return {
+    retryMs,
+    retryIntervalMs: Math.min(retryMs, Math.max(1, retryIntervalMs))
+  };
+}
+
+function waitForMs(ms = 0) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, Math.max(0, Number(ms) || 0));
+  });
 }
 
 function resolveProjectRoot() {
@@ -83,6 +110,27 @@ async function resolveManifestPath(packageId = '', registryRow = {}, packageRoot
   return '';
 }
 
+async function resolveManifestPathWithRetry(packageId = '', registryRow = {}, packageRootDir = '', settings = {}) {
+  const retryMs = readPositiveInt(settings?.retryMs, 0);
+  const retryIntervalMs = readPositiveInt(settings?.retryIntervalMs, 1);
+  const startedAt = Date.now();
+
+  // First attempt always runs immediately.
+  // Additional attempts run only inside the configured retry window.
+  while (true) {
+    // eslint-disable-next-line no-await-in-loop
+    const resolved = await resolveManifestPath(packageId, registryRow, packageRootDir);
+    if (resolved) return resolved;
+    if (retryMs <= 0) return '';
+
+    const elapsed = Date.now() - startedAt;
+    if (elapsed >= retryMs) return '';
+    const remaining = retryMs - elapsed;
+    // eslint-disable-next-line no-await-in-loop
+    await waitForMs(Math.min(retryIntervalMs, remaining));
+  }
+}
+
 async function readManifestFile(manifestPath = '') {
   const raw = await fs.readFile(manifestPath, 'utf8');
   const cleaned = String(raw || '').replace(/^\uFEFF/, '').trim();
@@ -122,6 +170,26 @@ function summarizeRegistryRows(rows = []) {
   return list.filter((row) => row && row.enabled === true);
 }
 
+function summarizeLocalCacheRows(rows = []) {
+  const list = Array.isArray(rows) ? rows : [];
+  return list
+    .map((row) => {
+      const packageId = normalizePackageId(row?.packageId || row?.id || '');
+      if (!packageId) return null;
+      return {
+        packageId,
+        enabled: row?.enabled !== false,
+        installStatus: row?.enabled === false ? 'disabled' : 'enabled',
+        metadata: {
+          manifestPath: cleanText(row?.manifestPath, 2000),
+          packageName: cleanText(row?.name, 200),
+          mountPath: cleanText(row?.mountPath, 500)
+        }
+      };
+    })
+    .filter((row) => row && row.enabled === true);
+}
+
 async function loadEnabledPackages(options = {}) {
   const startedAt = new Date().toISOString();
   const backendMode = cleanText(options.backendMode, 30) || undefined;
@@ -129,6 +197,8 @@ async function loadEnabledPackages(options = {}) {
   const hooks = createLoaderHooks(options.hooks || {});
   const logger = options.logger || startupLogger;
   const continueOnError = options.continueOnError !== false;
+  const localDevMode = localPackageSyncService.isLocalPackageDevModeEnabled();
+  const manifestRetrySettings = resolveManifestRetrySettings(options.env || process.env);
 
   const summary = {
     startedAt,
@@ -139,13 +209,38 @@ async function loadEnabledPackages(options = {}) {
     loadedCount: 0,
     failedCount: 0,
     loaded: [],
-    failed: []
+    failed: [],
+    localDevMode,
+    source: localDevMode ? 'local-cache' : 'registry',
+    localRegistryFilePath: '',
+    localRegistryCacheExists: false,
+    manifestRetry: {
+      retryMs: manifestRetrySettings.retryMs,
+      retryIntervalMs: manifestRetrySettings.retryIntervalMs
+    }
   };
 
-  const registryRows = await packageRegistryService.listPackageRegistry({
-    backendMode
-  });
-  const enabledRows = summarizeRegistryRows(registryRows);
+  let enabledRows = [];
+  if (localDevMode) {
+    const cache = await localPackageSyncService.readLocalPackageRegistryCache();
+    summary.localRegistryFilePath = cleanText(cache?.filePath, 2000);
+    summary.localRegistryCacheExists = await fileExists(summary.localRegistryFilePath);
+    enabledRows = summarizeLocalCacheRows(cache?.packages || []);
+    if (!summary.localRegistryCacheExists && logger && typeof logger.warn === 'function') {
+      logger.warn('PACKAGE_LOADER', 'LOCAL_CACHE_MISSING', 'Local package cache is missing; skipping dynamic package load.', {
+        localRegistryFilePath: summary.localRegistryFilePath
+      });
+    } else if (!enabledRows.length && logger && typeof logger.warn === 'function') {
+      logger.warn('PACKAGE_LOADER', 'LOCAL_CACHE_EMPTY', 'Local package cache has no enabled packages; skipping dynamic package load.', {
+        localRegistryFilePath: summary.localRegistryFilePath
+      });
+    }
+  } else {
+    const registryRows = await packageRegistryService.listPackageRegistry({
+      backendMode
+    });
+    enabledRows = summarizeRegistryRows(registryRows);
+  }
   summary.enabledCount = enabledRows.length;
 
   const loadedIds = new Set();
@@ -159,7 +254,12 @@ async function loadEnabledPackages(options = {}) {
 
     try {
       packageManifestService.assertValidPackageId(packageId, 'packageId');
-      const manifestPath = await resolveManifestPath(packageId, row, packageRootDir);
+      const manifestPath = await resolveManifestPathWithRetry(
+        packageId,
+        row,
+        packageRootDir,
+        manifestRetrySettings
+      );
       if (!manifestPath) {
         const missingManifestError = new Error('No manifest file found for this enabled package.');
         missingManifestError.code = 'PACKAGE_MANIFEST_NOT_FOUND';
@@ -202,29 +302,17 @@ async function loadEnabledPackages(options = {}) {
     } catch (error) {
       const reason = cleanText(error?.message || String(error), 4000) || 'Unknown package load error.';
       const isMissingManifest = cleanText(error?.code, 80) === 'PACKAGE_MANIFEST_NOT_FOUND';
-      if (isMissingManifest && packageId) {
-        await packageRegistryService.upsertPackageRegistry({
-          packageId,
-          enabled: false,
-          installStatus: 'failed',
-          lastError: '',
-          lastWarning: `Auto-disabled at startup: ${reason}`,
-          metadata: row?.metadata && typeof row.metadata === 'object' ? row.metadata : {}
-        }, {
-          backendMode,
-          actor: { id: 'SYSTEM', username: 'SYSTEM' }
-        }).catch(() => null);
-      }
       const failure = {
         packageId,
         message: reason,
-        autoDisabled: isMissingManifest
+        autoDisabled: false
       };
       summary.failed.push(failure);
       if (logger && typeof logger.warn === 'function') {
         logger.warn('PACKAGE_LOADER', 'LOAD_FAIL', `Skipped package ${packageId || '(unknown)'}.`, {
           ...baseMeta,
-          reason
+          reason,
+          missingManifest: isMissingManifest
         });
       }
       if (!continueOnError) {

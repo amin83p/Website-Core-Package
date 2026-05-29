@@ -37,6 +37,11 @@
     <div class="d-flex align-items-center gap-2 flex-wrap">
       <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">PACKAGE LIFECYCLE</span>
       <span class="badge bg-light text-dark border">Runtime: <%= activeMode.toUpperCase() %></span>
+      <% if (typeof localPackageDevModeEnabled !== 'undefined' && localPackageDevModeEnabled) { %>
+        <a href="/systemSettings/packages/local-sync" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-arrow-repeat me-1"></i>Package Sync Locally
+        </a>
+      <% } %>
       <a href="/systemSettings" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrow-left me-1"></i>Settings Home
       </a>
@@ -62,7 +67,7 @@
   <% } %>
   <% if (startupWarnings.length) { %>
     <div class="alert alert-warning border-0 shadow-sm py-2 px-3 mb-3 small">
-      <div class="fw-semibold mb-1">Startup Package Warnings</div>
+      <div class="fw-semibold mb-1">Startup Package Load Warnings (Registry State Unchanged)</div>
       <ul class="mb-0 ps-3">
         <% startupWarnings.slice(0, 8).forEach((msg) => { %>
           <li><%= msg %></li>

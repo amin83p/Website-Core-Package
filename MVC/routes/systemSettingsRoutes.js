@@ -270,6 +270,26 @@ router.post('/packages/install-zip',
           ),
           adminApproval,
           ctrl.installPackageZipFromManager);
+router.get('/packages/local-sync',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE, { keepActive: true }),
+          ctrl.showPackageLocalSyncPage);
+router.post('/packages/local-sync/scan',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+          ctrl.scanLocalPackagesFromManager);
+router.post('/packages/local-sync/sync',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.syncLocalPackagesFromManager);
 router.post('/packages/:packageId/enable',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),

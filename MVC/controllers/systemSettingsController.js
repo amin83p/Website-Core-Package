@@ -20,6 +20,7 @@ const jsonToMongoMigrationService = require('../services/migration/jsonToMongoMi
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
+const localPackageSyncService = require('../services/localPackageSyncService');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
 const { getPackageStorageRootAbsolute, getPackageStorageRootResolution } = require('../utils/packageStoragePathUtils');
 
@@ -42,6 +43,15 @@ function getPackageZipUploadLimitMb() {
     process.env.FILE_GATEWAY_MAX_FILE_MB,
     50
   ) || 50;
+}
+
+function buildOperationError(code, message, details = null) {
+  const error = new Error(message || 'Operation failed.');
+  error.code = cleanFormText(code, 120) || 'OPERATION_FAILED';
+  if (details && typeof details === 'object') {
+    error.details = details;
+  }
+  return error;
 }
 
 function normalizeScopeToken(value = '') {
@@ -1170,6 +1180,7 @@ exports.showPackageManagerPage = async (req, res) => {
     const settings = await systemSettingsRepository.getSettings();
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const keyContext = buildPackageTrustedKeyContext(settings);
+    const localPackageDevModeEnabled = localPackageSyncService.isLocalPackageDevModeEnabled();
     const storageResolution = getPackageStorageRootResolution({ ensureExists: false });
     const packageStorageRoot = storageResolution.effectiveRoot;
     const snapshot = await systemSettingsPackageManagerService.listPackageSnapshot({
@@ -1178,7 +1189,15 @@ exports.showPackageManagerPage = async (req, res) => {
     });
     const startupLoadSummary = req?.app?.locals?.packageLoadSummary || null;
     const startupPackageWarnings = Array.isArray(startupLoadSummary?.failed)
-      ? startupLoadSummary.failed.map((row) => String(row?.message || '').trim()).filter(Boolean)
+      ? startupLoadSummary.failed
+        .map((row) => {
+          const message = String(row?.message || '').trim();
+          if (!message) return '';
+          const packageId = cleanFormText(row?.packageId, 120).toLowerCase();
+          if (!packageId) return message;
+          return `[${packageId}] ${message}`;
+        })
+        .filter(Boolean)
       : [];
     const localManifestOptions = (snapshot?.localManifests || []).filter((row) => row.valid === true);
     const localManifestWarnings = (snapshot?.localManifests || []).filter((row) => row.valid !== true);
@@ -1201,6 +1220,7 @@ exports.showPackageManagerPage = async (req, res) => {
       packageStorageRootSource: storageResolution.source,
       packageStorageRootWarnings: Array.isArray(storageResolution.warnings) ? storageResolution.warnings : [],
       startupPackageWarnings,
+      localPackageDevModeEnabled,
       organizations: Array.isArray(organizations) ? organizations : [],
       activeOrgId,
       includeModal: true,
@@ -1264,6 +1284,14 @@ function sendPackageManagerError(res, error, fallbackMessage = 'Package operatio
     modifiedRecords: blocked ? (error?.modifiedRecords || []) : [],
     previewTransactionId: blocked ? (error?.previewTransactionId || '') : ''
   });
+}
+
+function assertLocalPackageDevModeEnabled() {
+  if (localPackageSyncService.isLocalPackageDevModeEnabled()) return;
+  throw buildOperationError(
+    'LOCAL_PACKAGE_DEV_MODE_DISABLED',
+    'Local package sync mode is disabled. Set PACKAGE_LOCAL_DEV_MODE=true and restart the app.'
+  );
 }
 
 exports.installPackageFromManager = async (req, res) => {
@@ -1363,6 +1391,70 @@ exports.syncPackageFromManager = async (req, res) => {
     });
   } catch (error) {
     return sendPackageManagerError(res, error, 'Package sync failed.');
+  }
+};
+
+exports.showPackageLocalSyncPage = async (req, res) => {
+  try {
+    const settings = await systemSettingsRepository.getSettings();
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const localPackageDevModeEnabled = localPackageSyncService.isLocalPackageDevModeEnabled();
+    const defaults = localPackageSyncService.resolveLocalSyncPaths({});
+    const cache = await localPackageSyncService.readLocalPackageRegistryCache();
+
+    return res.render('systemSettings/packageLocalSyncSettings', {
+      title: 'Package Sync Locally',
+      settings,
+      runtimeBackend,
+      localPackageDevModeEnabled,
+      targetRootDefault: defaults.targetRoot || '',
+      localRegistryFilePath: cache?.filePath || '',
+      localRegistryGeneratedAt: cleanFormText(cache?.generatedAt, 120),
+      includeModal: true,
+      user: req.user,
+      actionStateId: req.actionStateId
+    });
+  } catch (error) {
+    return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+exports.scanLocalPackagesFromManager = async (req, res) => {
+  try {
+    assertLocalPackageDevModeEnabled();
+    const report = await localPackageSyncService.scanMountedPackageSource({
+      targetRoot: cleanFormText(req.body?.targetRoot, 2000)
+    });
+    return res.json({
+      status: 'success',
+      message: `Scan completed. Found ${report.validCount} valid package(s).`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Local package scan failed.');
+  }
+};
+
+exports.syncLocalPackagesFromManager = async (req, res) => {
+  try {
+    assertLocalPackageDevModeEnabled();
+    const selectedPackageIds = Array.from(new Set(
+      asArray(req.body?.selectedPackageIds)
+        .map((item) => cleanFormText(item, 160).toLowerCase())
+        .filter(Boolean)
+    ));
+    const report = await localPackageSyncService.syncMountedPackages({
+      targetRoot: cleanFormText(req.body?.targetRoot, 2000),
+      selectedPackageIds,
+      syncAll: String(req.body?.syncAll || '').trim().toLowerCase() === 'true'
+    });
+    return res.json({
+      status: report.failedCount > 0 ? 'warning' : 'success',
+      message: `Synced ${report.syncedCount} package(s) locally. Restart the app to activate updated local packages.`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Local package sync failed.');
   }
 };
 

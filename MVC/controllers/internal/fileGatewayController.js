@@ -1,8 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const tar = require('tar');
 const pathResolver = require('../../utils/pathResolver');
 const uploadPathUtils = require('../../utils/uploadPathUtils');
 const orgFileBackupService = require('../../services/orgFileBackupService');
+const packageManifestService = require('../../services/packageManifestService');
+const { getPackageStorageRootResolution } = require('../../utils/packageStoragePathUtils');
 
 const INVALID_NAME_PATTERN = /[<>:"/\\|?*\x00-\x1F]/;
 const WINDOWS_RESERVED_NAMES = new Set([
@@ -172,6 +175,173 @@ function logGateway(op = '', payload = {}) {
   } catch (_) {
     // ignore logging failures
   }
+}
+
+function normalizeRuntimePackageId(value = '') {
+  const token = clean(value).toLowerCase();
+  packageManifestService.assertValidPackageId(token, 'Package id');
+  return token;
+}
+
+function resolveRuntimePackageStorageRoot() {
+  const resolution = getPackageStorageRootResolution({ ensureExists: false });
+  const packageRootDir = String(resolution?.effectiveRoot || '').trim();
+  if (!packageRootDir) {
+    throw new Error('Runtime package storage root is not configured.');
+  }
+  if (!fs.existsSync(packageRootDir) || !fs.statSync(packageRootDir).isDirectory()) {
+    throw new Error(`Runtime package storage root is unavailable: ${packageRootDir}`);
+  }
+  return {
+    packageRootDir,
+    source: String(resolution?.source || '').trim(),
+    warnings: Array.isArray(resolution?.warnings) ? resolution.warnings : []
+  };
+}
+
+function normalizeArchivePath(entryPath = '') {
+  const token = String(entryPath || '').replace(/\\/g, '/').replace(/^\.\/+/, '').trim();
+  if (!token) throw new Error('Archive contains an empty path.');
+  if (path.posix.isAbsolute(token) || /^[A-Za-z]:/.test(token)) {
+    throw new Error(`Archive contains an absolute path: ${token}`);
+  }
+  const parts = token.split('/').filter(Boolean);
+  if (!parts.length || parts.some((part) => part === '.' || part === '..')) {
+    throw new Error(`Archive contains unsafe path: ${token}`);
+  }
+  return parts.join('/');
+}
+
+function assertArchivePathInsidePackage(entryPath = '', packageFolderName = '') {
+  const normalized = normalizeArchivePath(entryPath);
+  const top = String(packageFolderName || '').trim();
+  if (!top) throw new Error('Package folder name is required.');
+  if (normalized !== top && !normalized.startsWith(`${top}/`)) {
+    throw new Error(`Archive path is outside requested package folder: ${normalized}`);
+  }
+  return true;
+}
+
+function resolveManifestPathForDirectory(packageDir = '') {
+  const first = path.join(packageDir, 'package.manifest.json');
+  if (fs.existsSync(first)) return first;
+  const second = path.join(packageDir, 'manifest.json');
+  if (fs.existsSync(second)) return second;
+  return '';
+}
+
+async function readRuntimePackageManifest(manifestPath = '', knownIds = []) {
+  const raw = await fs.promises.readFile(manifestPath, 'utf8');
+  const parsed = JSON.parse(String(raw || '').replace(/^\uFEFF/, '').trim() || '{}');
+  return packageManifestService.validatePackageManifest(parsed, {
+    knownIds: Array.isArray(knownIds) ? knownIds : []
+  });
+}
+
+async function discoverRuntimePackages() {
+  const runtime = resolveRuntimePackageStorageRoot();
+  const entries = await fs.promises.readdir(runtime.packageRootDir, { withFileTypes: true });
+  const knownIds = [];
+  const packages = [];
+
+  for (const entry of entries) {
+    if (!entry || !entry.isDirectory()) continue;
+    const folderName = clean(entry.name);
+    if (!folderName || folderName.startsWith('.')) continue;
+
+    const packageDir = path.join(runtime.packageRootDir, folderName);
+    const manifestPath = resolveManifestPathForDirectory(packageDir);
+    const baseRow = {
+      folderName,
+      packageDir: packageDir.replace(/\\/g, '/'),
+      packageId: '',
+      name: '',
+      version: '',
+      mountPath: '',
+      manifestPath: manifestPath ? manifestPath.replace(/\\/g, '/') : '',
+      valid: false,
+      reason: ''
+    };
+
+    if (!manifestPath) {
+      packages.push({
+        ...baseRow,
+        reason: 'Manifest file was not found.'
+      });
+      continue;
+    }
+
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const manifest = await readRuntimePackageManifest(manifestPath, knownIds);
+      const packageId = normalizeRuntimePackageId(manifest.id);
+      if (packageId !== folderName.toLowerCase()) {
+        throw new Error(`Folder "${folderName}" does not match manifest id "${packageId}".`);
+      }
+      knownIds.push(packageId);
+      packages.push({
+        ...baseRow,
+        packageId,
+        name: clean(manifest.name),
+        version: clean(manifest.version),
+        mountPath: clean(manifest.mountPath),
+        valid: true,
+        reason: ''
+      });
+    } catch (error) {
+      packages.push({
+        ...baseRow,
+        reason: clean(error?.message || 'Invalid package manifest.')
+      });
+    }
+  }
+
+  packages.sort((a, b) => {
+    const left = clean(a.packageId || a.folderName).toLowerCase();
+    const right = clean(b.packageId || b.folderName).toLowerCase();
+    return left.localeCompare(right);
+  });
+
+  return {
+    runtime,
+    packageCount: packages.length,
+    validCount: packages.filter((row) => row.valid === true).length,
+    invalidCount: packages.filter((row) => row.valid !== true).length,
+    packages
+  };
+}
+
+async function createRuntimePackageArchive({ packageFolderName = '', packageId = '', version = '', packageRootDir = '' } = {}) {
+  const cleanFolder = clean(packageFolderName);
+  if (!cleanFolder) throw new Error('Package folder name is required.');
+  const sourceDir = path.join(packageRootDir, cleanFolder);
+  if (!fs.existsSync(sourceDir) || !fs.statSync(sourceDir).isDirectory()) {
+    throw new Error(`Package folder was not found: ${cleanFolder}`);
+  }
+
+  const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
+  const tempRoot = path.join(uploadRoot, '.runtime-package-sync');
+  pathResolver.ensureDir(tempRoot);
+  const stamp = Date.now();
+  const archiveName = `runtime-package-${clean(packageId) || cleanFolder}-${clean(version) || '0.0.0'}-${stamp}.tar.gz`;
+  const archivePath = path.join(tempRoot, archiveName);
+
+  await tar.c({
+    gzip: true,
+    file: archivePath,
+    cwd: packageRootDir,
+    portable: true,
+    strict: true,
+    filter: (entryPath) => assertArchivePathInsidePackage(entryPath, cleanFolder)
+  }, [cleanFolder]);
+
+  return {
+    archivePath,
+    fileName: archiveName,
+    async cleanup() {
+      await fs.promises.rm(archivePath, { force: true }).catch(() => null);
+    }
+  };
 }
 
 exports.upload = async (req, res) => {
@@ -381,6 +551,59 @@ exports.list = (req, res) => {
 
     logGateway('list', { scopeKey, relativeDir, count: files.length });
     return res.json({ status: 'success', files });
+  } catch (error) {
+    return respondError(res, error);
+  }
+};
+
+exports.listRuntimePackages = async (req, res) => {
+  try {
+    const report = await discoverRuntimePackages();
+    logGateway('runtime-packages-list', {
+      packageRootDir: report.runtime.packageRootDir,
+      source: report.runtime.source,
+      packageCount: report.packageCount,
+      validCount: report.validCount,
+      invalidCount: report.invalidCount
+    });
+    return res.json({
+      status: 'success',
+      runtime: report.runtime,
+      packageCount: report.packageCount,
+      validCount: report.validCount,
+      invalidCount: report.invalidCount,
+      packages: report.packages
+    });
+  } catch (error) {
+    return respondError(res, error);
+  }
+};
+
+exports.downloadRuntimePackage = async (req, res) => {
+  try {
+    const packageId = normalizeRuntimePackageId(req.body?.packageId || '');
+    const report = await discoverRuntimePackages();
+    const selected = report.packages.find((row) => row.packageId === packageId);
+    if (!selected) {
+      return res.status(404).json({ status: 'error', message: `Runtime package "${packageId}" was not found.` });
+    }
+    if (selected.valid !== true) {
+      throw new Error(`Runtime package "${packageId}" manifest is invalid and cannot be downloaded.`);
+    }
+
+    const archive = await createRuntimePackageArchive({
+      packageFolderName: selected.folderName,
+      packageId: selected.packageId,
+      version: selected.version,
+      packageRootDir: report.runtime.packageRootDir
+    });
+
+    logGateway('runtime-package-download', {
+      packageId: selected.packageId,
+      version: selected.version,
+      packageRootDir: report.runtime.packageRootDir
+    });
+    return sendArchiveResponse(res, archive);
   } catch (error) {
     return respondError(res, error);
   }

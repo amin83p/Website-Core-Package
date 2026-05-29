@@ -527,6 +527,35 @@ async function gatewayListDirectory({ scopeKey = '', relativeDir = '' } = {}) {
   });
 }
 
+async function gatewayListRuntimePackages() {
+  return fetchJson('/internal/file-gateway/packages/runtime/list', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({})
+  });
+}
+
+async function gatewayDownloadRuntimePackage(packageId = '') {
+  const response = await fetchGatewayResponse('/internal/file-gateway/packages/runtime/download', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ packageId: clean(packageId) })
+  });
+
+  const contentDisposition = String(response.headers.get('content-disposition') || '');
+  const fileNameMatch = /filename="([^"]+)"/i.exec(contentDisposition);
+  const fileName = clean(fileNameMatch?.[1] || '');
+  const mimeType = String(response.headers.get('content-type') || 'application/gzip').toLowerCase();
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  return {
+    fileName: fileName || `runtime-package-${clean(packageId) || 'download'}.tar.gz`,
+    mimeType,
+    size: buffer.length,
+    buffer
+  };
+}
+
 async function gatewayDownloadOrgBackup({ orgId = '' } = {}) {
   return fetchGatewayResponse('/internal/file-gateway/org-backup/download', {
     method: 'POST',
@@ -564,6 +593,8 @@ module.exports = {
   gatewayRenameItem,
   gatewayCreateFolder,
   gatewayListDirectory,
+  gatewayListRuntimePackages,
+  gatewayDownloadRuntimePackage,
   gatewayDownloadOrgBackup,
   gatewayRestoreOrgBackup
 };

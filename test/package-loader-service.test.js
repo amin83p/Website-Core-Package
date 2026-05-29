@@ -17,12 +17,30 @@ function makeSilentLogger() {
   };
 }
 
+function makeSpyLogger() {
+  const events = { info: [], warn: [], success: [], error: [], debug: [] };
+  return {
+    events,
+    info(...args) { events.info.push(args); },
+    warn(...args) { events.warn.push(args); },
+    success(...args) { events.success.push(args); },
+    error(...args) { events.error.push(args); },
+    debug(...args) { events.debug.push(args); }
+  };
+}
+
 async function withTempPackageWorkspace(callback) {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-loader-'));
   const packageRootDir = path.join(tempRoot, 'packages');
   const registryPath = path.join(tempRoot, 'packageRegistry.test.json');
   const originalOverride = process.env.PACKAGE_REGISTRY_DATA_PATH;
+  const originalLocalDevMode = process.env.PACKAGE_LOCAL_DEV_MODE;
+  const originalLocalRegistryFile = process.env.PACKAGE_LOCAL_REGISTRY_FILE;
+  const originalManifestRetryMs = process.env.PACKAGE_STARTUP_MANIFEST_RETRY_MS;
+  const originalManifestRetryIntervalMs = process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS;
   process.env.PACKAGE_REGISTRY_DATA_PATH = registryPath;
+  process.env.PACKAGE_STARTUP_MANIFEST_RETRY_MS = '60';
+  process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS = '10';
 
   try {
     await fs.mkdir(packageRootDir, { recursive: true });
@@ -30,6 +48,14 @@ async function withTempPackageWorkspace(callback) {
   } finally {
     if (originalOverride === undefined) delete process.env.PACKAGE_REGISTRY_DATA_PATH;
     else process.env.PACKAGE_REGISTRY_DATA_PATH = originalOverride;
+    if (originalLocalDevMode === undefined) delete process.env.PACKAGE_LOCAL_DEV_MODE;
+    else process.env.PACKAGE_LOCAL_DEV_MODE = originalLocalDevMode;
+    if (originalLocalRegistryFile === undefined) delete process.env.PACKAGE_LOCAL_REGISTRY_FILE;
+    else process.env.PACKAGE_LOCAL_REGISTRY_FILE = originalLocalRegistryFile;
+    if (originalManifestRetryMs === undefined) delete process.env.PACKAGE_STARTUP_MANIFEST_RETRY_MS;
+    else process.env.PACKAGE_STARTUP_MANIFEST_RETRY_MS = originalManifestRetryMs;
+    if (originalManifestRetryIntervalMs === undefined) delete process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS;
+    else process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS = originalManifestRetryIntervalMs;
     await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
   }
 }
@@ -175,7 +201,7 @@ test('loader skips invalid package manifest without crashing when continueOnErro
   });
 });
 
-test('loader auto-disables enabled package when manifest file is missing', async () => {
+test('loader keeps package enabled when manifest file is missing at startup', async () => {
   await withTempPackageWorkspace(async ({ packageRootDir }) => {
     await packageRegistryService.upsertPackageRegistry({
       packageId: 'missing-pte',
@@ -198,10 +224,74 @@ test('loader auto-disables enabled package when manifest file is missing', async
     assert.equal(summary.enabledCount, 1);
     assert.equal(summary.failedCount, 1);
     assert.equal(summary.failed[0].packageId, 'missing-pte');
-    assert.equal(summary.failed[0].autoDisabled, true);
-    assert.equal(Boolean(registryRow?.enabled), false);
-    assert.equal(String(registryRow?.installStatus || ''), 'failed');
-    assert.match(String(registryRow?.lastWarning || ''), /Auto-disabled at startup/i);
+    assert.equal(summary.failed[0].autoDisabled, false);
+    assert.equal(Boolean(registryRow?.enabled), true);
+    assert.equal(String(registryRow?.installStatus || ''), 'enabled');
+  });
+});
+
+test('loader retries missing manifest and succeeds if manifest appears in retry window', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'delayed-pte',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    process.env.PACKAGE_STARTUP_MANIFEST_RETRY_MS = '450';
+    process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS = '50';
+
+    const timer = setTimeout(() => {
+      writeManifest(packageRootDir, 'delayed-pte', {
+        id: 'delayed-pte',
+        name: 'Delayed PTE',
+        version: '1.0.0',
+        mountPath: '/delayed-pte'
+      }).catch(() => {});
+    }, 140);
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      continueOnError: true,
+      logger: makeSilentLogger()
+    });
+    clearTimeout(timer);
+
+    const registryRow = await packageRegistryService.getPackageRegistryById('delayed-pte', { backendMode: 'json' });
+    assert.equal(summary.loadedCount, 1);
+    assert.equal(summary.failedCount, 0);
+    assert.equal(summary.loaded[0].packageId, 'delayed-pte');
+    assert.equal(Boolean(registryRow?.enabled), true);
+    assert.equal(String(registryRow?.installStatus || ''), 'enabled');
+  });
+});
+
+test('loader records startup failure after retry exhaustion without mutating registry state', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'retry-missing',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    process.env.PACKAGE_STARTUP_MANIFEST_RETRY_MS = '160';
+    process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS = '40';
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      continueOnError: true,
+      logger: makeSilentLogger()
+    });
+
+    const registryRow = await packageRegistryService.getPackageRegistryById('retry-missing', { backendMode: 'json' });
+    assert.equal(summary.loadedCount, 0);
+    assert.equal(summary.failedCount, 1);
+    assert.equal(summary.failed[0].packageId, 'retry-missing');
+    assert.match(String(summary.failed[0].message || ''), /No manifest file found/i);
+    assert.equal(Boolean(registryRow?.enabled), true);
+    assert.equal(String(registryRow?.installStatus || ''), 'enabled');
   });
 });
 
@@ -236,5 +326,111 @@ test('loader uses manifestPath metadata when provided', async () => {
     assert.equal(summary.loadedCount, 1);
     assert.equal(summary.loaded[0].packageId, 'credit');
     assert.equal(path.resolve(summary.loaded[0].manifestPath), path.resolve(customManifestPath));
+  });
+});
+
+test('loader uses local JSON cache as source in local dev mode', async () => {
+  await withTempPackageWorkspace(async ({ tempRoot, packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte'
+    });
+    const localCachePath = path.join(tempRoot, 'localPackageRegistry.json');
+    await fs.writeFile(localCachePath, JSON.stringify({
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      packages: [
+        {
+          packageId: 'pte',
+          enabled: true,
+          manifestPath: path.join(packageRootDir, 'pte', 'package.manifest.json')
+        }
+      ]
+    }, null, 2), 'utf8');
+
+    process.env.PACKAGE_LOCAL_DEV_MODE = 'true';
+    process.env.PACKAGE_LOCAL_REGISTRY_FILE = localCachePath;
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'mongo',
+      packageRootDir,
+      logger: makeSilentLogger()
+    });
+
+    assert.equal(summary.localDevMode, true);
+    assert.equal(summary.source, 'local-cache');
+    assert.equal(summary.enabledCount, 1);
+    assert.equal(summary.loadedCount, 1);
+    assert.equal(summary.failedCount, 0);
+    assert.equal(summary.loaded[0].packageId, 'pte');
+    assert.equal(path.resolve(summary.localRegistryFilePath), path.resolve(localCachePath));
+    assert.equal(summary.localRegistryCacheExists, true);
+  });
+});
+
+test('loader does not mutate DB package registry when local mode cache row fails to load', async () => {
+  await withTempPackageWorkspace(async ({ tempRoot, packageRootDir }) => {
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'missing-local',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const localCachePath = path.join(tempRoot, 'localPackageRegistry.json');
+    await fs.writeFile(localCachePath, JSON.stringify({
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      packages: [
+        {
+          packageId: 'missing-local',
+          enabled: true,
+          manifestPath: path.join(packageRootDir, 'missing-local', 'package.manifest.json')
+        }
+      ]
+    }, null, 2), 'utf8');
+
+    process.env.PACKAGE_LOCAL_DEV_MODE = 'true';
+    process.env.PACKAGE_LOCAL_REGISTRY_FILE = localCachePath;
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      continueOnError: true,
+      logger: makeSilentLogger()
+    });
+
+    const registryRow = await packageRegistryService.getPackageRegistryById('missing-local', { backendMode: 'json' });
+    assert.equal(summary.localDevMode, true);
+    assert.equal(summary.failedCount, 1);
+    assert.equal(summary.failed[0].packageId, 'missing-local');
+    assert.equal(summary.failed[0].autoDisabled, false);
+    assert.equal(Boolean(registryRow?.enabled), true);
+    assert.equal(String(registryRow?.installStatus || ''), 'enabled');
+  });
+});
+
+test('loader in local mode warns and safely skips when local cache file is missing', async () => {
+  await withTempPackageWorkspace(async ({ tempRoot, packageRootDir }) => {
+    const localCachePath = path.join(tempRoot, 'does-not-exist.localPackageRegistry.json');
+    process.env.PACKAGE_LOCAL_DEV_MODE = 'true';
+    process.env.PACKAGE_LOCAL_REGISTRY_FILE = localCachePath;
+
+    const logger = makeSpyLogger();
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      logger
+    });
+
+    assert.equal(summary.localDevMode, true);
+    assert.equal(summary.source, 'local-cache');
+    assert.equal(summary.localRegistryCacheExists, false);
+    assert.equal(summary.enabledCount, 0);
+    assert.equal(summary.loadedCount, 0);
+    assert.equal(summary.failedCount, 0);
+    assert.equal(logger.events.warn.length > 0, true);
+    assert.match(String(logger.events.warn[0]?.[1] || ''), /LOCAL_CACHE_MISSING/i);
   });
 });

@@ -9,6 +9,7 @@ const systemSettingsController = require('../MVC/controllers/systemSettingsContr
 const systemSettingsRepository = require('../MVC/repositories/systemSettingsRepository');
 const dataBackendRuntimeService = require('../MVC/services/dataBackendRuntimeService');
 const systemSettingsPackageManagerService = require('../MVC/services/systemSettingsPackageManagerService');
+const localPackageSyncService = require('../MVC/services/localPackageSyncService');
 
 function makeRenderResponse() {
   return {
@@ -79,12 +80,107 @@ test('package manager page controller renders snapshot and action state', async 
     assert.equal(Array.isArray(res.rendered?.payload?.packageStorageRootWarnings), true);
     assert.equal(Array.isArray(res.rendered?.payload?.startupPackageWarnings), true);
     assert.equal(res.rendered?.payload?.startupPackageWarnings.length, 1);
+    assert.match(String(res.rendered?.payload?.startupPackageWarnings?.[0] || ''), /^\[pte\]\s+/i);
   } finally {
     if (originalPackageStorageRoot === undefined) delete process.env.PACKAGE_STORAGE_ROOT;
     else process.env.PACKAGE_STORAGE_ROOT = originalPackageStorageRoot;
     systemSettingsRepository.getSettings = originalGetSettings;
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
     systemSettingsPackageManagerService.listPackageSnapshot = originalListSnapshot;
+  }
+});
+
+test('local package sync page controller renders defaults and cache details', async () => {
+  const originalGetSettings = systemSettingsRepository.getSettings;
+  const originalRuntimeStatus = dataBackendRuntimeService.getPublicBackendStatus;
+  const originalLocalMode = localPackageSyncService.isLocalPackageDevModeEnabled;
+  const originalResolvePaths = localPackageSyncService.resolveLocalSyncPaths;
+  const originalReadCache = localPackageSyncService.readLocalPackageRegistryCache;
+  const res = makeRenderResponse();
+
+  systemSettingsRepository.getSettings = async () => ({ app: {} });
+  dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'mongo', mongo: { ready: true } });
+  localPackageSyncService.isLocalPackageDevModeEnabled = () => true;
+  localPackageSyncService.resolveLocalSyncPaths = () => ({
+    targetRoot: 'C:/repo/packages'
+  });
+  localPackageSyncService.readLocalPackageRegistryCache = async () => ({
+    filePath: 'C:/repo/data/localPackageRegistry.json',
+    generatedAt: '2026-05-28T12:00:00.000Z',
+    packages: []
+  });
+
+  try {
+    await systemSettingsController.showPackageLocalSyncPage(
+      {
+        user: { id: 'USER_1' },
+        actionStateId: 'STATE_LOCAL_SYNC_1'
+      },
+      res
+    );
+
+    assert.equal(res.rendered?.view, 'systemSettings/packageLocalSyncSettings');
+    assert.equal(res.rendered?.payload?.title, 'Package Sync Locally');
+    assert.equal(res.rendered?.payload?.localPackageDevModeEnabled, true);
+    assert.equal(res.rendered?.payload?.targetRootDefault, 'C:/repo/packages');
+    assert.equal(res.rendered?.payload?.localRegistryFilePath, 'C:/repo/data/localPackageRegistry.json');
+    assert.equal(res.rendered?.payload?.actionStateId, 'STATE_LOCAL_SYNC_1');
+  } finally {
+    systemSettingsRepository.getSettings = originalGetSettings;
+    dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
+    localPackageSyncService.isLocalPackageDevModeEnabled = originalLocalMode;
+    localPackageSyncService.resolveLocalSyncPaths = originalResolvePaths;
+    localPackageSyncService.readLocalPackageRegistryCache = originalReadCache;
+  }
+});
+
+test('local package sync scan controller rejects when local mode is disabled', async () => {
+  const originalLocalMode = localPackageSyncService.isLocalPackageDevModeEnabled;
+  const res = makeRenderResponse();
+
+  try {
+    localPackageSyncService.isLocalPackageDevModeEnabled = () => false;
+    await systemSettingsController.scanLocalPackagesFromManager(
+      { body: {} },
+      res
+    );
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.jsonPayload?.status, 'error');
+    assert.equal(res.jsonPayload?.code, 'LOCAL_PACKAGE_DEV_MODE_DISABLED');
+  } finally {
+    localPackageSyncService.isLocalPackageDevModeEnabled = originalLocalMode;
+  }
+});
+
+test('local package sync controller returns warning status on partial sync', async () => {
+  const originalLocalMode = localPackageSyncService.isLocalPackageDevModeEnabled;
+  const originalSync = localPackageSyncService.syncMountedPackages;
+  const res = makeRenderResponse();
+
+  try {
+    localPackageSyncService.isLocalPackageDevModeEnabled = () => true;
+    localPackageSyncService.syncMountedPackages = async () => ({
+      status: 'partial',
+      syncedCount: 1,
+      failedCount: 1,
+      cache: { filePath: 'data/localPackageRegistry.json' }
+    });
+    await systemSettingsController.syncLocalPackagesFromManager(
+      {
+        body: {
+          targetRoot: 'C:/repo/packages',
+          selectedPackageIds: ['pte']
+        }
+      },
+      res
+    );
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonPayload?.status, 'warning');
+    assert.match(String(res.jsonPayload?.message || ''), /Synced 1 package/i);
+  } finally {
+    localPackageSyncService.isLocalPackageDevModeEnabled = originalLocalMode;
+    localPackageSyncService.syncMountedPackages = originalSync;
   }
 });
 
@@ -362,6 +458,7 @@ test('package manager EJS compiles and includes expected controls', () => {
       }
     ],
     localManifestWarnings: [],
+    startupPackageWarnings: ['[pte] No manifest file found for this enabled package.'],
     actionStateId: 'STATE_VIEW',
     zipTrustedKeysConfigured: true,
     zipTrustedKeysCount: 1
@@ -376,4 +473,47 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /Installed Packages/);
   assert.match(html, /Impact Preview/);
   assert.match(html, /Recent Lifecycle Transactions/);
+  assert.match(html, /Startup Package Load Warnings \(Registry State Unchanged\)/i);
+});
+
+test('package manager EJS shows local sync button when local dev mode is enabled', () => {
+  const viewPath = path.join(process.cwd(), 'MVC', 'views', 'systemSettings', 'packageManagerSettings.ejs');
+  const template = fs.readFileSync(viewPath, 'utf8');
+  const render = ejs.compile(template, { filename: viewPath });
+  const html = render({
+    title: 'Package Manager',
+    runtimeBackend: { mode: 'json', mongo: { ready: false } },
+    installedPackages: [],
+    localManifestOptions: [],
+    localManifestWarnings: [],
+    actionStateId: 'STATE_VIEW_LOCAL',
+    zipTrustedKeysConfigured: false,
+    zipTrustedKeysCount: 0,
+    localPackageDevModeEnabled: true
+  });
+
+  assert.match(html, /Package Sync Locally/);
+  assert.match(html, /\/systemSettings\/packages\/local-sync/);
+});
+
+test('local package sync EJS compiles and includes sync actions', () => {
+  const viewPath = path.join(process.cwd(), 'MVC', 'views', 'systemSettings', 'packageLocalSyncSettings.ejs');
+  const template = fs.readFileSync(viewPath, 'utf8');
+  const render = ejs.compile(template, { filename: viewPath });
+  const html = render({
+    title: 'Package Sync Locally',
+    runtimeBackend: { mode: 'json' },
+    localPackageDevModeEnabled: true,
+    targetRootDefault: 'C:/repo/packages',
+    localRegistryFilePath: 'data/localPackageRegistry.json',
+    localRegistryGeneratedAt: '2026-05-28T12:00:00.000Z',
+    actionStateId: 'STATE_LOCAL_SYNC_2'
+  });
+
+  assert.match(html, /Package Sync Locally/);
+  assert.match(html, /Scan Railway Runtime/);
+  assert.match(html, /RAILWAY_GATEWAY_BASE_URL/);
+  assert.match(html, /Sync Selected Package/);
+  assert.match(html, /\/systemSettings\/packages\/local-sync\/scan/);
+  assert.match(html, /\/systemSettings\/packages\/local-sync\/sync/);
 });
