@@ -1489,11 +1489,13 @@ function createService(overrides = {}) {
   function buildRegistryPayload(manifest = {}, options = {}) {
     const mode = cleanText(options.mode, 40).toLowerCase() || 'enable';
     const packageSource = cleanText(options.packageSource, 120) || 'manual';
+    const clearWarnings = mode === 'enable';
     return {
       packageId: manifest.id,
       version: manifest.version,
       enabled: mode === 'enable',
       installStatus: mode === 'remove' ? 'removed' : mode === 'disable' ? 'disabled' : 'enabled',
+      ...(clearWarnings ? { lastWarning: '', lastError: '' } : {}),
       metadata: {
         packageName: manifest.name,
         mountPath: manifest.mountPath,

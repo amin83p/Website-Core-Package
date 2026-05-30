@@ -15,6 +15,19 @@ PACKAGE_STORAGE_ROOT=/app/uploads/packages
 Notes:
 - Use your mounted Railway volume path.
 - If unset, the app falls back to `<project>/packages`.
+- In Railway production, do **not** set local sync vars:
+  - `PACKAGE_LOCAL_DEV_MODE`
+  - `PACKAGE_RUNTIME_MOUNT_PATH_LOCAL`
+  - `PACKAGE_LOCAL_TARGET_ROOT`
+  - `PACKAGE_LOCAL_REGISTRY_FILE`
+
+Optional startup recovery knobs (production-safe):
+
+```bash
+PACKAGE_STARTUP_RECOVERY_ENABLED=true
+PACKAGE_STARTUP_RECOVERY_WINDOW_MS=300000
+PACKAGE_STARTUP_RECOVERY_INTERVAL_MS=15000
+```
 
 ## One-time migration
 If packages were previously installed to `<project>/packages`, move/copy them once into the persistent root:
@@ -29,11 +42,13 @@ If packages were previously installed to `<project>/packages`, move/copy them on
 ## Startup self-healing behavior
 If a package is marked enabled but its manifest file is missing at startup:
 - App keeps running (core stays available).
-- Package row is auto-disabled with a warning in registry.
-- Warning appears in Package Manager startup warnings.
+- Package is recorded in startup warnings for this boot.
+- Startup recovery retries run in background for a bounded window.
+- Package registry rows remain enabled unless an explicit admin action changes them.
 
 ## Validation checklist
 1. Install package via ZIP upload.
 2. Confirm package appears enabled.
 3. Deploy a new core commit.
-4. Confirm package is still present and can be enabled/used without reinstall.
+4. Confirm package routes respond without manual re-enable.
+5. Confirm Package Manager warning columns clear after successful activation.

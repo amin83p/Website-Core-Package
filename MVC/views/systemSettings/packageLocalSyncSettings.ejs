@@ -3,6 +3,10 @@
   const activeMode = String(backend.mode || 'json').trim().toLowerCase();
   const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
   const localModeEnabled = Boolean(typeof localPackageDevModeEnabled !== 'undefined' ? localPackageDevModeEnabled : false);
+  const localModeState = (typeof localPackageModeState !== 'undefined' && localPackageModeState && typeof localPackageModeState === 'object')
+    ? localPackageModeState
+    : {};
+  const productionLocked = Boolean(localModeState.productionLocked === true);
   const targetRootValue = String(typeof targetRootDefault !== 'undefined' ? targetRootDefault : '').trim();
   const localRegistryPath = String(typeof localRegistryFilePath !== 'undefined' ? localRegistryFilePath : '').trim();
   const localRegistryGeneratedAtValue = String(
@@ -30,7 +34,12 @@
     </div>
   </div>
 
-  <% if (!localModeEnabled) { %>
+  <% if (productionLocked) { %>
+    <div class="alert alert-warning border-0 shadow-sm py-3 px-3 mb-3">
+      <div class="fw-semibold">Local package sync is disabled in production.</div>
+      <div class="small mt-1">Use Package Manager install/enable flows on the deployed runtime. Local sync is reserved for local development only.</div>
+    </div>
+  <% } else if (!localModeEnabled) { %>
     <div class="alert alert-warning border-0 shadow-sm py-3 px-3 mb-3">
       <div class="fw-semibold">Local package sync mode is disabled.</div>
       <div class="small mt-1">Set <code>PACKAGE_LOCAL_DEV_MODE=true</code> in <code>.env</code> and restart app.</div>

@@ -93,14 +93,21 @@ test('package manager page controller renders snapshot and action state', async 
 test('local package sync page controller renders defaults and cache details', async () => {
   const originalGetSettings = systemSettingsRepository.getSettings;
   const originalRuntimeStatus = dataBackendRuntimeService.getPublicBackendStatus;
-  const originalLocalMode = localPackageSyncService.isLocalPackageDevModeEnabled;
+  const originalResolveLocalMode = localPackageSyncService.resolveLocalPackageMode;
   const originalResolvePaths = localPackageSyncService.resolveLocalSyncPaths;
   const originalReadCache = localPackageSyncService.readLocalPackageRegistryCache;
   const res = makeRenderResponse();
 
   systemSettingsRepository.getSettings = async () => ({ app: {} });
   dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'mongo', mongo: { ready: true } });
-  localPackageSyncService.isLocalPackageDevModeEnabled = () => true;
+  localPackageSyncService.resolveLocalPackageMode = () => ({
+    requested: true,
+    enabled: true,
+    production: false,
+    productionLocked: false,
+    localOnlyVarsPresent: true,
+    localEnvKeys: ['PACKAGE_LOCAL_DEV_MODE']
+  });
   localPackageSyncService.resolveLocalSyncPaths = () => ({
     targetRoot: 'C:/repo/packages'
   });
@@ -128,18 +135,25 @@ test('local package sync page controller renders defaults and cache details', as
   } finally {
     systemSettingsRepository.getSettings = originalGetSettings;
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
-    localPackageSyncService.isLocalPackageDevModeEnabled = originalLocalMode;
+    localPackageSyncService.resolveLocalPackageMode = originalResolveLocalMode;
     localPackageSyncService.resolveLocalSyncPaths = originalResolvePaths;
     localPackageSyncService.readLocalPackageRegistryCache = originalReadCache;
   }
 });
 
 test('local package sync scan controller rejects when local mode is disabled', async () => {
-  const originalLocalMode = localPackageSyncService.isLocalPackageDevModeEnabled;
+  const originalResolveLocalMode = localPackageSyncService.resolveLocalPackageMode;
   const res = makeRenderResponse();
 
   try {
-    localPackageSyncService.isLocalPackageDevModeEnabled = () => false;
+    localPackageSyncService.resolveLocalPackageMode = () => ({
+      requested: false,
+      enabled: false,
+      production: false,
+      productionLocked: false,
+      localOnlyVarsPresent: false,
+      localEnvKeys: []
+    });
     await systemSettingsController.scanLocalPackagesFromManager(
       { body: {} },
       res
@@ -148,17 +162,49 @@ test('local package sync scan controller rejects when local mode is disabled', a
     assert.equal(res.jsonPayload?.status, 'error');
     assert.equal(res.jsonPayload?.code, 'LOCAL_PACKAGE_DEV_MODE_DISABLED');
   } finally {
-    localPackageSyncService.isLocalPackageDevModeEnabled = originalLocalMode;
+    localPackageSyncService.resolveLocalPackageMode = originalResolveLocalMode;
+  }
+});
+
+test('local package sync scan controller rejects in production even when local mode requested', async () => {
+  const originalResolveLocalMode = localPackageSyncService.resolveLocalPackageMode;
+  const res = makeRenderResponse();
+
+  try {
+    localPackageSyncService.resolveLocalPackageMode = () => ({
+      requested: true,
+      enabled: false,
+      production: true,
+      productionLocked: true,
+      localOnlyVarsPresent: true,
+      localEnvKeys: ['PACKAGE_LOCAL_DEV_MODE']
+    });
+    await systemSettingsController.scanLocalPackagesFromManager(
+      { body: {} },
+      res
+    );
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.jsonPayload?.status, 'error');
+    assert.equal(res.jsonPayload?.code, 'LOCAL_PACKAGE_SYNC_PRODUCTION_DISABLED');
+  } finally {
+    localPackageSyncService.resolveLocalPackageMode = originalResolveLocalMode;
   }
 });
 
 test('local package sync controller returns warning status on partial sync', async () => {
-  const originalLocalMode = localPackageSyncService.isLocalPackageDevModeEnabled;
+  const originalResolveLocalMode = localPackageSyncService.resolveLocalPackageMode;
   const originalSync = localPackageSyncService.syncMountedPackages;
   const res = makeRenderResponse();
 
   try {
-    localPackageSyncService.isLocalPackageDevModeEnabled = () => true;
+    localPackageSyncService.resolveLocalPackageMode = () => ({
+      requested: true,
+      enabled: true,
+      production: false,
+      productionLocked: false,
+      localOnlyVarsPresent: true,
+      localEnvKeys: ['PACKAGE_LOCAL_DEV_MODE']
+    });
     localPackageSyncService.syncMountedPackages = async () => ({
       status: 'partial',
       syncedCount: 1,
@@ -179,7 +225,7 @@ test('local package sync controller returns warning status on partial sync', asy
     assert.equal(res.jsonPayload?.status, 'warning');
     assert.match(String(res.jsonPayload?.message || ''), /Synced 1 package/i);
   } finally {
-    localPackageSyncService.isLocalPackageDevModeEnabled = originalLocalMode;
+    localPackageSyncService.resolveLocalPackageMode = originalResolveLocalMode;
     localPackageSyncService.syncMountedPackages = originalSync;
   }
 });

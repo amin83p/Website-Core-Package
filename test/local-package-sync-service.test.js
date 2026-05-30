@@ -77,6 +77,33 @@ test('scanMountedPackageSource uses gateway runtime rows', async () => {
   }
 });
 
+test('resolveLocalPackageMode forces local sync off in production', () => {
+  const state = localPackageSyncService.resolveLocalPackageMode({
+    NODE_ENV: 'production',
+    PACKAGE_LOCAL_DEV_MODE: 'true',
+    PACKAGE_LOCAL_TARGET_ROOT: '/app/uploads/packages'
+  });
+
+  assert.equal(state.requested, true);
+  assert.equal(state.production, true);
+  assert.equal(state.productionLocked, true);
+  assert.equal(state.enabled, false);
+  assert.equal(state.localOnlyVarsPresent, true);
+  assert.equal(state.localEnvKeys.includes('PACKAGE_LOCAL_DEV_MODE'), true);
+});
+
+test('resolveLocalPackageMode enables local sync in non-production when requested', () => {
+  const state = localPackageSyncService.resolveLocalPackageMode({
+    NODE_ENV: 'development',
+    PACKAGE_LOCAL_DEV_MODE: 'true'
+  });
+
+  assert.equal(state.requested, true);
+  assert.equal(state.production, false);
+  assert.equal(state.productionLocked, false);
+  assert.equal(state.enabled, true);
+});
+
 test('syncMountedPackages downloads selected package and refreshes local cache JSON', async () => {
   const originalList = fileGatewayClientService.gatewayListRuntimePackages;
   const originalDownload = fileGatewayClientService.gatewayDownloadRuntimePackage;

@@ -8,6 +8,12 @@ const fileGatewayClientService = require('./fileGatewayClientService');
 
 const LOCAL_PACKAGE_REGISTRY_FILE = path.resolve(process.cwd(), 'data', 'localPackageRegistry.json');
 const DEFAULT_TARGET_ROOT = path.resolve(process.cwd(), 'packages');
+const LOCAL_ONLY_ENV_KEYS = Object.freeze([
+  'PACKAGE_LOCAL_DEV_MODE',
+  'PACKAGE_RUNTIME_MOUNT_PATH_LOCAL',
+  'PACKAGE_LOCAL_TARGET_ROOT',
+  'PACKAGE_LOCAL_REGISTRY_FILE'
+]);
 
 function cleanText(value, max = 4000) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -20,8 +26,40 @@ function isTrue(value) {
   return token === '1' || token === 'true' || token === 'yes' || token === 'on';
 }
 
+function isProductionEnvironment(env = process.env) {
+  const token = cleanText(env?.NODE_ENV, 40).toLowerCase();
+  return token === 'production';
+}
+
+function collectLocalPackageEnvHints(env = process.env) {
+  const keys = [];
+  LOCAL_ONLY_ENV_KEYS.forEach((key) => {
+    if (cleanText(env?.[key], 2000)) {
+      keys.push(key);
+    }
+  });
+  return keys;
+}
+
+function resolveLocalPackageMode(env = process.env) {
+  const requested = isTrue(env?.PACKAGE_LOCAL_DEV_MODE);
+  const production = isProductionEnvironment(env);
+  const localEnvKeys = collectLocalPackageEnvHints(env);
+  const localOnlyVarsPresent = localEnvKeys.length > 0;
+  const productionLocked = production === true;
+  const enabled = requested && !productionLocked;
+  return {
+    requested,
+    enabled,
+    production,
+    productionLocked,
+    localOnlyVarsPresent,
+    localEnvKeys
+  };
+}
+
 function isLocalPackageDevModeEnabled(env = process.env) {
-  return isTrue(env.PACKAGE_LOCAL_DEV_MODE);
+  return resolveLocalPackageMode(env).enabled;
 }
 
 function normalizePackageId(value = '') {
@@ -482,6 +520,10 @@ async function syncMountedPackages(options = {}) {
 module.exports = {
   LOCAL_PACKAGE_REGISTRY_FILE,
   DEFAULT_TARGET_ROOT,
+  LOCAL_ONLY_ENV_KEYS,
+  isProductionEnvironment,
+  resolveLocalPackageMode,
+  collectLocalPackageEnvHints,
   isLocalPackageDevModeEnabled,
   resolveLocalSyncPaths,
   readLocalPackageRegistryCache,

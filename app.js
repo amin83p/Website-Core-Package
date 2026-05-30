@@ -63,6 +63,8 @@ const { isRailwayProxyMode, getGatewayBaseUrl } = require('./MVC/utils/uploadMod
 const { SESSION_SECRET } = require('./config/security');
 
 const PORT    = process.env.PORT || 3000;
+const DEFAULT_PACKAGE_STARTUP_RECOVERY_WINDOW_MS = 300000;
+const DEFAULT_PACKAGE_STARTUP_RECOVERY_INTERVAL_MS = 15000;
 
 const app = express();
 const server = http.createServer(app); // Create explicit server
@@ -312,6 +314,7 @@ app.use(packageRuntimeRouter);
 // }, 10 * 60 * 1000);
 
 let notFoundHandlerRegistered = false;
+let packageStartupRecoveryTimer = null;
 function registerNotFoundHandler() {
   if (notFoundHandlerRegistered) return;
   notFoundHandlerRegistered = true;
@@ -324,6 +327,190 @@ function registerNotFoundHandler() {
 }
 
 // ✅ Initialize Socket.io
+function readPositiveInt(value, fallback = 0) {
+  const parsed = Number.parseInt(String(value || '').trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+function isTrue(value, fallback = false) {
+  const token = String(value || '').trim().toLowerCase();
+  if (!token) return fallback;
+  return token === '1' || token === 'true' || token === 'yes' || token === 'on';
+}
+
+function resolvePackageStartupRecoverySettings(env = process.env) {
+  const enabled = isTrue(env.PACKAGE_STARTUP_RECOVERY_ENABLED, true);
+  const windowMs = readPositiveInt(env.PACKAGE_STARTUP_RECOVERY_WINDOW_MS, DEFAULT_PACKAGE_STARTUP_RECOVERY_WINDOW_MS);
+  const intervalMs = Math.min(
+    windowMs,
+    readPositiveInt(env.PACKAGE_STARTUP_RECOVERY_INTERVAL_MS, DEFAULT_PACKAGE_STARTUP_RECOVERY_INTERVAL_MS)
+  );
+  return {
+    enabled,
+    windowMs,
+    intervalMs: Math.max(1000, intervalMs)
+  };
+}
+
+function normalizePackageId(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function shouldRetryPackageFailure(row = {}) {
+  const code = String(row?.code || '').trim().toUpperCase();
+  const message = String(row?.message || '').trim();
+  if (row?.missingManifest === true) return true;
+  if (code === 'PACKAGE_MANIFEST_NOT_FOUND') return true;
+  if (code === 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED') return true;
+  if (/no manifest file found/i.test(message)) return true;
+  if (/runtime route|route mount/i.test(message)) return true;
+  return false;
+}
+
+function collectRecoverablePackageIds(summary = {}) {
+  const failures = Array.isArray(summary?.failed) ? summary.failed : [];
+  return Array.from(new Set(
+    failures
+      .filter((row) => shouldRetryPackageFailure(row))
+      .map((row) => normalizePackageId(row?.packageId || ''))
+      .filter(Boolean)
+  ));
+}
+
+function mergePackageLoadSummary(baseSummary = {}, latestSummary = {}) {
+  const existingLoaded = Array.isArray(baseSummary?.loaded) ? baseSummary.loaded : [];
+  const latestLoaded = Array.isArray(latestSummary?.loaded) ? latestSummary.loaded : [];
+  const loadedMap = new Map();
+  existingLoaded.forEach((row) => {
+    const packageId = normalizePackageId(row?.packageId || '');
+    if (!packageId) return;
+    loadedMap.set(packageId, row);
+  });
+  latestLoaded.forEach((row) => {
+    const packageId = normalizePackageId(row?.packageId || '');
+    if (!packageId) return;
+    loadedMap.set(packageId, row);
+  });
+
+  const loadedIds = new Set(Array.from(loadedMap.keys()));
+  const existingFailed = Array.isArray(baseSummary?.failed) ? baseSummary.failed : [];
+  const latestFailed = Array.isArray(latestSummary?.failed) ? latestSummary.failed : [];
+  const failedMap = new Map();
+
+  existingFailed.forEach((row) => {
+    const packageId = normalizePackageId(row?.packageId || '');
+    if (!packageId || loadedIds.has(packageId)) return;
+    failedMap.set(packageId, row);
+  });
+  latestFailed.forEach((row) => {
+    const packageId = normalizePackageId(row?.packageId || '');
+    if (!packageId || loadedIds.has(packageId)) return;
+    failedMap.set(packageId, row);
+  });
+
+  const loaded = Array.from(loadedMap.values());
+  const failed = Array.from(failedMap.values());
+  return {
+    ...baseSummary,
+    finishedAt: new Date().toISOString(),
+    loaded,
+    failed,
+    loadedCount: loaded.length,
+    failedCount: failed.length
+  };
+}
+
+function stopPackageStartupRecoveryLoop() {
+  if (packageStartupRecoveryTimer) {
+    clearInterval(packageStartupRecoveryTimer);
+    packageStartupRecoveryTimer = null;
+  }
+}
+
+function startPackageStartupRecoveryLoop({
+  initialSummary = {},
+  backendMode = '',
+  packageRootDir = '',
+  packageLoaderHooks = {},
+  packageRuntimeRouter = null
+} = {}) {
+  stopPackageStartupRecoveryLoop();
+  const settings = resolvePackageStartupRecoverySettings(process.env);
+  if (!settings.enabled) {
+    startupLogger.info('PACKAGE_LOADER', 'RECOVERY_DISABLED', 'Startup recovery loop is disabled by environment flag.');
+    return;
+  }
+
+  const pendingIds = new Set(collectRecoverablePackageIds(initialSummary));
+  if (!pendingIds.size) return;
+
+  const deadline = Date.now() + settings.windowMs;
+  const state = {
+    running: false
+  };
+
+  startupLogger.warn('PACKAGE_LOADER', 'RECOVERY_START', 'Starting background package startup recovery loop.', {
+    packageCount: pendingIds.size,
+    windowMs: settings.windowMs,
+    intervalMs: settings.intervalMs
+  });
+
+  const runTick = async () => {
+    if (state.running) return;
+    if (!pendingIds.size) {
+      stopPackageStartupRecoveryLoop();
+      return;
+    }
+    if (Date.now() >= deadline) {
+      startupLogger.warn('PACKAGE_LOADER', 'RECOVERY_TIMEOUT', 'Package startup recovery window expired.', {
+        pendingPackageIds: Array.from(pendingIds).join(',')
+      });
+      stopPackageStartupRecoveryLoop();
+      return;
+    }
+
+    state.running = true;
+    try {
+      const latestSummary = await packageLoaderService.loadEnabledPackages({
+        app,
+        packageRuntimeRouter,
+        backendMode,
+        packageRootDir,
+        hooks: packageLoaderHooks,
+        packageIds: Array.from(pendingIds),
+        continueOnError: true
+      });
+      app.locals.packageLoadSummary = mergePackageLoadSummary(app.locals.packageLoadSummary || {}, latestSummary);
+
+      const loadedRows = Array.isArray(latestSummary?.loaded) ? latestSummary.loaded : [];
+      loadedRows.forEach((row) => {
+        const packageId = normalizePackageId(row?.packageId || '');
+        if (!packageId) return;
+        pendingIds.delete(packageId);
+      });
+
+      if (!pendingIds.size) {
+        startupLogger.success('PACKAGE_LOADER', 'RECOVERY_COMPLETE', 'Background package startup recovery completed.', {
+          loadedCount: loadedRows.length
+        });
+        stopPackageStartupRecoveryLoop();
+      }
+    } catch (error) {
+      startupLogger.warn('PACKAGE_LOADER', 'RECOVERY_TICK_FAIL', 'Package startup recovery tick failed.', {
+        error: error?.message || String(error)
+      });
+    } finally {
+      state.running = false;
+    }
+  };
+
+  packageStartupRecoveryTimer = setInterval(() => {
+    void runTick();
+  }, settings.intervalMs);
+  void runTick();
+}
+
 socketService.init(server);
 
 // ✅ Initialize Settings (Load JSON to Memory)
@@ -347,6 +534,13 @@ async function startServer() {
         hooks: packageLoaderHooks
       });
       app.locals.packageLoadSummary = packageLoadSummary;
+      startPackageStartupRecoveryLoop({
+        initialSummary: packageLoadSummary,
+        backendMode: dataBackend.mode,
+        packageRootDir,
+        packageLoaderHooks,
+        packageRuntimeRouter
+      });
     } catch (packageLoaderError) {
       startupLogger.warn('PACKAGE_LOADER', 'STARTUP', 'Package loader failed during startup; continuing with core + hardcoded routes.', {
         error: packageLoaderError?.message || String(packageLoaderError)

@@ -1180,7 +1180,8 @@ exports.showPackageManagerPage = async (req, res) => {
     const settings = await systemSettingsRepository.getSettings();
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const keyContext = buildPackageTrustedKeyContext(settings);
-    const localPackageDevModeEnabled = localPackageSyncService.isLocalPackageDevModeEnabled();
+    const localPackageModeState = localPackageSyncService.resolveLocalPackageMode();
+    const localPackageDevModeEnabled = localPackageModeState.enabled === true;
     const storageResolution = getPackageStorageRootResolution({ ensureExists: false });
     const packageStorageRoot = storageResolution.effectiveRoot;
     const snapshot = await systemSettingsPackageManagerService.listPackageSnapshot({
@@ -1221,6 +1222,7 @@ exports.showPackageManagerPage = async (req, res) => {
       packageStorageRootWarnings: Array.isArray(storageResolution.warnings) ? storageResolution.warnings : [],
       startupPackageWarnings,
       localPackageDevModeEnabled,
+      localPackageModeState,
       organizations: Array.isArray(organizations) ? organizations : [],
       activeOrgId,
       includeModal: true,
@@ -1287,11 +1289,53 @@ function sendPackageManagerError(res, error, fallbackMessage = 'Package operatio
 }
 
 function assertLocalPackageDevModeEnabled() {
-  if (localPackageSyncService.isLocalPackageDevModeEnabled()) return;
+  const modeState = localPackageSyncService.resolveLocalPackageMode();
+  if (modeState.productionLocked) {
+    throw buildOperationError(
+      'LOCAL_PACKAGE_SYNC_PRODUCTION_DISABLED',
+      'Local package sync is disabled in production environments.'
+    );
+  }
+  if (modeState.enabled) return;
   throw buildOperationError(
     'LOCAL_PACKAGE_DEV_MODE_DISABLED',
     'Local package sync mode is disabled. Set PACKAGE_LOCAL_DEV_MODE=true and restart the app.'
   );
+}
+
+function removeStartupFailureForPackage(app = null, packageIdInput = '', row = null) {
+  const appRef = app && typeof app === 'object' ? app : null;
+  if (!appRef || !appRef.locals || typeof appRef.locals !== 'object') return;
+  const packageId = cleanFormText(packageIdInput, 120).toLowerCase();
+  if (!packageId) return;
+  const summary = appRef.locals.packageLoadSummary;
+  if (!summary || typeof summary !== 'object') return;
+
+  const currentFailed = Array.isArray(summary.failed) ? summary.failed : [];
+  const nextFailed = currentFailed.filter((item) => cleanFormText(item?.packageId, 120).toLowerCase() !== packageId);
+  const currentLoaded = Array.isArray(summary.loaded) ? summary.loaded : [];
+  const alreadyLoaded = currentLoaded.some((item) => cleanFormText(item?.packageId, 120).toLowerCase() === packageId);
+  const nextLoaded = alreadyLoaded
+    ? currentLoaded
+    : [
+        ...currentLoaded,
+        {
+          packageId,
+          name: cleanFormText(row?.name, 200),
+          version: cleanFormText(row?.version, 120),
+          mountPath: cleanFormText(row?.mountPath, 400),
+          manifestPath: cleanFormText(row?.manifestPath, 1600)
+        }
+      ];
+
+  appRef.locals.packageLoadSummary = {
+    ...summary,
+    failed: nextFailed,
+    loaded: nextLoaded,
+    failedCount: nextFailed.length,
+    loadedCount: nextLoaded.length,
+    finishedAt: new Date().toISOString()
+  };
 }
 
 exports.installPackageFromManager = async (req, res) => {
@@ -1302,6 +1346,7 @@ exports.installPackageFromManager = async (req, res) => {
       manifestPath: cleanFormText(req.body?.manifestPath, 1600),
       manifestJson: String(req.body?.manifestJson || '')
     }, buildPackageManagerOptions(req));
+    removeStartupFailureForPackage(req.app, report?.packageId, report);
 
     return res.json({
       status: 'success',
@@ -1321,6 +1366,7 @@ exports.installPackageZipFromManager = async (req, res) => {
       zipBuffer: packageZip?.buffer,
       signatureBuffer: packageSig?.buffer
     }, buildPackageManagerOptions(req));
+    removeStartupFailureForPackage(req.app, report?.packageId, report);
 
     return res.json({
       status: 'success',
@@ -1336,6 +1382,7 @@ exports.enablePackageFromManager = async (req, res) => {
   try {
     const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
     const report = await systemSettingsPackageManagerService.enablePackage(packageId, buildPackageManagerOptions(req));
+    removeStartupFailureForPackage(req.app, report?.packageId || packageId, report);
     return res.json({
       status: 'success',
       message: `Package "${report.packageId}" is enabled.`,
@@ -1398,7 +1445,8 @@ exports.showPackageLocalSyncPage = async (req, res) => {
   try {
     const settings = await systemSettingsRepository.getSettings();
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
-    const localPackageDevModeEnabled = localPackageSyncService.isLocalPackageDevModeEnabled();
+    const localPackageModeState = localPackageSyncService.resolveLocalPackageMode();
+    const localPackageDevModeEnabled = localPackageModeState.enabled === true;
     const defaults = localPackageSyncService.resolveLocalSyncPaths({});
     const cache = await localPackageSyncService.readLocalPackageRegistryCache();
 
@@ -1407,6 +1455,7 @@ exports.showPackageLocalSyncPage = async (req, res) => {
       settings,
       runtimeBackend,
       localPackageDevModeEnabled,
+      localPackageModeState,
       targetRootDefault: defaults.targetRoot || '',
       localRegistryFilePath: cache?.filePath || '',
       localRegistryGeneratedAt: cleanFormText(cache?.generatedAt, 120),

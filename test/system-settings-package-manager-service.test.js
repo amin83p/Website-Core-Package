@@ -326,6 +326,43 @@ test('enablePackage recovers from stale registry manifest path by local package-
   assert.equal(report.registry.manifestPath.includes('/pte/package.manifest.json') || report.registry.manifestPath.includes('\\pte\\package.manifest.json'), true);
 });
 
+test('enablePackage clears stale warning/error fields in registry payload', async () => {
+  const setup = createBaseDeps();
+  setup.deps.fs.readdir = async () => [createDirent('pte')];
+  setup.deps.fs.readFile = async () => JSON.stringify(createManifest({ id: 'pte', name: 'PTE', version: '1.0.1' }));
+  setup.deps.packageLoaderService.resolveManifestPath = async () => '';
+
+  const originalUpsert = setup.deps.packageRegistryService.upsertPackageRegistry;
+  const upsertCalls = [];
+  setup.deps.packageRegistryService.upsertPackageRegistry = async (input = {}) => {
+    upsertCalls.push({ ...input });
+    return originalUpsert(input);
+  };
+
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: false,
+    installStatus: 'failed',
+    lastWarning: 'Auto-disabled at startup: No manifest file found for this enabled package.',
+    lastError: 'Manifest missing',
+    metadata: {
+      packageName: 'PTE',
+      manifestPath: 'packages/missing/package.manifest.json',
+      mountPath: '/pte'
+    }
+  });
+
+  const service = createService(setup.deps);
+  const report = await service.enablePackage('pte', { backendMode: 'json' });
+
+  const enableUpsert = upsertCalls[upsertCalls.length - 1] || {};
+  assert.equal(report.registry.enabled, true);
+  assert.equal(enableUpsert.packageId, 'pte');
+  assert.equal(enableUpsert.lastWarning, '');
+  assert.equal(enableUpsert.lastError, '');
+});
+
 test('installPackage rejects invalid manifest JSON payload', async () => {
   const setup = createBaseDeps();
   const service = createService(setup.deps);

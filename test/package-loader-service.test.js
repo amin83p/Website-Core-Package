@@ -38,6 +38,7 @@ async function withTempPackageWorkspace(callback) {
   const originalLocalRegistryFile = process.env.PACKAGE_LOCAL_REGISTRY_FILE;
   const originalManifestRetryMs = process.env.PACKAGE_STARTUP_MANIFEST_RETRY_MS;
   const originalManifestRetryIntervalMs = process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS;
+  const originalNodeEnv = process.env.NODE_ENV;
   process.env.PACKAGE_REGISTRY_DATA_PATH = registryPath;
   process.env.PACKAGE_STARTUP_MANIFEST_RETRY_MS = '60';
   process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS = '10';
@@ -56,6 +57,8 @@ async function withTempPackageWorkspace(callback) {
     else process.env.PACKAGE_STARTUP_MANIFEST_RETRY_MS = originalManifestRetryMs;
     if (originalManifestRetryIntervalMs === undefined) delete process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS;
     else process.env.PACKAGE_STARTUP_MANIFEST_RETRY_INTERVAL_MS = originalManifestRetryIntervalMs;
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
     await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
   }
 }
@@ -326,6 +329,85 @@ test('loader uses manifestPath metadata when provided', async () => {
     assert.equal(summary.loadedCount, 1);
     assert.equal(summary.loaded[0].packageId, 'credit');
     assert.equal(path.resolve(summary.loaded[0].manifestPath), path.resolve(customManifestPath));
+  });
+});
+
+test('loader clears stale registry warnings/errors after successful startup load', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte'
+    });
+
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: true,
+      installStatus: 'failed',
+      lastWarning: 'Auto-disabled at startup: No manifest file found for this enabled package.',
+      lastError: 'Missing manifest'
+    }, { backendMode: 'json' });
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      logger: makeSilentLogger()
+    });
+
+    const registryRow = await packageRegistryService.getPackageRegistryById('pte', { backendMode: 'json' });
+    assert.equal(summary.loadedCount, 1);
+    assert.equal(Boolean(registryRow?.enabled), true);
+    assert.equal(String(registryRow?.installStatus || ''), 'enabled');
+    assert.equal(String(registryRow?.lastWarning || ''), '');
+    assert.equal(String(registryRow?.lastError || ''), '');
+  });
+});
+
+test('loader ignores local sync mode in production and uses registry source', async () => {
+  await withTempPackageWorkspace(async ({ tempRoot, packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte'
+    });
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const localCachePath = path.join(tempRoot, 'localPackageRegistry.json');
+    await fs.writeFile(localCachePath, JSON.stringify({
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      packages: [
+        {
+          packageId: 'school',
+          enabled: true,
+          manifestPath: path.join(packageRootDir, 'school', 'package.manifest.json')
+        }
+      ]
+    }, null, 2), 'utf8');
+
+    process.env.NODE_ENV = 'production';
+    process.env.PACKAGE_LOCAL_DEV_MODE = 'true';
+    process.env.PACKAGE_LOCAL_REGISTRY_FILE = localCachePath;
+
+    const logger = makeSpyLogger();
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      logger
+    });
+
+    assert.equal(summary.localDevMode, false);
+    assert.equal(summary.source, 'registry');
+    assert.equal(summary.loadedCount, 1);
+    assert.equal(summary.loaded[0].packageId, 'pte');
+    assert.equal(logger.events.warn.length > 0, true);
+    assert.match(String(logger.events.warn[0]?.[1] || ''), /LOCAL_MODE_IGNORED_IN_PRODUCTION/i);
   });
 });
 

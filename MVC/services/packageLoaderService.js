@@ -24,6 +24,13 @@ function normalizePackageId(value = '') {
   return cleanText(value, 80).toLowerCase();
 }
 
+function normalizePackageIdList(raw = []) {
+  const rows = Array.isArray(raw) ? raw : [raw];
+  return Array.from(new Set(
+    rows.map((item) => normalizePackageId(item)).filter(Boolean)
+  ));
+}
+
 function readPositiveInt(value, fallback = 0) {
   const parsed = Number.parseInt(String(value || '').trim(), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
@@ -197,8 +204,10 @@ async function loadEnabledPackages(options = {}) {
   const hooks = createLoaderHooks(options.hooks || {});
   const logger = options.logger || startupLogger;
   const continueOnError = options.continueOnError !== false;
-  const localDevMode = localPackageSyncService.isLocalPackageDevModeEnabled();
+  const modeState = localPackageSyncService.resolveLocalPackageMode(options.env || process.env);
+  const localDevMode = modeState.enabled;
   const manifestRetrySettings = resolveManifestRetrySettings(options.env || process.env);
+  const selectedPackageIds = normalizePackageIdList(options.packageIds || options.packageId || []);
 
   const summary = {
     startedAt,
@@ -211,14 +220,27 @@ async function loadEnabledPackages(options = {}) {
     loaded: [],
     failed: [],
     localDevMode,
+    localModeRequested: modeState.requested === true,
+    localModeProductionLocked: modeState.productionLocked === true,
+    localModeEnvHints: Array.isArray(modeState.localEnvKeys) ? modeState.localEnvKeys : [],
     source: localDevMode ? 'local-cache' : 'registry',
     localRegistryFilePath: '',
     localRegistryCacheExists: false,
+    selectedPackageIds,
     manifestRetry: {
       retryMs: manifestRetrySettings.retryMs,
       retryIntervalMs: manifestRetrySettings.retryIntervalMs
     }
   };
+
+  if (modeState.production && modeState.localOnlyVarsPresent && logger && typeof logger.warn === 'function') {
+    logger.warn(
+      'PACKAGE_LOADER',
+      'LOCAL_MODE_IGNORED_IN_PRODUCTION',
+      'Local package sync env vars are present but ignored in production; using registry mode.',
+      { localEnvKeys: modeState.localEnvKeys.join(',') }
+    );
+  }
 
   let enabledRows = [];
   if (localDevMode) {
@@ -241,6 +263,11 @@ async function loadEnabledPackages(options = {}) {
     });
     enabledRows = summarizeRegistryRows(registryRows);
   }
+
+  if (selectedPackageIds.length) {
+    enabledRows = enabledRows.filter((row) => selectedPackageIds.includes(normalizePackageId(row?.packageId || row?.id || '')));
+  }
+
   summary.enabledCount = enabledRows.length;
 
   const loadedIds = new Set();
@@ -293,6 +320,26 @@ async function loadEnabledPackages(options = {}) {
         mountPath: manifest.mountPath,
         manifestPath
       });
+      if (
+        !localDevMode
+        && (
+          row?.enabled !== true
+          || cleanText(row?.installStatus, 80).toLowerCase() !== 'enabled'
+          || Boolean(cleanText(row?.lastWarning, 10))
+          || Boolean(cleanText(row?.lastError, 10))
+        )
+      ) {
+        await packageRegistryService.upsertPackageRegistry({
+          packageId: manifest.id,
+          enabled: true,
+          installStatus: 'enabled',
+          lastWarning: '',
+          lastError: ''
+        }, {
+          backendMode,
+          actor: { id: 'SYSTEM', username: 'SYSTEM' }
+        }).catch(() => null);
+      }
       if (logger && typeof logger.success === 'function') {
         logger.success('PACKAGE_LOADER', 'LOAD_OK', `Loaded package ${manifest.id}.`, {
           mountPath: manifest.mountPath,
@@ -305,7 +352,9 @@ async function loadEnabledPackages(options = {}) {
       const failure = {
         packageId,
         message: reason,
-        autoDisabled: false
+        autoDisabled: false,
+        code: cleanText(error?.code, 120).toUpperCase(),
+        missingManifest: isMissingManifest
       };
       summary.failed.push(failure);
       if (logger && typeof logger.warn === 'function') {
