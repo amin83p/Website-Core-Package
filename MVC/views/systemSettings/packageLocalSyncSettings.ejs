@@ -73,7 +73,7 @@
         </button>
       </div>
       <div class="small text-muted mt-2">
-        Local cache: <code id="localSyncCachePath"><%= localRegistryPath || 'data/localPackageRegistry.json' %></code>
+        Local cache: <code id="localSyncCachePath"><%= localRegistryPath || '.local-runtime/package-sync/localPackageRegistry.json' %></code>
         <% if (localRegistryGeneratedAtValue) { %>
           <span class="ms-2">Last generated: <%= localRegistryGeneratedAtValue %></span>
         <% } %>

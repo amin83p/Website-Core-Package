@@ -71,6 +71,17 @@ async function writeManifest(packageRootDir, packageId, payload) {
   return manifestPath;
 }
 
+function createUseRouteDeclaration(overrides = {}) {
+  return {
+    id: 'ROUTE_USE_1',
+    method: 'USE',
+    path: '/students',
+    router: 'MVC/routes/pte/studentRoutes.js',
+    active: true,
+    ...overrides
+  };
+}
+
 test('loader returns empty summary when no enabled packages exist', async () => {
   await withTempPackageWorkspace(async ({ packageRootDir }) => {
     const summary = await packageLoaderService.loadEnabledPackages({
@@ -361,6 +372,152 @@ test('loader clears stale registry warnings/errors after successful startup load
     assert.equal(String(registryRow?.installStatus || ''), 'enabled');
     assert.equal(String(registryRow?.lastWarning || ''), '');
     assert.equal(String(registryRow?.lastError || ''), '');
+  });
+});
+
+test('loader records runtime route-mount failure when active USE routes fail during startup', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      routes: [createUseRouteDeclaration()]
+    });
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const hooks = {
+      registerRoutes: async () => ({
+        requested: 1,
+        prepared: 1,
+        mounted: 0,
+        failed: 1,
+        results: [{ method: 'USE', path: '/students', status: 'failed', message: 'Router export not found.' }]
+      }),
+      registerViews: async () => ({ requested: 0, registered: 0, failed: 0 }),
+      registerAssets: async () => ({ requested: 0, mounted: 0, failed: 0 }),
+      registerRegistryData: async () => {},
+      registerUploadFolders: async () => {},
+      registerQueryExecutors: async () => {}
+    };
+    const app = { use() {}, get() {}, set() {}, locals: { packageRuntimeRouter: { use() {} } } };
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      continueOnError: true,
+      hooks,
+      app,
+      packageRuntimeRouter: app.locals.packageRuntimeRouter,
+      logger: makeSilentLogger()
+    });
+
+    assert.equal(summary.loadedCount, 0);
+    assert.equal(summary.failedCount, 1);
+    assert.equal(summary.failed[0].packageId, 'pte');
+    assert.equal(summary.failed[0].code, 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED');
+    assert.match(String(summary.failed[0].message || ''), /failed route declarations/i);
+    assert.equal(Number(summary.failed[0]?.details?.expectedUseRoutes || 0), 1);
+  });
+});
+
+test('loader records runtime route-mount failure when active USE routes report zero effective mounts', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      routes: [createUseRouteDeclaration()]
+    });
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const hooks = {
+      registerRoutes: async () => ({
+        requested: 1,
+        prepared: 1,
+        mounted: 0,
+        failed: 0,
+        results: [{ method: 'USE', path: '/students', status: 'prepared', message: 'No app context.' }]
+      }),
+      registerViews: async () => ({ requested: 0, registered: 0, failed: 0 }),
+      registerAssets: async () => ({ requested: 0, mounted: 0, failed: 0 }),
+      registerRegistryData: async () => {},
+      registerUploadFolders: async () => {},
+      registerQueryExecutors: async () => {}
+    };
+    const app = { use() {}, get() {}, set() {}, locals: { packageRuntimeRouter: { use() {} } } };
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      continueOnError: true,
+      hooks,
+      app,
+      packageRuntimeRouter: app.locals.packageRuntimeRouter,
+      logger: makeSilentLogger()
+    });
+
+    assert.equal(summary.loadedCount, 0);
+    assert.equal(summary.failedCount, 1);
+    assert.equal(summary.failed[0].packageId, 'pte');
+    assert.equal(summary.failed[0].code, 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED');
+    assert.match(String(summary.failed[0].message || ''), /zero mounted routes/i);
+  });
+});
+
+test('loader accepts already-mounted skipped USE routes as effective startup mounts', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      routes: [createUseRouteDeclaration()]
+    });
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const hooks = {
+      registerRoutes: async () => ({
+        requested: 1,
+        prepared: 1,
+        mounted: 0,
+        failed: 0,
+        results: [{ method: 'USE', path: '/students', status: 'skipped', message: 'Route already mounted in this process.' }]
+      }),
+      registerViews: async () => ({ requested: 0, registered: 0, failed: 0 }),
+      registerAssets: async () => ({ requested: 0, mounted: 0, failed: 0 }),
+      registerRegistryData: async () => {},
+      registerUploadFolders: async () => {},
+      registerQueryExecutors: async () => {}
+    };
+    const app = { use() {}, get() {}, set() {}, locals: { packageRuntimeRouter: { use() {} } } };
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      continueOnError: true,
+      hooks,
+      app,
+      packageRuntimeRouter: app.locals.packageRuntimeRouter,
+      logger: makeSilentLogger()
+    });
+
+    assert.equal(summary.loadedCount, 1);
+    assert.equal(summary.failedCount, 0);
+    assert.equal(summary.loaded[0].packageId, 'pte');
   });
 });
 

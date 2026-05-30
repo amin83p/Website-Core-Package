@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const packageRegistryService = require('../MVC/services/packageRegistryService');
+const packageRegistryRepository = require('../MVC/repositories/packageRegistryRepository');
 
 async function withTempRegistryFile(callback) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-registry-'));
@@ -153,4 +154,41 @@ test('removePackageRegistry deletes registry row by package id', async () => {
     });
     assert.equal(after, null);
   });
+});
+
+test('package registry service forwards mongo backend mode through repository upsert path', async () => {
+  const originalUpsertByPackageId = packageRegistryRepository.upsertByPackageId;
+  const calls = [];
+  packageRegistryRepository.upsertByPackageId = async (packageId, payload, options = {}) => {
+    calls.push({
+      packageId,
+      payload: { ...payload },
+      options: { ...options }
+    });
+    return {
+      id: packageId,
+      packageId,
+      ...payload
+    };
+  };
+
+  try {
+    const row = await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      version: '1.0.0',
+      enabled: true,
+      installStatus: 'enabled'
+    }, {
+      backendMode: 'mongo',
+      actor: { id: 'USR_MONGO' }
+    });
+
+    assert.equal(row.packageId, 'pte');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].packageId, 'pte');
+    assert.equal(calls[0].options.backendMode, 'mongo');
+    assert.equal(calls[0].payload.enabled, true);
+  } finally {
+    packageRegistryRepository.upsertByPackageId = originalUpsertByPackageId;
+  }
 });

@@ -80,6 +80,68 @@ function createLoaderHooks(customHooks = {}) {
   };
 }
 
+function sanitizeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function countExpectedRuntimeUseRouteDeclarations(manifest = {}) {
+  const declarations = Array.isArray(manifest?.routes) ? manifest.routes : [];
+  return declarations.filter((row) => {
+    if (!row || typeof row !== 'object') return false;
+    if (row.active === false) return false;
+    if (row.metadataOnly === true) return false;
+    const method = cleanText(row.method || 'USE', 20).toUpperCase();
+    const router = cleanText(row.router || row.routerModule || row.routerModulePath || row.routerPath || '', 1200);
+    return method === 'USE' && Boolean(router);
+  }).length;
+}
+
+function buildRuntimeRouteMountError(context = {}, routeSummary = {}, reason = '') {
+  const manifest = context?.manifest && typeof context.manifest === 'object' ? context.manifest : {};
+  const error = new Error(
+    reason || 'Runtime route mount failed for this package. Startup route hooks did not mount active package routes correctly.'
+  );
+  error.code = 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED';
+  error.details = {
+    packageId: cleanText(context?.packageId || manifest?.id, 120),
+    mountPath: cleanText(manifest?.mountPath, 500),
+    expectedUseRoutes: countExpectedRuntimeUseRouteDeclarations(manifest),
+    runtimeRoutes: {
+      requested: Number(routeSummary?.requested || 0),
+      prepared: Number(routeSummary?.prepared || 0),
+      mounted: Number(routeSummary?.mounted || 0),
+      failed: Number(routeSummary?.failed || 0),
+      results: sanitizeArray(routeSummary?.results)
+    }
+  };
+  return error;
+}
+
+function assertRuntimeRouteMountHealth(context = {}, routeSummary = {}, options = {}) {
+  const strict = options.strict === true;
+  if (!strict) return;
+
+  const expectedUseRoutes = countExpectedRuntimeUseRouteDeclarations(context?.manifest || {});
+  if (expectedUseRoutes <= 0) return;
+
+  const failed = Number(routeSummary?.failed || 0);
+  const mounted = Number(routeSummary?.mounted || 0);
+  const alreadyMountedSkipped = sanitizeArray(routeSummary?.results).filter((row) => {
+    if (!row || typeof row !== 'object') return false;
+    const status = cleanText(row.status, 60).toLowerCase();
+    if (status !== 'skipped') return false;
+    const message = cleanText(row.message, 300).toLowerCase();
+    return message.includes('already mounted in this process');
+  }).length;
+  const effectiveMounted = mounted + alreadyMountedSkipped;
+  if (failed > 0) {
+    throw buildRuntimeRouteMountError(context, routeSummary, 'Runtime route mount reported failed route declarations.');
+  }
+  if (effectiveMounted <= 0) {
+    throw buildRuntimeRouteMountError(context, routeSummary, 'Runtime route mount reported zero mounted routes for active USE declarations.');
+  }
+}
+
 function resolveManifestCandidates(packageId = '', registryRow = {}, packageRootDir = '') {
   const projectRoot = resolveProjectRoot();
   const token = normalizePackageId(packageId);
@@ -164,12 +226,14 @@ async function runLoaderHooks(hooks, context = {}) {
       ? runtimeRouter
       : app);
 
-  await hooks.registerRoutes({ ...context, app: routesApp });
-  await hooks.registerViews({ ...context, app: viewsApp });
-  await hooks.registerAssets({ ...context, app: assetsApp });
-  await hooks.registerRegistryData(context);
-  await hooks.registerUploadFolders(context);
-  await hooks.registerQueryExecutors(context);
+  const report = {};
+  report.routes = await hooks.registerRoutes({ ...context, app: routesApp });
+  report.views = await hooks.registerViews({ ...context, app: viewsApp });
+  report.assets = await hooks.registerAssets({ ...context, app: assetsApp });
+  report.registryData = await hooks.registerRegistryData(context);
+  report.uploadFolders = await hooks.registerUploadFolders(context);
+  report.queryExecutors = await hooks.registerQueryExecutors(context);
+  return report;
 }
 
 function summarizeRegistryRows(rows = []) {
@@ -301,7 +365,7 @@ async function loadEnabledPackages(options = {}) {
         throw new Error(`Manifest id "${manifest.id}" does not match registry packageId "${packageId}".`);
       }
 
-      await runLoaderHooks(hooks, {
+      const hookReport = await runLoaderHooks(hooks, {
         app: options.app || null,
         packageRuntimeRouter: options.packageRuntimeRouter || options.app?.locals?.packageRuntimeRouter || null,
         backendMode,
@@ -311,6 +375,11 @@ async function loadEnabledPackages(options = {}) {
         packageRootDir,
         registryRow: row
       });
+      assertRuntimeRouteMountHealth(
+        { packageId, manifest },
+        hookReport?.routes || {},
+        { strict: Boolean(options?.app && typeof options.app.use === 'function') }
+      );
 
       loadedIds.add(manifest.id);
       summary.loaded.push({
@@ -354,7 +423,8 @@ async function loadEnabledPackages(options = {}) {
         message: reason,
         autoDisabled: false,
         code: cleanText(error?.code, 120).toUpperCase(),
-        missingManifest: isMissingManifest
+        missingManifest: isMissingManifest,
+        details: error?.details && typeof error.details === 'object' ? error.details : null
       };
       summary.failed.push(failure);
       if (logger && typeof logger.warn === 'function') {

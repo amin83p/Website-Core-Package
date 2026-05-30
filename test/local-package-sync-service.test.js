@@ -104,6 +104,12 @@ test('resolveLocalPackageMode enables local sync in non-production when requeste
   assert.equal(state.enabled, true);
 });
 
+test('default local registry cache path uses local-only runtime folder', async () => {
+  const cache = await localPackageSyncService.readLocalPackageRegistryCache({});
+  const normalized = String(cache?.filePath || '').replace(/\\/g, '/');
+  assert.match(normalized, /\.local-runtime\/package-sync\/localPackageRegistry\.json$/i);
+});
+
 test('syncMountedPackages downloads selected package and refreshes local cache JSON', async () => {
   const originalList = fileGatewayClientService.gatewayListRuntimePackages;
   const originalDownload = fileGatewayClientService.gatewayDownloadRuntimePackage;

@@ -6,7 +6,7 @@ const tar = require('tar');
 const packageManifestService = require('./packageManifestService');
 const fileGatewayClientService = require('./fileGatewayClientService');
 
-const LOCAL_PACKAGE_REGISTRY_FILE = path.resolve(process.cwd(), 'data', 'localPackageRegistry.json');
+const LOCAL_PACKAGE_REGISTRY_FILE = path.resolve(process.cwd(), '.local-runtime', 'package-sync', 'localPackageRegistry.json');
 const DEFAULT_TARGET_ROOT = path.resolve(process.cwd(), 'packages');
 const LOCAL_ONLY_ENV_KEYS = Object.freeze([
   'PACKAGE_LOCAL_DEV_MODE',
