@@ -212,10 +212,12 @@ async function readManifestFile(manifestPath = '') {
 }
 
 async function runLoaderHooks(hooks, context = {}) {
-  const app = context?.app && typeof context.app === 'object' ? context.app : null;
-  const runtimeRouter = context?.packageRuntimeRouter && typeof context.packageRuntimeRouter === 'object'
-    ? context.packageRuntimeRouter
-    : (app?.locals?.packageRuntimeRouter && typeof app.locals.packageRuntimeRouter === 'object'
+  const appCandidate = context?.app;
+  const app = appCandidate && typeof appCandidate.use === 'function' ? appCandidate : null;
+  const runtimeRouterCandidate = context?.packageRuntimeRouter;
+  const runtimeRouter = runtimeRouterCandidate && typeof runtimeRouterCandidate.use === 'function'
+    ? runtimeRouterCandidate
+    : (app?.locals?.packageRuntimeRouter && typeof app.locals.packageRuntimeRouter.use === 'function'
       ? app.locals.packageRuntimeRouter
       : null);
   const routesApp = runtimeRouter && typeof runtimeRouter.use === 'function' ? runtimeRouter : app;

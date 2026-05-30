@@ -82,6 +82,15 @@ function createUseRouteDeclaration(overrides = {}) {
   };
 }
 
+function createExpressLikeFunction() {
+  const fn = function expressLike() {};
+  fn.use = () => {};
+  fn.get = () => {};
+  fn.set = () => {};
+  fn.locals = {};
+  return fn;
+}
+
 test('loader returns empty summary when no enabled packages exist', async () => {
   await withTempPackageWorkspace(async ({ packageRootDir }) => {
     const summary = await packageLoaderService.loadEnabledPackages({
@@ -241,6 +250,108 @@ test('loader keeps package enabled when manifest file is missing at startup', as
     assert.equal(summary.failed[0].autoDisabled, false);
     assert.equal(Boolean(registryRow?.enabled), true);
     assert.equal(String(registryRow?.installStatus || ''), 'enabled');
+  });
+});
+
+test('loader accepts function-based express app/runtime router contexts', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte'
+    });
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const runtimeRouter = createExpressLikeFunction();
+    const app = createExpressLikeFunction();
+    app.locals.packageRuntimeRouter = runtimeRouter;
+
+    let routeAppRef = null;
+    let viewAppRef = null;
+    let assetAppRef = null;
+
+    const hooks = {
+      registerRoutes: async ({ app: hookApp }) => { routeAppRef = hookApp; return { requested: 0, prepared: 0, mounted: 0, failed: 0, results: [] }; },
+      registerViews: async ({ app: hookApp }) => { viewAppRef = hookApp; return { requested: 0, registered: 0, failed: 0 }; },
+      registerAssets: async ({ app: hookApp }) => { assetAppRef = hookApp; return { requested: 0, mounted: 0, failed: 0 }; },
+      registerRegistryData: async () => {},
+      registerUploadFolders: async () => {},
+      registerQueryExecutors: async () => {}
+    };
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      app,
+      packageRuntimeRouter: runtimeRouter,
+      hooks,
+      logger: makeSilentLogger()
+    });
+
+    assert.equal(summary.loadedCount, 1);
+    assert.equal(routeAppRef, runtimeRouter);
+    assert.equal(assetAppRef, runtimeRouter);
+    assert.equal(viewAppRef, app);
+  });
+});
+
+test('loader route health succeeds with function-based express context when USE route is mounted', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'pte', {
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte',
+      routes: [createUseRouteDeclaration()]
+    });
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+
+    const runtimeRouter = createExpressLikeFunction();
+    const app = createExpressLikeFunction();
+    app.locals.packageRuntimeRouter = runtimeRouter;
+
+    const hooks = {
+      registerRoutes: async ({ app: hookApp }) => ({
+        requested: 1,
+        prepared: 1,
+        mounted: hookApp && typeof hookApp.use === 'function' ? 1 : 0,
+        failed: 0,
+        results: [{
+          method: 'USE',
+          path: '/students',
+          status: hookApp && typeof hookApp.use === 'function' ? 'mounted' : 'prepared',
+          message: hookApp && typeof hookApp.use === 'function' ? 'Mounted.' : 'No app context.'
+        }]
+      }),
+      registerViews: async () => ({ requested: 0, registered: 0, failed: 0 }),
+      registerAssets: async () => ({ requested: 0, mounted: 0, failed: 0 }),
+      registerRegistryData: async () => {},
+      registerUploadFolders: async () => {},
+      registerQueryExecutors: async () => {}
+    };
+
+    const summary = await packageLoaderService.loadEnabledPackages({
+      backendMode: 'json',
+      packageRootDir,
+      continueOnError: true,
+      app,
+      packageRuntimeRouter: runtimeRouter,
+      hooks,
+      logger: makeSilentLogger()
+    });
+
+    assert.equal(summary.loadedCount, 1);
+    assert.equal(summary.failedCount, 0);
+    assert.equal(summary.loaded[0].packageId, 'pte');
   });
 });
 
