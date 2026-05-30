@@ -270,6 +270,13 @@
       const rowCount = Number(row?.rowCount || 0);
       const uploadCount = Number(row?.detectedUploadRefCount || 0);
       const remap = row?.remapCandidates || {};
+      const remapFieldMap = row?.remapFieldMap || {};
+      const orgFieldPaths = Array.isArray(remapFieldMap.orgFieldPaths) ? remapFieldMap.orgFieldPaths : [];
+      const uploadUrlFieldPaths = Array.isArray(remapFieldMap.uploadUrlFieldPaths) ? remapFieldMap.uploadUrlFieldPaths : [];
+      const remapOrgPathCount = orgFieldPaths.length;
+      const remapUploadPathCount = uploadUrlFieldPaths.length;
+      const orgFieldPathPreview = orgFieldPaths.slice(0, 3).join(', ');
+      const uploadFieldPathPreview = uploadUrlFieldPaths.slice(0, 3).join(', ');
       const selected = row?.selected !== false;
       return `
         <label class="d-flex align-items-start gap-2 py-1 border-bottom">
@@ -280,6 +287,11 @@
             <div class="text-muted">
               Upload refs: ${uploadCount} | Remap fields: ${Number(remap.orgFieldCount || 0)} | Upload URLs: ${Number(remap.uploadUrlCount || 0)} | ORG tokens: ${Number(remap.exactOrgTokenCount || 0)}
             </div>
+            <div class="text-muted">
+              Remap path map: org fields ${remapOrgPathCount} | upload URL fields ${remapUploadPathCount}
+            </div>
+            ${orgFieldPathPreview ? `<div class="text-muted"><span class="fw-semibold">Org paths:</span> ${orgFieldPathPreview.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
+            ${uploadFieldPathPreview ? `<div class="text-muted"><span class="fw-semibold">Upload URL paths:</span> ${uploadFieldPathPreview.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
           </span>
         </label>
       `;

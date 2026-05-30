@@ -284,6 +284,191 @@ function resolveSelectedFileFields(entityType = '', requestedSelection = {}, can
   return [];
 }
 
+function normalizeRemapFieldPathList(value = []) {
+  const rows = Array.isArray(value)
+    ? value
+    : String(value || '').split(/\r?\n|,/);
+  return Array.from(new Set(
+    rows
+      .map((row) => normalizeFieldPathToken(row))
+      .filter(Boolean)
+  ));
+}
+
+function normalizeRemapFieldMapEntry(value = {}) {
+  const source = sanitizeObject(value);
+  return {
+    orgFieldPaths: normalizeRemapFieldPathList(source.orgFieldPaths || []),
+    uploadUrlFieldPaths: normalizeRemapFieldPathList(source.uploadUrlFieldPaths || [])
+  };
+}
+
+function normalizeRemapFieldMap(input = {}) {
+  const out = {};
+  const source = sanitizeObject(input);
+  Object.entries(source).forEach(([entityTypeRaw, value]) => {
+    const entityType = cleanText(entityTypeRaw, 200);
+    if (!entityType) return;
+    out[entityType] = normalizeRemapFieldMapEntry(value);
+  });
+  return out;
+}
+
+function hasRemapFieldMapEntry(value = {}) {
+  const normalized = normalizeRemapFieldMapEntry(value);
+  return normalized.orgFieldPaths.length > 0 || normalized.uploadUrlFieldPaths.length > 0;
+}
+
+function parseFieldPathSegments(pathToken = '') {
+  const normalized = normalizeFieldPathToken(pathToken);
+  if (!normalized) return [];
+  const out = [];
+  normalized.split('.').forEach((partRaw) => {
+    let part = cleanText(partRaw, 400);
+    while (part) {
+      if (part.startsWith('[]')) {
+        out.push('[]');
+        part = part.slice(2);
+        continue;
+      }
+      const arrayIdx = part.indexOf('[]');
+      if (arrayIdx < 0) {
+        out.push(part);
+        break;
+      }
+      const key = cleanText(part.slice(0, arrayIdx), 300);
+      if (key) out.push(key);
+      out.push('[]');
+      part = part.slice(arrayIdx + 2);
+    }
+  });
+  return out.filter((segment) => segment === '[]' || Boolean(cleanText(segment, 200)));
+}
+
+function resolveTerminalFieldKey(pathToken = '') {
+  const segments = parseFieldPathSegments(pathToken);
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const segment = cleanText(segments[index], 200);
+    if (segment && segment !== '[]') return segment;
+  }
+  return '';
+}
+
+function collectRemapFieldMapFromRows(rows = []) {
+  const orgFieldPaths = new Set();
+  const uploadUrlFieldPaths = new Set();
+
+  sanitizeArray(rows).forEach((row) => {
+    const leafRows = collectStringLeafRows(row, [], []);
+    leafRows.forEach((leaf) => {
+      const fieldPath = normalizeFieldPathToken(leaf?.fieldPath || '');
+      if (!fieldPath) return;
+      const value = cleanText(leaf?.value, 4000);
+      if (!value) return;
+
+      const terminalFieldKey = cleanText(resolveTerminalFieldKey(fieldPath), 200).toLowerCase();
+      const normalizedOrgToken = normalizeOrgToken(value);
+      const hasScopedUploadUrl = /\/uploads\/ORG_[^/]+/i.test(value);
+
+      if (REMAP_ORG_FIELDS.has(terminalFieldKey) && normalizedOrgToken) {
+        orgFieldPaths.add(fieldPath);
+      } else if (ORG_TOKEN_EXACT_REGEX.test(value) || value === '{{ORG_ID}}') {
+        orgFieldPaths.add(fieldPath);
+      }
+
+      if (hasScopedUploadUrl) {
+        uploadUrlFieldPaths.add(fieldPath);
+      }
+    });
+  });
+
+  return {
+    orgFieldPaths: Array.from(orgFieldPaths),
+    uploadUrlFieldPaths: Array.from(uploadUrlFieldPaths)
+  };
+}
+
+function mutateFieldPathValue(node, segments = [], mutator = null, state = null) {
+  if (!segments.length) {
+    if (typeof mutator === 'function') return mutator(node, state);
+    return node;
+  }
+  const [head, ...rest] = segments;
+  if (head === '[]') {
+    if (!Array.isArray(node)) return node;
+    for (let index = 0; index < node.length; index += 1) {
+      node[index] = mutateFieldPathValue(node[index], rest, mutator, state);
+    }
+    return node;
+  }
+  if (!node || typeof node !== 'object') return node;
+  if (!Object.prototype.hasOwnProperty.call(node, head)) return node;
+  node[head] = mutateFieldPathValue(node[head], rest, mutator, state);
+  return node;
+}
+
+function cloneStructured(value) {
+  if (typeof global.structuredClone === 'function') {
+    return global.structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
+function remapMappedOrgFieldValue(value, targetOrgId = '', state = {}) {
+  if (typeof value !== 'string') return value;
+  const token = cleanText(value, 4000);
+  if (!token) return value;
+  const isPlaceholderToken = token === '{{ORG_ID}}';
+  const isExactOrgToken = ORG_TOKEN_EXACT_REGEX.test(token);
+  const isBusinessOrgToken = Boolean(normalizeOrgToken(token));
+  if (!isPlaceholderToken && !isExactOrgToken && !isBusinessOrgToken) return value;
+  if (!targetOrgId) return value;
+  const next = targetOrgId;
+  if (next !== value) {
+    state.rewrittenFieldCount = Number(state.rewrittenFieldCount || 0) + 1;
+    if (isPlaceholderToken || isExactOrgToken) {
+      state.rewrittenExactTokenCount = Number(state.rewrittenExactTokenCount || 0) + 1;
+    }
+  }
+  return next;
+}
+
+function remapMappedUploadUrlValue(value, targetOrgId = '', state = {}) {
+  if (typeof value !== 'string') return value;
+  const nextOrgId = cleanText(targetOrgId, 160);
+  if (!nextOrgId) return value;
+  const regex = /\/uploads\/(?:ORG_[^/]+|\{\{ORG_ID\}\})/ig;
+  const matches = String(value).match(regex) || [];
+  if (!matches.length) return value;
+  const next = String(value).replace(regex, `/uploads/${nextOrgId}`);
+  if (next !== value) {
+    state.rewrittenUrlCount = Number(state.rewrittenUrlCount || 0) + matches.length;
+  }
+  return next;
+}
+
+function applyRemapFieldMapToRow(row = {}, remapFieldMapEntry = {}, options = {}) {
+  const targetOrgId = cleanText(options.targetOrgId, 160);
+  if (!row || typeof row !== 'object' || !targetOrgId) return row;
+  const normalizedMap = normalizeRemapFieldMapEntry(remapFieldMapEntry);
+  const state = sanitizeObject(options.state);
+  let mapped = cloneStructured(row);
+
+  normalizedMap.orgFieldPaths.forEach((pathToken) => {
+    const segments = parseFieldPathSegments(pathToken);
+    if (!segments.length) return;
+    mapped = mutateFieldPathValue(mapped, segments, (value) => remapMappedOrgFieldValue(value, targetOrgId, state), state);
+  });
+
+  normalizedMap.uploadUrlFieldPaths.forEach((pathToken) => {
+    const segments = parseFieldPathSegments(pathToken);
+    if (!segments.length) return;
+    mapped = mutateFieldPathValue(mapped, segments, (value) => remapMappedUploadUrlValue(value, targetOrgId, state), state);
+  });
+
+  return mapped;
+}
+
 function deriveRowId(row = {}, index = 0) {
   const id = cleanText(row?.id || row?._id || '', 200);
   if (id) return id;
@@ -1166,6 +1351,7 @@ function createService(overrides = {}) {
           requestedFileFieldSelection,
           fileFieldCandidates
         );
+        const remapFieldMap = collectRemapFieldMapFromRows(rows);
         const selectedFieldSet = new Set(selectedFields);
         originScopeSummary.inspectedRows += scoped.summary.inspectedRows;
         originScopeSummary.includedRows += scoped.summary.includedRows;
@@ -1176,7 +1362,10 @@ function createService(overrides = {}) {
         const remapEntityState = { rewrittenFieldCount: 0, rewrittenUrlCount: 0, rewrittenExactTokenCount: 0, pathHits: [] };
         rows.forEach((row) => {
           extractUploadUrls(row, entityUploads);
-          transformForOrgRemap(row, remapEntityState);
+          applyRemapFieldMapToRow(row, remapFieldMap, {
+            targetOrgId: '{{ORG_ID}}',
+            state: remapEntityState
+          });
         });
         if (isSelected) {
           selectedRowCount += rows.length;
@@ -1252,6 +1441,7 @@ function createService(overrides = {}) {
             uploadUrlCount: remapEntityState.rewrittenUrlCount,
             exactOrgTokenCount: remapEntityState.rewrittenExactTokenCount
           },
+          remapFieldMap,
           fileFieldCandidates,
           fileFieldSelected: selectedFields,
           rejectedRows: sanitizeArray(scoped.rejectedRows),
@@ -1270,6 +1460,7 @@ function createService(overrides = {}) {
             uploadUrlCount: 0,
             exactOrgTokenCount: 0
           },
+          remapFieldMap: { orgFieldPaths: [], uploadUrlFieldPaths: [] },
           fileFieldCandidates: [],
           fileFieldSelected: [],
           rejectedRows: [],
@@ -1287,6 +1478,12 @@ function createService(overrides = {}) {
     }
 
     const selectedDataEntities = entityCatalog.filter((row) => row.selected);
+    const remapFieldMap = {};
+    selectedDataEntities.forEach((row) => {
+      const entityType = cleanText(row?.entityType, 200);
+      if (!entityType) return;
+      remapFieldMap[entityType] = normalizeRemapFieldMapEntry(row?.remapFieldMap || {});
+    });
 
     const manualFileRefs = parseManualFileRefs(input.selectedFileRefs || []);
     manualFileRefs.forEach((ref) => {
@@ -1361,6 +1558,7 @@ function createService(overrides = {}) {
       availableDataEntities,
       entityCatalog,
       selectedDataEntities,
+      remapFieldMap,
       symbolCatalog,
       selectedRowCount,
       remapImpactPreview,
@@ -1715,7 +1913,9 @@ function createService(overrides = {}) {
     const globalSymbolCatalog = rewriteSymbolCatalogToGlobal(resolvedSymbolCatalog);
     const originOrgId = cleanText(preflight.originOrgId, 160);
     const fileFieldSelection = sanitizeObject(preflight.fileFieldSelection);
+    const preflightRemapFieldMap = normalizeRemapFieldMap(preflight.remapFieldMap || {});
     const tablePayload = {};
+    const remapFieldMap = {};
     const remapState = { rewrittenUrlCount: 0, rewrittenFieldCount: 0, rewrittenExactTokenCount: 0 };
     const originScopeSummary = {
       inspectedRows: 0,
@@ -1725,15 +1925,26 @@ function createService(overrides = {}) {
     };
 
     for (const entity of selectedEntityRows) {
+      const entityType = cleanText(entity?.entityType, 200);
+      if (!entityType) continue;
       // eslint-disable-next-line no-await-in-loop
-      const rowsRaw = await fetchEntityRows(entity.entityType, { backendMode });
+      const rowsRaw = await fetchEntityRows(entityType, { backendMode });
       const scoped = filterRowsByOriginScope(rowsRaw, originOrgId);
       const rows = scoped.rows;
+      const entityRemapFieldMap = normalizeRemapFieldMapEntry(
+        preflightRemapFieldMap[entityType]
+        || entity?.remapFieldMap
+        || collectRemapFieldMapFromRows(rows)
+      );
       originScopeSummary.inspectedRows += scoped.summary.inspectedRows;
       originScopeSummary.includedRows += scoped.summary.includedRows;
       originScopeSummary.excludedOtherOrgRows += scoped.summary.excludedOtherOrgRows;
       originScopeSummary.includedUnscopedRows += scoped.summary.includedUnscopedRows;
-      tablePayload[entity.entityType] = rows.map((row) => transformForOrgRemap(row, remapState));
+      remapFieldMap[entityType] = entityRemapFieldMap;
+      tablePayload[entityType] = rows.map((row) => applyRemapFieldMapToRow(row, entityRemapFieldMap, {
+        targetOrgId: '{{ORG_ID}}',
+        state: remapState
+      }));
     }
 
     const fileRefs = sanitizeArray(preflight.filePlan?.normalizedRefs).map((row) => ({
@@ -1833,6 +2044,7 @@ function createService(overrides = {}) {
           label: row?.label,
           rowCount: Number(row?.rowCount || 0)
         })),
+        remapFieldMap,
         fileFieldSelection,
         tables: tableIndex,
         artifactsRoot: 'artifacts',
@@ -1919,6 +2131,7 @@ function createService(overrides = {}) {
           globalArtifactCount: globalArtifacts.length
         },
         symbolCatalog: globalSymbolCatalog,
+        remapFieldMap,
         fileFieldSelection,
         remapSummary: payload.remapSummary,
         orgRemapRequired: payload.orgRemapRequired,
@@ -1961,6 +2174,7 @@ function createService(overrides = {}) {
         manifest,
         data,
         orgRemapRequired: manifest?.orgRemapRequired === true,
+        remapFieldMap: normalizeRemapFieldMap(manifest?.remapFieldMap || {}),
         artifactsRoot: cleanText(manifest?.artifactsRoot, 200) || 'artifacts',
         tableArtifacts: sanitizeArray(manifest?.tableArtifacts),
         globalArtifacts: sanitizeArray(manifest?.globalArtifacts)
@@ -1975,6 +2189,7 @@ function createService(overrides = {}) {
       manifest: payload,
       data: sanitizeObject(payload?.data),
       orgRemapRequired: payload?.orgRemapRequired === true,
+      remapFieldMap: {},
       artifactsRoot: 'files',
       tableArtifacts: [],
       globalArtifacts: []
@@ -2129,6 +2344,11 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     const requiredSymbolSummary = summarizeRequiredSymbolAssets(payload);
     const orgRemapRequired = loadedPayload.orgRemapRequired === true;
     const targetOrgId = normalizeOrgToken(options.targetOrgId || '');
+    const payloadRemapFieldMap = normalizeRemapFieldMap(
+      loadedPayload?.remapFieldMap
+      || payload?.remapFieldMap
+      || {}
+    );
     if (orgRemapRequired && !targetOrgId) {
       const error = new Error('Target organization is required for this package install because exported data contains org-bound fields/URLs.');
       error.code = 'TARGET_ORG_REQUIRED';
@@ -2163,8 +2383,19 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     let symbolGlobalRewriteCount = 0;
     const entityNames = Object.keys(payloadData);
     for (const entityType of entityNames) {
+      const normalizedEntityType = cleanText(entityType, 200);
+      const entityRemapFieldMap = normalizeRemapFieldMapEntry(payloadRemapFieldMap[normalizedEntityType] || {});
       const rows = sanitizeArray(payloadData[entityType]).map((row) => {
-        let mapped = orgRemapRequired ? applyOrgRemap(row, targetOrgId) : row;
+        let mapped = row;
+        if (orgRemapRequired) {
+          if (hasRemapFieldMapEntry(entityRemapFieldMap)) {
+            mapped = applyRemapFieldMapToRow(row, entityRemapFieldMap, {
+              targetOrgId
+            });
+          } else {
+            mapped = applyOrgRemap(row, targetOrgId);
+          }
+        }
         if (cleanText(entityType, 200).toLowerCase() === 'symbols') {
           const rewritten = rewriteUploadsOrgSegmentToGlobal(mapped);
           if (JSON.stringify(rewritten) !== JSON.stringify(mapped)) symbolGlobalRewriteCount += 1;

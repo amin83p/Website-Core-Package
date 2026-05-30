@@ -206,6 +206,9 @@ test('package builder EJS compiles and includes expected controls', () => {
   assert.match(html, /builder-file-field-picker/);
   assert.match(html, /builder-file-field-add-btn/);
   assert.match(html, /builder-file-field-remove-btn/);
+  assert.match(html, /Remap path map: org fields/);
+  assert.match(html, /Org paths:/);
+  assert.match(html, /Upload URL paths:/);
   assert.match(html, /addSelectedFileField/);
   assert.match(html, /removeSelectedFileField/);
   assert.match(html, /getFileFieldSelection/);

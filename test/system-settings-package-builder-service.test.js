@@ -208,6 +208,9 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
       assert.equal(report.packageId, 'pte');
       assert.equal(report.version, '1.0.1');
       assert.equal(report.orgRemapRequired, true);
+      assert.equal(typeof report.remapFieldMap, 'object');
+      assert.equal(Array.isArray(report.remapFieldMap?.pteApplicants?.orgFieldPaths), true);
+      assert.equal(Array.isArray(report.remapFieldMap?.pteApplicants?.uploadUrlFieldPaths), true);
       assert.equal(Array.isArray(report.downloadLinks), true);
       assert.equal(fs.existsSync(report.artifacts.zip), true);
       assert.equal(fs.existsSync(report.artifacts.signature), true);
@@ -227,6 +230,11 @@ test('buildPackage creates signed artifacts and payload markers', async () => {
       assert.equal(payload.packageVersion, '1.0.1');
       assert.equal(Array.isArray(payload.tables), true);
       assert.equal(payload.artifactsRoot, 'artifacts');
+      assert.equal(typeof payload.remapFieldMap, 'object');
+      assert.equal(Array.isArray(payload.remapFieldMap?.pteApplicants?.orgFieldPaths), true);
+      assert.equal(Array.isArray(payload.remapFieldMap?.pteApplicants?.uploadUrlFieldPaths), true);
+      assert.equal(payload.remapFieldMap.pteApplicants.orgFieldPaths.includes('orgId'), true);
+      assert.equal(payload.remapFieldMap.pteApplicants.uploadUrlFieldPaths.includes('avatarUrl'), true);
       assert.equal(typeof payload.fileFieldSelection, 'object');
       assert.equal(Array.isArray(payload.tableArtifacts), true);
       assert.equal(Array.isArray(payload.globalArtifacts), true);
@@ -250,7 +258,12 @@ test('applyBuilderPayloadIfPresent applies table artifacts to target org and glo
     fs.writeFileSync(path.join(packageDir, '__builder_payload__', 'artifacts', 'global', 'symbols', 'logo.png'), 'png', 'utf8');
     fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
     writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'pteApplicants.json'), [
-      { id: 'A1', orgId: '{{ORG_ID}}', avatarUrl: '/uploads/{{ORG_ID}}/logo.png' }
+      {
+        id: 'A1',
+        orgId: '{{ORG_ID}}',
+        avatarUrl: '/uploads/{{ORG_ID}}/logo.png',
+        backupUrl: '/uploads/ORG_900000/keep.png'
+      }
     ]);
     writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'symbols.json'), [
       { id: 'S1', name: 'PTE', value: '/uploads/ORG_900000/symbols/logo.png' }
@@ -258,6 +271,12 @@ test('applyBuilderPayloadIfPresent applies table artifacts to target org and glo
     writeJson(path.join(packageDir, '__builder_payload__', 'manifest.json'), {
       schema: 'core.package-builder.payload.v2',
       orgRemapRequired: true,
+      remapFieldMap: {
+        pteApplicants: {
+          orgFieldPaths: ['orgId'],
+          uploadUrlFieldPaths: ['avatarUrl']
+        }
+      },
       artifactsRoot: 'artifacts',
       tables: [
         { entityType: 'pteApplicants', file: 'tables/pteApplicants.json', rowCount: 1 },
@@ -328,6 +347,7 @@ test('applyBuilderPayloadIfPresent applies table artifacts to target org and glo
     assert.ok(symbolUpdate);
     assert.equal(applicantUpdate.row.orgId, 'ORG_123');
     assert.equal(applicantUpdate.row.avatarUrl, '/uploads/ORG_123/logo.png');
+    assert.equal(applicantUpdate.row.backupUrl, '/uploads/ORG_900000/keep.png');
     assert.equal(symbolUpdate.row.value, '/uploads/GLOBAL/symbols/logo.png');
 
     const copiedTablePath = path.join(tempRoot, 'uploads', 'ORG_123', 'logo.png');
@@ -883,6 +903,57 @@ test('preflightBuild respects fileFieldSelection when extracting upload refs', a
     assert.equal(Array.isArray(report.filePlan.provenance), true);
     assert.equal(report.filePlan.provenance.every((row) => String(row?.fieldPath || '') === 'resumePath'), true);
     assert.deepEqual(report.fileFieldSelection?.pteApplicants, ['resumePath']);
+  });
+});
+
+test('preflightBuild returns deterministic remap field map for org and scoped upload URL paths', async () => {
+  await withTempCwd('pkg-builder-remap-map-', async (tempRoot) => {
+    writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest('1.0.0'));
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async fetchData(entityType) {
+          if (entityType !== 'pteApplicants') return [];
+          return [
+            {
+              id: 'A1',
+              orgId: 'ORG_900000',
+              profile: {
+                ownerToken: 'ORG_900000'
+              },
+              mediaAssets: [
+                { url: '/uploads/ORG_900000/symbols/avatar.png' },
+                { url: '/uploads/GLOBAL/symbols/avatar-global.png' }
+              ],
+              externalUrl: 'https://example.com/path'
+            }
+          ];
+        },
+        async getDataById(entityType, id) {
+          if (entityType === 'organizations' && id === 'ORG_900000') return { id };
+          return null;
+        }
+      }
+    });
+
+    const report = await service.preflightBuild({
+      packageId: 'pte',
+      originOrgId: 'ORG_900000',
+      selectedDataEntities: ['pteApplicants'],
+      fileFieldSelection: {
+        pteApplicants: ['mediaAssets[].url']
+      }
+    }, {
+      backendMode: 'json',
+      packageRootDir: path.join(tempRoot, 'packages')
+    });
+
+    const entity = report.entityCatalog.find((row) => row.entityType === 'pteApplicants');
+    assert.ok(entity);
+    assert.deepEqual(entity.remapFieldMap?.orgFieldPaths, ['orgId', 'profile.ownerToken']);
+    assert.deepEqual(entity.remapFieldMap?.uploadUrlFieldPaths, ['mediaAssets[].url']);
+    assert.equal(Array.isArray(report.remapFieldMap?.pteApplicants?.orgFieldPaths), true);
+    assert.equal(report.remapFieldMap.pteApplicants.orgFieldPaths.includes('orgId'), true);
+    assert.equal(report.remapFieldMap.pteApplicants.uploadUrlFieldPaths.includes('mediaAssets[].url'), true);
   });
 });
 
