@@ -246,6 +246,20 @@ function createBaseDeps() {
       }
     },
     packageBuilderService: {
+      async previewBuilderPayloadDeletionInventory() {
+        return {
+          payloadFound: true,
+          orgRemapRequired: false,
+          targetOrgId: '',
+          tableRows: [
+            { id: 'pteApplicants', entityType: 'pteApplicants', backendMode: 'json', estimatedRowCount: 2, selected: true }
+          ],
+          fileRows: [
+            { id: 'ORG_900000/symbols/logo.png', exists: true, size: 1024, selected: true }
+          ],
+          warnings: []
+        };
+      },
       async applyBuilderPayloadIfPresent(_context = {}, options = {}) {
         return {
           applied: false,
@@ -257,13 +271,27 @@ function createBaseDeps() {
         };
       },
       async removeBuilderPayloadIfPresent(_context = {}, options = {}) {
+        const selectionTables = Array.isArray(options?.deleteSelection?.tables) ? options.deleteSelection.tables : ['pteApplicants'];
+        const selectionFiles = Array.isArray(options?.deleteSelection?.files) ? options.deleteSelection.files : ['ORG_900000/symbols/logo.png'];
         return {
           applied: true,
           payloadFound: true,
           orgRemapRequired: false,
           targetOrgId: String(options.targetOrgId || '').replace(/^ORG_/i, ''),
-          rowSummary: { deleted: 0, skipped: 0, failed: 0, skippedWithoutId: [] },
-          fileSummary: { deleted: 0, skipped: 0, failed: 0 },
+          selectionApplied: {
+            tablesSelected: selectionTables.length,
+            filesSelected: selectionFiles.length
+          },
+          tableSummary: {
+            total: 1,
+            selected: selectionTables.length,
+            deleted: selectionTables.length ? 1 : 0,
+            retained: selectionTables.length ? 0 : 1,
+            skipped: 0,
+            failed: 0
+          },
+          rowSummary: { deleted: selectionTables.length ? 2 : 0, skipped: 0, failed: 0, skippedWithoutId: [] },
+          fileSummary: { total: 1, selected: selectionFiles.length, deleted: selectionFiles.length ? 1 : 0, retained: selectionFiles.length ? 0 : 1, skipped: 0, failed: 0 },
           warnings: []
         };
       }
@@ -815,6 +843,70 @@ test('removePackage keeps legacy keep-data mode when explicitly requested', asyn
   });
   assert.equal(report.cleanupMode, 'keep-data');
   assert.equal(report.dataSummary?.migrations?.skipped >= 1, true);
+});
+
+test('previewPackageUninstallImpact returns deletion inventory groups', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.previewPackageUninstallImpact('pte', { backendMode: 'json' });
+  assert.equal(Array.isArray(report?.deletionInventory?.critical), true);
+  assert.equal(Array.isArray(report?.deletionInventory?.tables), true);
+  assert.equal(Array.isArray(report?.deletionInventory?.files), true);
+  assert.equal(report?.deletionInventory?.tables?.[0]?.id, 'pteApplicants');
+  assert.equal(report?.deletionInventory?.files?.[0]?.id, 'ORG_900000/symbols/logo.png');
+});
+
+test('removePackage forwards validated deleteSelection and returns inventory summary', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+  let capturedDeleteSelection = null;
+  setup.deps.packageBuilderService.removeBuilderPayloadIfPresent = async (_context = {}, options = {}) => {
+    capturedDeleteSelection = options?.deleteSelection || null;
+    return {
+      applied: true,
+      payloadFound: true,
+      orgRemapRequired: false,
+      targetOrgId: '',
+      selectionApplied: { tablesSelected: 0, filesSelected: 1 },
+      tableSummary: { total: 1, selected: 0, deleted: 0, retained: 1, skipped: 0, failed: 0 },
+      rowSummary: { deleted: 0, skipped: 0, failed: 0, skippedWithoutId: [] },
+      fileSummary: { total: 1, selected: 1, deleted: 1, retained: 0, skipped: 0, failed: 0 },
+      warnings: []
+    };
+  };
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.removePackage('pte', {
+    backendMode: 'json',
+    deleteSelection: {
+      tables: [],
+      files: ['ORG_900000/symbols/logo.png']
+    }
+  });
+
+  assert.deepEqual(capturedDeleteSelection, {
+    provided: true,
+    tables: [],
+    files: ['ORG_900000/symbols/logo.png']
+  });
+  assert.equal(report?.inventorySummary?.tables?.selected, 0);
+  assert.equal(report?.inventorySummary?.tables?.retained, 1);
+  assert.equal(report?.inventorySummary?.files?.selected, 1);
+  assert.equal(report?.inventorySummary?.files?.deleted, 1);
 });
 
 test('previewPackageUninstallImpact blocks full cleanup when manifest is missing', async () => {

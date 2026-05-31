@@ -649,6 +649,31 @@ function loadSigningPrivateKey(projectRoot = process.cwd()) {
   );
 }
 
+function assertSigningPrivateKeyReady(options = {}) {
+  const projectRootInput = cleanText(options.projectRoot, 2000);
+  const projectRoot = projectRootInput || process.cwd();
+  try {
+    const signing = loadSigningPrivateKey(projectRoot);
+    return {
+      configured: true,
+      source: cleanText(signing?.source, 2000)
+    };
+  } catch (error) {
+    const normalizedError = new Error(
+      'Package Builder is disabled until signing private key is configured and usable.'
+    );
+    normalizedError.code = 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED';
+    normalizedError.details = {
+      reason: cleanText(error?.message || String(error), 1200),
+      expectedEnv: [
+        'PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE',
+        'PACKAGE_SIGNING_ED25519_PRIVATE_KEY_BASE64'
+      ]
+    };
+    throw normalizedError;
+  }
+}
+
 function extractUploadUrls(node, intoSet) {
   if (typeof node === 'string') {
     listUploadRefsInText(node).forEach((item) => intoSet.add(item));
@@ -2396,6 +2421,210 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     throw new Error(`Unsupported backend mode "${backendMode}" for unknown entity fallback.`);
   }
 
+  function normalizeDeleteSelectionInput(input = null) {
+    const source = sanitizeObject(input);
+    const hasTables = Object.prototype.hasOwnProperty.call(source, 'tables');
+    const hasFiles = Object.prototype.hasOwnProperty.call(source, 'files');
+    const providedFlag = source.provided === true || hasTables || hasFiles;
+    const normalizeList = (value) => {
+      if (Array.isArray(value)) {
+        return value.map((item) => cleanText(item, 2000)).filter(Boolean);
+      }
+      if (typeof value === 'string') {
+        return value
+          .split(/\r?\n|,/)
+          .map((item) => cleanText(item, 2000))
+          .filter(Boolean);
+      }
+      return [];
+    };
+    return {
+      provided: providedFlag,
+      tables: new Set(normalizeList(source.tables)),
+      files: new Set(normalizeList(source.files))
+    };
+  }
+
+  async function readPathStat(filePath = '') {
+    const targetPath = cleanText(filePath, 3000);
+    if (!targetPath) return null;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await deps.fs.stat(targetPath);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function previewBuilderPayloadDeletionInventory(context = {}, options = {}) {
+    const manifestPath = cleanText(context.manifestPath, 2000);
+    const report = {
+      payloadFound: false,
+      orgRemapRequired: false,
+      targetOrgId: '',
+      tableRows: [],
+      fileRows: [],
+      warnings: []
+    };
+    if (!manifestPath) return report;
+
+    const packageDir = path.dirname(path.resolve(manifestPath));
+    const loadedPayload = await loadBuilderPayload(packageDir);
+    if (!loadedPayload) return report;
+
+    const payloadData = sanitizeObject(loadedPayload.data);
+    const payload = sanitizeObject(loadedPayload.manifest);
+    const orgRemapRequired = loadedPayload.orgRemapRequired === true;
+    const targetOrgId = normalizeBusinessOrgId(options.targetOrgId || '');
+    const targetUploadScope = normalizeOrgToken(options.targetOrgId || '');
+    const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
+    const tableRows = [];
+    const fileRows = [];
+    const fileIdSet = new Set();
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+
+    Object.keys(payloadData).forEach((entityTypeRaw) => {
+      const entityType = cleanText(entityTypeRaw, 200);
+      if (!entityType) return;
+      const rows = sanitizeArray(payloadData[entityType]);
+      tableRows.push({
+        id: entityType,
+        entityType,
+        backendMode,
+        estimatedRowCount: rows.length,
+        selected: true
+      });
+    });
+
+    const pushFileRow = async ({ destinationRel = '', scopeMode = '', storageRelativePath = '', payloadPath = '' } = {}) => {
+      const normalizedDest = cleanText(destinationRel, 2000).replace(/\\/g, '/').replace(/^\/+/, '');
+      if (!normalizedDest) return;
+      if (fileIdSet.has(normalizedDest)) return;
+      fileIdSet.add(normalizedDest);
+      const absolutePath = path.resolve(uploadRoot, normalizedDest);
+      if (!uploadPathUtils.isInsideUploadRoot(absolutePath, uploadRoot)) {
+        report.warnings.push(`Skipped deletion inventory file outside upload root boundary: ${normalizedDest}`);
+        return;
+      }
+      const stat = await readPathStat(absolutePath);
+      fileRows.push({
+        id: normalizedDest,
+        scopeMode: cleanText(scopeMode, 40).toLowerCase() || 'table',
+        scopeFolder: cleanText(splitScopedUploadRelativePath(normalizedDest).scopeFolder, 160).toUpperCase(),
+        storageRelativePath: cleanText(storageRelativePath, 2000),
+        payloadPath: cleanText(payloadPath, 2000),
+        uploadsUrl: `/${path.join('uploads', normalizedDest).replace(/\\/g, '/')}`,
+        absolutePath,
+        exists: Boolean(stat && stat.isFile && stat.isFile()),
+        size: Number(stat?.size || 0) || 0,
+        selected: true
+      });
+    };
+
+    const tableArtifacts = sanitizeArray(loadedPayload?.tableArtifacts);
+    const globalArtifacts = sanitizeArray(loadedPayload?.globalArtifacts);
+    const hasGroupedArtifacts = tableArtifacts.length > 0 || globalArtifacts.length > 0;
+    if (hasGroupedArtifacts) {
+      for (const row of tableArtifacts) {
+        const storageRelativePath = cleanText(row?.storageRelativePath, 2000).replace(/\\/g, '/').replace(/^\/+/, '');
+        const scope = targetUploadScope || (orgRemapRequired ? 'ORG_{{ORG_ID}}' : 'GLOBAL');
+        const destinationRel = buildScopedUploadsRelativePath(storageRelativePath, scope);
+        // eslint-disable-next-line no-await-in-loop
+        await pushFileRow({
+          destinationRel,
+          scopeMode: 'table',
+          storageRelativePath,
+          payloadPath: cleanText(row?.payloadPath, 2000)
+        });
+      }
+      for (const row of globalArtifacts) {
+        const storageRelativePath = cleanText(row?.storageRelativePath, 2000).replace(/\\/g, '/').replace(/^\/+/, '');
+        const destinationRel = buildScopedUploadsRelativePath(storageRelativePath, 'GLOBAL');
+        // eslint-disable-next-line no-await-in-loop
+        await pushFileRow({
+          destinationRel,
+          scopeMode: 'global',
+          storageRelativePath,
+          payloadPath: cleanText(row?.payloadPath, 2000)
+        });
+      }
+    } else {
+      const sourceFilesRoot = path.join(packageDir, '__builder_payload__', loadedPayload.artifactsRoot || 'files');
+      if (await pathExists(sourceFilesRoot)) {
+        const files = walkFiles(sourceFilesRoot);
+        for (const sourcePath of files) {
+          const rel = path.relative(sourceFilesRoot, sourcePath).replace(/\\/g, '/');
+          let mappedRel = rel;
+          if (orgRemapRequired && targetUploadScope) {
+            mappedRel = rel.replace(/^ORG_[^/]+/i, targetUploadScope || rel);
+          }
+          // eslint-disable-next-line no-await-in-loop
+          await pushFileRow({
+            destinationRel: mappedRel,
+            scopeMode: 'table',
+            storageRelativePath: cleanText(splitScopedUploadRelativePath(mappedRel).storageRelativePath || mappedRel, 2000),
+            payloadPath: cleanText(rel, 2000)
+          });
+        }
+      }
+    }
+
+    return {
+      payloadFound: true,
+      orgRemapRequired,
+      targetOrgId: targetOrgId || '',
+      tableRows,
+      fileRows,
+      warnings: report.warnings
+    };
+  }
+
+  async function dropEntityTableJson(entityType = '') {
+    const normalizedEntityType = cleanText(entityType, 200);
+    const filePath = path.join(process.cwd(), 'data', `${normalizedEntityType}.json`);
+    const exists = await pathExists(filePath);
+    if (!exists) return { operation: 'missing', removedRows: 0 };
+    const payload = readJsonFile(filePath);
+    const rowCount = Array.isArray(payload) ? payload.length : 0;
+    await deps.fs.rm(filePath, { force: true });
+    return { operation: 'deleted', removedRows: rowCount };
+  }
+
+  async function dropEntityTableMongo(entityType = '') {
+    const normalizedEntityType = cleanText(entityType, 200);
+    if (typeof deps.getMongoDbOrNull === 'function' && !deps.getMongoDbOrNull()) {
+      throw new Error(`Mongo is not connected for table drop: ${normalizedEntityType}`);
+    }
+    if (typeof deps.getMongoCollection !== 'function') {
+      throw new Error(`Mongo collection resolver is unavailable for table drop: ${normalizedEntityType}`);
+    }
+    const collection = deps.getMongoCollection(normalizedEntityType);
+    if (!collection) {
+      throw new Error(`Mongo collection was not resolved for table drop: ${normalizedEntityType}`);
+    }
+    let rowCount = 0;
+    try {
+      rowCount = Number(await collection.countDocuments({})) || 0;
+    } catch (_) {}
+    try {
+      await collection.drop();
+      return { operation: 'deleted', removedRows: rowCount };
+    } catch (error) {
+      const message = cleanText(error?.message || String(error), 600).toLowerCase();
+      if (message.includes('ns not found') || message.includes('namespace not found')) {
+        return { operation: 'missing', removedRows: 0 };
+      }
+      throw error;
+    }
+  }
+
+  async function dropEntityTable(entityType = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    if (backendMode === 'json') return dropEntityTableJson(entityType);
+    if (backendMode === 'mongo') return dropEntityTableMongo(entityType);
+    throw new Error(`Unsupported backend mode "${backendMode}" for table drop.`);
+  }
+
   async function removeBuilderPayloadIfPresent(context = {}, options = {}) {
     const manifestPath = cleanText(context.manifestPath, 2000);
     const requirePayload = options.requirePayload === true;
@@ -2404,6 +2633,18 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
       payloadFound: false,
       orgRemapRequired: false,
       targetOrgId: '',
+      selectionApplied: {
+        tablesSelected: 0,
+        filesSelected: 0
+      },
+      tableSummary: {
+        total: 0,
+        selected: 0,
+        deleted: 0,
+        retained: 0,
+        skipped: 0,
+        failed: 0
+      },
       rowSummary: {
         deleted: 0,
         skipped: 0,
@@ -2411,7 +2652,10 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
         skippedWithoutId: []
       },
       fileSummary: {
+        total: 0,
+        selected: 0,
         deleted: 0,
+        retained: 0,
         skipped: 0,
         failed: 0
       },
@@ -2438,8 +2682,6 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     }
 
     const payload = loadedPayload.manifest;
-    const payloadData = sanitizeObject(loadedPayload.data);
-    const payloadTableAllowList = collectPayloadTableAllowList(payload);
     const orgRemapRequired = loadedPayload.orgRemapRequired === true;
     const targetOrgId = normalizeBusinessOrgId(options.targetOrgId || '');
     const targetUploadScope = normalizeOrgToken(options.targetOrgId || '');
@@ -2450,11 +2692,27 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     }
 
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    const inventory = await previewBuilderPayloadDeletionInventory(context, {
+      backendMode,
+      targetOrgId: targetOrgId || ''
+    });
     const report = {
       applied: true,
       payloadFound: true,
       orgRemapRequired,
       targetOrgId: targetOrgId || '',
+      selectionApplied: {
+        tablesSelected: 0,
+        filesSelected: 0
+      },
+      tableSummary: {
+        total: sanitizeArray(inventory.tableRows).length,
+        selected: 0,
+        deleted: 0,
+        retained: 0,
+        skipped: 0,
+        failed: 0
+      },
       rowSummary: {
         deleted: 0,
         skipped: 0,
@@ -2462,167 +2720,117 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
         skippedWithoutId: []
       },
       fileSummary: {
+        total: sanitizeArray(inventory.fileRows).length,
+        selected: 0,
         deleted: 0,
+        retained: 0,
         skipped: 0,
         failed: 0
       },
-      warnings: []
+      warnings: [...sanitizeArray(inventory.warnings)]
     };
-    const rowFailures = [];
+    const tableFailures = [];
     const fileFailures = [];
-
-    const entityNames = Object.keys(payloadData).reverse();
-    for (const entityType of entityNames) {
-      const rows = sanitizeArray(payloadData[entityType]).slice().reverse();
-      for (const row of rows) {
-        const rowId = cleanText(row?.id || row?._id || '', 200);
-        if (!rowId) {
-          report.rowSummary.skipped += 1;
-          report.rowSummary.skippedWithoutId.push({
-            entityType: cleanText(entityType, 200),
-            idHint: cleanText(row?.name || row?.key || '', 200)
-          });
-          report.warnings.push(`Skipped payload row delete for "${entityType}" because row.id is missing.`);
-          continue;
-        }
-
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          await deps.dataService.deleteData(entityType, rowId, SYSTEM_CONTEXT, { backendMode });
-          report.rowSummary.deleted += 1;
-        } catch (error) {
-          let resolvedError = error;
-          if (isUnknownEntityTypeError(error)) {
-            try {
-              assertUnknownEntityFallbackAllowed(entityType, payloadTableAllowList);
-              // eslint-disable-next-line no-await-in-loop
-              const operation = await removeUnknownEntityRow(entityType, row, { backendMode });
-              if (operation === 'deleted') {
-                report.rowSummary.deleted += 1;
-              } else {
-                report.rowSummary.skipped += 1;
-                report.warnings.push(`Skipped unknown-entity payload row delete for "${entityType}#${rowId}" because row was not found.`);
-              }
-              // eslint-disable-next-line no-continue
-              continue;
-            } catch (fallbackError) {
-              resolvedError = fallbackError;
-            }
-          }
-
-          report.rowSummary.failed += 1;
-          rowFailures.push({
-            entityType,
-            rowId,
-            message: cleanText(resolvedError?.message || String(resolvedError), 500)
-          });
-        }
+    const selection = normalizeDeleteSelectionInput(options.deleteSelection);
+    const allowedTableIds = new Set(sanitizeArray(inventory.tableRows).map((row) => cleanText(row?.id, 200)).filter(Boolean));
+    const allowedFileIds = new Set(sanitizeArray(inventory.fileRows).map((row) => cleanText(row?.id, 2000)).filter(Boolean));
+    if (selection.provided) {
+      const invalidTableIds = Array.from(selection.tables).filter((row) => !allowedTableIds.has(row));
+      const invalidFileIds = Array.from(selection.files).filter((row) => !allowedFileIds.has(row));
+      if (invalidTableIds.length || invalidFileIds.length) {
+        const error = new Error('Delete selection includes unknown table/file ids.');
+        error.code = 'PACKAGE_REMOVE_INVALID_SELECTION';
+        error.details = {
+          invalidTableIds,
+          invalidFileIds
+        };
+        throw error;
       }
     }
 
-    const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
-    const tableArtifacts = sanitizeArray(loadedPayload?.tableArtifacts);
-    const globalArtifacts = sanitizeArray(loadedPayload?.globalArtifacts);
-    const hasGroupedArtifacts = tableArtifacts.length > 0 || globalArtifacts.length > 0;
+    const selectedTableIds = selection.provided
+      ? new Set(Array.from(selection.tables))
+      : new Set(Array.from(allowedTableIds));
+    const selectedFileIds = selection.provided
+      ? new Set(Array.from(selection.files))
+      : new Set(Array.from(allowedFileIds));
+    report.selectionApplied.tablesSelected = selectedTableIds.size;
+    report.selectionApplied.filesSelected = selectedFileIds.size;
 
-    const deleteScopedArtifact = async (storageRelativePath = '', scopeMode = 'target', payloadPath = '') => {
-      const destinationScope = scopeMode === 'global'
-        ? 'GLOBAL'
-        : (targetUploadScope || 'GLOBAL');
-      const destinationRel = buildScopedUploadsRelativePath(storageRelativePath, destinationScope);
-      if (!destinationRel) {
-        report.fileSummary.skipped += 1;
-        report.warnings.push(`Skipped payload artifact delete because storage path was empty: ${payloadPath || storageRelativePath}`);
-        return;
+    for (const tableRow of sanitizeArray(inventory.tableRows)) {
+      const tableId = cleanText(tableRow?.id, 200);
+      const entityType = cleanText(tableRow?.entityType || tableId, 200);
+      const estimatedRowCount = Number(tableRow?.estimatedRowCount || 0) || 0;
+      if (!tableId || !entityType) continue;
+      if (!selectedTableIds.has(tableId)) {
+        report.tableSummary.retained += 1;
+        report.rowSummary.skipped += estimatedRowCount;
+        continue;
       }
-      const destinationPath = path.resolve(uploadRoot, destinationRel);
-      if (!uploadPathUtils.isInsideUploadRoot(destinationPath, uploadRoot)) {
+      report.tableSummary.selected += 1;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const outcome = await dropEntityTable(entityType, { backendMode });
+        if (outcome?.operation === 'deleted') {
+          report.tableSummary.deleted += 1;
+          report.rowSummary.deleted += Number(outcome?.removedRows || estimatedRowCount || 0) || 0;
+        } else {
+          report.tableSummary.skipped += 1;
+          report.rowSummary.skipped += 0;
+          report.warnings.push(`Skipped table delete because table was not found: ${entityType}`);
+        }
+      } catch (error) {
+        report.tableSummary.failed += 1;
+        report.rowSummary.failed += estimatedRowCount;
+        tableFailures.push({
+          entityType,
+          message: cleanText(error?.message || String(error), 500)
+        });
+      }
+    }
+
+    for (const fileRow of sanitizeArray(inventory.fileRows)) {
+      const fileId = cleanText(fileRow?.id, 2000);
+      if (!fileId) continue;
+      if (!selectedFileIds.has(fileId)) {
+        report.fileSummary.retained += 1;
+        continue;
+      }
+      report.fileSummary.selected += 1;
+      const absolutePath = cleanText(fileRow?.absolutePath, 3000);
+      if (!absolutePath) {
         report.fileSummary.failed += 1;
         fileFailures.push({
-          payloadPath: payloadPath || storageRelativePath,
-          message: 'Resolved artifact path is outside upload root boundary.'
+          payloadPath: cleanText(fileRow?.payloadPath || fileId, 2000),
+          message: 'File absolute path is missing in deletion inventory.'
         });
-        return;
+        continue;
       }
       // eslint-disable-next-line no-await-in-loop
-      const exists = await pathExists(destinationPath);
-      if (!exists) {
+      const stat = await readPathStat(absolutePath);
+      if (!stat || !(stat.isFile && stat.isFile())) {
         report.fileSummary.skipped += 1;
-        report.warnings.push(`Skipped payload artifact delete because file was not found: ${payloadPath || storageRelativePath}`);
-        return;
+        report.warnings.push(`Skipped payload artifact delete because file was not found: ${fileId}`);
+        continue;
       }
       try {
         // eslint-disable-next-line no-await-in-loop
-        await deps.fs.rm(destinationPath, { force: true });
+        await deps.fs.rm(absolutePath, { force: true });
         report.fileSummary.deleted += 1;
       } catch (error) {
         report.fileSummary.failed += 1;
         fileFailures.push({
-          payloadPath: payloadPath || storageRelativePath,
+          payloadPath: cleanText(fileRow?.payloadPath || fileId, 2000),
           message: cleanText(error?.message || String(error), 500)
         });
       }
-    };
-
-    if (hasGroupedArtifacts) {
-      for (const row of tableArtifacts) {
-        const storageRelativePath = cleanText(row?.storageRelativePath, 2000).replace(/\\/g, '/').replace(/^\/+/, '');
-        const payloadPath = cleanText(row?.payloadPath, 2000);
-        // eslint-disable-next-line no-await-in-loop
-        await deleteScopedArtifact(storageRelativePath, 'target', payloadPath);
-      }
-      for (const row of globalArtifacts) {
-        const storageRelativePath = cleanText(row?.storageRelativePath, 2000).replace(/\\/g, '/').replace(/^\/+/, '');
-        const payloadPath = cleanText(row?.payloadPath, 2000);
-        // eslint-disable-next-line no-await-in-loop
-        await deleteScopedArtifact(storageRelativePath, 'global', payloadPath);
-      }
-    } else {
-      const sourceFilesRoot = path.join(packageDir, '__builder_payload__', loadedPayload.artifactsRoot || 'files');
-      if (await pathExists(sourceFilesRoot)) {
-        const files = walkFiles(sourceFilesRoot);
-        for (const sourcePath of files) {
-          const rel = path.relative(sourceFilesRoot, sourcePath).replace(/\\/g, '/');
-          let mappedRel = rel;
-          if (orgRemapRequired && targetUploadScope) {
-            mappedRel = rel.replace(/^ORG_[^/]+/i, targetUploadScope || rel);
-          }
-          const destinationPath = path.resolve(uploadRoot, mappedRel);
-          if (!uploadPathUtils.isInsideUploadRoot(destinationPath, uploadRoot)) {
-            report.fileSummary.failed += 1;
-            fileFailures.push({
-              payloadPath: rel,
-              message: 'Resolved artifact path is outside upload root boundary.'
-            });
-            continue;
-          }
-          // eslint-disable-next-line no-await-in-loop
-          const exists = await pathExists(destinationPath);
-          if (!exists) {
-            report.fileSummary.skipped += 1;
-            report.warnings.push(`Skipped payload file delete because file was not found: ${rel}`);
-            continue;
-          }
-          try {
-            // eslint-disable-next-line no-await-in-loop
-            await deps.fs.rm(destinationPath, { force: true });
-            report.fileSummary.deleted += 1;
-          } catch (error) {
-            report.fileSummary.failed += 1;
-            fileFailures.push({
-              payloadPath: rel,
-              message: cleanText(error?.message || String(error), 500)
-            });
-          }
-        }
-      }
     }
 
-    if (rowFailures.length || fileFailures.length) {
+    if (tableFailures.length || fileFailures.length) {
       const error = new Error('Builder payload cleanup failed for one or more rows/files.');
       error.code = 'BUILDER_PAYLOAD_UNINSTALL_FAILED';
       error.details = {
-        rowFailures,
+        tableFailures,
         fileFailures,
         report
       };
@@ -2879,9 +3087,11 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
   }
 
   return {
+    assertSigningPrivateKeyReady,
     discoverLocalPackages,
     preflightBuild,
     buildPackage,
+    previewBuilderPayloadDeletionInventory,
     applyBuilderPayloadIfPresent,
     removeBuilderPayloadIfPresent
   };

@@ -34,10 +34,12 @@ test('package builder page controller renders package rows and action state', as
   const originalGetSettings = systemSettingsRepository.getSettings;
   const originalRuntimeStatus = dataBackendRuntimeService.getPublicBackendStatus;
   const originalDiscover = systemSettingsPackageBuilderService.discoverLocalPackages;
+  const originalSigningKeyCheck = systemSettingsPackageBuilderService.assertSigningPrivateKeyReady;
   const originalFetchData = dataService.fetchData;
   const res = makeRenderResponse();
 
   try {
+    systemSettingsPackageBuilderService.assertSigningPrivateKeyReady = () => ({ configured: true, source: 'test:file:key.pem' });
     systemSettingsRepository.getSettings = async () => ({ app: {} });
     dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json', mongo: { ready: false } });
     systemSettingsPackageBuilderService.discoverLocalPackages = async () => ([
@@ -65,6 +67,7 @@ test('package builder page controller renders package rows and action state', as
     systemSettingsRepository.getSettings = originalGetSettings;
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
     systemSettingsPackageBuilderService.discoverLocalPackages = originalDiscover;
+    systemSettingsPackageBuilderService.assertSigningPrivateKeyReady = originalSigningKeyCheck;
     dataService.fetchData = originalFetchData;
   }
 });
@@ -73,10 +76,12 @@ test('package builder preflight/build controllers return structured payloads', a
   const originalRuntimeStatus = dataBackendRuntimeService.getPublicBackendStatus;
   const originalPreflight = systemSettingsPackageBuilderService.preflightBuild;
   const originalBuild = systemSettingsPackageBuilderService.buildPackage;
+  const originalSigningKeyCheck = systemSettingsPackageBuilderService.assertSigningPrivateKeyReady;
   let capturedPreflightInput = null;
   let capturedBuildInput = null;
 
   try {
+    systemSettingsPackageBuilderService.assertSigningPrivateKeyReady = () => ({ configured: true, source: 'test:file:key.pem' });
     dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json' });
     systemSettingsPackageBuilderService.preflightBuild = async (input) => {
       capturedPreflightInput = input;
@@ -134,6 +139,7 @@ test('package builder preflight/build controllers return structured payloads', a
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
     systemSettingsPackageBuilderService.preflightBuild = originalPreflight;
     systemSettingsPackageBuilderService.buildPackage = originalBuild;
+    systemSettingsPackageBuilderService.assertSigningPrivateKeyReady = originalSigningKeyCheck;
   }
 });
 
@@ -141,7 +147,9 @@ test('package builder controllers reject missing origin org', async () => {
   const originalRuntimeStatus = dataBackendRuntimeService.getPublicBackendStatus;
   const originalPreflight = systemSettingsPackageBuilderService.preflightBuild;
   const originalBuild = systemSettingsPackageBuilderService.buildPackage;
+  const originalSigningKeyCheck = systemSettingsPackageBuilderService.assertSigningPrivateKeyReady;
   try {
+    systemSettingsPackageBuilderService.assertSigningPrivateKeyReady = () => ({ configured: true, source: 'test:file:key.pem' });
     dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json' });
     systemSettingsPackageBuilderService.preflightBuild = async () => {
       throw new Error('Origin organization is required. Select an origin org before preflight/build.');
@@ -169,6 +177,57 @@ test('package builder controllers reject missing origin org', async () => {
     assert.match(String(buildRes.jsonPayload?.message || ''), /origin organization is required/i);
   } finally {
     dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
+    systemSettingsPackageBuilderService.preflightBuild = originalPreflight;
+    systemSettingsPackageBuilderService.buildPackage = originalBuild;
+    systemSettingsPackageBuilderService.assertSigningPrivateKeyReady = originalSigningKeyCheck;
+  }
+});
+
+test('package builder controllers block access when signing key is not configured', async () => {
+  const originalRuntimeStatus = dataBackendRuntimeService.getPublicBackendStatus;
+  const originalSigningKeyCheck = systemSettingsPackageBuilderService.assertSigningPrivateKeyReady;
+  const originalPreflight = systemSettingsPackageBuilderService.preflightBuild;
+  const originalBuild = systemSettingsPackageBuilderService.buildPackage;
+  const pageRes = makeRenderResponse();
+  const preflightRes = makeRenderResponse();
+  const buildRes = makeRenderResponse();
+
+  try {
+    dataBackendRuntimeService.getPublicBackendStatus = () => ({ mode: 'json' });
+    systemSettingsPackageBuilderService.preflightBuild = async () => ({});
+    systemSettingsPackageBuilderService.buildPackage = async () => ({});
+    systemSettingsPackageBuilderService.assertSigningPrivateKeyReady = () => {
+      const error = new Error('Package Builder is disabled until signing private key is configured and usable.');
+      error.code = 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED';
+      throw error;
+    };
+
+    await systemSettingsController.showPackageBuilderPage(
+      { user: { id: 'USER_GATE_1' }, actionStateId: 'STATE_GATE_1' },
+      pageRes
+    );
+    assert.equal(pageRes.statusCode, 403);
+    assert.equal(pageRes.rendered?.view, 'error');
+    assert.match(String(pageRes.rendered?.payload?.message || ''), /disabled/i);
+
+    await systemSettingsController.preflightPackageBuilder(
+      { body: { packageId: 'pte', originOrgId: 'ORG_900000' }, user: { id: 'USER_GATE_2' } },
+      preflightRes
+    );
+    assert.equal(preflightRes.statusCode, 403);
+    assert.equal(preflightRes.jsonPayload?.status, 'error');
+    assert.equal(preflightRes.jsonPayload?.code, 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED');
+
+    await systemSettingsController.buildPackageFromBuilder(
+      { body: { packageId: 'pte', version: '1.0.1', originOrgId: 'ORG_900000' }, user: { id: 'USER_GATE_3' } },
+      buildRes
+    );
+    assert.equal(buildRes.statusCode, 403);
+    assert.equal(buildRes.jsonPayload?.status, 'error');
+    assert.equal(buildRes.jsonPayload?.code, 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED');
+  } finally {
+    dataBackendRuntimeService.getPublicBackendStatus = originalRuntimeStatus;
+    systemSettingsPackageBuilderService.assertSigningPrivateKeyReady = originalSigningKeyCheck;
     systemSettingsPackageBuilderService.preflightBuild = originalPreflight;
     systemSettingsPackageBuilderService.buildPackage = originalBuild;
   }

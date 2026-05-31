@@ -1261,9 +1261,25 @@ function buildPackageManagerOptions(req = {}) {
   };
 }
 
+function assertPackageBuilderSigningKeyReady() {
+  if (
+    !systemSettingsPackageBuilderService
+    || typeof systemSettingsPackageBuilderService.assertSigningPrivateKeyReady !== 'function'
+  ) {
+    throw buildOperationError(
+      'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED',
+      'Package Builder signing-key readiness check is unavailable in this runtime.'
+    );
+  }
+  return systemSettingsPackageBuilderService.assertSigningPrivateKeyReady({
+    projectRoot: process.cwd()
+  });
+}
+
 function sendPackageManagerError(res, error, fallbackMessage = 'Package operation failed.') {
   const code = String(error?.code || '').trim().toUpperCase();
-  const statusCode = code === 'ADMIN_REQUIRED' ? 403 : 400;
+  const adminRequired = code === 'ADMIN_REQUIRED';
+  const statusCode = (adminRequired || code === 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED') ? 403 : 400;
   const blocked = code === 'UNINSTALL_BLOCKED_MODIFIED';
   let message = error?.message || fallbackMessage;
   if (code === 'ZIP_SIGNATURE_NOT_CONFIGURED') {
@@ -1276,9 +1292,11 @@ function sendPackageManagerError(res, error, fallbackMessage = 'Package operatio
     message = 'This package includes org-bound exported data/files. Select a target organization and retry install.';
   } else if (code === 'BUILDER_PAYLOAD_IMPORT_FAILED') {
     message = 'Package install stopped because payload data import failed. Review details and retry after fixing the record conflict.';
+  } else if (code === 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED') {
+    message = 'Package Builder is disabled until PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE or PACKAGE_SIGNING_ED25519_PRIVATE_KEY_BASE64 is configured with a valid private key and the app is restarted.';
   }
   return res.status(statusCode).json({
-    status: statusCode === 403 ? 'admin_required' : (blocked ? 'blocked' : 'error'),
+    status: adminRequired ? 'admin_required' : (blocked ? 'blocked' : 'error'),
     message,
     code,
     details: error?.details || null,
@@ -1286,6 +1304,19 @@ function sendPackageManagerError(res, error, fallbackMessage = 'Package operatio
     modifiedRecords: blocked ? (error?.modifiedRecords || []) : [],
     previewTransactionId: blocked ? (error?.previewTransactionId || '') : ''
   });
+}
+
+function parseDeleteSelectionInput(value) {
+  if (!value) return null;
+  if (typeof value === 'object') return value;
+  const raw = cleanFormText(value, 400000);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 function assertLocalPackageDevModeEnabled() {
@@ -1413,11 +1444,13 @@ exports.removePackageFromManager = async (req, res) => {
     const force = String(req.query?.force || req.body?.force || '').trim().toLowerCase() === 'true';
     const cleanupModeRaw = cleanFormText(req.body?.cleanupMode || req.query?.cleanupMode, 40).toLowerCase();
     const cleanupMode = cleanupModeRaw === 'keep-data' ? 'keep-data' : 'full';
+    const deleteSelection = parseDeleteSelectionInput(req.body?.deleteSelection);
     const report = await systemSettingsPackageManagerService.removePackage(packageId, {
       ...buildPackageManagerOptions(req),
       force,
       cleanupMode,
-      previewTransactionId: cleanFormText(req.body?.previewTransactionId, 160)
+      previewTransactionId: cleanFormText(req.body?.previewTransactionId, 160),
+      deleteSelection
     });
     return res.json({
       status: 'success',
@@ -1514,6 +1547,7 @@ exports.syncLocalPackagesFromManager = async (req, res) => {
 ========================================================= */
 exports.showPackageBuilderPage = async (req, res) => {
   try {
+    const signingKeyState = assertPackageBuilderSigningKeyReady();
     const settings = await systemSettingsRepository.getSettings();
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const packageStorageRoot = getPackageStorageRootAbsolute();
@@ -1533,17 +1567,26 @@ exports.showPackageBuilderPage = async (req, res) => {
       packages: discovered,
       packageWarnings: discovered.filter((row) => row.valid !== true || row.manifestResolved !== true),
       organizations: Array.isArray(organizations) ? organizations : [],
+      packageBuilderSigningKeySource: cleanFormText(signingKeyState?.source, 300),
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
     });
   } catch (error) {
+    if (String(error?.code || '').trim().toUpperCase() === 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED') {
+      return res.status(403).render('error', {
+        title: 'Package Builder Disabled',
+        message: error.message || 'Package Builder is disabled until signing private key is configured.',
+        user: req.user
+      });
+    }
     return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
   }
 };
 
 exports.preflightPackageBuilder = async (req, res) => {
   try {
+    assertPackageBuilderSigningKeyReady();
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const report = await systemSettingsPackageBuilderService.preflightBuild({
       packageId: cleanFormText(req.body?.packageId, 120),
@@ -1567,6 +1610,9 @@ exports.preflightPackageBuilder = async (req, res) => {
       report
     });
   } catch (error) {
+    if (String(error?.code || '').trim().toUpperCase() === 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED') {
+      return sendPackageManagerError(res, error, 'Package build preflight failed.');
+    }
     return res.status(400).json({
       status: 'error',
       message: error?.message || 'Package build preflight failed.',
@@ -1578,6 +1624,7 @@ exports.preflightPackageBuilder = async (req, res) => {
 
 exports.buildPackageFromBuilder = async (req, res) => {
   try {
+    assertPackageBuilderSigningKeyReady();
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const report = await systemSettingsPackageBuilderService.buildPackage({
       packageId: cleanFormText(req.body?.packageId, 120),
@@ -1602,6 +1649,9 @@ exports.buildPackageFromBuilder = async (req, res) => {
       report
     });
   } catch (error) {
+    if (String(error?.code || '').trim().toUpperCase() === 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED') {
+      return sendPackageManagerError(res, error, 'Package build failed.');
+    }
     return res.status(400).json({
       status: 'error',
       message: error?.message || 'Package build failed.',

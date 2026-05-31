@@ -433,7 +433,13 @@ test('remove package controller defaults to full cleanup mode and forwards previ
     await systemSettingsController.removePackageFromManager(
       {
         params: { packageId: 'pte' },
-        body: { previewTransactionId: 'TXN_1' },
+        body: {
+          previewTransactionId: 'TXN_1',
+          deleteSelection: JSON.stringify({
+            tables: ['pteApplicants'],
+            files: ['ORG_900000/symbols/logo.png']
+          })
+        },
         user: { id: 'USER_7' },
         app: {}
       },
@@ -444,6 +450,10 @@ test('remove package controller defaults to full cleanup mode and forwards previ
     assert.equal(captured?.options?.force, false);
     assert.equal(captured?.options?.cleanupMode, 'full');
     assert.equal(captured?.options?.previewTransactionId, 'TXN_1');
+    assert.deepEqual(captured?.options?.deleteSelection, {
+      tables: ['pteApplicants'],
+      files: ['ORG_900000/symbols/logo.png']
+    });
   } finally {
     systemSettingsPackageManagerService.removePackage = originalRemove;
   }
@@ -540,6 +550,8 @@ test('package manager EJS shows local sync button when local dev mode is enabled
 
   assert.match(html, /Package Sync Locally/);
   assert.match(html, /\/systemSettings\/packages\/local-sync/);
+  assert.match(html, /Tables \(Selectable\)/);
+  assert.match(html, /Files \(Selectable\)/);
 });
 
 test('local package sync EJS compiles and includes sync actions', () => {

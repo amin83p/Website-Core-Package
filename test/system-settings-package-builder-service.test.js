@@ -1089,7 +1089,7 @@ test('applyBuilderPayloadIfPresent fails fast with structured details on import 
   });
 });
 
-test('removeBuilderPayloadIfPresent deletes known rows and payload artifacts', async () => {
+test('removeBuilderPayloadIfPresent deletes selected tables and payload artifacts', async () => {
   await withTempCwd('pkg-builder-remove-payload-', async (tempRoot) => {
     const packageDir = path.join(tempRoot, 'packages', 'pte');
     fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
@@ -1115,15 +1115,14 @@ test('removeBuilderPayloadIfPresent deletes known rows and payload artifacts', a
     fs.writeFileSync(path.join(tempRoot, 'uploads', 'ORG_123', 'symbols', 'logo.png'), 'png', 'utf8');
     fs.writeFileSync(path.join(tempRoot, 'uploads', 'GLOBAL', 'symbols', 'system.png'), 'png', 'utf8');
 
-    const deletedRows = [];
     const service = packageBuilderModule.createService({
       dataService: {
-        async deleteData(entityType, id) {
-          deletedRows.push({ entityType, id });
-          return true;
-        }
+        async deleteData() { return true; }
       }
     });
+    writeJson(path.join(tempRoot, 'data', 'pteApplicants.json'), [
+      { id: 'A1', orgId: '123' }
+    ]);
 
     const report = await service.removeBuilderPayloadIfPresent({
       manifestPath: path.join(packageDir, 'package.manifest.json')
@@ -1135,15 +1134,18 @@ test('removeBuilderPayloadIfPresent deletes known rows and payload artifacts', a
 
     assert.equal(report.applied, true);
     assert.equal(report.targetOrgId, '123');
+    assert.equal(report.tableSummary.selected, 1);
+    assert.equal(report.tableSummary.deleted, 1);
     assert.equal(report.rowSummary.deleted, 1);
+    assert.equal(report.fileSummary.selected, 2);
     assert.equal(report.fileSummary.deleted, 2);
-    assert.deepEqual(deletedRows, [{ entityType: 'pteApplicants', id: 'A1' }]);
+    assert.equal(await fsp.access(path.join(tempRoot, 'data', 'pteApplicants.json')).then(() => true).catch(() => false), false);
     assert.equal(await fsp.access(path.join(tempRoot, 'uploads', 'ORG_123', 'symbols', 'logo.png')).then(() => true).catch(() => false), false);
     assert.equal(await fsp.access(path.join(tempRoot, 'uploads', 'GLOBAL', 'symbols', 'system.png')).then(() => true).catch(() => false), false);
   });
 });
 
-test('removeBuilderPayloadIfPresent supports allow-listed unknown-entity JSON delete fallback and row-id skip reporting', async () => {
+test('removeBuilderPayloadIfPresent keeps unselected table/file rows and validates selection ids', async () => {
   await withTempCwd('pkg-builder-remove-unknown-', async (tempRoot) => {
     const packageDir = path.join(tempRoot, 'packages', 'pte');
     fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
@@ -1155,18 +1157,22 @@ test('removeBuilderPayloadIfPresent supports allow-listed unknown-entity JSON de
       schema: 'core.package-builder.payload.v2',
       orgRemapRequired: false,
       artifactsRoot: 'artifacts',
-      tables: [{ entityType: 'pteAiProviders', file: 'tables/pteAiProviders.json', rowCount: 2 }]
+      tables: [{ entityType: 'pteAiProviders', file: 'tables/pteAiProviders.json', rowCount: 2 }],
+      tableArtifacts: [{
+        payloadPath: 'artifacts/tables/logo.png',
+        storageRelativePath: 'symbols/logo.png'
+      }]
     });
     writeJson(path.join(tempRoot, 'data', 'pteAiProviders.json'), [
       { id: 'ROW_1', label: 'Stored' },
       { id: 'ROW_2', label: 'Keep' }
     ]);
+    fs.mkdirSync(path.join(tempRoot, 'uploads', 'GLOBAL', 'symbols'), { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'uploads', 'GLOBAL', 'symbols', 'logo.png'), 'png', 'utf8');
 
     const service = packageBuilderModule.createService({
       dataService: {
-        async deleteData() {
-          throw new Error('Unknown entity type for delete: pteAiProviders');
-        }
+        async deleteData() { return true; }
       }
     });
 
@@ -1174,15 +1180,33 @@ test('removeBuilderPayloadIfPresent supports allow-listed unknown-entity JSON de
       manifestPath: path.join(packageDir, 'package.manifest.json')
     }, {
       backendMode: 'json',
-      requirePayload: true
+      requirePayload: true,
+      deleteSelection: {
+        tables: [],
+        files: []
+      }
     });
 
     assert.equal(report.applied, true);
-    assert.equal(report.rowSummary.deleted, 1);
-    assert.equal(report.rowSummary.skipped >= 1, true);
-    assert.equal(report.rowSummary.skippedWithoutId.length, 1);
+    assert.equal(report.tableSummary.selected, 0);
+    assert.equal(report.tableSummary.retained, 1);
+    assert.equal(report.fileSummary.selected, 0);
+    assert.equal(report.fileSummary.retained, 1);
     const storedRows = JSON.parse(fs.readFileSync(path.join(tempRoot, 'data', 'pteAiProviders.json'), 'utf8'));
-    assert.equal(storedRows.length, 1);
-    assert.equal(storedRows[0].id, 'ROW_2');
+    assert.equal(storedRows.length, 2);
+
+    await assert.rejects(
+      () => service.removeBuilderPayloadIfPresent({
+        manifestPath: path.join(packageDir, 'package.manifest.json')
+      }, {
+        backendMode: 'json',
+        requirePayload: true,
+        deleteSelection: {
+          tables: ['pteAiProviders', 'unknownTable'],
+          files: []
+        }
+      }),
+      /PACKAGE_REMOVE_INVALID_SELECTION|unknown table\/file ids/i
+    );
   });
 });

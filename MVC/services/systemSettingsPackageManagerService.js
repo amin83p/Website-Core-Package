@@ -52,6 +52,70 @@ function normalizeCleanupMode(value = '') {
   return 'full';
 }
 
+function normalizeDeleteSelection(value = null) {
+  const source = sanitizeObject(value);
+  const hasTables = Object.prototype.hasOwnProperty.call(source, 'tables');
+  const hasFiles = Object.prototype.hasOwnProperty.call(source, 'files');
+  const provided = source.provided === true || hasTables || hasFiles;
+  const normalizeList = (input) => {
+    if (Array.isArray(input)) {
+      return input.map((item) => cleanText(item, 2000)).filter(Boolean);
+    }
+    if (typeof input === 'string') {
+      return input.split(/\r?\n|,/).map((item) => cleanText(item, 2000)).filter(Boolean);
+    }
+    return [];
+  };
+  return {
+    provided,
+    tables: normalizeList(source.tables),
+    files: normalizeList(source.files)
+  };
+}
+
+function buildDeleteSelectionDecision(preview = {}, deleteSelectionInput = null) {
+  const normalizedSelection = normalizeDeleteSelection(deleteSelectionInput);
+  const tableRows = sanitizeArray(preview?.deletionInventory?.tables);
+  const fileRows = sanitizeArray(preview?.deletionInventory?.files);
+  const allowedTableIds = Array.from(new Set(
+    tableRows.map((row) => cleanText(row?.id, 200)).filter(Boolean)
+  ));
+  const allowedFileIds = Array.from(new Set(
+    fileRows.map((row) => cleanText(row?.id, 2000)).filter(Boolean)
+  ));
+  const allowedTableSet = new Set(allowedTableIds);
+  const allowedFileSet = new Set(allowedFileIds);
+
+  const resolvedTableIds = normalizedSelection.provided
+    ? Array.from(new Set(normalizedSelection.tables))
+    : allowedTableIds.slice();
+  const resolvedFileIds = normalizedSelection.provided
+    ? Array.from(new Set(normalizedSelection.files))
+    : allowedFileIds.slice();
+
+  const invalidTableIds = resolvedTableIds.filter((item) => !allowedTableSet.has(item));
+  const invalidFileIds = resolvedFileIds.filter((item) => !allowedFileSet.has(item));
+  if (invalidTableIds.length > 0 || invalidFileIds.length > 0) {
+    const error = new Error('Delete selection includes unknown table/file ids.');
+    error.code = 'PACKAGE_REMOVE_INVALID_SELECTION';
+    error.details = {
+      invalidTableIds,
+      invalidFileIds
+    };
+    throw error;
+  }
+
+  return {
+    provided: normalizedSelection.provided,
+    tables: resolvedTableIds,
+    files: resolvedFileIds,
+    available: {
+      tables: allowedTableIds.length,
+      files: allowedFileIds.length
+    }
+  };
+}
+
 function readPositiveInt(value, fallback) {
   const parsed = Number.parseInt(String(value || ''), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
@@ -1845,6 +1909,30 @@ function createService(overrides = {}) {
     return direct.replace(/^ORG_/i, '');
   }
 
+  function buildCriticalDeletionInventory(packageId = '') {
+    const normalizedPackageId = normalizePackageId(packageId);
+    return [
+      {
+        id: 'critical:registry',
+        label: `Remove package registry row (${normalizedPackageId || 'package'})`,
+        mandatory: true,
+        selected: true
+      },
+      {
+        id: 'critical:declarations',
+        label: 'Remove package declarations (sections/roles/symbols/access/routes metadata)',
+        mandatory: true,
+        selected: true
+      },
+      {
+        id: 'critical:source',
+        label: 'Remove package source folder from package storage root',
+        mandatory: true,
+        selected: true
+      }
+    ];
+  }
+
   async function previewPackageUninstallImpact(packageIdInput = '', options = {}) {
     const actor = buildActor(options.actor || null);
     const backendMode = cleanText(options.backendMode, 30) || undefined;
@@ -1865,6 +1953,15 @@ function createService(overrides = {}) {
           actor
         }).catch(() => null)
       : null;
+    const deletionInventory = {
+      critical: buildCriticalDeletionInventory(packageId),
+      tables: [],
+      files: [],
+      summary: {
+        tableCount: 0,
+        fileCount: 0
+      }
+    };
     if (!existing) {
       return {
         packageId,
@@ -1874,6 +1971,7 @@ function createService(overrides = {}) {
         modifiedRecords: sanitizeArray(dataOnlyPreview?.modifiedRecords),
         dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact),
         summaryByEntity: {},
+        deletionInventory,
         warnings: [
           'Package registry row was not found. Remove action can proceed as no-op.',
           ...sanitizeArray(dataOnlyPreview?.warnings)
@@ -1931,14 +2029,57 @@ function createService(overrides = {}) {
         modifiedRecords,
         dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact),
         summaryByEntity: {},
+        deletionInventory,
         warnings: previewWarnings,
         previewTransactionId
       };
     }
 
     const resolved = presence.resolved;
+    let builderDeletionInventory = {
+      payloadFound: false,
+      orgRemapRequired: false,
+      targetOrgId: '',
+      tableRows: [],
+      fileRows: [],
+      warnings: []
+    };
 
     const latestInstallTx = await findLatestSuccessfulInstallTransaction(packageId, { backendMode });
+    const installedTargetOrgId = resolveTargetOrgIdFromInstallTransaction(latestInstallTx);
+    if (
+      deps.packageBuilderService
+      && typeof deps.packageBuilderService.previewBuilderPayloadDeletionInventory === 'function'
+    ) {
+      try {
+        builderDeletionInventory = await deps.packageBuilderService.previewBuilderPayloadDeletionInventory({
+          backendMode,
+          packageId: resolved.manifest.id,
+          packageName: resolved.manifest.name,
+          manifest: resolved.manifest,
+          manifestPath: resolved.manifestPath
+        }, {
+          backendMode,
+          targetOrgId: installedTargetOrgId || cleanText(options.targetOrgId, 160)
+        });
+      } catch (error) {
+        builderDeletionInventory = {
+          payloadFound: false,
+          orgRemapRequired: false,
+          targetOrgId: '',
+          tableRows: [],
+          fileRows: [],
+          warnings: [cleanText(error?.message || String(error), 1200)]
+        };
+      }
+    }
+    deletionInventory.tables = sanitizeArray(builderDeletionInventory?.tableRows);
+    deletionInventory.files = sanitizeArray(builderDeletionInventory?.fileRows);
+    deletionInventory.summary = {
+      tableCount: deletionInventory.tables.length,
+      fileCount: deletionInventory.files.length
+    };
+
     const baselineRows = sanitizeArray(latestInstallTx?.artifacts?.afterSnapshots);
     const currentRows = await captureManifestSnapshots(resolved.manifest, { backendMode });
     const baselineMap = buildSnapshotLookup(baselineRows);
@@ -1970,6 +2111,7 @@ function createService(overrides = {}) {
     if (!latestInstallTx) {
       previewWarnings.push('No successful install baseline transaction was found. Review impact details carefully before force removal.');
     }
+    previewWarnings.push(...sanitizeArray(builderDeletionInventory?.warnings));
     if (dataOnlyPreview) {
       previewWarnings.push(...sanitizeArray(dataOnlyPreview.warnings));
       blockedReasons.push(...sanitizeArray(dataOnlyPreview.blockedReasons));
@@ -2030,6 +2172,7 @@ function createService(overrides = {}) {
       modifiedRecords: mergedModifiedRecords,
       dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact),
       summaryByEntity: createLifecycleSummaryByEntity(operationRows),
+      deletionInventory,
       warnings: previewWarnings,
       previewTransactionId
     };
@@ -2049,6 +2192,14 @@ function createService(overrides = {}) {
       ? options.preview
       : await previewPackageUninstallImpact(packageId, options);
     const hasRisk = sanitizeArray(preview?.modifiedRecords).length > 0;
+    const deleteSelectionDecision = destructiveCleanup
+      ? buildDeleteSelectionDecision(preview, options.deleteSelection)
+      : {
+        provided: normalizeDeleteSelection(options.deleteSelection).provided,
+        tables: [],
+        files: [],
+        available: { tables: 0, files: 0 }
+      };
 
     const lifecycleTx = await startLifecycleTransaction({
       packageId,
@@ -2059,10 +2210,15 @@ function createService(overrides = {}) {
         force: forceRemove,
         cleanupMode: appliedCleanupMode,
         previewTransactionId: cleanText(preview?.previewTransactionId, 160),
-        providedPreviewTransactionId: cleanText(options.previewTransactionId, 160)
+        providedPreviewTransactionId: cleanText(options.previewTransactionId, 160),
+        deleteSelectionProvided: deleteSelectionDecision.provided === true
       },
       artifacts: {
-        modifiedRecords: sanitizeArray(preview?.modifiedRecords)
+        modifiedRecords: sanitizeArray(preview?.modifiedRecords),
+        deleteSelection: {
+          tables: deleteSelectionDecision.tables,
+          files: deleteSelectionDecision.files
+        }
       }
     }, { backendMode, actor });
     const transactionId = cleanText(lifecycleTx?.id, 160);
@@ -2096,6 +2252,28 @@ function createService(overrides = {}) {
       rollbackApplied: false,
       warnings: [],
       dataImpact: {}
+    };
+    let selectionApplied = {
+      tablesSelected: deleteSelectionDecision.tables.length,
+      filesSelected: deleteSelectionDecision.files.length
+    };
+    let inventorySummary = {
+      tables: {
+        available: deleteSelectionDecision.available.tables,
+        selected: deleteSelectionDecision.tables.length,
+        deleted: 0,
+        retained: 0,
+        failed: 0,
+        skipped: 0
+      },
+      files: {
+        available: deleteSelectionDecision.available.files,
+        selected: deleteSelectionDecision.files.length,
+        deleted: 0,
+        retained: 0,
+        failed: 0,
+        skipped: 0
+      }
     };
     let filePurgeSummary = {
       attemptedRoots: [],
@@ -2146,8 +2324,34 @@ function createService(overrides = {}) {
             backendMode,
             actor,
             targetOrgId: installedTargetOrgId || cleanText(options.targetOrgId, 160),
-            requirePayload: true
+            requirePayload: true,
+            deleteSelection: {
+              provided: true,
+              tables: deleteSelectionDecision.tables,
+              files: deleteSelectionDecision.files
+            }
           });
+          selectionApplied = sanitizeObject(payloadCleanupReport?.selectionApplied) && Object.keys(sanitizeObject(payloadCleanupReport?.selectionApplied)).length
+            ? sanitizeObject(payloadCleanupReport.selectionApplied)
+            : selectionApplied;
+          inventorySummary = {
+            tables: {
+              available: deleteSelectionDecision.available.tables,
+              selected: Number(selectionApplied.tablesSelected || deleteSelectionDecision.tables.length) || 0,
+              deleted: Number(payloadCleanupReport?.tableSummary?.deleted || 0) || 0,
+              retained: Number(payloadCleanupReport?.tableSummary?.retained || 0) || 0,
+              failed: Number(payloadCleanupReport?.tableSummary?.failed || 0) || 0,
+              skipped: Number(payloadCleanupReport?.tableSummary?.skipped || 0) || 0
+            },
+            files: {
+              available: deleteSelectionDecision.available.files,
+              selected: Number(selectionApplied.filesSelected || deleteSelectionDecision.files.length) || 0,
+              deleted: Number(payloadCleanupReport?.fileSummary?.deleted || 0) || 0,
+              retained: Number(payloadCleanupReport?.fileSummary?.retained || 0) || 0,
+              failed: Number(payloadCleanupReport?.fileSummary?.failed || 0) || 0,
+              skipped: Number(payloadCleanupReport?.fileSummary?.skipped || 0) || 0
+            }
+          };
           warnings.push(...sanitizeArray(payloadCleanupReport?.warnings));
           lifecycleOperations.push({
             entityType: 'builderPayload',
@@ -2259,6 +2463,8 @@ function createService(overrides = {}) {
       artifacts: {
         cleanupMode: appliedCleanupMode,
         previewTransactionId: cleanText(preview?.previewTransactionId, 160),
+        selectionApplied,
+        inventorySummary,
         payloadCleanupReport,
         dataLifecycleReport,
         filePurgeSummary
@@ -2275,6 +2481,8 @@ function createService(overrides = {}) {
       transactionId,
       phase: 'commit',
       cleanupMode: appliedCleanupMode,
+      selectionApplied,
+      inventorySummary,
       summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations),
       blockedReasons: sanitizeArray(preview?.blockedReasons),
       modifiedRecords: sanitizeArray(preview?.modifiedRecords),

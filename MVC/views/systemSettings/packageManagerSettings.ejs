@@ -522,6 +522,100 @@
     }
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatBytes(value) {
+    const size = Number(value);
+    if (!Number.isFinite(size) || size <= 0) return '-';
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  }
+
+  function buildRemoveInventoryModalHtml(packageId, preview = {}) {
+    const inventory = preview && typeof preview === 'object' ? (preview.deletionInventory || {}) : {};
+    const modifiedCount = Array.isArray(preview?.modifiedRecords) ? preview.modifiedRecords.length : 0;
+    const criticalRows = Array.isArray(inventory.critical) ? inventory.critical : [];
+    const tableRows = (Array.isArray(inventory.tables) ? inventory.tables : []).filter((row) => row && row.id && row.entityType);
+    const fileRows = (Array.isArray(inventory.files) ? inventory.files : []).filter((row) => row && row.id);
+
+    const criticalHtml = criticalRows.length
+      ? criticalRows.map((row) => `
+        <label class="d-flex align-items-start gap-2 small mb-2">
+          <input type="checkbox" checked disabled>
+          <span>${escapeHtml(row.label || row.id || 'Critical item')}</span>
+        </label>
+      `).join('')
+      : '<div class="small text-muted">No critical items were listed.</div>';
+
+    const tablesHtml = tableRows.length
+      ? tableRows.map((row) => `
+        <label class="d-flex align-items-start gap-2 small mb-2">
+          <input class="pkg-remove-check" type="checkbox" data-kind="table" data-item-id="${escapeHtml(row.id)}" checked>
+          <span>
+            <span class="fw-semibold">${escapeHtml(row.entityType)}</span>
+            <span class="text-muted">(${escapeHtml(row.backendMode || 'data')} | rows: ${Number(row.estimatedRowCount || 0)})</span>
+          </span>
+        </label>
+      `).join('')
+      : '<div class="small text-muted">No payload tables detected for this package.</div>';
+
+    const filesHtml = fileRows.length
+      ? fileRows.map((row) => `
+        <label class="d-flex align-items-start gap-2 small mb-2">
+          <input class="pkg-remove-check" type="checkbox" data-kind="file" data-item-id="${escapeHtml(row.id)}" checked>
+          <span>
+            <span class="fw-semibold">${escapeHtml(row.id)}</span>
+            <span class="text-muted d-block">exists: ${row.exists ? 'yes' : 'no'} | size: ${escapeHtml(formatBytes(row.size))}</span>
+          </span>
+        </label>
+      `).join('')
+      : '<div class="small text-muted">No payload files detected for this package.</div>';
+
+    return `
+      <div class="small">
+        <p class="mb-2">
+          Removing <code>${escapeHtml(packageId)}</code> will always remove critical package records.
+          Preview found <b>${modifiedCount}</b> modified package-owned record(s).
+        </p>
+        <div class="border rounded p-2 mb-2">
+          <div class="fw-semibold mb-2">Critical (Always Removed)</div>
+          ${criticalHtml}
+        </div>
+        <div class="border rounded p-2 mb-2">
+          <div class="fw-semibold mb-2">Tables (Selectable)</div>
+          ${tablesHtml}
+        </div>
+        <div class="border rounded p-2">
+          <div class="fw-semibold mb-2">Files (Selectable)</div>
+          ${filesHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  function collectDeleteSelectionFromModalBody() {
+    const body = document.getElementById('messageModalBody');
+    const selected = { tables: [], files: [] };
+    if (!body) return selected;
+    body.querySelectorAll('.pkg-remove-check[type="checkbox"]:checked').forEach((input) => {
+      const kind = String(input.getAttribute('data-kind') || '').trim().toLowerCase();
+      const itemId = String(input.getAttribute('data-item-id') || '').trim();
+      if (!itemId) return;
+      if (kind === 'table') selected.tables.push(itemId);
+      if (kind === 'file') selected.files.push(itemId);
+    });
+    return selected;
+  }
+
   async function confirmDanger(actionLabel, packageId) {
     const selected = await showModal({
       title: `${actionLabel} Package`,
@@ -640,13 +734,16 @@
       const selected = await showModal({
         title: 'Remove Package',
         icon: 'warning',
-        message: `This will permanently remove payload data rows, copied payload files, declarations, registry row, and package source folder for <code>${packageId}</code>. Impact preview detected <b>${modifiedCount}</b> modified package-owned record(s); these will also be removed.`,
+        size: 'lg',
+        message: buildRemoveInventoryModalHtml(packageId, preview),
         buttons: [
           { text: 'Cancel', class: 'btn-secondary' },
           { text: 'Remove Package', class: 'btn-danger' }
         ]
       });
-      if (selected === 'Cancel') return { status: 'cancelled', report: preview };
+      if (selected !== 'Remove Package') return { status: 'cancelled', report: preview };
+      const deleteSelection = collectDeleteSelectionFromModalBody();
+      bodyPayload.deleteSelection = JSON.stringify(deleteSelection);
 
       const removeResult = await runWithWaiting('Removing Package', async () => fetchJson(removeUrl, {
         method: 'POST',
