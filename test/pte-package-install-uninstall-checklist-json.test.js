@@ -196,18 +196,42 @@ function createChecklistDeps() {
           };
         },
         async runPackageDataUninstallLifecycle(_context = {}, options = {}) {
-          const force = options.force === true;
+          const cleanupMode = String(options.cleanupMode || '').toLowerCase() === 'keep-data' ? 'keep-data' : 'full';
+          const keepData = cleanupMode === 'keep-data';
           return {
             dataSummary: {
-              migrations: { applied: force ? 0 : 0, skipped: force ? 0 : 1, failed: 0 },
-              seeders: { applied: 0, skipped: force ? 0 : 0, failed: 0 }
+              migrations: { applied: 0, skipped: keepData ? 1 : 0, failed: 0 },
+              seeders: { applied: 0, skipped: 0, failed: 0 }
             },
             appliedSteps: [],
-            skippedSteps: force ? [] : [{ stepId: 'data-uninstall', stepType: 'migration', direction: 'down', status: 'skipped', reason: 'safe_mode_keep_data' }],
+            skippedSteps: keepData ? [{ stepId: 'data-uninstall', stepType: 'migration', direction: 'down', status: 'skipped', reason: 'safe_mode_keep_data' }] : [],
             failedStep: null,
             rollbackApplied: false,
             dataImpact: { ownershipCount: 0, modifiedCount: 0 },
-            warnings: force ? [] : ['Safe uninstall mode keeps package business data.']
+            warnings: keepData ? ['Keep-data uninstall mode was requested; package business data was retained.'] : []
+          };
+        }
+      },
+      packageBuilderService: {
+        async applyBuilderPayloadIfPresent() {
+          return {
+            applied: false,
+            orgRemapRequired: false,
+            targetOrgId: '',
+            dataSummary: { entityCount: 0, upserted: 0 },
+            fileSummary: { copied: 0 },
+            warnings: []
+          };
+        },
+        async removeBuilderPayloadIfPresent(_context = {}, options = {}) {
+          return {
+            applied: true,
+            payloadFound: true,
+            orgRemapRequired: false,
+            targetOrgId: String(options.targetOrgId || '').replace(/^ORG_/i, ''),
+            rowSummary: { deleted: 0, skipped: 0, failed: 0, skippedWithoutId: [] },
+            fileSummary: { deleted: 0, skipped: 0, failed: 0 },
+            warnings: []
           };
         }
       },
@@ -349,7 +373,7 @@ test('checklist scenario uninstall preview clean-state returns non-blocking repo
   assert.equal(typeof report.dataImpact, 'object');
 });
 
-test('checklist scenario default remove is safe and idempotent', async () => {
+test('checklist scenario default remove runs full cleanup mode and remains idempotent', async () => {
   const { deps } = createChecklistDeps();
   const service = createService(deps);
   await service.installPackage({
@@ -359,6 +383,7 @@ test('checklist scenario default remove is safe and idempotent', async () => {
 
   const first = await service.removePackage('pte', { backendMode: 'json' });
   assert.equal(first.action, 'remove');
+  assert.equal(first.cleanupMode, 'full');
   assert.equal(first.registry.removed, true);
   assert.equal(first.restartRecommended, true);
   assert.equal(typeof first.dataSummary, 'object');
@@ -389,7 +414,7 @@ test('checklist scenario reinstall after remove returns install success', async 
   assert.equal(report.dataSummary.seeders.applied, 0);
 });
 
-test('checklist scenario force-remove requires preview token binding and valid force token', async () => {
+test('checklist scenario default full cleanup removes even when preview detects customized records', async () => {
   const { deps, previewMap } = createChecklistDeps();
   previewMap.set('pte', {
     blocked: true,
@@ -404,21 +429,18 @@ test('checklist scenario force-remove requires preview token binding and valid f
     manifestPath: 'packages/pte/package.manifest.json'
   }, { backendMode: 'json' });
 
-  await assert.rejects(
-    () => service.removePackage('pte', {
-      backendMode: 'json',
-      force: true,
-      forceToken: 'WRONG TOKEN',
-      previewTransactionId: 'TXN_PREVIEW_BAD',
-      preview: {
-        blocked: true,
-        blockedReasons: ['customized'],
-        modifiedRecords: [{ entityType: 'sections', identityKey: 'name:PTE' }],
-        previewTransactionId: 'TXN_PREVIEW_BAD'
-      }
-    }),
-    /token mismatch/i
-  );
+  const report = await service.removePackage('pte', {
+    backendMode: 'json',
+    preview: {
+      blocked: true,
+      blockedReasons: ['customized'],
+      modifiedRecords: [{ entityType: 'sections', identityKey: 'name:PTE' }],
+      previewTransactionId: 'TXN_PREVIEW_BAD'
+    }
+  });
+  assert.equal(report.action, 'remove');
+  assert.equal(report.cleanupMode, 'full');
+  assert.equal(report.registry.removed, true);
 });
 
 test('checklist scenario transactions list/detail include lifecycle rows', async () => {

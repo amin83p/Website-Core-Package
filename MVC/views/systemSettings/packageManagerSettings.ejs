@@ -625,30 +625,28 @@
       const modifiedCount = Array.isArray(preview.modifiedRecords) ? preview.modifiedRecords.length : 0;
       let removeUrl = config.endpoint(packageId);
       const bodyPayload = {
-        actionStateId
+        actionStateId,
+        cleanupMode: 'full',
+        previewTransactionId: preview.previewTransactionId || ''
       };
 
-      if (preview.blocked === true || modifiedCount > 0) {
-        const selected = await showModal({
-          title: 'Customization Risk Detected',
-          icon: 'warning',
-          message: `Impact preview found <b>${modifiedCount}</b> modified records for <code>${packageId}</code>. Default remove keeps package data and removes declarations/registry only. Force remove also runs data rollback scripts and can permanently remove customized package data.`,
-          buttons: [
-            { text: 'Cancel', class: 'btn-secondary' },
-            { text: 'Remove (Keep Data)', class: 'btn-warning' },
-            { text: 'Force Remove', class: 'btn-danger' }
-          ]
-        });
-        if (selected === 'Cancel') return { status: 'cancelled', report: preview };
-        if (selected === 'Force Remove') {
-          removeUrl += '?force=true';
-          bodyPayload.previewTransactionId = preview.previewTransactionId || '';
-          bodyPayload.forceToken = `REMOVE ${packageId}`;
-        }
-      } else {
-        const confirmed = await confirmDanger(config.label, packageId);
-        if (!confirmed) return { status: 'cancelled', report: preview };
+      if (preview.mode === 'blocked_missing_manifest') {
+        const blockedText = Array.isArray(preview.blockedReasons) && preview.blockedReasons.length
+          ? preview.blockedReasons.join(' ')
+          : 'Manifest or builder payload is missing, so full cleanup remove is blocked.';
+        throw new Error(blockedText);
       }
+
+      const selected = await showModal({
+        title: 'Remove Package',
+        icon: 'warning',
+        message: `This will permanently remove payload data rows, copied payload files, declarations, registry row, and package source folder for <code>${packageId}</code>. Impact preview detected <b>${modifiedCount}</b> modified package-owned record(s); these will also be removed.`,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Remove Package', class: 'btn-danger' }
+        ]
+      });
+      if (selected === 'Cancel') return { status: 'cancelled', report: preview };
 
       const removeResult = await runWithWaiting('Removing Package', async () => fetchJson(removeUrl, {
         method: 'POST',

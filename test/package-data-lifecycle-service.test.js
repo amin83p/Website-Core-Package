@@ -177,10 +177,24 @@ test('data lifecycle uninstall safe mode skips destructive steps and force runs 
     }, {
       backendMode: 'json',
       packageRootDir: fixture.packageRootDir,
+      cleanupMode: 'keep-data',
       force: false
     });
     assert.equal(safeReport.appliedSteps.length, 0);
     assert.equal(safeReport.skippedSteps.length >= 1, true);
+
+    const defaultReport = await service.runPackageDataUninstallLifecycle({
+      packageId: 'addon',
+      packageVersion: '1.2.0',
+      manifest: fixture.manifest,
+      manifestPath: path.join(fixture.packageDir, 'package.manifest.json')
+    }, {
+      backendMode: 'json',
+      packageRootDir: fixture.packageRootDir
+    });
+    assert.equal(defaultReport.failedStep, null);
+    assert.equal(defaultReport.skippedSteps.length, 0);
+    assert.equal(defaultReport.rollbackApplied, true);
 
     const forceReport = await service.runPackageDataUninstallLifecycle({
       packageId: 'addon',

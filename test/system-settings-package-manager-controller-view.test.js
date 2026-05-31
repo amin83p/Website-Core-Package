@@ -420,7 +420,7 @@ test('install package controller maps runtime route mount failures to actionable
   }
 });
 
-test('remove package controller forwards force options and preview token', async () => {
+test('remove package controller defaults to full cleanup mode and forwards preview token', async () => {
   const originalRemove = systemSettingsPackageManagerService.removePackage;
   const res = makeRenderResponse();
   let captured = null;
@@ -433,8 +433,7 @@ test('remove package controller forwards force options and preview token', async
     await systemSettingsController.removePackageFromManager(
       {
         params: { packageId: 'pte' },
-        query: { force: 'true' },
-        body: { forceToken: 'REMOVE pte', previewTransactionId: 'TXN_1' },
+        body: { previewTransactionId: 'TXN_1' },
         user: { id: 'USER_7' },
         app: {}
       },
@@ -442,7 +441,8 @@ test('remove package controller forwards force options and preview token', async
     );
     assert.equal(res.statusCode, 200);
     assert.equal(captured?.packageId, 'pte');
-    assert.equal(captured?.options?.force, true);
+    assert.equal(captured?.options?.force, false);
+    assert.equal(captured?.options?.cleanupMode, 'full');
     assert.equal(captured?.options?.previewTransactionId, 'TXN_1');
   } finally {
     systemSettingsPackageManagerService.removePackage = originalRemove;

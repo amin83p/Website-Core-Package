@@ -46,6 +46,12 @@ function normalizeInstallMethod(value = '') {
   return '';
 }
 
+function normalizeCleanupMode(value = '') {
+  const token = cleanText(value, 40).toLowerCase();
+  if (token === 'keep-data') return 'keep-data';
+  return 'full';
+}
+
 function readPositiveInt(value, fallback) {
   const parsed = Number.parseInt(String(value || ''), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
@@ -1828,6 +1834,17 @@ function createService(overrides = {}) {
       .sort((a, b) => String(b.finishedAt || b.audit?.lastUpdateDateTime || '').localeCompare(String(a.finishedAt || a.audit?.lastUpdateDateTime || '')))[0] || null;
   }
 
+  function resolveTargetOrgIdFromInstallTransaction(transaction = {}) {
+    const direct = cleanText(
+      transaction?.artifacts?.builderPayloadReport?.targetOrgId
+      || transaction?.artifacts?.builderPayload?.targetOrgId
+      || '',
+      120
+    );
+    if (!direct) return '';
+    return direct.replace(/^ORG_/i, '');
+  }
+
   async function previewPackageUninstallImpact(packageIdInput = '', options = {}) {
     const actor = buildActor(options.actor || null);
     const backendMode = cleanText(options.backendMode, 30) || undefined;
@@ -1866,14 +1883,16 @@ function createService(overrides = {}) {
     }
 
     if (!presence.manifestResolved) {
-      const blockedReasons = sanitizeArray(dataOnlyPreview?.blockedReasons);
-      const modifiedRecords = sanitizeArray(dataOnlyPreview?.modifiedRecords);
-      const previewWarnings = [
+      const blockedReasons = [
         cleanText(
-          presence.manifestResolutionError || 'Manifest file was not found for this package. Registry-only remove is available.',
+          presence.manifestResolutionError || 'Manifest file was not found for this package. Full cleanup remove is blocked.',
           1200
         ),
-        'Declaration and manifest-based data rollback preview was skipped because package files are missing.',
+        ...sanitizeArray(dataOnlyPreview?.blockedReasons)
+      ].filter(Boolean);
+      const modifiedRecords = sanitizeArray(dataOnlyPreview?.modifiedRecords);
+      const previewWarnings = [
+        'Full cleanup remove requires a resolvable package manifest and builder payload files.',
         ...sanitizeArray(dataOnlyPreview?.warnings)
       ];
       const previewTransaction = await startLifecycleTransaction({
@@ -1882,7 +1901,7 @@ function createService(overrides = {}) {
         packageVersion: cleanText(existing?.version, 120),
         action: 'uninstall-preview',
         metadata: {
-          mode: 'registry_only_remove',
+          mode: 'blocked_missing_manifest',
           manifestResolved: false
         },
         artifacts: {
@@ -1891,7 +1910,7 @@ function createService(overrides = {}) {
       }, { backendMode, actor });
       const previewTransactionId = cleanText(previewTransaction?.id, 160);
       await completeLifecycleTransaction(previewTransactionId, {
-        status: blockedReasons.length ? 'blocked' : 'success',
+        status: 'blocked',
         phase: 'commit',
         warnings: previewWarnings,
         blockedReasons,
@@ -1906,8 +1925,8 @@ function createService(overrides = {}) {
         packageId,
         packageName: cleanText(existing?.metadata?.packageName, 200) || packageId.toUpperCase(),
         version: cleanText(existing?.version, 120),
-        mode: 'registry_only_remove',
-        blocked: blockedReasons.length > 0,
+        mode: 'blocked_missing_manifest',
+        blocked: true,
         blockedReasons,
         modifiedRecords,
         dataImpact: sanitizeObject(dataOnlyPreview?.dataImpact),
@@ -2021,49 +2040,26 @@ function createService(overrides = {}) {
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const packageId = normalizePackageId(packageIdInput);
     if (!packageId) throw new Error('Package id is required.');
+    const cleanupMode = normalizeCleanupMode(options.cleanupMode);
     const forceRemove = options.force === true;
-    const previewTransactionId = cleanText(options.previewTransactionId, 160);
-    const forceToken = cleanText(options.forceToken, 200);
-    const expectedForceToken = `REMOVE ${packageId}`.toUpperCase();
+    const destructiveCleanup = cleanupMode !== 'keep-data' || forceRemove;
+    const appliedCleanupMode = destructiveCleanup ? 'full' : 'keep-data';
 
     const preview = options.preview && typeof options.preview === 'object'
       ? options.preview
       : await previewPackageUninstallImpact(packageId, options);
     const hasRisk = sanitizeArray(preview?.modifiedRecords).length > 0;
-    if (forceRemove) {
-      if (!previewTransactionId) {
-        const error = new Error('Force remove requires a valid uninstall preview transaction id.');
-        error.code = 'UNINSTALL_FORCE_TOKEN_REQUIRED';
-        throw error;
-      }
-      if (forceToken.toUpperCase() !== expectedForceToken) {
-        const error = new Error(`Force remove confirmation token mismatch. Expected "${expectedForceToken}".`);
-        error.code = 'UNINSTALL_FORCE_TOKEN_REQUIRED';
-        throw error;
-      }
-      if (
-        deps.packageLifecycleTransactionService
-        && typeof deps.packageLifecycleTransactionService.getTransactionById === 'function'
-      ) {
-        const previewTx = await deps.packageLifecycleTransactionService.getTransactionById(previewTransactionId, { backendMode });
-        const previewPackageId = normalizePackageId(previewTx?.packageId || '');
-        if (!previewTx || previewPackageId !== packageId) {
-          const error = new Error('Force remove preview token is invalid or belongs to another package.');
-          error.code = 'UNINSTALL_FORCE_TOKEN_REQUIRED';
-          throw error;
-        }
-      }
-    }
 
     const lifecycleTx = await startLifecycleTransaction({
       packageId,
       packageName: cleanText(preview?.packageName, 200) || packageId.toUpperCase(),
       packageVersion: cleanText(preview?.version, 120),
-      action: forceRemove ? 'remove-force' : 'remove',
+      action: destructiveCleanup ? 'remove' : 'remove-keep-data',
       metadata: {
         force: forceRemove,
+        cleanupMode: appliedCleanupMode,
         previewTransactionId: cleanText(preview?.previewTransactionId, 160),
-        providedPreviewTransactionId: previewTransactionId
+        providedPreviewTransactionId: cleanText(options.previewTransactionId, 160)
       },
       artifacts: {
         modifiedRecords: sanitizeArray(preview?.modifiedRecords)
@@ -2081,8 +2077,17 @@ function createService(overrides = {}) {
     let declarationSummary = null;
     let manifest = null;
     let manifestPath = '';
-    let mode = cleanText(preview?.mode, 80).toLowerCase() || 'normal';
+    let mode = appliedCleanupMode === 'full' ? 'full_cleanup' : 'keep_data';
     const lifecycleOperations = [];
+    let payloadCleanupReport = {
+      applied: false,
+      payloadFound: false,
+      orgRemapRequired: false,
+      targetOrgId: '',
+      rowSummary: { deleted: 0, skipped: 0, failed: 0, skippedWithoutId: [] },
+      fileSummary: { deleted: 0, skipped: 0, failed: 0 },
+      warnings: []
+    };
     let dataLifecycleReport = {
       dataSummary: { migrations: { applied: 0, skipped: 0, failed: 0 }, seeders: { applied: 0, skipped: 0, failed: 0 } },
       appliedSteps: [],
@@ -2111,6 +2116,14 @@ function createService(overrides = {}) {
       warnings.push('Package registry row was not found. Remove action ran in no-op mode.');
     }
     if (!manifest) {
+      if (destructiveCleanup && existing) {
+        const error = new Error(
+          cleanText(preview?.blockedReasons?.[0], 1200)
+          || 'Package manifest/payload is unavailable. Full cleanup remove is blocked to prevent orphaned package data.'
+        );
+        error.code = 'PACKAGE_REMOVE_MANIFEST_REQUIRED';
+        throw error;
+      }
       mode = 'registry_only_remove';
     }
 
@@ -2122,6 +2135,37 @@ function createService(overrides = {}) {
         manifest,
         manifestPath
       };
+      if (destructiveCleanup) {
+        const latestInstallTx = await findLatestSuccessfulInstallTransaction(packageId, { backendMode });
+        const installedTargetOrgId = resolveTargetOrgIdFromInstallTransaction(latestInstallTx);
+        if (
+          deps.packageBuilderService
+          && typeof deps.packageBuilderService.removeBuilderPayloadIfPresent === 'function'
+        ) {
+          payloadCleanupReport = await deps.packageBuilderService.removeBuilderPayloadIfPresent(context, {
+            backendMode,
+            actor,
+            targetOrgId: installedTargetOrgId || cleanText(options.targetOrgId, 160),
+            requirePayload: true
+          });
+          warnings.push(...sanitizeArray(payloadCleanupReport?.warnings));
+          lifecycleOperations.push({
+            entityType: 'builderPayload',
+            identityKey: `packageId:${packageId}`,
+            ownership: { packageId, packageName: cleanText(manifest?.name, 200) },
+            operation: payloadCleanupReport?.applied === true ? 'removed' : 'skipped',
+            reason: payloadCleanupReport?.applied === true
+              ? 'Builder payload rows/files removed.'
+              : 'Builder payload cleanup skipped.',
+            afterPayload: sanitizeObject(payloadCleanupReport),
+            afterHash: hashPayload(sanitizeObject(payloadCleanupReport))
+          });
+        } else {
+          const error = new Error('Builder payload cleanup service is unavailable in current runtime.');
+          error.code = 'PACKAGE_REMOVE_PAYLOAD_SERVICE_UNAVAILABLE';
+          throw error;
+        }
+      }
       if (
         deps.packageDataLifecycleService
         && typeof deps.packageDataLifecycleService.runPackageDataUninstallLifecycle === 'function'
@@ -2130,7 +2174,8 @@ function createService(overrides = {}) {
           backendMode,
           actor,
           transactionId,
-          force: forceRemove,
+          cleanupMode: appliedCleanupMode,
+          force: false,
           preview
         });
         warnings.push(...sanitizeArray(dataLifecycleReport?.warnings));
@@ -2212,7 +2257,9 @@ function createService(overrides = {}) {
       warnings,
       modifiedRecords: sanitizeArray(preview?.modifiedRecords),
       artifacts: {
+        cleanupMode: appliedCleanupMode,
         previewTransactionId: cleanText(preview?.previewTransactionId, 160),
+        payloadCleanupReport,
         dataLifecycleReport,
         filePurgeSummary
       },
@@ -2227,9 +2274,11 @@ function createService(overrides = {}) {
       version: cleanText(existing?.version || manifest?.version, 120),
       transactionId,
       phase: 'commit',
+      cleanupMode: appliedCleanupMode,
       summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations),
       blockedReasons: sanitizeArray(preview?.blockedReasons),
       modifiedRecords: sanitizeArray(preview?.modifiedRecords),
+      payloadCleanupReport: sanitizeObject(payloadCleanupReport),
       dataImpact: sanitizeObject(dataLifecycleReport?.dataImpact),
       dataSummary: sanitizeObject(dataLifecycleReport?.dataSummary),
       appliedSteps: sanitizeArray(dataLifecycleReport?.appliedSteps),

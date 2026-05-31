@@ -226,21 +226,45 @@ function createBaseDeps() {
         };
       },
       async runPackageDataUninstallLifecycle(_context = {}, options = {}) {
-        const force = options.force === true;
+        const cleanupMode = String(options.cleanupMode || '').toLowerCase() === 'keep-data' ? 'keep-data' : 'full';
+        const destructive = cleanupMode === 'full';
         return {
           dataSummary: {
-            migrations: { applied: force ? 1 : 0, skipped: force ? 0 : 1, failed: 0 },
+            migrations: { applied: destructive ? 1 : 0, skipped: destructive ? 0 : 1, failed: 0 },
             seeders: { applied: 0, skipped: 0, failed: 0 }
           },
-          appliedSteps: force ? [{ stepId: 'sample', stepType: 'migration', direction: 'down', status: 'success', artifacts: {} }] : [],
-          skippedSteps: force ? [] : [{ stepId: 'sample', stepType: 'migration', direction: 'down', status: 'skipped', reason: 'safe_mode_keep_data' }],
+          appliedSteps: destructive ? [{ stepId: 'sample', stepType: 'migration', direction: 'down', status: 'success', artifacts: {} }] : [],
+          skippedSteps: destructive ? [] : [{ stepId: 'sample', stepType: 'migration', direction: 'down', status: 'skipped', reason: 'safe_mode_keep_data' }],
           failedStep: null,
-          rollbackApplied: force,
+          rollbackApplied: destructive,
           dataImpact: {
             ownershipCount: 1,
-            modifiedCount: force ? 0 : 1
+            modifiedCount: destructive ? 0 : 1
           },
-          warnings: force ? [] : ['Safe uninstall mode keeps package business data.']
+          warnings: destructive ? [] : ['Keep-data uninstall mode was requested; package business data was retained.']
+        };
+      }
+    },
+    packageBuilderService: {
+      async applyBuilderPayloadIfPresent(_context = {}, options = {}) {
+        return {
+          applied: false,
+          orgRemapRequired: false,
+          targetOrgId: String(options.targetOrgId || '').replace(/^ORG_/i, ''),
+          dataSummary: { entityCount: 0, upserted: 0 },
+          fileSummary: { copied: 0 },
+          warnings: []
+        };
+      },
+      async removeBuilderPayloadIfPresent(_context = {}, options = {}) {
+        return {
+          applied: true,
+          payloadFound: true,
+          orgRemapRequired: false,
+          targetOrgId: String(options.targetOrgId || '').replace(/^ORG_/i, ''),
+          rowSummary: { deleted: 0, skipped: 0, failed: 0, skippedWithoutId: [] },
+          fileSummary: { deleted: 0, skipped: 0, failed: 0 },
+          warnings: []
         };
       }
     }
@@ -741,7 +765,7 @@ test('syncPackage auto-disables package when runtime route mount health fails', 
   assert.equal(registryAfter?.enabled, false);
 });
 
-test('removePackage defaults to safe keep-data mode when uninstall preview reports modified records', async () => {
+test('removePackage defaults to full cleanup when uninstall preview reports modified records', async () => {
   const setup = createBaseDeps();
   const service = createService(setup.deps);
   await setup.deps.packageRegistryService.upsertPackageRegistry({
@@ -764,10 +788,11 @@ test('removePackage defaults to safe keep-data mode when uninstall preview repor
 
   assert.equal(report.action, 'remove');
   assert.equal(report.registry.removed, true);
-  assert.equal(report.dataSummary?.migrations?.skipped >= 1, true);
+  assert.equal(report.dataSummary?.migrations?.applied >= 1, true);
+  assert.equal(report.cleanupMode, 'full');
 });
 
-test('removePackage force mode requires confirmation token when preview has modifications', async () => {
+test('removePackage keeps legacy keep-data mode when explicitly requested', async () => {
   const setup = createBaseDeps();
   const service = createService(setup.deps);
   await setup.deps.packageRegistryService.upsertPackageRegistry({
@@ -778,24 +803,21 @@ test('removePackage force mode requires confirmation token when preview has modi
     metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
   });
 
-  await assert.rejects(
-    () => service.removePackage('pte', {
-      backendMode: 'json',
-      force: true,
-      preview: {
-        blocked: true,
-        blockedReasons: ['customized'],
-        modifiedRecords: [{ entityType: 'sections', identityKey: 'name:PTE' }],
-        previewTransactionId: 'TXN_PREVIEW'
-      },
-      previewTransactionId: 'TXN_PREVIEW',
-      forceToken: 'WRONG TOKEN'
-    }),
-    /token mismatch/i
-  );
+  const report = await service.removePackage('pte', {
+    backendMode: 'json',
+    cleanupMode: 'keep-data',
+    preview: {
+      blocked: true,
+      blockedReasons: ['customized'],
+      modifiedRecords: [{ entityType: 'sections', identityKey: 'name:PTE' }],
+      previewTransactionId: 'TXN_PREVIEW'
+    }
+  });
+  assert.equal(report.cleanupMode, 'keep-data');
+  assert.equal(report.dataSummary?.migrations?.skipped >= 1, true);
 });
 
-test('previewPackageUninstallImpact falls back to registry-only mode when manifest is missing', async () => {
+test('previewPackageUninstallImpact blocks full cleanup when manifest is missing', async () => {
   const setup = createBaseDeps();
   const service = createService(setup.deps);
   setup.deps.packageLoaderService.resolveManifestPath = async () => '';
@@ -809,13 +831,13 @@ test('previewPackageUninstallImpact falls back to registry-only mode when manife
 
   const report = await service.previewPackageUninstallImpact('pte', { backendMode: 'json' });
 
-  assert.equal(report.mode, 'registry_only_remove');
-  assert.equal(report.blocked, false);
+  assert.equal(report.mode, 'blocked_missing_manifest');
+  assert.equal(report.blocked, true);
   assert.equal(Array.isArray(report.warnings), true);
-  assert.equal(report.warnings.some((msg) => /manifest file was not found/i.test(String(msg || ''))), true);
+  assert.equal(report.blockedReasons.some((msg) => /manifest file was not found|full cleanup remove is blocked/i.test(String(msg || ''))), true);
 });
 
-test('removePackage succeeds in registry-only mode when manifest is missing', async () => {
+test('removePackage blocks full cleanup when manifest is missing and leaves registry unchanged', async () => {
   const setup = createBaseDeps();
   const service = createService(setup.deps);
   setup.deps.packageLoaderService.resolveManifestPath = async () => '';
@@ -827,14 +849,13 @@ test('removePackage succeeds in registry-only mode when manifest is missing', as
     metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
   });
 
-  const report = await service.removePackage('pte', { backendMode: 'json' });
+  await assert.rejects(
+    () => service.removePackage('pte', { backendMode: 'json' }),
+    /PACKAGE_REMOVE_MANIFEST_REQUIRED|full cleanup remove is blocked/i
+  );
   const registryAfter = await setup.deps.packageRegistryService.getPackageRegistryById('pte');
 
-  assert.equal(report.action, 'remove');
-  assert.equal(report.mode, 'registry_only_remove');
-  assert.equal(report.registry.removed, true);
-  assert.equal(registryAfter, null);
-  assert.equal(report.warnings.some((msg) => /declaration remove sync was skipped/i.test(String(msg || ''))), true);
+  assert.equal(registryAfter?.enabled, true);
 });
 
 test('installPackage allows same-version reinstall only for missing-files recovery', async () => {
@@ -893,7 +914,7 @@ test('installPackage requires target org when builder payload marks remap as req
         return {
           applied: false,
           orgRemapRequired: true,
-          targetOrgId: String(options.targetOrgId),
+          targetOrgId: String(options.targetOrgId || '').replace(/^ORG_/i, ''),
           dataSummary: { entityCount: 0, upserted: 0 },
           fileSummary: { copied: 0 },
           warnings: []
@@ -919,7 +940,7 @@ test('installPackage requires target org when builder payload marks remap as req
   });
   assert.equal(report.packageId, 'pte');
   assert.equal(report.payloadSummary.orgRemapRequired, true);
-  assert.equal(report.payloadSummary.targetOrgId, 'ORG_900000');
+  assert.equal(report.payloadSummary.targetOrgId, '900000');
 });
 
 test('installPackageZip verifies signature and installs package into packages directory', async () => {

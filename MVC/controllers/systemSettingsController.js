@@ -1411,10 +1411,12 @@ exports.removePackageFromManager = async (req, res) => {
   try {
     const packageId = cleanFormText(req.params?.packageId, 120).toLowerCase();
     const force = String(req.query?.force || req.body?.force || '').trim().toLowerCase() === 'true';
+    const cleanupModeRaw = cleanFormText(req.body?.cleanupMode || req.query?.cleanupMode, 40).toLowerCase();
+    const cleanupMode = cleanupModeRaw === 'keep-data' ? 'keep-data' : 'full';
     const report = await systemSettingsPackageManagerService.removePackage(packageId, {
       ...buildPackageManagerOptions(req),
       force,
-      forceToken: cleanFormText(req.body?.forceToken, 200),
+      cleanupMode,
       previewTransactionId: cleanFormText(req.body?.previewTransactionId, 160)
     });
     return res.json({

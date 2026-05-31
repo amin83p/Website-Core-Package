@@ -337,7 +337,7 @@ test('applyBuilderPayloadIfPresent applies table artifacts to target org and glo
     });
 
     assert.equal(report.applied, true);
-    assert.equal(report.targetOrgId, 'ORG_123');
+    assert.equal(report.targetOrgId, '123');
     assert.equal(report.dataSummary.upserted, 2);
     assert.equal(updates.length, 2);
     assert.equal(creates.length, 0);
@@ -345,7 +345,7 @@ test('applyBuilderPayloadIfPresent applies table artifacts to target org and glo
     const symbolUpdate = updates.find((row) => row.entityType === 'symbols');
     assert.ok(applicantUpdate);
     assert.ok(symbolUpdate);
-    assert.equal(applicantUpdate.row.orgId, 'ORG_123');
+    assert.equal(applicantUpdate.row.orgId, '123');
     assert.equal(applicantUpdate.row.avatarUrl, '/uploads/ORG_123/logo.png');
     assert.equal(applicantUpdate.row.backupUrl, '/uploads/ORG_900000/keep.png');
     assert.equal(symbolUpdate.row.value, '/uploads/GLOBAL/symbols/logo.png');
@@ -447,7 +447,7 @@ test('applyBuilderPayloadIfPresent falls back to allow-listed JSON upsert for un
     assert.equal(Array.isArray(storedRows), true);
     assert.equal(storedRows.length, 1);
     assert.equal(storedRows[0].id, 'PTEAIP1');
-    assert.equal(storedRows[0].orgId, 'ORG_900000');
+    assert.equal(storedRows[0].orgId, '900000');
   });
 });
 
@@ -1038,7 +1038,7 @@ test('applyBuilderPayloadIfPresent keeps backward compatibility with legacy payl
 
     assert.equal(report.applied, true);
     assert.equal(updates.length, 1);
-    assert.equal(updates[0].row.orgId, 'ORG_777');
+    assert.equal(updates[0].row.orgId, '777');
     const copiedPath = path.join(tempRoot, 'uploads', 'ORG_777', 'symbols', 'logo.png');
     assert.equal(await fsp.access(copiedPath).then(() => true).catch(() => false), true);
   });
@@ -1086,5 +1086,103 @@ test('applyBuilderPayloadIfPresent fails fast with structured details on import 
         return true;
       }
     );
+  });
+});
+
+test('removeBuilderPayloadIfPresent deletes known rows and payload artifacts', async () => {
+  await withTempCwd('pkg-builder-remove-payload-', async (tempRoot) => {
+    const packageDir = path.join(tempRoot, 'packages', 'pte');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
+    writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'pteApplicants.json'), [
+      { id: 'A1', orgId: '900000' }
+    ]);
+    writeJson(path.join(packageDir, '__builder_payload__', 'manifest.json'), {
+      schema: 'core.package-builder.payload.v2',
+      orgRemapRequired: true,
+      artifactsRoot: 'artifacts',
+      tables: [{ entityType: 'pteApplicants', file: 'tables/pteApplicants.json', rowCount: 1 }],
+      tableArtifacts: [{
+        payloadPath: 'artifacts/tables/logo.png',
+        storageRelativePath: 'symbols/logo.png'
+      }],
+      globalArtifacts: [{
+        payloadPath: 'artifacts/global/system.png',
+        storageRelativePath: 'symbols/system.png'
+      }]
+    });
+    fs.mkdirSync(path.join(tempRoot, 'uploads', 'ORG_123', 'symbols'), { recursive: true });
+    fs.mkdirSync(path.join(tempRoot, 'uploads', 'GLOBAL', 'symbols'), { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'uploads', 'ORG_123', 'symbols', 'logo.png'), 'png', 'utf8');
+    fs.writeFileSync(path.join(tempRoot, 'uploads', 'GLOBAL', 'symbols', 'system.png'), 'png', 'utf8');
+
+    const deletedRows = [];
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async deleteData(entityType, id) {
+          deletedRows.push({ entityType, id });
+          return true;
+        }
+      }
+    });
+
+    const report = await service.removeBuilderPayloadIfPresent({
+      manifestPath: path.join(packageDir, 'package.manifest.json')
+    }, {
+      backendMode: 'json',
+      targetOrgId: 'ORG_123',
+      requirePayload: true
+    });
+
+    assert.equal(report.applied, true);
+    assert.equal(report.targetOrgId, '123');
+    assert.equal(report.rowSummary.deleted, 1);
+    assert.equal(report.fileSummary.deleted, 2);
+    assert.deepEqual(deletedRows, [{ entityType: 'pteApplicants', id: 'A1' }]);
+    assert.equal(await fsp.access(path.join(tempRoot, 'uploads', 'ORG_123', 'symbols', 'logo.png')).then(() => true).catch(() => false), false);
+    assert.equal(await fsp.access(path.join(tempRoot, 'uploads', 'GLOBAL', 'symbols', 'system.png')).then(() => true).catch(() => false), false);
+  });
+});
+
+test('removeBuilderPayloadIfPresent supports allow-listed unknown-entity JSON delete fallback and row-id skip reporting', async () => {
+  await withTempCwd('pkg-builder-remove-unknown-', async (tempRoot) => {
+    const packageDir = path.join(tempRoot, 'packages', 'pte');
+    fs.mkdirSync(path.join(packageDir, '__builder_payload__', 'tables'), { recursive: true });
+    writeJson(path.join(packageDir, '__builder_payload__', 'tables', 'pteAiProviders.json'), [
+      { id: 'ROW_1', label: 'A' },
+      { label: 'MissingIdRow' }
+    ]);
+    writeJson(path.join(packageDir, '__builder_payload__', 'manifest.json'), {
+      schema: 'core.package-builder.payload.v2',
+      orgRemapRequired: false,
+      artifactsRoot: 'artifacts',
+      tables: [{ entityType: 'pteAiProviders', file: 'tables/pteAiProviders.json', rowCount: 2 }]
+    });
+    writeJson(path.join(tempRoot, 'data', 'pteAiProviders.json'), [
+      { id: 'ROW_1', label: 'Stored' },
+      { id: 'ROW_2', label: 'Keep' }
+    ]);
+
+    const service = packageBuilderModule.createService({
+      dataService: {
+        async deleteData() {
+          throw new Error('Unknown entity type for delete: pteAiProviders');
+        }
+      }
+    });
+
+    const report = await service.removeBuilderPayloadIfPresent({
+      manifestPath: path.join(packageDir, 'package.manifest.json')
+    }, {
+      backendMode: 'json',
+      requirePayload: true
+    });
+
+    assert.equal(report.applied, true);
+    assert.equal(report.rowSummary.deleted, 1);
+    assert.equal(report.rowSummary.skipped >= 1, true);
+    assert.equal(report.rowSummary.skippedWithoutId.length, 1);
+    const storedRows = JSON.parse(fs.readFileSync(path.join(tempRoot, 'data', 'pteAiProviders.json'), 'utf8'));
+    assert.equal(storedRows.length, 1);
+    assert.equal(storedRows[0].id, 'ROW_2');
   });
 });

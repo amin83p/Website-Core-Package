@@ -490,27 +490,12 @@ function createService(overrides = {}) {
     const packageVersion = cleanText(context.packageVersion || context.manifest?.version, 120);
     const backendMode = cleanText(options.backendMode || context.backendMode, 40).toLowerCase() || 'json';
     const force = options.force === true;
+    const cleanupMode = cleanText(options.cleanupMode, 40).toLowerCase();
+    const keepDataMode = cleanupMode === 'keep-data' && !force;
     const preview = options.preview && typeof options.preview === 'object'
       ? options.preview
       : await previewPackageDataUninstallImpact(context, options);
-    if (preview.blocked && !force) {
-      return {
-        dataSummary: summarizeByType([]),
-        appliedSteps: [],
-        skippedSteps: [{
-          stepId: 'data-uninstall',
-          stepType: 'migration',
-          direction: 'down',
-          status: 'skipped',
-          reason: 'blocked_modified_data'
-        }],
-        failedStep: null,
-        rollbackApplied: false,
-        dataImpact: preview,
-        warnings: ['Data rollback skipped because uninstall is blocked by modified records.']
-      };
-    }
-    if (!force) {
+    if (keepDataMode) {
       const steps = [
         ...sanitizeArray(context.manifest?.migrations).map((row) => ({
           stepId: cleanText(row?.id, 200),
@@ -534,7 +519,7 @@ function createService(overrides = {}) {
         failedStep: null,
         rollbackApplied: false,
         dataImpact: preview,
-        warnings: ['Safe uninstall mode keeps package business data.']
+        warnings: ['Keep-data uninstall mode was requested; package business data was retained.']
       };
     }
 
