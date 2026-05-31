@@ -540,80 +540,268 @@
     return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   }
 
-  function buildRemoveInventoryModalHtml(packageId, preview = {}) {
+  function createRemoveInventoryWizardState(packageId, preview = {}) {
     const inventory = preview && typeof preview === 'object' ? (preview.deletionInventory || {}) : {};
-    const modifiedCount = Array.isArray(preview?.modifiedRecords) ? preview.modifiedRecords.length : 0;
-    const criticalRows = Array.isArray(inventory.critical) ? inventory.critical : [];
-    const tableRows = (Array.isArray(inventory.tables) ? inventory.tables : []).filter((row) => row && row.id && row.entityType);
-    const fileRows = (Array.isArray(inventory.files) ? inventory.files : []).filter((row) => row && row.id);
+    const hasOwnSelectedFlag = (row) => row && typeof row === 'object' && Object.prototype.hasOwnProperty.call(row, 'selected');
+    const defaultSelected = (row) => (hasOwnSelectedFlag(row) ? row.selected === true : true);
 
-    const criticalHtml = criticalRows.length
-      ? criticalRows.map((row) => `
+    return {
+      packageId: String(packageId || '').trim(),
+      modifiedCount: Array.isArray(preview?.modifiedRecords) ? preview.modifiedRecords.length : 0,
+      criticalRows: (Array.isArray(inventory.critical) ? inventory.critical : [])
+        .filter((row) => row && (row.id || row.label))
+        .map((row) => ({
+          id: String(row.id || '').trim(),
+          label: String(row.label || row.id || 'Critical item')
+        })),
+      tableRows: (Array.isArray(inventory.tables) ? inventory.tables : [])
+        .filter((row) => row && row.id && row.entityType)
+        .map((row) => ({
+          id: String(row.id || '').trim(),
+          entityType: String(row.entityType || '').trim(),
+          backendMode: String(row.backendMode || 'data').trim(),
+          estimatedRowCount: Number(row.estimatedRowCount || 0) || 0,
+          selected: defaultSelected(row)
+        })),
+      fileRows: (Array.isArray(inventory.files) ? inventory.files : [])
+        .filter((row) => row && row.id)
+        .map((row) => ({
+          id: String(row.id || '').trim(),
+          exists: row.exists === true,
+          size: Number(row.size || 0) || 0,
+          selected: defaultSelected(row)
+        }))
+    };
+  }
+
+  function getRemoveWizardStepModel(stepIndex = 0) {
+    const steps = [
+      { key: 'critical', title: 'Critical (Always Removed)', selectable: false },
+      { key: 'table', title: 'Tables (Selectable)', selectable: true },
+      { key: 'file', title: 'Files (Selectable)', selectable: true }
+    ];
+    return steps[Math.max(0, Math.min(steps.length - 1, Number(stepIndex) || 0))];
+  }
+
+  function setRemoveWizardSelection(state, kind, itemId, checked) {
+    if (!state || !kind || !itemId) return;
+    const key = String(kind || '').trim().toLowerCase();
+    const id = String(itemId || '').trim();
+    const nextChecked = checked === true;
+    if (!id) return;
+    if (key === 'table') {
+      const row = state.tableRows.find((entry) => entry && entry.id === id);
+      if (row) row.selected = nextChecked;
+    }
+    if (key === 'file') {
+      const row = state.fileRows.find((entry) => entry && entry.id === id);
+      if (row) row.selected = nextChecked;
+    }
+  }
+
+  function setRemoveWizardSelectionAll(state, kind, checked) {
+    if (!state || !kind) return;
+    const key = String(kind || '').trim().toLowerCase();
+    const nextChecked = checked === true;
+    if (key === 'table') {
+      state.tableRows.forEach((row) => {
+        if (row && row.id) row.selected = nextChecked;
+      });
+    }
+    if (key === 'file') {
+      state.fileRows.forEach((row) => {
+        if (row && row.id) row.selected = nextChecked;
+      });
+    }
+  }
+
+  function buildRemoveWizardItemsHtml(state, kind) {
+    const key = String(kind || '').trim().toLowerCase();
+    if (key === 'critical') {
+      if (!Array.isArray(state.criticalRows) || state.criticalRows.length === 0) {
+        return '<div class="small text-muted">No critical items were listed.</div>';
+      }
+      return state.criticalRows.map((row) => `
         <label class="d-flex align-items-start gap-2 small mb-2">
           <input type="checkbox" checked disabled>
           <span>${escapeHtml(row.label || row.id || 'Critical item')}</span>
         </label>
-      `).join('')
-      : '<div class="small text-muted">No critical items were listed.</div>';
+      `).join('');
+    }
 
-    const tablesHtml = tableRows.length
-      ? tableRows.map((row) => `
+    if (key === 'table') {
+      if (!Array.isArray(state.tableRows) || state.tableRows.length === 0) {
+        return '<div class="small text-muted">No payload tables detected for this package.</div>';
+      }
+      return state.tableRows.map((row) => `
         <label class="d-flex align-items-start gap-2 small mb-2">
-          <input class="pkg-remove-check" type="checkbox" data-kind="table" data-item-id="${escapeHtml(row.id)}" checked>
+          <input
+            class="pkg-remove-wizard-check"
+            type="checkbox"
+            data-kind="table"
+            data-item-id="${escapeHtml(row.id)}"
+            ${row.selected ? 'checked' : ''}>
           <span>
             <span class="fw-semibold">${escapeHtml(row.entityType)}</span>
             <span class="text-muted">(${escapeHtml(row.backendMode || 'data')} | rows: ${Number(row.estimatedRowCount || 0)})</span>
           </span>
         </label>
-      `).join('')
-      : '<div class="small text-muted">No payload tables detected for this package.</div>';
+      `).join('');
+    }
 
-    const filesHtml = fileRows.length
-      ? fileRows.map((row) => `
-        <label class="d-flex align-items-start gap-2 small mb-2">
-          <input class="pkg-remove-check" type="checkbox" data-kind="file" data-item-id="${escapeHtml(row.id)}" checked>
-          <span>
-            <span class="fw-semibold">${escapeHtml(row.id)}</span>
-            <span class="text-muted d-block">exists: ${row.exists ? 'yes' : 'no'} | size: ${escapeHtml(formatBytes(row.size))}</span>
-          </span>
-        </label>
-      `).join('')
-      : '<div class="small text-muted">No payload files detected for this package.</div>';
+    if (!Array.isArray(state.fileRows) || state.fileRows.length === 0) {
+      return '<div class="small text-muted">No payload files detected for this package.</div>';
+    }
+    return state.fileRows.map((row) => `
+      <label class="d-flex align-items-start gap-2 small mb-2">
+        <input
+          class="pkg-remove-wizard-check"
+          type="checkbox"
+          data-kind="file"
+          data-item-id="${escapeHtml(row.id)}"
+          ${row.selected ? 'checked' : ''}>
+        <span>
+          <span class="fw-semibold">${escapeHtml(row.id)}</span>
+          <span class="text-muted d-block">exists: ${row.exists ? 'yes' : 'no'} | size: ${escapeHtml(formatBytes(row.size))}</span>
+        </span>
+      </label>
+    `).join('');
+  }
+
+  function buildRemoveWizardStepHtml(state, stepIndex = 0) {
+    const stepModel = getRemoveWizardStepModel(stepIndex);
+    const stepNumber = Math.max(1, Math.min(3, Number(stepIndex || 0) + 1));
+    const stepHint = stepModel.key === 'critical'
+      ? 'These items are mandatory and will always be removed.'
+      : (stepModel.key === 'table'
+        ? 'Choose package tables/collections to remove.'
+        : 'Choose payload-copied files to remove.');
+    const selectableControls = stepModel.selectable
+      ? `
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-secondary btn-sm pkg-remove-wizard-toggle-btn" data-kind="${escapeHtml(stepModel.key)}" data-mode="all">Select All</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm pkg-remove-wizard-toggle-btn" data-kind="${escapeHtml(stepModel.key)}" data-mode="none">Unselect All</button>
+        </div>
+      `
+      : '';
 
     return `
       <div class="small">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+          <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">Step ${stepNumber} of 3</span>
+          <span class="text-muted">Package: <code>${escapeHtml(state.packageId)}</code></span>
+        </div>
         <p class="mb-2">
-          Removing <code>${escapeHtml(packageId)}</code> will always remove critical package records.
-          Preview found <b>${modifiedCount}</b> modified package-owned record(s).
+          Preview found <b>${Number(state.modifiedCount || 0)}</b> modified package-owned record(s).
         </p>
-        <div class="border rounded p-2 mb-2">
-          <div class="fw-semibold mb-2">Critical (Always Removed)</div>
-          ${criticalHtml}
-        </div>
-        <div class="border rounded p-2 mb-2">
-          <div class="fw-semibold mb-2">Tables (Selectable)</div>
-          ${tablesHtml}
-        </div>
         <div class="border rounded p-2">
-          <div class="fw-semibold mb-2">Files (Selectable)</div>
-          ${filesHtml}
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <div>
+              <div class="fw-semibold">${escapeHtml(stepModel.title)}</div>
+              <div class="text-muted small">${escapeHtml(stepHint)}</div>
+            </div>
+            ${selectableControls}
+          </div>
+          <div class="border rounded p-2" style="height: 250px; overflow:auto;">
+            ${buildRemoveWizardItemsHtml(state, stepModel.key)}
+          </div>
         </div>
       </div>
     `;
   }
 
-  function collectDeleteSelectionFromModalBody() {
+  function attachRemoveWizardStepHandlers(state, stepIndex = 0) {
+    const stepModel = getRemoveWizardStepModel(stepIndex);
+    if (!stepModel.selectable) return;
     const body = document.getElementById('messageModalBody');
-    const selected = { tables: [], files: [] };
-    if (!body) return selected;
-    body.querySelectorAll('.pkg-remove-check[type="checkbox"]:checked').forEach((input) => {
-      const kind = String(input.getAttribute('data-kind') || '').trim().toLowerCase();
-      const itemId = String(input.getAttribute('data-item-id') || '').trim();
-      if (!itemId) return;
-      if (kind === 'table') selected.tables.push(itemId);
-      if (kind === 'file') selected.files.push(itemId);
+    if (!body) return;
+
+    body.querySelectorAll('.pkg-remove-wizard-check[type="checkbox"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const kind = String(input.getAttribute('data-kind') || '').trim().toLowerCase();
+        const itemId = String(input.getAttribute('data-item-id') || '').trim();
+        setRemoveWizardSelection(state, kind, itemId, input.checked === true);
+      });
     });
-    return selected;
+
+    body.querySelectorAll('.pkg-remove-wizard-toggle-btn').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        const kind = String(button.getAttribute('data-kind') || '').trim().toLowerCase();
+        const mode = String(button.getAttribute('data-mode') || '').trim().toLowerCase();
+        const selectAll = mode === 'all';
+        setRemoveWizardSelectionAll(state, kind, selectAll);
+        body.querySelectorAll(`.pkg-remove-wizard-check[data-kind="${kind}"]`).forEach((input) => {
+          input.checked = selectAll;
+        });
+      });
+    });
+  }
+
+  function collectDeleteSelectionFromWizardState(state) {
+    return {
+      tables: (Array.isArray(state?.tableRows) ? state.tableRows : [])
+        .filter((row) => row && row.id && row.selected === true)
+        .map((row) => row.id),
+      files: (Array.isArray(state?.fileRows) ? state.fileRows : [])
+        .filter((row) => row && row.id && row.selected === true)
+        .map((row) => row.id)
+    };
+  }
+
+  async function showRemoveInventoryWizard(packageId, preview = {}) {
+    const state = createRemoveInventoryWizardState(packageId, preview);
+    let stepIndex = 0;
+
+    while (true) {
+      const buttons = stepIndex === 0
+        ? [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Next', class: 'btn-primary' }
+        ]
+        : (stepIndex === 1
+          ? [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Back', class: 'btn-outline-secondary' },
+            { text: 'Next', class: 'btn-primary' }
+          ]
+          : [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Back', class: 'btn-outline-secondary' },
+            { text: 'Remove Package', class: 'btn-danger' }
+          ]);
+
+      const decisionPromise = showModal({
+        title: 'Remove Package',
+        icon: 'warning',
+        size: 'lg',
+        message: buildRemoveWizardStepHtml(state, stepIndex),
+        buttons
+      });
+
+      attachRemoveWizardStepHandlers(state, stepIndex);
+      const decision = await decisionPromise;
+
+      if (decision === 'Cancel' || decision === 'closed') {
+        return { status: 'cancelled', report: preview };
+      }
+      if (decision === 'Back') {
+        stepIndex = Math.max(0, stepIndex - 1);
+        continue;
+      }
+      if (decision === 'Next') {
+        stepIndex = Math.min(2, stepIndex + 1);
+        continue;
+      }
+      if (decision === 'Remove Package') {
+        return {
+          status: 'ready',
+          report: preview,
+          deleteSelection: collectDeleteSelectionFromWizardState(state)
+        };
+      }
+      return { status: 'cancelled', report: preview };
+    }
   }
 
   async function confirmDanger(actionLabel, packageId) {
@@ -716,7 +904,6 @@
         }
       ));
       const preview = previewResult.report || {};
-      const modifiedCount = Array.isArray(preview.modifiedRecords) ? preview.modifiedRecords.length : 0;
       let removeUrl = config.endpoint(packageId);
       const bodyPayload = {
         actionStateId,
@@ -731,19 +918,9 @@
         throw new Error(blockedText);
       }
 
-      const selected = await showModal({
-        title: 'Remove Package',
-        icon: 'warning',
-        size: 'lg',
-        message: buildRemoveInventoryModalHtml(packageId, preview),
-        buttons: [
-          { text: 'Cancel', class: 'btn-secondary' },
-          { text: 'Remove Package', class: 'btn-danger' }
-        ]
-      });
-      if (selected !== 'Remove Package') return { status: 'cancelled', report: preview };
-      const deleteSelection = collectDeleteSelectionFromModalBody();
-      bodyPayload.deleteSelection = JSON.stringify(deleteSelection);
+      const wizardResult = await showRemoveInventoryWizard(packageId, preview);
+      if (wizardResult?.status !== 'ready') return { status: 'cancelled', report: preview };
+      bodyPayload.deleteSelection = JSON.stringify(wizardResult.deleteSelection || { tables: [], files: [] });
 
       const removeResult = await runWithWaiting('Removing Package', async () => fetchJson(removeUrl, {
         method: 'POST',

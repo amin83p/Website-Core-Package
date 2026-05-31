@@ -530,6 +530,15 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /Impact Preview/);
   assert.match(html, /Recent Lifecycle Transactions/);
   assert.match(html, /Startup Package Load Warnings \(Registry State Unchanged\)/i);
+  assert.match(html, /showRemoveInventoryWizard/);
+  assert.match(html, /Critical \(Always Removed\)/);
+  assert.match(html, /Tables \(Selectable\)/);
+  assert.match(html, /Files \(Selectable\)/);
+  assert.match(html, /Step \$\{stepNumber\} of 3/);
+  assert.match(html, /Select All/);
+  assert.match(html, /Unselect All/);
+  assert.match(html, /pkg-remove-wizard-check/);
+  assert.match(html, /pkg-remove-wizard-toggle-btn/);
 });
 
 test('package manager EJS shows local sync button when local dev mode is enabled', () => {
@@ -550,8 +559,6 @@ test('package manager EJS shows local sync button when local dev mode is enabled
 
   assert.match(html, /Package Sync Locally/);
   assert.match(html, /\/systemSettings\/packages\/local-sync/);
-  assert.match(html, /Tables \(Selectable\)/);
-  assert.match(html, /Files \(Selectable\)/);
 });
 
 test('local package sync EJS compiles and includes sync actions', () => {
