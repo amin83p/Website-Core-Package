@@ -335,7 +335,6 @@ app.use('/benchpath', require('./MVC/routes/benchpath/benchpathMainRoute'));
 
 app.use('/credit', require('./MVC/routes/credit/creditRoutes'));
 
-app.use('/school', require('./MVC/routes/school/schoolMainRoute'));
 app.use('/internal/file-gateway', fileGatewayRoutes);
 
 // Package runtime container stays mounted before 404 so package actions can activate routes live.

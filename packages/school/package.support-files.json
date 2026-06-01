@@ -1,10 +1,10 @@
 {
   "packageId": "school",
-  "step": 5,
-  "status": "view-partials-normalized",
+  "step": 6,
+  "status": "runtime-mount-cutover",
   "notes": [
-    "Passes 1-4 completed: scaffold, route wrappers, runtime wrappers, and School view mirror are in place.",
-    "Pass 5 normalizes package School view includes to stable partial include paths (partials/...).",
+    "Passes 1-5 completed: scaffold, route wrappers, runtime wrappers, School view mirror, and partial include normalization.",
+    "Pass 6 removes hardcoded core /school mount from app.js and keeps package manifest as the mount contract.",
     "Core dependencies remain behind packages/school/MVC/services/school/schoolCoreContracts.js."
   ],
   "scripts": [],
@@ -13,13 +13,15 @@
     "docs/school-package-pass2-route-layer-2026-06-01.md",
     "docs/school-package-pass3-runtime-wrapper-surface-2026-06-01.md",
     "docs/school-package-pass4-view-mirror-2026-06-01.md",
-    "docs/school-package-pass5-partials-2026-06-01.md"
+    "docs/school-package-pass5-partials-2026-06-01.md",
+    "docs/school-package-pass6-runtime-cutover-2026-06-01.md"
   ],
   "tests": [
     "test/school-package-certification-hardcoded-coupling.test.js",
     "test/school-package-route-layer-pass2.test.js",
     "test/school-package-runtime-wrapper-parity-pass3.test.js",
     "test/school-package-view-parity-pass4.test.js",
-    "test/school-package-view-partials-pass5.test.js"
+    "test/school-package-view-partials-pass5.test.js",
+    "test/school-package-runtime-cutover-pass6.test.js"
   ]
 }
