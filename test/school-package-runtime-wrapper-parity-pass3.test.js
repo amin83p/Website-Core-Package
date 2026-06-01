@@ -63,7 +63,8 @@ const packageOwnedByDomain = {
     'programRegistrationController.js',
     'scheduleController.js',
     'reportController.js',
-    'termRegistrationController.js'
+    'termRegistrationController.js',
+    'examController.js'
   ]),
   services: new Set(),
   repositories: new Set(),
