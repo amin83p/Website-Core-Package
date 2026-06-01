@@ -133,3 +133,30 @@ test('school package pass9 owns timesheetRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.viewTimesheet/);
   assert.match(routeSource, /ctrl\.saveTimesheet/);
 });
+
+test('school package pass10 owns attendanceRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/attendanceRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/attendanceRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/attendanceController'\)/);
+  assert.match(routeSource, /requireCoreModule\('MVC\/middleware\/attendanceMatrixPolicyAdminMiddleware'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /ctrl\.showAttendanceMatrixSettings/);
+  assert.match(routeSource, /ctrl\.saveAttendanceMatrixSettings/);
+  assert.match(routeSource, /ctrl\.showAttendancePage/);
+  assert.match(routeSource, /ctrl\.updateAttendanceRosterCell/);
+});
+
+test('school package pass10 owns sampleDataRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/sampleDataRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/sampleDataRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/schoolSampleDataController'\)/);
+  assert.match(routeSource, /requireCoreModule\('MVC\/middleware\/adminApproval'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SAMPLE_DATA,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /ctrl\.showForm/);
+  assert.match(routeSource, /ctrl\.generate/);
+  assert.match(routeSource, /ctrl\.clearTransactionalData/);
+  assert.match(routeSource, /ctrl\.deleteSelectedSamplePeople/);
+});
