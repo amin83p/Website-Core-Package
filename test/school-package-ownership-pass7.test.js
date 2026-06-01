@@ -104,3 +104,32 @@ test('school package pass8 owns timesheetPeriodRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.saveTimesheetPeriod/);
   assert.match(routeSource, /ctrl\.deleteTimesheetPeriod/);
 });
+
+test('school package pass9 owns termRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/termRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/termRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/termController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TERMS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TERMS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TERMS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TERMS,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listTerms/);
+  assert.match(routeSource, /ctrl\.showAddWizardForm/);
+  assert.match(routeSource, /ctrl\.showEditWizardForm/);
+  assert.match(routeSource, /ctrl\.saveTerm/);
+  assert.match(routeSource, /ctrl\.deleteTerm/);
+});
+
+test('school package pass9 owns timesheetRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/timesheetRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/timesheetRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/timesheetController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TIMESHEETS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TIMESHEETS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /ctrl\.listMyTimesheets/);
+  assert.match(routeSource, /ctrl\.listEligibleTimesheetPersons/);
+  assert.match(routeSource, /ctrl\.viewTimesheet/);
+  assert.match(routeSource, /ctrl\.saveTimesheet/);
+});
