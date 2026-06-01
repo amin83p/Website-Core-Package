@@ -78,7 +78,8 @@ test('school package route wrappers should resolve core routes through core cont
   ];
   const packageOwnedRoutes = new Set([
     'schoolRoutes.js',
-    'transactionDefinitionRoutes.js'
+    'transactionDefinitionRoutes.js',
+    'gradesMatrixRoutes.js'
   ]);
 
   const offenders = [];

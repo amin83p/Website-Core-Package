@@ -25,3 +25,14 @@ test('school package pass7 keeps transactionDefinitionRoutes as package-owned al
   assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/transactionDefinitionRoutes')"), false);
   assert.match(routeSource, /module\.exports\s*=\s*require\('\.\/transactionTemplateRoutes'\)/);
 });
+
+test('school package pass7 owns gradesMatrixRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/gradesMatrixRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/gradesMatrixRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/gradesMatrixController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_GRADEBOOK,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /trackActionState\(SECTIONS\.SCHOOL_GRADEBOOK,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /ctrl\.showGradesMatrixPage/);
+  assert.match(routeSource, /ctrl\.getGradesMatrixData/);
+});
