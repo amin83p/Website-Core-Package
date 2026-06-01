@@ -139,3 +139,34 @@ test('school package pass18 owns withdrawalController implementation', () => {
   assert.match(source, /require\('\.\.\/\.\.\/services\/school\/withdrawal'\)/);
   assert.match(source, /module\.exports\s*=\s*\{/);
 });
+test('school package pass19 owns programController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/programController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/programController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
+  assert.match(source, /exports\.saveProgram/);
+});
+
+test('school package pass19 owns academicLedgerController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/academicLedgerController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/academicLedgerController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/generalTools'\)/);
+  assert.match(source, /exports\.listLedger/);
+});
+
+test('school package pass19 owns studentProgramPriorSubjectController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/studentProgramPriorSubjectController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/studentProgramPriorSubjectController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/paginationHelper'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/idAdapter'\)/);
+  assert.match(source, /exports\.createBatch/);
+});
+
+test('school package pass19 owns transactionsManagerController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/transactionsManagerController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/transactionsManagerController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/paginationHelper'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
+  assert.match(source, /exports\.saveTransaction/);
+});
