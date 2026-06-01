@@ -76,6 +76,9 @@ test('school package route wrappers should resolve core routes through core cont
     'withdrawalRoutes.js',
     'schoolRoutes.js'
   ];
+  const packageOwnedRoutes = new Set([
+    'schoolRoutes.js'
+  ]);
 
   const offenders = [];
   expectedRouteFiles.forEach((name) => {
@@ -86,6 +89,13 @@ test('school package route wrappers should resolve core routes through core cont
     }
 
     const source = read(filePath);
+    if (packageOwnedRoutes.has(name)) {
+      if (source.includes("requireCoreModule('MVC/routes/school/")) {
+        offenders.push(`${name}: should be package-owned (still bridges to core route)`); 
+      }
+      return;
+    }
+
     if (!source.includes("require('../services/school/schoolCoreContracts')")) {
       offenders.push(`${name}: missing schoolCoreContracts import`);
       return;
