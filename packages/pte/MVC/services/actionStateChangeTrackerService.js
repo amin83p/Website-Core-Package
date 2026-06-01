@@ -1,3 +1,3 @@
-const { actionStateChangeTrackerService } = require('./pte/pteCoreContracts');
+const { requireCoreModule } = require('./pte/pteCoreModuleResolver');
 
-module.exports = actionStateChangeTrackerService;
+module.exports = requireCoreModule('MVC/services/actionStateChangeTrackerService');

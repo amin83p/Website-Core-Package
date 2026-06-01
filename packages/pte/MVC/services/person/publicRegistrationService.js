@@ -1,3 +1,3 @@
-const { publicRegistrationService } = require('../pte/pteCoreContracts');
+const { requireCoreModule } = require('../pte/pteCoreModuleResolver');
 
-module.exports = publicRegistrationService;
+module.exports = requireCoreModule('MVC/services/person/publicRegistrationService');

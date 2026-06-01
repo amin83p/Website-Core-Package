@@ -1,3 +1,3 @@
-const { mongoConnection } = require('../../services/pte/pteCoreContracts');
+const { requireCoreModule } = require('../../services/pte/pteCoreModuleResolver');
 
-module.exports = mongoConnection;
+module.exports = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');

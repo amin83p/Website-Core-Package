@@ -1,3 +1,3 @@
-const { coreFilesService } = require('./pte/pteCoreContracts');
+const { requireCoreModule } = require('./pte/pteCoreModuleResolver');
 
-module.exports = coreFilesService;
+module.exports = requireCoreModule('MVC/services/coreFilesService');
