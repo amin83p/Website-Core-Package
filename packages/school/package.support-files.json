@@ -17,7 +17,8 @@
     "docs/school-package-pass6-runtime-cutover-2026-06-01.md",
     "docs/school-package-pass7-ownership-begin-2026-06-01.md",
     "docs/school-package-pass7-ownership-slice2-2026-06-01.md",
-    "docs/school-package-pass7-ownership-slice3-2026-06-01.md"
+    "docs/school-package-pass7-ownership-slice3-2026-06-01.md",
+    "docs/school-package-pass7-ownership-slice4-2026-06-01.md"
   ],
   "tests": [
     "test/school-package-certification-hardcoded-coupling.test.js",

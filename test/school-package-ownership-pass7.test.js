@@ -36,3 +36,14 @@ test('school package pass7 owns gradesMatrixRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.showGradesMatrixPage/);
   assert.match(routeSource, /ctrl\.getGradesMatrixData/);
 });
+
+test('school package pass7 owns sessionRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/sessionRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/sessionRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/sessionController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SESSIONS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /trackActionState\(SECTIONS\.SCHOOL_SESSIONS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /ctrl\.showSessionListPage/);
+  assert.match(routeSource, /ctrl\.getSessionsApi/);
+});
