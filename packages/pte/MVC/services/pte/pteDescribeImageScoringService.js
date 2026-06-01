@@ -1,7 +1,6 @@
 const fs = require('fs/promises');
 const path = require('path');
-const uploadPathUtils = require('../../../../../MVC/utils/uploadPathUtils');
-const { getGatewayBaseUrl } = require('../../../../../MVC/utils/uploadModeUtils');
+const { uploadPathUtils, getGatewayBaseUrl } = require('./pteCoreContracts');
 const pteAiProviderDataService = require('./pteAiProviderDataService');
 const pteAiProviderService = require('./ai/aiProviderService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');

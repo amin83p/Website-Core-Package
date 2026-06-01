@@ -1,1 +1,3 @@
-module.exports = require('../../../../../MVC/repositories/backend/mongoRepositoryUtils');
+const { mongoRepositoryUtils } = require('../../services/pte/pteCoreContracts');
+
+module.exports = mongoRepositoryUtils;

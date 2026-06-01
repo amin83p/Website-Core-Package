@@ -7,14 +7,16 @@ const pteAttemptArtifactRepository = require('../../repositories/pteAttemptArtif
 const pteTestVersionRepository = require('../../repositories/pteTestVersionRepository');
 const pteQuestionVersionRepository = require('../../repositories/pteQuestionVersionRepository');
 const pteApplicantRepository = require('../../repositories/pteApplicantRepository');
-const adminChekersService = require('../../../../../MVC/services/adminChekersService');
-const dataService = require('../../../../../MVC/services/dataService');
-const coreFilesService = require('../../../../../MVC/services/coreFilesService');
+const {
+  adminChekersService,
+  dataService,
+  coreFilesService,
+  isRailwayProxyMode,
+  activityQuotaLedgerService,
+  consumptionDefinitionPolicyService,
+  resolveEntity
+} = require('./pteCoreContracts');
 const pteUploadPathUtils = require('../../utils/pteUploadPathUtils');
-const { isRailwayProxyMode } = require('../../../../../MVC/utils/uploadModeUtils');
-const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
-const consumptionDefinitionPolicyService = require('../../../../../MVC/services/activityQuota/consumptionDefinitionPolicyService');
-const { resolveEntity } = require('../../../../../MVC/utils/entityResolver');
 const { toPublicId, idsEqual } = require('../../utils/idAdapter');
 const { applyGenericFilter } = require('../../utils/queryEngine');
 const pteQuestionScoringProfileService = require('./pteQuestionScoringProfileService');

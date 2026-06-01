@@ -1,1 +1,3 @@
-module.exports = require('../../../../../MVC/repositories/backend/repositoryBackendSelector');
+const { repositoryBackendSelector } = require('../../services/pte/pteCoreContracts');
+
+module.exports = repositoryBackendSelector;

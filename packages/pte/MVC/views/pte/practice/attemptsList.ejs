@@ -30,7 +30,7 @@
   );
 %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl: 'pte/practice/attempts',
   newLabel: null,
@@ -165,7 +165,7 @@
   </div>
 </div>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search attempts by session id, practice name, status, skill, feedback state, or question title...',
   fields: attemptsSearchableFields
 }) %>
@@ -268,15 +268,15 @@
   </table>
 </div>
 
-<%- include('../../../../../../MVC/views/partials/pagination', {
+<%- include('partials/pagination', {
   pagination: pagination,
   filters: filters,
   baseUrlPath: '/pte/practice/attempts'
 }) %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
 
-<%- include('../../../../../../MVC/views/partials/modal_GenericPicker', { user }) %>
+<%- include('partials/modal_GenericPicker', { user }) %>
 
 <script>
 (() => {

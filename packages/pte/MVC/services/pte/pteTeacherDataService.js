@@ -1,17 +1,22 @@
 const bcrypt = require('bcrypt');
 const pteTeacherRepository = require('../../repositories/pteTeacherRepository');
 const pteCourseRepository = require('../../repositories/pteCourseRepository');
-const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
-const dataService = require('../../../../../MVC/services/dataService');
-const adminChekersService = require('../../../../../MVC/services/adminChekersService');
+const {
+  activityQuotaLedgerService,
+  dataService,
+  adminChekersService,
+  normalizeQueryOptions,
+  resolveEntity,
+  assertCreateOrgContextOrThrow,
+  getActiveOrgIdOrThrow,
+  normalizeOrgRoles,
+  getPrimaryOrgRole,
+  resolveCanonicalOrganizationName,
+  settingService,
+  SYSTEM_CONTEXT
+} = require('./pteCoreContracts');
 const { applyGenericFilter } = require('../../utils/queryEngine');
-const { normalizeQueryOptions } = require('../../../../../MVC/utils/queryOptionsAdapter');
-const { resolveEntity } = require('../../../../../MVC/utils/entityResolver');
-const { assertCreateOrgContextOrThrow, getActiveOrgIdOrThrow, normalizeOrgRoles, getPrimaryOrgRole } = require('../../../../../MVC/utils/orgContextUtils');
 const { idsEqual, toPublicId } = require('../../utils/idAdapter');
-const { resolveCanonicalOrganizationName } = require('../../../../../MVC/utils/organizationDisplay');
-const settingService = require('../../../../../MVC/services/settingService');
-const { SYSTEM_CONTEXT } = require('../../../../../config/constants');
 
 const PERSON_ROLE_TOKEN = 'PTE_Teacher';
 const PERSON_ORG_ROLE_TOKEN = 'pte_teacher';

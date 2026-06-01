@@ -38,7 +38,7 @@
   );
 %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -186,7 +186,7 @@
   </div>
 </div>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search questions by title, code, family, type, status, or tags...',
   fields: searchableFields || []
 }) %>
@@ -360,13 +360,13 @@
   </table>
 </div>
 
-<%- include('../../../../../../MVC/views/partials/pagination', {
+<%- include('partials/pagination', {
   pagination: pagination,
   filters: filters,
   baseUrlPath: newUrl
 }) %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {

@@ -1,7 +1,7 @@
 {
   "id": "pte",
   "name": "PTE",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "mountPath": "/pte",
   "enabledByDefault": false,
   "routes": [
@@ -15,35 +15,35 @@
     {
       "method": "GET",
       "path": "/pte",
-      "controller": "MVC/controllers/pte/infoController.showPteTestInfo",
+      "controller": "MVC/controllers/infoController.showPteTestInfo",
       "metadataOnly": true,
       "active": true
     },
     {
       "method": "GET",
       "path": "/pte/join",
-      "controller": "MVC/controllers/pte/publicJoinController.showPtePublicJoinForm",
+      "controller": "MVC/controllers/publicJoinController.showPtePublicJoinForm",
       "metadataOnly": true,
       "active": true
     },
     {
       "method": "POST",
       "path": "/pte/join",
-      "controller": "MVC/controllers/pte/publicJoinController.processPtePublicJoin",
+      "controller": "MVC/controllers/publicJoinController.processPtePublicJoin",
       "metadataOnly": true,
       "active": true
     },
     {
       "method": "GET",
       "path": "/pte/packages",
-      "controller": "MVC/controllers/pte/infoController.showPublicPackages",
+      "controller": "MVC/controllers/infoController.showPublicPackages",
       "metadataOnly": true,
       "active": true
     },
     {
       "method": "GET",
       "path": "/pte/dashboard",
-      "controller": "MVC/controllers/pte/userDashboardController.showDashboard",
+      "controller": "MVC/controllers/userDashboardController.showDashboard",
       "metadataOnly": true,
       "active": true
     }

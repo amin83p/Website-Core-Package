@@ -1,1 +1,3 @@
-module.exports = require('../../../../../MVC/services/person/publicRegistrationService');
+const { publicRegistrationService } = require('../pte/pteCoreContracts');
+
+module.exports = publicRegistrationService;

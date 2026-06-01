@@ -9,7 +9,7 @@
   const statusClass = status === 'success' ? 'bg-success' : (status === 'failed' ? 'bg-danger' : 'bg-secondary');
 %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl: null,
   newLabel: null,
@@ -136,4 +136,4 @@
   </div>
 </div>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>

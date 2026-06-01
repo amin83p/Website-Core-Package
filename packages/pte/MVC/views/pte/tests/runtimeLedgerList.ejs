@@ -50,7 +50,7 @@
   );
 %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -219,7 +219,7 @@
   </div>
 </div>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search runtime events by ids, types, source ids, question ids, or user ids...',
   fields: searchableFields || []
 }) %>
@@ -335,14 +335,14 @@
   </table>
 </div>
 
-<%- include('../../../../../../MVC/views/partials/pagination', {
+<%- include('partials/pagination', {
   pagination: pagination,
   filters: filters,
   baseUrlPath: newUrl
 }) %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-end') %>
-<%- include('../../../../../../MVC/views/partials/modal_GenericPicker', { user }) %>
+<%- include('partials/tablePages-end') %>
+<%- include('partials/modal_GenericPicker', { user }) %>
 
 <script>
 (() => {

@@ -7,3 +7,4 @@ node_modules/
 /data/sessions.json
 .env
 /.local-runtime/
+/install_packages/

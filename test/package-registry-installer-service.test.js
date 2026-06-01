@@ -622,13 +622,13 @@ test('loader hooks include route registration and keep metadata-only routes non-
         {
           method: 'USE',
           path: '/pte',
-          router: 'MVC/routes/pte/pteMainRoute.js',
+          router: 'MVC/routes/pteMainRoute.js',
           metadataOnly: true
         },
         {
           method: 'GET',
           path: '/pte/test-info',
-          controller: 'MVC/controllers/pte/infoController.showPteTestInfo',
+          controller: 'MVC/controllers/infoController.showPteTestInfo',
           metadataOnly: true
         }
       ]

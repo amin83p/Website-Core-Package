@@ -7,7 +7,7 @@ const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 const PTE_VIEW_DIR = path.join(ROOT_DIR, 'packages/pte/MVC/views/pte');
 const CORE_PARTIAL_DIR = path.join(ROOT_DIR, 'MVC/views/partials');
 const PACKAGE_PARTIAL_DIR = path.join(ROOT_DIR, 'packages/pte/MVC/views/partials');
-const CORE_PARTIAL_INCLUDE_PREFIX = '../../../../../../MVC/views/partials/';
+const CORE_PARTIAL_INCLUDE_PREFIX = 'partials/';
 
 function walkFiles(directory) {
   const entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -71,5 +71,6 @@ test('package views should never include package-local partial path tokens', () 
     const source = fs.readFileSync(viewFile, 'utf8');
     assert.equal(source.includes("'../../partials/"), false, `${path.relative(PTE_VIEW_DIR, viewFile)} should not include '../../partials/'`);
     assert.equal(source.includes('"../../partials/'), false, `${path.relative(PTE_VIEW_DIR, viewFile)} should not include "../../partials/"`);
+    assert.equal(source.includes('../../../../../../MVC/views/partials/'), false, `${path.relative(PTE_VIEW_DIR, viewFile)} should not include deep core partial traversal.`);
   }
 });

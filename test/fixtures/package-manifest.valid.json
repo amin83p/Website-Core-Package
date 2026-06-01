@@ -5,11 +5,11 @@
   "mountPath": "/pte",
   "enabledByDefault": false,
   "routes": [
-    "MVC/routes/pte/pteMainRoute.js"
+    "MVC/routes/pteMainRoute.js"
   ],
   "queryExecutors": [],
   "views": {
-    "path": "MVC/views/pte"
+    "path": "packages/pte/MVC/views/pte"
   },
   "assets": {
     "publicPath": "public/pte"

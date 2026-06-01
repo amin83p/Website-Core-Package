@@ -11,17 +11,6 @@ const CORE_EXCLUDED_ENTITY_TYPES = new Set([
   'sessions'
 ]);
 
-const PTE_TRACKED_ENTITY_TYPES = new Set([
-  'pteApplicants',
-  'pteTeachers',
-  'pteCourses',
-  'pteAiProviders',
-  'ptePublicPageSettings',
-  'pteTestVersions',
-  'pteQuestionVersions',
-  'pteApplicantPackageAssignments'
-]);
-
 function normalizeEntityToken(value) {
   return String(value || '').trim();
 }
@@ -54,9 +43,7 @@ function resolveActionStateContext() {
 
 function shouldTrackEntity(entityType, source = 'core') {
   const token = normalizeEntityToken(entityType);
-  const sourceToken = String(source || 'core').trim().toLowerCase();
   if (!token) return false;
-  if (sourceToken === 'pte') return PTE_TRACKED_ENTITY_TYPES.has(token);
   return !CORE_EXCLUDED_ENTITY_TYPES.has(token);
 }
 

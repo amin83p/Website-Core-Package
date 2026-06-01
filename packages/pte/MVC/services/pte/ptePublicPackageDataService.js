@@ -1,10 +1,13 @@
-const packageDataService = require('../../../../../MVC/services/activityQuota/packageDataService');
-const packageManagerDataService = require('../../../../../MVC/services/activityQuota/packageManagerDataService');
-const activityQuotaPackageAssignmentRepository = require('../../../../../MVC/repositories/activityQuotaPackageAssignmentRepository');
-const dataService = require('../../../../../MVC/services/dataService');
-const settingService = require('../../../../../MVC/services/settingService');
+const {
+  packageDataService,
+  packageManagerDataService,
+  activityQuotaPackageAssignmentRepository,
+  dataService,
+  settingService,
+  DEFAULTS,
+  SYSTEM_CONTEXT
+} = require('./pteCoreContracts');
 const pteStudentDataService = require('./pteStudentDataService');
-const { DEFAULTS, SYSTEM_CONTEXT } = require('../../../../../config/constants');
 const { idsEqual, toPublicId } = require('../../utils/idAdapter');
 
 const FREE_ORG_ID = Number(DEFAULTS?.FREE_ORG_ID || 900000);
@@ -55,9 +58,22 @@ function resolveConfiguredOrgId(settingKey, fallbackValue) {
   return FREE_ORG_ID;
 }
 
+function resolvePteJoinOrgOverride(fallbackValue) {
+  const envParsed = Number.parseInt(String(process.env.PTE_JOIN_ORG_ID ?? '').trim(), 10);
+  if (Number.isFinite(envParsed) && envParsed > 0) return envParsed;
+
+  const packageSetting = settingService.getValue('pte', 'joinOrgId');
+  const packageParsed = Number.parseInt(String(packageSetting ?? '').trim(), 10);
+  if (Number.isFinite(packageParsed) && packageParsed > 0) return packageParsed;
+
+  const fallbackParsed = Number.parseInt(String(fallbackValue ?? '').trim(), 10);
+  if (Number.isFinite(fallbackParsed) && fallbackParsed > 0) return fallbackParsed;
+  return FREE_ORG_ID;
+}
+
 function resolvePteJoinOrgId() {
   const freeOrgId = resolveConfiguredOrgId('freeOrgId', FREE_ORG_ID);
-  return resolveConfiguredOrgId('pteJoinOrgId', freeOrgId);
+  return resolvePteJoinOrgOverride(freeOrgId);
 }
 
 function isPtePublicRoleToken(value = '') {

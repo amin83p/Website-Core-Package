@@ -104,9 +104,6 @@ const PUBLIC_MENU_ENDPOINT_OPTIONS = Object.freeze([
   { label: 'Newsletter Unsubscribe', href: '/newsletter/unsubscribe', icon: 'bi-envelope-x', visibility: 'all', target: '_self', category: 'Newsletter' }
 ]);
 
-const REMOVED_PUBLIC_MENU_HREFS = new Set(['/pte/test-info', '/pte/join', '/pte/packages']);
-const REMOVED_PUBLIC_MENU_LABELS = new Set(['pte test info', 'join pte practice', 'pte packages']);
-
 function cleanText(value, { max = 4000, fallback = '' } = {}) {
   const token = String(value ?? '').replace(/\0/g, '').trim();
   const out = token || fallback || '';
@@ -465,14 +462,7 @@ function dedupeMenuItems(items = []) {
 }
 
 function removeDeprecatedPublicMenuItems(items = []) {
-  return (Array.isArray(items) ? items : []).filter((item) => {
-    const source = item && typeof item === 'object' ? item : {};
-    const href = cleanMenuHref(source.href || '');
-    const label = cleanText(source.label, { max: 120, fallback: '' }).toLowerCase();
-    if (href && REMOVED_PUBLIC_MENU_HREFS.has(href)) return false;
-    if (label && REMOVED_PUBLIC_MENU_LABELS.has(label)) return false;
-    return true;
-  });
+  return Array.isArray(items) ? items : [];
 }
 
 function getPublicMenu(user = null) {

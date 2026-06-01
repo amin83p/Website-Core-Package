@@ -1,59 +1,30 @@
-const adminChekersService = require('../../../../../MVC/services/adminChekersService');
-const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
-const coreFilesService = require('../../../../../MVC/services/coreFilesService');
-const uploadCategoryResolverService = require('../../../../../MVC/services/uploadCategoryResolverService');
-const uploadFolderSettingsService = require('../../../../../MVC/services/uploadFolderSettingsService');
-const settingService = require('../../../../../MVC/services/settingService');
-const dataService = require('../../../../../MVC/services/dataService');
-const { normalizeQueryOptions } = require('../../../../../MVC/utils/queryOptionsAdapter');
-const { resolveEntity } = require('../../../../../MVC/utils/entityResolver');
-const { applyGenericFilter } = require('../../../../../MVC/utils/queryEngine');
-const { idsEqual, toPublicId } = require('../../../../../MVC/utils/idAdapter');
-const {
-  assertCreateOrgContextOrThrow,
-  getActiveOrgIdOrThrow,
-  normalizeOrgRoles
-} = require('../../../../../MVC/utils/orgContextUtils');
-const { decrypt } = require('../../../../../MVC/utils/encyptors');
-const paginate = require('../../../../../MVC/utils/paginationHelper');
-const {
-  buildDataServiceQuery,
-  inferSearchableFields,
-  isAjax
-} = require('../../../../../MVC/utils/generalTools');
-const {
-  isRailwayProxyMode,
-  getGatewayBaseUrl,
-  getGatewayTimeoutMs
-} = require('../../../../../MVC/utils/uploadModeUtils');
-const { runByRepositoryBackend } = require('../../../../../MVC/repositories/backend/repositoryBackendSelector');
-const { getMongoCollection } = require('../../../../../MVC/infrastructure/mongo/mongoConnection');
+const coreContracts = require('./pteCoreContracts');
 
 module.exports = {
-  adminChekersService,
-  activityQuotaLedgerService,
-  coreFilesService,
-  uploadCategoryResolverService,
-  uploadFolderSettingsService,
-  settingService,
-  dataService,
-  normalizeQueryOptions,
-  resolveEntity,
-  applyGenericFilter,
-  getActiveOrgIdOrThrow,
-  idsEqual,
-  toPublicId,
-  paginate,
-  buildDataServiceQuery,
-  inferSearchableFields,
-  isAjax,
-  isRailwayProxyMode,
-  getGatewayBaseUrl,
-  getGatewayTimeoutMs,
-  assertCreateOrgContextOrThrow,
-  normalizeOrgRoles,
-  decrypt,
-  runByRepositoryBackend,
-  getMongoCollection,
-  SYSTEM_CONTEXT: require('../../../../../config/constants').SYSTEM_CONTEXT
+  adminChekersService: coreContracts.adminChekersService,
+  activityQuotaLedgerService: coreContracts.activityQuotaLedgerService,
+  coreFilesService: coreContracts.coreFilesService,
+  uploadCategoryResolverService: coreContracts.uploadCategoryResolverService,
+  uploadFolderSettingsService: coreContracts.uploadFolderSettingsService,
+  settingService: coreContracts.settingService,
+  dataService: coreContracts.dataService,
+  normalizeQueryOptions: coreContracts.normalizeQueryOptions,
+  resolveEntity: coreContracts.resolveEntity,
+  applyGenericFilter: coreContracts.applyGenericFilter,
+  getActiveOrgIdOrThrow: coreContracts.getActiveOrgIdOrThrow,
+  idsEqual: coreContracts.idsEqual,
+  toPublicId: coreContracts.toPublicId,
+  paginate: coreContracts.paginate,
+  buildDataServiceQuery: coreContracts.buildDataServiceQuery,
+  inferSearchableFields: coreContracts.inferSearchableFields,
+  isAjax: coreContracts.isAjax,
+  isRailwayProxyMode: coreContracts.isRailwayProxyMode,
+  getGatewayBaseUrl: coreContracts.getGatewayBaseUrl,
+  getGatewayTimeoutMs: coreContracts.getGatewayTimeoutMs,
+  assertCreateOrgContextOrThrow: coreContracts.assertCreateOrgContextOrThrow,
+  normalizeOrgRoles: coreContracts.normalizeOrgRoles,
+  decrypt: coreContracts.decrypt,
+  runByRepositoryBackend: coreContracts.runByRepositoryBackend,
+  getMongoCollection: coreContracts.getMongoCollection,
+  SYSTEM_CONTEXT: coreContracts.SYSTEM_CONTEXT
 };

@@ -1,7 +1,7 @@
 const questionTypeRegistry = require('./questionTypeRegistry');
 const pteQuestionTypeScoringProfileRepository = require('../../repositories/pteQuestionTypeScoringProfileRepository');
 const pteQuestionTypeScoringProfileHistoryRepository = require('../../repositories/pteQuestionTypeScoringProfileHistoryRepository');
-const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
+const { activityQuotaLedgerService } = require('./pteCoreContracts');
 const { toPublicId } = require('../../utils/idAdapter');
 
 function isPlainObject(value) {

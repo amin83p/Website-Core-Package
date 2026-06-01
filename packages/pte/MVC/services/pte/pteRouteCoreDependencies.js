@@ -1,9 +1,11 @@
-const { requireAuth } = require('../../../../../MVC/middleware/authMiddleware');
-const { requireAccess } = require('../../../../../MVC/middleware/accessMiddleware');
-const { trackActionState } = require('../../../../../MVC/middleware/actionStateMiddleware');
-const upload = require('../../../../../MVC/middleware/upload');
+const {
+  requireAuth,
+  requireAccess,
+  trackActionState,
+  upload,
+  resolveActivityQuotaPolicy
+} = require('./pteCoreContracts');
 const pteUploadContext = require('../../middleware/pteUploadContextMiddleware');
-const { resolveActivityQuotaPolicy } = require('../../../../../MVC/middleware/activityQuotaMiddleware');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 module.exports = {

@@ -1,7 +1,6 @@
 const fs = require('fs/promises');
 const path = require('path');
-const coreFilesService = require('../../../../../MVC/services/coreFilesService');
-const { getGatewayBaseUrl } = require('../../../../../MVC/utils/uploadModeUtils');
+const { coreFilesService, getGatewayBaseUrl } = require('./pteCoreContracts');
 
 const DEFAULT_REMOTE_FETCH_TIMEOUT_MS = 25000;
 

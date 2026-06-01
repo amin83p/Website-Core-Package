@@ -1,1 +1,3 @@
-module.exports = require('../../../../../MVC/repositories/contracts/crudRepositoryContract');
+const { crudRepositoryContract } = require('../../services/pte/pteCoreContracts');
+
+module.exports = crudRepositoryContract;

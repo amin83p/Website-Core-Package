@@ -1,6 +1,6 @@
 const questionTypeRegistry = require('./questionTypeRegistry');
 const pteQuestionScoringProfileService = require('./pteQuestionScoringProfileService');
-const adminChekersService = require('../../../../../MVC/services/adminChekersService');
+const { adminChekersService } = require('./pteCoreContracts');
 const { toPublicId } = require('../../utils/idAdapter');
 
 function cleanText(value, { max = 4000 } = {}) {

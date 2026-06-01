@@ -2,21 +2,26 @@ const bcrypt = require('bcrypt');
 const pteApplicantRepository = require('../../repositories/pteApplicantRepository');
 const pteAssignmentRepository = require('../../repositories/pteApplicantPackageAssignmentRepository');
 const pteCourseRepository = require('../../repositories/pteCourseRepository');
-const packageDataService = require('../../../../../MVC/services/activityQuota/packageDataService');
-const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
-const userAccessProfileService = require('../../../../../MVC/services/users/userAccessProfileService');
-const userMembershipRepository = require('../../../../../MVC/repositories/userMembershipRepository');
-const dataService = require('../../../../../MVC/services/dataService');
-const adminChekersService = require('../../../../../MVC/services/adminChekersService');
+const {
+  packageDataService,
+  activityQuotaLedgerService,
+  userAccessProfileService,
+  userMembershipRepository,
+  dataService,
+  adminChekersService,
+  normalizeQueryOptions,
+  resolveEntity,
+  normalizeMembershipPayload,
+  assertCreateOrgContextOrThrow,
+  getActiveOrgIdOrThrow,
+  normalizeOrgRoles,
+  getPrimaryOrgRole,
+  resolveCanonicalOrganizationName,
+  settingService,
+  SYSTEM_CONTEXT
+} = require('./pteCoreContracts');
 const { applyGenericFilter } = require('../../utils/queryEngine');
-const { normalizeQueryOptions } = require('../../../../../MVC/utils/queryOptionsAdapter');
-const { resolveEntity } = require('../../../../../MVC/utils/entityResolver');
-const { normalizeMembershipPayload } = require('../../../../../MVC/services/security/entitlementService');
-const { assertCreateOrgContextOrThrow, getActiveOrgIdOrThrow, normalizeOrgRoles, getPrimaryOrgRole } = require('../../../../../MVC/utils/orgContextUtils');
 const { idsEqual, toPublicId } = require('../../utils/idAdapter');
-const { resolveCanonicalOrganizationName } = require('../../../../../MVC/utils/organizationDisplay');
-const settingService = require('../../../../../MVC/services/settingService');
-const { SYSTEM_CONTEXT } = require('../../../../../config/constants');
 
 const PERSON_ROLE_TOKEN = 'PTE_Student';
 const PERSON_ORG_ROLE_TOKEN = 'pte_student';

@@ -2,13 +2,16 @@ const pteTestVersionRepository = require('../../repositories/pteTestVersionRepos
 const pteQuestionVersionRepository = require('../../repositories/pteQuestionVersionRepository');
 const pteQuestionBankDataService = require('./pteQuestionBankDataService');
 const questionTypeRegistry = require('./questionTypeRegistry');
-const adminChekersService = require('../../../../../MVC/services/adminChekersService');
-const activityQuotaLedgerService = require('../../../../../MVC/services/activityQuotaLedgerService');
-const { normalizeQueryOptions } = require('../../../../../MVC/utils/queryOptionsAdapter');
-const { resolveEntity } = require('../../../../../MVC/utils/entityResolver');
+const {
+  adminChekersService,
+  activityQuotaLedgerService,
+  normalizeQueryOptions,
+  resolveEntity,
+  assertCreateOrgContextOrThrow,
+  getActiveOrgIdOrThrow,
+  settingService
+} = require('./pteCoreContracts');
 const { idsEqual, toPublicId } = require('../../utils/idAdapter');
-const { assertCreateOrgContextOrThrow, getActiveOrgIdOrThrow } = require('../../../../../MVC/utils/orgContextUtils');
-const settingService = require('../../../../../MVC/services/settingService');
 
 const ORGANIZATION_SCOPE_NAMES = new Set(['ADMIN', 'GLOBAL', 'ORGANIZATION', 'ORG']);
 const VALID_SKILLS = Object.freeze(['speaking', 'writing', 'reading', 'listening']);

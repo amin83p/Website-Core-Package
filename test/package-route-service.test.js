@@ -153,7 +153,7 @@ test('route service can mount package-root relative router modules', async () =>
   assert.equal(typeof app.calls[0][1], 'function');
 });
 
-test('route service bridges legacy relative core imports for packages mounted from uploads root', async () => {
+test('route service does not bridge legacy relative core imports for uploaded package modules', async () => {
   packageRouteService.resetMountedRoutes();
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-route-legacy-'));
   const packageRootDir = path.join(tempRoot, 'uploads', 'packages');
@@ -189,9 +189,10 @@ test('route service bridges legacy relative core imports for packages mounted fr
       }
     }, { logger: makeSilentLogger() });
 
-    assert.equal(summary.failed, 0);
-    assert.equal(summary.mounted, 1);
-    assert.equal(app.calls.length, 1);
+    assert.equal(summary.failed, 1);
+    assert.equal(summary.mounted, 0);
+    assert.equal(app.calls.length, 0);
+    assert.match(summary.results[0].message, /Cannot find module|Failed to load router module/i);
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
   }

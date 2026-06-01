@@ -33,7 +33,7 @@
     : '<a href="' + resolvedListArchivedPath + '" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-archive me-1"></i> ' + (secondaryArchivedLabel || 'Archived Applicants') + '</a>';
 %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -50,7 +50,7 @@
   ]
 }) %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search applicants by id, person, user, country, local id, or status...',
   fields: searchableFields || []
 }) %>
@@ -158,13 +158,13 @@
   </table>
 </div>
 
-<%- include('../../../../../../MVC/views/partials/pagination', {
+<%- include('partials/pagination', {
   pagination: pagination,
   filters: filters,
   baseUrlPath: normalizedNewUrl
 }) %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {

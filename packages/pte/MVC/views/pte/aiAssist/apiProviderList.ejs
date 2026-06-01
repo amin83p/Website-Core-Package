@@ -5,7 +5,7 @@
   const aiAssistDashboardHref = '/dashboard/section-nav/PTE_AI_ASSISST';
 %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -24,7 +24,7 @@
   ]
 }) %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search by name, provider, model, or notes...',
   fields: ['id', 'name', 'providerId', 'modelId', 'project', 'location', 'notes']
 }) %>
@@ -85,15 +85,15 @@
   </table>
 </div>
 
-<%- include('../../../../../../MVC/views/partials/pagination', {
+<%- include('partials/pagination', {
   pagination: pagination,
   filters: filters,
   baseUrlPath: newUrl
 }) %>
 
-<%- include('../../../../../../MVC/views/partials/tablePages-end') %>
-<%- include('../../../../../../MVC/views/partials/modal_GenericPicker', { user }) %>
-<%- include('../../../../../../MVC/views/partials/modal') %>
+<%- include('partials/tablePages-end') %>
+<%- include('partials/modal_GenericPicker', { user }) %>
+<%- include('partials/modal') %>
 
 <script>
   const btnOpenDefaultApiPicker = document.getElementById('btnOpenDefaultApiPicker');

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const coreFilesService = require('../../../../../MVC/services/coreFilesService');
+const { coreFilesService } = require('./pteCoreContracts');
 const pteTestVersionRepository = require('../../repositories/pteTestVersionRepository');
 const pteQuestionVersionRepository = require('../../repositories/pteQuestionVersionRepository');
 const pteAttemptSessionRepository = require('../../repositories/pteAttemptSessionRepository');

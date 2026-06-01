@@ -39,6 +39,8 @@ function createAppStub(initialViews = '') {
 test('view declarations append package view roots without replacing existing core view root', async () => {
   const coreViews = path.resolve(__dirname, '../MVC/views');
   const app = createAppStub(coreViews);
+  const packageViewsRoot = path.resolve(__dirname, '../packages/pte/MVC/views');
+  const packageViewRoot = path.resolve(__dirname, '../packages/pte/MVC/views/pte');
   const summary = await packageViewAssetService.registerManifestViews({
     app,
     packageId: 'pte',
@@ -46,20 +48,21 @@ test('view declarations append package view roots without replacing existing cor
       id: 'pte',
       views: {
         id: 'pte-views',
-        root: 'MVC/views',
-        path: 'MVC/views/pte'
+        root: 'packages/pte/MVC/views',
+        path: 'packages/pte/MVC/views/pte'
       }
     }
   }, { logger: makeSilentLogger() });
 
   assert.equal(summary.requested, 1);
   assert.equal(summary.prepared, 1);
-  assert.equal(summary.registered, 1);
+  assert.equal(summary.registered, 2);
   assert.equal(summary.failed, 0);
-  assert.deepEqual(app.get('views'), [
-    coreViews,
-    path.resolve(__dirname, '../MVC/views/pte')
-  ]);
+  const configuredViews = app.get('views');
+  assert.equal(Array.isArray(configuredViews), true);
+  assert.ok(configuredViews.some((viewRoot) => path.resolve(viewRoot) === coreViews));
+  assert.ok(configuredViews.some((viewRoot) => path.resolve(viewRoot) === packageViewsRoot));
+  assert.ok(configuredViews.some((viewRoot) => path.resolve(viewRoot) === packageViewRoot));
 });
 
 test('asset declarations mount static middleware and skip duplicate mounts', async () => {

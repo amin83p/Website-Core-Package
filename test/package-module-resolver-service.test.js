@@ -13,18 +13,18 @@ const PTE_CONTEXT = {
   manifestPath: path.join(ROOT_DIR, 'packages/pte/package.manifest.json')
 };
 
-test('module resolver maps legacy pte route shim paths to package-owned routes', () => {
+test('module resolver resolves canonical package route paths', () => {
   const resolved = packageModuleResolverService.resolvePackageModulePath(
-    'MVC/routes/pte/pteMainRoute.js',
+    'MVC/routes/pteMainRoute.js',
     PTE_CONTEXT
   );
 
   assert.equal(resolved, path.join(ROOT_DIR, 'packages/pte/MVC/routes/pteMainRoute.js'));
 });
 
-test('module resolver maps legacy pte controller shim paths to package-owned controllers', () => {
+test('module resolver resolves canonical package controller paths', () => {
   const resolved = packageModuleResolverService.resolvePackageModulePath(
-    'MVC/controllers/pte/infoController.js',
+    'MVC/controllers/infoController.js',
     PTE_CONTEXT
   );
 

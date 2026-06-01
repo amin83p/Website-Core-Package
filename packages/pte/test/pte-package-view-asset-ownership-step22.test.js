@@ -7,21 +7,12 @@ const packageManifestService = require('../../../MVC/services/packageManifestSer
 const packageRegistryInstallerService = require('../../../MVC/services/packageRegistryInstallerService');
 
 const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
-const CURRENT_VIEW_ROOT = path.join(ROOT_DIR, 'MVC/views/pte');
 const PACKAGE_VIEW_ROOT = path.join(ROOT_DIR, 'packages/pte/MVC/views/pte');
 const CURRENT_SCRIPT = path.join(ROOT_DIR, 'public/scripts/ptePracticeCoachRules.js');
 const PACKAGE_SCRIPT = path.join(ROOT_DIR, 'packages/pte/public/scripts/ptePracticeCoachRules.js');
 
 function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
-}
-
-function normalizePackageViewForComparison(source = '') {
-  return String(source || '')
-    .replaceAll(
-      "include('../../../../../../MVC/views/partials/",
-      "include('../../partials/"
-    );
 }
 
 function listFiles(rootDir) {
@@ -71,18 +62,13 @@ function createAppStub(initialViews = '') {
   };
 }
 
-test('PTE package view tree mirrors current PTE views', () => {
-  const currentFiles = listFiles(CURRENT_VIEW_ROOT);
+test('PTE package views are package-owned and root view duplication is removed', () => {
+  const currentViewRoot = path.join(ROOT_DIR, 'MVC/views/pte');
   const packageFiles = listFiles(PACKAGE_VIEW_ROOT);
 
-  assert.deepEqual(packageFiles, currentFiles);
-  currentFiles.forEach((relativeFile) => {
-    assert.equal(
-      normalizePackageViewForComparison(readText(path.join(PACKAGE_VIEW_ROOT, relativeFile))),
-      readText(path.join(CURRENT_VIEW_ROOT, relativeFile)),
-      `${relativeFile} should match the current PTE view copy`
-    );
-  });
+  assert.equal(fs.existsSync(currentViewRoot), false, 'Root MVC/views/pte should be retired.');
+  assert.equal(packageFiles.length > 0, true, 'Package view tree should remain populated.');
+  assert.equal(packageFiles.includes('testInfo.ejs'), true, 'Package view tree should include PTE root view templates.');
 });
 
 test('PTE package public script mirrors current PTE public script', () => {

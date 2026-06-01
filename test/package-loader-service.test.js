@@ -76,7 +76,7 @@ function createUseRouteDeclaration(overrides = {}) {
     id: 'ROUTE_USE_1',
     method: 'USE',
     path: '/students',
-    router: 'MVC/routes/pte/studentRoutes.js',
+    router: 'MVC/routes/studentRoutes.js',
     active: true,
     ...overrides
   };
