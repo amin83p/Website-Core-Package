@@ -229,3 +229,10 @@ test('school package pass24 owns examController implementation', () => {
   assert.match(source, /requireCoreModule\('MVC\/services\/uploadFolderSettingsService'\)/);
   assert.match(source, /module\.exports\s*=\s*\{/);
 });
+test('school package pass25 owns classController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/classController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/classController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/services\/security\/index'\)/);
+  assert.match(source, /module\.exports\s*=\s*\{/);
+});
