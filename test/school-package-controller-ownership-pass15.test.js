@@ -170,3 +170,34 @@ test('school package pass19 owns transactionsManagerController implementation', 
   assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
   assert.match(source, /exports\.saveTransaction/);
 });
+test('school package pass20 owns staffController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/staffController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/staffController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
+  assert.match(source, /exports\.saveStaff/);
+});
+
+test('school package pass20 owns teacherController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/teacherController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/teacherController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
+  assert.match(source, /exports\.saveTeacher/);
+});
+
+test('school package pass20 owns studentController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/studentController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/studentController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/middleware\/upload'\)/);
+  assert.match(source, /exports\.saveStudent/);
+});
+
+test('school package pass20 owns programRegistrationController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/programRegistrationController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/programRegistrationController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/paginationHelper'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/services\/transactionContextService'\)/);
+  assert.match(source, /exports\.applyBatchRegistration/);
+});
