@@ -2508,6 +2508,208 @@ function createService(overrides = {}) {
     };
   }
 
+  function isFailedInstallSnapshotCandidate(row = {}) {
+    const status = cleanText(row?.installStatus, 80).toLowerCase();
+    if (status === 'failed') return true;
+    const warningBlob = [
+      cleanText(row?.lastError, 1200),
+      cleanText(row?.lastWarning, 1200),
+      ...sanitizeArray(row?.warnings).map((item) => cleanText(item, 1200))
+    ].join(' | ').toLowerCase();
+    if (!warningBlob) return false;
+    return (
+      warningBlob.includes('runtime route mount')
+      || warningBlob.includes('auto-disabled at startup')
+      || warningBlob.includes('manifest file was not found')
+      || warningBlob.includes('package runtime route mount failed')
+    );
+  }
+
+  async function runFallbackFailedAttemptCleanup(packageId = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const actor = buildActor(options.actor || null);
+    const warnings = [];
+    let registryRemoved = false;
+    try {
+      registryRemoved = await deps.packageRegistryService.removePackageRegistry(packageId, { backendMode });
+    } catch (error) {
+      warnings.push(`Registry cleanup failed: ${cleanText(error?.message || String(error), 500) || 'unknown error'}`);
+    }
+    const filePurgeSummary = await purgePackageFiles(packageId, options);
+    filePurgeSummary.failedPaths.forEach((row) => {
+      warnings.push(`Package file cleanup failed for "${cleanText(row?.path, 1200)}": ${cleanText(row?.message, 500) || 'unknown error'}`);
+    });
+    if (!registryRemoved && !filePurgeSummary.deletedPaths.length) {
+      const error = new Error('Fallback cleanup could not remove package registry row or package files.');
+      error.code = 'PACKAGE_FAILED_ATTEMPT_CLEANUP_FAILED';
+      error.details = {
+        packageId,
+        registryRemoved,
+        filePurgeSummary
+      };
+      throw error;
+    }
+
+    const lifecycleTx = await startLifecycleTransaction({
+      packageId,
+      packageName: packageId.toUpperCase(),
+      packageVersion: '',
+      action: 'cleanup-failed-attempt',
+      metadata: {
+        fallback: true
+      },
+      artifacts: {
+        filePurgeSummary
+      }
+    }, { backendMode, actor });
+    const transactionId = cleanText(lifecycleTx?.id, 160);
+    const operations = [];
+    operations.push({
+      entityType: 'packageRegistry',
+      identityKey: `packageId:${packageId}`,
+      ownership: { packageId, packageName: packageId.toUpperCase() },
+      operation: registryRemoved ? 'removed' : 'skipped',
+      reason: registryRemoved ? 'Registry row removed in fallback failed-attempt cleanup.' : 'Registry row not found during fallback cleanup.'
+    });
+    filePurgeSummary.deletedPaths.forEach((targetPath) => {
+      operations.push({
+        entityType: 'packageFiles',
+        identityKey: `path:${targetPath}`,
+        ownership: { packageId, packageName: packageId.toUpperCase() },
+        operation: 'removed',
+        reason: 'Package source folder removed in fallback failed-attempt cleanup.'
+      });
+    });
+    filePurgeSummary.missingPaths.forEach((targetPath) => {
+      operations.push({
+        entityType: 'packageFiles',
+        identityKey: `path:${targetPath}`,
+        ownership: { packageId, packageName: packageId.toUpperCase() },
+        operation: 'skipped',
+        reason: 'Package source folder missing during fallback cleanup.'
+      });
+    });
+    filePurgeSummary.failedPaths.forEach((row) => {
+      operations.push({
+        entityType: 'packageFiles',
+        identityKey: `path:${cleanText(row?.path, 2000)}`,
+        ownership: { packageId, packageName: packageId.toUpperCase() },
+        operation: 'skipped',
+        reason: `Delete failed: ${cleanText(row?.message, 500)}`
+      });
+    });
+    await appendLifecycleOperations(transactionId, operations, { backendMode, actor }).catch(() => null);
+    await completeLifecycleTransaction(transactionId, {
+      status: 'success',
+      phase: 'commit',
+      warnings,
+      artifacts: {
+        fallback: true,
+        registryRemoved,
+        filePurgeSummary
+      },
+      summaryByEntity: createLifecycleSummaryByEntity(operations)
+    }, { backendMode, actor }).catch(() => null);
+
+    return {
+      packageId,
+      fallback: true,
+      transactionId,
+      registryRemoved,
+      filePurgeSummary,
+      warnings
+    };
+  }
+
+  async function cleanupFailedInstallAttempts(options = {}) {
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const snapshot = await listPackageSnapshot({ ...options, backendMode });
+    const rows = sanitizeArray(snapshot?.installedPackages);
+    const candidates = rows.filter(isFailedInstallSnapshotCandidate);
+    const report = {
+      action: 'cleanup-failed-attempts',
+      candidateCount: candidates.length,
+      cleanedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      results: [],
+      warnings: []
+    };
+
+    for (const row of candidates) {
+      const packageId = normalizePackageId(row?.packageId);
+      const item = {
+        packageId,
+        name: cleanText(row?.name, 200),
+        installStatus: cleanText(row?.installStatus, 80),
+        result: 'pending',
+        transactionId: '',
+        mode: '',
+        message: '',
+        warnings: []
+      };
+      if (!packageId) {
+        item.result = 'skipped';
+        item.message = 'Package row has no valid package id.';
+        report.skippedCount += 1;
+        report.results.push(item);
+        continue;
+      }
+
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const removed = await removePackage(packageId, {
+          ...options,
+          backendMode,
+          force: true,
+          cleanupMode: 'full',
+          deleteSelection: null
+        });
+        item.result = 'cleaned';
+        item.transactionId = cleanText(removed?.transactionId, 160);
+        item.mode = cleanText(removed?.mode, 80);
+        item.message = 'Full cleanup remove completed.';
+        item.warnings = sanitizeArray(removed?.warnings).slice(0, 8);
+        report.cleanedCount += 1;
+      } catch (error) {
+        const code = cleanText(error?.code, 120).toUpperCase();
+        if (code === 'PACKAGE_REMOVE_MANIFEST_REQUIRED') {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const fallback = await runFallbackFailedAttemptCleanup(packageId, {
+              ...options,
+              backendMode
+            });
+            item.result = 'cleaned_with_warnings';
+            item.transactionId = cleanText(fallback?.transactionId, 160);
+            item.mode = 'fallback';
+            item.message = 'Fallback cleanup applied (registry/files).';
+            item.warnings = sanitizeArray(fallback?.warnings).slice(0, 8);
+            report.cleanedCount += 1;
+          } catch (fallbackError) {
+            item.result = 'failed';
+            item.message = cleanText(fallbackError?.message || String(fallbackError), 1200) || 'Failed to cleanup failed install attempt.';
+            item.warnings = [cleanText(error?.message || String(error), 1200)].filter(Boolean);
+            report.failedCount += 1;
+          }
+        } else {
+          item.result = 'failed';
+          item.message = cleanText(error?.message || String(error), 1200) || 'Failed to cleanup failed install attempt.';
+          report.failedCount += 1;
+        }
+      }
+      report.results.push(item);
+    }
+
+    if (report.failedCount > 0) {
+      report.warnings.push(`Failed to clean ${report.failedCount} package install attempt(s).`);
+    }
+    if (!report.candidateCount) {
+      report.warnings.push('No failed package install attempts were detected.');
+    }
+    return report;
+  }
+
   async function syncPackage(packageIdInput = '', options = {}) {
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const packageId = normalizePackageId(packageIdInput);
@@ -2605,6 +2807,7 @@ function createService(overrides = {}) {
     pausePackage,
     removePackage,
     syncPackage,
+    cleanupFailedInstallAttempts,
     previewPackageUninstallImpact,
     listPackageTransactions,
     getPackageTransactionById

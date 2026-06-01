@@ -459,6 +459,50 @@ test('remove package controller defaults to full cleanup mode and forwards previ
   }
 });
 
+test('cleanup failed attempts controller returns summary and clears startup warning rows for cleaned packages', async () => {
+  const originalCleanup = systemSettingsPackageManagerService.cleanupFailedInstallAttempts;
+  const res = makeRenderResponse();
+  const req = {
+    body: {},
+    user: { id: 'USER_9' },
+    app: {
+      locals: {
+        packageLoadSummary: {
+          failed: [
+            { packageId: 'pte', message: 'Runtime route mount failed.' },
+            { packageId: 'other', message: 'Manifest missing.' }
+          ],
+          loaded: [],
+          failedCount: 2,
+          loadedCount: 0
+        }
+      }
+    }
+  };
+
+  try {
+    systemSettingsPackageManagerService.cleanupFailedInstallAttempts = async () => ({
+      action: 'cleanup-failed-attempts',
+      candidateCount: 1,
+      cleanedCount: 1,
+      skippedCount: 0,
+      failedCount: 0,
+      results: [{ packageId: 'pte', result: 'cleaned' }]
+    });
+
+    await systemSettingsController.cleanupFailedPackageAttemptsFromManager(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonPayload?.status, 'success');
+    assert.equal(res.jsonPayload?.report?.cleanedCount, 1);
+    assert.equal(Array.isArray(req.app.locals.packageLoadSummary.failed), true);
+    assert.equal(req.app.locals.packageLoadSummary.failed.length, 1);
+    assert.equal(req.app.locals.packageLoadSummary.failed[0]?.packageId, 'other');
+  } finally {
+    systemSettingsPackageManagerService.cleanupFailedInstallAttempts = originalCleanup;
+  }
+});
+
 test('uninstall preview controller returns success payload', async () => {
   const originalPreview = systemSettingsPackageManagerService.previewPackageUninstallImpact;
   const res = makeRenderResponse();
@@ -524,8 +568,11 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /Install \/ Enable Package/);
   assert.match(html, /\/systemSettings\/packages\/install/);
   assert.match(html, /\/systemSettings\/packages\/install-zip/);
+  assert.match(html, /\/systemSettings\/packages\/cleanup-failed/);
   assert.match(html, /ZIP Upload/);
   assert.match(html, /Trusted signature keys configured/i);
+  assert.match(html, /Clean Failed Attempts/);
+  assert.match(html, /pkgCleanupFailedBtn/);
   assert.match(html, /Installed Packages/);
   assert.match(html, /Impact Preview/);
   assert.match(html, /Recent Lifecycle Transactions/);

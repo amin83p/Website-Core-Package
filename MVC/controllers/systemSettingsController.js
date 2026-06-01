@@ -1364,6 +1364,26 @@ function removeStartupFailureForPackage(app = null, packageIdInput = '', row = n
   };
 }
 
+function clearStartupFailureForPackage(app = null, packageIdInput = '') {
+  const appRef = app && typeof app === 'object' ? app : null;
+  if (!appRef || !appRef.locals || typeof appRef.locals !== 'object') return;
+  const packageId = cleanFormText(packageIdInput, 120).toLowerCase();
+  if (!packageId) return;
+  const summary = appRef.locals.packageLoadSummary;
+  if (!summary || typeof summary !== 'object') return;
+
+  const currentFailed = Array.isArray(summary.failed) ? summary.failed : [];
+  const nextFailed = currentFailed.filter((item) => cleanFormText(item?.packageId, 120).toLowerCase() !== packageId);
+  if (nextFailed.length === currentFailed.length) return;
+
+  appRef.locals.packageLoadSummary = {
+    ...summary,
+    failed: nextFailed,
+    failedCount: nextFailed.length,
+    finishedAt: new Date().toISOString()
+  };
+}
+
 exports.installPackageFromManager = async (req, res) => {
   try {
     const report = await systemSettingsPackageManagerService.installPackage({
@@ -1468,6 +1488,27 @@ exports.syncPackageFromManager = async (req, res) => {
     });
   } catch (error) {
     return sendPackageManagerError(res, error, 'Package sync failed.');
+  }
+};
+
+exports.cleanupFailedPackageAttemptsFromManager = async (req, res) => {
+  try {
+    const report = await systemSettingsPackageManagerService.cleanupFailedInstallAttempts(buildPackageManagerOptions(req));
+    const cleanedRows = Array.isArray(report?.results)
+      ? report.results.filter((row) => String(row?.result || '').startsWith('cleaned'))
+      : [];
+    cleanedRows.forEach((row) => clearStartupFailureForPackage(req.app, row?.packageId));
+    const status = Number(report?.failedCount || 0) > 0 ? 'warning' : 'success';
+    const message = Number(report?.candidateCount || 0) > 0
+      ? `Processed ${report.candidateCount} failed install attempt(s). Cleaned: ${report.cleanedCount}, failed: ${report.failedCount}.`
+      : 'No failed package install attempts were detected.';
+    return res.json({
+      status,
+      message,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Failed package attempt cleanup failed.');
   }
 };
 

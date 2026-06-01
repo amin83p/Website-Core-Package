@@ -270,6 +270,16 @@ router.post('/packages/install-zip',
           ),
           adminApproval,
           ctrl.installPackageZipFromManager);
+router.post('/packages/cleanup-failed',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.cleanupFailedPackageAttemptsFromManager);
 router.get('/packages/local-sync',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),

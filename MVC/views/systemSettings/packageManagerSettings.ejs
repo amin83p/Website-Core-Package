@@ -159,6 +159,9 @@
         <button type="button" class="btn btn-primary btn-filled" id="pkgInstallBtn">
           <i class="bi bi-box-arrow-in-down-right me-1"></i>Install / Enable
         </button>
+        <button type="button" class="btn btn-outline-danger" id="pkgCleanupFailedBtn">
+          <i class="bi bi-trash3 me-1"></i>Clean Failed Attempts
+        </button>
         <button type="button" class="btn btn-outline-secondary" id="pkgRefreshSnapshotBtn">
           <i class="bi bi-arrow-clockwise me-1"></i>Refresh Snapshot
         </button>
@@ -299,6 +302,7 @@
   const installMethodEl = document.getElementById('pkgInstallMethod');
   const targetOrgEl = document.getElementById('pkgTargetOrgId');
   const installBtn = document.getElementById('pkgInstallBtn');
+  const cleanupFailedBtn = document.getElementById('pkgCleanupFailedBtn');
   const tableEl = document.getElementById('packageManagerTable');
   const transactionTableEl = document.getElementById('pkgTransactionTable');
   const transactionLabelEl = document.getElementById('pkgTxnLabel');
@@ -817,6 +821,19 @@
     return selected === actionLabel;
   }
 
+  async function confirmCleanupFailedAttempts() {
+    const selected = await showModal({
+      title: 'Clean Failed Attempts',
+      icon: 'warning',
+      message: 'This removes failed package-install attempts and their leftover registry/files when possible. Continue?',
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Clean Failed Attempts', class: 'btn-danger' }
+      ]
+    });
+    return selected === 'Clean Failed Attempts';
+  }
+
   async function installPackage() {
     const installMethod = String(installMethodEl.value || '').trim();
     const targetOrgId = String(targetOrgEl?.value || '').trim();
@@ -955,6 +972,31 @@
     return response;
   }
 
+  async function cleanupFailedAttempts() {
+    const confirmed = await confirmCleanupFailedAttempts();
+    if (!confirmed) return { status: 'cancelled' };
+    await requireAdminVerification();
+    return runWithWaiting('Cleaning Failed Attempts', async () => fetchJson('/systemSettings/packages/cleanup-failed', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: new URLSearchParams({ actionStateId }).toString()
+    }), {
+      note: 'Removing failed package attempts and stale package files...',
+      operation: 'Cleanup Failed Attempts',
+      progressSteps: [
+        { progress: 15, note: 'Validating access and request token...', operation: 'Validation' },
+        { progress: 40, note: 'Scanning installed package snapshot...', operation: 'Snapshot' },
+        { progress: 70, note: 'Applying cleanup for failed package attempts...', operation: 'Cleanup' },
+        { progress: 92, note: 'Finalizing cleanup report...', operation: 'Finalize' }
+      ]
+    });
+  }
+
   async function showSuccess(message) {
     await showModal({
       title: 'Completed',
@@ -996,6 +1038,33 @@
     } finally {
       installBtn.disabled = false;
       installBtn.innerHTML = original;
+    }
+  });
+
+  cleanupFailedBtn?.addEventListener('click', async () => {
+    const original = cleanupFailedBtn.innerHTML;
+    cleanupFailedBtn.disabled = true;
+    cleanupFailedBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running...';
+    try {
+      const result = await cleanupFailedAttempts();
+      if (result?.status === 'cancelled') {
+        setOutput('Cancelled', { action: 'cleanup-failed-attempts' });
+        return;
+      }
+      setOutput('Cleanup Failed Attempts', result.report || result);
+      await showSuccess(result.message || 'Failed package attempts cleanup completed.');
+      window.location.reload();
+    } catch (error) {
+      setOutput('Cleanup Failed Attempts Failed', {
+        status: 'error',
+        message: error.message || 'Unknown error',
+        code: error?.code || '',
+        details: error?.payload?.details || null
+      });
+      await showError(error.message || 'Failed package attempts cleanup failed.');
+    } finally {
+      cleanupFailedBtn.disabled = false;
+      cleanupFailedBtn.innerHTML = original;
     }
   });
 

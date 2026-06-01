@@ -1,7 +1,7 @@
 {
   "id": "pte",
   "name": "PTE",
-  "version": "1.0.3",
+  "version": "1.0.56",
   "mountPath": "/pte",
   "enabledByDefault": false,
   "routes": [
