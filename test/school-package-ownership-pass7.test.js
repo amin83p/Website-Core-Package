@@ -220,3 +220,64 @@ test('school package pass11 owns departmentRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.showCreateWizardForm/);
   assert.match(routeSource, /ctrl\.saveDepartment/);
 });
+
+test('school package pass12 owns studentRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/studentRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/studentRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/studentController'\)/);
+  assert.match(routeSource, /requireCoreModule\('MVC\/middleware\/upload'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_STUDENTS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_STUDENTS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_STUDENTS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_STUDENTS,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listStudents/);
+  assert.match(routeSource, /ctrl\.recoverStudent/);
+  assert.match(routeSource, /ctrl\.downloadAttachment/);
+  assert.match(routeSource, /ctrl\.saveStudent/);
+});
+
+test('school package pass12 owns schoolAccountRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/schoolAccountRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/schoolAccountRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/schoolAccountController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ACCOUNTS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ACCOUNTS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ACCOUNTS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ACCOUNTS,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listAccounts/);
+  assert.match(routeSource, /ctrl\.syncOwnerAccountNamesFromPersons/);
+  assert.match(routeSource, /ctrl\.showAddWizardForm/);
+  assert.match(routeSource, /ctrl\.saveAccount/);
+});
+
+test('school package pass12 owns transactionsManagerRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/transactionsManagerRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/transactionsManagerRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/transactionsManagerController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TRANSACTIONS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TRANSACTIONS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TRANSACTIONS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TRANSACTIONS,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listTransactions/);
+  assert.match(routeSource, /ctrl\.showStatement/);
+  assert.match(routeSource, /ctrl\.postDraftTransaction/);
+  assert.match(routeSource, /ctrl\.deleteTransaction/);
+});
+
+test('school package pass12 owns transactionTemplateRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/transactionTemplateRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/transactionTemplateRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/transactionDefinitionController'\)/);
+  assert.match(routeSource, /const SECTION_ID = SECTIONS\.SCHOOL_TRANSACTION_TEMPLATES/);
+  assert.match(routeSource, /requireAccess\(SECTION_ID,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTION_ID,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTION_ID,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTION_ID,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listTransactionDefinitions/);
+  assert.match(routeSource, /ctrl\.previewOrApplyTransactionDefinition/);
+  assert.match(routeSource, /ctrl\.deleteTransactionDefinition/);
+});
