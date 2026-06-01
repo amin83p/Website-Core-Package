@@ -281,3 +281,44 @@ test('school package pass12 owns transactionTemplateRoutes implementation', () =
   assert.match(routeSource, /ctrl\.previewOrApplyTransactionDefinition/);
   assert.match(routeSource, /ctrl\.deleteTransactionDefinition/);
 });
+
+test('school package pass13 owns scheduleRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/scheduleRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/scheduleRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/scheduleController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SCHEDULES,\s*OPERATIONS\.READ\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SCHEDULES,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /ctrl\.showMySchedulePage/);
+  assert.match(routeSource, /ctrl\.getMyScheduleData/);
+  assert.match(routeSource, /ctrl\.showGlobalSchedulePage/);
+  assert.match(routeSource, /ctrl\.getGlobalSchedule/);
+});
+
+test('school package pass13 owns academicLedgerRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/academicLedgerRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/academicLedgerRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/academicLedgerController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ACADEMIC_LEDGER,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ACADEMIC_LEDGER,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_ACADEMIC_LEDGER,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /ctrl\.listLedger/);
+  assert.match(routeSource, /ctrl\.postProgramRegistration/);
+  assert.match(routeSource, /ctrl\.postTermRegistration/);
+  assert.match(routeSource, /ctrl\.rebuildSnapshot/);
+});
+
+test('school package pass13 owns withdrawalRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/withdrawalRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/withdrawalRoutes')"), false);
+  assert.match(routeSource, /const\s+withdrawalController\s*=\s*require\('\.\.\/controllers\/school\/withdrawalController'\)/);
+  assert.match(routeSource, /const SECTION = SECTIONS\.SCHOOL_WITHDRAWAL/);
+  assert.match(routeSource, /requireAccess\(SECTION,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTION,\s*OPERATIONS\.READ\)/);
+  assert.match(routeSource, /requireAccess\(SECTION,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /withdrawalController\.showDashboard/);
+  assert.match(routeSource, /withdrawalController\.apiExecuteProgramWithdrawal/);
+  assert.match(routeSource, /withdrawalController\.apiFinalizeWithdrawal/);
+});
