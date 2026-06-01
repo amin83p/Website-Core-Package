@@ -1,3 +1,3 @@
-const { requireCoreModule } = require('../services/school/schoolCoreContracts');
-
-module.exports = requireCoreModule('MVC/routes/school/transactionDefinitionRoutes');
+// Keep package behavior aligned with core alias:
+// /school/transactionDefinitions uses the same router as /school/transactionTemplates.
+module.exports = require('./transactionTemplateRoutes');

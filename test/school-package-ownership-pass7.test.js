@@ -19,3 +19,9 @@ test('school package pass7 starts route implementation ownership with package-ow
   assert.match(routeSource, /encodeURIComponent\(SECTIONS\.SCHOOL\)/);
 });
 
+test('school package pass7 keeps transactionDefinitionRoutes as package-owned alias', () => {
+  const routeSource = read('packages/school/MVC/routes/transactionDefinitionRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/transactionDefinitionRoutes')"), false);
+  assert.match(routeSource, /module\.exports\s*=\s*require\('\.\/transactionTemplateRoutes'\)/);
+});
