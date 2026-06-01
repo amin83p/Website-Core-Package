@@ -35,6 +35,18 @@ const domains = [
   { label: 'models', coreDir: 'MVC/models/school', packageDir: 'packages/school/MVC/models/school' }
 ];
 
+const packageOwnedByDomain = {
+  controllers: new Set([
+    'sessionController.js',
+    'termController.js',
+    'subjectController.js',
+    'holidayController.js'
+  ]),
+  services: new Set(),
+  repositories: new Set(),
+  models: new Set()
+};
+
 for (const domain of domains) {
   test(`school package ${domain.label} wrappers should cover current core file surface`, () => {
     const coreAbs = path.join(ROOT_DIR, domain.coreDir);
@@ -53,6 +65,13 @@ for (const domain of domains) {
 
       const source = read(packageFileAbs);
       const coreModulePath = `${domain.coreDir.replace(/\\/g, '/')}/${relInsideDomain}`;
+      const packageOwned = (packageOwnedByDomain[domain.label] || new Set()).has(relInsideDomain);
+      if (packageOwned) {
+        if (source.includes(`requireCoreModule('${coreModulePath}')`)) {
+          invalid.push(`${relInsideDomain}: should be package-owned (still bridges to core module)`);
+        }
+        return;
+      }
       if (!source.includes('requireCoreModule(')) {
         invalid.push(`${relInsideDomain}: missing requireCoreModule call`);
         return;
