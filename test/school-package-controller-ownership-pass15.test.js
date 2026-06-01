@@ -108,3 +108,34 @@ test('school package pass17 owns schoolDashboardController implementation', () =
   assert.match(source, /config\/accessConstants/);
   assert.match(source, /module\.exports\s*=\s*\{/);
 });
+test('school package pass18 owns attendanceController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/attendanceController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/attendanceController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/services\/security\/index'\)/);
+  assert.match(source, /config\/accessConstants/);
+  assert.match(source, /module\.exports\s*=\s*\{/);
+});
+
+test('school package pass18 owns schoolAccountController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/schoolAccountController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/schoolAccountController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/paginationHelper'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/services\/adminChekersService'\)/);
+  assert.match(source, /exports\.saveAccount/);
+});
+
+test('school package pass18 owns timesheetController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/timesheetController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/timesheetController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /exports\.saveTimesheet/);
+});
+
+test('school package pass18 owns withdrawalController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/withdrawalController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/withdrawalController.js')"), false);
+  assert.match(source, /require\('\.\.\/\.\.\/services\/school\/withdrawal'\)/);
+  assert.match(source, /module\.exports\s*=\s*\{/);
+});

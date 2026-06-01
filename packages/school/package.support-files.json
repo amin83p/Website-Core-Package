@@ -1,10 +1,10 @@
 {
     "packageId":  "school",
-    "step":  17,
+    "step":  18,
     "status":  "controller-ownership-batch-progress",
     "notes":  [
                   "Passes 1-6 completed: scaffold through runtime mount cutover.",
-                  "Passes 7-14 completed route ownership; passes 15-17 progressed controller ownership in controlled batches.",
+                  "Passes 7-14 completed route ownership; passes 15-18 progressed controller ownership in controlled batches.",
                   "Core dependencies remain behind packages/school/MVC/services/school/schoolCoreContracts.js where package ownership is not yet migrated."
               ],
     "scripts":  [
@@ -32,7 +32,8 @@
                  "docs/school-package-pass14-route-ownership-batch7-2026-06-01.md",
                  "docs/school-package-pass15-controller-ownership-batch1-2026-06-01.md",
                  "docs/school-package-pass16-controller-ownership-batch2-2026-06-01.md",
-                 "docs/school-package-pass17-controller-ownership-batch3-2026-06-01.md"
+                 "docs/school-package-pass17-controller-ownership-batch3-2026-06-01.md",
+                 "docs/school-package-pass18-controller-ownership-batch4-2026-06-01.md"
              ],
     "tests":  [
                   "test/school-package-certification-hardcoded-coupling.test.js",
