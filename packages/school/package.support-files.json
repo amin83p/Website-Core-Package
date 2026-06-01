@@ -1,10 +1,10 @@
 {
   "packageId": "school",
-  "step": 13,
+  "step": 14,
   "status": "route-ownership-batch-progress",
   "notes": [
     "Passes 1-6 completed: scaffold through runtime mount cutover.",
-    "Passes 7-13 continue implementation ownership by replacing delegated route wrappers with package-owned route implementations in controlled slices/batches.",
+    "Passes 7-14 continue implementation ownership by replacing delegated route wrappers with package-owned route implementations in controlled slices/batches.",
     "Core dependencies remain behind packages/school/MVC/services/school/schoolCoreContracts.js where package ownership is not yet migrated."
   ],
   "scripts": [],
@@ -26,7 +26,8 @@
     "docs/school-package-pass10-route-ownership-batch3-2026-06-01.md",
     "docs/school-package-pass11-route-ownership-batch4-2026-06-01.md",
     "docs/school-package-pass12-route-ownership-batch5-2026-06-01.md",
-    "docs/school-package-pass13-route-ownership-batch6-2026-06-01.md"
+    "docs/school-package-pass13-route-ownership-batch6-2026-06-01.md",
+    "docs/school-package-pass14-route-ownership-batch7-2026-06-01.md"
   ],
   "tests": [
     "test/school-package-certification-hardcoded-coupling.test.js",

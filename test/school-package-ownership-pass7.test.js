@@ -322,3 +322,63 @@ test('school package pass13 owns withdrawalRoutes implementation', () => {
   assert.match(routeSource, /withdrawalController\.apiExecuteProgramWithdrawal/);
   assert.match(routeSource, /withdrawalController\.apiFinalizeWithdrawal/);
 });
+
+test('school package pass14 owns classRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/classRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/classRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/classController'\)/);
+  assert.match(routeSource, /requireCoreModule\('MVC\/services\/security\/index'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_CLASSES,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_CLASS_ENROLLMENT_PERIODS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_CLASS_CYCLES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /ctrl\.listClasses/);
+  assert.match(routeSource, /ctrl\.showFinalGradesPage/);
+  assert.match(routeSource, /ctrl\.createClassEnrollmentWithTransactions/);
+  assert.match(routeSource, /ctrl\.manageSession/);
+});
+
+test('school package pass14 owns programRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/programRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/programRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/programController'\)/);
+  assert.match(routeSource, /const\s+programRegistrationCtrl\s*=\s*require\('\.\.\/controllers\/school\/programRegistrationController'\)/);
+  assert.match(routeSource, /const\s+studentProgramPriorSubjectCtrl\s*=\s*require\('\.\.\/controllers\/school\/studentProgramPriorSubjectController'\)/);
+  assert.match(routeSource, /const\s+termRegistrationCtrl\s*=\s*require\('\.\.\/controllers\/school\/termRegistrationController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_PROGRAMS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_PROGRAM_REGISTRATIONS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TERM_REGISTRATIONS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /programRegistrationCtrl\.previewBatchRegistration/);
+  assert.match(routeSource, /termRegistrationCtrl\.previewBatchRegistration/);
+  assert.match(routeSource, /ctrl\.applyProgramTransactionsForStudent/);
+});
+
+test('school package pass14 owns reportRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/reportRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/reportRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/reportController'\)/);
+  assert.match(routeSource, /requireCoreModule\('MVC\/middleware\/upload'\)/);
+  assert.match(routeSource, /const REPORT_TEMPLATE_SECTION = SECTIONS\.SCHOOL_REPORTS_TEMPLATE/);
+  assert.match(routeSource, /requireAccess\(REPORT_ASSIGNMENT_SECTION,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /ctrl\.listTemplates/);
+  assert.match(routeSource, /ctrl\.saveAssignment/);
+  assert.match(routeSource, /ctrl\.lockInstance/);
+  assert.match(routeSource, /ctrl\.exportInstance/);
+});
+
+test('school package pass14 owns examRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/examRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/examRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/examController'\)/);
+  assert.match(routeSource, /requireCoreModule\('MVC\/middleware\/upload'\)/);
+  assert.match(routeSource, /requireCoreModule\('MVC\/middleware\/accessMiddleware'\)/);
+  assert.match(routeSource, /const ANY_EXAM_READ = \[TPL, ALLOC, TAKE, REV\]/);
+  assert.match(routeSource, /requireAccessAny\(ANY_EXAM_READ,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /ctrl\.uploadQuestionMedia/);
+  assert.match(routeSource, /ctrl\.saveAllocation/);
+  assert.match(routeSource, /ctrl\.listTakeAssignments/);
+  assert.match(routeSource, /ctrl\.submitTakeAssignment/);
+});
