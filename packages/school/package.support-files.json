@@ -1,43 +1,46 @@
 {
-  "packageId": "school",
-  "step": 15,
-  "status": "route-ownership-batch-progress",
-  "notes": [
-    "Passes 1-6 completed: scaffold through runtime mount cutover.",
-    "Passes 7-14 completed route ownership; pass 15 begins controller ownership in controlled batches.",
-    "Core dependencies remain behind packages/school/MVC/services/school/schoolCoreContracts.js where package ownership is not yet migrated."
-  ],
-  "scripts": [],
-  "docs": [
-    "docs/school-package-pass1-foundation-2026-06-01.md",
-    "docs/school-package-pass2-route-layer-2026-06-01.md",
-    "docs/school-package-pass3-runtime-wrapper-surface-2026-06-01.md",
-    "docs/school-package-pass4-view-mirror-2026-06-01.md",
-    "docs/school-package-pass5-partials-2026-06-01.md",
-    "docs/school-package-pass6-runtime-cutover-2026-06-01.md",
-    "docs/school-package-pass7-ownership-begin-2026-06-01.md",
-    "docs/school-package-pass7-ownership-slice2-2026-06-01.md",
-    "docs/school-package-pass7-ownership-slice3-2026-06-01.md",
-    "docs/school-package-pass7-ownership-slice4-2026-06-01.md",
-    "docs/school-package-pass7-ownership-slice5-2026-06-01.md",
-    "docs/school-package-pass7-ownership-slice6-2026-06-01.md",
-    "docs/school-package-pass8-route-ownership-batch1-2026-06-01.md",
-    "docs/school-package-pass9-route-ownership-batch2-2026-06-01.md",
-    "docs/school-package-pass10-route-ownership-batch3-2026-06-01.md",
-    "docs/school-package-pass11-route-ownership-batch4-2026-06-01.md",
-    "docs/school-package-pass12-route-ownership-batch5-2026-06-01.md",
-    "docs/school-package-pass13-route-ownership-batch6-2026-06-01.md",
-    "docs/school-package-pass14-route-ownership-batch7-2026-06-01.md",
-    "docs/school-package-pass15-controller-ownership-batch1-2026-06-01.md"
-  ],
-  "tests": [
-    "test/school-package-certification-hardcoded-coupling.test.js",
-    "test/school-package-route-layer-pass2.test.js",
-    "test/school-package-runtime-wrapper-parity-pass3.test.js",
-    "test/school-package-view-parity-pass4.test.js",
-    "test/school-package-view-partials-pass5.test.js",
-    "test/school-package-runtime-cutover-pass6.test.js",
-    "test/school-package-ownership-pass7.test.js",
-    "test/school-package-controller-ownership-pass15.test.js"
-  ]
+    "packageId":  "school",
+    "step":  16,
+    "status":  "controller-ownership-batch-progress",
+    "notes":  [
+                  "Passes 1-6 completed: scaffold through runtime mount cutover.",
+                  "Passes 7-14 completed route ownership; passes 15-16 progressed controller ownership in controlled batches.",
+                  "Core dependencies remain behind packages/school/MVC/services/school/schoolCoreContracts.js where package ownership is not yet migrated."
+              ],
+    "scripts":  [
+
+                ],
+    "docs":  [
+                 "docs/school-package-pass1-foundation-2026-06-01.md",
+                 "docs/school-package-pass2-route-layer-2026-06-01.md",
+                 "docs/school-package-pass3-runtime-wrapper-surface-2026-06-01.md",
+                 "docs/school-package-pass4-view-mirror-2026-06-01.md",
+                 "docs/school-package-pass5-partials-2026-06-01.md",
+                 "docs/school-package-pass6-runtime-cutover-2026-06-01.md",
+                 "docs/school-package-pass7-ownership-begin-2026-06-01.md",
+                 "docs/school-package-pass7-ownership-slice2-2026-06-01.md",
+                 "docs/school-package-pass7-ownership-slice3-2026-06-01.md",
+                 "docs/school-package-pass7-ownership-slice4-2026-06-01.md",
+                 "docs/school-package-pass7-ownership-slice5-2026-06-01.md",
+                 "docs/school-package-pass7-ownership-slice6-2026-06-01.md",
+                 "docs/school-package-pass8-route-ownership-batch1-2026-06-01.md",
+                 "docs/school-package-pass9-route-ownership-batch2-2026-06-01.md",
+                 "docs/school-package-pass10-route-ownership-batch3-2026-06-01.md",
+                 "docs/school-package-pass11-route-ownership-batch4-2026-06-01.md",
+                 "docs/school-package-pass12-route-ownership-batch5-2026-06-01.md",
+                 "docs/school-package-pass13-route-ownership-batch6-2026-06-01.md",
+                 "docs/school-package-pass14-route-ownership-batch7-2026-06-01.md",
+                 "docs/school-package-pass15-controller-ownership-batch1-2026-06-01.md",
+                 "docs/school-package-pass16-controller-ownership-batch2-2026-06-01.md"
+             ],
+    "tests":  [
+                  "test/school-package-certification-hardcoded-coupling.test.js",
+                  "test/school-package-route-layer-pass2.test.js",
+                  "test/school-package-runtime-wrapper-parity-pass3.test.js",
+                  "test/school-package-view-parity-pass4.test.js",
+                  "test/school-package-view-partials-pass5.test.js",
+                  "test/school-package-runtime-cutover-pass6.test.js",
+                  "test/school-package-ownership-pass7.test.js",
+                  "test/school-package-controller-ownership-pass15.test.js"
+              ]
 }

@@ -44,3 +44,34 @@ test('school package pass15 owns holidayController implementation', () => {
   assert.match(source, /module\.exports\s*=\s*\{/);
 });
 
+test('school package pass16 owns payRateController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/payRateController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/payRateController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/idAdapter'\)/);
+  assert.match(source, /exports\.listPayRates/);
+});
+
+test('school package pass16 owns sessionStatusController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/sessionStatusController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/sessionStatusController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/adminChekersService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/paginationHelper'\)/);
+  assert.match(source, /exports\.saveSessionStatus/);
+});
+
+test('school package pass16 owns timesheetPeriodController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/timesheetPeriodController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/timesheetPeriodController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/generalTools'\)/);
+  assert.match(source, /exports\.saveTimesheetPeriod/);
+});
+
+test('school package pass16 owns schoolSampleDataController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/schoolSampleDataController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/schoolSampleDataController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/generalTools'\)/);
+  assert.match(source, /exports\.deleteSelectedSamplePeople/);
+});
