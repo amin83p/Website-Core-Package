@@ -61,3 +61,17 @@ test('school package pass7 owns sessionStatusRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.saveSessionStatus/);
   assert.match(routeSource, /ctrl\.deleteSessionStatus/);
 });
+
+test('school package pass7 owns holidayRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/holidayRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/holidayRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/holidayController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_HOLIDAYS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_HOLIDAYS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_HOLIDAYS,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listHolidays/);
+  assert.match(routeSource, /ctrl\.listHolidaysInRange/);
+  assert.match(routeSource, /ctrl\.saveHoliday/);
+  assert.match(routeSource, /ctrl\.deleteHoliday/);
+});
