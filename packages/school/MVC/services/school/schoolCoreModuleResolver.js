@@ -38,6 +38,18 @@ function fileLooksLoadable(absPath = '') {
   return fs.existsSync(path.join(absPath, 'index.js'));
 }
 
+function resolveCoreRoot() {
+  const roots = buildCoreRootCandidates();
+  for (const root of roots) {
+    if (isPackageOwnedPath(root)) continue;
+    const constantsPath = path.resolve(root, 'config/constants.js');
+    if (fs.existsSync(constantsPath)) {
+      return root;
+    }
+  }
+  return path.resolve(process.cwd());
+}
+
 function requireCoreModule(relativeModulePath = '') {
   const rel = normalizeFilePath(relativeModulePath);
   let lastError = null;
@@ -61,5 +73,6 @@ function requireCoreModule(relativeModulePath = '') {
 }
 
 module.exports = {
-  requireCoreModule
+  requireCoreModule,
+  resolveCoreRoot
 };

@@ -1,11 +1,12 @@
 {
     "packageId":  "school",
-    "step":  26,
-    "status":  "domain-ownership-guardrails-baselined",
+    "step":  27,
+    "status":  "model-ownership-batch1-in-progress",
     "notes":  [
                   "Passes 1-6 completed: scaffold through runtime mount cutover.",
                   "Passes 7-14 completed route ownership; passes 15-25 completed controller ownership.",
                   "Pass 26 baselined ownership guardrails via registry-driven parity checks for upcoming model/service/repository migration.",
+                  "Pass 27 converted first model ownership batch (16 School models) from wrappers to package-owned implementations with core contract bridging.",
                   "School package runtime now owns all school controllers; shared dependencies are bridged via packages/school/MVC/services/school/schoolCoreContracts.js where applicable."
               ],
     "scripts":  [
@@ -43,7 +44,8 @@
                  "docs/school-package-pass24-controller-ownership-batch10-2026-06-01.md",
                  "docs/school-package-pass25-controller-ownership-batch11-2026-06-01.md",
                  "docs/school-package-pass26-domain-ownership-guardrails-2026-06-01.md",
-                 "docs/school-package-pass26-32-full-ownership-plan-2026-06-01.md"
+                 "docs/school-package-pass26-32-full-ownership-plan-2026-06-01.md",
+                 "docs/school-package-pass27-model-ownership-batch1-2026-06-01.md"
              ],
     "tests":  [
                   "test/school-package-certification-hardcoded-coupling.test.js",
@@ -54,6 +56,7 @@
                   "test/school-package-runtime-cutover-pass6.test.js",
                   "test/school-package-ownership-pass7.test.js",
                   "test/school-package-controller-ownership-pass15.test.js",
-                  "test/school-package-ownership-registry-pass26.test.js"
+                  "test/school-package-ownership-registry-pass26.test.js",
+                  "test/school-package-model-ownership-pass27.test.js"
               ]
 }

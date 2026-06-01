@@ -32,5 +32,22 @@
   ],
   "services": [],
   "repositories": [],
-  "models": []
+  "models": [
+    "academicSnapshotModel.js",
+    "holidayModel.js",
+    "payRateModel.js",
+    "schoolAccountModel.js",
+    "schoolIndexModel.js",
+    "sessionStatusModel.js",
+    "staffModel.js",
+    "teacherModel.js",
+    "termModel.js",
+    "timesheetModel.js",
+    "timesheetPeriodModel.js",
+    "studentProgramRegistrationModel.js",
+    "studentTermRegistrationModel.js",
+    "studentProgramPriorSubjectModel.js",
+    "transactionJournalModel.js",
+    "withdrawalModel.js"
+  ]
 }
