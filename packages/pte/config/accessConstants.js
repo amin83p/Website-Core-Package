@@ -9,6 +9,11 @@ function normalizeFilePath(value = '') {
   return cleanText(value).replace(/\\/g, '/');
 }
 
+function isPackageOwnedPath(absPath = '') {
+  const normalized = normalizeFilePath(absPath).toLowerCase();
+  return normalized.includes('/packages/pte/') || normalized.includes('/uploads/packages/pte/');
+}
+
 function buildCoreRootCandidates() {
   const unique = new Set();
   const out = [];
@@ -37,6 +42,8 @@ function requireCoreAccessConstants() {
   for (const root of buildCoreRootCandidates()) {
     const candidate = path.resolve(root, 'config/accessConstants');
     tried.push(candidate);
+    // Guard against self-resolution when env/root points to package storage.
+    if (isPackageOwnedPath(candidate)) continue;
     try {
       return require(candidate);
     } catch (error) {

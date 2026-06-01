@@ -5,6 +5,11 @@ function normalizeFilePath(value = '') {
   return String(value || '').replace(/\\/g, '/').trim();
 }
 
+function isPackageOwnedPath(absPath = '') {
+  const normalized = normalizeFilePath(absPath).toLowerCase();
+  return normalized.includes('/packages/pte/') || normalized.includes('/uploads/packages/pte/');
+}
+
 function buildCoreRootCandidates() {
   const unique = new Set();
   const out = [];
@@ -45,6 +50,8 @@ function requireCoreModule(relativeModulePath = '') {
   for (const root of roots) {
     const absPath = path.resolve(root, rel);
     tried.push(absPath);
+    // Prevent self-resolution loops when env roots point to the package itself.
+    if (isPackageOwnedPath(absPath)) continue;
     if (!fileLooksLoadable(absPath)) continue;
     try {
       return require(absPath);
