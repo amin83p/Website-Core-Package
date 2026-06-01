@@ -1,0 +1,1284 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-magic me-2"></i><%= title %></h1>
+      <div class="text-muted small mt-1">Active organization: <b><%= activeOrgName %></b> (<span class="font-monospace"><%= activeOrgId %></span>)</div>
+    </div>
+    <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Dashboard</a>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="sampleGeneratorForm" action="/school/sample-data" method="POST">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= actionStateId || '' %>">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="alert alert-info border-info shadow-sm mb-4">
+            <i class="bi bi-info-circle me-2"></i>
+            This tool creates valid sample <b>Persons</b> and then registers them as <b>Students</b>, <b>Teachers</b>, or <b>Staff</b> in the current active organization.
+          </div>
+
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <label class="form-label fw-bold">Students</label>
+              <input type="number" name="studentCount" class="form-control size-md" value="0" min="0" max="200">
+            </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label fw-bold">Teachers</label>
+              <input type="number" name="teacherCount" class="form-control size-md" value="0" min="0" max="200">
+            </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label fw-bold">Staff</label>
+              <input type="number" name="staffCount" class="form-control size-md" value="0" min="0" max="200">
+            </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label fw-bold">Name Prefix</label>
+              <input type="text" name="prefix" class="form-control size-md" value="Sample" maxlength="30" placeholder="Sample">
+            </div>
+          </div>
+
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="createLinkedAccounts" id="createLinkedAccounts" checked>
+            <label class="form-check-label fw-bold" for="createLinkedAccounts">
+              Create linked school accounts when matching head accounts are available
+            </label>
+          </div>
+
+          <div class="small text-muted">
+            Limits: max <b>200</b> items for each group in one run.
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="alert alert-warning border-warning shadow-sm mb-4">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            This action clears <b>Academic Ledger</b>, <b>Transaction Book</b>, <b>Journals</b>, <b>Program/Term Registrations</b>, <b>Prior Subject Credits</b>, <b>Withdrawals</b>, <b>Class Enrollments</b> (including enrollment period rows and completion-decision fields), per-class folders under <code>classes_storage</code> <em>and</em> embedded <code>sessions</code> on class rows in <code>classes.json</code> (JSON) or <code>schoolClasses</code> (Mongo), <b>Report Instances &amp; Assignments</b> (templates stay), <b>Timesheets</b> (period definitions stay), per-subject folders under <code>subjects_storage</code>, <b>Attendance Matrix Policy</b> overrides for this org (JSON or Mongo), <b>Official Final Grades</b> workflow state on classes in this org, and optional migration log files. It then rebuilds teacher/student schedule indexes for classes in this org. Master row definitions remain (accounts, people, programs, terms, classes, subjects, report templates, timesheet periods).
+          </div>
+
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="includeAcademicSnapshots" checked>
+            <label class="form-check-label fw-bold" for="includeAcademicSnapshots">
+              Also clear academic snapshots (recommended for clean test runs)
+            </label>
+          </div>
+
+          <button type="button" class="btn btn-outline-danger btn-md fw-bold px-4" id="btnClearTransactionalData">
+            Clear Transactions, Registrations & Withdrawals
+          </button>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="alert alert-danger border-danger shadow-sm mb-3">
+            <i class="bi bi-trash3-fill me-2"></i>
+            <b>Destructive sample cleanup:</b> review and permanently delete sample <b>Students</b>, <b>Teachers</b>, <b>Staff</b>, selected associated <b>Persons</b>, and eligible linked school accounts.
+          </div>
+          <button type="button" class="btn btn-danger btn-md fw-bold px-4" id="btnOpenSamplePeopleDeleteModal">
+            Delete Sample People (Selectable)
+          </button>
+          <div class="small text-muted mt-2">
+            Recommended order: first run transactional clear, then run this people cleanup for a fully clean school workspace.
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md fw-bold px-4" id="btnGenerateSamples">Generate Sample Data</button>
+        <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+
+    <div id="sampleGeneratorResult" class="mt-4"></div>
+    <div id="samplePeopleDeleteResult" class="mt-4"></div>
+    <div id="sampleResetResult" class="mt-4"></div>
+  </div>
+</div>
+
+<div class="modal fade" id="sampleDataOperationModal" tabindex="-1" aria-labelledby="sampleDataOperationModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-body p-4">
+        <div class="d-flex align-items-start gap-3 mb-3">
+          <div class="spinner-border text-primary flex-shrink-0 mt-1" role="status" aria-hidden="true"></div>
+          <div>
+            <h5 class="fw-bold mb-1" id="sampleDataOperationModalLabel">Working on your request</h5>
+            <div class="text-muted small" id="sampleDataOperationSubtitle">Please keep this page open.</div>
+          </div>
+        </div>
+        <div class="progress mb-3" style="height: 16px;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" id="sampleDataOperationProgressBar" style="width: 0%;">0%</div>
+        </div>
+        <div class="small fw-semibold" id="sampleDataOperationComment">Preparing...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="samplePeopleDeleteModal" tabindex="-1" aria-labelledby="samplePeopleDeleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="samplePeopleDeleteModalLabel">
+          <i class="bi bi-trash3 me-2"></i>Delete Sample People (Selectable)
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning border-warning mb-3">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          This cleanup is permanent. Only sample-marked records from the active organization are listed.
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSelectAllSamplePeople">Select All</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnUnselectAllSamplePeople">Unselect All</button>
+          <span class="small text-muted ms-2" id="samplePeopleSelectionSummaryText"></span>
+        </div>
+        <div id="samplePeopleDeleteModalContent"></div>
+      </div>
+      <div class="modal-footer d-flex justify-content-between align-items-center">
+        <div class="small text-muted" id="samplePeopleDeleteImpactText"></div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger" id="btnConfirmSamplePeopleDelete">
+            Delete Selected
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (lastResult) { %>
+<script>
+  window.__LAST_SAMPLE_GENERATOR_RESULT__ = <%- JSON.stringify(lastResult).replace(/</g, '\\u003c') %>;
+</script>
+<% } else { %>
+<script>window.__LAST_SAMPLE_GENERATOR_RESULT__ = null;</script>
+<% } %>
+<% if (lastResetResult) { %>
+<script>
+  window.__LAST_SAMPLE_RESET_RESULT__ = <%- JSON.stringify(lastResetResult).replace(/</g, '\\u003c') %>;
+</script>
+<% } else { %>
+<script>window.__LAST_SAMPLE_RESET_RESULT__ = null;</script>
+<% } %>
+
+<script>
+(function () {
+  const form = document.getElementById('sampleGeneratorForm');
+  const resultEl = document.getElementById('sampleGeneratorResult');
+  const peopleDeleteResultEl = document.getElementById('samplePeopleDeleteResult');
+  const resetResultEl = document.getElementById('sampleResetResult');
+  const submitBtn = document.getElementById('btnGenerateSamples');
+  const clearBtn = document.getElementById('btnClearTransactionalData');
+  const openPeopleDeleteBtn = document.getElementById('btnOpenSamplePeopleDeleteModal');
+  const selectAllPeopleBtn = document.getElementById('btnSelectAllSamplePeople');
+  const unselectAllPeopleBtn = document.getElementById('btnUnselectAllSamplePeople');
+  const confirmPeopleDeleteBtn = document.getElementById('btnConfirmSamplePeopleDelete');
+  const peopleDeleteModalEl = document.getElementById('samplePeopleDeleteModal');
+  const peopleDeleteModalContentEl = document.getElementById('samplePeopleDeleteModalContent');
+  const peopleDeleteSelectionSummaryTextEl = document.getElementById('samplePeopleSelectionSummaryText');
+  const peopleDeleteImpactTextEl = document.getElementById('samplePeopleDeleteImpactText');
+  const includeSnapshotsCheckbox = document.getElementById('includeAcademicSnapshots');
+  const actionStateInput = document.getElementById('hid_actionStateId');
+  const operationModalEl = document.getElementById('sampleDataOperationModal');
+  const operationTitleEl = document.getElementById('sampleDataOperationModalLabel');
+  const operationSubtitleEl = document.getElementById('sampleDataOperationSubtitle');
+  const operationCommentEl = document.getElementById('sampleDataOperationComment');
+  const operationProgressBarEl = document.getElementById('sampleDataOperationProgressBar');
+  const operationProgressWrapEl = operationProgressBarEl ? operationProgressBarEl.closest('.progress') : null;
+
+  let samplePeoplePreview = null;
+  let peopleDeleteModalApi = null;
+  let operationModalApi = null;
+  let operationProgressTimer = null;
+  let operationStageTimer = null;
+  let operationProgressValue = 0;
+  let operationStageIndex = 0;
+  let operationStages = [];
+  let peopleDeleteSubmissionActive = false;
+
+  function showMsg(opts) {
+    if (typeof showMessageModal === 'function') return showMessageModal(opts);
+    alert(opts?.message || 'Done');
+    return Promise.resolve();
+  }
+
+  function getOperationModalApi() {
+    if (operationModalApi) return operationModalApi;
+    if (operationModalEl && window.bootstrap && window.bootstrap.Modal) {
+      operationModalApi = window.bootstrap.Modal.getOrCreateInstance(operationModalEl, {
+        backdrop: 'static',
+        keyboard: false
+      });
+      return operationModalApi;
+    }
+    return null;
+  }
+
+  function setOperationProgress(value, comment) {
+    const nextValue = Math.max(0, Math.min(100, Math.round(Number(value || 0))));
+    operationProgressValue = nextValue;
+    if (operationProgressBarEl) {
+      operationProgressBarEl.style.width = `${nextValue}%`;
+      operationProgressBarEl.textContent = `${nextValue}%`;
+    }
+    if (operationProgressWrapEl) {
+      operationProgressWrapEl.setAttribute('aria-valuenow', String(nextValue));
+    }
+    if (operationCommentEl && comment) {
+      operationCommentEl.textContent = comment;
+    }
+  }
+
+  function stopOperationTimers() {
+    if (operationProgressTimer) {
+      window.clearInterval(operationProgressTimer);
+      operationProgressTimer = null;
+    }
+    if (operationStageTimer) {
+      window.clearInterval(operationStageTimer);
+      operationStageTimer = null;
+    }
+  }
+
+  function showOperationModal(config) {
+    stopOperationTimers();
+    operationProgressValue = 8;
+    operationStageIndex = 0;
+    operationStages = Array.isArray(config?.stages) && config.stages.length
+      ? config.stages
+      : ['Preparing request...', 'Processing records...', 'Finalizing result...'];
+
+    if (operationTitleEl) operationTitleEl.textContent = String(config?.title || 'Working on your request');
+    if (operationSubtitleEl) operationSubtitleEl.textContent = String(config?.subtitle || 'Please keep this page open.');
+    setOperationProgress(operationProgressValue, operationStages[0]);
+
+    const api = getOperationModalApi();
+    if (api) {
+      api.show();
+    } else if (operationModalEl) {
+      operationModalEl.style.display = 'block';
+      operationModalEl.classList.add('show');
+      operationModalEl.removeAttribute('aria-hidden');
+      operationModalEl.setAttribute('aria-modal', 'true');
+      operationModalEl.setAttribute('role', 'dialog');
+      document.body.classList.add('modal-open');
+    }
+
+    operationProgressTimer = window.setInterval(() => {
+      const cap = operationProgressValue < 55 ? 72 : 92;
+      if (operationProgressValue >= cap) return;
+      const step = operationProgressValue < 45 ? 4 : 2;
+      setOperationProgress(Math.min(cap, operationProgressValue + step));
+    }, 900);
+
+    operationStageTimer = window.setInterval(() => {
+      if (!operationStages.length) return;
+      operationStageIndex = Math.min(operationStages.length - 1, operationStageIndex + 1);
+      if (operationCommentEl) operationCommentEl.textContent = operationStages[operationStageIndex];
+    }, 2600);
+  }
+
+  async function completeOperationModal(comment) {
+    stopOperationTimers();
+    setOperationProgress(100, comment || 'Completed. Preparing result...');
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    hideOperationModal();
+  }
+
+  function hideOperationModal() {
+    stopOperationTimers();
+    const api = getOperationModalApi();
+    if (api) {
+      api.hide();
+      return;
+    }
+    if (!operationModalEl) return;
+    operationModalEl.classList.remove('show');
+    operationModalEl.style.display = 'none';
+    operationModalEl.setAttribute('aria-hidden', 'true');
+    operationModalEl.removeAttribute('aria-modal');
+    document.body.classList.remove('modal-open');
+  }
+
+  function isAdminVerificationCancel(error) {
+    return error && error.code === 'ADMIN_VERIFICATION_CANCELLED';
+  }
+
+  function isAdminRequiredError(error) {
+    return error && error.code === 'ADMIN_VERIFICATION_REQUIRED';
+  }
+
+  async function ensureAdminVerification() {
+    if (typeof window.requestProtectedAction !== 'function') {
+      throw new Error('Admin verification system is not loaded. Please refresh the page and try again.');
+    }
+    await window.requestProtectedAction();
+  }
+
+  async function readJsonResponse(response, fallbackMessage) {
+    const result = await response.json().catch(() => ({}));
+    if (response.status === 403 && result?.status === 'admin_required') {
+      if (typeof window.resetAdminVerificationCache === 'function') {
+        window.resetAdminVerificationCache();
+      }
+      const error = new Error(result.message || fallbackMessage || 'Admin approval required or session expired.');
+      error.code = 'ADMIN_VERIFICATION_REQUIRED';
+      throw error;
+    }
+    return result;
+  }
+
+  function safeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function getPeopleDeleteModalApi() {
+    if (peopleDeleteModalApi) return peopleDeleteModalApi;
+    if (peopleDeleteModalEl && window.bootstrap && window.bootstrap.Modal) {
+      peopleDeleteModalApi = window.bootstrap.Modal.getOrCreateInstance(peopleDeleteModalEl);
+      return peopleDeleteModalApi;
+    }
+    return null;
+  }
+
+  function showPeopleDeleteModal() {
+    const api = getPeopleDeleteModalApi();
+    if (api) {
+      api.show();
+      return;
+    }
+    if (!peopleDeleteModalEl) return;
+    peopleDeleteModalEl.style.display = 'block';
+    peopleDeleteModalEl.classList.add('show');
+    peopleDeleteModalEl.removeAttribute('aria-hidden');
+    peopleDeleteModalEl.setAttribute('aria-modal', 'true');
+    peopleDeleteModalEl.setAttribute('role', 'dialog');
+    document.body.classList.add('modal-open');
+  }
+
+  function hidePeopleDeleteModal() {
+    const api = getPeopleDeleteModalApi();
+    if (api) {
+      api.hide();
+      return;
+    }
+    if (!peopleDeleteModalEl) return;
+    peopleDeleteModalEl.classList.remove('show');
+    peopleDeleteModalEl.style.display = 'none';
+    peopleDeleteModalEl.setAttribute('aria-hidden', 'true');
+    peopleDeleteModalEl.removeAttribute('aria-modal');
+    document.body.classList.remove('modal-open');
+  }
+
+  function renderResult(payload) {
+    if (!payload || !payload.summary) {
+      resultEl.innerHTML = '';
+      return;
+    }
+
+    const summary = payload.summary || {};
+    const warnings = Array.isArray(payload.warnings) ? payload.warnings : [];
+    const errors = Array.isArray(payload.errors) ? payload.errors : [];
+
+    resultEl.innerHTML = `
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+          <h5 class="m-0 fw-bold"><i class="bi bi-list-check me-2"></i>Generation Result</h5>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3 mb-3">
+            <div class="col-md-3">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Students Created</div>
+                <div class="fs-4 fw-bold text-primary">${Number(summary.created?.students || 0)}</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Teachers Created</div>
+                <div class="fs-4 fw-bold text-success">${Number(summary.created?.teachers || 0)}</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Staff Created</div>
+                <div class="fs-4 fw-bold text-warning">${Number(summary.created?.staff || 0)}</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Failures</div>
+                <div class="fs-4 fw-bold text-danger">${Number(summary.failed || 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          ${warnings.length ? `
+            <div class="alert alert-warning border-warning">
+              <div class="fw-bold mb-2">Warnings</div>
+              <ul class="mb-0">
+                ${warnings.map(item => `<li>${safeHtml(item)}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          ${errors.length ? `
+            <div class="alert alert-danger border-danger mb-0">
+              <div class="fw-bold mb-2">Errors</div>
+              <ul class="mb-0">
+                ${errors.map(item => `<li>${safeHtml(item)}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderResetResult(payload) {
+    if (!payload || !payload.summary) {
+      resetResultEl.innerHTML = '';
+      return;
+    }
+    const cleared = payload.summary.cleared || {};
+    const remaining = payload.summary.remaining || {};
+    const resetWarnings = Array.isArray(payload.warnings) ? payload.warnings : [];
+
+    resetResultEl.innerHTML = `
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+          <h5 class="m-0 fw-bold"><i class="bi bi-eraser me-2"></i>Transactional Reset Result</h5>
+        </div>
+        <div class="card-body p-4">
+          ${resetWarnings.length ? `
+            <div class="alert alert-warning border-warning mb-3">
+              <div class="fw-bold mb-2">Warnings</div>
+              <ul class="mb-0 small">
+                ${resetWarnings.map(item => `<li>${safeHtml(item)}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+          <div class="row g-3 mb-3">
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Academic Ledger Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.academicLedgerEntries || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Global Transactions Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.globalTransactions || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Journals Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.transactionJournals || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Program Reg. Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.programRegistrations || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Prior Subject Credits Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.priorSubjectCredits || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Term Reg. Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.termRegistrations || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Enroll. Periods Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.classEnrollmentPeriods || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Withdrawals Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.withdrawals || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Legacy Class Roster Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.classEnrollments || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Snapshots Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.academicSnapshots || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Report Instances Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.reportInstances || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Report Assignments Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.reportAssignments || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Timesheets Cleared</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.timesheets || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Class Workspaces Removed</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.classRuntimeDirs || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Embedded sessions cleared (class rows)</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.embeddedSessionsClearedClasses || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Subject Storage Dirs Removed</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.subjectStorageDirs || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Migration Logs Removed</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.migrationLogFiles || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Attendance Matrix Policy (org)</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.attendanceMatrixPolicyOrgs || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Official Final Grades Reset (classes)</div>
+                <div class="fs-4 fw-bold text-danger">${Number(cleared.officialFinalGradesClasses || 0)}</div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-4">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-muted">Class Indexes Rebuilt</div>
+                <div class="fs-4 fw-bold text-primary">${Number(cleared.classIndexesRebuilt || 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-secondary border-secondary mb-0">
+            <div class="fw-bold mb-2">Remaining Records Snapshot</div>
+            <div class="small">
+              Academic Ledger: <b>${Number(remaining.academicLedgerEntries || 0)}</b> |
+              Global Transactions: <b>${Number(remaining.globalTransactions || 0)}</b> |
+              Journals: <b>${Number(remaining.transactionJournals || 0)}</b> |
+              Program Registrations: <b>${Number(remaining.programRegistrations || 0)}</b> |
+              Prior Subject Credits: <b>${Number(remaining.priorSubjectCredits || 0)}</b> |
+              Term Registrations: <b>${Number(remaining.termRegistrations || 0)}</b> |
+              Enroll. Periods: <b>${Number(remaining.classEnrollmentPeriods || 0)}</b> |
+              Withdrawals: <b>${Number(remaining.withdrawals || 0)}</b> |
+              Legacy Class Roster Rows: <b>${Number(remaining.classEnrollments || 0)}</b> |
+              Snapshots: <b>${Number(remaining.academicSnapshots || 0)}</b> |
+              Report Instances: <b>${Number(remaining.reportInstances || 0)}</b> |
+              Report Assignments: <b>${Number(remaining.reportAssignments || 0)}</b> |
+              Timesheets: <b>${Number(remaining.timesheets || 0)}</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function badgeClassForStatus(statusKey) {
+    const key = String(statusKey || '').trim().toLowerCase();
+    if (key === 'archived') return 'bg-secondary-subtle text-secondary border border-secondary-subtle';
+    if (key === 'active') return 'bg-success-subtle text-success border border-success-subtle';
+    if (key === 'inactive' || key === 'on leave' || key === 'on_leave') return 'bg-warning-subtle text-warning border border-warning-subtle';
+    if (key === 'missing') return 'bg-danger-subtle text-danger border border-danger-subtle';
+    return 'bg-light text-dark border';
+  }
+
+  function getGroupKeys() {
+    return ['students', 'teachers', 'staff', 'persons'];
+  }
+
+  function collectModalSelection() {
+    const selected = { students: [], teachers: [], staff: [], persons: [] };
+    const checkboxes = peopleDeleteModalContentEl
+      ? peopleDeleteModalContentEl.querySelectorAll('.js-sample-people-row')
+      : [];
+    checkboxes.forEach((checkbox) => {
+      if (checkbox.disabled) return;
+      const group = String(checkbox.getAttribute('data-group') || '').trim();
+      const id = String(checkbox.getAttribute('data-id') || '').trim();
+      if (!checkbox.checked || !id || !Object.prototype.hasOwnProperty.call(selected, group)) return;
+      selected[group].push(id);
+    });
+    return selected;
+  }
+
+  function renderAccountImpactPreview(preview, selection) {
+    const accounts = Array.isArray(preview?.linkedAccounts) ? preview.linkedAccounts : [];
+    const selectedRoleSets = {
+      students: new Set(selection.students || []),
+      teachers: new Set(selection.teachers || []),
+      staff: new Set(selection.staff || [])
+    };
+    const impacted = accounts
+      .map((account) => {
+        const owners = Array.isArray(account?.owners) ? account.owners : [];
+        const selectedOwners = owners.filter((owner) => selectedRoleSets[owner.group]?.has(String(owner.roleId || '').trim()));
+        if (!selectedOwners.length) return null;
+        return {
+          id: String(account?.id || '').trim(),
+          name: String(account?.name || '').trim() || '(Unnamed Account)',
+          status: String(account?.status || '').trim().toLowerCase() || 'unknown',
+          ownerCount: owners.length,
+          selectedOwnerCount: selectedOwners.length,
+          eligible: selectedOwners.length === owners.length
+        };
+      })
+      .filter(Boolean);
+
+    const eligibleCount = impacted.filter((row) => row.eligible).length;
+    const sharedCount = impacted.length - eligibleCount;
+
+    if (peopleDeleteImpactTextEl) {
+      peopleDeleteImpactTextEl.innerHTML = impacted.length
+        ? `Linked account impact: <b>${eligibleCount}</b> eligible, <b>${sharedCount}</b> shared/likely skipped.`
+        : 'Linked account impact: none from current selection.';
+    }
+
+    const target = document.getElementById('samplePeopleLinkedAccountImpactTable');
+    if (!target) return;
+    if (!impacted.length) {
+      target.innerHTML = '<div class="small text-muted">No linked school accounts are affected by the current selection.</div>';
+      return;
+    }
+
+    target.innerHTML = `
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Status</th>
+              <th>Owners Selected</th>
+              <th>Impact</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${impacted.map((row) => `
+              <tr>
+                <td>
+                  <div class="fw-semibold">${safeHtml(row.name)}</div>
+                  <div class="small text-muted font-monospace">${safeHtml(row.id)}</div>
+                </td>
+                <td><span class="badge ${badgeClassForStatus(row.status)}">${safeHtml(row.status || 'unknown')}</span></td>
+                <td>${Number(row.selectedOwnerCount)} / ${Number(row.ownerCount)}</td>
+                <td>
+                  ${row.eligible
+                    ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Will Attempt Delete</span>'
+                    : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">Shared / Likely Skipped</span>'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function updatePeopleDeleteSelectionSummary() {
+    const selection = collectModalSelection();
+    const selectedCounts = {
+      students: selection.students.length,
+      teachers: selection.teachers.length,
+      staff: selection.staff.length,
+      persons: selection.persons.length
+    };
+    const totalSelected = selectedCounts.students + selectedCounts.teachers + selectedCounts.staff + selectedCounts.persons;
+    if (peopleDeleteSelectionSummaryTextEl) {
+      peopleDeleteSelectionSummaryTextEl.textContent = `Selected: ${selectedCounts.students} Students, ${selectedCounts.teachers} Teachers, ${selectedCounts.staff} Staff, ${selectedCounts.persons} Persons (Total ${totalSelected})`;
+    }
+    renderAccountImpactPreview(samplePeoplePreview, selection);
+  }
+
+  function buildPeopleRowsHtml(groupKey, rows) {
+    const groupTitleMap = {
+      students: 'Students',
+      teachers: 'Teachers',
+      staff: 'Staff',
+      persons: 'Persons'
+    };
+    const title = groupTitleMap[groupKey] || groupKey;
+
+    const tableRows = (Array.isArray(rows) ? rows : []).map((row) => {
+      if (groupKey === 'persons') {
+        const associations = Array.isArray(row?.associations) ? row.associations : [];
+        const assocText = associations.length
+          ? associations.map((item) => `${item.role || ''}:${item.roleId || ''}`).join(', ')
+          : 'No linked sample role row';
+        const schoolRoles = Array.isArray(row?.schoolRoles) ? row.schoolRoles : [];
+        const otherRoles = Array.isArray(row?.otherRoles) ? row.otherRoles : [];
+        const schoolRoleText = schoolRoles.length ? schoolRoles.join(', ') : 'member';
+        const otherRoleText = otherRoles.length
+          ? otherRoles.map((token) => `<span class="badge bg-warning-subtle text-warning border border-warning-subtle me-1 mb-1">${safeHtml(token)}</span>`).join('')
+          : '<span class="small text-muted">None</span>';
+        const isMissing = String(row?.status || '').trim().toLowerCase() === 'missing';
+        return `
+          <tr>
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input js-sample-people-row" data-group="persons" data-id="${safeHtml(row.id)}" ${isMissing ? 'disabled' : 'checked'}>
+            </td>
+            <td>
+              <div class="fw-semibold">${safeHtml(row.personName)}</div>
+              <div class="small text-muted font-monospace">${safeHtml(row.id)}</div>
+              ${isMissing ? '<div class="small text-muted">Person row is already absent; linked school rows can still be cleaned.</div>' : ''}
+            </td>
+            <td>${row.personEmail ? `<span class="small">${safeHtml(row.personEmail)}</span>` : '<span class="small text-muted">-</span>'}</td>
+            <td><span class="badge ${badgeClassForStatus(row.status)}">${safeHtml(row.status)}</span></td>
+            <td><span class="small">${safeHtml(assocText)}</span></td>
+            <td><span class="small">${safeHtml(schoolRoleText)}</span></td>
+            <td>${otherRoleText}</td>
+          </tr>
+        `;
+      }
+
+      const accountText = row.linkedAccountId
+        ? `${safeHtml(row.linkedAccountName || '(Unnamed Account)')} (${safeHtml(row.linkedAccountId)})`
+        : '-';
+      return `
+        <tr>
+          <td class="text-center">
+            <input type="checkbox" class="form-check-input js-sample-people-row" data-group="${safeHtml(groupKey)}" data-id="${safeHtml(row.id)}" checked>
+          </td>
+          <td>
+            <div class="fw-semibold">${safeHtml(row.personName)}</div>
+            <div class="small text-muted font-monospace">${safeHtml(row.id)}</div>
+          </td>
+          <td><span class="badge ${badgeClassForStatus(row.statusKey)}">${safeHtml(row.status)}</span></td>
+          <td>${row.sampleCode ? `<span class="small font-monospace">${safeHtml(row.sampleCode)}</span>` : '<span class="small text-muted">-</span>'}</td>
+          <td><span class="small">${accountText}</span></td>
+        </tr>
+      `;
+    }).join('');
+
+    const columns = groupKey === 'persons'
+      ? '<th>Name</th><th>Email</th><th>Status</th><th>Associations</th><th>School Roles</th><th>Other Roles</th>'
+      : '<th>Name</th><th>Status</th><th>Sample Marker</th><th>Linked Account</th>';
+
+    return `
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+          <div class="fw-semibold">${title} <span class="badge bg-light text-dark border ms-2">${Number((rows || []).length)}</span></div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm js-group-toggle" data-group="${safeHtml(groupKey)}" data-value="true">Select All</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm js-group-toggle" data-group="${safeHtml(groupKey)}" data-value="false">Unselect All</button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          ${rows.length
+            ? `<div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th class="text-center" style="width:44px;">#</th>
+                      ${columns}
+                    </tr>
+                  </thead>
+                  <tbody>${tableRows}</tbody>
+                </table>
+              </div>`
+            : '<div class="p-3 small text-muted">No sample records found in this group.</div>'}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPeopleDeleteModal(preview) {
+    samplePeoplePreview = preview || null;
+    const groups = preview?.groups || {};
+    if (!peopleDeleteModalContentEl) return;
+
+    peopleDeleteModalContentEl.innerHTML = `
+      <div class="alert alert-info border-info mb-3 small">
+        Active Org: <b>${safeHtml(preview?.orgId || '')}</b> |
+        Students: <b>${Number(preview?.summary?.students || 0)}</b>,
+        Teachers: <b>${Number(preview?.summary?.teachers || 0)}</b>,
+        Staff: <b>${Number(preview?.summary?.staff || 0)}</b>,
+        Persons: <b>${Number(preview?.summary?.persons || 0)}</b>
+      </div>
+      <div class="alert alert-secondary border-secondary mb-3 small">
+        Person rows with non-school roles are retained automatically, even if selected.
+      </div>
+      ${buildPeopleRowsHtml('students', Array.isArray(groups.students) ? groups.students : [])}
+      ${buildPeopleRowsHtml('teachers', Array.isArray(groups.teachers) ? groups.teachers : [])}
+      ${buildPeopleRowsHtml('staff', Array.isArray(groups.staff) ? groups.staff : [])}
+      ${buildPeopleRowsHtml('persons', Array.isArray(groups.persons) ? groups.persons : [])}
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-2 fw-semibold">Linked Account Impact Preview</div>
+        <div class="card-body" id="samplePeopleLinkedAccountImpactTable"></div>
+      </div>
+    `;
+    updatePeopleDeleteSelectionSummary();
+  }
+
+  function renderPeopleDeleteResult(payload) {
+    if (!payload || !payload.summary) {
+      peopleDeleteResultEl.innerHTML = '';
+      return;
+    }
+    const requested = payload.summary.requested || {};
+    const succeeded = payload.summary.succeeded || {};
+    const failed = payload.summary.failed || {};
+    const skipped = payload.summary.skipped || {};
+    const rows = Array.isArray(payload.results) ? payload.results : [];
+    const failures = rows.filter((row) => String(row?.status || '').toLowerCase() === 'error');
+    const skippedItems = rows.filter((row) => String(row?.status || '').toLowerCase() === 'skipped');
+    const badge = String(payload.status || '').toLowerCase();
+    const titleBadge = badge === 'success'
+      ? '<span class="badge bg-success">Success</span>'
+      : (badge === 'partial'
+        ? '<span class="badge bg-warning text-dark">Partial</span>'
+        : '<span class="badge bg-danger">Error</span>');
+
+    peopleDeleteResultEl.innerHTML = `
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+          <h5 class="m-0 fw-bold"><i class="bi bi-trash3 me-2"></i>Sample People Cleanup Result</h5>
+          ${titleBadge}
+        </div>
+        <div class="card-body p-4">
+          <p class="mb-3">${safeHtml(payload.message || '')}</p>
+          <div class="row g-3 mb-3">
+            <div class="col-md-3"><div class="border rounded-3 p-3"><div class="small text-muted">Requested</div><div class="fs-4 fw-bold">${Number(requested.total || 0)}</div></div></div>
+            <div class="col-md-3"><div class="border rounded-3 p-3"><div class="small text-muted">Succeeded</div><div class="fs-4 fw-bold text-success">${Number(succeeded.total || 0)}</div></div></div>
+            <div class="col-md-3"><div class="border rounded-3 p-3"><div class="small text-muted">Skipped</div><div class="fs-4 fw-bold text-warning">${Number(skipped.total || 0)}</div></div></div>
+            <div class="col-md-3"><div class="border rounded-3 p-3"><div class="small text-muted">Failed</div><div class="fs-4 fw-bold text-danger">${Number(failed.total || 0)}</div></div></div>
+          </div>
+          <div class="small text-muted mb-3">
+            Students: ${Number(succeeded.students || 0)}/${Number(requested.students || 0)} |
+            Teachers: ${Number(succeeded.teachers || 0)}/${Number(requested.teachers || 0)} |
+            Staff: ${Number(succeeded.staff || 0)}/${Number(requested.staff || 0)} |
+            Persons: ${Number(succeeded.persons || 0)}/${Number(requested.persons || 0)} |
+            Accounts: ${Number(succeeded.accounts || 0)}/${Number(requested.accounts || 0)}
+          </div>
+          ${skippedItems.length ? `
+            <div class="alert alert-info border-info mb-3">
+              <div class="fw-bold mb-2">Retained / Skipped</div>
+              <ul class="mb-0 small">
+                ${skippedItems.slice(0, 20).map((row) => `<li>[${safeHtml(row.group || 'item')}] ${safeHtml(row.id || '')}: ${safeHtml(row.message || '')}</li>`).join('')}
+              </ul>
+              ${skippedItems.length > 20 ? `<div class="small mt-2 text-muted">+${skippedItems.length - 20} more skipped item(s)</div>` : ''}
+            </div>
+          ` : ''}
+          ${failures.length ? `
+            <div class="alert alert-warning border-warning mb-0">
+              <div class="fw-bold mb-2">Items Needing Attention</div>
+              <ul class="mb-0 small">
+                ${failures.slice(0, 30).map((row) => `<li>[${safeHtml(row.group || 'item')}] ${safeHtml(row.id || '')}: ${safeHtml(row.message || '')}</li>`).join('')}
+              </ul>
+              ${failures.length > 30 ? `<div class="small mt-2 text-muted">+${failures.length - 30} more item(s)</div>` : ''}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  async function loadPeopleDeletePreview() {
+    if (!peopleDeleteModalContentEl) return null;
+    peopleDeleteModalContentEl.innerHTML = '<div class="py-4 text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading preview...</div>';
+    const params = new URLSearchParams();
+    params.set('actionStateId', String(actionStateInput?.value || '').trim());
+    const response = await fetch(`/school/sample-data/people-delete-preview?${params.toString()}`, {
+      method: 'GET',
+      headers: { 'X-AJAX-Request': 'true' }
+    });
+    const result = await response.json();
+    if (result.status !== 'success') {
+      throw new Error(result.message || 'Failed to load sample people preview.');
+    }
+    renderPeopleDeleteModal(result.preview || null);
+    return result.preview || null;
+  }
+
+  function setAllPeopleSelection(checked) {
+    if (!peopleDeleteModalContentEl) return;
+    peopleDeleteModalContentEl.querySelectorAll('.js-sample-people-row').forEach((el) => {
+      if (el.disabled) return;
+      el.checked = checked;
+    });
+    updatePeopleDeleteSelectionSummary();
+  }
+
+  function setGroupPeopleSelection(group, checked) {
+    if (!peopleDeleteModalContentEl) return;
+    peopleDeleteModalContentEl.querySelectorAll(`.js-sample-people-row[data-group="${group}"]`).forEach((el) => {
+      if (el.disabled) return;
+      el.checked = checked;
+    });
+    updatePeopleDeleteSelectionSummary();
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.__LAST_SAMPLE_GENERATOR_RESULT__) {
+      renderResult(window.__LAST_SAMPLE_GENERATOR_RESULT__);
+    }
+    if (window.__LAST_SAMPLE_RESET_RESULT__) {
+      renderResetResult(window.__LAST_SAMPLE_RESET_RESULT__);
+    }
+  });
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const originalText = submitBtn.innerHTML;
+    try {
+      await ensureAdminVerification();
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
+      const formData = new FormData(form);
+      const totalRequested =
+        Number(formData.get('studentCount') || 0)
+        + Number(formData.get('teacherCount') || 0)
+        + Number(formData.get('staffCount') || 0);
+      showOperationModal({
+        title: 'Generating sample school data',
+        subtitle: `Creating ${Number.isFinite(totalRequested) ? totalRequested : 0} sample role record(s) for the active organization.`,
+        stages: [
+          'Checking the active organization and request details...',
+          'Creating person profiles and school role records...',
+          'Linking school accounts when matching accounts are available...',
+          'Validating generated records...',
+          'Preparing the generation summary...'
+        ]
+      });
+
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: new URLSearchParams(formData).toString()
+      });
+
+      const result = await readJsonResponse(response, 'Admin approval is required before generating sample data.');
+      if (result?.idempotency?.state) hideOperationModal();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Generation In Progress', replayTitle: 'Generation Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'Generation failed.');
+      }
+      if (!result?.idempotency?.state) {
+        await completeOperationModal('Generation completed. Preparing the result...');
+      }
+
+      renderResult(result.result);
+      await showMsg({
+        title: 'Completed',
+        icon: 'success',
+        message: result.message || 'Sample data generation completed.',
+        buttons: [{ text: 'OK', class: 'btn-success' }]
+      });
+    } catch (error) {
+      hideOperationModal();
+      if (isAdminVerificationCancel(error)) return;
+      await showMsg({
+        title: isAdminRequiredError(error) ? 'Admin Verification Required' : 'System Error',
+        icon: isAdminRequiredError(error) ? 'warning' : 'error',
+        message: error.message || 'Failed to generate sample data.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+    }
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async function () {
+    const originalText = clearBtn.innerHTML;
+    try {
+      let confirmed = false;
+      if (typeof window.showMessageModal === 'function') {
+        const result = await window.showMessageModal({
+          title: 'Clear Transactions, Registrations & Withdrawals?',
+          icon: 'warning',
+          message: 'This will clear academic/accounting transactions, program & term registrations, prior subject credits, withdrawals, class enrollments, enrollment periods, class workspace files, report runs (not templates), timesheets (not periods), subject storage folders, attendance matrix policy for this org, official final grades on classes, optional snapshots, and rebuild class-related schedule indexes. Master definitions will remain unchanged.',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Clear Data', class: 'btn-danger' }
+          ]
+        });
+        confirmed = result === 'Clear Data';
+      } else {
+        confirmed = window.confirm('Clear transactions, registrations, prior credits, withdrawals, enrollments, workspaces, report runs, timesheets, attendance policy, official final grades, snapshots (if enabled), and rebuild indexes? Master definitions will remain unchanged.');
+      }
+      if (!confirmed) return;
+
+      await ensureAdminVerification();
+
+      clearBtn.disabled = true;
+      clearBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Clearing...';
+      showOperationModal({
+        title: 'Clearing sample transactional data',
+        subtitle: 'Removing generated transactional records and rebuilding related school indexes.',
+        stages: [
+          'Checking the active organization and cleanup options...',
+          'Clearing ledgers, journals, registrations, and withdrawals...',
+          'Removing class workspace data and report runs...',
+          'Resetting attendance and final grade workflow state...',
+          'Rebuilding indexes and preparing the cleanup summary...'
+        ]
+      });
+
+      const params = new URLSearchParams();
+      params.set('actionStateId', String(actionStateInput?.value || '').trim());
+      params.set('includeAcademicSnapshots', includeSnapshotsCheckbox?.checked ? 'true' : 'false');
+
+      const response = await fetch('/school/sample-data/clear-transactional', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: params.toString()
+      });
+
+      const result = await readJsonResponse(response, 'Admin approval is required before clearing sample transactional data.');
+      if (result?.idempotency?.state) hideOperationModal();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Clear In Progress', replayTitle: 'Clear Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'Failed to clear transactional data.');
+      }
+      if (!result?.idempotency?.state) {
+        await completeOperationModal('Cleanup completed. Preparing the result...');
+      }
+
+      renderResetResult(result.result);
+      await showMsg({
+        title: 'Completed',
+        icon: 'success',
+        message: result.message || 'Transactional data cleared successfully.',
+        buttons: [{ text: 'OK', class: 'btn-success' }]
+      });
+    } catch (error) {
+      hideOperationModal();
+      if (isAdminVerificationCancel(error)) return;
+      await showMsg({
+        title: isAdminRequiredError(error) ? 'Admin Verification Required' : 'System Error',
+        icon: isAdminRequiredError(error) ? 'warning' : 'error',
+        message: error.message || 'Failed to clear transactional data.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      clearBtn.disabled = false;
+      clearBtn.innerHTML = originalText;
+    }
+    });
+  }
+
+  if (peopleDeleteModalContentEl) {
+    peopleDeleteModalContentEl.addEventListener('change', function (event) {
+      if (event.target && event.target.classList.contains('js-sample-people-row')) {
+        updatePeopleDeleteSelectionSummary();
+      }
+    });
+    peopleDeleteModalContentEl.addEventListener('click', function (event) {
+      const btn = event.target.closest('.js-group-toggle');
+      if (!btn) return;
+      const group = String(btn.getAttribute('data-group') || '').trim();
+      const value = String(btn.getAttribute('data-value') || '').trim() === 'true';
+      if (!getGroupKeys().includes(group)) return;
+      setGroupPeopleSelection(group, value);
+    });
+  }
+
+  if (peopleDeleteModalEl) {
+    peopleDeleteModalEl.addEventListener('click', function (event) {
+      const dismissBtn = event.target.closest('[data-bs-dismiss="modal"]');
+      if (dismissBtn) {
+        hidePeopleDeleteModal();
+        return;
+      }
+      if (event.target === peopleDeleteModalEl) {
+        hidePeopleDeleteModal();
+      }
+    });
+  }
+
+  if (selectAllPeopleBtn) {
+    selectAllPeopleBtn.addEventListener('click', function () {
+      setAllPeopleSelection(true);
+    });
+  }
+  if (unselectAllPeopleBtn) {
+    unselectAllPeopleBtn.addEventListener('click', function () {
+      setAllPeopleSelection(false);
+    });
+  }
+
+  if (openPeopleDeleteBtn) {
+    openPeopleDeleteBtn.addEventListener('click', async function () {
+      const originalText = openPeopleDeleteBtn.innerHTML;
+      openPeopleDeleteBtn.disabled = true;
+      openPeopleDeleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Loading...';
+      try {
+        await loadPeopleDeletePreview();
+        showPeopleDeleteModal();
+      } catch (error) {
+        await showMsg({
+          title: 'System Error',
+          icon: 'error',
+          message: error.message || 'Failed to load sample people preview.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        openPeopleDeleteBtn.disabled = false;
+        openPeopleDeleteBtn.innerHTML = originalText;
+      }
+    });
+  }
+
+  if (confirmPeopleDeleteBtn) {
+    confirmPeopleDeleteBtn.addEventListener('click', async function () {
+      if (peopleDeleteSubmissionActive) return;
+      peopleDeleteSubmissionActive = true;
+      const originalText = confirmPeopleDeleteBtn.innerHTML;
+      const selection = collectModalSelection();
+      const totalSelected = selection.students.length + selection.teachers.length + selection.staff.length + selection.persons.length;
+      try {
+        if (totalSelected <= 0) {
+          peopleDeleteSubmissionActive = false;
+          await showMsg({
+            title: 'No Selection',
+            icon: 'warning',
+            message: 'Please select at least one row to delete.',
+            buttons: [{ text: 'OK', class: 'btn-secondary' }]
+          });
+          return;
+        }
+
+        let confirmed = false;
+        if (typeof window.showMessageModal === 'function') {
+          const confirmResult = await window.showMessageModal({
+            title: 'Delete Selected Sample Records?',
+            icon: 'warning',
+            message: `This is permanent. Selected now: ${selection.students.length} Students, ${selection.teachers.length} Teachers, ${selection.staff.length} Staff, ${selection.persons.length} Persons.`,
+            buttons: [
+              { text: 'Cancel', class: 'btn-secondary' },
+              { text: 'Delete Permanently', class: 'btn-danger' }
+            ]
+          });
+          confirmed = confirmResult === 'Delete Permanently';
+        } else {
+          confirmed = window.confirm('Delete selected sample records permanently?');
+        }
+        if (!confirmed) return;
+
+        confirmPeopleDeleteBtn.disabled = true;
+        confirmPeopleDeleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Verifying...';
+
+        await ensureAdminVerification();
+
+        confirmPeopleDeleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Deleting...';
+        hidePeopleDeleteModal();
+        showOperationModal({
+          title: 'Deleting selected sample records',
+          subtitle: `Processing ${totalSelected} selected row(s) and checking linked school records.`,
+          stages: [
+            'Validating the selected records...',
+            'Deleting selected student, teacher, and staff rows...',
+            'Cleaning school role memberships from person profiles...',
+            'Checking linked accounts and safety references...',
+            'Preparing the cleanup report...'
+          ]
+        });
+
+        const params = new URLSearchParams();
+        params.set('actionStateId', String(actionStateInput?.value || '').trim());
+        selection.students.forEach((id) => params.append('studentIds', id));
+        selection.teachers.forEach((id) => params.append('teacherIds', id));
+        selection.staff.forEach((id) => params.append('staffIds', id));
+        selection.persons.forEach((id) => params.append('personIds', id));
+
+        const response = await fetch('/school/sample-data/people-delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: params.toString()
+        });
+        const result = await readJsonResponse(response, 'Admin approval is required before deleting sample people.');
+        if (result?.idempotency?.state) hideOperationModal();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Deletion In Progress', replayTitle: 'Deletion Already Processed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (String(result.status || '').toLowerCase() === 'error') {
+          throw new Error(result.message || 'Deletion failed.');
+        }
+        if (!result?.idempotency?.state) {
+          await completeOperationModal('Deletion completed. Preparing the report...');
+        }
+
+        renderPeopleDeleteResult(result);
+        hidePeopleDeleteModal();
+        await showMsg({
+          title: String(result.status || '').toLowerCase() === 'partial' ? 'Completed with Warnings' : 'Completed',
+          icon: String(result.status || '').toLowerCase() === 'partial' ? 'warning' : 'success',
+          message: result.message || 'Sample people cleanup completed.',
+          buttons: [{ text: 'OK', class: 'btn-success' }]
+        });
+      } catch (error) {
+        hideOperationModal();
+        if (isAdminVerificationCancel(error)) return;
+        await showMsg({
+          title: isAdminRequiredError(error) ? 'Admin Verification Required' : 'System Error',
+          icon: isAdminRequiredError(error) ? 'warning' : 'error',
+          message: error.message || 'Failed to delete selected sample records.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        peopleDeleteSubmissionActive = false;
+        confirmPeopleDeleteBtn.disabled = false;
+        confirmPeopleDeleteBtn.innerHTML = originalText;
+      }
+    });
+  }
+})();
+</script>

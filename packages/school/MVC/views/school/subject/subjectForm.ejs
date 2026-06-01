@@ -1,0 +1,519 @@
+<%
+  const s = subject || {};
+  const isEdit = !!s.id;
+  
+  // UPDATED initializer for department
+  const initAcademicUnit = JSON.stringify(s.academicUnit || { departmentId: '', departmentCode: '', departmentName: '' });
+  const initConfiguration = JSON.stringify(s.configuration || { defaultHours: 45, credits: 3, level: 'Beginner', deliveryMethod: 'Hybrid' });
+  const initPrerequisites = JSON.stringify(s.prerequisites || []);
+  const initAttachments = JSON.stringify(s.attachments || []);
+  const initFeeRules = JSON.stringify(s.feeRules || []);
+  const initDefaultScoreRules = JSON.stringify(s.defaultScoreRules || { minPassingScore: null, minPassingAverage: null, mustPass: false, allowCompensation: false, notes: '' });
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Subject' : 'New Subject' %></h1>
+      <div class="d-flex flex-column align-items-end gap-1">
+        <% if(isEdit) { %> <span class="badge bg-primary border font-monospace">ID: <%= s.id %></span> <% } %>
+        <button type="button" class="btn btn-outline-primary btn-md" id="btn_copyFromSubject">
+          <i class="bi bi-copy me-1"></i> Copy From Subject
+        </button>
+      </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="subjectForm" action="<%= isEdit ? '/school/subjects/edit/'+s.id : '/school/subjects/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
+      
+      <input type="hidden" name="academicUnit" id="hid_academicUnit" value='<%- initAcademicUnit %>'>
+      <input type="hidden" name="configuration" id="hid_configuration" value='<%- initConfiguration %>'>
+      <input type="hidden" name="prerequisites" id="hid_prerequisites" value='<%- initPrerequisites %>'>
+      <input type="hidden" name="attachments" id="hid_attachments" value='<%- initAttachments %>'>
+      <input type="hidden" name="feeRules" id="hid_feeRules" value='<%- initFeeRules %>'>
+      <input type="hidden" name="defaultScoreRules" id="hid_defaultScoreRules" value='<%- initDefaultScoreRules %>'>
+
+      <ul class="nav nav-tabs mb-4" id="conTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General Info</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-academic" type="button">Academic Unit</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-config" type="button">Configuration & Req.</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scoreRules" type="button">Default Score Rules</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-fees" type="button">Fee Rules</button></li>
+      </ul>
+
+      <div class="tab-content">
+        
+        <div class="tab-pane fade show active" id="tab-general">
+           <div class="row">
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Subject Title *</label>
+                 <input type="text" name="title" class="form-control size-md" value="<%= s.title || '' %>" required>
+              </div>
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Organization</label>
+                 <input type="text" class="form-control size-md bg-light" value="Active Organization Context" readonly>
+                 <div class="form-text small">Organization is determined securely from your active organization.</div>
+              </div>
+           </div>
+
+           <div class="row">
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Course Code (e.g. CS101)</label>
+                 <input type="text" name="code" class="form-control size-md" value="<%= s.code || '' %>">
+              </div>
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Status</label>
+                 <select name="status" class="form-select size-md">
+                    <option value="draft" <%= s.status=='draft'?'selected':'' %>>Draft</option>
+                    <option value="active" <%= s.status=='active'?'selected':'' %>>Active</option>
+                    <option value="archived" <%= s.status=='archived'?'selected':'' %>>Archived</option>
+                 </select>
+              </div>
+           </div>
+
+           <div class="mb-3">
+              <label class="form-label">Description</label>
+              <textarea name="description" class="form-control size-md" rows="3"><%= s.description || '' %></textarea>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-academic">
+           <div class="alert alert-info py-2">The Department Code is used to generate the permanent System ID for this subject.</div>
+           <div class="row">
+              <div class="col-md-8 mb-3">
+                 <label class="form-label">Associated Department *</label>
+                 <div class="input-group">
+                    <input type="hidden" id="inp_departmentId" required>
+                    <input type="hidden" id="inp_departmentCode">
+                    <input type="text" id="inp_departmentName" class="form-control size-md bg-white" placeholder="Select Academic Department..." readonly required>
+                    <button type="button" class="btn btn-outline-primary" id="openDeptPickerBtn"><i class="bi bi-diagram-3"></i></button>
+                 </div>
+              </div>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-config">
+           <h6 class="fw-bold text-primary mb-3">Course Delivery Metrics</h6>
+           <div class="row">
+              <div class="col-md-3 mb-3">
+                 <label class="form-label">Default Hours</label>
+                 <input type="number" id="inp_hours" class="form-control size-md">
+              </div>
+              <div class="col-md-3 mb-3">
+                 <label class="form-label">Credits</label>
+                 <input type="number" id="inp_credits" class="form-control size-md">
+              </div>
+              <div class="col-md-3 mb-3">
+                 <label class="form-label">Level</label>
+                 <select id="inp_level" class="form-select size-md">
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
+                    <option value="Expert">Expert</option>
+                 </select>
+              </div>
+              <div class="col-md-3 mb-3">
+                 <label class="form-label">Delivery Method</label>
+                 <select id="inp_delivery" class="form-select size-md">
+                    <option value="In-Person">In-Person</option>
+                    <option value="Online">Online</option>
+                    <option value="Hybrid">Hybrid</option>
+                 </select>
+              </div>
+           </div>
+
+           <hr>
+           <h6 class="fw-bold text-primary mb-3">Prerequisites</h6>
+           <div class="mb-3">
+              <label class="form-label">Required Subject Codes (Comma separated)</label>
+              <input type="text" id="inp_prereq" class="form-control size-md" placeholder="e.g. MATH101, CS099">
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-fees">
+           <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h6 class="fw-bold text-primary mb-1">Subject Fee Rules</h6>
+                <div class="small text-muted">Define fee per student category and validity period. Class enrollment will sum the active subject fees for the student category.</div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="btn_addFeeRule"><i class="bi bi-plus"></i> Add Fee Rule</button>
+           </div>
+           <div class="table-responsive border rounded bg-white">
+              <table class="table table-sm align-middle mb-0">
+                 <thead class="table-light">
+                    <tr>
+                      <th style="width: 220px;">Fee Category</th>
+                      <th style="width: 140px;">Amount</th>
+                      <th style="width: 110px;">Currency</th>
+                      <th style="width: 150px;">Valid From</th>
+                      <th style="width: 150px;">Valid To</th>
+                      <th>Notes</th>
+                      <th style="width: 80px;">Active</th>
+                      <th style="width: 60px;"></th>
+                    </tr>
+                 </thead>
+                 <tbody id="feeRulesTbody">
+                    <tr><td colspan="8" class="text-center text-muted py-4">No fee rules added yet.</td></tr>
+                 </tbody>
+              </table>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-scoreRules">
+           <div class="alert alert-info py-2">
+             These are the default academic rules for this subject. Programs can inherit them and then edit them per program subject.
+           </div>
+           <div class="row">
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Default Minimum Passing Score</label>
+                 <input type="number" id="inp_defaultMinPassingScore" class="form-control size-md" min="0" max="100" step="0.01" placeholder="Leave blank if not required">
+              </div>
+              <div class="col-md-6 mb-3">
+                 <label class="form-label">Default Minimum Passing Average</label>
+                 <input type="number" id="inp_defaultMinPassingAverage" class="form-control size-md" min="0" max="100" step="0.01" placeholder="Leave blank if not required">
+              </div>
+           </div>
+           <div class="form-check mb-2">
+              <input type="checkbox" class="form-check-input" id="chk_defaultMustPass">
+              <label class="form-check-label" for="chk_defaultMustPass">Student must pass this subject individually by default</label>
+           </div>
+           <div class="form-check mb-3">
+              <input type="checkbox" class="form-check-input" id="chk_defaultAllowCompensation">
+              <label class="form-check-label" for="chk_defaultAllowCompensation">Allow compensation by overall average by default</label>
+           </div>
+           <div class="mb-3">
+              <label class="form-label">Default Rule Notes</label>
+              <textarea id="inp_defaultScoreRuleNotes" class="form-control size-md" rows="3" placeholder="Optional note for program specialists"></textarea>
+           </div>
+        </div>
+
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Subject</button>
+        <a href="/school/subjects" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/school/subjects">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('subjectForm');
+    const tabsRoot = document.getElementById('conTabs');
+    const dAcad = JSON.parse(document.getElementById('hid_academicUnit').value);
+    const dConf = JSON.parse(document.getElementById('hid_configuration').value);
+    const dPre = JSON.parse(document.getElementById('hid_prerequisites').value);
+    let feeRulesState = JSON.parse(document.getElementById('hid_feeRules').value || '[]');
+    const defaultScoreRulesState = JSON.parse(document.getElementById('hid_defaultScoreRules').value || '{}');
+    const feeCategories = <%- JSON.stringify(typeof feeCategories !== 'undefined' ? feeCategories : []) %>;
+    const allFeeCategoryKey = <%- JSON.stringify(typeof allFeeCategoryKey !== 'undefined' ? allFeeCategoryKey : '__ALL__') %>;
+    const allFeeCategoryLabel = <%- JSON.stringify(typeof allFeeCategoryLabel !== 'undefined' ? allFeeCategoryLabel : 'All Categories') %>;
+
+    // Populate UI
+    document.getElementById('inp_departmentId').value = dAcad.departmentId || '';
+    document.getElementById('inp_departmentCode').value = dAcad.departmentCode || '';
+    document.getElementById('inp_departmentName').value = dAcad.departmentName || '';
+    
+    document.getElementById('inp_hours').value = dConf.defaultHours || 45;
+    document.getElementById('inp_credits').value = dConf.credits || 3;
+    document.getElementById('inp_level').value = dConf.level || 'Beginner';
+    document.getElementById('inp_delivery').value = dConf.deliveryMethod || 'Hybrid';
+    document.getElementById('inp_prereq').value = (dPre || []).join(', ');
+    document.getElementById('inp_defaultMinPassingScore').value = defaultScoreRulesState.minPassingScore ?? '';
+    document.getElementById('inp_defaultMinPassingAverage').value = defaultScoreRulesState.minPassingAverage ?? '';
+    document.getElementById('chk_defaultMustPass').checked = defaultScoreRulesState.mustPass === true;
+    document.getElementById('chk_defaultAllowCompensation').checked = defaultScoreRulesState.allowCompensation === true;
+    document.getElementById('inp_defaultScoreRuleNotes').value = defaultScoreRulesState.notes || '';
+
+    function activateTab(targetSelector) {
+        if (!targetSelector) return;
+        const trigger = tabsRoot ? tabsRoot.querySelector(`[data-bs-target="${targetSelector}"]`) : null;
+        if (!trigger) return;
+        if (window.bootstrap && typeof window.bootstrap.Tab === 'function') {
+            window.bootstrap.Tab.getOrCreateInstance(trigger).show();
+            return;
+        }
+        trigger.click();
+    }
+
+    function activateTabForElement(element) {
+        if (!element) return;
+        const pane = element.closest('.tab-pane');
+        if (pane && pane.id) activateTab(`#${pane.id}`);
+    }
+
+    function activateTabForErrorMessage(message) {
+        const msg = String(message || '').toLowerCase();
+        if (!msg) return;
+        if (msg.includes('department') || msg.includes('academic unit')) return activateTab('#tab-academic');
+        if (msg.includes('fee rule') || msg.includes('fee category') || msg.includes('validto') || msg.includes('validfrom') || msg.includes('currency') || msg.includes('amount')) return activateTab('#tab-fees');
+        if (msg.includes('passing score') || msg.includes('passing average') || msg.includes('compensation') || msg.includes('default minimum')) return activateTab('#tab-scoreRules');
+        if (msg.includes('hours') || msg.includes('credits') || msg.includes('delivery') || msg.includes('prerequisite') || msg.includes('level')) return activateTab('#tab-config');
+        if (msg.includes('title') || msg.includes('code') || msg.includes('status') || msg.includes('description')) return activateTab('#tab-general');
+    }
+
+    function applySubjectTemplate(template) {
+        if (!template || typeof template !== 'object') return;
+        document.querySelector('input[name="title"]').value = template.title || '';
+        document.querySelector('input[name="code"]').value = template.code || '';
+        document.querySelector('select[name="status"]').value = template.status || 'draft';
+        document.querySelector('textarea[name="description"]').value = template.description || '';
+
+        const academicUnit = template.academicUnit || {};
+        document.getElementById('inp_departmentId').value = academicUnit.departmentId || '';
+        document.getElementById('inp_departmentCode').value = academicUnit.departmentCode || '';
+        document.getElementById('inp_departmentName').value = academicUnit.departmentName || '';
+
+        const configuration = template.configuration || {};
+        document.getElementById('inp_hours').value = configuration.defaultHours ?? 45;
+        document.getElementById('inp_credits').value = configuration.credits ?? 3;
+        document.getElementById('inp_level').value = configuration.level || 'Beginner';
+        document.getElementById('inp_delivery').value = configuration.deliveryMethod || 'Hybrid';
+        document.getElementById('inp_prereq').value = Array.isArray(template.prerequisites) ? template.prerequisites.join(', ') : '';
+
+        const rules = template.defaultScoreRules || {};
+        document.getElementById('inp_defaultMinPassingScore').value = rules.minPassingScore ?? '';
+        document.getElementById('inp_defaultMinPassingAverage').value = rules.minPassingAverage ?? '';
+        document.getElementById('chk_defaultMustPass').checked = rules.mustPass === true;
+        document.getElementById('chk_defaultAllowCompensation').checked = rules.allowCompensation === true;
+        document.getElementById('inp_defaultScoreRuleNotes').value = rules.notes || '';
+
+        feeRulesState = Array.isArray(template.feeRules)
+            ? template.feeRules.map((rule) => ({
+                feeCategory: rule.feeCategory || '',
+                amount: rule.amount ?? '',
+                currency: rule.currency || 'CAD',
+                validFrom: rule.validFrom || '',
+                validTo: rule.validTo || '',
+                notes: rule.notes || '',
+                active: rule.active !== false
+            }))
+            : [];
+        renderFeeRules();
+        activateTab('#tab-general');
+    }
+
+    function renderFeeRules() {
+        const tbody = document.getElementById('feeRulesTbody');
+        if (!tbody) return;
+
+        if (!Array.isArray(feeRulesState) || feeRulesState.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No fee rules added yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = feeRulesState.map((rule, index) => `
+            <tr>
+                <td>
+                    <select class="form-select form-select-sm fee-rule-field" data-index="${index}" data-field="feeCategory">
+                        <option value="">Select Category</option>
+                        <option value="${allFeeCategoryKey}" ${rule.feeCategory === allFeeCategoryKey ? 'selected' : ''}>${allFeeCategoryLabel}</option>
+                        ${feeCategories.map((cat) => `<option value="${cat}" ${rule.feeCategory === cat ? 'selected' : ''}>${cat}</option>`).join('')}
+                    </select>
+                </td>
+                <td><input type="number" min="0" step="0.01" class="form-control form-control-sm fee-rule-field" data-index="${index}" data-field="amount" value="${rule.amount ?? ''}"></td>
+                <td><input type="text" maxlength="3" class="form-control form-control-sm fee-rule-field text-uppercase" data-index="${index}" data-field="currency" value="${rule.currency || 'CAD'}"></td>
+                <td><input type="date" class="form-control form-control-sm fee-rule-field" data-index="${index}" data-field="validFrom" value="${rule.validFrom || ''}"></td>
+                <td><input type="date" class="form-control form-control-sm fee-rule-field" data-index="${index}" data-field="validTo" value="${rule.validTo || ''}"></td>
+                <td><input type="text" class="form-control form-control-sm fee-rule-field" data-index="${index}" data-field="notes" value="${rule.notes || ''}" placeholder="Optional note"></td>
+                <td class="text-center"><input type="checkbox" class="form-check-input fee-rule-check" data-index="${index}" ${rule.active !== false ? 'checked' : ''}></td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-fee-rule" data-index="${index}"><i class="bi bi-trash"></i></button></td>
+            </tr>
+        `).join('');
+    }
+
+    renderFeeRules();
+
+    // NEW: Department Picker
+    const deptBtn = document.getElementById('openDeptPickerBtn');
+    if(deptBtn) {
+        deptBtn.addEventListener('click', () => {
+            GenericPicker.open(GenericPickerPresets.department({
+                title: 'Select Department',
+                apiEndpoint: '/school/departments/api/data',
+                placeholder: 'Search departments...',
+                onSelect: (item) => {
+                    document.getElementById('inp_departmentId').value = item.id;
+                    document.getElementById('inp_departmentCode').value = item.code;
+                    document.getElementById('inp_departmentName').value = item.name;
+                }
+            }));
+        });
+    }
+
+    const copyBtn = document.getElementById('btn_copyFromSubject');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            GenericPicker.open(GenericPickerPresets.subject({
+                title: 'Copy From Subject',
+                placeholder: 'Search subjects to copy...',
+                onSelect: async (item) => {
+                    if (!item || (item.id && <%- JSON.stringify(s.id || '') %> && String(item.id) === String(<%- JSON.stringify(s.id || '') %>))) return;
+                    applySubjectTemplate(item);
+                    if (typeof showMessageModal === 'function') {
+                        await showMessageModal({
+                            title: 'Template Applied',
+                            icon: 'success',
+                            message: 'Subject fields were copied. Review and edit the values before saving.',
+                            buttons: [{ text: 'OK', class: 'btn-success' }]
+                        });
+                    }
+                }
+            }));
+        });
+    }
+
+    const addFeeRuleBtn = document.getElementById('btn_addFeeRule');
+    if (addFeeRuleBtn) {
+        addFeeRuleBtn.addEventListener('click', () => {
+            feeRulesState.push({
+                feeCategory: '',
+                amount: '',
+                currency: 'CAD',
+                validFrom: '',
+                validTo: '',
+                notes: '',
+                active: true
+            });
+            renderFeeRules();
+        });
+    }
+
+    document.getElementById('feeRulesTbody').addEventListener('input', (e) => {
+        const target = e.target;
+        const index = Number(target.dataset.index);
+        const field = target.dataset.field;
+        if (!Number.isInteger(index) || !field || !feeRulesState[index]) return;
+        feeRulesState[index][field] = target.value;
+    });
+
+    document.getElementById('feeRulesTbody').addEventListener('change', (e) => {
+        const target = e.target;
+        const index = Number(target.dataset.index);
+        if (!Number.isInteger(index) || !feeRulesState[index]) return;
+        if (target.classList.contains('fee-rule-check')) {
+            feeRulesState[index].active = target.checked;
+        }
+        if (target.classList.contains('fee-rule-field')) {
+            feeRulesState[index][target.dataset.field] = target.value;
+        }
+    });
+
+    document.getElementById('feeRulesTbody').addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-remove-fee-rule');
+        if (!btn) return;
+        const index = Number(btn.dataset.index);
+        if (!Number.isInteger(index)) return;
+        feeRulesState.splice(index, 1);
+        renderFeeRules();
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+        try {
+            // Pack JSONs
+            const acad = {
+                departmentId: document.getElementById('inp_departmentId').value.trim(),
+                departmentCode: document.getElementById('inp_departmentCode').value.trim().toUpperCase(),
+                departmentName: document.getElementById('inp_departmentName').value.trim()
+            };
+            document.getElementById('hid_academicUnit').value = JSON.stringify(acad);
+
+            const conf = {
+                defaultHours: parseInt(document.getElementById('inp_hours').value) || 45,
+                credits: parseInt(document.getElementById('inp_credits').value) || 3,
+                level: document.getElementById('inp_level').value,
+                deliveryMethod: document.getElementById('inp_delivery').value
+            };
+            document.getElementById('hid_configuration').value = JSON.stringify(conf);
+
+            const rawPre = document.getElementById('inp_prereq').value;
+            const prereqs = rawPre.split(',').map(s => s.trim()).filter(Boolean);
+            document.getElementById('hid_prerequisites').value = JSON.stringify(prereqs);
+            document.getElementById('hid_feeRules').value = JSON.stringify(feeRulesState);
+            document.getElementById('hid_defaultScoreRules').value = JSON.stringify({
+                minPassingScore: document.getElementById('inp_defaultMinPassingScore').value.trim() === '' ? null : Number(document.getElementById('inp_defaultMinPassingScore').value),
+                minPassingAverage: document.getElementById('inp_defaultMinPassingAverage').value.trim() === '' ? null : Number(document.getElementById('inp_defaultMinPassingAverage').value),
+                mustPass: document.getElementById('chk_defaultMustPass').checked,
+                allowCompensation: document.getElementById('chk_defaultAllowCompensation').checked,
+                notes: document.getElementById('inp_defaultScoreRuleNotes').value.trim()
+            });
+
+            if (!form.checkValidity()) {
+                const firstInvalid = form.querySelector(':invalid');
+                activateTabForElement(firstInvalid);
+                form.reportValidity();
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                return;
+            }
+
+            const formData = new FormData(form);
+            const data = new URLSearchParams(formData);
+
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+                body: data.toString()
+            });
+
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                 throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+            }
+
+            const result = await response.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+                : { stop: false };
+            if (guarded.stop) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                return;
+            }
+
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: result.status === 'success' ? 'Success' : 'Error',
+                    icon: result.status === 'success' ? 'success' : 'error',
+                    message: result.message || 'Operation completed.',
+                    buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
+                });
+            } else {
+                alert(result.message);
+            }
+
+            if (result.status === 'success') {
+                window.location.href = '/school/subjects';
+            } else {
+                activateTabForErrorMessage(result.message);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+
+        } catch (error) {
+            console.error('Submission Error:', error);
+            activateTabForErrorMessage(error.message);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'System Error', icon: 'error', message: error.message || 'An unexpected network error occurred.',
+                    buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                });
+            } else { alert(error.message); }
+        }
+    });
+});
+</script>

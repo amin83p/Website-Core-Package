@@ -1,0 +1,367 @@
+<%
+  function buildReviewScopeQuery(extra) {
+    const p = new URLSearchParams();
+    if (extra && typeof extra === 'object') {
+      Object.keys(extra).forEach((k) => {
+        const v = extra[k];
+        if (v != null && String(v).trim() !== '') p.set(k, String(v));
+      });
+    }
+    if (typeof selectedTeacherId !== 'undefined' && selectedTeacherId) p.set('teacherId', String(selectedTeacherId));
+    else if (typeof selectedPersonId !== 'undefined' && selectedPersonId) p.set('personId', String(selectedPersonId));
+    const s = p.toString();
+    return s ? `?${s}` : '';
+  }
+  const backQuery = buildReviewScopeQuery();
+%>
+<div class="sections-page">
+  <input type="hidden" id="gradingActionStateId" value="<%= actionStateId || '' %>">
+  <input type="hidden" id="reviewScopeTeacherId" value="<%= typeof selectedTeacherId !== 'undefined' && selectedTeacherId ? String(selectedTeacherId) : '' %>">
+  <input type="hidden" id="reviewScopePersonId" value="<%= typeof selectedPersonId !== 'undefined' && selectedPersonId ? String(selectedPersonId) : '' %>">
+  <input type="hidden" id="reviewAllocationId" value="<%= allocation?.id || '' %>">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <h1 class="page-heading size-md m-0"><i class="bi bi-clipboard-check me-2"></i>Review Attempt</h1>
+      <div class="text-muted small mt-1">Student: <strong><%= studentName || assignment?.studentId || '-' %></strong> | Assignment: <span class="font-monospace"><%= assignment?.id || '-' %></span></div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/school/exams" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house me-1"></i>Exam Home</a>
+      <a href="/school/exams/teacher-assignments/<%= allocation?.id %><%= backQuery %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Students</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-3">
+      <div class="row g-3">
+        <div class="col-md-3"><div class="small text-muted">Exam</div><div class="fw-bold"><%= template?.title || allocation?.allocationName || '-' %></div></div>
+        <div class="col-md-2"><div class="small text-muted">Revision</div><div class="fw-bold">R<%= Number(revision?.revisionNo || assignment?.revisionNo || 0) %></div></div>
+        <div class="col-md-3"><div class="small text-muted">Class</div><div class="fw-bold"><%= classRow?.title || classRow?.name || assignment?.classId || '-' %></div></div>
+        <div class="col-md-2"><div class="small text-muted">Attempt</div><div class="fw-bold font-monospace"><%= attempt?.id || '-' %></div></div>
+        <div class="col-md-2"><div class="small text-muted">Status</div><div class="fw-bold"><%= String(attempt?.status || '-').toLowerCase() %></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <h5 class="m-0 fw-bold">Attempt Versions</h5>
+      <button type="button" class="btn btn-success btn-sm" id="btnBulkGradeSubjective">
+        <i class="bi bi-check2-all me-1"></i>Grade All Pending Subjective
+      </button>
+    </div>
+    <div class="card-body p-3">
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <% (attempts || []).forEach((row) => { %>
+          <div class="d-inline-flex align-items-center gap-1 border rounded px-1 py-1 bg-body-secondary bg-opacity-10">
+            <a class="btn <%= String(row?.id || '') === String(attempt?.id || '') ? 'btn-primary' : 'btn-outline-secondary' %> btn-sm" href="/school/exams/teacher-assignments/review/<%= assignment?.id %><%= buildReviewScopeQuery({ attemptId: row?.id }) %>">
+              #<%= Number(row?.attemptNo || 0) %> — <%= String(row?.status || '').toLowerCase() %>
+            </a>
+            <button type="button" class="btn btn-outline-danger btn-sm btn-delete-attempt p-1" title="Delete this attempt" data-attempt-id="<%= row?.id || '' %>" data-attempt-no="<%= Number(row?.attemptNo || 0) %>">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        <% }); %>
+      </div>
+      <p class="form-text mb-0 mt-2">Deleting removes the attempt and its answers. The assignment is updated so the student can start again if attempts remain.</p>
+    </div>
+  </div>
+
+  <% (questionRows || []).forEach((entry, idx) => { %>
+    <% const q = entry.question || {}; %>
+    <% const ans = entry.answer || null; %>
+    <% const qid = String(q?.id || ''); %>
+    <% const maxScore = Number(q?.scoring?.maxScore || 0); %>
+    <% const currentScore = ans?.manualScore ?? ans?.finalScore ?? 0; %>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="m-0 fw-bold">Q<%= idx + 1 %> | <%= String(q?.questionType || '').replace(/_/g, ' ') %></h6>
+        <span class="badge bg-light text-dark border">Max: <%= maxScore %></span>
+      </div>
+      <div class="card-body p-3">
+        <div class="mb-3"><%- q?.promptHtml || q?.promptText || '' %></div>
+        <div class="border rounded p-2 bg-light-subtle mb-3">
+          <div class="small fw-semibold mb-1">Student Answer</div>
+          <% if (!ans) { %>
+            <div class="text-muted small">No answer submitted for this question.</div>
+          <% } else if (String(q?.questionType || '').toLowerCase() === 'objective') { %>
+            <% const selectedIds = Array.isArray(ans?.objectiveResponse?.selectedOptionIds) ? ans.objectiveResponse.selectedOptionIds : []; %>
+            <div class="small">
+              Selected:
+              <% if (!selectedIds.length) { %>
+                <span class="text-muted">none</span>
+              <% } else { %>
+                <%= selectedIds.join(', ') %>
+              <% } %>
+            </div>
+          <% } else { %>
+            <div class="small"><%- (ans?.subjectiveResponse?.text || '<span class="text-muted">(empty)</span>') %></div>
+          <% } %>
+        </div>
+
+        <form
+          class="grading-form"
+          data-answer-id="<%= ans?.id || '' %>"
+          data-max-score="<%= maxScore %>"
+          data-answer-type="<%= String(ans?.answerType || q?.questionType || '').toLowerCase() %>"
+          data-answer-status="<%= String(ans?.status || '').toLowerCase() %>">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-2">
+              <label class="form-label small fw-bold">Score</label>
+              <input type="number" class="form-control form-control-sm grading-score" min="0" max="<%= maxScore %>" step="0.01" value="<%= Number(currentScore || 0) %>" <%= ans ? '' : 'disabled' %>>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small fw-bold">Correct</label>
+              <select class="form-select form-select-sm grading-correct" <%= ans ? '' : 'disabled' %>>
+                <option value="false" <%= ans?.isCorrect ? '' : 'selected' %>>No</option>
+                <option value="true" <%= ans?.isCorrect ? 'selected' : '' %>>Yes</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">Feedback</label>
+              <input type="text" class="form-control form-control-sm grading-feedback" value="<%= ans?.feedback || '' %>" maxlength="2000" placeholder="Feedback..." <%= ans ? '' : 'disabled' %>>
+            </div>
+            <div class="col-md-2 d-grid">
+              <button type="button" class="btn btn-primary btn-sm btn-grade-save" <%= ans ? '' : 'disabled' %>>
+                <i class="bi bi-check2-circle me-1"></i>Save Grade
+              </button>
+            </div>
+          </div>
+          <div class="small text-muted mt-2">
+            Answer ID: <span class="font-monospace"><%= ans?.id || '-' %></span>
+            <% if (ans?.gradedAtUtc) { %> | Last graded: <span class="font-monospace"><%= ans.gradedAtUtc %></span><% } %>
+          </div>
+        </form>
+      </div>
+    </div>
+  <% }); %>
+</div>
+
+<script>
+  (function () {
+    const assignmentId = '<%= assignment?.id || "" %>';
+    const attemptId = '<%= attempt?.id || "" %>';
+    const actionStateId = document.getElementById('gradingActionStateId')?.value || '';
+    const bulkGradeBtn = document.getElementById('btnBulkGradeSubjective');
+    const allocationId = document.getElementById('reviewAllocationId')?.value || '';
+
+    function buildScopeParams() {
+      const p = new URLSearchParams();
+      const tid = String(document.getElementById('reviewScopeTeacherId')?.value || '').trim();
+      const pid = String(document.getElementById('reviewScopePersonId')?.value || '').trim();
+      if (tid) p.set('teacherId', tid);
+      else if (pid) p.set('personId', pid);
+      return p;
+    }
+
+    function navigateAfterDelete(nextAttemptId) {
+      if (nextAttemptId) {
+        const q = buildScopeParams();
+        q.set('attemptId', String(nextAttemptId));
+        window.location.href = `/school/exams/teacher-assignments/review/${encodeURIComponent(assignmentId)}?${q.toString()}`;
+        return;
+      }
+      if (allocationId) {
+        const q = buildScopeParams();
+        const tail = q.toString();
+        window.location.href = `/school/exams/teacher-assignments/${encodeURIComponent(allocationId)}${tail ? `?${tail}` : ''}`;
+        return;
+      }
+      window.location.reload();
+    }
+
+    function escapeHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    async function showGradingMessageModal(options) {
+      if (typeof window.showMessageModal === 'function') {
+        return window.showMessageModal(options);
+      }
+      const msg = String(options?.message || '').replace(/<[^>]*>/g, '').trim();
+      window.alert(msg || options?.title || 'Notice');
+      return 'OK';
+    }
+
+    async function postJson(url, payload) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(payload || {})
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.status !== 'success') {
+        throw new Error(String(data?.message || 'Operation failed.'));
+      }
+      return data;
+    }
+
+    document.querySelectorAll('.btn-grade-save').forEach((button) => {
+      button.addEventListener('click', async function () {
+        const form = button.closest('.grading-form');
+        if (!form) return;
+        const answerId = String(form.getAttribute('data-answer-id') || '').trim();
+        if (!answerId) return;
+        const maxScore = Number(form.getAttribute('data-max-score') || 0);
+        const scoreInput = form.querySelector('.grading-score');
+        const correctInput = form.querySelector('.grading-correct');
+        const feedbackInput = form.querySelector('.grading-feedback');
+        const manualScore = Number(scoreInput?.value || 0);
+        if (!Number.isFinite(manualScore) || manualScore < 0 || manualScore > maxScore) {
+          await showGradingMessageModal({
+            title: 'Invalid score',
+            icon: 'warning',
+            message: `<p class="mb-0">Score must be between 0 and ${escapeHtml(String(maxScore))}.</p>`,
+            buttons: [{ text: 'OK', class: 'btn-secondary' }]
+          });
+          return;
+        }
+
+        try {
+          button.disabled = true;
+          const prevHtml = button.innerHTML;
+          button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+          await postJson(`/school/exams/teacher-assignments/review/${encodeURIComponent(assignmentId)}/attempts/${encodeURIComponent(attemptId)}/answers/${encodeURIComponent(answerId)}/grade`, {
+            actionStateId,
+            manualScore,
+            isCorrect: String(correctInput?.value || '').toLowerCase() === 'true',
+            feedback: String(feedbackInput?.value || '').trim()
+          });
+          button.innerHTML = '<i class="bi bi-check2 me-1"></i>Saved';
+          setTimeout(() => { button.innerHTML = prevHtml; }, 1000);
+        } catch (error) {
+          await showGradingMessageModal({
+            title: 'Could not save grade',
+            icon: 'error',
+            message: `<p class="mb-0">${escapeHtml(String(error?.message || error || 'Operation failed.'))}</p>`,
+            buttons: [{ text: 'OK', class: 'btn-secondary' }]
+          });
+        } finally {
+          button.disabled = false;
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-delete-attempt').forEach((btn) => {
+      btn.addEventListener('click', async function () {
+        const id = String(btn.getAttribute('data-attempt-id') || '').trim();
+        const no = String(btn.getAttribute('data-attempt-no') || '').trim();
+        if (!id) return;
+        const decision = await showGradingMessageModal({
+          title: 'Delete attempt?',
+          icon: 'warning',
+          message: `<p class="mb-0">Remove attempt <strong>#${escapeHtml(no)}</strong> and all of its answers? This cannot be undone.</p>`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Delete', class: 'btn-danger' }
+          ]
+        });
+        if (decision !== 'Delete') return;
+
+        const prevHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+        try {
+          const data = await postJson(
+            `/school/exams/teacher-assignments/review/${encodeURIComponent(assignmentId)}/attempts/${encodeURIComponent(id)}/delete`,
+            { actionStateId }
+          );
+          const deletedCurrent = String(id) === String(attemptId);
+          if (deletedCurrent) {
+            navigateAfterDelete(String(data?.nextAttemptId || '').trim());
+          } else {
+            window.location.reload();
+          }
+        } catch (error) {
+          await showGradingMessageModal({
+            title: 'Could not delete attempt',
+            icon: 'error',
+            message: `<p class="mb-0">${escapeHtml(String(error?.message || error || 'Operation failed.'))}</p>`,
+            buttons: [{ text: 'OK', class: 'btn-secondary' }]
+          });
+          btn.disabled = false;
+          btn.innerHTML = prevHtml;
+        }
+      });
+    });
+
+    bulkGradeBtn?.addEventListener('click', async function () {
+      const targetForms = Array.from(document.querySelectorAll('.grading-form'))
+        .filter((form) => {
+          const answerId = String(form.getAttribute('data-answer-id') || '').trim();
+          const type = String(form.getAttribute('data-answer-type') || '').trim().toLowerCase();
+          const status = String(form.getAttribute('data-answer-status') || '').trim().toLowerCase();
+          if (!answerId) return false;
+          if (type !== 'subjective') return false;
+          return status !== 'graded';
+        });
+
+      if (!targetForms.length) {
+        await showGradingMessageModal({
+          title: 'Nothing to grade',
+          icon: 'info',
+          message: '<p class="mb-0">No pending subjective answers found.</p>',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        return;
+      }
+
+      const previousHtml = bulkGradeBtn.innerHTML;
+      bulkGradeBtn.disabled = true;
+      bulkGradeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Grading...';
+
+      let successCount = 0;
+      const failedIds = [];
+      for (const form of targetForms) {
+        const answerId = String(form.getAttribute('data-answer-id') || '').trim();
+        const maxScore = Number(form.getAttribute('data-max-score') || 0);
+        const scoreInput = form.querySelector('.grading-score');
+        const correctInput = form.querySelector('.grading-correct');
+        const feedbackInput = form.querySelector('.grading-feedback');
+        const manualScore = Number(scoreInput?.value || 0);
+        if (!Number.isFinite(manualScore) || manualScore < 0 || manualScore > maxScore) {
+          failedIds.push(answerId);
+          continue;
+        }
+
+        try {
+          await postJson(`/school/exams/teacher-assignments/review/${encodeURIComponent(assignmentId)}/attempts/${encodeURIComponent(attemptId)}/answers/${encodeURIComponent(answerId)}/grade`, {
+            actionStateId,
+            manualScore,
+            isCorrect: String(correctInput?.value || '').toLowerCase() === 'true',
+            feedback: String(feedbackInput?.value || '').trim()
+          });
+          form.setAttribute('data-answer-status', 'graded');
+          successCount += 1;
+        } catch (_) {
+          failedIds.push(answerId);
+        }
+      }
+
+      bulkGradeBtn.disabled = false;
+      bulkGradeBtn.innerHTML = previousHtml;
+      if (!failedIds.length) {
+        await showGradingMessageModal({
+          title: 'Bulk grading complete',
+          icon: 'success',
+          message: `<p class="mb-0">Graded <strong>${successCount}</strong> subjective answer(s).</p>`,
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+        window.location.reload();
+        return;
+      }
+      await showGradingMessageModal({
+        title: 'Bulk grading finished with errors',
+        icon: 'warning',
+        message: `<p class="mb-0">Graded: <strong>${successCount}</strong>, failed: <strong>${failedIds.length}</strong>.</p>`,
+        buttons: [{ text: 'OK', class: 'btn-secondary' }]
+      });
+    });
+  })();
+</script>

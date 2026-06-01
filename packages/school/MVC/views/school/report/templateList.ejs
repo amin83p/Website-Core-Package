@@ -1,0 +1,80 @@
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  headerManageBtns: [
+    `<a href="/school/reports" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house me-1"></i>Report Home</a>`,
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search templates...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Template</th>
+        <th>Type</th>
+        <th>Version</th>
+        <th>Status</th>
+        <th>Fields</th>
+        <th>DOCX</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr><td colspan="7" class="text-center py-4 text-muted">No templates found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= row.title %></div>
+            <div class="x-small text-muted font-monospace"><%= row.id %></div>
+            <div class="x-small text-muted"><%= row.description || '' %></div>
+          </td>
+          <td><%= row.type %></td>
+          <td><span class="badge bg-light text-dark border">v<%= Number(row.version || 1) %></span></td>
+          <td>
+            <% const st = String(row.status || '').toLowerCase(); %>
+            <span class="badge <%= st === 'active' ? 'bg-success' : (st === 'draft' ? 'bg-warning text-dark' : 'bg-secondary') %>"><%= st || '-' %></span>
+          </td>
+          <td><%= Array.isArray(row?.schema?.fields) ? row.schema.fields.length : 0 %></td>
+          <td>
+            <% if (row?.docxTemplate?.url) { %>
+              <a href="<%= row.docxTemplate.url %>" target="_blank" class="btn btn-sm btn-outline-secondary">View</a>
+            <% } else { %>
+              <span class="text-muted small">No file</span>
+            <% } %>
+          </td>
+          <td class="table-actions pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Template Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <a href="/school/reports/templates/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <a href="/school/reports/templates/delete/<%= row.id %>" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-2"></i>Delete</a>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="<%= newUrl %>" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
+<%- include('../../partials/tablePages-end') %>

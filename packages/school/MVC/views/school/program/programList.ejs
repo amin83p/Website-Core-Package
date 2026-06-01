@@ -1,0 +1,76 @@
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel: (newLabel || 'New Program'),
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  manageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
+    `<a href="/school/programs/new-wizard" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-signpost-split me-1"></i> Program Wizard</a>`
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search programs...',
+  fields: [
+    { name: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'inactive', 'archived'] }
+  ]
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Program</th>
+        <th>Administrator</th>
+        <th>Duration / Credits</th>
+        <th class="text-center">Status</th>
+        <th class="text-center">Subjects</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if(data.length === 0) { %>
+         <tr><td colspan="6" class="text-center py-4 text-muted">No programs found.</td></tr>
+      <% } %>
+      <% data.forEach(item => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-primary"><%= item.name %></div>
+            <div class="small text-muted font-monospace"><%= item.code || 'NO-CODE' %> | <%= item.id %></div>
+          </td>
+          <td>
+            <div class="small text-dark fw-bold"><%= item.administratorName || 'N/A' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.programAdministratorPersonId || '' %></div>
+          </td>
+          <td class="small">
+            <span class="badge bg-light text-secondary border me-1"><%= item.duration?.years || 0 %>Y <%= item.duration?.months || 0 %>M <%= item.duration?.days || 0 %>D</span>
+            <span class="badge bg-light text-secondary border"><%= item.credits ?? 0 %> Credits</span>
+          </td>
+          <td class="text-center">
+            <%
+              let badge = 'bg-secondary';
+              if (item.status === 'active') badge = 'bg-success';
+              if (item.status === 'draft') badge = 'bg-warning text-dark';
+              if (item.status === 'inactive') badge = 'bg-secondary';
+              if (item.status === 'archived') badge = 'bg-danger';
+            %>
+            <span class="badge <%= badge %>"><%= (item.status || 'unknown').toUpperCase() %></span>
+          </td>
+          <td class="text-center fw-bold"><%= item.subjectCount || 0 %></td>
+          <td class="table-actions text-end pe-4">
+            <a href="/school/programs/edit-wizard/<%= item.id %>" class="btn btn-sm btn-outline-info me-1">Wizard</a>
+            <a href="/school/programs/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="school/programs" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/programs' }) %>
+<%- include('../../partials/tablePages-end') %>

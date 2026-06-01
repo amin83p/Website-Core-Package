@@ -1,0 +1,17 @@
+<%
+  const rc = typeof classData !== 'undefined' ? (classData || {}) : {};
+  const rLife = typeof lifecycleContext !== 'undefined' ? (lifecycleContext || {}) : {};
+  const rIsRolling = String(rc.registrationMode || '').trim().toLowerCase() === 'rolling';
+%>
+<div class="text-muted small mb-2">
+  <span class="fw-semibold"><%= rc.title || rc.id %></span>
+  <span class="font-monospace ms-2"><%= rc.id || '' %></span>
+</div>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <span class="badge <%= rIsRolling ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-light text-dark border' %>">
+    <%= rIsRolling ? 'Rolling' : 'Term-Based' %>
+  </span>
+  <span class="badge bg-info-subtle text-info border border-info-subtle">Active Periods: <%= Number(rLife.activePeriodCount || 0) %></span>
+  <span class="badge bg-light text-dark border">Open Periods: <%= Number(rLife.openPeriodCount || 0) %></span>
+  <span class="badge bg-light text-dark border ms-auto" id="lbl_periodCount">0 rows</span>
+</div>

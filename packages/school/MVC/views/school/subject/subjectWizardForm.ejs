@@ -1,0 +1,382 @@
+<%- include('./subjectForm') %>
+
+<style>
+  #subjectWizardGuide {
+    font-size: 1rem;
+  }
+  #subjectWizardGuide .small {
+    font-size: 1rem !important;
+  }
+  .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .wizard-step-rail::-webkit-scrollbar {
+    display: none;
+  }
+  #subjectWizardGuide .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    transition: all 0.2s ease;
+  }
+  #subjectWizardGuide .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #subjectWizardGuide .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #subjectWizardGuide .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #subjectWizardGuide .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  .subject-wizard-controls {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .subject-wizard-controls .wizard-step-label {
+    color: #17324d;
+    font-weight: 600;
+  }
+  .subject-wizard-controls .btn.btn-sm {
+    font-size: 1rem;
+    padding: 0.45rem 0.85rem;
+  }
+</style>
+
+<script src="/scripts/wizardStepRail.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tabs = document.getElementById('conTabs');
+  const form = document.getElementById('subjectForm');
+  if (!tabs || !form || typeof bootstrap === 'undefined') return;
+
+  const navButtons = Array.from(tabs.querySelectorAll('button.nav-link[data-bs-target]'));
+  if (!navButtons.length) return;
+
+  function parseJson(id, fallback) {
+    try {
+      const raw = document.getElementById(id)?.value;
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  const stepConfig = [
+    {
+      target: '#tab-general',
+      title: 'General Info',
+      helper: [
+        'Set the official title, code, status, and description for this subject.',
+        'Use a stable code so it stays consistent across reports and curriculum mapping.',
+        'Keep description concise and aligned with learning outcomes.'
+      ],
+      impacts: [
+        'Subject title and code appear in programs, classes, and student records.',
+        'Status controls active catalog visibility during setup workflows.',
+        'Clear description helps advisors and instructors apply the subject correctly.'
+      ],
+      required: [
+        { selector: 'input[name="title"]', label: 'Subject Title' }
+      ]
+    },
+    {
+      target: '#tab-academic',
+      title: 'Academic Unit',
+      helper: [
+        'Assign the owning department for governance and organization scope.',
+        'Pick the department from the active organization context.',
+        'Department code contributes to long-term catalog consistency.'
+      ],
+      impacts: [
+        'Programs and operations use department ownership for academic governance.',
+        'Department mapping helps registrar and scheduling decisions.',
+        'Missing department data causes downstream validation issues.'
+      ],
+      required: [
+        { selector: '#inp_departmentId', label: 'Associated Department' }
+      ]
+    },
+    {
+      target: '#tab-config',
+      title: 'Configuration & Req.',
+      helper: [
+        'Set delivery hours, credits, level, and delivery method.',
+        'Define prerequisites when progression constraints are required.',
+        'Keep baseline metrics realistic for timetable and workload planning.'
+      ],
+      impacts: [
+        'Hours and credits influence class planning and academic summaries.',
+        'Prerequisites affect eligibility decisions in program pathways.',
+        'Configuration values are reused during class setup and validation.'
+      ],
+      required: []
+    },
+    {
+      target: '#tab-scoreRules',
+      title: 'Default Score Rules',
+      helper: [
+        'Set default pass score/average and progression flags.',
+        'Use must-pass/compensation defaults only when policy requires them.',
+        'Keep notes clear for program specialists overriding these values.'
+      ],
+      impacts: [
+        'Programs inherit these defaults for subject-level academic rules.',
+        'Consistent defaults reduce manual overrides across programs.',
+        'Incorrect defaults can lead to grading and progression exceptions.'
+      ],
+      required: []
+    },
+    {
+      target: '#tab-fees',
+      title: 'Fee Rules',
+      helper: [
+        'Define fee rows per student category and effective dates.',
+        'Use active flags and date windows carefully to avoid pricing conflicts.',
+        'Set currency and notes explicitly for finance traceability.'
+      ],
+      impacts: [
+        'Class enrollment pricing snapshots consume these subject fee rules.',
+        'Category-specific rules control what students are charged.',
+        'Invalid or overlapping rows can cause finance posting errors.'
+      ],
+      required: [],
+      customCheck: function () {
+        const rules = parseJson('hid_feeRules', []);
+        if (!Array.isArray(rules)) return '';
+        for (const row of rules) {
+          const validFrom = String(row?.validFrom || '').trim();
+          const validTo = String(row?.validTo || '').trim();
+          if (validFrom && validTo && validTo < validFrom) {
+            return 'Fee Rule Valid To cannot be before Valid From.';
+          }
+        }
+        return '';
+      }
+    }
+  ];
+
+  const byTarget = new Map(stepConfig.map((step, index) => [step.target, { ...step, index }]));
+
+  const guide = document.createElement('div');
+  guide.id = 'subjectWizardGuide';
+  guide.className = 'card border-0 shadow-sm mb-3';
+  guide.innerHTML = [
+    '<div class="card-body">',
+      '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">',
+        '<div>',
+          '<div class="fw-bold text-primary">Subject Definition Wizard</div>',
+          '<div class="text-muted">Complete each step to build a clean subject definition for curriculum and finance workflows.</div>',
+        '</div>',
+        '<div class="d-flex align-items-center gap-2">',
+          '<span class="badge bg-light text-dark border" id="subjectWizardStepBadge">Step 1 of ' + stepConfig.length + '</span>',
+          '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="subjectWizardProgressPct">0%</span>',
+        '</div>',
+      '</div>',
+      '<div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="subjectWizardProgressBar"></div></div>',
+      '<div class="wizard-step-rail mb-3" id="subjectWizardStepPills"></div>',
+      '<div class="row g-3">',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light-subtle">',
+            '<div class="fw-bold mb-2">Active Step Help</div>',
+            '<div id="subjectWizardStepHelp"></div>',
+          '</div>',
+        '</div>',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light">',
+            '<div class="fw-bold mb-2">How Other Sections Use This Data</div>',
+            '<div id="subjectWizardStepImpacts"></div>',
+          '</div>',
+        '</div>',
+      '</div>',
+    '</div>'
+  ].join('');
+
+  tabs.parentNode.insertBefore(guide, tabs);
+  tabs.classList.add('d-none');
+
+  const buttonRow = form.querySelector('.button-row');
+  const controls = document.createElement('div');
+  controls.className = 'subject-wizard-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3';
+  controls.innerHTML = [
+    '<div class="wizard-step-label" id="subjectWizardCurrentLabel"></div>',
+    '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="subjectWizardPrevBtn"><i class="bi bi-arrow-left me-1"></i>Previous</button>',
+      '<button type="button" class="btn btn-primary btn-sm" id="subjectWizardNextBtn">Next<i class="bi bi-arrow-right ms-1"></i></button>',
+    '</div>'
+  ].join('');
+  if (buttonRow && buttonRow.parentNode) {
+    buttonRow.parentNode.insertBefore(controls, buttonRow);
+  }
+
+  const stepPills = document.getElementById('subjectWizardStepPills');
+  const stepHelp = document.getElementById('subjectWizardStepHelp');
+  const stepImpacts = document.getElementById('subjectWizardStepImpacts');
+  const stepBadge = document.getElementById('subjectWizardStepBadge');
+  const progressPct = document.getElementById('subjectWizardProgressPct');
+  const stepLabel = document.getElementById('subjectWizardCurrentLabel');
+  const progressBar = document.getElementById('subjectWizardProgressBar');
+  const btnPrev = document.getElementById('subjectWizardPrevBtn');
+  const btnNext = document.getElementById('subjectWizardNextBtn');
+
+  let currentIndex = Math.max(0, navButtons.findIndex((btn) => btn.classList.contains('active')));
+  if (currentIndex < 0) currentIndex = 0;
+
+  function escapeHtml(input) {
+    return String(input || '').replace(/[&<>\"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function renderList(items) {
+    const safe = Array.isArray(items) ? items : [];
+    if (!safe.length) return '<div class="text-muted">No additional notes for this step.</div>';
+    return '<ul class="mb-0 ps-3">' + safe.map(function (line) {
+      return '<li>' + escapeHtml(line) + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function getStepIndexFromTarget(target) {
+    return byTarget.has(target) ? byTarget.get(target).index : 0;
+  }
+
+  function showStep(index) {
+    const bounded = Math.max(0, Math.min(stepConfig.length - 1, Number(index)));
+    const tab = navButtons[bounded];
+    if (!tab) return;
+    bootstrap.Tab.getOrCreateInstance(tab).show();
+  }
+
+  function findMissingRequired(step) {
+    const missing = [];
+    (step.required || []).forEach(function (rule) {
+      const el = form.querySelector(rule.selector);
+      const value = String(el?.value || '').trim();
+      if (!el || !value) missing.push({ label: rule.label, selector: rule.selector });
+    });
+    if (typeof step.customCheck === 'function') {
+      const customError = String(step.customCheck() || '').trim();
+      if (customError) missing.push({ label: customError, selector: '' });
+    }
+    return missing;
+  }
+
+  async function showWarning(message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title: 'Step Incomplete',
+        icon: 'warning',
+        message,
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  function renderWizardUi() {
+    const step = stepConfig[currentIndex];
+    const progress = ((currentIndex + 1) / stepConfig.length) * 100;
+
+    stepBadge.textContent = 'Step ' + (currentIndex + 1) + ' of ' + stepConfig.length;
+    if (progressPct) progressPct.textContent = Math.round(progress) + '%';
+    stepLabel.textContent = step.title;
+    progressBar.style.width = progress.toFixed(2) + '%';
+    stepHelp.innerHTML = renderList(step.helper);
+    stepImpacts.innerHTML = renderList(step.impacts);
+
+    stepPills.innerHTML = stepConfig.map(function (item, idx) {
+      const cls = idx === currentIndex ? 'active' : (idx < currentIndex ? 'completed' : '');
+      return '<button type="button" class="wizard-step-pill ' + cls + '" data-step-index="' + idx + '">' + (idx + 1) + '. ' + escapeHtml(item.title) + '</button>';
+    }).join('');
+
+    stepPills.querySelectorAll('[data-step-index]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        showStep(Number(btn.getAttribute('data-step-index')));
+      });
+    });
+
+    if (window.WizardStepRail) window.WizardStepRail.sync(stepPills);
+
+    btnPrev.disabled = currentIndex <= 0;
+    btnNext.innerHTML = currentIndex >= stepConfig.length - 1
+      ? 'Review Save<i class="bi bi-check2-circle ms-1"></i>'
+      : 'Next<i class="bi bi-arrow-right ms-1"></i>';
+  }
+
+  btnPrev?.addEventListener('click', function () {
+    showStep(currentIndex - 1);
+  });
+
+  btnNext?.addEventListener('click', async function () {
+    const step = stepConfig[currentIndex];
+    if (currentIndex < stepConfig.length - 1) {
+      const missing = findMissingRequired(step);
+      if (missing.length) {
+        const message = 'Complete required fields before moving on:<br>' +
+          missing.map(function (item) { return '- ' + escapeHtml(item.label); }).join('<br>');
+        await showWarning(message);
+        const first = missing.find(function (item) { return item.selector; });
+        if (first?.selector) {
+          const el = form.querySelector(first.selector);
+          if (el) {
+            try { el.focus(); } catch (_) {}
+          }
+        }
+        return;
+      }
+      showStep(currentIndex + 1);
+      return;
+    }
+    const saveRow = form.querySelector('.button-row');
+    if (saveRow) saveRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const saveBtn = form.querySelector('button[type="submit"]');
+    if (saveBtn) {
+      saveBtn.classList.add('shadow');
+      setTimeout(function () { saveBtn.classList.remove('shadow'); }, 1200);
+    }
+  });
+
+  navButtons.forEach(function (btn) {
+    btn.addEventListener('shown.bs.tab', function (event) {
+      currentIndex = getStepIndexFromTarget(event.target.getAttribute('data-bs-target'));
+      renderWizardUi();
+    });
+  });
+
+  renderWizardUi();
+});
+</script>
+
+

@@ -1,0 +1,355 @@
+<%- include('../../partials/tablePages-start', {
+  title, newUrl, newLabel: 'Register Students', newHref: '/school/programs/register-students', user, tableName, btn_export: true, print,
+  manageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
+    `<a href="/school/programs/register-students-wizard" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-signpost-split me-1"></i> Wizard</a>`,
+    '<a href="/school/programs/prior-subject-credits" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-mortarboard me-1"></i> Prior subject credits</a>'
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search program registrations...',
+  fields: [
+    { name: 'status', label: 'Record Status', type: 'select', options: ['draft', 'registered', 'rolled_back', 'error', 'withdrawn', 'cancelled', 'completed'] },
+    { name: 'verificationStatus', label: 'Verification', type: 'select', options: ['verified', 'partial', 'rolled_back', 'failed', 'pending'] }
+  ]
+}) %>
+
+<input type="hidden" id="hid_actionStateId" value="<%= actionStateId || '' %>">
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Registration</th>
+        <th>Student</th>
+        <th>Program</th>
+        <th>Verification</th>
+        <th>Finance</th>
+        <th>Academic</th>
+        <th>Note</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if(data.length === 0) { %>
+        <tr><td colspan="8" class="text-center py-4 text-muted">No program registrations found.</td></tr>
+      <% } %>
+      <% data.forEach(item => { %>
+        <tr data-registration-row="<%= item.id %>">
+          <td class="ps-4">
+            <div class="fw-bold text-primary"><a href="/school/programs/registrations/<%= encodeURIComponent(item.id) %>"><%= item.id %></a></div>
+            <div class="small text-muted"><%= item.registrationDate || '-' %></div>
+            <div class="x-small text-muted registration-record-status">Record: <%= String(item.status || '').toLowerCase() === 'rolled_back' ? 'Moved back to draft' : item.status %></div>
+          </td>
+          <td>
+            <div class="fw-bold"><%= item.studentName || item.studentId %></div>
+            <div class="small text-muted font-monospace"><%= item.studentId || '-' %></div>
+            <div class="x-small text-muted"><%= item.feeCategorySnapshot || '-' %></div>
+          </td>
+          <td>
+            <div class="fw-bold"><%= item.programLabel || item.programId %></div>
+            <div class="small text-muted font-monospace"><%= item.programId || '-' %></div>
+          </td>
+          <td data-col="verification">
+            <span class="badge <%= item.statusBadgeClass %>"><%= String(item.verificationStatus || '').toLowerCase() === 'rolled_back' ? 'Moved back to draft' : item.verificationStatus %></span>
+          </td>
+          <td class="small" data-col="finance">
+            <div>Posted: <span class="fw-bold"><%= item.finance.posted %></span> / <%= item.finance.expected %></div>
+            <div>Reversed: <span class="fw-bold"><%= item.finance.reversed %></span></div>
+          </td>
+          <td class="small" data-col="academic">
+            <div>Posted: <span class="fw-bold"><%= item.academic.posted %></span> / <%= item.academic.expected %></div>
+            <div>Voided: <span class="fw-bold"><%= item.academic.voided %></span></div>
+          </td>
+          <td class="small"><%= item.note || '-' %></td>
+          <td class="table-actions text-end pe-4" data-col="actions">
+            <a href="/school/programs/registrations/<%= encodeURIComponent(item.id) %>" class="btn btn-sm btn-outline-secondary"><%= String(item.status || '').toLowerCase() === 'draft' ? 'Review Draft' : 'Details' %></a>
+            <% if (canManageRegistrations && item.canApprove) { %>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-success approve-btn"
+                data-id="<%= item.id %>"
+                data-name="<%= item.studentName || item.studentId %>">
+                Approve & Post
+              </button>
+            <% } %>
+            <% if (canManageRegistrations && item.canRollback) { %>
+              <button
+                type="button"
+                class="btn btn-sm btn-filled btn-delete rollback-btn"
+                data-id="<%= item.id %>"
+                data-name="<%= item.studentName || item.studentId %>">
+                <%= String(item.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Move Back to Draft' %>
+              </button>
+            <% } else if (canManageRegistrations && item.termRegistrationsCount) { %>
+              <span class="text-muted small ms-2">Move back to draft is blocked (term registrations exist)</span>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="school/programs/registrations" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/programs/registrations' }) %>
+<%- include('../../partials/tablePages-end') %>
+
+<script>
+(function () {
+  const canManageRegistrations = <%- JSON.stringify(Boolean(canManageRegistrations)) %>;
+
+  function showMsg(opts) {
+    if (typeof showMessageModal === 'function') return showMessageModal(opts);
+    alert(opts?.message || 'Done');
+    return Promise.resolve();
+  }
+
+  function findRegistrationRow(registrationId) {
+    const targetId = String(registrationId || '').trim();
+    if (!targetId) return null;
+    const rows = Array.from(document.querySelectorAll('tr[data-registration-row]'));
+    return rows.find(function (row) {
+      return String(row.getAttribute('data-registration-row') || '').trim() === targetId;
+    }) || null;
+  }
+
+  function updateRegistrationRowAfterApprove(registrationId, result) {
+    const row = findRegistrationRow(registrationId);
+    if (!row) return;
+
+    const postedTx = Number(result?.summary?.postedTransactionCount || 0);
+    const postedAcademic = Number(result?.summary?.postedAcademicEntryCount || 0);
+
+    const recordStatusEl = row.querySelector('.registration-record-status');
+    if (recordStatusEl) recordStatusEl.textContent = 'Record: registered';
+
+    const verificationCell = row.querySelector('td[data-col="verification"]');
+    if (verificationCell) {
+      verificationCell.innerHTML = '<span class="badge bg-success">verified</span>';
+    }
+
+    const financeCell = row.querySelector('td[data-col="finance"]');
+    if (financeCell) {
+      financeCell.innerHTML =
+        '<div>Posted: <span class="fw-bold">' + String(postedTx) + '</span> / ' + String(postedTx) + '</div>' +
+        '<div>Reversed: <span class="fw-bold">0</span></div>';
+    }
+
+    const academicCell = row.querySelector('td[data-col="academic"]');
+    if (academicCell) {
+      academicCell.innerHTML =
+        '<div>Posted: <span class="fw-bold">' + String(postedAcademic) + '</span> / ' + String(postedAcademic) + '</div>' +
+        '<div>Voided: <span class="fw-bold">0</span></div>';
+    }
+
+    const actionCell = row.querySelector('td[data-col="actions"]');
+    if (!actionCell) return;
+
+    const detailsLink = actionCell.querySelector('a[href*="/school/programs/registrations/"]');
+    if (detailsLink) detailsLink.textContent = 'Details';
+
+    const approveBtn = actionCell.querySelector('button.approve-btn');
+    if (approveBtn) approveBtn.remove();
+
+    const rollbackBtn = actionCell.querySelector('button.rollback-btn');
+    if (rollbackBtn) rollbackBtn.textContent = 'Move Back to Draft';
+
+    if (!rollbackBtn && canManageRegistrations) {
+      let hint = actionCell.querySelector('span.text-muted.small.ms-2');
+      if (!hint) {
+        hint = document.createElement('span');
+        hint.className = 'text-muted small ms-2';
+        actionCell.appendChild(hint);
+      }
+      hint.textContent = 'Move back to draft is available from Details';
+    }
+  }
+
+  function updateRegistrationRowAfterRollback(registrationId, result) {
+    const row = findRegistrationRow(registrationId);
+    if (!row) return;
+
+    const isWarning = String(result?.status || '').toLowerCase() === 'warning';
+    const verificationLabel = isWarning ? 'failed' : 'Moved back to draft';
+    const verificationClass = isWarning ? 'bg-danger' : 'bg-secondary';
+    const recordStatus = isWarning ? 'error' : 'Moved back to draft';
+    const reversalCount = Number(result?.rollback?.reversalCount || 0);
+    const voidedCount = Number(result?.rollback?.voidedEntryCount || 0);
+
+    const recordStatusEl = row.querySelector('.registration-record-status');
+    if (recordStatusEl) recordStatusEl.textContent = 'Record: ' + recordStatus;
+
+    const verificationCell = row.querySelector('td[data-col="verification"]');
+    if (verificationCell) {
+      verificationCell.innerHTML = '<span class="badge ' + verificationClass + '">' + verificationLabel + '</span>';
+    }
+
+    const financeCell = row.querySelector('td[data-col="finance"]');
+    if (financeCell && Number.isFinite(reversalCount)) {
+      const postedText = financeCell.querySelector('div:first-child')?.innerHTML || 'Posted: <span class="fw-bold">0</span> / 0';
+      financeCell.innerHTML =
+        '<div>' + postedText + '</div>' +
+        '<div>Reversed: <span class="fw-bold">' + String(reversalCount) + '</span></div>';
+    }
+
+    const academicCell = row.querySelector('td[data-col="academic"]');
+    if (academicCell && Number.isFinite(voidedCount)) {
+      const postedText = academicCell.querySelector('div:first-child')?.innerHTML || 'Posted: <span class="fw-bold">0</span> / 0';
+      academicCell.innerHTML =
+        '<div>' + postedText + '</div>' +
+        '<div>Voided: <span class="fw-bold">' + String(voidedCount) + '</span></div>';
+    }
+
+    const actionCell = row.querySelector('td[data-col="actions"]');
+    if (!actionCell) return;
+
+    const detailsLink = actionCell.querySelector('a[href*="/school/programs/registrations/"]');
+    if (detailsLink) detailsLink.textContent = 'Details';
+
+    const approveBtn = actionCell.querySelector('button.approve-btn');
+    if (approveBtn) approveBtn.remove();
+
+    const rollbackBtn = actionCell.querySelector('button.rollback-btn');
+    if (rollbackBtn) rollbackBtn.remove();
+
+    let hint = actionCell.querySelector('span.text-muted.small.ms-2');
+    if (!hint) {
+      hint = document.createElement('span');
+      hint.className = 'text-muted small ms-2';
+      actionCell.appendChild(hint);
+    }
+    hint.textContent = isWarning ? 'Moved back to draft with issues' : 'Moved back to draft';
+  }
+
+  document.querySelectorAll('.rollback-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const id = String(btn.getAttribute('data-id') || '').trim();
+      const name = String(btn.getAttribute('data-name') || id).trim();
+      if (!id) return;
+      let confirmed = false;
+      if (typeof window.showMessageModal === 'function') {
+        const result = await window.showMessageModal({
+          title: 'Move Registration Back to Draft?',
+          icon: 'warning',
+          message: 'Move registration for <b>' + String(name || '').replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; }) + '</b> back to draft?',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Move Back to Draft', class: 'btn-danger' }
+          ]
+        });
+        confirmed = result === 'Move Back to Draft';
+      } else {
+        confirmed = window.confirm('Move registration for ' + name + ' back to draft?');
+      }
+      if (!confirmed) return;
+
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Moving back...';
+      try {
+        const body = new URLSearchParams({
+          note: 'Manual rollback from Program Registrations list'
+        });
+        const response = await fetch('/school/programs/register-students/rollback/' + encodeURIComponent(id), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: body.toString()
+        });
+        const result = await response.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Move Back to Draft In Progress', replayTitle: 'Move Back to Draft Already Processed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (result.status === 'error') throw new Error(result.message || 'Move back to draft failed.');
+        await showMsg({
+          title: 'Move Back to Draft Result',
+          icon: result.status === 'warning' ? 'warning' : 'success',
+          message: result.message || 'Moved back to draft.',
+          buttons: [{ text: 'OK', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+        });
+        updateRegistrationRowAfterRollback(id, result);
+      } catch (error) {
+        await showMsg({
+          title: 'Move Back to Draft Error',
+          icon: 'error',
+          message: error.message || 'Move back to draft failed.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
+  });
+
+  document.querySelectorAll('.approve-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const id = String(btn.getAttribute('data-id') || '').trim();
+      const name = String(btn.getAttribute('data-name') || id).trim();
+      if (!id) return;
+
+      let confirmed = false;
+      if (typeof window.showMessageModal === 'function') {
+        const result = await window.showMessageModal({
+          title: 'Approve Draft?',
+          icon: 'warning',
+          message: 'Approve and post draft registration for <b>' + String(name || '').replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; }) + '</b>?',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Approve & Post', class: 'btn-success' }
+          ]
+        });
+        confirmed = result === 'Approve & Post';
+      } else {
+        confirmed = window.confirm('Approve and post draft registration for ' + name + '?');
+      }
+      if (!confirmed) return;
+
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Posting...';
+      try {
+        const body = new URLSearchParams({
+          note: 'Approved from Program Registrations list'
+        });
+        const response = await fetch('/school/programs/register-students/approve/' + encodeURIComponent(id), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: body.toString()
+        });
+        const result = await response.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Approval In Progress', replayTitle: 'Approval Already Processed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (result.status === 'error') throw new Error(result.message || 'Approval failed.');
+        await showMsg({
+          title: 'Approval Result',
+          icon: result.status === 'warning' ? 'warning' : 'success',
+          message: result.message || 'Draft approved.',
+          buttons: [{ text: 'OK', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+        });
+        updateRegistrationRowAfterApprove(id, result);
+      } catch (error) {
+        await showMsg({
+          title: 'Approval Error',
+          icon: 'error',
+          message: error.message || 'Approval failed.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
+  });
+})();
+</script>

@@ -1,0 +1,214 @@
+<%
+  const reviewQsParts = [];
+  if (typeof selectedTeacherId !== 'undefined' && selectedTeacherId) {
+    reviewQsParts.push(`teacherId=${encodeURIComponent(selectedTeacherId)}`);
+  } else if (typeof selectedPersonId !== 'undefined' && selectedPersonId) {
+    reviewQsParts.push(`personId=${encodeURIComponent(selectedPersonId)}`);
+  }
+  const reviewQs = reviewQsParts.length ? `?${reviewQsParts.join('&')}` : '';
+%>
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  headerManageBtns: [
+    `<a href="/school/exams" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-house me-1"></i> Exam Home</a>`
+  ],
+  manageBtns: [
+    `<a href="/school/exams/allocations" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-calendar2-check me-1"></i> Allocations</a>`,
+    `<a href="/school/exams/templates" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-richtext me-1"></i> Templates</a>`
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search exams by name, class, status...',
+  fields: []
+}) %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body p-3">
+    <form method="GET" action="/school/exams/teacher-assignments" id="teacherReviewFilterForm">
+      <% if (isAdminViewer && !(selectedTeacherId || '') && (selectedPersonId || '')) { %>
+        <input type="hidden" name="personId" value="<%= selectedPersonId %>">
+      <% } %>
+      <div class="row g-2 align-items-end">
+        <% if (isAdminViewer) { %>
+        <div class="col-md-6">
+          <label class="form-label small fw-bold mb-1">Teacher</label>
+          <div class="input-group">
+            <input type="hidden" id="teacherIdFilterInput" name="teacherId" value="<%= selectedTeacherId || '' %>">
+            <input type="text" id="teacherNameFilterInput" class="form-control bg-white" value="<%= selectedPersonDisplay || '' %>" placeholder="Pick a teacher..." readonly>
+            <button class="btn btn-outline-primary" type="button" id="btnPickTeacherFilter"><i class="bi bi-search"></i></button>
+            <button class="btn btn-outline-secondary" type="button" id="btnClearTeacherFilter"><i class="bi bi-x-lg"></i></button>
+          </div>
+        </div>
+        <% } %>
+        <div class="<%= isAdminViewer ? 'col-md-6' : 'col-md-8 col-lg-6' %>">
+          <label class="form-label small fw-bold mb-1">Class</label>
+          <div class="input-group">
+            <input type="hidden" id="classIdFilterInput" name="classId" value="<%= filters?.classId || '' %>">
+            <input type="text" id="classTitleFilterInput" class="form-control bg-white" value="" placeholder="Any class" readonly>
+            <button class="btn btn-outline-primary" type="button" id="btnPickClassFilter"><i class="bi bi-search"></i></button>
+            <button class="btn btn-outline-secondary" type="button" id="btnClearClassFilter"><i class="bi bi-x-lg"></i></button>
+          </div>
+        </div>
+      </div>
+      <% if (isAdminViewer) { %>
+      <div class="small text-muted mt-1 mb-2">Admins: choose who instructs the class for each allocation.</div>
+      <% } %>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-6 col-lg-4">
+          <label class="form-label small fw-bold mb-1">Allocation status</label>
+          <select name="status" class="form-select">
+            <option value="">Any</option>
+            <% (allocationStatuses || []).forEach((st) => { %>
+              <option value="<%= st %>" <%= String(filters?.status || '') === String(st) ? 'selected' : '' %>><%= st %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="col-md-6 col-lg-8 d-flex align-items-end justify-content-md-end pt-2 pt-md-0">
+          <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+      </div>
+    </form>
+    <% if (!isAdminViewer) { %>
+      <div class="small text-muted mt-2">Your classes and linked assignments are listed below. Open an exam to see each student&apos;s status and review work.</div>
+    <% } %>
+  </div>
+</div>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Exam allocation</th>
+        <th>Class</th>
+        <th>Window (UTC)</th>
+        <th>Status</th>
+        <th>Assignments</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (requiresTeacherSelection) { %>
+        <tr><td colspan="7" class="text-center py-4 text-muted">Select a teacher and click <strong>Apply</strong> to load exam allocations they instruct.</td></tr>
+      <% } else if (invalidTeacherSelection) { %>
+        <tr><td colspan="7" class="text-center py-4 text-warning">That teacher could not be found. Choose another teacher.</td></tr>
+      <% } else if (!data || !data.length) { %>
+        <tr><td colspan="7" class="text-center py-4 text-muted">No exam allocations match these filters.</td></tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <% const st = String(row.status || '').toLowerCase(); %>
+        <% const counts = (selectedPersonId ? row.viewerAssignmentCounts : row.assignmentCounts) || {}; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= row.allocationName || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= row.id %></div>
+          </td>
+          <td>
+            <div class="fw-semibold"><%= row.className || row.classId || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= row.classId || '-' %></div>
+          </td>
+          <td>
+            <div class="x-small text-muted">Start</div>
+            <div class="font-monospace x-small"><%= row.windowStartUtc || '-' %></div>
+            <div class="x-small text-muted mt-1">End</div>
+            <div class="font-monospace x-small"><%= row.windowEndUtc || '-' %></div>
+          </td>
+          <td>
+            <span class="badge <%= st === 'open' ? 'bg-success' : (st === 'scheduled' ? 'bg-primary' : (st === 'closed' ? 'bg-secondary' : (st === 'cancelled' ? 'bg-danger' : 'bg-warning text-dark'))) %>"><%= st || '-' %></span>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border me-1">T: <%= Number(counts.total || 0) %></span>
+            <span class="badge bg-warning-subtle text-warning-emphasis border me-1">P: <%= Number(counts.pending || 0) %></span>
+            <span class="badge bg-info-subtle text-info-emphasis border me-1">S: <%= Number(counts.started || 0) %></span>
+            <span class="badge bg-primary-subtle text-primary-emphasis border me-1">Sub: <%= Number(counts.submitted || 0) %></span>
+            <span class="badge bg-success-subtle text-success-emphasis border">G: <%= Number(counts.graded || 0) %></span>
+          </td>
+          <td class="table-actions pe-4 text-end">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <a class="btn btn-outline-primary btn-sm" href="/school/exams/teacher-assignments/<%= row.id %><%= reviewQs %>"><i class="bi bi-people me-2"></i>Students &amp; status</a>
+                <a class="btn btn-outline-secondary btn-sm" href="/school/exams/allocations/<%= row.id %>"><i class="bi bi-box-arrow-up-right me-2"></i>View allocation</a>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/exams/teacher-assignments' }) %>
+<%- include('../../partials/tablePages-end') %>
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+  (function () {
+    const isAdminViewer = <%= isAdminViewer ? 'true' : 'false' %>;
+    const teacherIdInput = document.getElementById('teacherIdFilterInput');
+    const teacherNameInput = document.getElementById('teacherNameFilterInput');
+    const classIdInput = document.getElementById('classIdFilterInput');
+    const classTitleInput = document.getElementById('classTitleFilterInput');
+    const btnPickTeacher = document.getElementById('btnPickTeacherFilter');
+    const btnClearTeacher = document.getElementById('btnClearTeacherFilter');
+    const btnPickClass = document.getElementById('btnPickClassFilter');
+    const btnClearClass = document.getElementById('btnClearClassFilter');
+    const classIndex = new Map(<%- JSON.stringify((classes || []).map((row) => [String(row.id || ''), String(row.title || row.name || row.id || '')])) %>);
+
+    function syncClassTitle() {
+      const id = String(classIdInput?.value || '').trim();
+      classTitleInput.value = classIndex.get(id) || '';
+    }
+
+    btnPickTeacher?.addEventListener('click', function () {
+      if (!isAdminViewer || !window.GenericPicker || !window.GenericPickerPresets) return;
+      GenericPicker.open(GenericPickerPresets.teacher({
+        title: 'Select Teacher',
+        onSelect: function (item) {
+          const id = String(item?.id || '').trim();
+          if (!id) return;
+          teacherIdInput.value = id;
+          teacherNameInput.value = String(item?.title || item?.employeeNumber || item?.name || id).trim();
+        }
+      }));
+    });
+
+    btnClearTeacher?.addEventListener('click', function () {
+      if (!isAdminViewer) return;
+      teacherIdInput.value = '';
+      teacherNameInput.value = '';
+    });
+
+    btnPickClass?.addEventListener('click', function () {
+      if (!window.GenericPicker || !window.GenericPickerPresets) return;
+      GenericPicker.open(GenericPickerPresets.class({
+        onSelect: function (item) {
+          const id = String(item?.id || '').trim();
+          if (!id) return;
+          classIdInput.value = id;
+          classTitleInput.value = String(item?.title || item?.name || id);
+        }
+      }));
+    });
+
+    btnClearClass?.addEventListener('click', function () {
+      classIdInput.value = '';
+      classTitleInput.value = '';
+    });
+
+    syncClassTitle();
+  })();
+</script>

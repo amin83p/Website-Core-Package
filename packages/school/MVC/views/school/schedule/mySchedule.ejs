@@ -1,0 +1,683 @@
+<style>
+    .schedule-shell .filter-panel {
+        background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
+        border: 1px solid #dce9ff;
+        border-radius: 14px;
+    }
+
+    .schedule-shell .period-chip {
+        min-width: 110px;
+    }
+
+    .schedule-shell .period-chip.active {
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+    }
+
+    .schedule-shell .summary-tile {
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        transition: all 0.18s ease;
+        cursor: pointer;
+    }
+
+    .schedule-shell .summary-tile:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.4rem 1rem rgba(13, 110, 253, 0.08);
+    }
+
+    .schedule-shell .summary-tile.active {
+        border-color: #0d6efd;
+        background: #f3f8ff;
+        box-shadow: 0 0 0 1px rgba(13, 110, 253, 0.18);
+    }
+
+    .schedule-shell .summary-label {
+        font-size: 0.75rem;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: #6c757d;
+    }
+
+    .schedule-shell .status-pill {
+        border-radius: 999px;
+        padding: 0.32rem 0.7rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border: 1px solid transparent;
+    }
+
+    .schedule-shell .status-scheduled {
+        background: #e7f1ff;
+        color: #0a58ca;
+        border-color: #b6d4fe;
+    }
+
+    .schedule-shell .status-completed {
+        background: #d1e7dd;
+        color: #146c43;
+        border-color: #a3cfbb;
+    }
+
+    .schedule-shell .status-cancelled {
+        background: #f8d7da;
+        color: #b02a37;
+        border-color: #f1aeb5;
+    }
+
+    .schedule-shell .status-holiday {
+        background: #fff3cd;
+        color: #997404;
+        border-color: #ffda6a;
+    }
+
+    .schedule-shell .status-other {
+        background: #e9ecef;
+        color: #495057;
+        border-color: #ced4da;
+    }
+
+    .schedule-shell .session-row {
+        cursor: pointer;
+        transition: filter 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .schedule-shell .session-row:hover {
+        filter: brightness(0.985);
+    }
+
+    .schedule-shell .role-badge {
+        background: #eff6ff;
+        color: #0b5ed7;
+        border: 1px solid #bfd7ff;
+    }
+
+    .schedule-shell .status-tag {
+        border-radius: 999px;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        border: 1px solid transparent;
+    }
+
+    .schedule-shell .status-tag.scheduled {
+        background: #e7f1ff;
+        color: #084298;
+        border-color: #b6d4fe;
+    }
+
+    .schedule-shell .status-tag.completed {
+        background: #d1e7dd;
+        color: #0f5132;
+        border-color: #a3cfbb;
+    }
+
+    .schedule-shell .status-tag.cancelled {
+        background: #f8d7da;
+        color: #842029;
+        border-color: #f1aeb5;
+    }
+
+    .schedule-shell .status-tag.holiday {
+        background: #fff3cd;
+        color: #664d03;
+        border-color: #ffe69c;
+    }
+
+    .schedule-shell .status-tag.other {
+        background: #e2e3e5;
+        color: #41464b;
+        border-color: #c6c8ca;
+    }
+</style>
+
+<div class="sections-page schedule-shell">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="page-heading size-md m-0"><i class="bi bi-calendar2-week me-2"></i> Schedule Overview</h1>
+            <div class="text-muted small mt-1">
+                View daily, weekly, monthly, seasonal, and yearly workload with sessions and assigned tasks.
+            </div>
+        </div>
+        <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-sm">
+            <i class="bi bi-speedometer2 me-1"></i> Dashboard
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body filter-panel">
+            <div class="row g-3 align-items-end">
+                <% if (isAdminViewer) { %>
+                    <div class="col-xl-4 col-lg-5">
+                        <label class="form-label fw-bold small mb-2">Person Type</label>
+                        <div class="d-flex flex-wrap gap-2" id="ms_personTypeWrap">
+                            <input type="radio" class="btn-check" name="ms_personType" id="ms_typeTeacher" value="teacher" checked>
+                            <label class="btn btn-outline-primary btn-sm" for="ms_typeTeacher">Teacher</label>
+
+                            <input type="radio" class="btn-check" name="ms_personType" id="ms_typeStudent" value="student">
+                            <label class="btn btn-outline-primary btn-sm" for="ms_typeStudent">Student</label>
+
+                            <input type="radio" class="btn-check" name="ms_personType" id="ms_typeStaff" value="staff">
+                            <label class="btn btn-outline-primary btn-sm" for="ms_typeStaff">Staff</label>
+
+                            <input type="radio" class="btn-check" name="ms_personType" id="ms_typeAny" value="person">
+                            <label class="btn btn-outline-primary btn-sm" for="ms_typeAny">Any Person</label>
+                        </div>
+                    </div>
+                    <div class="col-xl-4 col-lg-5">
+                        <label class="form-label fw-bold small">Select Person</label>
+                        <div class="input-group">
+                            <input type="hidden" id="ms_personId" value="<%= prefillPersonId || '' %>">
+                            <input type="text" id="ms_personName" class="form-control bg-white" placeholder="Select a person..." readonly value="<%= prefillPersonName || '' %>">
+                            <button type="button" class="btn btn-outline-danger" id="ms_clearPerson" title="Clear">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" id="ms_pickPerson">
+                                <i class="bi bi-search me-1"></i> Pick
+                            </button>
+                        </div>
+                    </div>
+                <% } else { %>
+                    <div class="col-xl-8 col-lg-10">
+                        <label class="form-label fw-bold small">My Profile</label>
+                        <div class="input-group">
+                            <input type="hidden" id="ms_personId" value="<%= selfPersonId || '' %>">
+                            <input type="text" id="ms_personName" class="form-control bg-white" readonly value="<%= selfPersonName || '' %>">
+                            <span class="input-group-text bg-primary-subtle text-primary fw-semibold">Self View</span>
+                        </div>
+                    </div>
+                <% } %>
+
+                <div class="col-xl-2 col-lg-2 col-md-6">
+                    <label class="form-label fw-bold small">Anchor Date</label>
+                    <input type="date" class="form-control" id="ms_anchorDate">
+                </div>
+                <div class="col-xl-2 col-lg-2 col-md-6">
+                    <button type="button" class="btn btn-primary w-100 fw-bold" id="ms_loadBtn">
+                        <i class="bi bi-arrow-repeat me-1"></i> Load
+                    </button>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-3" id="ms_periodControls">
+                <button type="button" class="btn btn-outline-secondary btn-sm period-chip" data-period="day">Daily</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm period-chip active" data-period="week">Weekly</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm period-chip" data-period="month">Monthly</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm period-chip" data-period="season">Seasonal</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm period-chip" data-period="year">Yearly</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3" id="ms_periodSummary">
+        <div class="col-12">
+            <div class="alert alert-light border mb-0 text-muted py-3">
+                Select a period and load schedule data.
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                    <div class="text-muted small">Active Range</div>
+                    <div class="fw-bold" id="ms_rangeLabel">-</div>
+                </div>
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <span class="badge bg-primary-subtle text-primary border" id="ms_personBadge">-</span>
+                    <span class="badge bg-info text-dark" id="ms_hoursBadge">0.00 Hours</span>
+                    <span class="badge bg-secondary" id="ms_countBadge">0 Items</span>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-3" id="ms_statusSummary"></div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+            <h5 class="m-0 fw-bold"><i class="bi bi-list-task me-2"></i> Session Details</h5>
+            <span class="badge bg-primary text-white" id="ms_resultBadge">0</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Date</th>
+                        <th>Time</th>
+                        <th>Class</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th class="text-end">Hours</th>
+                        <th class="text-end pe-3">Details</th>
+                    </tr>
+                </thead>
+                <tbody id="ms_sessionsBody">
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">No schedule loaded yet.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const state = {
+        isAdminViewer: <%- JSON.stringify(Boolean(isAdminViewer)) %>,
+        period: 'week',
+        personId: String(<%- JSON.stringify(prefillPersonId || selfPersonId || '') %> || '').trim(),
+        personName: String(<%- JSON.stringify(prefillPersonName || selfPersonName || '') %> || '').trim()
+    };
+
+    const els = {
+        personId: document.getElementById('ms_personId'),
+        personName: document.getElementById('ms_personName'),
+        anchorDate: document.getElementById('ms_anchorDate'),
+        loadBtn: document.getElementById('ms_loadBtn'),
+        pickPerson: document.getElementById('ms_pickPerson'),
+        clearPerson: document.getElementById('ms_clearPerson'),
+        periodControls: document.getElementById('ms_periodControls'),
+        periodSummary: document.getElementById('ms_periodSummary'),
+        rangeLabel: document.getElementById('ms_rangeLabel'),
+        personBadge: document.getElementById('ms_personBadge'),
+        hoursBadge: document.getElementById('ms_hoursBadge'),
+        countBadge: document.getElementById('ms_countBadge'),
+        statusSummary: document.getElementById('ms_statusSummary'),
+        resultBadge: document.getElementById('ms_resultBadge'),
+        sessionsBody: document.getElementById('ms_sessionsBody')
+    };
+
+    const today = new Date();
+    const toIsoDate = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
+    const periodLabel = {
+        day: 'Daily',
+        week: 'Weekly',
+        month: 'Monthly',
+        season: 'Seasonal',
+        year: 'Yearly'
+    };
+
+    const normalizeStatusCode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'other';
+    let sessionStatusMetaMap = new Map();
+    let statusOrder = ['other'];
+
+    const escapeHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const getStatusMeta = (status) => sessionStatusMetaMap.get(normalizeStatusCode(status)) || null;
+    const statusStyle = (status) => {
+        const meta = getStatusMeta(status);
+        if (!meta) return 'background:#e2e3e5;color:#41464b;border-color:#c6c8ca;';
+        return `background:${meta.colorBg || '#e2e3e5'};color:${meta.colorText || '#41464b'};border-color:${meta.colorBorder || '#c6c8ca'};`;
+    };
+    const normalizeHexColor = (value, fallback = '#e2e3e5') => {
+        const raw = String(value || '').trim();
+        const normalized = raw.startsWith('#') ? raw : `#${raw}`;
+        return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized) ? normalized : fallback;
+    };
+    const colorToRgba = (value, alpha = 1, fallback = '#e2e3e5') => {
+        const hex = normalizeHexColor(value, fallback).replace('#', '');
+        const full = hex.length === 3 ? hex.split('').map((ch) => ch + ch).join('') : hex;
+        const r = Number.parseInt(full.slice(0, 2), 16);
+        const g = Number.parseInt(full.slice(2, 4), 16);
+        const b = Number.parseInt(full.slice(4, 6), 16);
+        const safeAlpha = Math.max(0, Math.min(1, Number(alpha)));
+        return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
+    };
+    const rowStyle = (status, locked) => {
+        const meta = getStatusMeta(status);
+        const normalized = normalizeStatusCode(status);
+        const colorBg = normalizeHexColor(meta?.colorBg, normalized === 'holiday' ? '#fff3cd' : '#e2e3e5');
+        const colorBorder = normalizeHexColor(meta?.colorBorder, normalized === 'holiday' ? '#ffe69c' : '#c6c8ca');
+        const baseLayer = `linear-gradient(${colorToRgba(colorBg, 0.20, colorBg)}, ${colorToRgba(colorBg, 0.20, colorBg)})`;
+        const lockLayer = locked
+            ? `, repeating-linear-gradient(-45deg, ${colorToRgba('#6c757d', 0.08, '#6c757d')} 0 10px, ${colorToRgba('#adb5bd', 0.18, '#adb5bd')} 10px 20px)`
+            : '';
+        return [
+            `background-color:${colorToRgba(colorBg, locked ? 0.14 : 0.20, colorBg)}`,
+            `background-image:${baseLayer}${lockLayer}`,
+            `border-left:4px solid ${locked ? '#6c757d' : colorBorder}`,
+            locked ? 'box-shadow:inset 0 0 0 1px rgba(108, 117, 125, 0.18)' : ''
+        ].filter(Boolean).join(';');
+    };
+
+    const statusText = (status) => {
+        const meta = getStatusMeta(status);
+        if (meta?.label) return meta.label;
+        const normalized = normalizeStatusCode(status);
+        if (!normalized || normalized === 'other') return 'Other';
+        if (normalized === 'holiday') return 'Holiday';
+        return normalized.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    };
+
+    const showAlert = async (message, title = 'Notice') => {
+        try {
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({ title, message, type: 'info', okText: 'OK' });
+                return;
+            }
+        } catch (_) {}
+        alert(message);
+    };
+
+    const setBusy = (busy) => {
+        if (!els.loadBtn) return;
+        els.loadBtn.disabled = busy;
+        els.loadBtn.innerHTML = busy
+            ? '<span class="spinner-border spinner-border-sm me-1"></span> Loading'
+            : '<i class="bi bi-arrow-repeat me-1"></i> Load';
+    };
+
+    const syncPersonStateFromInputs = () => {
+        state.personId = String(els.personId?.value || '').trim();
+        state.personName = String(els.personName?.value || '').trim();
+    };
+
+    const setPeriodActive = (period) => {
+        state.period = period;
+        document.querySelectorAll('#ms_periodControls .period-chip').forEach((btn) => {
+            const active = btn.dataset.period === period;
+            btn.classList.toggle('active', active);
+            btn.classList.toggle('btn-primary', active);
+            btn.classList.toggle('text-white', active);
+            btn.classList.toggle('btn-outline-secondary', !active);
+        });
+    };
+
+    const getSelectedPersonType = () => {
+        const selected = document.querySelector('input[name="ms_personType"]:checked');
+        return selected ? selected.value : 'teacher';
+    };
+
+    const openPersonPicker = () => {
+        if (!state.isAdminViewer) return;
+        const selectedType = getSelectedPersonType();
+        const context = GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' });
+
+        const configFactory = {
+            teacher: () => GenericPickerPresets.teacher({ title: 'Select Teacher', context }),
+            student: () => GenericPickerPresets.student({ title: 'Select Student', context }),
+            staff: () => GenericPickerPresets.staff({ title: 'Select Staff', context }),
+            person: () => GenericPickerPresets.person({ title: 'Select Person', context })
+        };
+
+        const configBuilder = configFactory[selectedType] || configFactory.person;
+        const config = configBuilder();
+        config.onSelect = (item) => {
+            const personId = item.personId || item.id || '';
+            const name = `${item.firstName || ''} ${item.lastName || ''}`.trim()
+                || item.name
+                || personId;
+            if (els.personId) els.personId.value = personId;
+            if (els.personName) els.personName.value = name;
+            syncPersonStateFromInputs();
+            loadSchedule();
+        };
+
+        GenericPicker.open(config);
+    };
+
+    const renderStatusSummary = (selectedSummary) => {
+        const counts = selectedSummary?.statusCounts || {};
+        const total = Number(selectedSummary?.sessionCount || 0);
+        if (!total) {
+            els.statusSummary.innerHTML = '<span class="text-muted small">No status data for selected period.</span>';
+            return;
+        }
+
+        const pills = statusOrder.map((key) => {
+            const value = Number(counts[key] || 0);
+            if (!value) return '';
+            return `<span class="status-pill" style="${statusStyle(key)}">${statusText(key)}: ${value}</span>`;
+        }).filter(Boolean);
+
+        els.statusSummary.innerHTML = pills.join('') || '<span class="text-muted small">No status data for selected period.</span>';
+    };
+
+    const renderPeriodSummary = (totalsByPeriod) => {
+        const cards = ['day', 'week', 'month', 'season', 'year'].map((key) => {
+            const row = totalsByPeriod?.[key] || {};
+            const active = key === state.period;
+            const hours = Number(row.totalHours || 0).toFixed(2);
+            const sessions = Number(row.sessionCount || 0);
+            const range = escapeHtml(row.rangeLabel || '-');
+
+            return `
+                <div class="col-md-6 col-xl-2">
+                    <div class="summary-tile p-3 h-100 ${active ? 'active' : ''}" data-period="${key}">
+                        <div class="summary-label mb-1">${periodLabel[key]}</div>
+                        <div class="fw-bold fs-5">${hours}h</div>
+                        <div class="text-muted small">${sessions} items</div>
+                        <div class="text-muted small mt-2">${range}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        els.periodSummary.innerHTML = cards;
+    };
+
+    const renderSessions = (events) => {
+        const lifecycleHtml = (event) => {
+            const lifecycle = event?.classLifecycle || {};
+            const mode = String(lifecycle.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
+            if (mode !== 'rolling') {
+                return '<span class="badge bg-light text-dark border">Term-Based</span>';
+            }
+            const cycleNo = Number.isFinite(Number(lifecycle.cycleNo)) && Number(lifecycle.cycleNo) > 0 ? Number(lifecycle.cycleNo) : 1;
+            const range = `${String(lifecycle.cycleStartDate || '').trim() || '?'} -> ${String(lifecycle.cycleEndDate || '').trim() || 'Open'}`;
+            const closed = lifecycle.isClosedForNewEnrollment
+                ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1">Closed Enrollment</span>'
+                : '';
+            return ''
+                + '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle me-1">Rolling</span>'
+                + '<span class="badge bg-light text-dark border me-1">Cycle #' + escapeHtml(cycleNo) + '</span>'
+                + closed
+                + '<span class="small text-muted ms-1">Cycle Window: ' + escapeHtml(range) + '</span>';
+        };
+        const rows = Array.isArray(events) ? events : [];
+        els.resultBadge.textContent = String(rows.length);
+
+        if (!rows.length) {
+            els.sessionsBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
+                        No schedule items found for the selected period.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        els.sessionsBody.innerHTML = rows.map((event) => {
+            const dateLabel = new Date(`${event.date}T00:00:00`).toLocaleDateString('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+            });
+            const url = String(event.detailsUrl || '').trim();
+            const canOpen = Boolean(url);
+            return `
+                <tr class="session-row" data-url="${escapeHtml(url)}" style="${rowStyle(event.status, event.locked === true)}">
+                    <td class="ps-3 fw-semibold">${escapeHtml(dateLabel)}</td>
+                    <td class="small text-muted">${escapeHtml(event.start || '-')} - ${escapeHtml(event.end || '-')}</td>
+                    <td class="fw-semibold text-primary">
+                        <div>${escapeHtml(event.className || event.classId || '-')}</div>
+                        <div class="small mt-1">${lifecycleHtml(event)}</div>
+                    </td>
+                    <td><span class="badge role-badge">${escapeHtml(event.roleLabel || '-')}</span></td>
+                    <td><span class="status-tag" style="${statusStyle(event.status)}">${escapeHtml(statusText(event.status))}</span>${event.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : ''}</td>
+                    <td class="text-end fw-semibold">${Number(event.duration || 0).toFixed(2)}</td>
+                    <td class="text-end pe-3">
+                        ${canOpen
+                            ? '<button type="button" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-right"></i></button>'
+                            : '<span class="text-muted small">N/A</span>'}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    };
+
+    const applyResponse = (payload) => {
+        sessionStatusMetaMap = new Map(
+            (Array.isArray(payload?.statusMeta) ? payload.statusMeta : [])
+                .map((row) => [normalizeStatusCode(row?.code), row])
+                .filter(([code]) => Boolean(code))
+        );
+        const responseStatusCounts = payload?.selectedSummary?.statusCounts || {};
+        const dynamicStatusOrder = [...sessionStatusMetaMap.keys(), ...Object.keys(responseStatusCounts).map((key) => normalizeStatusCode(key)), 'other'];
+        statusOrder = [...new Set(dynamicStatusOrder)];
+
+        const personName = payload?.person?.name || state.personName || state.personId || 'Person';
+        const selectedSummary = payload?.selectedSummary || {};
+        const selectedRange = payload?.selectedRange || {};
+
+        state.personName = personName;
+        if (els.personName && !els.personName.value) {
+            els.personName.value = personName;
+        }
+
+        els.personBadge.textContent = personName;
+        els.rangeLabel.textContent = selectedRange.label || '-';
+        els.hoursBadge.textContent = `${Number(selectedSummary.totalHours || 0).toFixed(2)} Hours`;
+        els.countBadge.textContent = `${Number(selectedSummary.sessionCount || 0)} Items`;
+
+        renderStatusSummary(selectedSummary);
+        renderPeriodSummary(payload?.totalsByPeriod || {});
+        renderSessions(payload?.events || []);
+    };
+
+    const buildQuery = () => {
+        const params = new URLSearchParams();
+        params.set('period', state.period);
+        params.set('anchorDate', String(els.anchorDate?.value || toIsoDate(today)));
+        if (state.personId) params.set('personId', state.personId);
+        return params.toString();
+    };
+
+    const loadSchedule = async () => {
+        syncPersonStateFromInputs();
+        if (!state.personId) {
+            if (state.isAdminViewer) {
+                await showAlert('Please select a person first.');
+            } else {
+                await showAlert('Your account is not linked to a person profile.');
+            }
+            return;
+        }
+
+        setBusy(true);
+        els.sessionsBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-5">
+                    <div class="spinner-border text-primary mb-2"></div>
+                    <div class="text-muted small">Loading schedule...</div>
+                </td>
+            </tr>
+        `;
+
+        try {
+            const response = await fetch(`/school/schedules/api/my-schedule?${buildQuery()}`, {
+                headers: { 'X-AJAX-Request': 'true' }
+            });
+            const payload = await response.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(payload, { busyTitle: 'Schedule Load In Progress', replayTitle: 'Schedule Already Loaded' })
+                : { stop: false };
+            if (guarded.stop) return;
+            if (!response.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Failed to load schedule.');
+            }
+
+            applyResponse(payload);
+        } catch (error) {
+            els.sessionsBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>${escapeHtml(error.message)}
+                    </td>
+                </tr>
+            `;
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    if (els.anchorDate) els.anchorDate.value = toIsoDate(today);
+    setPeriodActive('week');
+
+    if (state.isAdminViewer) {
+        if (els.pickPerson) els.pickPerson.addEventListener('click', openPersonPicker);
+        if (els.clearPerson) {
+            els.clearPerson.addEventListener('click', () => {
+                if (els.personId) els.personId.value = '';
+                if (els.personName) els.personName.value = '';
+                syncPersonStateFromInputs();
+            });
+        }
+        document.querySelectorAll('input[name="ms_personType"]').forEach((input) => {
+            input.addEventListener('change', () => {
+                if (els.personId) els.personId.value = '';
+                if (els.personName) els.personName.value = '';
+                syncPersonStateFromInputs();
+            });
+        });
+    }
+
+    if (els.loadBtn) els.loadBtn.addEventListener('click', loadSchedule);
+    if (els.anchorDate) els.anchorDate.addEventListener('change', () => {
+        if (!state.personId && state.isAdminViewer) return;
+        loadSchedule();
+    });
+
+    if (els.periodControls) {
+        els.periodControls.addEventListener('click', (event) => {
+            const btn = event.target.closest('[data-period]');
+            if (!btn) return;
+            const period = String(btn.dataset.period || '').trim();
+            if (!period) return;
+            setPeriodActive(period);
+            if (!state.personId && state.isAdminViewer) return;
+            loadSchedule();
+        });
+    }
+
+    if (els.periodSummary) {
+        els.periodSummary.addEventListener('click', (event) => {
+            const tile = event.target.closest('[data-period]');
+            if (!tile) return;
+            const period = String(tile.dataset.period || '').trim();
+            if (!period || period === state.period) return;
+            setPeriodActive(period);
+            if (!state.personId && state.isAdminViewer) return;
+            loadSchedule();
+        });
+    }
+
+    if (els.sessionsBody) {
+        els.sessionsBody.addEventListener('click', (event) => {
+            const row = event.target.closest('tr[data-url]');
+            if (!row) return;
+            const url = String(row.getAttribute('data-url') || '').trim();
+            if (!url) return;
+            window.location.href = url;
+        });
+    }
+
+    if (state.personId) loadSchedule();
+});
+</script>

@@ -1,0 +1,359 @@
+<style>
+  .gm-cell-effective .gm-score { color: #0f5132; font-weight: 600; }
+  .gm-cell-excluded .gm-score { color: #6c757d; }
+  .gm-cell-excluded .gm-pct { text-decoration: line-through; opacity: 0.85; }
+  .matrix-wrapper.gm-matrix { max-height: min(70vh, 720px); overflow: auto; border: 1px solid #dee2e6; border-radius: 6px; }
+  .gm-matrix-table th { position: sticky; top: 0; z-index: 2; background-color: #f8f9fa; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.08); vertical-align: bottom; font-size: 0.78rem; }
+  .gm-matrix-table th.gm-sticky-final,
+  .gm-matrix-table td.gm-sticky-final {
+    position: sticky; left: 0; z-index: 3; min-width: 72px; max-width: 88px; width: 80px;
+    border-right: 1px solid #dee2e6; background-color: #fff;
+  }
+  .gm-matrix-table th.gm-sticky-final { background-color: #f8f9fa; z-index: 4; }
+  .gm-matrix-table th.gm-sticky-name,
+  .gm-matrix-table td.gm-sticky-name {
+    position: sticky; left: 80px; z-index: 3; width: 140px; min-width: 140px; max-width: 140px; border-right: 1px solid #dee2e6;
+    box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06); background-color: #fff;
+  }
+  .gm-matrix-table th.gm-sticky-name { background-color: #f8f9fa; z-index: 4; }
+  .gm-matrix-table td.gm-sticky-name { font-weight: 600; }
+  .gm-matrix-table th.gm-sticky-att,
+  .gm-matrix-table td.gm-sticky-att {
+    position: sticky; left: 220px; z-index: 3; width: 88px; min-width: 88px; max-width: 88px;
+    border-right: 2px solid #dee2e6; background-color: #fff;
+    box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06);
+    text-align: center; vertical-align: middle;
+  }
+  .gm-matrix-table th.gm-sticky-att { background-color: #f8f9fa; z-index: 4; font-size: 0.75rem; }
+  .gm-matrix-table td.gm-sticky-att { font-variant-numeric: tabular-nums; }
+  .gm-band-0 { background-color: #eef6ff !important; }
+  .gm-band-1 { background-color: #f3edff !important; }
+  .gm-band-2 { background-color: #ecfdf3 !important; }
+  .gm-band-3 { background-color: #fff4e6 !important; }
+  .gm-matrix-table th.gm-date-group { text-align: center; font-weight: 700; color: #334155; }
+  .gm-matrix-table .gm-col-head { white-space: nowrap; max-width: 140px; }
+  .gm-eval-card { font-size: 0.85rem; }
+</style>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-table me-2"></i> Grades Matrix</h1>
+      <p class="text-muted small mb-0 mt-1">Session gradebooks, quizzes, and assignments — aligned with class <strong>Evaluation Rules</strong>. Rolling classes use attendance and assignments weights only (no midterm/final exam weights).</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
+      <a href="<%= typeof schoolSectionDashboardHref !== 'undefined' ? schoolSectionDashboardHref : '/dashboard' %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2">
+        <i class="bi bi-speedometer2 me-1"></i> Dashboard
+      </a>
+      <a href="/school/attendances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-grid-3x3 me-1"></i> Attendance matrix</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body bg-light rounded">
+      <div class="row align-items-end g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Class</label>
+          <div class="input-group">
+            <input type="hidden" id="gm_classId">
+            <input type="text" id="gm_className" class="form-control bg-white" placeholder="Search class..." readonly>
+            <button type="button" class="btn btn-outline-primary" id="gm_btnClassPicker"><i class="bi bi-search"></i></button>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">Start date</label>
+          <input type="date" id="gm_startDate" class="form-control">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">End date</label>
+          <input type="date" id="gm_endDate" class="form-control">
+        </div>
+        <div class="col-md-2">
+          <button type="button" id="gm_btnLoad" class="btn btn-primary w-100 fw-bold">Load</button>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="today">Today</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="twoWeeks">Two weeks</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="thisWeek">This week</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="thisMonth">This month</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary gm-range" data-range="allTime">All dates in range</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3 d-none" id="gm_evalCard">
+    <div class="card-body py-2 gm-eval-card">
+      <span class="fw-bold text-primary me-2"><i class="bi bi-sliders me-1"></i>Evaluation rules</span>
+      <span class="text-muted me-2">Passing:</span><span id="gm_passing" class="me-3">—</span>
+      <span class="text-muted">Weights</span>
+      <span id="gm_weights" class="ms-1">—</span>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm d-none" id="gm_results">
+    <div class="card-header bg-white border-bottom py-3">
+      <h5 class="m-0 fw-bold text-primary" id="gm_classTitle">Class</h5>
+      <div class="small text-muted mt-1" id="gm_matrixBlurb">
+        <span class="me-3" id="gm_matrixBlurbMain"><strong>Final</strong> blends weights using attendance % and the average of <em>included</em> assignment-category items (gradebooks, quizzes, assignments).</span>
+        <span class="me-2"><span class="badge bg-light text-success border">Included</span> counts toward category average</span>
+        <span><span class="badge bg-secondary">excl.</span> scored but excluded from average</span>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="matrix-wrapper gm-matrix">
+        <table class="table table-hover table-bordered mb-0 gm-matrix-table" id="gm_table">
+          <thead id="gm_thead"></thead>
+          <tbody id="gm_tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const INITIAL = <%- JSON.stringify({
+    classId: typeof initialClassId !== 'undefined' ? initialClassId : '',
+    className: typeof initialClassName !== 'undefined' ? initialClassName : '',
+    startDate: typeof initialStartDate !== 'undefined' ? initialStartDate : '',
+    endDate: typeof initialEndDate !== 'undefined' ? initialEndDate : '',
+    range: typeof initialRange !== 'undefined' ? initialRange : ''
+  }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
+
+  const toYmd = (d) => {
+    if (!d) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const startOfLocalDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  function setRange(range) {
+    const today = new Date();
+    let start; let end;
+    if (range === 'today') {
+      start = startOfLocalDay(today);
+      end = new Date(start);
+    } else if (range === 'twoWeeks') {
+      const day = today.getDay() || 7;
+      start = startOfLocalDay(today);
+      start.setDate(today.getDate() - (day - 1));
+      end = new Date(start);
+      end.setDate(start.getDate() + 13);
+    } else if (range === 'thisWeek') {
+      const day = today.getDay() || 7;
+      start = startOfLocalDay(today);
+      start.setDate(today.getDate() - (day - 1));
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (range === 'thisMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (range === 'allTime') {
+      document.getElementById('gm_startDate').value = '';
+      document.getElementById('gm_endDate').value = '';
+      return;
+    } else return;
+    document.getElementById('gm_startDate').value = toYmd(start);
+    document.getElementById('gm_endDate').value = toYmd(end);
+  }
+
+  document.querySelectorAll('.gm-range').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setRange(btn.getAttribute('data-range'));
+      if (document.getElementById('gm_classId').value) document.getElementById('gm_btnLoad').click();
+    });
+  });
+
+  if (INITIAL.classId) {
+    document.getElementById('gm_classId').value = INITIAL.classId;
+    document.getElementById('gm_className').value = INITIAL.className || '';
+    document.getElementById('gm_startDate').value = INITIAL.startDate || '';
+    document.getElementById('gm_endDate').value = INITIAL.endDate || '';
+  }
+
+  document.getElementById('gm_btnClassPicker').addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.class({
+      title: 'Select class',
+      icon: 'bi-book',
+      onSelect: (item) => {
+        document.getElementById('gm_classId').value = item.id;
+        document.getElementById('gm_className').value = item.title || item.id;
+        document.getElementById('gm_btnLoad').click();
+      }
+    }));
+  });
+
+  function renderCellHtml(c) {
+    if (!c) return '—';
+    if (c.absent) return '<span class="text-muted small">N/A</span>';
+    if (c.score == null || c.score === '') return '—';
+    const pct = c.percent != null ? `<span class="gm-pct small ms-1">${c.percent}%</span>` : '';
+    const incl = c.includeInGradeCalculation !== false;
+    const eff = !!c.effective;
+    const wrapCls = eff ? 'gm-cell-effective' : 'gm-cell-excluded';
+    const badge = !incl ? '<span class="badge bg-secondary ms-1" title="Excluded in session activity">excl.</span>' : '';
+    return `<div class="${wrapCls}"><span class="gm-score">${c.score}</span>${pct}${badge}</div>`;
+  }
+
+  function bandClass(band) {
+    const b = Number(band) || 0;
+    return `gm-band-${Math.abs(b) % 4}`;
+  }
+
+  /** Attendance / final % display — one decimal, trim trailing .0 */
+  function formatGmPercent(val) {
+    if (val == null || val === '' || Number.isNaN(Number(val))) return '—';
+    const n = Number(val);
+    const t = Math.round(n * 10) / 10;
+    const s = t % 1 === 0 ? String(t) : t.toFixed(1);
+    return `${s}%`;
+  }
+
+  let gmLoadSeq = 0;
+  let gmLoadAbort = null;
+
+  document.getElementById('gm_btnLoad').addEventListener('click', async () => {
+    const classId = document.getElementById('gm_classId').value;
+    const startDate = document.getElementById('gm_startDate').value;
+    const endDate = document.getElementById('gm_endDate').value;
+    if (!classId) return;
+
+    if (gmLoadAbort) gmLoadAbort.abort();
+    gmLoadAbort = new AbortController();
+    const seq = (gmLoadSeq += 1);
+    const requestedClassId = classId;
+
+    const thead = document.getElementById('gm_thead');
+    const tbody = document.getElementById('gm_tbody');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+    document.getElementById('gm_results').classList.add('d-none');
+
+    const btn = document.getElementById('gm_btnLoad');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    try {
+      const url = `/school/grades-matrix/api/data?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+      const res = await fetch(url, {
+        headers: { 'X-AJAX-Request': 'true' },
+        signal: gmLoadAbort.signal,
+        cache: 'no-store'
+      });
+      const result = await res.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status !== 'success') throw new Error(result.message || 'Load failed');
+      if (seq !== gmLoadSeq) return;
+      if (String(result.classId || '') !== String(requestedClassId)) return;
+
+      const { evaluation, columns, matrix, className, dateOrder, registrationMode } = result;
+      const isRollingClass = String(registrationMode || '').trim().toLowerCase() === 'rolling';
+      document.getElementById('gm_classTitle').textContent = className || 'Class';
+      document.getElementById('gm_passing').textContent = (evaluation && evaluation.passingScore != null) ? `${evaluation.passingScore}%` : '—';
+      const w = evaluation && evaluation.weights ? evaluation.weights : {};
+      const weightParts = [
+        w.attendance != null ? `Attendance ${w.attendance}%` : null,
+        w.assignments != null ? `Assignments ${w.assignments}%` : null
+      ];
+      if (!isRollingClass) {
+        weightParts.push(w.midterm != null ? `Midterm ${w.midterm}%` : null);
+        weightParts.push(w.finalExam != null ? `Final exam ${w.finalExam}%` : null);
+      }
+      document.getElementById('gm_weights').innerHTML = weightParts.filter(Boolean).join(' · ') || '—';
+      const blurbMain = document.getElementById('gm_matrixBlurbMain');
+      if (blurbMain) {
+        blurbMain.innerHTML = isRollingClass
+          ? '<strong>Final</strong> uses only <strong>attendance</strong> and <strong>assignments</strong> weights (rolling classes). Assignments = average of <em>included</em> session items (gradebooks, quizzes, assignments). Midterm and final exam weights do not apply.'
+          : '<strong>Final</strong> blends weights using attendance % and the average of <em>included</em> assignment-category items (gradebooks, quizzes, assignments). Session items map to the assignments bucket; midterm/final exam weights on the class apply when those components are wired into this view.';
+      }
+      document.getElementById('gm_evalCard').classList.remove('d-none');
+
+      if (!columns || !columns.length) {
+        thead.innerHTML = '<tr><th class="gm-sticky-final">Final</th><th class="gm-sticky-name">Student</th><th class="gm-sticky-att" title="Attendance performance % for the selected period">Attend.</th><th>No graded items in this date range</th></tr>';
+        matrix.forEach((row) => {
+          const tr = document.createElement('tr');
+          const fp = formatGmPercent(row.finalPercent);
+          const att = formatGmPercent(row.attendancePct);
+          tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${row.name}</td><td class="gm-sticky-att small">${att}</td><td class="text-muted">—</td>`;
+          tbody.appendChild(tr);
+        });
+        document.getElementById('gm_results').classList.remove('d-none');
+        return;
+      }
+
+      const groups = [];
+      let i = 0;
+      while (i < columns.length) {
+        const d = columns[i].date;
+        let j = i;
+        while (j < columns.length && columns[j].date === d) j += 1;
+        groups.push({ date: d, start: i, len: j - i });
+        i = j;
+      }
+
+      const trDate = document.createElement('tr');
+      trDate.innerHTML = `<th class="gm-sticky-final gm-date-group" rowspan="2">Final</th>
+        <th class="gm-sticky-name gm-date-group" rowspan="2">Student</th>
+        <th class="gm-sticky-att gm-date-group" rowspan="2" title="Attendance performance % for sessions in the selected date range (same credit rules as the attendance matrix)">Attend.</th>`;
+      groups.forEach((g) => {
+        const th = document.createElement('th');
+        th.colSpan = g.len;
+        th.className = `gm-date-group ${bandClass(columns[g.start].dateBand)}`;
+        th.textContent = g.date || '—';
+        trDate.appendChild(th);
+      });
+      const trCols = document.createElement('tr');
+      columns.forEach((col) => {
+        const th = document.createElement('th');
+        th.className = `gm-col-head text-center ${bandClass(col.dateBand)}`;
+        th.innerHTML = `<div class="small text-muted">${col.kindLabel || ''}</div><div class="text-dark text-truncate" title="${col.label}">${col.label}</div>`;
+        trCols.appendChild(th);
+      });
+      thead.appendChild(trDate);
+      thead.appendChild(trCols);
+
+      matrix.forEach((row) => {
+        const tr = document.createElement('tr');
+        const fp = row.finalPercent != null ? `<span class="fw-bold">${formatGmPercent(row.finalPercent)}</span>` : '—';
+        const attStr = formatGmPercent(row.attendancePct);
+        const attCell = attStr === '—'
+          ? '<span class="text-muted">—</span>'
+          : `<span class="fw-semibold text-primary">${attStr}</span>`;
+        let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${row.name}</td><td class="gm-sticky-att small">${attCell}</td>`;
+        row.cells.forEach((cell, idx) => {
+          const col = columns[idx];
+          html += `<td class="text-center small ${bandClass(col.dateBand)}">${renderCellHtml(cell)}</td>`;
+        });
+        tr.innerHTML = html;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('gm_results').classList.remove('d-none');
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({ title: 'Error', icon: 'error', message: e.message, buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+      } else {
+        alert(e.message);
+      }
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
+  });
+
+  if (INITIAL.classId) {
+    setTimeout(() => document.getElementById('gm_btnLoad').click(), 100);
+  }
+});
+</script>

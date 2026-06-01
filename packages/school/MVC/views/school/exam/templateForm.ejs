@@ -1,0 +1,2374 @@
+<%
+  const isEdit = !!template;
+  const ownerUserId = String(currentOwnerUserId || template?.ownerUserId || user?.id || '').trim();
+  const ownerLabel = String(currentOwnerDisplayName || user?.username || user?.id || ownerUserId).trim();
+  const templateVisibility = String(template?.visibility || 'private').trim().toLowerCase() === 'public' ? 'public' : 'private';
+  const initialDepartment = {
+    id: String(template?.departmentId || '').trim(),
+    code: String(template?.departmentCode || '').trim(),
+    name: String(template?.departmentName || '').trim()
+  };
+  const initialSubjects = Array.isArray(selectedSubjects) ? selectedSubjects : [];
+  const initialSubjectsJsonAttr = JSON.stringify(initialSubjects)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  const parentTemplateId = String(template?.parentTemplateId || '').trim();
+  const rootTemplateId = String(template?.rootTemplateId || '').trim();
+  const revisionDepth = Number(template?.revisionDepth || 0) || 0;
+  const qbRevisionId = String(questionRevision?.id || '').trim();
+  const qbRows = Array.isArray(questionRows) ? questionRows : [];
+  const qbRowsJsonAttr = JSON.stringify(qbRows)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+%>
+
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<style>
+  #tab-questions .row-actions-wrap {
+    position: relative;
+    display: inline-block;
+  }
+  #tab-questions .row-actions-wrap .row-actions-menu,
+  body > .row-actions-menu.row-actions-menu--floating {
+    min-width: 150px;
+    max-width: min(100vw - 1rem, 240px);
+    z-index: 1100;
+    background: #fff;
+    border: 1px solid #d0d7de;
+    border-radius: 0.45rem;
+    box-shadow: 0 0.45rem 1rem rgba(0, 0, 0, 0.15);
+    padding: 0.35rem;
+  }
+  #tab-questions .row-actions-wrap > .row-actions-menu:not(.row-actions-menu--floating) {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    z-index: 12;
+  }
+  #tab-questions .row-actions-menu .btn,
+  body > .row-actions-menu.row-actions-menu--floating .btn {
+    width: 100%;
+    text-align: left;
+    justify-content: flex-start;
+    margin-bottom: 0.25rem;
+  }
+  #tab-questions .row-actions-menu .btn:last-child,
+  body > .row-actions-menu.row-actions-menu--floating .btn:last-child {
+    margin-bottom: 0;
+  }
+  body > .row-actions-menu.row-actions-menu--floating {
+    position: fixed;
+    margin: 0;
+  }
+</style>
+
+<div class="sections-page">
+  <div class="row g-2 align-items-start mb-4">
+    <div class="col">
+      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><%= isEdit ? 'Edit Exam Template' : 'New Exam Template' %></h1>
+      <% if (isEdit) { %>
+        <h6 class="fw-semibold text-primary mt-2 mb-0"><%= template?.title || 'Exam Template' %></h6>
+        <div class="text-muted small mt-1">Template code: <strong class="font-monospace"><%= template?.code || '-' %></strong></div>
+      <% } else { %>
+        <div class="text-muted small mt-2 mb-0">Define the exam shell, then add questions in the Question Builder tab.</div>
+      <% } %>
+    </div>
+    <div class="col-auto d-flex flex-column align-items-end gap-1">
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= template.id %></span>
+      <% } %>
+      <a href="/school/exams" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house me-1"></i>Exam Home</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <a href="/school/exams/templates" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Templates</a>
+        <% if (isEdit && canPublishFromForm) { %>
+          <form method="POST" action="/school/exams/templates/<%= template.id %>/publish" class="m-0 d-inline">
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <button type="submit" class="btn btn-warning btn-sm text-dark"><i class="bi bi-upload me-1"></i>Publish</button>
+          </form>
+        <% } else { %>
+          <button type="button" class="btn btn-warning btn-sm text-dark" disabled><i class="bi bi-upload me-1"></i>Publish</button>
+        <% } %>
+        <% if (isEdit && template?.publishedRevisionId) { %>
+          <form method="POST" action="/school/exams/templates/<%= template.id %>/revisions/create-copy" class="m-0 d-inline">
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-files me-1"></i>Create Revision</button>
+          </form>
+        <% } else { %>
+          <button type="button" class="btn btn-success btn-sm" disabled title="Publish this template before creating a revision."><i class="bi bi-files me-1"></i>Create Revision</button>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="badge bg-light text-dark border font-monospace">Owner User: <%= ownerUserId || '-' %></span>
+        <span class="badge bg-light text-dark border font-monospace">Parent ID: <%= parentTemplateId || '-' %></span>
+        <span class="badge bg-light text-dark border font-monospace">Root ID: <%= rootTemplateId || (isEdit ? template.id : '-') %></span>
+        <span class="badge bg-info-subtle text-info border border-info-subtle">Revision Depth: <%= revisionDepth %></span>
+      </div>
+      <div class="small text-muted mt-2">
+        <% if (isEdit) { %>
+          Build questions in this template, then publish this snapshot or create a revision copy.
+        <% } else { %>
+          Save the template first, then use the Question Builder tab to add items.
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="templateForm" method="POST" action="<%= isEdit ? ('/school/exams/templates/edit/' + template.id) : '/school/exams/templates/new' %>">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="ownerUserId" id="inp_ownerUserId" value="<%= ownerUserId %>">
+      <input type="hidden" name="departmentId" id="inp_departmentId" value="<%= initialDepartment.id %>">
+      <input type="hidden" name="departmentCode" id="inp_departmentCode" value="<%= initialDepartment.code %>">
+      <input type="hidden" name="departmentName" id="inp_departmentName" value="<%= initialDepartment.name %>">
+      <input type="hidden" name="subjectIdsJson" id="inp_subjectIdsJson" value="<%- initialSubjectsJsonAttr %>">
+
+      <ul class="nav nav-tabs mb-4" id="templateTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General Info</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-owner" type="button">Ownership & Access</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-subjects" type="button">Department & Subjects</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-defaults" type="button">Defaults</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-questions" type="button">Question Builder</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-general">
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Code</label>
+              <input type="text" name="code" id="inp_code" class="form-control size-md" maxlength="80" value="<%= template?.code || '' %>" placeholder="e.g., EXM-LINC-READ-01">
+            </div>
+            <div class="col-md-8 mb-3">
+              <label class="form-label">Title *</label>
+              <input type="text" name="title" id="inp_title" class="form-control size-md" maxlength="220" value="<%= template?.title || '' %>" required placeholder="Template title">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Status</label>
+              <select name="status" class="form-select size-md">
+                <% (templateStatuses || ['draft', 'active', 'archived']).forEach((st) => { %>
+                  <option value="<%= st %>" <%= String(template?.status || 'draft') === String(st) ? 'selected' : '' %>><%= st %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Class Level</label>
+              <input type="text" name="classLevel" class="form-control size-md" maxlength="80" value="<%= template?.classLevel || '' %>" placeholder="e.g., CLB 4">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Tags (CSV)</label>
+              <input type="text" name="tags" class="form-control size-md" value="<%= Array.isArray(template?.tags) ? template.tags.join(', ') : '' %>" placeholder="assessment, housing">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-12 mb-3">
+              <label class="form-label">Description</label>
+              <textarea name="description" class="form-control size-md" rows="4" placeholder="Template description, context, and usage notes..."><%= template?.description || '' %></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-owner">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Owner User</label>
+              <input type="text" class="form-control size-md bg-light" value="<%= ownerLabel %>" readonly>
+              <div class="form-text small">Automatically assigned from the current signed-in user.</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Template Visibility</label>
+              <select name="visibility" class="form-select size-md">
+                <option value="private" <%= templateVisibility === 'private' ? 'selected' : '' %>>Private (owner only)</option>
+                <option value="public" <%= templateVisibility === 'public' ? 'selected' : '' %>>Public (available to other users)</option>
+              </select>
+              <div class="form-text small">Public templates can be reused by other authorized users in the organization.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-subjects">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-9 mb-3">
+                  <label class="form-label">Department *</label>
+                  <div class="input-group">
+                    <input type="text" id="inp_departmentDisplay" class="form-control size-md bg-white" value="<%= initialDepartment.name ? (initialDepartment.name + (initialDepartment.code ? (' (' + initialDepartment.code + ')') : '')) : '' %>" placeholder="Select department..." readonly required>
+                    <button type="button" class="btn btn-outline-primary" id="btnPickDepartment"><i class="bi bi-diagram-3"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" id="btnClearDepartment"><i class="bi bi-x-lg"></i></button>
+                  </div>
+                  <div class="form-text small">Choose a department first, then select one or more linked subjects.</div>
+                </div>
+                <div class="col-md-3 mb-3 d-grid">
+                  <label class="form-label d-block" style="visibility: hidden;">Department *</label>
+                  <button type="button" class="btn btn-outline-primary size-md w-100" id="btnAddSubjects"><i class="bi bi-book me-1"></i>Add Subjects</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h6 class="m-0 fw-bold">Selected Subjects</h6>
+              <span class="badge bg-light text-dark border" id="subjectsCountBadge">0</span>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th class="ps-3">Subject</th>
+                      <th>Code</th>
+                      <th>Status</th>
+                      <th>Credits</th>
+                      <th class="text-end pe-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="subjectsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-defaults">
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Default Duration (min)</label>
+              <input type="number" name="defaultDurationMinutes" min="1" max="1440" class="form-control size-md" value="<%= Number(template?.settings?.defaultDurationMinutes || 60) %>">
+            </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Pass Score (%)</label>
+              <input type="number" name="passScorePercent" min="0" max="100" class="form-control size-md" value="<%= Number(template?.settings?.passScorePercent || 50) %>">
+            </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Default Timezone</label>
+              <input type="text" name="defaultTimezone" class="form-control size-md" maxlength="80" value="<%= template?.settings?.defaultTimezone || 'UTC' %>">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Shuffle Questions</label>
+              <select name="shuffleQuestions" class="form-select size-md">
+                <option value="false" <%= template?.settings?.shuffleQuestions ? '' : 'selected' %>>No</option>
+                <option value="true" <%= template?.settings?.shuffleQuestions ? 'selected' : '' %>>Yes</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Allow Back Navigation</label>
+              <select name="allowBackNavigation" class="form-select size-md">
+                <option value="true" <%= template?.settings?.allowBackNavigation === false ? '' : 'selected' %>>Yes</option>
+                <option value="false" <%= template?.settings?.allowBackNavigation === false ? 'selected' : '' %>>No</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Show Result Immediately</label>
+              <select name="showResultImmediately" class="form-select size-md">
+                <option value="false" <%= template?.settings?.showResultImmediately ? '' : 'selected' %>>No</option>
+                <option value="true" <%= template?.settings?.showResultImmediately ? 'selected' : '' %>>Yes</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Default Window Policy</label>
+              <select name="defaultWindowPolicy" class="form-select size-md">
+                <option value="strict_fixed_window" <%= String(template?.settings?.defaultWindowPolicy || 'strict_fixed_window') === 'strict_fixed_window' ? 'selected' : '' %>>Strict fixed window</option>
+                <option value="suggested_window" <%= String(template?.settings?.defaultWindowPolicy || '') === 'suggested_window' ? 'selected' : '' %>>Suggested (guidance)</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Default Question Presentation</label>
+              <select name="defaultQuestionPresentationMode" class="form-select size-md">
+                <option value="all_questions_on_one_page" <%= String(template?.settings?.defaultQuestionPresentationMode || 'all_questions_on_one_page') === 'all_questions_on_one_page' ? 'selected' : '' %>>All questions in one page</option>
+                <option value="sequential_one_by_one" <%= String(template?.settings?.defaultQuestionPresentationMode || '') === 'sequential_one_by_one' ? 'selected' : '' %>>One by one (save then next)</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Default Include In Final Score</label>
+              <select name="defaultCountsInFinalScore" class="form-select size-md">
+                <option value="true" <%= template?.settings?.defaultCountsInFinalScore === false ? '' : 'selected' %>>Yes</option>
+                <option value="false" <%= template?.settings?.defaultCountsInFinalScore === false ? 'selected' : '' %>>No</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-questions">
+          <% if (!isEdit) { %>
+            <div class="alert alert-info">
+              Save this template first. After that, open this tab to add and reorder questions.
+            </div>
+          <% } else { %>
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 class="m-0 fw-bold">Question Builder</h6>
+                  <div class="text-muted x-small">Internal revision: <span class="font-monospace"><%= qbRevisionId || '-' %></span></div>
+                </div>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnQbReorderSave"><i class="bi bi-arrow-down-up me-1"></i>Save Order</button>
+                  <button type="button" class="btn btn-primary btn-sm" id="btnQbAdd"><i class="bi bi-plus-circle me-1"></i>Add Question</button>
+                </div>
+              </div>
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th class="ps-3" style="width: 50px;">#</th>
+                        <th style="width: 44px;"></th>
+                        <th>Question</th>
+                        <th>Type</th>
+                        <th>Mode</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                        <th class="text-end pe-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="qbTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <input type="hidden" id="qbRowsJson" value="<%- qbRowsJsonAttr %>">
+            <input type="hidden" id="qbRevisionId" value="<%= qbRevisionId %>">
+          <% } %>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-filled btn-success btn-md" type="submit" id="btnSaveTemplate">Save Template</button>
+        <% if (isEdit) { %>
+          <a href="/school/exams/templates/<%= template.id %>" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+        <% } else { %>
+          <a href="/school/exams/templates" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+        <% } %>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (isEdit) { %>
+  <div class="modal fade" id="qbQuestionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold"><i class="bi bi-question-diamond me-2"></i><span id="qbModalTitle">Add Question</span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="qbQuestionForm">
+            <input type="hidden" id="qbQuestionId">
+            <ul class="nav nav-tabs mb-3" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#qbTabInfo" type="button" role="tab">Question Information</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#qbTabQuestion" type="button" role="tab">Question</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#qbTabAnswer" type="button" role="tab">Answer</button>
+              </li>
+            </ul>
+
+            <div class="tab-content">
+              <div class="tab-pane fade show active" id="qbTabInfo" role="tabpanel">
+                <div class="row g-3 mb-1">
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Sequence</label>
+                    <input type="number" id="qbSequenceNo" class="form-control" min="1" max="100000" value="1">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Status</label>
+                    <select id="qbStatus" class="form-select">
+                      <% (questionStatuses || ['draft', 'active', 'archived']).forEach((st) => { %>
+                        <option value="<%= st %>"><%= String(st || '').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()) %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Type</label>
+                    <select id="qbType" class="form-select">
+                      <% (questionTypes || ['objective', 'subjective']).forEach((tp) => { %>
+                        <option value="<%= tp %>"><%= String(tp || '').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()) %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Max Score</label>
+                    <input type="number" id="qbMaxScore" class="form-control" min="0" step="0.01" value="1">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Negative Score</label>
+                    <input type="number" id="qbNegativeScore" class="form-control" max="0" step="0.01" value="0">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Must Be Answered</label>
+                    <select id="qbMustBeAnswered" class="form-select">
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-pane fade" id="qbTabQuestion" role="tabpanel">
+                <div class="mb-3">
+                  <label class="form-label fw-bold">Question (Rich Text)</label>
+                  <div id="qbPromptEditor" class="border rounded bg-white" style="height: 200px;"></div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-1">
+                  <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="m-0 fw-bold">Add Media to the question</h6>
+                    <button type="button" class="btn btn-outline-secondary" id="qbManageInsertMediaBtn">
+                      <i class="bi bi-images me-1"></i>Manage & Insert Media
+                    </button>
+                  </div>
+                  <div class="card-body">
+                    <div class="mb-3" style="max-width: 280px;">
+                      <label class="form-label fw-bold">Select Media Type</label>
+                      <select id="qbQuestionMediaType" class="form-select">
+                        <option value="audio">Audio</option>
+                        <option value="video">Video</option>
+                        <option value="photo">Photo</option>
+                      </select>
+                    </div>
+
+                    <div id="qbQuestionMediaAudioPanel">
+                      <div class="row g-3 mb-2">
+                        <div class="col-md-3">
+                          <label class="form-label fw-bold">Playable Count</label>
+                          <input type="number" id="qbMediaAudioPlayCount" class="form-control" min="1" max="100" value="1">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label fw-bold">Can Be Stopped</label>
+                          <select id="qbMediaAudioCanStop" class="form-select">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                          </select>
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label fw-bold">Can Be Paused</label>
+                          <select id="qbMediaAudioCanPause" class="form-select">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                          </select>
+                        </div>
+                        <div class="col-md-12">
+                          <label class="form-label fw-bold">Audio URL</label>
+                          <input type="url" id="qbMediaAudioUrl" class="form-control" placeholder="https://...">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div id="qbQuestionMediaVideoPanel" class="d-none">
+                      <div class="row g-3 mb-2">
+                        <div class="col-md-3">
+                          <label class="form-label fw-bold">Playable Count</label>
+                          <input type="number" id="qbMediaVideoPlayCount" class="form-control" min="1" max="100" value="1">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label fw-bold">Can Be Stopped</label>
+                          <select id="qbMediaVideoCanStop" class="form-select">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                          </select>
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label fw-bold">Can Be Paused</label>
+                          <select id="qbMediaVideoCanPause" class="form-select">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                          </select>
+                        </div>
+                        <div class="col-md-12">
+                          <label class="form-label fw-bold">Video URL</label>
+                          <input type="url" id="qbMediaVideoUrl" class="form-control" placeholder="https://...">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div id="qbQuestionMediaPhotoPanel" class="d-none">
+                      <div class="row g-3 mb-2">
+                        <div class="col-md-4">
+                          <label class="form-label fw-bold">Display Time (seconds)</label>
+                          <input type="number" id="qbMediaPhotoDisplaySeconds" class="form-control" min="1" max="3600" value="30">
+                        </div>
+                        <div class="col-md-12">
+                          <label class="form-label fw-bold">Photo URL</label>
+                          <input type="url" id="qbMediaPhotoUrl" class="form-control" placeholder="https://...">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-3 mb-2">
+                      <button type="button" class="btn btn-outline-primary" id="qbAddQuestionMediaBtn"><i class="bi bi-plus-lg me-1"></i>Add Media</button>
+                    </div>
+
+                    <div class="table-responsive mt-3">
+                      <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                          <tr>
+                            <th style="width: 120px;">Type</th>
+                            <th>URL</th>
+                            <th>Rules</th>
+                            <th style="width: 90px;" class="text-end">Remove</th>
+                          </tr>
+                        </thead>
+                        <tbody id="qbQuestionMediaTbody">
+                          <tr><td colspan="4" class="text-center text-muted py-2">No media added.</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-pane fade" id="qbTabAnswer" role="tabpanel">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <label class="form-label fw-bold m-0">Answer (Rich Text)</label>
+                  <div class="form-check m-0">
+                    <input class="form-check-input" type="checkbox" id="qbShowAnswerKey">
+                    <label class="form-check-label small" for="qbShowAnswerKey">Display Answer</label>
+                  </div>
+                </div>
+                <div id="qbAnswerEditor" class="border rounded bg-white mb-3" style="height: 180px;"></div>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label fw-bold">Answer Type</label>
+                    <select id="qbAnswerType" class="form-select">
+                      <option value="single_option">Single Option</option>
+                      <option value="multiple_choice">Multiple Choice</option>
+                      <option value="true_false">True / False</option>
+                      <option value="yes_no">Yes / No</option>
+                      <option value="yes_no_na">Yes / No / N/A</option>
+                      <option value="written_answer">Written Answer</option>
+                      <option value="audio_recording">Audio Recording</option>
+                      <option value="video_recording">Video Recording</option>
+                      <option value="upload_photos">Upload Photos</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="small text-muted mb-3">
+                  Auto-scoring setup:
+                  for <strong>Single Option</strong> select exactly one correct answer;
+                  for <strong>Multiple Choice</strong> select one or more correct answers.
+                </div>
+                <div id="qbObjectiveModeWrap" class="d-none">
+                  <label class="form-label fw-bold">Objective Mode</label>
+                  <select id="qbObjectiveMode" class="form-select">
+                    <option value="single_choice">Single Choice</option>
+                    <option value="multiple_choice">Multiple Choice</option>
+                    <option value="true_false">True / False</option>
+                    <option value="yes_no">Yes / No</option>
+                    <option value="yes_no_na">Yes / No / N/A</option>
+                  </select>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3" id="qbObjectiveCard">
+                  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold">Objective Answers</h6>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="qbAddOptionBtn"><i class="bi bi-plus-lg me-1"></i>Add Option</button>
+                  </div>
+                  <div class="card-body">
+                    <div id="qbOptionEditorWrap">
+                      <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                          <thead class="table-light">
+                            <tr>
+                              <th style="width: 72px;">Key</th>
+                              <th style="width: 80px;">Correct</th>
+                              <th>Option Text</th>
+                              <th style="width: 90px;" class="text-end">Remove</th>
+                            </tr>
+                          </thead>
+                          <tbody id="qbOptionsTbody"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div id="qbTrueFalseWrap" class="d-none">
+                      <div class="small text-muted mb-2">Answer options shown to students:</div>
+                      <div class="d-flex gap-2 flex-wrap mb-2">
+                        <span class="badge bg-light text-dark border">True</span>
+                        <span class="badge bg-light text-dark border">False</span>
+                      </div>
+                      <label class="form-label fw-bold">Correct Answer</label>
+                      <div class="d-flex gap-3">
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" name="qbTrueFalseCorrect" id="qbTfTrue" value="true" checked>
+                          <label class="form-check-label" for="qbTfTrue">True</label>
+                        </div>
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" name="qbTrueFalseCorrect" id="qbTfFalse" value="false">
+                          <label class="form-check-label" for="qbTfFalse">False</label>
+                        </div>
+                      </div>
+                    </div>
+                    <div id="qbYesNoNaWrap" class="d-none">
+                      <div class="small text-muted mb-2">Answer options shown to students:</div>
+                      <div class="d-flex gap-2 flex-wrap mb-2">
+                        <span class="badge bg-light text-dark border">Yes</span>
+                        <span class="badge bg-light text-dark border">No</span>
+                        <span class="badge bg-light text-dark border">N/A</span>
+                      </div>
+                      <div class="small text-muted mb-2">Pick one correct answer:</div>
+                      <div class="d-flex gap-4 flex-wrap">
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" name="qbYnaCorrect" id="qbYnaYes" value="YES" checked>
+                          <label class="form-check-label" for="qbYnaYes">Yes</label>
+                        </div>
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" name="qbYnaCorrect" id="qbYnaNo" value="NO">
+                          <label class="form-check-label" for="qbYnaNo">No</label>
+                        </div>
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" name="qbYnaCorrect" id="qbYnaNa" value="NA">
+                          <label class="form-check-label" for="qbYnaNa">N/A</label>
+                        </div>
+                      </div>
+                    </div>
+                    <div id="qbYesNoWrap" class="d-none">
+                      <div class="small text-muted mb-2">Answer options shown to students:</div>
+                      <div class="d-flex gap-2 flex-wrap mb-2">
+                        <span class="badge bg-light text-dark border">Yes</span>
+                        <span class="badge bg-light text-dark border">No</span>
+                      </div>
+                      <label class="form-label fw-bold">Correct Answer</label>
+                      <div class="d-flex gap-3">
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" name="qbYnCorrect" id="qbYnYes" value="YES" checked>
+                          <label class="form-check-label" for="qbYnYes">Yes</label>
+                        </div>
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" name="qbYnCorrect" id="qbYnNo" value="NO">
+                          <label class="form-check-label" for="qbYnNo">No</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3 d-none" id="qbRecordingAnswerPanel">
+                  <div class="card-header bg-white">
+                    <h6 class="m-0 fw-bold">Recording Answer Rules</h6>
+                  </div>
+                  <div class="card-body">
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label fw-bold">Maximum Duration (seconds)</label>
+                        <input type="number" id="qbRecordingMaxDuration" class="form-control" min="5" max="3600" value="180">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label fw-bold">Allow Re-Record</label>
+                        <select id="qbRecordingAllowRerecord" class="form-select">
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3 d-none" id="qbUploadPhotoAnswerPanel">
+                  <div class="card-header bg-white">
+                    <h6 class="m-0 fw-bold">Photo Upload Rules</h6>
+                  </div>
+                  <div class="card-body">
+                    <div class="row g-3">
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">Max Photo Count</label>
+                        <input type="number" id="qbUploadPhotoMaxCount" class="form-control" min="1" max="50" value="5">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">Max Each Photo (MB)</label>
+                        <input type="number" id="qbUploadPhotoMaxEachMb" class="form-control" min="1" max="100" value="10">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">Total Upload Size (MB)</label>
+                        <input type="number" id="qbUploadPhotoTotalMb" class="form-control" min="1" max="500" value="30">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-1" id="qbSubjectiveCard">
+                  <div class="card-header bg-white">
+                    <h6 class="m-0 fw-bold">Subjective Answer Configuration</h6>
+                  </div>
+                  <div class="card-body">
+                    <div class="row g-3 mb-3">
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">Minimum Length</label>
+                        <input type="number" id="qbSubjectiveMinLength" class="form-control" min="0" max="200000" value="0">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">Maximum Length</label>
+                        <input type="number" id="qbSubjectiveMaxLength" class="form-control" min="1" max="200000" value="4000">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-bold">Allow Attachments</label>
+                        <select id="qbSubjectiveAllowAttachments" class="form-select">
+                          <option value="false">No</option>
+                          <option value="true">Yes</option>
+                        </select>
+                      </div>
+                    </div>
+                    <label class="form-label fw-bold mt-3">Rubric Criteria (one line each)</label>
+                    <textarea id="qbRubricCriteria" class="form-control" rows="4" placeholder="e.g. Clear organization&#10;Accurate facts&#10;Appropriate vocabulary"></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <input type="hidden" id="qbMediaUrl" value="">
+            <input type="hidden" id="qbMediaLabel" value="">
+            <input type="file" id="qbMediaFiles" class="d-none" multiple>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="qbCancelQuestionBtn" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="qbSaveQuestionBtn">Save Question</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (isEdit) { %>
+  <div class="modal fade" id="qbMediaManagerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content" style="height: 88vh;">
+        <div class="modal-header border-bottom-0 pb-0">
+          <ul class="nav nav-tabs border-bottom-0" role="tablist">
+            <li class="nav-item">
+              <button class="nav-link active fw-bold" id="qbMediaTabLibraryBtn" data-bs-toggle="tab" data-bs-target="#qbMediaTabLibrary" type="button">
+                <i class="bi bi-images me-2"></i>Library
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link fw-bold" id="qbMediaTabUploadBtn" data-bs-toggle="tab" data-bs-target="#qbMediaTabUpload" type="button">
+                <i class="bi bi-cloud-upload me-2"></i>Upload
+              </button>
+            </li>
+          </ul>
+          <button type="button" class="btn-close mb-2 me-2" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <div class="tab-content h-100">
+            <div class="tab-pane fade show active h-100" id="qbMediaTabLibrary">
+              <div class="row g-3" id="qbMediaLibraryGrid"></div>
+              <div id="qbMediaLibraryEmpty" class="d-none flex-column align-items-center justify-content-center h-100 text-muted">
+                <i class="bi bi-images fs-1 opacity-25 mb-3"></i>
+                <p>No saved or uploaded media found.</p>
+                <button class="btn btn-sm btn-outline-primary" type="button" onclick="document.getElementById('qbMediaTabUploadBtn')?.click()">Go to Upload</button>
+              </div>
+            </div>
+            <div class="tab-pane fade h-100" id="qbMediaTabUpload">
+              <div class="d-flex flex-column align-items-center justify-content-center h-100 p-5 border rounded-3 bg-white border-dashed">
+                <div id="qbMediaUploadSpinner" class="d-none text-center">
+                  <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+                  <h5 class="mt-3">Uploading...</h5>
+                </div>
+                <div id="qbMediaUploadZone" class="text-center">
+                  <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 4rem;"></i>
+                  <h4 class="fw-bold mt-3">Upload Files</h4>
+                  <p class="text-muted mb-4">Upload media and insert the selected URL into the current question media field.</p>
+                  <input type="file" id="qbMediaUploadInput" class="d-none" multiple accept="image/*,video/*,audio/*,application/pdf">
+                  <button class="btn btn-primary btn-lg px-5" type="button" onclick="document.getElementById('qbMediaUploadInput')?.click()">Select Files</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <div class="me-auto text-muted small" id="qbMediaSelectionStatus">Select a file to insert its URL</div>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" id="qbInsertSelectedMediaBtn" disabled>
+            <i class="bi bi-plus-lg me-1"></i>Insert Selected URL
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<%- include('../../partials/modal_GenericPicker') %>
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+<script>
+  (function () {
+    const formEl = document.getElementById('templateForm');
+    const titleInput = document.getElementById('inp_title');
+    const ownerInput = document.getElementById('inp_ownerUserId');
+    const depIdInput = document.getElementById('inp_departmentId');
+    const depCodeInput = document.getElementById('inp_departmentCode');
+    const depNameInput = document.getElementById('inp_departmentName');
+    const depDisplayInput = document.getElementById('inp_departmentDisplay');
+    const subjectsJsonInput = document.getElementById('inp_subjectIdsJson');
+    const subjectsTbody = document.getElementById('subjectsTbody');
+    const subjectsCountBadge = document.getElementById('subjectsCountBadge');
+    const btnPickDepartment = document.getElementById('btnPickDepartment');
+    const btnClearDepartment = document.getElementById('btnClearDepartment');
+    const btnAddSubjects = document.getElementById('btnAddSubjects');
+    const btnSave = document.getElementById('btnSaveTemplate');
+    const actionStateId = '<%= actionStateId || '' %>';
+    const initialDepartmentState = <%- JSON.stringify(initialDepartment || { id: '', code: '', name: '' }) %>;
+    const templateId = '<%= template?.id || '' %>';
+    const isEditTemplate = <%= isEdit ? 'true' : 'false' %>;
+
+    let subjectsState = [];
+    try {
+      const parsed = JSON.parse(subjectsJsonInput.value || '[]');
+      subjectsState = Array.isArray(parsed) ? parsed.map(function (row) {
+        const id = String(row?.id || row?.subjectId || '').trim();
+        return {
+          id: id,
+          code: String(row?.code || '').trim(),
+          title: String(row?.title || id).trim(),
+          status: String(row?.status || '').trim(),
+          credits: Number(row?.credits || 0) || 0
+        };
+      }).filter(function (row) { return row.id; }) : [];
+    } catch (_) {
+      subjectsState = [];
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showMsg(options) {
+      if (typeof showMessageModal === 'function') return showMessageModal(options || {});
+      const message = options && options.message ? options.message : 'Done';
+      alert(message);
+      return Promise.resolve('OK');
+    }
+
+    function stripHtml(value) {
+      const div = document.createElement('div');
+      div.innerHTML = String(value || '');
+      return String(div.textContent || div.innerText || '').trim();
+    }
+
+    async function postFormData(url, formData) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-AJAX-Request': 'true' },
+        body: formData
+      });
+      const result = await response.json().catch(function () { return {}; });
+      if (!response.ok || String(result.status || '').toLowerCase() === 'error') {
+        throw new Error(String(result?.message || 'Request failed.'));
+      }
+      return result;
+    }
+
+    function setDepartment(department) {
+      depIdInput.value = String(department?.id || '').trim();
+      depCodeInput.value = String(department?.code || '').trim().toUpperCase();
+      depNameInput.value = String(department?.name || '').trim();
+      depDisplayInput.value = depNameInput.value
+        ? (depNameInput.value + (depCodeInput.value ? (' (' + depCodeInput.value + ')') : ''))
+        : '';
+      btnAddSubjects.disabled = !depIdInput.value;
+    }
+
+    function renderSubjects() {
+      subjectsCountBadge.textContent = String(subjectsState.length);
+      if (!subjectsState.length) {
+        subjectsTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No subjects selected.</td></tr>';
+        return;
+      }
+
+      subjectsTbody.innerHTML = subjectsState.map(function (row, idx) {
+        const st = String(row.status || '').trim().toLowerCase();
+        const badgeClass = st === 'active' ? 'bg-success' : (st ? 'bg-warning text-dark' : 'bg-secondary');
+        return `
+          <tr>
+            <td class="ps-3">
+              <div class="fw-semibold">${escapeHtml(row.title || row.id)}</div>
+              <div class="x-small text-muted font-monospace">${escapeHtml(row.id)}</div>
+            </td>
+            <td>${escapeHtml(row.code || '-')}</td>
+            <td><span class="badge ${badgeClass}">${escapeHtml(st || '-')}</span></td>
+            <td>${Number(row.credits || 0)}</td>
+            <td class="text-end pe-3">
+              <button type="button" class="btn btn-sm btn-outline-danger js-remove-subject" data-index="${idx}">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      subjectsTbody.querySelectorAll('.js-remove-subject').forEach(function (button) {
+        button.addEventListener('click', function () {
+          const idx = Number.parseInt(String(button.getAttribute('data-index') || '-1'), 10);
+          if (!Number.isFinite(idx) || idx < 0 || idx >= subjectsState.length) return;
+          subjectsState.splice(idx, 1);
+          renderSubjects();
+        });
+      });
+    }
+
+    function syncHiddenSubjects() {
+      subjectsJsonInput.value = JSON.stringify(subjectsState.map(function (row) {
+        return {
+          id: String(row.id || '').trim(),
+          code: String(row.code || '').trim(),
+          title: String(row.title || '').trim(),
+          status: String(row.status || '').trim(),
+          credits: Number(row.credits || 0) || 0
+        };
+      }));
+    }
+
+    async function clearDepartmentWithPrompt() {
+      if (!subjectsState.length) {
+        setDepartment({ id: '', code: '', name: '' });
+        return;
+      }
+      const decision = await showMsg({
+        title: 'Clear Department?',
+        icon: 'warning',
+        message: 'Clearing department also removes selected subjects. Continue?',
+        buttons: [
+          { text: 'No', class: 'btn-secondary' },
+          { text: 'Yes', class: 'btn-danger' }
+        ]
+      });
+      if (decision !== 'Yes') return;
+      setDepartment({ id: '', code: '', name: '' });
+      subjectsState = [];
+      renderSubjects();
+    }
+
+    btnPickDepartment?.addEventListener('click', function () {
+      if (!window.GenericPicker || !window.GenericPickerPresets) return;
+      GenericPicker.open(GenericPickerPresets.department({
+        title: 'Select Department',
+        apiEndpoint: '/school/departments/api/data',
+        onSelect: async function (item) {
+          const nextId = String(item?.id || '').trim();
+          if (!nextId) return;
+          const currentId = String(depIdInput.value || '').trim();
+          if (currentId && currentId !== nextId && subjectsState.length) {
+            const decision = await showMsg({
+              title: 'Change Department?',
+              icon: 'warning',
+              message: 'Changing department removes selected subjects. Continue?',
+              buttons: [
+                { text: 'No', class: 'btn-secondary' },
+                { text: 'Yes', class: 'btn-danger' }
+              ]
+            });
+            if (decision !== 'Yes') return;
+            subjectsState = [];
+            renderSubjects();
+          }
+          setDepartment(item);
+        }
+      }));
+    });
+
+    btnClearDepartment?.addEventListener('click', function () {
+      clearDepartmentWithPrompt();
+    });
+
+    btnAddSubjects?.addEventListener('click', async function () {
+      const departmentId = String(depIdInput.value || '').trim();
+      if (!departmentId) {
+        await showMsg({
+          title: 'Department Required',
+          icon: 'warning',
+          message: 'Select department first, then add subjects.',
+          buttons: [{ text: 'OK', class: 'btn-secondary' }]
+        });
+        return;
+      }
+      if (!window.GenericPicker || !window.GenericPickerPresets) return;
+      GenericPicker.open(GenericPickerPresets.subject({
+        title: 'Select Subjects',
+        icon: 'bi-book',
+        multiselect: true,
+        apiEndpoint: '/school/exams/api/subjects-by-department?departmentId=' + encodeURIComponent(departmentId),
+        placeholder: 'Search department subjects, select multiple, then Add Selected...',
+        onSelect: function (items) {
+          const rows = Array.isArray(items) ? items : [items];
+          rows.forEach(function (item) {
+            const subjectId = String(item?.id || '').trim();
+            if (!subjectId) return;
+            if (subjectsState.some(function (row) { return row.id === subjectId; })) return;
+            subjectsState.push({
+              id: subjectId,
+              code: String(item?.code || '').trim(),
+              title: String(item?.title || item?.name || subjectId).trim(),
+              status: String(item?.status || '').trim(),
+              credits: Number(item?.configuration?.credits || 0) || 0
+            });
+          });
+          renderSubjects();
+        }
+      }));
+    });
+
+    formEl?.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      const title = String(titleInput?.value || '').trim();
+      const owner = String(ownerInput?.value || '').trim();
+      const departmentId = String(depIdInput?.value || '').trim();
+      if (!title) {
+        await showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: 'Template title is required.',
+          buttons: [{ text: 'OK', class: 'btn-secondary' }]
+        });
+        return;
+      }
+      if (!owner) {
+        await showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: 'Owner user is required.',
+          buttons: [{ text: 'OK', class: 'btn-secondary' }]
+        });
+        return;
+      }
+      if (!departmentId) {
+        await showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: 'Department is required.',
+          buttons: [{ text: 'OK', class: 'btn-secondary' }]
+        });
+        return;
+      }
+      if (!Array.isArray(subjectsState) || subjectsState.length <= 0) {
+        await showMsg({
+          title: 'Validation',
+          icon: 'warning',
+          message: 'Add at least one subject.',
+          buttons: [{ text: 'OK', class: 'btn-secondary' }]
+        });
+        return;
+      }
+
+      syncHiddenSubjects();
+      if (btnSave) {
+        btnSave.disabled = true;
+        if (!btnSave.dataset.originalHtml) btnSave.dataset.originalHtml = btnSave.innerHTML;
+        btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+      }
+      if (typeof showLoading === 'function') showLoading();
+
+      try {
+        const formData = new FormData(formEl);
+        const encodedBody = new URLSearchParams();
+        formData.forEach(function (value, key) {
+          encodedBody.append(key, value == null ? '' : String(value));
+        });
+        const response = await fetch(formEl.action, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: encodedBody.toString()
+        });
+        const payload = await response.json().catch(function () { return {}; });
+        if (!response.ok || String(payload?.status || '').toLowerCase() === 'error') {
+          throw new Error(String(payload?.message || 'Could not save template.'));
+        }
+
+        const nextTemplateId = String(payload?.templateId || templateId || '').trim();
+        await showMsg({
+          title: 'Saved',
+          icon: 'success',
+          message: String(payload?.message || 'Template saved successfully.'),
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+
+        if (nextTemplateId) {
+          window.location.href = '/school/exams/templates/' + encodeURIComponent(nextTemplateId);
+          return;
+        }
+        window.location.reload();
+      } catch (error) {
+        await showMsg({
+          title: 'Save Failed',
+          icon: 'error',
+          message: String(error?.message || 'Could not save template.'),
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        if (btnSave) {
+          btnSave.disabled = false;
+          btnSave.innerHTML = btnSave.dataset.originalHtml || 'Save Template';
+        }
+        if (typeof hideLoading === 'function') hideLoading();
+      }
+    });
+
+    setDepartment(initialDepartmentState);
+    renderSubjects();
+    syncHiddenSubjects();
+
+    if (isEditTemplate) {
+      const qbRowsInput = document.getElementById('qbRowsJson');
+      const qbRevisionIdInput = document.getElementById('qbRevisionId');
+      const qbTbody = document.getElementById('qbTbody');
+      const btnQbAdd = document.getElementById('btnQbAdd');
+      const btnQbReorderSave = document.getElementById('btnQbReorderSave');
+      const qbModalEl = document.getElementById('qbQuestionModal');
+      const qbModalTitle = document.getElementById('qbModalTitle');
+      const qbSaveQuestionBtn = document.getElementById('qbSaveQuestionBtn');
+      const qbCancelQuestionBtn = document.getElementById('qbCancelQuestionBtn');
+      const qbType = document.getElementById('qbType');
+      const qbStatus = document.getElementById('qbStatus');
+      const qbObjectiveMode = document.getElementById('qbObjectiveMode');
+      const qbObjectiveModeWrap = document.getElementById('qbObjectiveModeWrap');
+      const qbObjectiveCard = document.getElementById('qbObjectiveCard');
+      const qbSubjectiveCard = document.getElementById('qbSubjectiveCard');
+      const qbOptionEditorWrap = document.getElementById('qbOptionEditorWrap');
+      const qbTrueFalseWrap = document.getElementById('qbTrueFalseWrap');
+      const qbYesNoNaWrap = document.getElementById('qbYesNoNaWrap');
+      const qbYesNoWrap = document.getElementById('qbYesNoWrap');
+      const qbIncludeNa = document.getElementById('qbIncludeNa');
+      const qbYnaNaWrap = document.getElementById('qbYnaNaWrap');
+      const qbYnaNaOptionBadgeWrap = document.getElementById('qbYnaNaOptionBadgeWrap');
+      const qbAddOptionBtn = document.getElementById('qbAddOptionBtn');
+      const qbOptionsTbody = document.getElementById('qbOptionsTbody');
+      const qbQuestionId = document.getElementById('qbQuestionId');
+      const qbSequenceNo = document.getElementById('qbSequenceNo');
+      const qbMaxScore = document.getElementById('qbMaxScore');
+      const qbNegativeScore = document.getElementById('qbNegativeScore');
+      const qbMustBeAnswered = document.getElementById('qbMustBeAnswered');
+      const qbRubricCriteria = document.getElementById('qbRubricCriteria');
+      const qbShowAnswerKey = document.getElementById('qbShowAnswerKey');
+      const qbAnswerType = document.getElementById('qbAnswerType');
+      const qbSubjectiveMinLength = document.getElementById('qbSubjectiveMinLength');
+      const qbSubjectiveMaxLength = document.getElementById('qbSubjectiveMaxLength');
+      const qbSubjectiveAllowAttachments = document.getElementById('qbSubjectiveAllowAttachments');
+      const qbQuestionMediaType = document.getElementById('qbQuestionMediaType');
+      const qbAddQuestionMediaBtn = document.getElementById('qbAddQuestionMediaBtn');
+      const qbManageInsertMediaBtn = document.getElementById('qbManageInsertMediaBtn');
+      const qbQuestionMediaAudioPanel = document.getElementById('qbQuestionMediaAudioPanel');
+      const qbQuestionMediaVideoPanel = document.getElementById('qbQuestionMediaVideoPanel');
+      const qbQuestionMediaPhotoPanel = document.getElementById('qbQuestionMediaPhotoPanel');
+      const qbMediaAudioPlayCount = document.getElementById('qbMediaAudioPlayCount');
+      const qbMediaAudioCanStop = document.getElementById('qbMediaAudioCanStop');
+      const qbMediaAudioCanPause = document.getElementById('qbMediaAudioCanPause');
+      const qbMediaAudioUrl = document.getElementById('qbMediaAudioUrl');
+      const qbMediaVideoPlayCount = document.getElementById('qbMediaVideoPlayCount');
+      const qbMediaVideoCanStop = document.getElementById('qbMediaVideoCanStop');
+      const qbMediaVideoCanPause = document.getElementById('qbMediaVideoCanPause');
+      const qbMediaVideoUrl = document.getElementById('qbMediaVideoUrl');
+      const qbMediaPhotoDisplaySeconds = document.getElementById('qbMediaPhotoDisplaySeconds');
+      const qbMediaPhotoUrl = document.getElementById('qbMediaPhotoUrl');
+      const qbQuestionMediaTbody = document.getElementById('qbQuestionMediaTbody');
+      const qbMediaManagerModalEl = document.getElementById('qbMediaManagerModal');
+      const qbMediaLibraryGrid = document.getElementById('qbMediaLibraryGrid');
+      const qbMediaLibraryEmpty = document.getElementById('qbMediaLibraryEmpty');
+      const qbMediaUploadInput = document.getElementById('qbMediaUploadInput');
+      const qbMediaUploadSpinner = document.getElementById('qbMediaUploadSpinner');
+      const qbMediaUploadZone = document.getElementById('qbMediaUploadZone');
+      const qbInsertSelectedMediaBtn = document.getElementById('qbInsertSelectedMediaBtn');
+      const qbMediaSelectionStatus = document.getElementById('qbMediaSelectionStatus');
+      const qbRecordingAnswerPanel = document.getElementById('qbRecordingAnswerPanel');
+      const qbUploadPhotoAnswerPanel = document.getElementById('qbUploadPhotoAnswerPanel');
+      const qbRecordingMaxDuration = document.getElementById('qbRecordingMaxDuration');
+      const qbRecordingAllowRerecord = document.getElementById('qbRecordingAllowRerecord');
+      const qbUploadPhotoMaxCount = document.getElementById('qbUploadPhotoMaxCount');
+      const qbUploadPhotoMaxEachMb = document.getElementById('qbUploadPhotoMaxEachMb');
+      const qbUploadPhotoTotalMb = document.getElementById('qbUploadPhotoTotalMb');
+      const qbMediaFiles = document.getElementById('qbMediaFiles');
+      const qbMediaUrl = document.getElementById('qbMediaUrl');
+      const qbMediaLabel = document.getElementById('qbMediaLabel');
+      const qbRevisionId = String(qbRevisionIdInput?.value || '').trim();
+      const bs = (typeof window !== 'undefined' && window.bootstrap && window.bootstrap.Modal) ? window.bootstrap : null;
+      const qbModal = (qbModalEl && bs) ? bs.Modal.getOrCreateInstance(qbModalEl) : null;
+      const qbMediaManagerModal = (qbMediaManagerModalEl && bs) ? bs.Modal.getOrCreateInstance(qbMediaManagerModalEl) : null;
+
+      function showQbModal() {
+        if (qbModal) {
+          qbModal.show();
+          return;
+        }
+        if (!qbModalEl) return;
+        qbModalEl.classList.add('show');
+        qbModalEl.style.display = 'block';
+        qbModalEl.removeAttribute('aria-hidden');
+      }
+
+      function hideQbModal() {
+        if (qbModal) {
+          qbModal.hide();
+          return;
+        }
+        if (!qbModalEl) return;
+        qbModalEl.classList.remove('show');
+        qbModalEl.style.display = 'none';
+        qbModalEl.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+        document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+      }
+
+      function createRichEditor(containerId, heightPx) {
+        const host = document.getElementById(containerId);
+        if (!host) return { getHtml: function () { return ''; }, setHtml: function () {} };
+        if (typeof window.Quill === 'function') {
+          const instance = new window.Quill(`#${containerId}`, {
+            theme: 'snow',
+            modules: { toolbar: [[{ header: [1, 2, false] }], ['bold', 'italic', 'underline'], [{ list: 'ordered' }, { list: 'bullet' }], ['link', 'clean']] }
+          });
+          return {
+            getHtml: function () { return String(instance.root?.innerHTML || '').trim(); },
+            setHtml: function (html) { instance.root.innerHTML = String(html || '<p><br></p>'); }
+          };
+        }
+        host.innerHTML = `<textarea class="form-control" style="height:${Number(heightPx || 180)}px;"></textarea>`;
+        const textarea = host.querySelector('textarea');
+        return {
+          getHtml: function () { return String(textarea?.value || '').trim(); },
+          setHtml: function (html) { if (textarea) textarea.value = stripHtml(String(html || '')); }
+        };
+      }
+
+      const promptEditor = createRichEditor('qbPromptEditor', 200);
+      const answerEditor = createRichEditor('qbAnswerEditor', 180);
+
+      let qbRows = [];
+      let qbCurrentOptions = [];
+      let qbQuestionMediaItems = [];
+      let qbMediaLibraryItems = [];
+      let qbSelectedLibraryMedia = null;
+      let qbDragId = '';
+      let qbRestoreQuestionModalAfterMedia = false;
+      try {
+        const parsed = JSON.parse(String(qbRowsInput?.value || '[]'));
+        qbRows = Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        qbRows = [];
+      }
+
+      function findWrapByQuestionId(questionId) {
+        const wanted = String(questionId || '').trim();
+        const toggles = document.querySelectorAll('#tab-questions .btn-row-actions-toggle');
+        for (let i = 0; i < toggles.length; i += 1) {
+          const btn = toggles[i];
+          if (String(btn.getAttribute('data-qid') || '').trim() === wanted) {
+            return btn.closest('.row-actions-wrap');
+          }
+        }
+        return null;
+      }
+
+      function dockRowActionsMenu(menu) {
+        if (!menu || menu.parentElement !== document.body) return;
+        const wrap = findWrapByQuestionId(menu.getAttribute('data-qid'));
+        if (wrap) wrap.appendChild(menu);
+      }
+
+      function resetFloatingMenuStyles(menu) {
+        if (!menu) return;
+        menu.classList.remove('row-actions-menu--floating');
+        menu.style.left = '';
+        menu.style.top = '';
+        menu.style.right = '';
+        menu.style.visibility = '';
+        menu.style.position = '';
+      }
+
+      function placeFloatingRowMenu(menu, wrap) {
+        if (!menu || !wrap) return;
+        const rect = wrap.getBoundingClientRect();
+        const zoomRaw = Number.parseFloat(document.body?.dataset?.appZoom || '');
+        const zoom = Number.isFinite(zoomRaw) && zoomRaw > 0 ? zoomRaw : 1;
+        const viewportWidth = window.innerWidth / zoom;
+        const viewportHeight = window.innerHeight / zoom;
+        const rectTop = rect.top / zoom;
+        const rectRight = rect.right / zoom;
+        const rectBottom = rect.bottom / zoom;
+        menu.classList.add('row-actions-menu--floating');
+        menu.style.visibility = 'hidden';
+        menu.style.position = 'fixed';
+        menu.style.left = '0';
+        menu.style.top = '0';
+        const menuWidth = Math.max(menu.offsetWidth || 0, 148);
+        const menuHeight = menu.offsetHeight || 0;
+        let left = rectRight - menuWidth;
+        left = Math.max(8, Math.min(left, viewportWidth - menuWidth - 8));
+        const gap = 4;
+        let top = rectBottom + gap;
+        if (menuHeight > 0 && top + menuHeight > viewportHeight - 8) {
+          top = Math.max(8, rectTop - menuHeight - gap);
+        }
+        if (menuHeight > 0 && top + menuHeight > viewportHeight - 8) {
+          top = Math.max(8, viewportHeight - menuHeight - 8);
+        }
+        if (menuWidth > 0 && left + menuWidth > viewportWidth - 8) {
+          left = Math.max(8, viewportWidth - menuWidth - 8);
+        }
+        menu.style.left = `${Math.round(left)}px`;
+        menu.style.top = `${Math.round(top)}px`;
+        menu.style.visibility = '';
+      }
+
+      function repositionOpenRowActionMenu() {
+        const menu = document.querySelector('body > .row-actions-menu.row-actions-menu--floating:not(.d-none)');
+        if (!menu) return;
+        const wrap = findWrapByQuestionId(menu.getAttribute('data-qid'));
+        if (wrap) placeFloatingRowMenu(menu, wrap);
+      }
+
+      function closeAllQuestionActionMenus() {
+        document.querySelectorAll('#tab-questions .row-actions-menu, body > .row-actions-menu.row-actions-menu--floating').forEach(function (menu) {
+          menu.classList.add('d-none');
+          resetFloatingMenuStyles(menu);
+          dockRowActionsMenu(menu);
+        });
+      }
+
+      function formatTokenLabel(raw) {
+        return String(raw || '')
+          .replace(/_/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .replace(/\b\w/g, function (m) { return m.toUpperCase(); });
+      }
+
+      function formatModeLabel(rawMode) {
+        const token = String(rawMode || '').trim().toLowerCase();
+        if (token === 'true_false') return 'True / False';
+        if (token === 'yes_no') return 'Yes / No';
+        if (token === 'yes_no_na') return 'Yes / No / N/A';
+        return formatTokenLabel(token);
+      }
+
+      function isObjectiveAnswerType(answerType) {
+        const token = String(answerType || '').trim().toLowerCase();
+        return ['single_option', 'multiple_choice', 'true_false', 'yes_no', 'yes_no_na'].includes(token);
+      }
+
+      function answerTypeToObjectiveMode(answerType) {
+        const token = String(answerType || '').trim().toLowerCase();
+        if (token === 'single_option') return 'single_choice';
+        if (token === 'multiple_choice') return 'multiple_choice';
+        if (token === 'true_false') return 'true_false';
+        if (token === 'yes_no') return 'yes_no';
+        if (token === 'yes_no_na') return 'yes_no_na';
+        return '';
+      }
+
+      function deriveAnswerTypeFromRow(row) {
+        const extType = String(row?.extensions?.answerType || '').trim().toLowerCase();
+        if (extType) return extType;
+        const qType = String(row?.questionType || '').trim().toLowerCase();
+        const mode = String(row?.objectiveMode || '').trim().toLowerCase();
+        if (qType === 'objective') {
+          if (mode === 'multiple_choice') return 'multiple_choice';
+          if (mode === 'true_false') return 'true_false';
+          if (mode === 'yes_no') return 'yes_no';
+          if (mode === 'yes_no_na') return 'yes_no_na';
+          const optionTexts = Array.isArray(row?.objectiveOptions)
+            ? row.objectiveOptions.map(function (o) { return String(o?.text || '').trim().toLowerCase(); })
+            : [];
+          if (mode === 'single_choice' && optionTexts.includes('yes') && optionTexts.includes('no')) {
+            return optionTexts.includes('n/a') ? 'yes_no_na' : 'yes_no';
+          }
+          return 'single_option';
+        }
+        return 'written_answer';
+      }
+
+      function ensureAnswerTypeOptions() {
+        if (!qbAnswerType) return;
+        const selected = String(qbAnswerType.value || '').trim().toLowerCase();
+        const expected = [
+          ['single_option', 'Single Option'],
+          ['multiple_choice', 'Multiple Choice'],
+          ['true_false', 'True / False'],
+          ['yes_no', 'Yes / No'],
+          ['yes_no_na', 'Yes / No / N/A'],
+          ['written_answer', 'Written Answer'],
+          ['audio_recording', 'Audio Recording'],
+          ['video_recording', 'Video Recording'],
+          ['upload_photos', 'Upload Photos']
+        ];
+        qbAnswerType.innerHTML = expected.map(function (row) {
+          return `<option value="${row[0]}">${row[1]}</option>`;
+        }).join('');
+        const hasSelected = expected.some(function (row) { return row[0] === selected; });
+        qbAnswerType.value = hasSelected ? selected : 'single_option';
+      }
+
+      function refreshQuestionMediaTypeUi() {
+        const token = String(qbQuestionMediaType?.value || 'audio').trim().toLowerCase();
+        if (qbQuestionMediaAudioPanel) qbQuestionMediaAudioPanel.classList.toggle('d-none', token !== 'audio');
+        if (qbQuestionMediaVideoPanel) qbQuestionMediaVideoPanel.classList.toggle('d-none', token !== 'video');
+        if (qbQuestionMediaPhotoPanel) qbQuestionMediaPhotoPanel.classList.toggle('d-none', token !== 'photo');
+      }
+
+      function renderQuestionMediaRows() {
+        if (!qbQuestionMediaTbody) return;
+        if (!qbQuestionMediaItems.length) {
+          qbQuestionMediaTbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">No media added.</td></tr>';
+          return;
+        }
+        qbQuestionMediaTbody.innerHTML = qbQuestionMediaItems.map(function (item, index) {
+          const token = String(item?.type || '').trim().toLowerCase();
+          const ruleSummary = token === 'photo'
+            ? `Display: ${Number(item?.displaySeconds || 0)}s`
+            : `Plays: ${Number(item?.playCount || 1)} | Stop: ${item?.canStop ? 'Yes' : 'No'} | Pause: ${item?.canPause ? 'Yes' : 'No'}`;
+          return `
+            <tr>
+              <td><span class="badge bg-light text-dark border">${escapeHtml(formatTokenLabel(token))}</span></td>
+              <td class="small">${escapeHtml(String(item?.url || ''))}</td>
+              <td class="small">${escapeHtml(ruleSummary)}</td>
+              <td class="text-end">
+                <button type="button" class="btn btn-outline-danger btn-sm qb-media-remove" data-index="${index}">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      function buildQuestionMediaItemFromInputs() {
+        const token = String(qbQuestionMediaType?.value || 'audio').trim().toLowerCase();
+        if (token === 'audio') {
+          return {
+            type: 'audio',
+            url: String(qbMediaAudioUrl?.value || '').trim(),
+            playCount: Number(qbMediaAudioPlayCount?.value || 1),
+            canStop: String(qbMediaAudioCanStop?.value || 'true').toLowerCase() === 'true',
+            canPause: String(qbMediaAudioCanPause?.value || 'true').toLowerCase() === 'true'
+          };
+        }
+        if (token === 'video') {
+          return {
+            type: 'video',
+            url: String(qbMediaVideoUrl?.value || '').trim(),
+            playCount: Number(qbMediaVideoPlayCount?.value || 1),
+            canStop: String(qbMediaVideoCanStop?.value || 'true').toLowerCase() === 'true',
+            canPause: String(qbMediaVideoCanPause?.value || 'true').toLowerCase() === 'true'
+          };
+        }
+        return {
+          type: 'photo',
+          url: String(qbMediaPhotoUrl?.value || '').trim(),
+          displaySeconds: Number(qbMediaPhotoDisplaySeconds?.value || 30)
+        };
+      }
+
+      function clearCurrentMediaTypeInputs() {
+        const token = String(qbQuestionMediaType?.value || 'audio').trim().toLowerCase();
+        if (token === 'audio' && qbMediaAudioUrl) qbMediaAudioUrl.value = '';
+        if (token === 'video' && qbMediaVideoUrl) qbMediaVideoUrl.value = '';
+        if (token === 'photo' && qbMediaPhotoUrl) qbMediaPhotoUrl.value = '';
+      }
+
+      function currentQuestionMediaUrlInput() {
+        const token = String(qbQuestionMediaType?.value || 'audio').trim().toLowerCase();
+        if (token === 'video') return qbMediaVideoUrl;
+        if (token === 'photo') return qbMediaPhotoUrl;
+        return qbMediaAudioUrl;
+      }
+
+      function normalizeUploadedMediaType(raw) {
+        const token = String(raw || '').trim().toLowerCase();
+        if (token.includes('image')) return 'photo';
+        if (token.includes('video')) return 'video';
+        if (token.includes('audio')) return 'audio';
+        return 'file';
+      }
+
+      function seedMediaLibraryFromRows() {
+        const seeded = [];
+        const pushSeed = function (entry) {
+          const url = String(entry?.url || '').trim();
+          if (!url) return;
+          if (seeded.some(function (row) { return String(row?.url || '') === url; })) return;
+          seeded.push({
+            url,
+            type: String(entry?.type || entry?.mimeType || '').trim(),
+            name: String(entry?.name || entry?.label || entry?.originalName || entry?.fileName || 'Saved Media').trim()
+          });
+        };
+
+        qbRows.forEach(function (row) {
+          const mediaRefs = Array.isArray(row?.mediaRefs) ? row.mediaRefs : [];
+          mediaRefs.forEach(function (m) {
+            pushSeed({
+              url: m?.url,
+              type: m?.mimeType || m?.type,
+              name: m?.label || m?.originalName || m?.fileName
+            });
+          });
+
+          const questionMedia = Array.isArray(row?.extensions?.questionMedia) ? row.extensions.questionMedia : [];
+          questionMedia.forEach(function (m) {
+            pushSeed({
+              url: m?.url,
+              type: m?.type,
+              name: `${formatTokenLabel(m?.type || 'Media')} - ${String(row?.id || '').trim() || 'Question'}`
+            });
+          });
+        });
+
+        qbMediaLibraryItems = seeded;
+      }
+
+      function renderMediaLibraryGrid() {
+        if (!qbMediaLibraryGrid) return;
+        qbMediaLibraryGrid.innerHTML = '';
+        if (!qbMediaLibraryItems.length) {
+          qbMediaLibraryEmpty?.classList.remove('d-none');
+          qbMediaLibraryEmpty?.classList.add('d-flex');
+          qbInsertSelectedMediaBtn && (qbInsertSelectedMediaBtn.disabled = true);
+          if (qbMediaSelectionStatus) qbMediaSelectionStatus.textContent = 'Select a file to insert its URL';
+          return;
+        }
+        qbMediaLibraryEmpty?.classList.add('d-none');
+        qbMediaLibraryEmpty?.classList.remove('d-flex');
+        qbMediaLibraryItems.forEach(function (item, index) {
+          const col = document.createElement('div');
+          col.className = 'col-md-3 col-sm-4 col-6';
+          const typeToken = normalizeUploadedMediaType(item?.type);
+          const name = String(item?.name || `Media ${index + 1}`);
+          const url = String(item?.url || '');
+          const thumb = typeToken === 'photo'
+            ? `<img src="${escapeHtml(url)}" class="object-fit-cover w-100 h-100" alt="${escapeHtml(name)}">`
+            : `<div class="d-flex align-items-center justify-content-center text-white h-100 w-100 bg-secondary"><i class="bi ${typeToken === 'video' ? 'bi-file-earmark-play' : (typeToken === 'audio' ? 'bi-file-earmark-music' : 'bi-file-earmark')} fs-1"></i></div>`;
+          col.innerHTML = `
+            <div class="card h-100 border shadow-sm qb-media-library-card ${qbSelectedLibraryMedia?.url === url ? 'border-primary border-2' : ''}" data-index="${index}">
+              <div class="ratio ratio-1x1 position-relative">${thumb}</div>
+              <div class="card-body p-2 bg-white">
+                <div class="small fw-bold text-truncate">${escapeHtml(name)}</div>
+                <div class="x-small text-muted text-truncate">${escapeHtml(url)}</div>
+              </div>
+            </div>
+          `;
+          qbMediaLibraryGrid.appendChild(col);
+        });
+      }
+
+      function openMediaManager() {
+        qbSelectedLibraryMedia = null;
+        if (!qbMediaLibraryItems.length) seedMediaLibraryFromRows();
+        if (qbInsertSelectedMediaBtn) qbInsertSelectedMediaBtn.disabled = true;
+        if (qbMediaSelectionStatus) qbMediaSelectionStatus.textContent = 'Select a file to insert its URL';
+        renderMediaLibraryGrid();
+        qbRestoreQuestionModalAfterMedia = false;
+        if (qbModal && qbModalEl && qbModalEl.classList.contains('show')) {
+          qbRestoreQuestionModalAfterMedia = true;
+          qbModal.hide();
+        } else if (qbModalEl && qbModalEl.classList.contains('show')) {
+          qbRestoreQuestionModalAfterMedia = true;
+          hideQbModal();
+        }
+        if (qbMediaManagerModal) {
+          qbMediaManagerModal.show();
+          return;
+        }
+        if (qbMediaManagerModalEl) {
+          qbMediaManagerModalEl.classList.add('show');
+          qbMediaManagerModalEl.style.display = 'block';
+          qbMediaManagerModalEl.removeAttribute('aria-hidden');
+          document.body.classList.add('modal-open');
+        }
+      }
+
+      function closeMediaManager() {
+        if (qbMediaManagerModal) {
+          qbMediaManagerModal.hide();
+        } else if (qbMediaManagerModalEl) {
+          qbMediaManagerModalEl.classList.remove('show');
+          qbMediaManagerModalEl.style.display = 'none';
+          qbMediaManagerModalEl.setAttribute('aria-hidden', 'true');
+          document.body.classList.remove('modal-open');
+          document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+        }
+        if (qbRestoreQuestionModalAfterMedia) {
+          qbRestoreQuestionModalAfterMedia = false;
+          showQbModal();
+        }
+      }
+
+      function refreshYesNoNaVisibility() {
+        const yesRadio = document.getElementById('qbYnaYes');
+        const noRadio = document.getElementById('qbYnaNo');
+        const naRadio = document.getElementById('qbYnaNa');
+        if (!yesRadio && !noRadio && !naRadio) return;
+        if ((yesRadio && yesRadio.checked) || (noRadio && noRadio.checked) || (naRadio && naRadio.checked)) return;
+        if (yesRadio) yesRadio.checked = true;
+      }
+
+      function refreshQbModeUi() {
+        const answerType = String(qbAnswerType?.value || '').toLowerCase();
+        const fromAnswerTypeMode = answerTypeToObjectiveMode(answerType);
+        if (fromAnswerTypeMode) {
+          if (qbType) qbType.value = 'objective';
+          if (qbObjectiveMode) qbObjectiveMode.value = fromAnswerTypeMode;
+        } else if (answerType) {
+          if (qbType) qbType.value = 'subjective';
+        }
+
+        const isObjective = String(qbType?.value || '').toLowerCase() === 'objective';
+        const objectiveMode = String(qbObjectiveMode?.value || 'single_choice').toLowerCase();
+        if (qbObjectiveModeWrap) qbObjectiveModeWrap.classList.add('d-none');
+        if (qbObjectiveCard) qbObjectiveCard.classList.toggle('d-none', !isObjective);
+        if (qbSubjectiveCard) qbSubjectiveCard.classList.toggle('d-none', isObjective);
+        if (qbOptionEditorWrap) qbOptionEditorWrap.classList.toggle('d-none', !(isObjective && objectiveMode !== 'true_false' && objectiveMode !== 'yes_no' && objectiveMode !== 'yes_no_na'));
+        if (qbTrueFalseWrap) qbTrueFalseWrap.classList.toggle('d-none', !(isObjective && objectiveMode === 'true_false'));
+        if (qbYesNoWrap) qbYesNoWrap.classList.toggle('d-none', !(isObjective && objectiveMode === 'yes_no'));
+        if (qbYesNoNaWrap) qbYesNoNaWrap.classList.toggle('d-none', !(isObjective && objectiveMode === 'yes_no_na'));
+        if (qbAddOptionBtn) qbAddOptionBtn.classList.toggle('d-none', !(isObjective && objectiveMode !== 'true_false' && objectiveMode !== 'yes_no' && objectiveMode !== 'yes_no_na'));
+        if (qbRecordingAnswerPanel) qbRecordingAnswerPanel.classList.toggle('d-none', !(answerType === 'audio_recording' || answerType === 'video_recording'));
+        if (qbUploadPhotoAnswerPanel) qbUploadPhotoAnswerPanel.classList.toggle('d-none', answerType !== 'upload_photos');
+        if (qbShowAnswerKey) {
+          const lockDisplayAnswer = answerType === 'written_answer';
+          if (lockDisplayAnswer) qbShowAnswerKey.checked = true;
+          qbShowAnswerKey.disabled = lockDisplayAnswer;
+        }
+      }
+
+      function renderOptionRows() {
+        if (!qbOptionsTbody) return;
+        if (!qbCurrentOptions.length) {
+          qbOptionsTbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">No options yet.</td></tr>';
+          return;
+        }
+        const objectiveMode = String(qbObjectiveMode?.value || 'single_choice').toLowerCase();
+        const isSingle = objectiveMode === 'single_choice' || objectiveMode === 'yes_no';
+        const optionKey = function (idx) {
+          return String.fromCharCode(65 + (idx % 26));
+        };
+        qbOptionsTbody.innerHTML = qbCurrentOptions.map(function (opt, idx) {
+          return `
+            <tr>
+              <td><span class="badge bg-light text-dark border">${optionKey(idx)}</span></td>
+              <td>
+                <input class="form-check-input qb-opt-correct" type="${isSingle ? 'radio' : 'checkbox'}" name="qbCorrectOption" data-index="${idx}" ${opt.isCorrect ? 'checked' : ''}>
+              </td>
+              <td>
+                <input type="text" class="form-control form-control-sm qb-opt-text" data-index="${idx}" value="${escapeHtml(opt.text || '')}">
+              </td>
+              <td class="text-end">
+                <button type="button" class="btn btn-outline-danger btn-sm qb-opt-remove" data-index="${idx}"><i class="bi bi-trash"></i></button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        qbOptionsTbody.querySelectorAll('.qb-opt-correct').forEach(function (el) {
+          el.addEventListener('change', function () {
+            const idx = Number.parseInt(String(el.getAttribute('data-index') || '-1'), 10);
+            if (!Number.isFinite(idx) || idx < 0 || idx >= qbCurrentOptions.length) return;
+            if (isSingle) {
+              qbCurrentOptions = qbCurrentOptions.map(function (row, i) { return { text: row.text, isCorrect: i === idx }; });
+            } else {
+              qbCurrentOptions[idx].isCorrect = el.checked;
+            }
+          });
+        });
+
+        qbOptionsTbody.querySelectorAll('.qb-opt-text').forEach(function (el) {
+          el.addEventListener('input', function () {
+            const idx = Number.parseInt(String(el.getAttribute('data-index') || '-1'), 10);
+            if (!Number.isFinite(idx) || idx < 0 || idx >= qbCurrentOptions.length) return;
+            qbCurrentOptions[idx].text = String(el.value || '');
+          });
+        });
+
+        qbOptionsTbody.querySelectorAll('.qb-opt-remove').forEach(function (el) {
+          el.addEventListener('click', function () {
+            const idx = Number.parseInt(String(el.getAttribute('data-index') || '-1'), 10);
+            if (!Number.isFinite(idx) || idx < 0 || idx >= qbCurrentOptions.length) return;
+            qbCurrentOptions.splice(idx, 1);
+            renderOptionRows();
+          });
+        });
+      }
+
+      function normalizeModeForPersistence(mode) {
+        return (mode === 'yes_no_na' || mode === 'yes_no') ? 'single_choice' : mode;
+      }
+
+      function optionLinesForSubmit() {
+        const mode = String(qbObjectiveMode?.value || 'single_choice').toLowerCase();
+        if (mode === 'true_false') return [];
+        if (mode === 'yes_no') {
+          const selected = String(document.querySelector('input[name="qbYnCorrect"]:checked')?.value || 'YES').toUpperCase();
+          return ['YES', 'NO'].map(function (label) {
+            return `${selected === label ? '*' : ''}${label === 'YES' ? 'Yes' : 'No'}`;
+          });
+        }
+        if (mode === 'yes_no_na') {
+          const selected = String(document.querySelector('input[name="qbYnaCorrect"]:checked')?.value || 'YES').toUpperCase();
+          const labels = ['YES', 'NO', 'NA'];
+          return labels.map(function (label) {
+            return `${selected === label ? '*' : ''}${label === 'NA' ? 'N/A' : (label === 'YES' ? 'Yes' : 'No')}`;
+          });
+        }
+        return qbCurrentOptions
+          .map(function (opt) {
+            const text = String(opt?.text || '').trim();
+            if (!text) return '';
+            return `${opt?.isCorrect ? '*' : ''}${text}`;
+          })
+          .filter(Boolean);
+      }
+
+      function fillModalFromQuestion(row) {
+        const questionType = String(row?.questionType || 'objective').toLowerCase();
+        const mode = String(row?.objectiveMode || 'single_choice').toLowerCase();
+        const answerType = deriveAnswerTypeFromRow(row);
+        qbQuestionId.value = String(row?.id || '');
+        qbStatus.value = String(row?.status || 'draft');
+        qbType.value = questionType;
+        qbObjectiveMode.value = mode;
+        if (qbAnswerType) qbAnswerType.value = answerType;
+        qbSequenceNo.value = Number(row?.sequenceNo || (qbRows.length + 1));
+        qbMaxScore.value = Number(row?.scoring?.maxScore || 1);
+        if (qbNegativeScore) qbNegativeScore.value = Number(row?.scoring?.negativeScore || 0);
+        if (qbMustBeAnswered) qbMustBeAnswered.value = row?.extensions?.mustBeAnswered === false ? 'false' : 'true';
+        if (qbShowAnswerKey) qbShowAnswerKey.checked = row?.extensions?.showAnswerKey === true;
+        qbRubricCriteria.value = Array.isArray(row?.scoring?.rubricCriteria) ? row.scoring.rubricCriteria.join('\n') : '';
+        if (qbSubjectiveMinLength) qbSubjectiveMinLength.value = Number(row?.subjectiveConfig?.minLength ?? 0);
+        if (qbSubjectiveMaxLength) qbSubjectiveMaxLength.value = Number(row?.subjectiveConfig?.maxLength ?? 4000);
+        if (qbSubjectiveAllowAttachments) qbSubjectiveAllowAttachments.value = row?.subjectiveConfig?.allowAttachments ? 'true' : 'false';
+        if (qbRecordingMaxDuration) qbRecordingMaxDuration.value = Number(row?.extensions?.responsePolicy?.maxDurationSeconds ?? 180);
+        if (qbRecordingAllowRerecord) qbRecordingAllowRerecord.value = row?.extensions?.responsePolicy?.allowRerecord === false ? 'false' : 'true';
+        if (qbUploadPhotoMaxCount) qbUploadPhotoMaxCount.value = Number(row?.extensions?.responsePolicy?.maxPhotoCount ?? 5);
+        if (qbUploadPhotoMaxEachMb) qbUploadPhotoMaxEachMb.value = Number(row?.extensions?.responsePolicy?.maxPhotoSizeMb ?? 10);
+        if (qbUploadPhotoTotalMb) qbUploadPhotoTotalMb.value = Number(row?.extensions?.responsePolicy?.maxTotalPhotoSizeMb ?? 30);
+        promptEditor.setHtml(String(row?.promptHtml || row?.promptText || '<p><br></p>'));
+        answerEditor.setHtml(String(row?.subjectiveConfig?.rubricHint || '<p><br></p>'));
+        qbQuestionMediaItems = Array.isArray(row?.extensions?.questionMedia)
+          ? row.extensions.questionMedia.map(function (item) {
+              return {
+                type: String(item?.type || '').trim().toLowerCase(),
+                url: String(item?.url || '').trim(),
+                playCount: Number(item?.playCount || 1),
+                canStop: item?.canStop !== false,
+                canPause: item?.canPause !== false,
+                displaySeconds: Number(item?.displaySeconds || 30)
+              };
+            }).filter(function (item) {
+              return item.type && item.url;
+            })
+          : [];
+        qbCurrentOptions = Array.isArray(row?.objectiveOptions)
+          ? row.objectiveOptions.map(function (opt) { return { text: String(opt?.text || ''), isCorrect: opt?.isCorrect === true }; })
+          : [];
+
+        if (mode === 'single_choice' && qbCurrentOptions.length >= 2) {
+          const l0 = String(qbCurrentOptions[0]?.text || '').trim().toLowerCase();
+          const l1 = String(qbCurrentOptions[1]?.text || '').trim().toLowerCase();
+          const hasNa = qbCurrentOptions.some(function (opt) { return String(opt?.text || '').trim().toLowerCase() === 'n/a'; });
+          if ((l0 === 'yes' && l1 === 'no') || (l0 === 'no' && l1 === 'yes')) {
+            qbObjectiveMode.value = hasNa ? 'yes_no_na' : 'yes_no';
+            const correct = qbCurrentOptions.find(function (opt) { return opt?.isCorrect; });
+            const correctTxt = String(correct?.text || 'yes').trim().toLowerCase();
+            if (hasNa) {
+              if (correctTxt === 'no') document.getElementById('qbYnaNo').checked = true;
+              else if (correctTxt === 'n/a') document.getElementById('qbYnaNa').checked = true;
+              else document.getElementById('qbYnaYes').checked = true;
+            } else {
+              if (correctTxt === 'no') document.getElementById('qbYnNo').checked = true;
+              else document.getElementById('qbYnYes').checked = true;
+            }
+          }
+        }
+
+        renderQuestionMediaRows();
+        refreshQuestionMediaTypeUi();
+        renderOptionRows();
+        refreshYesNoNaVisibility();
+        refreshQbModeUi();
+      }
+
+      function openModalForAdd() {
+        ensureAnswerTypeOptions();
+        qbModalTitle.textContent = 'Add Question';
+        qbQuestionId.value = '';
+        qbStatus.value = 'draft';
+        qbType.value = 'objective';
+        qbObjectiveMode.value = 'single_choice';
+        if (qbAnswerType) qbAnswerType.value = 'single_option';
+        qbSequenceNo.value = String(qbRows.length + 1);
+        qbMaxScore.value = '1';
+        if (qbNegativeScore) qbNegativeScore.value = '0';
+        if (qbMustBeAnswered) qbMustBeAnswered.value = 'true';
+        if (qbShowAnswerKey) qbShowAnswerKey.checked = false;
+        qbRubricCriteria.value = '';
+        if (qbSubjectiveMinLength) qbSubjectiveMinLength.value = '0';
+        if (qbSubjectiveMaxLength) qbSubjectiveMaxLength.value = '4000';
+        if (qbSubjectiveAllowAttachments) qbSubjectiveAllowAttachments.value = 'false';
+        if (qbRecordingMaxDuration) qbRecordingMaxDuration.value = '180';
+        if (qbRecordingAllowRerecord) qbRecordingAllowRerecord.value = 'true';
+        if (qbUploadPhotoMaxCount) qbUploadPhotoMaxCount.value = '5';
+        if (qbUploadPhotoMaxEachMb) qbUploadPhotoMaxEachMb.value = '10';
+        if (qbUploadPhotoTotalMb) qbUploadPhotoTotalMb.value = '30';
+        promptEditor.setHtml('<p><br></p>');
+        answerEditor.setHtml('<p><br></p>');
+        qbQuestionMediaItems = [];
+        qbCurrentOptions = [{ text: 'Option 1', isCorrect: true }, { text: 'Option 2', isCorrect: false }];
+        renderQuestionMediaRows();
+        refreshQuestionMediaTypeUi();
+        renderOptionRows();
+        refreshYesNoNaVisibility();
+        refreshQbModeUi();
+        if (qbMediaFiles) qbMediaFiles.value = '';
+        if (qbMediaUrl) qbMediaUrl.value = '';
+        if (qbMediaLabel) qbMediaLabel.value = '';
+        showQbModal();
+      }
+
+      function openModalForEdit(questionId) {
+        const id = String(questionId || '').trim();
+        if (!id) return;
+        const row = qbRows.find(function (candidate) { return String(candidate?.id || '').trim() === id; });
+        if (!row) return;
+        ensureAnswerTypeOptions();
+        qbModalTitle.textContent = 'Edit Question';
+        fillModalFromQuestion(row);
+        showQbModal();
+      }
+
+      async function deleteQuestionById(questionId) {
+        const id = String(questionId || '').trim();
+        if (!id) return;
+        const decision = await showMsg({
+          title: 'Delete Question?',
+          icon: 'warning',
+          message: 'This will remove the question from this template.',
+          buttons: [{ text: 'No', class: 'btn-secondary' }, { text: 'Yes', class: 'btn-danger' }]
+        });
+        if (decision !== 'Yes') return;
+        try {
+          if (typeof showLoading === 'function') showLoading();
+          const fd = new FormData();
+          fd.append('actionStateId', actionStateId);
+          await postFormData(`/school/exams/templates/${encodeURIComponent(templateId)}/questions/${encodeURIComponent(id)}/delete`, fd);
+          qbRows = qbRows.filter(function (r) { return String(r?.id || '').trim() !== id; });
+          renderQRows();
+        } catch (error) {
+          await showMsg({ title: 'Delete Failed', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+        } finally {
+          if (typeof hideLoading === 'function') hideLoading();
+        }
+      }
+
+      function renderQRows() {
+        if (!qbTbody) return;
+        if (!qbRows.length) {
+          qbTbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No questions yet. Use Add Question.</td></tr>';
+          return;
+        }
+
+        qbRows.sort(function (a, b) { return Number(a?.sequenceNo || 0) - Number(b?.sequenceNo || 0); });
+        qbRows.forEach(function (row, idx) { row.sequenceNo = idx + 1; });
+
+        qbTbody.innerHTML = qbRows.map(function (row, idx) {
+          const st = String(row?.status || '').toLowerCase();
+          const badgeClass = st === 'active' ? 'bg-success' : (st === 'draft' ? 'bg-warning text-dark' : 'bg-secondary');
+          const optionTexts = Array.isArray(row?.objectiveOptions) ? row.objectiveOptions.map(function (o) { return String(o?.text || '').trim().toLowerCase(); }) : [];
+          const hasYesNo = optionTexts.includes('yes') && optionTexts.includes('no');
+          const hasNa = optionTexts.includes('n/a');
+          const modeToken = String(row?.objectiveMode || '-').toLowerCase() === 'single_choice' && hasYesNo
+            ? (hasNa ? 'yes_no_na' : 'yes_no')
+            : String(row?.objectiveMode || '-');
+          const modeLabel = formatModeLabel(modeToken);
+          const typeLabel = formatTokenLabel(String(row?.questionType || '-'));
+          const statusLabel = formatTokenLabel(st || '-');
+          return `
+            <tr data-qid="${escapeHtml(String(row?.id || ''))}" draggable="true">
+              <td class="ps-3"><span class="badge bg-light text-dark border">${idx + 1}</span></td>
+              <td><span class="text-muted"><i class="bi bi-grip-vertical"></i></span></td>
+              <td>
+                <div class="small">${escapeHtml(stripHtml(row?.promptHtml || row?.promptText || '(media)')).slice(0, 120)}</div>
+                <div class="x-small text-muted font-monospace">${escapeHtml(String(row?.id || 'new'))}</div>
+              </td>
+              <td>${escapeHtml(typeLabel)}</td>
+              <td>${escapeHtml(modeLabel)}</td>
+              <td>${Number(row?.scoring?.maxScore || 0)}</td>
+              <td><span class="badge ${badgeClass}">${escapeHtml(statusLabel)}</span></td>
+              <td class="text-end pe-3">
+                <div class="row-actions-wrap">
+                  <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-qid="${escapeHtml(String(row?.id || ''))}" title="Row actions">
+                    <i class="bi bi-three-dots-vertical"></i>
+                  </button>
+                  <div class="row-actions-menu d-none" data-qid="${escapeHtml(String(row?.id || ''))}">
+                    <button type="button" class="btn btn-outline-secondary btn-sm qb-row-edit" data-qid="${escapeHtml(String(row?.id || ''))}">
+                      <i class="bi bi-pencil-square me-1"></i>Edit
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm qb-row-delete" data-qid="${escapeHtml(String(row?.id || ''))}">
+                      <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        qbTbody.querySelectorAll('tr[data-qid]').forEach(function (rowEl) {
+          rowEl.addEventListener('dragstart', function () {
+            qbDragId = String(rowEl.getAttribute('data-qid') || '').trim();
+            rowEl.classList.add('table-warning');
+          });
+          rowEl.addEventListener('dragend', function () {
+            rowEl.classList.remove('table-warning');
+          });
+          rowEl.addEventListener('dragover', function (event) {
+            event.preventDefault();
+          });
+          rowEl.addEventListener('drop', function (event) {
+            event.preventDefault();
+            const targetId = String(rowEl.getAttribute('data-qid') || '').trim();
+            if (!qbDragId || !targetId || qbDragId === targetId) return;
+            const fromIdx = qbRows.findIndex(function (r) { return String(r?.id || '').trim() === qbDragId; });
+            const toIdx = qbRows.findIndex(function (r) { return String(r?.id || '').trim() === targetId; });
+            if (fromIdx < 0 || toIdx < 0) return;
+            const moved = qbRows.splice(fromIdx, 1)[0];
+            qbRows.splice(toIdx, 0, moved);
+            renderQRows();
+          });
+        });
+      }
+
+      qbAddOptionBtn?.addEventListener('click', function () {
+        qbCurrentOptions.push({ text: `Option ${qbCurrentOptions.length + 1}`, isCorrect: false });
+        renderOptionRows();
+      });
+      qbQuestionMediaType?.addEventListener('change', refreshQuestionMediaTypeUi);
+      qbManageInsertMediaBtn?.addEventListener('click', openMediaManager);
+      qbMediaManagerModalEl?.addEventListener('click', function (event) {
+        const dismissTrigger = event.target.closest('[data-bs-dismiss="modal"]');
+        if (dismissTrigger) {
+          event.preventDefault();
+          closeMediaManager();
+        }
+      });
+      qbMediaManagerModalEl?.addEventListener('hidden.bs.modal', function () {
+        if (qbRestoreQuestionModalAfterMedia) {
+          qbRestoreQuestionModalAfterMedia = false;
+          showQbModal();
+        }
+      });
+      qbAddQuestionMediaBtn?.addEventListener('click', async function () {
+        const item = buildQuestionMediaItemFromInputs();
+        if (!String(item?.url || '').trim()) {
+          await showMsg({ title: 'Validation', icon: 'warning', message: 'Please enter a media URL before adding.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+          return;
+        }
+        qbQuestionMediaItems.push(item);
+        renderQuestionMediaRows();
+        clearCurrentMediaTypeInputs();
+      });
+      qbMediaUploadInput?.addEventListener('change', async function () {
+        if (!qbMediaUploadInput.files || !qbMediaUploadInput.files.length) return;
+        const formData = new FormData();
+        Array.from(qbMediaUploadInput.files).forEach(function (file) {
+          formData.append('files', file);
+        });
+        try {
+          qbMediaUploadZone?.classList.add('d-none');
+          qbMediaUploadSpinner?.classList.remove('d-none');
+          const fdTemplateId = String(templateId || '').trim();
+          const fdQuestionId = String(qbQuestionId?.value || '_unsaved').trim() || '_unsaved';
+          formData.append('actionStateId', actionStateId);
+          formData.append('templateId', fdTemplateId);
+          formData.append('questionId', fdQuestionId);
+          const response = await fetch('/school/exams/api/upload-question-media', {
+            method: 'POST',
+            headers: { 'X-AJAX-Request': 'true' },
+            body: formData
+          });
+          const payload = await response.json().catch(function () { return {}; });
+          if (!response.ok || String(payload?.status || '').toLowerCase() !== 'success') {
+            throw new Error(String(payload?.message || 'Upload failed.'));
+          }
+          const uploaded = Array.isArray(payload?.files) ? payload.files : [];
+          uploaded.forEach(function (file) {
+            const normalized = {
+              url: String(file?.url || '').trim(),
+              type: String(file?.type || '').trim(),
+              name: String(file?.name || file?.fileName || 'Uploaded File').trim()
+            };
+            if (!normalized.url) return;
+            if (!qbMediaLibraryItems.some(function (row) { return String(row?.url || '') === normalized.url; })) {
+              qbMediaLibraryItems.unshift(normalized);
+            }
+          });
+          renderMediaLibraryGrid();
+          document.getElementById('qbMediaTabLibraryBtn')?.click();
+          await showMsg({ title: 'Upload Complete', icon: 'success', message: `Uploaded ${uploaded.length} file(s).`, buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+        } catch (error) {
+          await showMsg({ title: 'Upload Failed', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+        } finally {
+          qbMediaUploadSpinner?.classList.add('d-none');
+          qbMediaUploadZone?.classList.remove('d-none');
+          qbMediaUploadInput.value = '';
+        }
+      });
+      qbMediaLibraryGrid?.addEventListener('click', function (event) {
+        const card = event.target.closest('.qb-media-library-card');
+        if (!card) return;
+        const idx = Number.parseInt(String(card.getAttribute('data-index') || '-1'), 10);
+        if (!Number.isFinite(idx) || idx < 0 || idx >= qbMediaLibraryItems.length) return;
+        qbSelectedLibraryMedia = qbMediaLibraryItems[idx];
+        qbInsertSelectedMediaBtn && (qbInsertSelectedMediaBtn.disabled = false);
+        if (qbMediaSelectionStatus) qbMediaSelectionStatus.innerHTML = `Selected: <strong>${escapeHtml(String(qbSelectedLibraryMedia?.name || 'Media'))}</strong>`;
+        renderMediaLibraryGrid();
+      });
+      qbInsertSelectedMediaBtn?.addEventListener('click', async function () {
+        if (!qbSelectedLibraryMedia?.url) return;
+        const input = currentQuestionMediaUrlInput();
+        if (!input) {
+          await showMsg({ title: 'Insert Failed', icon: 'warning', message: 'No active media URL input found.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+          return;
+        }
+        input.value = String(qbSelectedLibraryMedia.url);
+        closeMediaManager();
+        await showMsg({ title: 'Inserted', icon: 'success', message: 'Media URL inserted into the current field.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+      });
+      qbType?.addEventListener('change', function () {
+        const qType = String(qbType?.value || '').toLowerCase();
+        if (qType !== 'objective' && qbAnswerType && isObjectiveAnswerType(qbAnswerType.value)) {
+          qbAnswerType.value = 'written_answer';
+        }
+        refreshQbModeUi();
+      });
+      qbAnswerType?.addEventListener('change', function () {
+        const answerType = String(qbAnswerType?.value || '').toLowerCase();
+        if (answerType === 'true_false') {
+          const trueRadio = document.getElementById('qbTfTrue');
+          if (trueRadio) trueRadio.checked = true;
+        } else if (answerType === 'yes_no') {
+          const yesRadio = document.getElementById('qbYnYes');
+          if (yesRadio) yesRadio.checked = true;
+        } else if (answerType === 'yes_no_na') {
+          const yesRadio = document.getElementById('qbYnaYes');
+          if (yesRadio) yesRadio.checked = true;
+        }
+        refreshQbModeUi();
+        renderOptionRows();
+        refreshYesNoNaVisibility();
+      });
+      qbObjectiveMode?.addEventListener('change', function () {
+        const mode = String(qbObjectiveMode?.value || '').toLowerCase();
+        if (qbAnswerType) {
+          if (mode === 'true_false') qbAnswerType.value = 'true_false';
+          else if (mode === 'yes_no') qbAnswerType.value = 'yes_no';
+          else if (mode === 'yes_no_na') qbAnswerType.value = 'yes_no_na';
+          else if (mode === 'multiple_choice') qbAnswerType.value = 'multiple_choice';
+          else qbAnswerType.value = 'single_option';
+        }
+        renderOptionRows();
+        refreshYesNoNaVisibility();
+        refreshQbModeUi();
+      });
+      btnQbAdd?.addEventListener('click', openModalForAdd);
+      qbCancelQuestionBtn?.addEventListener('click', hideQbModal);
+      qbModalEl?.querySelector('.btn-close')?.addEventListener('click', hideQbModal);
+
+      window.addEventListener('scroll', repositionOpenRowActionMenu, true);
+      window.addEventListener('resize', repositionOpenRowActionMenu);
+      qbTbody?.closest('.table-responsive')?.addEventListener('scroll', repositionOpenRowActionMenu, { passive: true });
+
+      document.addEventListener('click', function (event) {
+        const toggleBtn = event.target.closest('#tab-questions .btn-row-actions-toggle');
+        if (toggleBtn) {
+          const qid = String(toggleBtn.getAttribute('data-qid') || '').trim();
+          const targetMenu = Array.from(document.querySelectorAll('#tab-questions .row-actions-menu, body > .row-actions-menu.row-actions-menu--floating'))
+            .find(function (menu) { return String(menu.getAttribute('data-qid') || '').trim() === qid; });
+          const willOpen = targetMenu ? targetMenu.classList.contains('d-none') : false;
+          closeAllQuestionActionMenus();
+          if (targetMenu && willOpen) {
+            const wrap = toggleBtn.closest('.row-actions-wrap');
+            targetMenu.classList.remove('d-none');
+            document.body.appendChild(targetMenu);
+            placeFloatingRowMenu(targetMenu, wrap);
+            requestAnimationFrame(function () {
+              requestAnimationFrame(repositionOpenRowActionMenu);
+            });
+          }
+          return;
+        }
+
+        const editBtn = event.target.closest('#tab-questions .qb-row-edit, body > .row-actions-menu .qb-row-edit');
+        if (editBtn) {
+          closeAllQuestionActionMenus();
+          openModalForEdit(editBtn.getAttribute('data-qid'));
+          return;
+        }
+
+        const deleteBtn = event.target.closest('#tab-questions .qb-row-delete, body > .row-actions-menu .qb-row-delete');
+        if (deleteBtn) {
+          closeAllQuestionActionMenus();
+          deleteQuestionById(deleteBtn.getAttribute('data-qid'));
+          return;
+        }
+
+        const mediaRemoveBtn = event.target.closest('.qb-media-remove');
+        if (mediaRemoveBtn) {
+          const idx = Number.parseInt(String(mediaRemoveBtn.getAttribute('data-index') || '-1'), 10);
+          if (Number.isFinite(idx) && idx >= 0 && idx < qbQuestionMediaItems.length) {
+            qbQuestionMediaItems.splice(idx, 1);
+            renderQuestionMediaRows();
+          }
+          return;
+        }
+
+        if (!event.target.closest('#tab-questions .row-actions-wrap') && !event.target.closest('body > .row-actions-menu')) {
+          closeAllQuestionActionMenus();
+        }
+      });
+
+      qbSaveQuestionBtn?.addEventListener('click', async function () {
+        const answerType = String(qbAnswerType?.value || '').toLowerCase();
+        const modeFromAnswerType = answerTypeToObjectiveMode(answerType);
+        const qType = modeFromAnswerType ? 'objective' : String(qbType?.value || 'objective').toLowerCase();
+        const modeUi = modeFromAnswerType || String(qbObjectiveMode?.value || 'single_choice').toLowerCase();
+        const modePersist = normalizeModeForPersistence(modeUi);
+        const promptHtml = String(promptEditor.getHtml() || '').trim();
+        const promptText = stripHtml(promptHtml);
+        if (!promptText) {
+          await showMsg({ title: 'Validation', icon: 'warning', message: 'Question text is required.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+          return;
+        }
+        if (qType === 'subjective') {
+          const minLen = Number(qbSubjectiveMinLength?.value || 0);
+          const maxLen = Number(qbSubjectiveMaxLength?.value || 4000);
+          if (!Number.isFinite(minLen) || minLen < 0) {
+            await showMsg({ title: 'Validation', icon: 'warning', message: 'Minimum Length must be 0 or greater.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+            return;
+          }
+          if (!Number.isFinite(maxLen) || maxLen < 1) {
+            await showMsg({ title: 'Validation', icon: 'warning', message: 'Maximum Length must be at least 1.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+            return;
+          }
+          if (maxLen < minLen) {
+            await showMsg({ title: 'Validation', icon: 'warning', message: 'Maximum Length cannot be less than Minimum Length.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+            return;
+          }
+        }
+
+        const fd = new FormData();
+        fd.append('actionStateId', actionStateId);
+        fd.append('questionId', String(qbQuestionId.value || '').trim());
+        fd.append('templateId', templateId);
+        fd.append('revisionId', qbRevisionId);
+        fd.append('sequenceNo', String(qbSequenceNo.value || '1'));
+        fd.append('status', String(qbStatus.value || 'draft'));
+        fd.append('questionType', qType);
+        fd.append('objectiveMode', modePersist);
+        fd.append('promptHtml', promptHtml);
+        fd.append('promptText', promptText);
+        fd.append('maxScore', String(qbMaxScore.value || '1'));
+        fd.append('negativeScore', String(qbNegativeScore?.value || '0'));
+        fd.append('partialAllowed', modePersist === 'multiple_choice' ? 'true' : 'false');
+        fd.append('mustBeAnswered', String(qbMustBeAnswered?.value || 'true'));
+        const isWrittenAnswer = answerType === 'written_answer';
+        fd.append('showAnswerKey', (isWrittenAnswer || qbShowAnswerKey?.checked) ? 'true' : 'false');
+        fd.append('answerType', answerType || (qType === 'objective' ? 'single_option' : 'written_answer'));
+        fd.append('mediaRulesJson', JSON.stringify(qbQuestionMediaItems));
+        fd.append('recordingMaxDuration', String(qbRecordingMaxDuration?.value || '180'));
+        fd.append('recordingAllowRerecord', String(qbRecordingAllowRerecord?.value || 'true'));
+        fd.append('uploadPhotoMaxCount', String(qbUploadPhotoMaxCount?.value || '5'));
+        fd.append('uploadPhotoMaxEachMb', String(qbUploadPhotoMaxEachMb?.value || '10'));
+        fd.append('uploadPhotoTotalMb', String(qbUploadPhotoTotalMb?.value || '30'));
+        fd.append('rubricCriteria', String(qbRubricCriteria.value || '').trim());
+        fd.append('subjectiveRubricHint', String(answerEditor.getHtml() || '').trim());
+        fd.append('subjectiveMinLength', String(qbSubjectiveMinLength?.value || '0'));
+        fd.append('subjectiveMaxLength', String(qbSubjectiveMaxLength?.value || '4000'));
+        fd.append('subjectiveAllowAttachments', String(qbSubjectiveAllowAttachments?.value || 'false'));
+
+        if (qType === 'objective') {
+          if (modeUi === 'true_false') {
+            const tf = String(document.querySelector('input[name="qbTrueFalseCorrect"]:checked')?.value || 'true');
+            fd.append('trueFalseCorrect', tf);
+            fd.append('objectiveOptionsText', '');
+          } else {
+            const lines = optionLinesForSubmit();
+            if (lines.length < 2) {
+              await showMsg({ title: 'Validation', icon: 'warning', message: 'Add at least two objective options.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+              return;
+            }
+            const correctCount = lines.filter(function (line) { return String(line || '').startsWith('*'); }).length;
+            if (modeUi === 'single_choice' && correctCount !== 1) {
+              await showMsg({ title: 'Validation', icon: 'warning', message: 'Single Option requires exactly one correct answer.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+              return;
+            }
+            if (modeUi === 'yes_no' && correctCount !== 1) {
+              await showMsg({ title: 'Validation', icon: 'warning', message: 'Yes / No requires exactly one correct answer.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+              return;
+            }
+            if (modeUi === 'multiple_choice' && correctCount < 1) {
+              await showMsg({ title: 'Validation', icon: 'warning', message: 'Multiple Choice requires at least one correct answer.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+              return;
+            }
+            fd.append('objectiveOptionsText', lines.join('\n'));
+          }
+        } else {
+          fd.append('objectiveOptionsText', '');
+        }
+
+        const mediaFiles = qbMediaFiles?.files ? Array.from(qbMediaFiles.files) : [];
+        mediaFiles.forEach(function (file) { fd.append('mediaFiles', file); });
+        if (String(qbMediaUrl?.value || '').trim()) {
+          fd.append('mediaUrl', String(qbMediaUrl.value || '').trim());
+          fd.append('mediaLabel', String(qbMediaLabel?.value || '').trim());
+        }
+        qbQuestionMediaItems.forEach(function (item) {
+          if (!item?.url) return;
+          fd.append('mediaUrl', String(item.url));
+          fd.append('mediaLabel', String(item.type || '').toUpperCase());
+        });
+
+        try {
+          if (typeof showLoading === 'function') showLoading();
+          qbSaveQuestionBtn.disabled = true;
+          const editingId = String(qbQuestionId.value || '').trim();
+          const url = editingId
+            ? `/school/exams/templates/${encodeURIComponent(templateId)}/questions/${encodeURIComponent(editingId)}/edit`
+            : `/school/exams/templates/${encodeURIComponent(templateId)}/questions/new`;
+          const result = await postFormData(url, fd);
+          const savedId = String(result?.questionId || editingId || `tmp_${Date.now()}`).trim();
+          const updatedRow = {
+            ...(qbRows.find(function (r) { return String(r?.id || '') === savedId; }) || {}),
+            id: savedId,
+            templateId: templateId,
+            revisionId: qbRevisionId,
+            sequenceNo: Number(qbSequenceNo.value || 1),
+            questionType: qType,
+            objectiveMode: qType === 'objective' ? modePersist : '',
+            promptText: promptText,
+            promptHtml: promptHtml,
+            objectiveOptions: qType === 'objective'
+              ? (modeUi === 'true_false'
+                ? [
+                    { id: 'TRUE', text: 'True', isCorrect: String(document.querySelector('input[name="qbTrueFalseCorrect"]:checked')?.value || 'true') === 'true', order: 1 },
+                    { id: 'FALSE', text: 'False', isCorrect: String(document.querySelector('input[name="qbTrueFalseCorrect"]:checked')?.value || 'true') !== 'true', order: 2 }
+                  ]
+                : (modeUi === 'yes_no'
+                  ? [
+                      { id: 'YES', text: 'Yes', isCorrect: String(document.querySelector('input[name="qbYnCorrect"]:checked')?.value || 'YES').toUpperCase() === 'YES', order: 1 },
+                      { id: 'NO', text: 'No', isCorrect: String(document.querySelector('input[name="qbYnCorrect"]:checked')?.value || 'YES').toUpperCase() === 'NO', order: 2 }
+                    ]
+                : optionLinesForSubmit().map(function (line, idx) {
+                    const correct = String(line).startsWith('*');
+                    const txt = correct ? String(line).slice(1) : String(line);
+                    return { id: `OPT_${idx + 1}`, text: txt, isCorrect: correct, order: idx + 1 };
+                  })))
+              : [],
+            mediaRefs: qbQuestionMediaItems.map(function (item, idx) {
+              return {
+                id: `MEDIA_URL_${Date.now()}_${idx + 1}`,
+                fileId: '',
+                label: String(item?.type || '').toUpperCase(),
+                fileName: '',
+                originalName: '',
+                mimeType: String(item?.type || ''),
+                storagePath: '',
+                url: String(item?.url || ''),
+                sizeBytes: 0
+              };
+            }).filter(function (item) { return String(item?.url || '').trim(); }),
+            subjectiveConfig: qType === 'subjective'
+              ? {
+                  rubricHint: String(answerEditor.getHtml() || '').trim(),
+                  minLength: Number(qbSubjectiveMinLength?.value || 0),
+                  maxLength: Number(qbSubjectiveMaxLength?.value || 4000),
+                  allowAttachments: String(qbSubjectiveAllowAttachments?.value || 'false').toLowerCase() === 'true'
+                }
+              : {},
+            scoring: {
+              maxScore: Number(qbMaxScore.value || 1),
+              negativeScore: Number(qbNegativeScore?.value || 0),
+              rubricCriteria: String(qbRubricCriteria.value || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean)
+            },
+            extensions: {
+              mustBeAnswered: String(qbMustBeAnswered?.value || 'true') === 'true',
+              showAnswerKey: isWrittenAnswer || (qbShowAnswerKey?.checked === true),
+              answerType: answerType || (qType === 'objective' ? 'single_option' : 'written_answer'),
+              questionMedia: qbQuestionMediaItems.slice(),
+              responsePolicy: {
+                maxDurationSeconds: Number(qbRecordingMaxDuration?.value || 180),
+                allowRerecord: String(qbRecordingAllowRerecord?.value || 'true') === 'true',
+                maxPhotoCount: Number(qbUploadPhotoMaxCount?.value || 5),
+                maxPhotoSizeMb: Number(qbUploadPhotoMaxEachMb?.value || 10),
+                maxTotalPhotoSizeMb: Number(qbUploadPhotoTotalMb?.value || 30)
+              }
+            },
+            status: String(qbStatus.value || 'draft')
+          };
+
+          const existingIdx = qbRows.findIndex(function (r) { return String(r?.id || '') === savedId; });
+          if (existingIdx >= 0) qbRows[existingIdx] = updatedRow;
+          else qbRows.push(updatedRow);
+          seedMediaLibraryFromRows();
+          renderQRows();
+          hideQbModal();
+          await showMsg({ title: 'Saved', icon: 'success', message: 'Question saved successfully.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+        } catch (error) {
+          await showMsg({ title: 'Save Failed', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+        } finally {
+          qbSaveQuestionBtn.disabled = false;
+          if (typeof hideLoading === 'function') hideLoading();
+        }
+      });
+
+      btnQbReorderSave?.addEventListener('click', async function () {
+        if (!qbRows.length) return;
+        try {
+          if (typeof showLoading === 'function') showLoading();
+          const fd = new FormData();
+          fd.append('actionStateId', actionStateId);
+          fd.append('questionOrder', qbRows.map(function (row) { return String(row?.id || '').trim(); }).filter(Boolean).join(','));
+          await postFormData(`/school/exams/templates/${encodeURIComponent(templateId)}/questions/reorder`, fd);
+          await showMsg({ title: 'Order Saved', icon: 'success', message: 'Question order updated.', buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+        } catch (error) {
+          await showMsg({ title: 'Reorder Failed', icon: 'error', message: error.message, buttons: [{ text: 'OK', class: 'btn-secondary' }] });
+        } finally {
+          if (typeof hideLoading === 'function') hideLoading();
+        }
+      });
+
+      renderQRows();
+      seedMediaLibraryFromRows();
+      refreshQbModeUi();
+      refreshQuestionMediaTypeUi();
+      renderQuestionMediaRows();
+      refreshYesNoNaVisibility();
+      renderOptionRows();
+    }
+  })();
+</script>

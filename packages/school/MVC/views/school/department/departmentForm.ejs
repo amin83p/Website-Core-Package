@@ -1,0 +1,430 @@
+<%
+  const d = department || {};
+  const isEdit = !!d.id;
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const initPostingPolicies = JSON.stringify(d.postingPolicies || []).replace(/</g, '\\u003c');
+  const initTransactionDefinitions = JSON.stringify(transactionDefinitions || []).replace(/</g, '\\u003c');
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <h1 class="page-heading size-md m-0"><i class="bi bi-diagram-3-fill me-2"></i><%= isEdit ? 'Edit Department' : 'New Department' %></h1>
+        <% if(isEdit) { %> <span class="badge bg-primary border font-monospace">ID: <%= d.id %></span> <% } %>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromDepartment">
+          <i class="bi bi-copy me-1"></i> Copy From Department
+        </button>
+        <a href="/school/departments/help" class="btn btn-outline-primary btn-sm"><i class="bi bi-journal-text me-1"></i> Help</a>
+      </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="deptForm" action="<%= isEdit ? '/school/departments/edit/'+d.id : '/school/departments/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
+      <input type="hidden" name="postingPolicies" id="hid_postingPolicies" value='<%- initPostingPolicies %>'>
+
+      <ul class="nav nav-tabs mb-4" id="departmentTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General Info</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-posting-policy" type="button">Posting Policies</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-general">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <div class="row">
+                <div class="col-md-4 mb-3">
+                   <label class="form-label fw-bold">Department Code *</label>
+                   <input type="text" name="code" class="form-control size-md text-uppercase" placeholder="e.g. SCI-ADV" value="<%= d.code || '' %>" required>
+                   <div class="form-text">A short, unique identifier.</div>
+                </div>
+                <div class="col-md-8 mb-3">
+                   <label class="form-label fw-bold">Department Name *</label>
+                   <input type="text" name="name" class="form-control size-md" placeholder="e.g. Advanced Sciences" value="<%= d.name || '' %>" required>
+                </div>
+             </div>
+
+             <div class="row">
+                <div class="col-md-4 mb-3">
+                   <label class="form-label fw-bold">Status</label>
+                   <select name="status" class="form-select size-md">
+                      <option value="active" <%= d.status === 'active' ? 'selected' : '' %>>Active</option>
+                      <option value="inactive" <%= d.status === 'inactive' ? 'selected' : '' %>>Inactive</option>
+                   </select>
+                </div>
+                <div class="col-md-8 mb-3">
+                   <label class="form-label fw-bold">Description</label>
+                   <textarea name="description" class="form-control size-md" rows="2" placeholder="Brief description..."><%= d.description || '' %></textarea>
+                </div>
+             </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-posting-policy">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <div class="alert alert-warning border-warning shadow-sm mt-2 mb-3">
+                <div class="fw-bold mb-1"><i class="bi bi-cash-stack me-2"></i>Posting Policies</div>
+                <div class="small text-muted">
+                  Department-level Posting Policies are the default for term-registration class charges. Program and Class policies can override them.
+                </div>
+              </div>
+
+              <div class="row align-items-end">
+                <div class="col-md-3 mb-3">
+                  <label class="form-label fw-bold">Fee Category</label>
+                  <select id="postingPolicyCategory" class="form-select size-md">
+                    <option value="__ALL__">All Categories</option>
+                    <option value="Domestic">Domestic</option>
+                    <option value="International">International</option>
+                    <option value="Corporate">Corporate</option>
+                    <option value="Scholarship">Scholarship</option>
+                    <option value="Government Funded">Government Funded</option>
+                    <option value="LINC Alberta">LINC Alberta</option>
+                    <option value="WCB Alberta">WCB Alberta</option>
+                    <option value="Others">Others</option>
+                  </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Transaction Template</label>
+                  <div class="small text-muted mb-1">Choose the template this department should use by default.</div>
+                  <div class="input-group">
+                    <input type="hidden" id="postingPolicyDefinitionId">
+                    <input type="text" id="postingPolicyDefinitionLabel" class="form-control size-md bg-white" placeholder="Select Transaction Template" readonly>
+                    <button type="button" class="btn btn-outline-primary" id="btnPickPostingPolicyDefinition"><i class="bi bi-search"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" id="btnClearPostingPolicyDefinition"><i class="bi bi-x-lg"></i></button>
+                    <a href="#" class="btn btn-outline-info d-none" id="btnViewPostingPolicyDefinition" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i></a>
+                  </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                  <label class="form-label fw-bold">Notes</label>
+                  <input type="text" id="postingPolicyNotes" class="form-control size-md" placeholder="Optional note">
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <button type="button" class="btn btn-filled btn-primary btn-sm" id="btnAddPostingPolicy"><i class="bi bi-plus-circle me-1"></i>Add Posting Policy</button>
+              </div>
+
+              <div class="table-responsive border rounded bg-white">
+                <table class="table table-hover table-sm mb-0 align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Fee Category</th>
+                      <th>Posting Policy</th>
+                      <th>Template Code</th>
+                      <th>Notes</th>
+                      <th style="width:60px;" class="text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="postingPolicyTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Department</button>
+        <a href="/school/departments" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/school/departments">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+  window.__INIT_DEPARTMENT_POSTING_POLICIES__ = <%- initPostingPolicies %>;
+  window.__INIT_DEPARTMENT_TRANSACTION_DEFINITIONS__ = <%- initTransactionDefinitions %>;
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('deptForm');
+    const currentDepartmentId = <%- JSON.stringify(d.id || '') %>;
+    const hidPostingPolicies = document.getElementById('hid_postingPolicies');
+    const postingPolicyTbody = document.getElementById('postingPolicyTbody');
+    const transactionDefinitions = Array.isArray(window.__INIT_DEPARTMENT_TRANSACTION_DEFINITIONS__) ? window.__INIT_DEPARTMENT_TRANSACTION_DEFINITIONS__ : [];
+    let postingPolicies = Array.isArray(window.__INIT_DEPARTMENT_POSTING_POLICIES__) ? window.__INIT_DEPARTMENT_POSTING_POLICIES__ : [];
+
+    function safeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    function normalizePolicies() {
+        const seen = new Set();
+        postingPolicies = (Array.isArray(postingPolicies) ? postingPolicies : []).map((row) => ({
+            feeCategory: String(row?.feeCategory || '').trim() || '__ALL__',
+            transactionDefinitionId: String(row?.transactionDefinitionId || '').trim(),
+            transactionDefinitionCode: String(row?.transactionDefinitionCode || '').trim().toUpperCase(),
+            transactionDefinitionName: String(row?.transactionDefinitionName || '').trim(),
+            notes: String(row?.notes || '').trim(),
+            active: row?.active !== false && String(row?.active) !== 'false'
+        })).filter((row) => {
+            if (!row.transactionDefinitionId) return false;
+            if (seen.has(row.feeCategory)) return false;
+            seen.add(row.feeCategory);
+            return true;
+        });
+    }
+
+    function syncPostingPolicies() {
+        normalizePolicies();
+        hidPostingPolicies.value = JSON.stringify(postingPolicies);
+    }
+
+    function formatPolicyLabel(row) {
+        return [row.transactionDefinitionCode || '', row.transactionDefinitionName || ''].filter(Boolean).join(' - ') || row.transactionDefinitionId || '-';
+    }
+
+    function labelFeeCategory(category) {
+        return String(category || '').trim() === '__ALL__' ? 'All Categories' : String(category || '').trim();
+    }
+
+    function syncSelectedPolicyUi() {
+        const idInput = document.getElementById('postingPolicyDefinitionId');
+        const labelInput = document.getElementById('postingPolicyDefinitionLabel');
+        const viewBtn = document.getElementById('btnViewPostingPolicyDefinition');
+        const definitionId = String(idInput?.value || '').trim();
+        if (definitionId) {
+            viewBtn.href = '/school/transactionTemplates/edit/' + encodeURIComponent(definitionId);
+            viewBtn.classList.remove('d-none');
+        } else {
+            viewBtn.href = '#';
+            viewBtn.classList.add('d-none');
+        }
+        if (!definitionId) labelInput.value = '';
+    }
+
+    function activateTab(targetSelector) {
+        if (!targetSelector) return;
+        const tabsRoot = document.getElementById('departmentTabs');
+        const trigger = tabsRoot ? tabsRoot.querySelector(`[data-bs-target="${targetSelector}"]`) : null;
+        if (!trigger) return;
+        if (window.bootstrap && typeof window.bootstrap.Tab === 'function') {
+            window.bootstrap.Tab.getOrCreateInstance(trigger).show();
+            return;
+        }
+        trigger.click();
+    }
+
+    function applyDepartmentTemplate(item) {
+        if (!item || typeof item !== 'object') return;
+
+        const codeInput = form.querySelector('input[name="code"]');
+        const nameInput = form.querySelector('input[name="name"]');
+        const statusInput = form.querySelector('select[name="status"]');
+        const descriptionInput = form.querySelector('textarea[name="description"]');
+
+        if (codeInput) codeInput.value = String(item.code || '').trim().toUpperCase();
+        if (nameInput) nameInput.value = String(item.name || '').trim();
+        if (descriptionInput) descriptionInput.value = String(item.description || '').trim();
+        if (statusInput) {
+            const incomingStatus = String(item.status || 'active').trim().toLowerCase();
+            const hasOption = Array.from(statusInput.options || []).some((option) => String(option.value || '').trim().toLowerCase() === incomingStatus);
+            if (hasOption) statusInput.value = incomingStatus;
+        }
+
+        postingPolicies = Array.isArray(item.postingPolicies)
+            ? item.postingPolicies.map((row) => ({
+                feeCategory: String(row?.feeCategory || '__ALL__').trim() || '__ALL__',
+                transactionDefinitionId: String(row?.transactionDefinitionId || '').trim(),
+                transactionDefinitionCode: String(row?.transactionDefinitionCode || '').trim().toUpperCase(),
+                transactionDefinitionName: String(row?.transactionDefinitionName || '').trim(),
+                notes: String(row?.notes || '').trim(),
+                active: row?.active !== false && String(row?.active) !== 'false'
+            }))
+            : [];
+
+        renderPostingPolicies();
+        activateTab('#tab-general');
+    }
+
+    function renderPostingPolicies() {
+        normalizePolicies();
+        if (!postingPolicies.length) {
+            postingPolicyTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No posting policies added yet.</td></tr>';
+            syncPostingPolicies();
+            return;
+        }
+        postingPolicyTbody.innerHTML = postingPolicies.map((row, index) => (
+            '<tr>' +
+                '<td><span class="fw-bold">' + safeHtml(labelFeeCategory(row.feeCategory)) + '</span></td>' +
+                '<td><div class="fw-bold">' + safeHtml(formatPolicyLabel(row)) + '</div></td>' +
+                '<td><span class="font-monospace">' + safeHtml(row.transactionDefinitionCode || row.transactionDefinitionId || '-') + '</span></td>' +
+                '<td><span class="small text-muted">' + safeHtml(row.notes || '') + '</span></td>' +
+                '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-del-policy="' + index + '"><i class="bi bi-trash"></i></button></td>' +
+            '</tr>'
+        )).join('');
+        postingPolicyTbody.querySelectorAll('button[data-del-policy]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const index = Number(btn.getAttribute('data-del-policy'));
+                if (!Number.isInteger(index) || !postingPolicies[index]) return;
+                postingPolicies.splice(index, 1);
+                renderPostingPolicies();
+            });
+        });
+        syncPostingPolicies();
+    }
+
+    document.getElementById('btnPickPostingPolicyDefinition').addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.transactionDefinition({
+            title: 'Select Transaction Template',
+            onSelect: function (item) {
+                document.getElementById('postingPolicyDefinitionId').value = String(item.id || '');
+                document.getElementById('postingPolicyDefinitionId').dataset.code = String(item.code || '');
+                document.getElementById('postingPolicyDefinitionId').dataset.name = String(item.name || '');
+                document.getElementById('postingPolicyDefinitionLabel').value = [item.code || '', item.name || ''].filter(Boolean).join(' - ');
+                syncSelectedPolicyUi();
+            }
+        }));
+    });
+
+    document.getElementById('btnClearPostingPolicyDefinition').addEventListener('click', () => {
+        const idInput = document.getElementById('postingPolicyDefinitionId');
+        idInput.value = '';
+        idInput.dataset.code = '';
+        idInput.dataset.name = '';
+        syncSelectedPolicyUi();
+    });
+
+    document.getElementById('btnAddPostingPolicy').addEventListener('click', async () => {
+        const feeCategory = String(document.getElementById('postingPolicyCategory').value || '__ALL__').trim() || '__ALL__';
+        const definitionInput = document.getElementById('postingPolicyDefinitionId');
+        const transactionDefinitionId = String(definitionInput.value || '').trim();
+        if (!transactionDefinitionId) {
+            alert('Select a Transaction Template first.');
+            return;
+        }
+        if (postingPolicies.some((row) => String(row.feeCategory || '').trim() === feeCategory)) {
+            alert('This fee category already has a Posting Policy.');
+            return;
+        }
+        postingPolicies.push({
+            feeCategory,
+            transactionDefinitionId,
+            transactionDefinitionCode: String(definitionInput.dataset.code || '').trim().toUpperCase(),
+            transactionDefinitionName: String(definitionInput.dataset.name || '').trim(),
+            notes: String(document.getElementById('postingPolicyNotes').value || '').trim(),
+            active: true
+        });
+        document.getElementById('postingPolicyCategory').value = '__ALL__';
+        document.getElementById('postingPolicyNotes').value = '';
+        document.getElementById('postingPolicyDefinitionId').value = '';
+        document.getElementById('postingPolicyDefinitionId').dataset.code = '';
+        document.getElementById('postingPolicyDefinitionId').dataset.name = '';
+        syncSelectedPolicyUi();
+        renderPostingPolicies();
+    });
+
+    const copyBtn = document.getElementById('btnCopyFromDepartment');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            GenericPicker.open(GenericPickerPresets.department({
+                title: 'Copy From Department',
+                apiEndpoint: '/school/departments/api/data',
+                placeholder: 'Search departments to copy...',
+                onSelect: async (item) => {
+                    const sourceId = String(item?.id || '').trim();
+                    if (!item || (currentDepartmentId && sourceId === String(currentDepartmentId))) {
+                        if (typeof showMessageModal === 'function') {
+                            await showMessageModal({
+                                title: 'Invalid Selection',
+                                icon: 'warning',
+                                message: 'Select a different department to copy from.',
+                                buttons: [{ text: 'OK', class: 'btn-warning' }]
+                            });
+                        }
+                        return;
+                    }
+                    applyDepartmentTemplate(item);
+                    if (typeof showMessageModal === 'function') {
+                        await showMessageModal({
+                            title: 'Template Applied',
+                            icon: 'success',
+                            message: 'Department fields were copied. Review and edit values before saving.',
+                            buttons: [{ text: 'OK', class: 'btn-success' }]
+                        });
+                    }
+                }
+            }));
+        });
+    }
+
+    renderPostingPolicies();
+    syncSelectedPolicyUi();
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+        try {
+            syncPostingPolicies();
+            const formData = new FormData(form);
+            const data = new URLSearchParams(formData);
+
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-AJAX-Request': 'true'
+                },
+                body: data.toString()
+            });
+
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                 throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+            }
+
+            const result = await response.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+                : { stop: false };
+            if (guarded.stop) return;
+
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: result.status === 'success' ? 'Success' : 'Error',
+                    icon: result.status === 'success' ? 'success' : 'error',
+                    message: result.message || 'Operation completed.',
+                    buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
+                });
+            } else {
+                alert(result.message);
+            }
+
+            if (result.status === 'success') {
+                window.location.href = '/school/departments';
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+
+        } catch (error) {
+            console.error('Submission Error:', error);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'System Error',
+                    icon: 'error',
+                    message: error.message || 'An unexpected network error occurred.',
+                    buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                });
+            } else {
+                alert(error.message);
+            }
+        }
+    });
+});
+</script>

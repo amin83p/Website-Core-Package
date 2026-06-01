@@ -1,0 +1,539 @@
+<div class="sections-page">
+  <div class="mx-auto" style="max-width: 1400px;">
+  <% const isPendingRequest = ['draft', 'submitted', 'pending_approval', 'pending_program_admin_approval'].includes(String(withdrawal.status || '').toLowerCase()); %>
+  <% const canManageRequest = Boolean(typeof canManagePendingRequest !== 'undefined' ? canManagePendingRequest : false); %>
+  <input type="hidden" id="withdrawalActionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h2 class="page-heading size-md m-0">
+        <% if (withdrawal.type === 'class') { %>
+          <i class="bi bi-easel2-fill me-2 text-info"></i>
+        <% } else if (withdrawal.type === 'term') { %>
+          <i class="bi bi-calendar3-fill me-2 text-warning"></i>
+        <% } else { %>
+          <i class="bi bi-journal-x me-2 text-danger"></i>
+        <% } %>
+        Withdrawal Details
+      </h2>
+      <div class="text-muted small mt-1">
+        <code><%= withdrawal.id %></code>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <% if (isPendingRequest && canManageRequest) { %>
+        <% if (String(withdrawal.type || '').toLowerCase() === 'program') { %>
+          <a href="/school/withdrawal/finalize/<%= withdrawal.id %>" class="btn btn-primary btn-sm">
+            <i class="bi bi-journal-check me-1"></i>Review & Finalize
+          </a>
+        <% } else { %>
+          <button type="button" id="btnFinalizeRequest" class="btn btn-primary btn-sm">
+            <i class="bi bi-check2-circle me-1"></i>Finalize Request
+          </button>
+        <% } %>
+        <button type="button" id="btnRejectRequest" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-x-circle me-1"></i>Reject Request
+        </button>
+      <% } %>
+      <a href="/school/withdrawal/list" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to List
+      </a>
+      <a href="/school/withdrawal" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-speedometer2 me-1"></i>Dashboard
+      </a>
+    </div>
+  </div>
+
+  <% if (isPendingRequest && !canManageRequest) { %>
+    <div class="alert alert-info py-2 mb-4">
+      <i class="bi bi-info-circle me-2"></i>
+      This request is in review mode. Only administrators, superusers, or the assigned program administrator can finalize or reject it.
+    </div>
+  <% } %>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+          <h5 class="fw-bold mb-0"><i class="bi bi-info-circle me-2"></i>General Information</h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small text-muted">Type</label>
+              <div>
+                <% if (withdrawal.type === 'class') { %>
+                  <span class="badge bg-info-subtle text-info fs-6"><i class="bi bi-easel2 me-1"></i>Class Withdrawal</span>
+                <% } else if (withdrawal.type === 'term') { %>
+                  <span class="badge bg-warning-subtle text-warning fs-6"><i class="bi bi-calendar3 me-1"></i>Term Withdrawal</span>
+                <% } else { %>
+                  <span class="badge bg-danger-subtle text-danger fs-6"><i class="bi bi-journal-text me-1"></i>Program Withdrawal</span>
+                <% } %>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small text-muted">Status</label>
+              <div>
+                <% if (withdrawal.status === 'completed') { %>
+                  <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i>Completed</span>
+                <% } else if (withdrawal.status === 'error') { %>
+                  <span class="badge bg-danger fs-6"><i class="bi bi-x-circle me-1"></i>Error</span>
+                <% } else if (withdrawal.status === 'processing') { %>
+                  <span class="badge bg-primary fs-6"><i class="bi bi-arrow-repeat me-1"></i>Processing</span>
+                <% } else if (withdrawal.status === 'pending_program_admin_approval') { %>
+                  <span class="badge bg-warning text-dark fs-6"><i class="bi bi-person-check me-1"></i>Pending Program Admin</span>
+                <% } else if (withdrawal.status === 'pending_approval' || withdrawal.status === 'submitted' || withdrawal.status === 'draft') { %>
+                  <span class="badge bg-warning text-dark fs-6"><i class="bi bi-hourglass-split me-1"></i>Pending Review</span>
+                <% } else if (withdrawal.status === 'rejected') { %>
+                  <span class="badge bg-secondary fs-6"><i class="bi bi-x-octagon me-1"></i>Rejected</span>
+                <% } else { %>
+                  <span class="badge bg-secondary fs-6"><%= withdrawal.status %></span>
+                <% } %>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small text-muted">Reason</label>
+              <div class="fw-bold"><%= reasonLabels[withdrawal.reason] || withdrawal.reason || '-' %></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small text-muted">Initiator</label>
+              <div><%= withdrawal.initiatorType || '-' %> <% if (withdrawal.initiatorId) { %>(<%= withdrawal.initiatorId %>)<% } %></div>
+            </div>
+            <% if (withdrawal.reasonDetail) { %>
+              <div class="col-12">
+                <label class="form-label small text-muted">Reason Details</label>
+                <div class="p-2 bg-light rounded"><%= withdrawal.reasonDetail %></div>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+          <h5 class="fw-bold mb-0"><i class="bi bi-person me-2"></i>Student Information</h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small text-muted">Student ID</label>
+              <div class="fw-bold"><%= withdrawal.studentId %></div>
+            </div>
+            <% if (student) { %>
+              <div class="col-md-6">
+                <label class="form-label small text-muted">Name</label>
+                <div class="fw-bold"><%= student.firstName %> <%= student.lastName %></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small text-muted">Student Number</label>
+                <div><%= student.studentNumber || '-' %></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small text-muted">Fee Category</label>
+                <div><%= student.feeCategory || '-' %></div>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <% if (withdrawal.financialImpact) { %>
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white py-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>Financial Impact</h5>
+          </div>
+          <div class="card-body">
+            <% const isPendingProgramReview = String(withdrawal.type || '').toLowerCase() === 'program' && isPendingRequest; %>
+            <div class="row g-3">
+              <% if (isPendingProgramReview) { %>
+                <div class="col-md-3">
+                  <label class="form-label small text-muted">Program Fee (Charged)</label>
+                  <div class="h4 text-primary mb-0">
+                    $<%= Number(withdrawal.financialImpact.programFeeOriginal || 0).toFixed(2) %>
+                    <small class="text-muted"><%= withdrawal.financialImpact.currency || 'CAD' %></small>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small text-muted">Amount Paid</label>
+                  <div class="h4 text-success mb-0">
+                    $<%= Number(withdrawal.financialImpact.programFeePaid || 0).toFixed(2) %>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small text-muted">Outstanding Debt</label>
+                  <div class="h4 text-danger mb-0">
+                    $<%= Number(withdrawal.financialImpact.programFeeOutstandingDebt || 0).toFixed(2) %>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small text-muted">Refund Status</label>
+                  <div class="h5 text-warning mb-0">Pending Policy Review</div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small text-muted">Policy</label>
+                  <div>Refund is determined by withdrawal policy and posted payments.</div>
+                </div>
+                <div class="col-12">
+                  <div class="alert alert-info mb-0 py-2">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Final refund will be calculated during review and applied to the student account if eligible from posted payments.
+                  </div>
+                </div>
+              <% } else { %>
+                <div class="col-md-4">
+                  <label class="form-label small text-muted">Refund Amount</label>
+                  <div class="h4 text-success mb-0">
+                    $<%= (withdrawal.financialImpact.refundAmount || 0).toFixed(2) %>
+                    <small class="text-muted"><%= withdrawal.financialImpact.currency || 'CAD' %></small>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small text-muted">Penalty Amount</label>
+                  <div class="h4 text-danger mb-0">
+                    $<%= (withdrawal.financialImpact.penaltyAmount || 0).toFixed(2) %>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small text-muted">Refund Policy</label>
+                  <div><%= withdrawal.financialImpact.refundPolicy || '-' %></div>
+                </div>
+              <% } %>
+              <% if (withdrawal.financialImpact.notes) { %>
+                <div class="col-12">
+                  <label class="form-label small text-muted">Notes</label>
+                  <div class="p-2 bg-light rounded"><%= withdrawal.financialImpact.notes %></div>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (withdrawal.academicImpact) { %>
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white py-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-mortarboard me-2 text-primary"></i>Academic Impact</h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label small text-muted">Grade Assigned</label>
+                <div class="h5 mb-0">
+                  <% if (withdrawal.academicImpact.gradeAssigned) { %>
+                    <span class="badge bg-secondary fs-6"><%= withdrawal.academicImpact.gradeAssigned %></span>
+                  <% } else { %>
+                    <span class="text-muted">None</span>
+                  <% } %>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small text-muted">Appears on Transcript</label>
+                <div>
+                  <% if (withdrawal.academicImpact.appearsOnTranscript) { %>
+                    <span class="text-success"><i class="bi bi-check-circle me-1"></i>Yes</span>
+                  <% } else { %>
+                    <span class="text-muted"><i class="bi bi-x-circle me-1"></i>No</span>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+          <h5 class="fw-bold mb-0"><i class="bi bi-calendar-event me-2"></i>Timeline</h5>
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-0">
+            <li class="d-flex align-items-start mb-3">
+              <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center me-3" style="width: 32px; height: 32px; min-width: 32px;">
+                <i class="bi bi-plus-lg"></i>
+              </div>
+              <div>
+                <div class="fw-bold">Request Date</div>
+                <div class="small text-muted"><%= withdrawal.requestDate || '-' %></div>
+              </div>
+            </li>
+            <li class="d-flex align-items-start mb-3">
+              <div class="rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center me-3" style="width: 32px; height: 32px; min-width: 32px;">
+                <i class="bi bi-calendar-check"></i>
+              </div>
+              <div>
+                <div class="fw-bold">Effective Date</div>
+                <div class="small text-muted"><%= withdrawal.effectiveDate || '-' %></div>
+              </div>
+            </li>
+            <% if (withdrawal.approvedDate) { %>
+              <li class="d-flex align-items-start mb-3">
+                <div class="rounded-circle bg-info-subtle text-info d-flex align-items-center justify-content-center me-3" style="width: 32px; height: 32px; min-width: 32px;">
+                  <i class="bi bi-check2"></i>
+                </div>
+                <div>
+                  <div class="fw-bold">Approved Date</div>
+                  <div class="small text-muted"><%= withdrawal.approvedDate %></div>
+                </div>
+              </li>
+            <% } %>
+            <% if (withdrawal.completedDate) { %>
+              <li class="d-flex align-items-start">
+                <div class="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center me-3" style="width: 32px; height: 32px; min-width: 32px;">
+                  <i class="bi bi-check-circle"></i>
+                </div>
+                <div>
+                  <div class="fw-bold">Completed Date</div>
+                  <div class="small text-muted"><%= withdrawal.completedDate %></div>
+                </div>
+              </li>
+            <% } %>
+          </ul>
+        </div>
+      </div>
+
+      <% if (withdrawal.type !== 'class') { %>
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white py-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-diagram-3 me-2"></i>Related Registrations</h5>
+          </div>
+          <div class="card-body">
+            <ul class="list-unstyled mb-0">
+              <% if (withdrawal.programRegistrationId) { %>
+                <li class="mb-2">
+                  <span class="small text-muted">Program Registration:</span>
+                  <div><a href="/school/programs/registrations/<%= withdrawal.programRegistrationId %>"><%= withdrawal.programRegistrationId %></a></div>
+                </li>
+              <% } %>
+              <% if (withdrawal.termRegistrationId) { %>
+                <li class="mb-2">
+                  <span class="small text-muted">Term Registration:</span>
+                  <div><a href="/school/programs/term-registrations/<%= withdrawal.termRegistrationId %>"><%= withdrawal.termRegistrationId %></a></div>
+                </li>
+              <% } %>
+              <% if (withdrawal.programId) { %>
+                <li class="mb-2">
+                  <span class="small text-muted">Program:</span>
+                  <div><%= withdrawal.programId %></div>
+                </li>
+              <% } %>
+              <% if (withdrawal.termId) { %>
+                <li>
+                  <span class="small text-muted">Term:</span>
+                  <div><%= withdrawal.termId %></div>
+                </li>
+              <% } %>
+            </ul>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (childWithdrawals.length > 0) { %>
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white py-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-collection me-2"></i>Child Withdrawals</h5>
+          </div>
+          <div class="card-body p-0">
+            <ul class="list-group list-group-flush">
+              <% childWithdrawals.forEach(child => { %>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <% if (child.type === 'class') { %>
+                      <i class="bi bi-easel2 text-info me-1"></i>
+                    <% } else if (child.type === 'term') { %>
+                      <i class="bi bi-calendar3 text-warning me-1"></i>
+                    <% } %>
+                    <span class="small"><%= child.id %></span>
+                  </div>
+                  <a href="/school/withdrawal/detail/<%= child.id %>" class="btn btn-outline-primary btn-sm py-0">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                </li>
+              <% }) %>
+            </ul>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (withdrawal.errors && withdrawal.errors.length > 0) { %>
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-danger-subtle py-3">
+            <h5 class="fw-bold mb-0 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Errors</h5>
+          </div>
+          <div class="card-body">
+            <ul class="list-unstyled mb-0">
+              <% withdrawal.errors.forEach(err => { %>
+                <li class="small text-danger mb-1"><i class="bi bi-x-circle me-1"></i><%= err %></li>
+              <% }) %>
+            </ul>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal fade" id="rejectRequestModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-x-circle text-danger me-2"></i>Reject Request</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label fw-bold">Rejection Note (Optional)</label>
+        <textarea id="rejectNoteInput" class="form-control" rows="3" placeholder="Reason for rejection..."></textarea>
+        <div id="rejectModalError" class="alert alert-danger py-2 mt-3 mb-0 d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btnRejectRequestConfirm">
+          <i class="bi bi-x-circle me-1"></i>Reject
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const finalizeBtn = document.getElementById('btnFinalizeRequest');
+  const rejectBtn = document.getElementById('btnRejectRequest');
+  const rejectConfirmBtn = document.getElementById('btnRejectRequestConfirm');
+  const rejectNoteInput = document.getElementById('rejectNoteInput');
+  const rejectModalError = document.getElementById('rejectModalError');
+  const rejectModalEl = document.getElementById('rejectRequestModal');
+  const rejectModal = rejectModalEl ? new bootstrap.Modal(rejectModalEl) : null;
+  const actionStateId = document.getElementById('withdrawalActionStateId')?.value || '';
+
+  function showMsg(opts) {
+    if (typeof window.showMessageModal === 'function') return window.showMessageModal(opts || {});
+    return Promise.resolve('OK');
+  }
+
+  async function postAction(url, payload) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: JSON.stringify({ ...payload, actionStateId })
+    });
+    const responseText = await response.text();
+    let result = null;
+    try {
+      result = responseText ? JSON.parse(responseText) : {};
+    } catch (parseError) {
+      throw new Error(`Server returned a non-JSON response (HTTP ${response.status}).`);
+    }
+    if (result && typeof window.applyGuardedApiResult === 'function' && result?.idempotency?.state) {
+      const guarded = await window.applyGuardedApiResult(result, {
+        busyTitle: 'Request In Progress',
+        replayTitle: 'Request Already Processed'
+      });
+      if (guarded.stop) return null;
+    }
+    if (!response.ok || result.status !== 'success') {
+      throw new Error(result.message || 'Request failed.');
+    }
+    return result;
+  }
+
+  if (finalizeBtn) {
+    finalizeBtn.addEventListener('click', async function () {
+      const answer = await showMsg({
+        title: 'Finalize Request?',
+        icon: 'warning',
+        message: 'Finalize this pending withdrawal request now?',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Finalize', class: 'btn-primary' }
+        ]
+      });
+      if (answer !== 'Finalize') return;
+      try {
+        finalizeBtn.disabled = true;
+        const result = await postAction(`/school/withdrawal/api/<%= withdrawal.id %>/finalize`, {});
+        if (!result) return;
+        await showMsg({
+          title: 'Finalized',
+          icon: 'success',
+          message: result.message || 'Withdrawal request finalized.',
+          buttons: [{ text: 'OK', class: 'btn-success' }]
+        });
+        window.location.reload();
+      } catch (error) {
+        await showMsg({
+          title: 'Finalize Failed',
+          icon: 'error',
+          message: error.message || 'Finalize failed.',
+          buttons: [{ text: 'Close', class: 'btn-danger' }]
+        });
+      } finally {
+        finalizeBtn.disabled = false;
+      }
+    });
+  }
+
+  if (rejectBtn) {
+    rejectBtn.addEventListener('click', function () {
+      if (!rejectModal) return;
+      if (rejectNoteInput) rejectNoteInput.value = '';
+      if (rejectModalError) {
+        rejectModalError.classList.add('d-none');
+        rejectModalError.textContent = '';
+      }
+      rejectModal.show();
+    });
+  }
+
+  if (rejectConfirmBtn) {
+    rejectConfirmBtn.addEventListener('click', async function () {
+      const note = String(rejectNoteInput?.value || '').trim();
+      try {
+        rejectConfirmBtn.disabled = true;
+        rejectConfirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Rejecting...';
+        if (rejectModalError) {
+          rejectModalError.classList.add('d-none');
+          rejectModalError.textContent = '';
+        }
+        const result = await postAction(`/school/withdrawal/api/<%= withdrawal.id %>/reject`, { note });
+        if (!result) return;
+        if (rejectModal) rejectModal.hide();
+        await showMsg({
+          title: 'Rejected',
+          icon: 'success',
+          message: result.message || 'Withdrawal request rejected.',
+          buttons: [{ text: 'OK', class: 'btn-success' }]
+        });
+        window.location.reload();
+      } catch (error) {
+        if (rejectModalError) {
+          rejectModalError.textContent = error.message || 'Rejection failed.';
+          rejectModalError.classList.remove('d-none');
+        } else {
+          await showMsg({
+            title: 'Reject Failed',
+            icon: 'error',
+            message: error.message || 'Rejection failed.',
+            buttons: [{ text: 'Close', class: 'btn-danger' }]
+          });
+        }
+      } finally {
+        rejectConfirmBtn.disabled = false;
+        rejectConfirmBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Reject';
+      }
+    });
+  }
+});
+</script>
+
+<style>
+  .bg-primary-subtle { background-color: #cfe2ff !important; }
+  .bg-success-subtle { background-color: #d1e7dd !important; }
+  .bg-info-subtle { background-color: #cff4fc !important; }
+  .bg-warning-subtle { background-color: #fff3cd !important; }
+  .bg-danger-subtle { background-color: #f8d7da !important; }
+</style>

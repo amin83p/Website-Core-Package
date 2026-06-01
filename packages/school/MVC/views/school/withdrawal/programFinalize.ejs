@@ -1,0 +1,452 @@
+<div class="sections-page">
+  <div class="mx-auto" style="max-width: 1400px;">
+    <% const paidFromImpact = Number(withdrawal?.financialImpact?.programFeePaid || 0); %>
+    <% const chargedFromImpact = Number(withdrawal?.financialImpact?.programFeeOriginal || 0); %>
+    <% const debtFromImpact = Number(withdrawal?.financialImpact?.programFeeOutstandingDebt || 0); %>
+    <% const paidFromSource = (Array.isArray(sourceTransactions) ? sourceTransactions : []).reduce(function(sum, tx) { return String(tx?.amount?.direction || '').toLowerCase() === 'debit' ? sum + Number(tx?.amount?.value || 0) : sum; }, 0); %>
+    <% const programPaidAmount = paidFromImpact > 0 ? paidFromImpact : paidFromSource; %>
+    <input type="hidden" id="withdrawalActionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div>
+        <h2 class="page-heading size-md m-0">
+          <i class="bi bi-journal-check me-2 text-danger"></i>Finalize Program Withdrawal
+        </h2>
+        <div class="text-muted small mt-1">
+          Review source transactions, build balanced settlement rows, and submit finalization.
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="/school/withdrawal/detail/<%= withdrawal.id %>" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left me-1"></i>Back to Details
+        </a>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white py-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-info-circle me-2"></i>Request Summary</h5>
+          </div>
+          <div class="card-body">
+            <dl class="row small mb-0">
+              <dt class="col-5 text-muted">Withdrawal ID</dt>
+              <dd class="col-7 font-monospace"><%= withdrawal.id %></dd>
+              <dt class="col-5 text-muted">Status</dt>
+              <dd class="col-7"><%= withdrawal.status %></dd>
+              <dt class="col-5 text-muted">Student</dt>
+              <dd class="col-7">
+                <div class="fw-bold"><%= student ? ((student.firstName || '') + ' ' + (student.lastName || '')).trim() : withdrawal.studentId %></div>
+                <div class="font-monospace"><%= withdrawal.studentId %></div>
+              </dd>
+              <dt class="col-5 text-muted">Program Reg</dt>
+              <dd class="col-7 font-monospace"><%= withdrawal.programRegistrationId || '-' %></dd>
+              <dt class="col-5 text-muted">Program Fee (Charged)</dt>
+              <dd class="col-7 fw-bold">
+                $<%= Number(chargedFromImpact || 0).toFixed(2) %>
+              </dd>
+              <dt class="col-5 text-muted">Program Amount Paid</dt>
+              <dd class="col-7 fw-bold text-primary">
+                $<span id="recommendedRefund"><%= Number(programPaidAmount || 0).toFixed(2) %></span>
+              </dd>
+              <dt class="col-5 text-muted">Outstanding Debt</dt>
+              <dd class="col-7 fw-bold text-danger">
+                $<%= Number(debtFromImpact || 0).toFixed(2) %>
+              </dd>
+              <dt class="col-5 text-muted">Currency</dt>
+              <dd class="col-7"><%= withdrawal.financialImpact?.currency || 'CAD' %></dd>
+              <dt class="col-5 text-muted">Effective Date</dt>
+              <dd class="col-7"><%= withdrawal.effectiveDate || '-' %></dd>
+            </dl>
+            <div class="alert alert-info py-2 mt-3 mb-0">
+              <i class="bi bi-info-circle me-2"></i>Final refund is policy-based and must be calculated during review from posted payments only. If eligible, approved refund is applied to the student account.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-8">
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2"></i>Source Transactions</h5>
+            <span class="badge bg-light text-dark border"><%= sourceTransactions.length %> record(s)</span>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Transaction</th>
+                    <th>Date</th>
+                    <th>Direction</th>
+                    <th>Account</th>
+                    <th class="text-end">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% if (!sourceTransactions.length) { %>
+                    <tr>
+                      <td colspan="5" class="text-center text-muted py-4">No source transaction details found for this registration.</td>
+                    </tr>
+                  <% } %>
+                  <% sourceTransactions.forEach(function(tx) { %>
+                    <tr>
+                      <td>
+                        <div class="fw-bold font-monospace"><%= tx.id %></div>
+                        <div class="small text-muted"><%= tx.source?.eventType || '-' %></div>
+                      </td>
+                      <td><%= tx.effectiveDate || '-' %></td>
+                      <td>
+                        <span class="badge <%= String(tx.amount?.direction || '').toLowerCase() === 'debit' ? 'bg-success' : 'bg-danger' %>">
+                          <%= tx.amount?.direction || '-' %>
+                        </span>
+                      </td>
+                      <td>
+                        <div class="fw-bold font-monospace"><%= tx.metadata?.accountCode || tx.metadata?.accountId || '-' %></div>
+                        <div class="small text-muted"><%= tx.metadata?.accountName || '-' %></div>
+                      </td>
+                      <td class="text-end fw-bold"><%= Number(tx.amount?.value || 0).toFixed(2) %> <%= tx.amount?.currency || '' %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0"><i class="bi bi-bezier2 me-2"></i>Manual Settlement (Double Entry)</h5>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddSettlementRow">
+              <i class="bi bi-plus-lg me-1"></i>Add Row
+            </button>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th style="min-width: 240px;">Debit Account</th>
+                    <th style="min-width: 240px;">Credit Account</th>
+                    <th style="min-width: 130px;">Amount</th>
+                    <th>Memo</th>
+                    <th class="text-end">Remove</th>
+                  </tr>
+                </thead>
+                <tbody id="settlementRowsTbody"></tbody>
+              </table>
+            </div>
+
+            <div class="row g-3 border-top pt-3">
+              <div class="col-md-4">
+                <div class="small text-muted">Program Amount Paid</div>
+                <div class="fw-bold text-primary">$<span id="sumRequestedRefund"><%= Number(programPaidAmount || 0).toFixed(2) %></span></div>
+              </div>
+              <div class="col-md-4">
+                <div class="small text-muted">Manual Debit Total</div>
+                <div class="fw-bold">$<span id="sumDebit">0.00</span></div>
+              </div>
+              <div class="col-md-4">
+                <div class="small text-muted">Manual Credit Total</div>
+                <div class="fw-bold">$<span id="sumCredit">0.00</span></div>
+              </div>
+              <div class="col-12">
+                <div id="balanceStatus" class="alert alert-warning py-2 mb-0">
+                  <i class="bi bi-exclamation-triangle me-2"></i>Settlement rows must be complete and balanced before submission.
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <label class="form-label fw-bold">Finalization Note (Optional)</label>
+              <textarea id="settlementNote" class="form-control" rows="2" placeholder="Add final reviewer note..."></textarea>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4">
+              <a href="/school/withdrawal/detail/<%= withdrawal.id %>" class="btn btn-outline-secondary">
+                <i class="bi bi-x-lg me-1"></i>Cancel
+              </a>
+              <button type="button" class="btn btn-danger" id="btnSubmitFinalize">
+                <i class="bi bi-check2-circle me-1"></i>Submit Finalization
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker', { user }) %>
+
+<script>
+(function () {
+  const withdrawalId = <%- JSON.stringify(withdrawal.id || '') %>;
+  const actionStateId = String(document.getElementById('withdrawalActionStateId')?.value || '').trim();
+  const tbody = document.getElementById('settlementRowsTbody');
+  const btnAdd = document.getElementById('btnAddSettlementRow');
+  const btnSubmit = document.getElementById('btnSubmitFinalize');
+  const sumDebitEl = document.getElementById('sumDebit');
+  const sumCreditEl = document.getElementById('sumCredit');
+  const balanceStatusEl = document.getElementById('balanceStatus');
+  const recommendedRefund = Number(document.getElementById('recommendedRefund')?.textContent || 0);
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function showMsg(opts) {
+    if (typeof window.showMessageModal === 'function') return window.showMessageModal(opts || {});
+    return Promise.resolve('OK');
+  }
+
+  function accountDisplay(code, name, id) {
+    const safeCode = escapeHtml(code || '');
+    const safeName = escapeHtml(name || '');
+    const safeId = escapeHtml(id || '');
+    if (safeCode || safeName) {
+      return '<div class="fw-bold font-monospace">' + (safeCode || '-') + '</div><div class="small text-muted">' + (safeName || safeId || '-') + '</div>';
+    }
+    return '<span class="text-muted">No account selected</span>';
+  }
+
+  function recalcTotals() {
+    const rows = Array.from(tbody.querySelectorAll('tr[data-row]'));
+    let debit = 0;
+    let credit = 0;
+    let valid = rows.length > 0;
+
+    rows.forEach((row) => {
+      const amount = Number(row.querySelector('.js-amount')?.value || 0);
+      const debitId = String(row.querySelector('.js-debit-id')?.value || '').trim();
+      const creditId = String(row.querySelector('.js-credit-id')?.value || '').trim();
+      if (amount > 0) {
+        debit += amount;
+        credit += amount;
+      } else {
+        valid = false;
+      }
+      if (!debitId || !creditId) valid = false;
+    });
+
+    sumDebitEl.textContent = debit.toFixed(2);
+    sumCreditEl.textContent = credit.toFixed(2);
+
+    const balanced = Math.abs(debit - credit) < 0.01;
+    if (valid && balanced) {
+      balanceStatusEl.className = 'alert alert-success py-2 mb-0';
+      balanceStatusEl.innerHTML = '<i class="bi bi-check-circle me-2"></i>Settlement rows are balanced and ready.';
+      return true;
+    }
+
+    balanceStatusEl.className = 'alert alert-warning py-2 mb-0';
+    balanceStatusEl.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Settlement rows must be complete and balanced before submission.';
+    return false;
+  }
+
+  function openAccountPicker(onSelect) {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showMsg({
+        title: 'Picker Unavailable',
+        icon: 'error',
+        message: 'Account picker is not available on this page.',
+        buttons: [{ text: 'OK', class: 'btn-danger' }]
+      });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.account({
+      title: 'Select Account',
+      placeholder: 'Search accounts by code/name...',
+      onSelect: onSelect
+    }));
+  }
+
+  function createRow(initial) {
+    const data = initial || {};
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-row', '1');
+    tr.innerHTML = [
+      '<td>',
+        '<input type="hidden" class="js-debit-id" value="' + escapeHtml(data.debitAccountId || '') + '">',
+        '<input type="hidden" class="js-debit-code" value="' + escapeHtml(data.debitAccountCode || '') + '">',
+        '<input type="hidden" class="js-debit-name" value="' + escapeHtml(data.debitAccountName || '') + '">',
+        '<div class="border rounded p-2 bg-light js-debit-display mb-2">' + accountDisplay(data.debitAccountCode, data.debitAccountName, data.debitAccountId) + '</div>',
+        '<button type="button" class="btn btn-outline-primary btn-sm js-pick-debit"><i class="bi bi-search me-1"></i>Pick Debit</button>',
+      '</td>',
+      '<td>',
+        '<input type="hidden" class="js-credit-id" value="' + escapeHtml(data.creditAccountId || '') + '">',
+        '<input type="hidden" class="js-credit-code" value="' + escapeHtml(data.creditAccountCode || '') + '">',
+        '<input type="hidden" class="js-credit-name" value="' + escapeHtml(data.creditAccountName || '') + '">',
+        '<div class="border rounded p-2 bg-light js-credit-display mb-2">' + accountDisplay(data.creditAccountCode, data.creditAccountName, data.creditAccountId) + '</div>',
+        '<button type="button" class="btn btn-outline-primary btn-sm js-pick-credit"><i class="bi bi-search me-1"></i>Pick Credit</button>',
+      '</td>',
+      '<td>',
+        '<input type="number" min="0.01" step="0.01" class="form-control form-control-sm js-amount" value="' + (Number(data.amount || 0) > 0 ? Number(data.amount).toFixed(2) : '') + '">',
+      '</td>',
+      '<td>',
+        '<input type="text" class="form-control form-control-sm js-memo" value="' + escapeHtml(data.memo || '') + '" placeholder="Memo">',
+      '</td>',
+      '<td class="text-end">',
+        '<button type="button" class="btn btn-outline-danger btn-sm js-remove-row"><i class="bi bi-trash"></i></button>',
+      '</td>'
+    ].join('');
+
+    tr.querySelector('.js-pick-debit').addEventListener('click', function () {
+      openAccountPicker(function (item) {
+        tr.querySelector('.js-debit-id').value = item.id || '';
+        tr.querySelector('.js-debit-code').value = item.code || '';
+        tr.querySelector('.js-debit-name').value = item.name || '';
+        tr.querySelector('.js-debit-display').innerHTML = accountDisplay(item.code, item.name, item.id);
+        recalcTotals();
+      });
+    });
+
+    tr.querySelector('.js-pick-credit').addEventListener('click', function () {
+      openAccountPicker(function (item) {
+        tr.querySelector('.js-credit-id').value = item.id || '';
+        tr.querySelector('.js-credit-code').value = item.code || '';
+        tr.querySelector('.js-credit-name').value = item.name || '';
+        tr.querySelector('.js-credit-display').innerHTML = accountDisplay(item.code, item.name, item.id);
+        recalcTotals();
+      });
+    });
+
+    tr.querySelector('.js-remove-row').addEventListener('click', function () {
+      tr.remove();
+      if (!tbody.querySelector('tr[data-row]')) {
+        createRow({ amount: recommendedRefund > 0 ? Number(recommendedRefund).toFixed(2) : '' });
+      }
+      recalcTotals();
+    });
+
+    tr.querySelector('.js-amount').addEventListener('input', recalcTotals);
+    tr.querySelector('.js-memo').addEventListener('input', recalcTotals);
+
+    tbody.appendChild(tr);
+  }
+
+  function collectRows() {
+    const rows = [];
+    const errors = [];
+    Array.from(tbody.querySelectorAll('tr[data-row]')).forEach((tr, idx) => {
+      const debitAccountId = String(tr.querySelector('.js-debit-id')?.value || '').trim();
+      const debitAccountCode = String(tr.querySelector('.js-debit-code')?.value || '').trim();
+      const debitAccountName = String(tr.querySelector('.js-debit-name')?.value || '').trim();
+      const creditAccountId = String(tr.querySelector('.js-credit-id')?.value || '').trim();
+      const creditAccountCode = String(tr.querySelector('.js-credit-code')?.value || '').trim();
+      const creditAccountName = String(tr.querySelector('.js-credit-name')?.value || '').trim();
+      const amount = Number(tr.querySelector('.js-amount')?.value || 0);
+      const memo = String(tr.querySelector('.js-memo')?.value || '').trim();
+
+      if (!debitAccountId || !creditAccountId || !(amount > 0)) {
+        errors.push('Row ' + (idx + 1) + ' is incomplete.');
+        return;
+      }
+
+      rows.push({
+        debitAccountId: debitAccountId,
+        debitAccountCode: debitAccountCode,
+        debitAccountName: debitAccountName,
+        creditAccountId: creditAccountId,
+        creditAccountCode: creditAccountCode,
+        creditAccountName: creditAccountName,
+        amount: Number(amount.toFixed(2)),
+        memo: memo
+      });
+    });
+    return { rows: rows, errors: errors };
+  }
+
+  async function submitFinalization() {
+    const collected = collectRows();
+    if (collected.errors.length) {
+      await showMsg({
+        title: 'Invalid Settlement',
+        icon: 'warning',
+        message: '<ul class="mb-0"><li>' + collected.errors.map(escapeHtml).join('</li><li>') + '</li></ul>',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+
+    const isBalanced = recalcTotals();
+    if (!isBalanced) {
+      await showMsg({
+        title: 'Not Balanced',
+        icon: 'warning',
+        message: 'Please complete and balance all settlement rows before finalizing.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+
+    const confirmed = await showMsg({
+      title: 'Finalize Program Withdrawal?',
+      icon: 'warning',
+      message: 'This will post manual settlement transactions and complete the request.',
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Finalize', class: 'btn-danger' }
+      ]
+    });
+    if (confirmed !== 'Finalize') return;
+
+    btnSubmit.disabled = true;
+    const originalLabel = btnSubmit.innerHTML;
+    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting...';
+
+    try {
+      const response = await fetch('/school/withdrawal/api/' + encodeURIComponent(withdrawalId) + '/finalize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify({
+          manualSettlementRows: collected.rows,
+          settlementNote: String(document.getElementById('settlementNote')?.value || '').trim(),
+          actionStateId: actionStateId
+        })
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Finalize In Progress', replayTitle: 'Finalize Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (!response.ok || result.status !== 'success' || !result.result?.success) {
+        throw new Error(result.message || result.result?.errors?.join(', ') || 'Finalization failed.');
+      }
+
+      await showMsg({
+        title: 'Finalized',
+        icon: 'success',
+        message: result.message || 'Program withdrawal request finalized successfully.',
+        buttons: [{ text: 'OK', class: 'btn-success' }]
+      });
+      window.location.href = '/school/withdrawal/detail/' + encodeURIComponent(withdrawalId);
+    } catch (error) {
+      await showMsg({
+        title: 'Finalize Failed',
+        icon: 'error',
+        message: escapeHtml(error.message || 'Unexpected error occurred.'),
+        buttons: [{ text: 'Close', class: 'btn-danger' }]
+      });
+    } finally {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = originalLabel;
+    }
+  }
+
+  btnAdd.addEventListener('click', function () {
+    createRow({});
+    recalcTotals();
+  });
+
+  btnSubmit.addEventListener('click', submitFinalization);
+
+  createRow({ amount: recommendedRefund > 0 ? Number(recommendedRefund).toFixed(2) : '' });
+  recalcTotals();
+})();
+</script>

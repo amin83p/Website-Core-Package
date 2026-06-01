@@ -1,0 +1,69 @@
+<%- include('../../partials/tablePages-start', {
+  title, newUrl, newLabel, user, tableName, btn_export: true, print,
+  manageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_PEOPLE" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-people me-1"></i> People Dashboard</a>',
+    `<a href="/school/teachers/archived" class="btn btn-outline-warning btn-md mb-2"><i class="bi bi-arrow-counterclockwise me-1"></i> Recover Archived</a>`
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search teachers...',
+  fields: [
+    { name: 'status', label: 'Status', type: 'select', options: ['Active', 'On Leave', 'Inactive'] },
+    { name: 'employmentType', label: 'Employment', type: 'select', options: employmentTypes || ['Full-Time', 'Part-Time', 'Contract', 'Sessional', 'Substitute'] }
+  ]
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Teacher</th>
+        <th>Contact</th>
+        <th>Department</th>
+        <th>Employment</th>
+        <th class="text-center">Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if(data.length === 0) { %>
+         <tr><td colspan="6" class="text-center py-4 text-muted">No teachers found.</td></tr>
+      <% } %>
+      <% data.forEach(item => { %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-primary"><%= item.firstName %> <%= item.lastName %></div>
+            <div class="small text-muted font-monospace"><i class="bi bi-person-badge me-1"></i><%= item.id %></div>
+            <div class="small text-muted"><%= item.specialization || '-' %></div>
+          </td>
+          <td class="small text-muted">
+            <div><i class="bi bi-envelope me-1"></i><%= item.email %></div>
+            <div><i class="bi bi-telephone me-1"></i><%= item.phone %></div>
+          </td>
+          <td class="small"><%= item.departmentName || '-' %></td>
+          <td class="small"><%= item.employmentType || '-' %></td>
+          <td class="text-center">
+            <% 
+              let badge = 'bg-secondary';
+              if(item.status === 'Active') badge = 'bg-success';
+              if(item.status === 'On Leave') badge = 'bg-warning text-dark';
+              if(item.status === 'Inactive') badge = 'bg-danger';
+              if(item.status === 'Archived') badge = 'bg-secondary';
+            %>
+            <span class="badge <%= badge %>"><%= String(item.status || 'Unknown').toUpperCase() %></span>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <a href="/school/teachers/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Archive</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="school/teachers" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/teachers' }) %>
+<%- include('../../partials/tablePages-end') %>

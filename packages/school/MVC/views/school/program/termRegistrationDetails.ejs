@@ -1,0 +1,913 @@
+<div class="container-fluid py-3">
+  <% const isDraftRecord = String(registration.status || '').toLowerCase() === 'draft'; %>
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-stars me-2"></i><%= title %></h1>
+    <div class="d-flex gap-2">
+      <a href="/school/programs/term-registrations" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to Registrations</a>
+      <a href="/school/programs/register-terms" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>New Term Registration</a>
+    </div>
+  </div>
+
+  <input type="hidden" id="hid_actionStateId" value="<%= actionStateId || '' %>">
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+              <div class="small text-muted">Registration</div>
+              <div class="fw-bold text-primary font-monospace"><%= registration.id %></div>
+            </div>
+            <span class="badge <%= registration.statusBadgeClass %>"><%= String(registration.verificationStatus || '').toLowerCase() === 'rolled_back' ? 'Moved back to draft' : registration.verificationStatus %></span>
+          </div>
+          <dl class="row small mb-0">
+            <dt class="col-5 text-muted">Record Status</dt>
+            <dd class="col-7"><%= String(registration.status || '').toLowerCase() === 'rolled_back' ? 'Moved back to draft' : registration.status %></dd>
+            <dt class="col-5 text-muted">Date</dt>
+            <dd class="col-7"><%= registration.registrationDate || '-' %></dd>
+            <dt class="col-5 text-muted">Student</dt>
+            <dd class="col-7">
+              <div class="fw-bold"><%= registration.studentName || registration.studentId %></div>
+              <div class="font-monospace"><%= registration.studentId || '-' %></div>
+            </dd>
+            <dt class="col-5 text-muted">Program</dt>
+            <dd class="col-7">
+              <div class="fw-bold"><%= registration.programLabel || registration.programId %></div>
+              <div class="font-monospace"><%= registration.programId || '-' %></div>
+            </dd>
+            <dt class="col-5 text-muted">Term</dt>
+            <dd class="col-7"><%= registration.termLabel || registration.termId %></dd>
+            <dt class="col-5 text-muted">Fee Category</dt>
+            <dd class="col-7"><%= registration.feeCategorySnapshot || '-' %></dd>
+            <dt class="col-5 text-muted">Credits</dt>
+            <dd class="col-7"><%= Number(registration.record?.creditSummary?.selectedCredits || 0).toFixed(2) %></dd>
+            <dt class="col-5 text-muted">Classes</dt>
+            <dd class="col-7"><%= registration.record?.classSummary?.count || 0 %></dd>
+            <dt class="col-5 text-muted">Note</dt>
+            <dd class="col-7"><%= registration.note || '-' %></dd>
+          </dl>
+
+          <hr>
+
+          <div class="small text-muted mb-1">Finance Verification</div>
+          <div class="fw-bold mb-3">Posted <%= registration.finance.posted %> / <%= registration.finance.expected %>, Reversed <%= registration.finance.reversed %></div>
+
+          <div class="small text-muted mb-1">Academic Verification</div>
+          <div class="fw-bold mb-3">Posted <%= registration.academic.posted %> / <%= registration.academic.expected %>, Voided <%= registration.academic.voided %></div>
+
+          <% if (canManageRegistrations && isDraftRecord) { %>
+            <button type="button" class="btn btn-success btn-sm me-2" id="btnApproveRegistration">
+              <i class="bi bi-check2-circle me-1"></i>Approve & Post Draft
+            </button>
+          <% } %>
+
+          <% if (canManageRegistrations && registration.canRollback) { %>
+            <button type="button" class="btn btn-danger btn-sm" id="btnRollbackRegistration">
+              <i class="bi bi-arrow-counterclockwise me-1"></i><%= isDraftRecord ? 'Cancel Draft' : 'Move Registration Back to Draft' %>
+            </button>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-8">
+      <% if (isDraftRecord) { %>
+        <div class="card border-0 shadow-sm mb-4" id="draftTransactionEditorCard">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="fw-bold">Draft Transaction List</div>
+              <div class="small text-muted">Edit rows, then save draft changes or approve and post.</div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-2">
+                <thead>
+                  <tr>
+                    <th>Include</th>
+                    <th>Debit Account</th>
+                    <th>Credit Account</th>
+                    <th style="min-width: 140px;">Amount</th>
+                    <th style="min-width: 260px;">Memo</th>
+                  </tr>
+                </thead>
+                <tbody id="draftTransactionsTbody">
+                  <% if (!(registration.draftPreviewRows || []).length) { %>
+                    <tr><td colspan="5" class="text-center text-muted py-3">No draft transaction rows found.</td></tr>
+                  <% } %>
+                  <% (registration.draftPreviewRows || []).forEach(function (row) { %>
+                    <tr data-draft-row-index="<%= row.rowIndex %>">
+                      <td>
+                        <div class="form-check">
+                          <input class="form-check-input draft-include" type="checkbox" checked>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="fw-bold font-monospace draft-debit-account-code"><%= row.debitAccount?.code || row.debitAccount?.id || '-' %></div>
+                        <div class="small text-muted draft-debit-account-name"><%= row.debitAccount?.name || '-' %></div>
+                        <input type="hidden" class="draft-debit-account-id" value="<%= row.debitAccount?.id || '' %>">
+                        <button type="button" class="btn btn-outline-secondary btn-sm mt-1 draft-change-debit-account"><i class="bi bi-search me-1"></i>Change</button>
+                      </td>
+                      <td>
+                        <div class="fw-bold font-monospace draft-credit-account-code"><%= row.creditAccount?.code || row.creditAccount?.id || '-' %></div>
+                        <div class="small text-muted draft-credit-account-name"><%= row.creditAccount?.name || '-' %></div>
+                        <input type="hidden" class="draft-credit-account-id" value="<%= row.creditAccount?.id || '' %>">
+                        <button type="button" class="btn btn-outline-secondary btn-sm mt-1 draft-change-credit-account"><i class="bi bi-search me-1"></i>Change</button>
+                      </td>
+                      <td>
+                        <div class="input-group input-group-sm">
+                          <input type="number" class="form-control draft-amount" min="0.01" step="0.01" value="<%= Number(row.amount || 0).toFixed(2) %>">
+                          <span class="input-group-text"><%= row.currency || 'CAD' %></span>
+                        </div>
+                      </td>
+                      <td>
+                        <input type="text" class="form-control form-control-sm draft-memo" value="<%= row.memo || '' %>" placeholder="Memo">
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mb-3 small">
+              <span class="badge bg-light text-dark border">Draft Rows Total: <span id="txt_draftRowsTotal">0.00</span></span>
+              <span class="badge bg-light text-dark border">Manual Rows Total: <span id="txt_manualRowsTotal">0.00</span></span>
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Projected Total: <span id="txt_projectedRowsTotal">0.00</span></span>
+            </div>
+
+            <div class="border rounded-3 p-3 mb-3 bg-light-subtle">
+              <div class="fw-bold mb-2">Add Manual Transaction Row</div>
+              <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Debit Account *</label>
+                  <div class="input-group input-group-sm">
+                    <input type="hidden" id="inp_manualDebitAccountId">
+                    <input type="text" id="inp_manualDebitAccountLabel" class="form-control bg-white" placeholder="Pick active + postable account..." readonly>
+                    <button type="button" class="btn btn-outline-primary" id="btnPickManualDebit"><i class="bi bi-search"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" id="btnClearManualDebit"><i class="bi bi-x-lg"></i></button>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Credit Account *</label>
+                  <div class="input-group input-group-sm">
+                    <input type="hidden" id="inp_manualCreditAccountId">
+                    <input type="text" id="inp_manualCreditAccountLabel" class="form-control bg-white" placeholder="Pick active + postable account..." readonly>
+                    <button type="button" class="btn btn-outline-primary" id="btnPickManualCredit"><i class="bi bi-search"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" id="btnClearManualCredit"><i class="bi bi-x-lg"></i></button>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-bold">Amount *</label>
+                  <input type="number" id="inp_manualAmount" class="form-control form-control-sm" min="0.01" step="0.01" placeholder="0.00">
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label fw-bold">CCY *</label>
+                  <input type="text" id="inp_manualCurrency" class="form-control form-control-sm font-monospace" maxlength="3" value="CAD">
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label fw-bold">Memo</label>
+                  <input type="text" id="inp_manualMemo" class="form-control form-control-sm" placeholder="Manual adjustment note">
+                </div>
+                <div class="col-md-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btnAddManualRow"><i class="bi bi-plus-circle me-1"></i>Add</button>
+                </div>
+              </div>
+
+              <div class="table-responsive mt-3">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Debit</th>
+                      <th>Credit</th>
+                      <th>Amount</th>
+                      <th>Memo</th>
+                      <th class="text-end">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="manualRowsTbody">
+                    <tr data-empty-row="1"><td colspan="5" class="text-center text-muted py-3">No manual rows added.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12">
+                <label class="form-label fw-bold">Approval Note (Optional)</label>
+                <input type="text" id="inp_draftApprovalNote" class="form-control form-control-sm" placeholder="Optional note for draft save/approval.">
+              </div>
+              <div class="col-12">
+                <div class="d-flex flex-column flex-sm-row justify-content-sm-end gap-2 pt-2 border-top">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnSaveDraftTransactions">
+                    <i class="bi bi-save me-1"></i>Save Draft Changes
+                  </button>
+                  <button type="button" class="btn btn-success btn-sm" id="btnApproveDraftFromEditor">
+                    <i class="bi bi-check2-circle me-1"></i>Approve & Post
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <div class="fw-bold mb-3">Selected Classes</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Class</th>
+                  <th>Subjects</th>
+                  <th>Credits</th>
+                  <th>Class Fee</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% const classRows = registration.record?.classSummary?.rows || []; %>
+                <% if (!classRows.length) { %>
+                  <tr><td colspan="5" class="text-center text-muted py-3">No class rows recorded.</td></tr>
+                <% } %>
+                <% classRows.forEach(function (row) { %>
+                  <% const lifecycleMode = String(row?.lifecycle?.registrationMode || row?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based'; %>
+                  <% const cycleNo = Number(row?.lifecycle?.cycleNo || row?.cycleNo || 1) > 0 ? Number(row?.lifecycle?.cycleNo || row?.cycleNo || 1) : 1; %>
+                  <% const cycleStartDate = String(row?.lifecycle?.cycleStartDate || row?.cycleStartDate || '').trim(); %>
+                  <% const cycleEndDate = String(row?.lifecycle?.cycleEndDate || row?.cycleEndDate || '').trim(); %>
+                  <% const closedEnrollment = row?.lifecycle?.isClosedForNewEnrollment === true || row?.isClosedForNewEnrollment === true || String(row?.lifecycle?.isClosedForNewEnrollment || row?.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true'; %>
+                  <tr>
+                    <td>
+                      <div class="fw-bold"><%= row.classTitle || row.classId %></div>
+                      <div class="small text-muted font-monospace"><%= row.classId || '-' %></div>
+                      <% if (lifecycleMode === 'rolling') { %>
+                        <div class="mt-1 d-flex flex-wrap gap-1">
+                          <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Rolling</span>
+                          <span class="badge bg-light text-dark border">Cycle #<%= cycleNo %></span>
+                          <% if (closedEnrollment) { %>
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed Enrollment</span>
+                          <% } %>
+                        </div>
+                        <div class="small text-muted mt-1">Cycle Window: <%= cycleStartDate || '?' %> -> <%= cycleEndDate || 'Open' %></div>
+                      <% } else { %>
+                        <div class="mt-1"><span class="badge bg-light text-dark border">Term-Based</span></div>
+                      <% } %>
+                      <% if (row.classId) { %>
+                        <a href="/school/classes/edit-wizard/<%= encodeURIComponent(row.classId) %>" class="btn btn-outline-secondary btn-sm mt-1">Lifecycle</a>
+                      <% } %>
+                    </td>
+                    <td class="small"><%= Array.isArray(row.subjectLabels) && row.subjectLabels.length ? row.subjectLabels.join(', ') : '-' %></td>
+                    <td><%= Number(row.credits || 0).toFixed(2) %></td>
+                    <td><%= Number(row.pricing?.total || 0).toFixed(2) %> <%= row.pricing?.currency || '' %></td>
+                    <td><span class="badge <%= row.status === 'error' ? 'bg-danger' : (row.status === 'warning' ? 'bg-warning text-dark' : 'bg-success') %>"><%= row.status || 'ready' %></span></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="fw-bold">Financial Transactions</div>
+            <% if ((registration.pendingDraftTransactions || []).length) { %>
+              <span class="badge bg-warning text-dark">Includes Pending Draft Rows</span>
+            <% } %>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Transaction</th>
+                  <th>Date</th>
+                  <th>Direction</th>
+                  <th>Account</th>
+                  <th>Amount</th>
+                  <th>Memo</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% const financialRows = Array.isArray(registration.financialTransactions) ? registration.financialTransactions : []; %>
+                <% if (!financialRows.length) { %>
+                  <tr><td colspan="7" class="text-center text-muted py-3">No financial transactions recorded.</td></tr>
+                <% } %>
+                <% financialRows.forEach(function (tx) { %>
+                  <tr class="<%= tx.__isPendingDraft ? 'table-warning-subtle' : '' %>">
+                    <td>
+                      <div class="fw-bold font-monospace"><%= tx.id %></div>
+                      <div class="small text-muted"><%= tx.source?.eventType || '-' %></div>
+                    </td>
+                    <td><%= tx.effectiveDate || '-' %></td>
+                    <td><span class="badge <%= tx.amount?.direction === 'debit' ? 'bg-success' : 'bg-danger' %>"><%= tx.amount?.direction || '-' %></span></td>
+                    <td>
+                      <div class="fw-bold font-monospace"><%= tx.metadata?.accountCode || tx.metadata?.accountId || '-' %></div>
+                      <div class="small text-muted"><%= tx.metadata?.accountName || '-' %></div>
+                    </td>
+                    <td class="fw-bold"><%= Number(tx.amount?.value || 0).toFixed(2) %> <%= tx.amount?.currency || '' %></td>
+                    <td class="small"><%= tx.memo || '-' %></td>
+                    <td>
+                      <% if (tx.__isPendingDraft) { %>
+                        <span class="badge bg-warning text-dark">Draft (Not Posted)</span>
+                      <% } else { %>
+                        <span class="badge <%= tx.status === 'posted' ? 'bg-success' : 'bg-secondary' %>"><%= tx.status || '-' %></span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <div class="fw-bold mb-3">Reversal Transactions</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Transaction</th>
+                  <th>Date</th>
+                  <th>Direction</th>
+                  <th>Account</th>
+                  <th>Amount</th>
+                  <th>Memo</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!(registration.reversalTransactions || []).length) { %>
+                  <tr><td colspan="7" class="text-center text-muted py-3">No reversal transactions recorded.</td></tr>
+                <% } %>
+                <% (registration.reversalTransactions || []).forEach(function (tx) { %>
+                  <tr>
+                    <td>
+                      <div class="fw-bold font-monospace"><%= tx.id %></div>
+                      <div class="small text-muted">Reversal of <%= tx.reversalOfTransactionId || '-' %></div>
+                    </td>
+                    <td><%= tx.effectiveDate || '-' %></td>
+                    <td><span class="badge <%= tx.amount?.direction === 'debit' ? 'bg-success' : 'bg-danger' %>"><%= tx.amount?.direction || '-' %></span></td>
+                    <td>
+                      <div class="fw-bold font-monospace"><%= tx.metadata?.accountCode || tx.metadata?.accountId || '-' %></div>
+                      <div class="small text-muted"><%= tx.metadata?.accountName || '-' %></div>
+                    </td>
+                    <td class="fw-bold"><%= Number(tx.amount?.value || 0).toFixed(2) %> <%= tx.amount?.currency || '' %></td>
+                    <td class="small"><%= tx.memo || '-' %></td>
+                    <td><span class="badge <%= tx.status === 'posted' ? 'bg-success' : 'bg-secondary' %>"><%= tx.status || '-' %></span></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <div class="fw-bold mb-3">Academic Ledger Entries</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Entry</th>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Memo</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% const academicRows = (registration.academicEntries || []).concat((registration.voidedAcademicEntries || []).filter(function (entry) { return !(registration.academicEntries || []).some(function (posted) { return String(posted.id || '') === String(entry.id || ''); }); })); %>
+                <% if (!academicRows.length) { %>
+                  <tr><td colspan="5" class="text-center text-muted py-3">No academic entries recorded.</td></tr>
+                <% } %>
+                <% academicRows.forEach(function (entry) { %>
+                  <tr>
+                    <td class="font-monospace"><%= entry.id || '-' %></td>
+                    <td><%= entry.effectiveDate || '-' %></td>
+                    <td><span class="badge bg-primary-subtle text-primary"><%= entry.entryType || '-' %></span></td>
+                    <td class="small"><%= entry.memo || '-' %></td>
+                    <td><span class="badge <%= entry.status === 'posted' ? 'bg-success' : (entry.status === 'void' ? 'bg-secondary' : 'bg-warning text-dark') %>"><%= entry.status || '-' %></span></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="fw-bold mb-3">Validation Snapshot</div>
+          <div class="row g-3 small">
+            <div class="col-md-4">
+              <div class="text-muted">Preview Status</div>
+              <div class="fw-bold"><%= registration.record?.validationSummary?.status || '-' %></div>
+            </div>
+            <div class="col-md-4">
+              <div class="text-muted">Term Fees</div>
+              <div class="fw-bold"><%= Number(registration.record?.transactionSummary?.termTransactionTotal || 0).toFixed(2) %></div>
+            </div>
+            <div class="col-md-4">
+              <div class="text-muted">Class Fees</div>
+              <div class="fw-bold"><%= Number(registration.record?.transactionSummary?.classFeeTotal || 0).toFixed(2) %></div>
+            </div>
+          </div>
+          <hr>
+          <div class="small text-muted mb-2">Issues</div>
+          <div class="small mb-3"><%= Array.isArray(registration.record?.validationSummary?.issues) && registration.record.validationSummary.issues.length ? registration.record.validationSummary.issues.join(' | ') : 'None' %></div>
+          <div class="small text-muted mb-2">Warnings</div>
+          <div class="small"><%= Array.isArray(registration.record?.validationSummary?.warnings) && registration.record.validationSummary.warnings.length ? registration.record.validationSummary.warnings.join(' | ') : 'None' %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const btn = document.getElementById('btnRollbackRegistration');
+  const btnApproveTop = document.getElementById('btnApproveRegistration');
+  const btnSaveDraft = document.getElementById('btnSaveDraftTransactions');
+  const btnApproveDraftFromEditor = document.getElementById('btnApproveDraftFromEditor');
+  const actionStateId = String(document.getElementById('hid_actionStateId')?.value || '').trim();
+  const registrationId = <%- JSON.stringify(registration.id || '') %>;
+  const studentName = <%- JSON.stringify(registration.studentName || registration.studentId || 'student') %>;
+  const isDraftRecord = <%- JSON.stringify(isDraftRecord) %>;
+  const actionButtons = [btn, btnApproveTop, btnSaveDraft, btnApproveDraftFromEditor].filter(Boolean);
+  const manualRows = [];
+  let actionInProgress = false;
+
+  function showMsg(opts) {
+    if (typeof showMessageModal === 'function') return showMessageModal(opts);
+    alert(opts?.message || 'Done');
+    return Promise.resolve();
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function formatAccountLabel(account) {
+    const code = String(account?.code || '').trim();
+    const name = String(account?.name || '').trim();
+    const id = String(account?.id || '').trim();
+    if (code && name) return code + ' - ' + name;
+    return name || code || id;
+  }
+
+  function setActionLock(isLocked, activeButton, loadingLabel) {
+    actionButtons.forEach(function (button) {
+      if (!button) return;
+      if (!button.dataset.originalHtml) button.dataset.originalHtml = button.innerHTML;
+      button.disabled = isLocked;
+    });
+
+    if (activeButton) {
+      if (!activeButton.dataset.originalHtml) activeButton.dataset.originalHtml = activeButton.innerHTML;
+      if (isLocked) {
+        activeButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + String(loadingLabel || 'Processing...');
+      } else if (activeButton.dataset.originalHtml) {
+        activeButton.innerHTML = activeButton.dataset.originalHtml;
+      }
+    }
+
+    if (typeof showLoading === 'function') {
+      if (isLocked) showLoading();
+      else if (typeof hideLoading === 'function') hideLoading();
+    }
+  }
+
+  function roundMoney(value) {
+    const n = Number(value || 0);
+    if (!Number.isFinite(n)) return 0;
+    return Math.round(n * 100) / 100;
+  }
+
+  function updateDraftTotalsIndicator() {
+    const draftRowsTotal = Array.from(document.querySelectorAll('#draftTransactionsTbody tr[data-draft-row-index]')).reduce(function (sum, row) {
+      const include = row.querySelector('.draft-include')?.checked !== false;
+      if (!include) return sum;
+      const amount = Number(row.querySelector('.draft-amount')?.value || 0);
+      if (!Number.isFinite(amount) || amount <= 0) return sum;
+      return sum + amount;
+    }, 0);
+
+    const manualRowsTotal = manualRows.reduce(function (sum, row) {
+      const amount = Number(row?.amount || 0);
+      if (!Number.isFinite(amount) || amount <= 0) return sum;
+      return sum + amount;
+    }, 0);
+
+    const draftTotal = roundMoney(draftRowsTotal);
+    const manualTotal = roundMoney(manualRowsTotal);
+    const projected = roundMoney(draftTotal + manualTotal);
+
+    const draftLabel = document.getElementById('txt_draftRowsTotal');
+    const manualLabel = document.getElementById('txt_manualRowsTotal');
+    const projectedLabel = document.getElementById('txt_projectedRowsTotal');
+    if (draftLabel) draftLabel.textContent = draftTotal.toFixed(2);
+    if (manualLabel) manualLabel.textContent = manualTotal.toFixed(2);
+    if (projectedLabel) projectedLabel.textContent = projected.toFixed(2);
+  }
+
+  function collectEditedRows() {
+    return Array.from(document.querySelectorAll('#draftTransactionsTbody tr[data-draft-row-index]')).map(function (row) {
+      const rowIndex = Number(row.getAttribute('data-draft-row-index'));
+      const include = row.querySelector('.draft-include')?.checked !== false;
+      const amount = Number(row.querySelector('.draft-amount')?.value || 0);
+      const memo = String(row.querySelector('.draft-memo')?.value || '').trim();
+      const debitAccountId = String(row.querySelector('.draft-debit-account-id')?.value || '').trim();
+      const creditAccountId = String(row.querySelector('.draft-credit-account-id')?.value || '').trim();
+      return { rowIndex: rowIndex, include: include, amount: amount, memo: memo, debitAccountId: debitAccountId, creditAccountId: creditAccountId };
+    }).filter(function (row) {
+      return Number.isInteger(row.rowIndex) && row.rowIndex >= 0;
+    });
+  }
+
+  function collectAddedRows() {
+    return manualRows.map(function (row) {
+      return {
+        debitAccountId: String(row.debitAccountId || '').trim(),
+        creditAccountId: String(row.creditAccountId || '').trim(),
+        amount: Number(row.amount || 0),
+        currency: String(row.currency || 'CAD').trim().toUpperCase() || 'CAD',
+        memo: String(row.memo || '').trim()
+      };
+    });
+  }
+
+  async function openAccountPicker(targetPrefix) {
+    if (typeof GenericPicker === 'undefined' || !GenericPicker || !GenericPicker.open) {
+      await showMsg({
+        title: 'Picker Unavailable',
+        icon: 'warning',
+        message: 'Account picker is not available on this page.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+
+    GenericPicker.open(GenericPickerPresets.account({
+      title: 'Select Posting Account',
+      icon: 'bi-wallet2',
+      placeholder: 'Search active + postable accounts...',
+      apiEndpoint: '/school/accounts?allowPost=true&status=active',
+      onSelect: async function (item) {
+        if (!item) return;
+        const isActive = String(item.status || '').trim().toLowerCase() === 'active';
+        if (!item.allowPost || !isActive) {
+          await showMsg({
+            title: 'Invalid Account',
+            icon: 'warning',
+            message: 'Only Active + Postable accounts can be selected.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          return;
+        }
+        const idField = document.getElementById('inp_manual' + targetPrefix + 'AccountId');
+        const labelField = document.getElementById('inp_manual' + targetPrefix + 'AccountLabel');
+        if (idField) idField.value = String(item.id || '').trim();
+        if (labelField) labelField.value = formatAccountLabel(item);
+      }
+    }));
+  }
+
+  function clearManualAccount(targetPrefix) {
+    const idField = document.getElementById('inp_manual' + targetPrefix + 'AccountId');
+    const labelField = document.getElementById('inp_manual' + targetPrefix + 'AccountLabel');
+    if (idField) idField.value = '';
+    if (labelField) labelField.value = '';
+  }
+
+  function applyDraftRowAccountSelection(row, side, account) {
+    if (!row || !side || !account) return;
+    const sideName = side === 'credit' ? 'credit' : 'debit';
+    const idField = row.querySelector('.draft-' + sideName + '-account-id');
+    const codeLabel = row.querySelector('.draft-' + sideName + '-account-code');
+    const nameLabel = row.querySelector('.draft-' + sideName + '-account-name');
+    if (idField) idField.value = String(account.id || '').trim();
+    if (codeLabel) codeLabel.textContent = String(account.code || account.id || '-').trim();
+    if (nameLabel) nameLabel.textContent = String(account.name || '-').trim();
+  }
+
+  async function openDraftRowAccountPicker(row, side) {
+    if (typeof GenericPicker === 'undefined' || !GenericPicker || !GenericPicker.open) {
+      await showMsg({
+        title: 'Picker Unavailable',
+        icon: 'warning',
+        message: 'Account picker is not available on this page.',
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+
+    GenericPicker.open(GenericPickerPresets.account({
+      title: 'Select ' + (side === 'credit' ? 'Credit' : 'Debit') + ' Account',
+      icon: 'bi-wallet2',
+      placeholder: 'Search active + postable accounts...',
+      apiEndpoint: '/school/accounts?allowPost=true&status=active',
+      onSelect: async function (item) {
+        if (!item) return;
+        const isActive = String(item.status || '').trim().toLowerCase() === 'active';
+        if (!item.allowPost || !isActive) {
+          await showMsg({
+            title: 'Invalid Account',
+            icon: 'warning',
+            message: 'Only Active + Postable accounts can be selected.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+          return;
+        }
+        applyDraftRowAccountSelection(row, side, item);
+      }
+    }));
+  }
+
+  function bindDraftRowAccountPickers() {
+    document.querySelectorAll('#draftTransactionsTbody tr[data-draft-row-index]').forEach(function (row) {
+      const debitBtn = row.querySelector('.draft-change-debit-account');
+      const creditBtn = row.querySelector('.draft-change-credit-account');
+      if (debitBtn && !debitBtn.dataset.boundPicker) {
+        debitBtn.dataset.boundPicker = '1';
+        debitBtn.addEventListener('click', function () {
+          openDraftRowAccountPicker(row, 'debit');
+        });
+      }
+      if (creditBtn && !creditBtn.dataset.boundPicker) {
+        creditBtn.dataset.boundPicker = '1';
+        creditBtn.addEventListener('click', function () {
+          openDraftRowAccountPicker(row, 'credit');
+        });
+      }
+    });
+  }
+
+  function renderManualRows() {
+    const tbody = document.getElementById('manualRowsTbody');
+    if (!tbody) return;
+    if (!manualRows.length) {
+      tbody.innerHTML = '<tr data-empty-row="1"><td colspan="5" class="text-center text-muted py-3">No manual rows added.</td></tr>';
+      updateDraftTotalsIndicator();
+      return;
+    }
+
+    tbody.innerHTML = manualRows.map(function (row, index) {
+      return ''
+        + '<tr data-manual-row-index="' + index + '">'
+        +   '<td><div class="fw-bold font-monospace">' + escapeHtml(row.debitAccountCode || row.debitAccountId || '-') + '</div><div class="small text-muted">' + escapeHtml(row.debitAccountName || '-') + '</div></td>'
+        +   '<td><div class="fw-bold font-monospace">' + escapeHtml(row.creditAccountCode || row.creditAccountId || '-') + '</div><div class="small text-muted">' + escapeHtml(row.creditAccountName || '-') + '</div></td>'
+        +   '<td class="fw-bold">' + Number(row.amount || 0).toFixed(2) + ' ' + escapeHtml(row.currency || 'CAD') + '</td>'
+        +   '<td class="small">' + escapeHtml(row.memo || '-') + '</td>'
+        +   '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-remove-manual-row="' + index + '">Remove</button></td>'
+        + '</tr>';
+    }).join('');
+
+    tbody.querySelectorAll('button[data-remove-manual-row]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        const idx = Number(button.getAttribute('data-remove-manual-row'));
+        if (!Number.isInteger(idx) || idx < 0 || idx >= manualRows.length) return;
+        manualRows.splice(idx, 1);
+        renderManualRows();
+      });
+    });
+    updateDraftTotalsIndicator();
+  }
+
+  async function addManualRow() {
+    const debitAccountId = String(document.getElementById('inp_manualDebitAccountId')?.value || '').trim();
+    const creditAccountId = String(document.getElementById('inp_manualCreditAccountId')?.value || '').trim();
+    const debitLabel = String(document.getElementById('inp_manualDebitAccountLabel')?.value || '').trim();
+    const creditLabel = String(document.getElementById('inp_manualCreditAccountLabel')?.value || '').trim();
+    const amount = Number(document.getElementById('inp_manualAmount')?.value || 0);
+    const currency = String(document.getElementById('inp_manualCurrency')?.value || 'CAD').trim().toUpperCase();
+    const memo = String(document.getElementById('inp_manualMemo')?.value || '').trim();
+
+    if (!debitAccountId || !creditAccountId) {
+      await showMsg({ title: 'Validation', icon: 'warning', message: 'Both debit and credit accounts are required.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+    if (debitAccountId === creditAccountId) {
+      await showMsg({ title: 'Validation', icon: 'warning', message: 'Debit and credit accounts cannot be the same.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      await showMsg({ title: 'Validation', icon: 'warning', message: 'Amount must be greater than zero.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      await showMsg({ title: 'Validation', icon: 'warning', message: 'Currency must be a valid ISO code (for example CAD).', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+      return;
+    }
+
+    manualRows.push({
+      debitAccountId: debitAccountId,
+      debitAccountCode: debitLabel.split(' - ')[0] || debitAccountId,
+      debitAccountName: debitLabel,
+      creditAccountId: creditAccountId,
+      creditAccountCode: creditLabel.split(' - ')[0] || creditAccountId,
+      creditAccountName: creditLabel,
+      amount: amount,
+      currency: currency,
+      memo: memo
+    });
+
+    clearManualAccount('Debit');
+    clearManualAccount('Credit');
+    const amountField = document.getElementById('inp_manualAmount');
+    const memoField = document.getElementById('inp_manualMemo');
+    const currencyField = document.getElementById('inp_manualCurrency');
+    if (amountField) amountField.value = '';
+    if (memoField) memoField.value = '';
+    if (currencyField) currencyField.value = 'CAD';
+
+    renderManualRows();
+  }
+
+  async function postDraftAction(url, options) {
+    if (actionInProgress) return null;
+    const title = String(options?.title || 'Confirm');
+    const message = String(options?.message || 'Are you sure?');
+    const confirmLabel = String(options?.confirmLabel || 'Confirm');
+    const note = String(options?.note || '').trim();
+    let confirmed = false;
+    if (typeof window.showMessageModal === 'function') {
+      const result = await window.showMessageModal({
+        title: title,
+        icon: 'warning',
+        message: message,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: confirmLabel, class: options?.confirmClass || 'btn-success' }
+        ]
+      });
+      confirmed = result === confirmLabel;
+    } else {
+      confirmed = window.confirm(title);
+    }
+    if (!confirmed) return null;
+
+    actionInProgress = true;
+    setActionLock(true, options.activeButton || null, options.loadingLabel || 'Processing...');
+    let unlocked = false;
+
+    try {
+      const body = new URLSearchParams();
+      body.set('note', note || String(document.getElementById('inp_draftApprovalNote')?.value || '').trim());
+      if (actionStateId) body.set('actionStateId', actionStateId);
+      if (isDraftRecord && options?.includeDraftPayload !== false) {
+        body.set('editedRows', JSON.stringify(collectEditedRows()));
+        body.set('addedRows', JSON.stringify(collectAddedRows()));
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: body.toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Operation In Progress', replayTitle: 'Operation Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return null;
+      if (result.status === 'error') throw new Error(result.message || 'Request failed.');
+
+      actionInProgress = false;
+      setActionLock(false, options.activeButton || null);
+      unlocked = true;
+      await showMsg({
+        title: options?.resultTitle || 'Done',
+        icon: result.status === 'warning' ? 'warning' : 'success',
+        message: result.message || 'Completed.',
+        buttons: [{ text: 'OK', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+      });
+      return result;
+    } finally {
+      if (!unlocked) {
+        actionInProgress = false;
+        setActionLock(false, options.activeButton || null);
+      }
+    }
+  }
+
+  if (btn) {
+    btn.addEventListener('click', async function () {
+      if (!registrationId) return;
+      try {
+        const result = await postDraftAction(
+          '/school/programs/register-terms/rollback/' + encodeURIComponent(registrationId),
+          {
+            activeButton: btn,
+            loadingLabel: isDraftRecord ? 'Cancelling...' : 'Moving back...',
+            title: isDraftRecord ? 'Cancel Draft?' : 'Move Registration Back to Draft?',
+            message: isDraftRecord
+              ? 'Cancel draft registration for <b>' + escapeHtml(studentName) + '</b>?<br><br>This keeps the registration in draft.'
+              : 'Move registration for <b>' + escapeHtml(studentName) + '</b> back to draft?<br><br>This will reverse finance postings and void academic entries that belong to this registration.',
+            confirmLabel: isDraftRecord ? 'Cancel Draft' : 'Move Back to Draft',
+            confirmClass: 'btn-danger',
+            resultTitle: isDraftRecord ? 'Draft Cancel Result' : 'Move Back to Draft Result',
+            note: isDraftRecord ? 'Draft cancelled from Term Registration details' : 'Manual rollback from Term Registration details',
+            includeDraftPayload: false
+          }
+        );
+        if (result) window.location.reload();
+      } catch (error) {
+        await showMsg({
+          title: isDraftRecord ? 'Cancel Error' : 'Move Back to Draft Error',
+          icon: 'error',
+          message: error.message || (isDraftRecord ? 'Draft cancellation failed.' : 'Move back to draft failed.'),
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      }
+    });
+  }
+
+  if (btnSaveDraft) {
+    btnSaveDraft.addEventListener('click', async function () {
+      try {
+        const result = await postDraftAction(
+          '/school/programs/register-terms/draft/' + encodeURIComponent(registrationId) + '/transactions',
+          {
+            activeButton: btnSaveDraft,
+            loadingLabel: 'Saving...',
+            title: 'Save Draft Changes?',
+            message: 'Save your edited draft transaction rows now?',
+            confirmLabel: 'Save',
+            confirmClass: 'btn-primary',
+            resultTitle: 'Draft Saved',
+            note: 'Draft transaction rows updated from Term Registration details'
+          }
+        );
+        if (result) window.location.reload();
+      } catch (error) {
+        await showMsg({
+          title: 'Save Draft Error',
+          icon: 'error',
+          message: error.message || 'Failed to save draft transaction changes.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      }
+    });
+  }
+
+  async function handleApprove(buttonRef) {
+    if (!buttonRef) return;
+    try {
+      const result = await postDraftAction(
+        '/school/programs/register-terms/approve/' + encodeURIComponent(registrationId),
+        {
+          activeButton: buttonRef,
+          loadingLabel: 'Posting...',
+          title: 'Approve Draft?',
+          message: 'Approve and post draft term registration for <b>' + escapeHtml(studentName) + '</b>?<br><br>This will post finance transactions and academic entries.',
+          confirmLabel: 'Approve & Post',
+          confirmClass: 'btn-success',
+          resultTitle: 'Approval Result',
+          note: 'Approved from Term Registration details'
+        }
+      );
+      if (result) window.location.reload();
+    } catch (error) {
+      await showMsg({
+        title: 'Approval Error',
+        icon: 'error',
+        message: error.message || 'Approval failed.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    }
+  }
+
+  document.getElementById('btnPickManualDebit')?.addEventListener('click', function () { openAccountPicker('Debit'); });
+  document.getElementById('btnPickManualCredit')?.addEventListener('click', function () { openAccountPicker('Credit'); });
+  document.getElementById('btnClearManualDebit')?.addEventListener('click', function () { clearManualAccount('Debit'); });
+  document.getElementById('btnClearManualCredit')?.addEventListener('click', function () { clearManualAccount('Credit'); });
+  document.getElementById('btnAddManualRow')?.addEventListener('click', function () { addManualRow(); });
+  document.querySelectorAll('#draftTransactionsTbody .draft-include, #draftTransactionsTbody .draft-amount').forEach(function (el) {
+    el.addEventListener('change', updateDraftTotalsIndicator);
+    el.addEventListener('input', updateDraftTotalsIndicator);
+  });
+  bindDraftRowAccountPickers();
+
+  if (btnApproveTop) {
+    btnApproveTop.addEventListener('click', function () {
+      handleApprove(btnApproveTop);
+    });
+  }
+  if (btnApproveDraftFromEditor) {
+    btnApproveDraftFromEditor.addEventListener('click', function () {
+      handleApprove(btnApproveDraftFromEditor);
+    });
+  }
+  updateDraftTotalsIndicator();
+  renderManualRows();
+})();
+</script>

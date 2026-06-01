@@ -1,0 +1,457 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-journal-medical me-2"></i><%= title %></h1>
+    <div class="d-flex gap-2">
+      <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+      <form method="GET" action="/school/academic-ledger" id="academicLedgerFilterForm">
+        <% if (typeof filterError !== 'undefined' && filterError) { %>
+          <div class="alert alert-warning border-0 shadow-sm"><%= filterError %></div>
+        <% } %>
+        <% if (typeof resultsLoaded !== 'undefined' && !resultsLoaded && !filterError) { %>
+          <div class="alert alert-info border-0 shadow-sm mb-3">
+            Set one or more filters below, then click <strong>Apply Filters</strong> to load ledger rows. Data is not loaded automatically when you open this page.
+          </div>
+        <% } %>
+        <div class="row">
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Effective From</label>
+            <input type="date" name="effectiveFrom" class="form-control size-md" value="<%= filters?.effectiveFrom || '' %>">
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Effective To</label>
+            <input type="date" name="effectiveTo" class="form-control size-md" value="<%= filters?.effectiveTo || '' %>">
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Posted From (DateTime)</label>
+            <input type="datetime-local" name="postedFrom" class="form-control size-md" value="<%= filters?.postedFrom || '' %>">
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label fw-bold">Posted To (DateTime)</label>
+            <input type="datetime-local" name="postedTo" class="form-control size-md" value="<%= filters?.postedTo || '' %>">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label class="form-label fw-bold">Entry Types</label>
+            <select name="entryTypes" class="form-select size-md" multiple size="6">
+              <% (entryTypes || []).forEach((type) => { %>
+                <option value="<%= type %>" <%= (filters?.entryTypes || []).includes(type) ? 'selected' : '' %>><%= type %></option>
+              <% }) %>
+            </select>
+            <div class="form-text small">Use Ctrl/Cmd for multi-select.</div>
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label fw-bold">Statuses</label>
+            <select name="statuses" class="form-select size-md" multiple size="6">
+              <% (entryStatuses || []).forEach((status) => { %>
+                <option value="<%= status %>" <%= (filters?.statuses || []).includes(status) ? 'selected' : '' %>><%= status %></option>
+              <% }) %>
+            </select>
+            <div class="form-text small">Use Ctrl/Cmd for multi-select.</div>
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label fw-bold">Search</label>
+            <input type="text" name="search" class="form-control size-md" value="<%= filters?.search || '' %>" placeholder="Student, program, term, memo, event id...">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 col-lg-3 mb-3">
+            <label class="form-label fw-bold">Programs</label>
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickProgram"><i class="bi bi-search me-1"></i>Add Program</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnClearPrograms">Clear</button>
+            </div>
+            <div id="selectedProgramsBox" class="border rounded p-2 bg-light-subtle small"></div>
+          </div>
+          <div class="col-md-6 col-lg-3 mb-3">
+            <label class="form-label fw-bold">Students</label>
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickStudent"><i class="bi bi-search me-1"></i>Add Student</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnClearStudents">Clear</button>
+            </div>
+            <div id="selectedStudentsBox" class="border rounded p-2 bg-light-subtle small"></div>
+          </div>
+          <div class="col-md-6 col-lg-3 mb-3">
+            <label class="form-label fw-bold">Terms</label>
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickTerm"><i class="bi bi-search me-1"></i>Add Term</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnClearTerms">Clear</button>
+            </div>
+            <div id="selectedTermsBox" class="border rounded p-2 bg-light-subtle small"></div>
+          </div>
+          <div class="col-md-6 col-lg-3 mb-3">
+            <label class="form-label fw-bold">Classes</label>
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickClass"><i class="bi bi-search me-1"></i>Add Class</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnClearClasses">Clear</button>
+            </div>
+            <div id="selectedClassesBox" class="border rounded p-2 bg-light-subtle small"></div>
+            <p class="form-text small mt-2 mb-0">Use for class-only enrollments and scores tied to a class.</p>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="submit" name="run" value="1" class="btn btn-filled btn-primary btn-md"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+          <a href="/school/academic-ledger" class="btn btn-outline-secondary btn-md">Reset</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <% if (typeof resultsLoaded !== 'undefined' && !resultsLoaded) { %>
+  <div class="text-muted small mb-3">Summary and tables appear after you load data with Apply Filters.</div>
+  <% } %>
+  <div class="row g-3 mb-4">
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Entries</div>
+          <div class="fs-4 fw-bold"><%= summary?.entryCount || 0 %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Students</div>
+          <div class="fs-4 fw-bold"><%= summary?.studentCount || 0 %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Programs</div>
+          <div class="fs-4 fw-bold"><%= summary?.programCount || 0 %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Attempted Credits</div>
+          <div class="fs-6 fw-bold"><%= Number(summary?.totalAttemptedCredits || 0).toFixed(2) %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Earned Credits</div>
+          <div class="fs-6 fw-bold text-success"><%= Number(summary?.totalEarnedCredits || 0).toFixed(2) %></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="small text-muted">Average Score</div>
+          <div class="fs-6 fw-bold"><%= summary?.averageScore === null || summary?.averageScore === undefined ? '-' : Number(summary.averageScore).toFixed(2) %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+      <h5 class="m-0 fw-bold">Program Summary</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="ps-3">Program</th>
+              <th>Entries</th>
+              <th>Attempted Credits</th>
+              <th>Earned Credits</th>
+              <th>Pass</th>
+              <th class="pe-3">Fail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!(byProgramSummary || []).length) { %>
+              <tr><td colspan="6" class="text-center text-muted py-3"><%= (typeof resultsLoaded !== 'undefined' && !resultsLoaded) ? 'Load data to see program summary.' : 'No program summary rows found.' %></td></tr>
+            <% } %>
+            <% (byProgramSummary || []).forEach((row) => { %>
+              <tr>
+                <td class="ps-3">
+                  <div class="fw-bold"><%= row.label || row.programId %></div>
+                  <div class="x-small text-muted font-monospace"><%= row.programId %></div>
+                </td>
+                <td class="fw-bold"><%= row.entryCount || 0 %></td>
+                <td><%= Number(row.attemptedCredits || 0).toFixed(2) %></td>
+                <td class="text-success fw-bold"><%= Number(row.earnedCredits || 0).toFixed(2) %></td>
+                <td><%= row.passCount || 0 %></td>
+                <td class="pe-3"><%= row.failCount || 0 %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+      <h5 class="m-0 fw-bold">Student Summary</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="ps-3">Student</th>
+              <th>Entries</th>
+              <th>Attempted Credits</th>
+              <th>Earned Credits</th>
+              <th class="pe-3">Score Rows</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!(byStudentSummary || []).length) { %>
+              <tr><td colspan="5" class="text-center text-muted py-3"><%= (typeof resultsLoaded !== 'undefined' && !resultsLoaded) ? 'Load data to see student summary.' : 'No student summary rows found.' %></td></tr>
+            <% } %>
+            <% (byStudentSummary || []).forEach((row) => { %>
+              <tr>
+                <td class="ps-3">
+                  <div class="fw-bold"><%= row.name || row.studentId %></div>
+                  <div class="x-small text-muted font-monospace"><%= row.studentId %></div>
+                </td>
+                <td class="fw-bold"><%= row.entryCount || 0 %></td>
+                <td><%= Number(row.attemptedCredits || 0).toFixed(2) %></td>
+                <td class="text-success fw-bold"><%= Number(row.earnedCredits || 0).toFixed(2) %></td>
+                <td class="pe-3"><%= row.scoreCount || 0 %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3">
+      <h5 class="m-0 fw-bold">Statement Rows</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="ps-3">Effective</th>
+              <th>Posted At</th>
+              <th>Student</th>
+              <th>Program / Term</th>
+              <th>Class / Subject</th>
+              <th>Type</th>
+              <th>Result</th>
+              <th>Credits</th>
+              <th>Score</th>
+              <th>Status</th>
+              <th class="pe-3">Memo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!(rows || []).length) { %>
+              <tr><td colspan="11" class="text-center text-muted py-3"><%= (typeof resultsLoaded !== 'undefined' && !resultsLoaded) ? 'No data loaded yet. Choose filters and click Apply Filters.' : 'No academic ledger rows matched your filters.' %></td></tr>
+            <% } %>
+            <% (rows || []).forEach((row) => { %>
+              <tr>
+                <td class="ps-3">
+                  <div><%= row.effectiveDate || '-' %></div>
+                  <div class="x-small text-muted font-monospace"><%= row.id || '-' %></div>
+                </td>
+                <td><%= row.__postedAtDisplay || '-' %></td>
+                <td>
+                  <div class="fw-bold"><%= row.__studentName || row.studentId || '-' %></div>
+                  <div class="x-small text-muted font-monospace"><%= row.studentId || '-' %></div>
+                  <% if (row.studentId) { %>
+                    <a href="/school/academic-ledger/student/<%= encodeURIComponent(row.studentId) %>?programId=<%= encodeURIComponent(row.programId || '') %>" class="small">Statement</a>
+                  <% } %>
+                </td>
+                <td>
+                  <div class="fw-bold"><%= row.__programLabel || row.programId || '-' %></div>
+                  <div class="x-small text-muted"><%= row.__termLabel || row.termId || '-' %></div>
+                </td>
+                <td>
+                  <div><%= row.__classLabel || row.classId || '-' %></div>
+                  <div class="x-small text-muted"><%= row.__subjectLabel || row.subjectId || '-' %></div>
+                </td>
+                <td><span class="badge bg-primary-subtle text-primary"><%= row.entryType || '-' %></span></td>
+                <td>
+                  <div><%= row.academic?.result || '-' %></div>
+                  <div class="x-small text-muted"><%= row.academic?.standing || '-' %></div>
+                </td>
+                <td>
+                  <div>Attempted: <%= row.quantities?.creditsAttempted ?? '-' %></div>
+                  <div class="x-small text-muted">Earned: <%= row.quantities?.creditsEarned ?? '-' %></div>
+                </td>
+                <td>
+                  <div><%= row.quantities?.score ?? '-' %></div>
+                  <div class="x-small text-muted">Avg: <%= row.quantities?.average ?? '-' %></div>
+                </td>
+                <td><span class="badge <%= row.status === 'posted' ? 'bg-success' : (row.status === 'draft' ? 'bg-warning text-dark' : 'bg-secondary') %>"><%= row.status || '-' %></span></td>
+                <td class="pe-3">
+                  <div class="small"><%= row.memo || '-' %></div>
+                  <div class="x-small text-muted font-monospace"><%= row.source?.eventId || '-' %></div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const selectedPrograms = <%- JSON.stringify(selectedPrograms || []) %>;
+  const selectedStudents = <%- JSON.stringify(selectedStudents || []) %>;
+  const selectedTerms = <%- JSON.stringify(selectedTerms || []) %>;
+  const selectedClasses = <%- JSON.stringify(selectedClasses || []) %>;
+  const form = document.getElementById('academicLedgerFilterForm');
+
+  function listForBox(boxId) {
+    if (boxId === 'selectedProgramsBox') return selectedPrograms;
+    if (boxId === 'selectedStudentsBox') return selectedStudents;
+    if (boxId === 'selectedTermsBox') return selectedTerms;
+    if (boxId === 'selectedClassesBox') return selectedClasses;
+    return selectedPrograms;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function renderPickerList(boxId, inputName, items) {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    if (!items.length) {
+      box.innerHTML = '<div class="text-muted">No items selected.</div>';
+      return;
+    }
+    box.innerHTML = items.map(function (item, index) {
+      return '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-2 py-1 mb-2">' +
+        '<div class="text-break">' +
+          '<div class="fw-bold">' + escapeHtml(item.label || item.id) + '</div>' +
+          '<div class="x-small text-muted font-monospace">' + escapeHtml(item.id || '') + '</div>' +
+        '</div>' +
+        '<div class="d-flex align-items-center gap-2">' +
+          '<input type="hidden" name="' + inputName + '" value="' + escapeHtml(item.id || '') + '">' +
+          '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-index="' + index + '" data-box-id="' + boxId + '"><i class="bi bi-x-lg"></i></button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    box.querySelectorAll('button[data-remove-index]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const idx = Number(btn.getAttribute('data-remove-index'));
+        const target = btn.getAttribute('data-box-id');
+        const list = listForBox(target);
+        if (Number.isNaN(idx) || idx < 0 || idx >= list.length) return;
+        list.splice(idx, 1);
+        renderAllLists();
+      });
+    });
+  }
+
+  function renderAllLists() {
+    renderPickerList('selectedProgramsBox', 'programIds', selectedPrograms);
+    renderPickerList('selectedStudentsBox', 'studentIds', selectedStudents);
+    renderPickerList('selectedTermsBox', 'termIds', selectedTerms);
+    renderPickerList('selectedClassesBox', 'classIds', selectedClasses);
+  }
+
+  function addUnique(items, nextItem) {
+    const id = String(nextItem?.id || '').trim();
+    if (!id) return;
+    if (items.some(function (item) { return String(item.id || '') === id; })) return;
+    items.push({ id: id, label: String(nextItem.label || id) });
+    renderAllLists();
+  }
+
+  document.getElementById('btnPickProgram')?.addEventListener('click', function () {
+    GenericPicker.open(GenericPickerPresets.program({
+      title: 'Select Program',
+      onSelect: function (item) {
+        addUnique(selectedPrograms, {
+          id: item.id,
+          label: [String(item.code || item.id || ''), String(item.name || '')].filter(Boolean).join(' - ')
+        });
+      }
+    }));
+  });
+
+  document.getElementById('btnPickStudent')?.addEventListener('click', function () {
+    GenericPicker.open(GenericPickerPresets.student({
+      title: 'Select Student',
+      onSelect: function (item) {
+        const fullName = [item.firstName || item.name?.first || '', item.lastName || item.name?.last || ''].filter(Boolean).join(' ').trim();
+        addUnique(selectedStudents, {
+          id: item.id,
+          label: (fullName || item.id) + ' (' + String(item.id || '') + ')'
+        });
+      }
+    }));
+  });
+
+  document.getElementById('btnPickTerm')?.addEventListener('click', function () {
+    GenericPicker.open(GenericPickerPresets.term({
+      title: 'Select Term',
+      onSelect: function (item) {
+        addUnique(selectedTerms, {
+          id: item.id,
+          label: [String(item.code || item.id || ''), String(item.name || '')].filter(Boolean).join(' - ')
+        });
+      }
+    }));
+  });
+
+  document.getElementById('btnPickClass')?.addEventListener('click', function () {
+    GenericPicker.open(GenericPickerPresets.class({
+      title: 'Select Class',
+      onSelect: function (item) {
+        addUnique(selectedClasses, {
+          id: item.id,
+          label: [String(item.code || item.id || ''), String(item.title || item.name || '')].filter(Boolean).join(' - ')
+        });
+      }
+    }));
+  });
+
+  document.getElementById('btnClearPrograms')?.addEventListener('click', function () {
+    selectedPrograms.length = 0;
+    renderAllLists();
+  });
+  document.getElementById('btnClearStudents')?.addEventListener('click', function () {
+    selectedStudents.length = 0;
+    renderAllLists();
+  });
+  document.getElementById('btnClearTerms')?.addEventListener('click', function () {
+    selectedTerms.length = 0;
+    renderAllLists();
+  });
+  document.getElementById('btnClearClasses')?.addEventListener('click', function () {
+    selectedClasses.length = 0;
+    renderAllLists();
+  });
+
+  form?.addEventListener('submit', function () {
+    renderAllLists();
+  });
+
+  renderAllLists();
+})();
+</script>

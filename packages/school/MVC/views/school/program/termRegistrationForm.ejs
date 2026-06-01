@@ -1,0 +1,1094 @@
+<div class="sections-page term-registration-page">
+  <style>
+    .term-registration-page .summary-tile {
+      border: 1px solid rgba(23, 50, 77, 0.12);
+      border-radius: 1rem;
+      background: #f8fafc;
+      min-height: 100%;
+    }
+    .term-registration-page .selection-shell {
+      border: 1px solid rgba(23, 50, 77, 0.1);
+      border-radius: 1rem;
+      background: linear-gradient(135deg, #fffaf0 0%, #f8fbff 100%);
+    }
+    .term-registration-page .selection-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7a89;
+    }
+    .term-registration-page .selection-value {
+      color: #17324d;
+    }
+    .term-registration-page .preview-table td,
+    .term-registration-page .preview-table th {
+      vertical-align: top;
+    }
+  </style>
+
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-stars me-2"></i><%= title %></h1>
+    <div class="d-flex gap-2">
+      <a href="/school/programs/register-terms-batch-wizard" class="btn btn-outline-primary btn-sm"><i class="bi bi-diagram-3 me-1"></i> Batch Wizard</a>
+      <a href="/school/programs/term-registrations" class="btn btn-outline-secondary btn-sm"><i class="bi bi-card-list me-1"></i> Registration Records</a>
+      <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1450px;">
+    <form id="termRegistrationForm" method="POST" action="/school/programs/register-terms/apply">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="studentId" id="hid_studentId" value="">
+      <input type="hidden" name="programRegistrationId" id="hid_programRegistrationId" value="">
+      <input type="hidden" name="termId" id="hid_termId" value="">
+      <input type="hidden" name="classIds" id="hid_classIds" value="[]">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <div class="row g-3 align-items-end">
+            <div class="col-lg-4">
+              <label class="form-label fw-bold">Student *</label>
+              <div class="input-group">
+                <input type="text" id="inp_studentLabel" class="form-control bg-white" value="" placeholder="Select student..." readonly required>
+                <button type="button" class="btn btn-outline-primary" id="btnPickStudent"><i class="bi bi-search"></i></button>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <label class="form-label fw-bold">Registered Program *</label>
+              <div class="input-group">
+                <input type="text" id="inp_programRegistrationLabel" class="form-control bg-white" value="" placeholder="Select one of the student's registered programs..." readonly required>
+                <button type="button" class="btn btn-outline-primary" id="btnPickProgramRegistration"><i class="bi bi-search"></i></button>
+              </div>
+            </div>
+            <div class="col-lg-2">
+              <label class="form-label fw-bold">Effective Date *</label>
+              <input type="date" class="form-control" name="effectiveDate" id="inp_effectiveDate" value="<%= new Date().toISOString().slice(0,10) %>" required>
+            </div>
+            <div class="col-lg-2">
+              <label class="form-label fw-bold">External Ref</label>
+              <input type="text" class="form-control" name="externalReference" id="inp_externalReference" placeholder="Optional">
+            </div>
+          </div>
+
+          <div class="selection-shell p-3 mt-4">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="selection-label mb-1">Student Summary</div>
+                <div class="selection-value fw-bold" id="studentSummaryLine">No student selected.</div>
+                <div class="small text-muted mt-1" id="studentSummaryMeta">Select a student first.</div>
+              </div>
+              <div class="col-md-4">
+                <div class="selection-label mb-1">Program Summary</div>
+                <div class="selection-value fw-bold" id="programSummaryLine">No registered program selected.</div>
+                <div class="small text-muted mt-1" id="programSummaryMeta">Pick one active program registration for this student.</div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-bold mb-1">Term *</label>
+                <div class="input-group">
+                  <input type="text" id="inp_termLabel" class="form-control bg-white" value="" placeholder="Select an active term..." readonly required>
+                  <button type="button" class="btn btn-outline-primary" id="btnPickTerm" disabled><i class="bi bi-search"></i></button>
+                </div>
+                <div class="small text-muted mt-1" id="termSummaryMeta">Terms will load after you select a registered program.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-bold">Selected Classes</div>
+              <div class="small text-muted">Add eligible classes one by one. Preview will validate prerequisites, duplicate subjects, capacity, and credit rules before applying the registration.</div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" id="btnAddClass" disabled><i class="bi bi-plus-circle me-1"></i>Add Class</button>
+          </div>
+
+          <div id="classSelectionAlerts" class="mt-3"></div>
+
+          <div class="table-responsive mt-3">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Class</th>
+                  <th>Credits</th>
+                  <th>Department / Subjects</th>
+                  <th>Roster</th>
+                  <th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="selectedClassesTbody">
+                <tr><td colspan="5" class="text-center text-muted py-4">No classes selected yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label fw-bold">Note</label>
+            <textarea class="form-control" name="note" id="inp_note" rows="2" placeholder="Optional registrar note"></textarea>
+          </div>
+
+          <div class="d-flex gap-2 mt-4">
+            <button type="button" class="btn btn-outline-primary" id="btnPreview"><i class="bi bi-eye me-1"></i>Preview Registration</button>
+            <button type="submit" class="btn btn-primary" id="btnApply" disabled><i class="bi bi-save me-1"></i>Save Draft Term Registration</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <div class="fw-bold">Preview</div>
+              <div class="small text-muted" id="previewSummary">Run preview to validate credits, prerequisites, finance postings, and class fees.</div>
+            </div>
+            <span class="badge bg-secondary" id="previewStatusBadge">Waiting</span>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-3"><div class="summary-tile p-3"><div class="small text-muted">Selected Classes</div><div class="h4 mb-1" id="sumClassCount">0</div><div class="small text-muted">Current basket size</div></div></div>
+            <div class="col-md-3"><div class="summary-tile p-3"><div class="small text-muted">Credits</div><div class="h4 mb-1" id="sumCreditCount">0.00</div><div class="small text-muted" id="sumCreditMeta">Waiting for preview</div></div></div>
+            <div class="col-md-3"><div class="summary-tile p-3"><div class="small text-muted">Term Fees</div><div class="h4 mb-1" id="sumTermFee">0.00</div><div class="small text-muted">Transaction templates</div></div></div>
+            <div class="col-md-3"><div class="summary-tile p-3"><div class="small text-muted">Grand Total</div><div class="h4 mb-1" id="sumGrandTotal">0.00</div><div class="small text-muted">Term plus class fees</div></div></div>
+          </div>
+
+          <div id="previewAlerts"></div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle preview-table">
+              <thead>
+                <tr>
+                  <th>Class</th>
+                  <th>Credits</th>
+                  <th>Class Fee</th>
+                  <th>Status</th>
+                  <th>Validation</th>
+                </tr>
+              </thead>
+              <tbody id="previewClassesTbody">
+                <tr><td colspan="5" class="text-center text-muted py-4">No preview available yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="fw-bold mt-4 mb-2">Auto-applied Term Transactions</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle preview-table mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Debit</th>
+                  <th>Credit</th>
+                  <th>Amount</th>
+                  <th>Memo</th>
+                </tr>
+              </thead>
+              <tbody id="previewTransactionsTbody">
+                <tr><td colspan="5" class="text-center text-muted py-4">No term transactions previewed yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="fw-bold mt-4 mb-2">Auto-applied Class Fee Transactions</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle preview-table mb-0">
+              <thead>
+                <tr>
+                  <th>Class</th>
+                  <th>Template</th>
+                  <th>Debit</th>
+                  <th>Credit</th>
+                  <th>Amount</th>
+                  <th>Memo</th>
+                </tr>
+              </thead>
+              <tbody id="previewClassTransactionsTbody">
+                <tr><td colspan="6" class="text-center text-muted py-4">No class fee transactions previewed yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <div class="fw-bold">Recent Term Registrations</div>
+            <div class="small text-muted">Use this section to review recent registrations and confirm finance and academic postings.</div>
+          </div>
+          <a href="/school/programs/term-registrations" class="btn btn-outline-secondary btn-sm">Open Full List</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Registration</th>
+                <th>Student</th>
+                <th>Program / Term</th>
+                <th>Credits</th>
+                <th>Finance</th>
+                <th>Academic</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!(recentRegistrations || []).length) { %>
+                <tr><td colspan="7" class="text-center text-muted py-4">No recent term registrations found for the active organization.</td></tr>
+              <% } else { %>
+                <% (recentRegistrations || []).forEach(function (row) { %>
+                  <tr>
+                    <td><div class="fw-bold"><a href="/school/programs/term-registrations/<%= encodeURIComponent(row.id) %>"><%= row.id %></a></div><div class="small text-muted"><%= row.registrationDate || '-' %></div></td>
+                    <td><div class="fw-bold"><%= row.studentName || row.studentId %></div><div class="small text-muted font-monospace"><%= row.studentId || '-' %></div></td>
+                    <td><div class="fw-bold"><%= row.programLabel || row.programId %></div><div class="small text-muted"><%= row.termLabel || row.termId %></div></td>
+                    <td><%= Number(row.selectedCredits || 0).toFixed(2) %> / <%= row.classCount || 0 %> classes</td>
+                    <td>Posted <strong><%= row.finance.posted %></strong> / <%= row.finance.expected %></td>
+                    <td>Posted <strong><%= row.academic.posted %></strong> / <%= row.academic.expected %></td>
+                    <td class="text-end">
+                      <a href="/school/programs/term-registrations/<%= encodeURIComponent(row.id) %>" class="btn btn-outline-secondary btn-sm me-1"><%= String(row.status || '').toLowerCase() === 'draft' ? 'Review Draft' : 'Details' %></a>
+                      <% if (canManageRegistrations && row.canApprove) { %>
+                        <button type="button" class="btn btn-outline-success btn-sm me-1" data-approve-term-registration="<%= row.id %>" data-approve-term-student="<%= row.studentName || row.studentId %>">
+                          <i class="bi bi-check2-circle me-1"></i>Approve & Post
+                        </button>
+                      <% } %>
+                      <% if (canManageRegistrations && row.canRollback) { %>
+                        <button type="button" class="btn btn-outline-danger btn-sm" data-rollback-term-registration="<%= row.id %>" data-rollback-term-student="<%= row.studentName || row.studentId %>" data-rollback-term-status="<%= String(row.status || '').toLowerCase() %>">
+                          <i class="bi bi-arrow-counterclockwise me-1"></i><%= String(row.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Rollback' %>
+                        </button>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const actionStateId = String(document.getElementById('hid_actionStateId')?.value || '').trim();
+  const state = {
+    student: null,
+    programRegistration: null,
+    termId: '',
+    selectedClasses: [],
+    preview: null
+  };
+
+  function showMsg(opts) {
+    if (typeof showMessageModal === 'function') return showMessageModal(opts);
+    alert(opts?.message || 'Done');
+    return Promise.resolve();
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>\"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function formatStudentName(item) {
+    return String(
+      item?.name ||
+      [item?.firstName || item?.name?.first || '', item?.lastName || item?.name?.last || ''].filter(Boolean).join(' ').trim() ||
+      item?.id ||
+      ''
+    ).trim();
+  }
+
+  function normalizeStudent(item) {
+    return {
+      id: String(item?.id || '').trim(),
+      personId: String(item?.personId || '').trim(),
+      name: formatStudentName(item),
+      feeCategory: String(item?.feeCategory || '').trim(),
+      studentAccountId: String(item?.studentAccountId || '').trim(),
+      programRegistrationCount: Number(item?.programRegistrationCount || 0)
+    };
+  }
+
+  function normalizeProgramRegistration(item) {
+    return {
+      id: String(item?.id || '').trim(),
+      studentId: String(item?.studentId || '').trim(),
+      studentName: String(item?.studentName || '').trim(),
+      programId: String(item?.programId || '').trim(),
+      programCode: String(item?.programCode || '').trim(),
+      programName: String(item?.programName || '').trim(),
+      registrationDate: String(item?.registrationDate || '').trim(),
+      feeCategory: String(item?.feeCategory || '').trim(),
+      programSubjectIds: Array.isArray(item?.programSubjectIds) ? item.programSubjectIds.map(String) : [],
+      termOptions: Array.isArray(item?.termOptions) ? item.termOptions.map(function (term) {
+        return {
+          termId: String(term?.termId || '').trim(),
+          termCode: String(term?.termCode || '').trim(),
+          termName: String(term?.termName || '').trim(),
+          termStatus: String(term?.termStatus || '').trim(),
+          order: Number(term?.order || 0),
+          isRequired: Boolean(term?.isRequired),
+          alreadyRegistered: Boolean(term?.alreadyRegistered),
+          rules: term?.rules || {}
+        };
+      }) : [],
+      termCount: Number(item?.termCount || (Array.isArray(item?.termOptions) ? item.termOptions.length : 0)),
+      openTermCount: Number(item?.openTermCount || 0)
+    };
+  }
+
+  function normalizeClassItem(item) {
+    const parsedCycleNo = Number.parseInt(String(item?.cycleNo || item?.lifecycle?.cycleNo || '').trim(), 10);
+    const cycleNo = Number.isFinite(parsedCycleNo) && parsedCycleNo > 0 ? parsedCycleNo : 1;
+    const lifecycle = {
+      registrationMode: String(item?.registrationMode || item?.lifecycle?.registrationMode || '').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based',
+      cycleNo: cycleNo,
+      cycleGroupId: String(item?.cycleGroupId || item?.lifecycle?.cycleGroupId || '').trim(),
+      cycleStartDate: String(item?.cycleStartDate || item?.lifecycle?.cycleStartDate || '').trim(),
+      cycleEndDate: String(item?.cycleEndDate || item?.lifecycle?.cycleEndDate || '').trim(),
+      isClosedForNewEnrollment: item?.isClosedForNewEnrollment === true
+        || item?.lifecycle?.isClosedForNewEnrollment === true
+        || String(item?.isClosedForNewEnrollment || item?.lifecycle?.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true',
+      previousClassId: String(item?.previousClassId || item?.lifecycle?.previousClassId || '').trim(),
+      nextClassId: String(item?.nextClassId || item?.lifecycle?.nextClassId || '').trim()
+    };
+    return {
+      id: String(item?.id || '').trim(),
+      title: String(item?.title || item?.id || '').trim(),
+      status: String(item?.status || '').trim(),
+      credits: item?.credits === null || item?.credits === undefined || item?.credits === '' ? null : Number(item.credits),
+      deliveryDepartmentName: String(item?.deliveryDepartmentName || '').trim(),
+      curriculumSubjects: Array.isArray(item?.curriculumSubjects) ? item.curriculumSubjects.map(function (subjectRef) {
+        return {
+          subjectId: String(subjectRef?.subjectId || '').trim(),
+          code: String(subjectRef?.code || '').trim(),
+          name: String(subjectRef?.name || '').trim()
+        };
+      }) : [],
+      enrolledCount: Number(item?.enrolledCount || 0),
+      maxCapacity: Number(item?.maxCapacity || 0),
+      lifecycle: lifecycle,
+      registrationMode: lifecycle.registrationMode
+    };
+  }
+
+  function buildLifecycleBadgesHtml(classRow, opts) {
+    const options = opts && typeof opts === 'object' ? opts : {};
+    const lifecycle = classRow?.lifecycle || {};
+    const mode = String(lifecycle.registrationMode || classRow?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
+    if (mode !== 'rolling') {
+      return '<span class="badge bg-light text-dark border">Term-Based</span>';
+    }
+    const cycleNo = Number.isFinite(Number(lifecycle.cycleNo)) && Number(lifecycle.cycleNo) > 0 ? Number(lifecycle.cycleNo) : 1;
+    const rangeLabel = [String(lifecycle.cycleStartDate || '').trim() || '?', String(lifecycle.cycleEndDate || '').trim() || 'Open'].join(' -> ');
+    const closeBadge = lifecycle.isClosedForNewEnrollment
+      ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed Enrollment</span>'
+      : '';
+    if (options.compact) {
+      return ''
+        + '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle me-1">Rolling</span>'
+        + '<span class="badge bg-light text-dark border me-1">Cycle #' + escapeHtml(cycleNo) + '</span>'
+        + closeBadge;
+    }
+    return ''
+      + '<div class="d-flex flex-wrap gap-1 mb-1">'
+      +   '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Rolling</span>'
+      +   '<span class="badge bg-light text-dark border">Cycle #' + escapeHtml(cycleNo) + '</span>'
+      +   closeBadge
+      + '</div>'
+      + '<div class="small text-muted">Cycle Window: ' + escapeHtml(rangeLabel) + '</div>';
+  }
+
+  function buildClassLifecycleActionHtml(classId) {
+    const id = String(classId || '').trim();
+    if (!id) return '';
+    return '<a href="/school/classes/edit-wizard/' + encodeURIComponent(id) + '" class="btn btn-outline-secondary btn-sm mt-1">Lifecycle</a>';
+  }
+
+  function getSelectedTerm() {
+    const options = Array.isArray(state.programRegistration?.termOptions) ? state.programRegistration.termOptions : [];
+    return options.find(function (term) {
+      return String(term.termId || '') === String(state.termId || '');
+    }) || null;
+  }
+
+  function resetPreview() {
+    state.preview = null;
+    renderPreview();
+  }
+
+  function getSelectedClassCreditsTotal() {
+    return Number((state.selectedClasses || []).reduce(function (sum, row) {
+      const credits = Number(row?.credits);
+      return Number.isFinite(credits) ? (sum + credits) : sum;
+    }, 0).toFixed(2));
+  }
+
+  function buildClassSelectionAlertState() {
+    const selectedTerm = getSelectedTerm();
+    if (!selectedTerm) return { status: '', messages: [] };
+
+    const termRules = selectedTerm.rules || {};
+    const selectedCredits = getSelectedClassCreditsTotal();
+    const maxCredits = termRules.totalAllowedCredits == null || termRules.totalAllowedCredits === ''
+      ? null
+      : Number(termRules.totalAllowedCredits);
+    const minCredits = Number(termRules.minimumRequiredCredits || 0);
+    const missingCreditClasses = (state.selectedClasses || []).filter(function (row) {
+      return row.credits === null || row.credits === undefined || row.credits === '';
+    });
+
+    const messages = [];
+    let status = '';
+
+    if (missingCreditClasses.length) {
+      status = 'warning';
+      messages.push('Some selected classes do not have a credit value. They will fail preview until class credits are set.');
+    }
+
+    if (maxCredits !== null && selectedCredits > maxCredits) {
+      status = 'error';
+      messages.push('Selected class credits ' + selectedCredits.toFixed(2) + ' exceed the term limit ' + Number(maxCredits).toFixed(2) + '.');
+    } else if (minCredits > 0 && state.selectedClasses.length && selectedCredits < minCredits) {
+      if (!status) status = 'warning';
+      messages.push('Selected credits ' + selectedCredits.toFixed(2) + ' are still below the minimum required ' + Number(minCredits).toFixed(2) + '.');
+    }
+
+    return { status, messages, selectedCredits, minCredits, maxCredits };
+  }
+
+  function syncHiddenState() {
+    document.getElementById('hid_studentId').value = state.student?.id || '';
+    document.getElementById('hid_programRegistrationId').value = state.programRegistration?.id || '';
+    document.getElementById('hid_termId').value = state.termId || '';
+    document.getElementById('hid_classIds').value = JSON.stringify(state.selectedClasses.map(function (row) { return row.id; }));
+  }
+
+  function renderStudentSummary() {
+    document.getElementById('inp_studentLabel').value = state.student ? state.student.name + ' (' + state.student.id + ')' : '';
+    document.getElementById('studentSummaryLine').textContent = state.student ? state.student.name : 'No student selected.';
+    document.getElementById('studentSummaryMeta').textContent = state.student
+      ? 'Fee Category: ' + (state.student.feeCategory || '-') + ' | Account: ' + (state.student.studentAccountId || '-')
+      : 'Select a student first.';
+  }
+
+  function renderProgramSummary() {
+    const registration = state.programRegistration;
+    document.getElementById('inp_programRegistrationLabel').value = registration
+      ? [registration.programCode || registration.programId, registration.programName].filter(Boolean).join(' - ')
+      : '';
+    document.getElementById('programSummaryLine').textContent = registration
+      ? [registration.programCode || registration.programId, registration.programName].filter(Boolean).join(' - ')
+      : 'No registered program selected.';
+    document.getElementById('programSummaryMeta').textContent = registration
+      ? 'Registration: ' + (registration.id || '-') + ' | Registered on: ' + (registration.registrationDate || '-') + ' | Open Terms: ' + String(registration.openTermCount || 0)
+      : 'Pick one active program registration for this student.';
+  }
+
+  function renderTermOptions() {
+    const options = Array.isArray(state.programRegistration?.termOptions) ? state.programRegistration.termOptions.slice() : [];
+    const selectedTerm = getSelectedTerm();
+    const btnPickTerm = document.getElementById('btnPickTerm');
+    const inpTermLabel = document.getElementById('inp_termLabel');
+
+    btnPickTerm.disabled = !state.programRegistration || !options.length;
+    if (selectedTerm && !selectedTerm.alreadyRegistered) {
+      inpTermLabel.value = [selectedTerm.termCode || selectedTerm.termId, selectedTerm.termName].filter(Boolean).join(' - ');
+    } else {
+      if (state.termId) state.termId = '';
+      inpTermLabel.value = '';
+    }
+
+    document.getElementById('termSummaryMeta').textContent = selectedTerm
+      ? 'Order ' + (selectedTerm.order || '-') + ' | Min Credits ' + Number(selectedTerm.rules?.minimumRequiredCredits || 0).toFixed(2) + ' | Max Credits ' + (selectedTerm.rules?.totalAllowedCredits == null || selectedTerm.rules?.totalAllowedCredits === '' ? 'Open' : Number(selectedTerm.rules.totalAllowedCredits).toFixed(2))
+      : (state.programRegistration ? 'Only active terms on the selected program can be picked.' : 'Terms will load after you select a registered program.');
+
+    document.getElementById('btnAddClass').disabled = !state.programRegistration || !state.termId;
+  }
+
+  function renderSelectedClasses() {
+    const tbody = document.getElementById('selectedClassesTbody');
+    if (!state.selectedClasses.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No classes selected yet.</td></tr>';
+      renderClassSelectionAlerts();
+      return;
+    }
+
+    tbody.innerHTML = state.selectedClasses.map(function (row, index) {
+      const subjects = (row.curriculumSubjects || []).map(function (subjectRef) {
+        return [subjectRef.code, subjectRef.name].filter(Boolean).join(' - ');
+      }).filter(Boolean).join(', ');
+      const roster = String(row.enrolledCount || 0) + (row.maxCapacity ? (' / ' + row.maxCapacity) : '');
+      const lifecycleHtml = buildLifecycleBadgesHtml(row);
+      const lifecycleActionHtml = buildClassLifecycleActionHtml(row.id);
+      return '<tr>' +
+        '<td><div class="fw-bold">' + escapeHtml(row.title || row.id) + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.id || '-') + '</div>' + lifecycleHtml + lifecycleActionHtml + '</td>' +
+        '<td>' + escapeHtml(row.credits == null ? '-' : Number(row.credits).toFixed(2)) + '</td>' +
+        '<td><div>' + escapeHtml(row.deliveryDepartmentName || '-') + '</div><div class="small text-muted">' + escapeHtml(subjects || 'No curriculum subjects listed') + '</div></td>' +
+        '<td>' + escapeHtml(roster) + '</td>' +
+        '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-remove-class="' + index + '"><i class="bi bi-trash"></i></button></td>' +
+      '</tr>';
+    }).join('');
+
+    tbody.querySelectorAll('button[data-remove-class]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const index = Number(btn.getAttribute('data-remove-class'));
+        if (Number.isNaN(index) || index < 0 || index >= state.selectedClasses.length) return;
+        state.selectedClasses.splice(index, 1);
+        syncHiddenState();
+        renderSelectedClasses();
+        resetPreview();
+      });
+    });
+
+    renderClassSelectionAlerts();
+  }
+
+  function renderClassSelectionAlerts() {
+    const wrap = document.getElementById('classSelectionAlerts');
+    if (!wrap) return;
+    const alertState = buildClassSelectionAlertState();
+    if (!alertState.status || !alertState.messages.length) {
+      wrap.innerHTML = '';
+      return;
+    }
+    const alertClass = alertState.status === 'error' ? 'alert-danger' : 'alert-warning';
+    const title = alertState.status === 'error' ? 'Credit Limit Issue' : 'Registration Notice';
+    const meta = [
+      'Selected Credits: ' + Number(alertState.selectedCredits || 0).toFixed(2),
+      'Minimum: ' + Number(alertState.minCredits || 0).toFixed(2),
+      'Maximum: ' + (alertState.maxCredits == null ? 'Open' : Number(alertState.maxCredits).toFixed(2))
+    ].join(' | ');
+    wrap.innerHTML =
+      '<div class="alert ' + alertClass + ' py-2 mb-0">' +
+        '<div class="fw-bold mb-1">' + escapeHtml(title) + '</div>' +
+        '<div class="small mb-1">' + escapeHtml(meta) + '</div>' +
+        alertState.messages.map(function (message) {
+          return '<div class="small">' + escapeHtml(message) + '</div>';
+        }).join('') +
+      '</div>';
+  }
+
+  function renderPreview() {
+    const preview = state.preview;
+    const badge = document.getElementById('previewStatusBadge');
+    const summary = document.getElementById('previewSummary');
+    const alerts = document.getElementById('previewAlerts');
+    const classesTbody = document.getElementById('previewClassesTbody');
+    const transactionsTbody = document.getElementById('previewTransactionsTbody');
+    const classTransactionsTbody = document.getElementById('previewClassTransactionsTbody');
+    const btnApply = document.getElementById('btnApply');
+
+    if (!preview) {
+      badge.className = 'badge bg-secondary';
+      badge.textContent = 'Waiting';
+      summary.textContent = 'Run preview to validate credits, prerequisites, finance postings, and class fees.';
+      alerts.innerHTML = '';
+      classesTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No preview available yet.</td></tr>';
+      transactionsTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No term transactions previewed yet.</td></tr>';
+      classTransactionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No class fee transactions previewed yet.</td></tr>';
+      document.getElementById('sumClassCount').textContent = String(state.selectedClasses.length);
+      document.getElementById('sumCreditCount').textContent = '0.00';
+      document.getElementById('sumCreditMeta').textContent = 'Waiting for preview';
+      document.getElementById('sumTermFee').textContent = '0.00';
+      document.getElementById('sumGrandTotal').textContent = '0.00';
+      btnApply.disabled = true;
+      return;
+    }
+
+    badge.className = 'badge ' + (preview.status === 'error' ? 'bg-danger' : (preview.status === 'warning' ? 'bg-warning text-dark' : 'bg-success'));
+    badge.textContent = String(preview.status || 'ready').toUpperCase();
+    summary.textContent = (preview.status === 'error')
+      ? 'Resolve the issues below before applying the term registration.'
+      : 'Preview is ready. Review classes, fees, and term transactions before applying.';
+    btnApply.disabled = preview.status === 'error';
+
+    document.getElementById('sumClassCount').textContent = String((preview.classSelections || []).length);
+    document.getElementById('sumCreditCount').textContent = Number(preview.creditSummary?.selectedCredits || 0).toFixed(2);
+    document.getElementById('sumCreditMeta').textContent = 'Min ' + Number(preview.creditSummary?.minimumRequiredCredits || 0).toFixed(2) + ' | Max ' + (preview.creditSummary?.totalAllowedCredits == null ? 'Open' : Number(preview.creditSummary.totalAllowedCredits).toFixed(2));
+    document.getElementById('sumTermFee').textContent = Number(preview.financeSummary?.termTransactionTotal || 0).toFixed(2);
+    document.getElementById('sumGrandTotal').textContent = Number(preview.financeSummary?.grandTotal || 0).toFixed(2);
+
+    const issueHtml = Array.isArray(preview.issues) && preview.issues.length
+      ? '<div class="alert alert-danger py-2 small">' + preview.issues.map(function (issue) { return '<div>' + escapeHtml(issue) + '</div>'; }).join('') + '</div>'
+      : '';
+    const warningHtml = Array.isArray(preview.warnings) && preview.warnings.length
+      ? '<div class="alert alert-warning py-2 small">' + preview.warnings.map(function (warning) { return '<div>' + escapeHtml(warning) + '</div>'; }).join('') + '</div>'
+      : '';
+    alerts.innerHTML = issueHtml + warningHtml;
+
+    classesTbody.innerHTML = (preview.classSelections || []).length
+      ? (preview.classSelections || []).map(function (row) {
+          const validationLines = []
+            .concat(Array.isArray(row.issues) ? row.issues : [])
+            .concat(Array.isArray(row.warnings) ? row.warnings : []);
+          const lifecycleHtml = buildLifecycleBadgesHtml(row, { compact: true });
+          const lifecycleActionHtml = buildClassLifecycleActionHtml(row.classId);
+          return '<tr>' +
+            '<td><div class="fw-bold">' + escapeHtml(row.classTitle || row.classId) + '</div><div class="small text-muted">' + escapeHtml((row.subjectLabels || []).join(', ') || '-') + '</div><div class="mt-1">' + lifecycleHtml + '</div>' + lifecycleActionHtml + '</td>' +
+            '<td>' + escapeHtml(Number(row.credits || 0).toFixed(2)) + '</td>' +
+            '<td>' + escapeHtml(Number(row.pricing?.total || 0).toFixed(2)) + ' ' + escapeHtml(row.pricing?.currency || '') + '</td>' +
+            '<td><span class="badge ' + (row.status === 'error' ? 'bg-danger' : (row.status === 'warning' ? 'bg-warning text-dark' : 'bg-success')) + '">' + escapeHtml(row.status || 'ready') + '</span></td>' +
+            '<td class="small">' + (validationLines.length ? validationLines.map(function (line) { return '<div>' + escapeHtml(line) + '</div>'; }).join('') : '<span class="text-muted">None</span>') + '</td>' +
+          '</tr>';
+        }).join('')
+      : '<tr><td colspan="5" class="text-center text-muted py-4">No classes selected.</td></tr>';
+
+    transactionsTbody.innerHTML = (preview.financeSummary?.termTransactionPreview || []).length
+      ? (preview.financeSummary.termTransactionPreview || []).map(function (row, index) {
+          return '<tr>' +
+            '<td>' + (index + 1) + '</td>' +
+            '<td><div class="fw-bold font-monospace">' + escapeHtml(row.debitAccount?.code || '-') + '</div><div class="small text-muted">' + escapeHtml(row.debitAccount?.name || '-') + '</div></td>' +
+            '<td><div class="fw-bold font-monospace">' + escapeHtml(row.creditAccount?.code || '-') + '</div><div class="small text-muted">' + escapeHtml(row.creditAccount?.name || '-') + '</div></td>' +
+            '<td>' + escapeHtml(Number(row.amount || 0).toFixed(2)) + ' ' + escapeHtml(row.currency || '') + '</td>' +
+            '<td class="small">' + escapeHtml(row.memo || '-') + '</td>' +
+          '</tr>';
+        }).join('')
+      : '<tr><td colspan="5" class="text-center text-muted py-4">No term transaction templates applied to this student category.</td></tr>';
+
+    classTransactionsTbody.innerHTML = (preview.financeSummary?.classTransactionPreview || []).length
+      ? (preview.financeSummary.classTransactionPreview || []).map(function (row) {
+          const templateLabel = [row.transactionDefinitionCode || '', row.transactionDefinitionName || ''].filter(Boolean).join(' - ');
+          return '<tr>' +
+            '<td><div class="fw-bold">' + escapeHtml(row.classTitle || row.classId || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.classId || '-') + '</div></td>' +
+            '<td><div class="fw-bold font-monospace">' + escapeHtml(row.transactionDefinitionCode || '-') + '</div><div class="small text-muted">' + escapeHtml(templateLabel || '-') + '</div></td>' +
+            '<td><div class="fw-bold font-monospace">' + escapeHtml(row.debitAccount?.code || '-') + '</div><div class="small text-muted">' + escapeHtml(row.debitAccount?.name || '-') + '</div></td>' +
+            '<td><div class="fw-bold font-monospace">' + escapeHtml(row.creditAccount?.code || '-') + '</div><div class="small text-muted">' + escapeHtml(row.creditAccount?.name || '-') + '</div></td>' +
+            '<td>' + escapeHtml(Number(row.amount || 0).toFixed(2)) + ' ' + escapeHtml(row.currency || '') + '</td>' +
+            '<td class="small">' + escapeHtml(row.memo || '-') + '</td>' +
+          '</tr>';
+        }).join('')
+      : '<tr><td colspan="6" class="text-center text-muted py-4">No class fee transaction templates applied yet.</td></tr>';
+  }
+
+  function renderAll() {
+    renderStudentSummary();
+    renderProgramSummary();
+    renderTermOptions();
+    renderSelectedClasses();
+    renderPreview();
+  }
+
+  function buildProgramRegistrationRenderer(item) {
+    const normalized = normalizeProgramRegistration(item);
+    return '<div class="d-flex justify-content-between align-items-start gap-3 w-100">' +
+      '<div>' +
+        '<div class="fw-bold text-dark">' + escapeHtml([normalized.programCode || normalized.programId, normalized.programName].filter(Boolean).join(' - ')) + '</div>' +
+        '<div class="small text-muted">Registration: <span class="font-monospace">' + escapeHtml(normalized.id || '-') + '</span> | Registered on ' + escapeHtml(normalized.registrationDate || '-') + '</div>' +
+        '<div class="small text-muted">Available terms: ' + escapeHtml(normalized.openTermCount || 0) + ' of ' + escapeHtml(normalized.termCount || normalized.termOptions.length) + '</div>' +
+      '</div>' +
+      '<span class="badge bg-light text-dark border">' + escapeHtml(normalized.feeCategory || '-') + '</span>' +
+    '</div>';
+  }
+
+  function buildClassRenderer(item) {
+    const normalized = normalizeClassItem(item);
+    const subjects = (normalized.curriculumSubjects || []).map(function (subjectRef) {
+      return [subjectRef.code, subjectRef.name].filter(Boolean).join(' - ');
+    }).filter(Boolean).join(', ');
+    const lifecycleBadges = buildLifecycleBadgesHtml(normalized, { compact: true });
+    const lifecycleRange = normalized.lifecycle?.registrationMode === 'rolling'
+      ? ('<div class="small text-muted mt-1">Cycle Window: ' + escapeHtml(normalized.lifecycle?.cycleStartDate || '?') + ' -> ' + escapeHtml(normalized.lifecycle?.cycleEndDate || 'Open') + '</div>')
+      : '';
+    return '<div class="d-flex justify-content-between align-items-start gap-3 w-100">' +
+      '<div>' +
+        '<div class="fw-bold text-dark">' + escapeHtml(normalized.title || normalized.id) + '</div>' +
+        '<div class="small text-muted">' + escapeHtml(normalized.deliveryDepartmentName || 'Academic delivery') + '</div>' +
+        '<div class="small text-muted">' + escapeHtml(subjects || 'No curriculum subjects listed') + '</div>' +
+        '<div class="mt-1">' + lifecycleBadges + '</div>' +
+        lifecycleRange +
+      '</div>' +
+      '<div class="text-end small text-muted"><div>Credits ' + escapeHtml(normalized.credits == null ? '-' : Number(normalized.credits).toFixed(2)) + '</div><div>Roster ' + escapeHtml(normalized.enrolledCount || 0) + (normalized.maxCapacity ? (' / ' + escapeHtml(normalized.maxCapacity)) : '') + '</div></div>' +
+    '</div>';
+  }
+
+  function buildTermRenderer(item) {
+    const label = [item?.termCode || item?.termId, item?.termName].filter(Boolean).join(' - ');
+    const maxCredits = item?.rules?.totalAllowedCredits == null || item?.rules?.totalAllowedCredits === ''
+      ? 'Open'
+      : Number(item.rules.totalAllowedCredits).toFixed(2);
+    return '<div class="d-flex justify-content-between align-items-start gap-3 w-100">' +
+      '<div>' +
+        '<div class="fw-bold text-dark">' + escapeHtml(label || item?.termId || '') + '</div>' +
+        '<div class="small text-muted">Order ' + escapeHtml(item?.order || '-') + ' | Min ' + escapeHtml(Number(item?.rules?.minimumRequiredCredits || 0).toFixed(2)) + ' | Max ' + escapeHtml(maxCredits) + '</div>' +
+      '</div>' +
+      '<span class="badge ' + (item?.isRequired ? 'bg-warning text-dark' : 'bg-success') + '">' + (item?.isRequired ? 'Required' : 'Active') + '</span>' +
+    '</div>';
+  }
+
+  async function runPreview() {
+    try {
+      if (!state.student?.id) throw new Error('Select a student first.');
+      if (!state.programRegistration?.id) throw new Error('Select a registered program first.');
+      if (!state.termId) throw new Error('Select a term first.');
+      if (!state.selectedClasses.length) throw new Error('Add at least one class.');
+
+      syncHiddenState();
+      const body = new URLSearchParams({
+        studentId: state.student.id,
+        programRegistrationId: state.programRegistration.id,
+        termId: state.termId,
+        classIds: JSON.stringify(state.selectedClasses.map(function (row) { return row.id; })),
+        effectiveDate: document.getElementById('inp_effectiveDate').value || '',
+        externalReference: document.getElementById('inp_externalReference').value || ''
+      });
+
+      const response = await fetch('/school/programs/register-terms/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: body.toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Preview In Progress', replayTitle: 'Preview Already Completed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status === 'error') throw new Error(result.message || 'Preview failed.');
+      state.preview = result.preview || null;
+      renderPreview();
+    } catch (error) {
+      state.preview = null;
+      renderPreview();
+      await showMsg({
+        title: 'Preview Error',
+        icon: 'error',
+        message: error.message || 'Failed to preview registration.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    }
+  }
+
+  document.getElementById('btnPickStudent').addEventListener('click', function () {
+    GenericPicker.open(GenericPickerPresets.student({
+      title: 'Select Student',
+      onSelect: function (item) {
+        state.student = normalizeStudent(item);
+        state.programRegistration = null;
+        state.termId = '';
+        state.selectedClasses = [];
+        state.preview = null;
+        syncHiddenState();
+        renderAll();
+      }
+    }));
+  });
+
+  document.getElementById('btnPickProgramRegistration').addEventListener('click', async function () {
+    if (!state.student?.id) {
+      await showMsg({
+        title: 'Select Student',
+        icon: 'warning',
+        message: 'Select a student before choosing a registered program.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+      return;
+    }
+
+    GenericPicker.open({
+      title: 'Select Registered Program',
+      icon: 'bi-journal-check',
+      apiEndpoint: '/school/programs/register-terms/program-registrations?studentId=' + encodeURIComponent(state.student.id),
+      placeholder: 'Search registered programs...',
+      renderer: buildProgramRegistrationRenderer,
+      onSelect: function (item) {
+        state.programRegistration = normalizeProgramRegistration(item);
+        state.termId = '';
+        state.selectedClasses = [];
+        state.preview = null;
+        syncHiddenState();
+        renderAll();
+      }
+    });
+  });
+
+  document.getElementById('btnPickTerm').addEventListener('click', async function () {
+    if (!state.programRegistration?.id) {
+      await showMsg({
+        title: 'Select Program',
+        icon: 'warning',
+        message: 'Select a registered program before choosing a term.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+      return;
+    }
+
+    GenericPicker.open({
+      title: 'Select Active Term',
+      icon: 'bi-calendar3-range-fill',
+      apiEndpoint: '/school/programs/register-terms/available-terms?programRegistrationId=' + encodeURIComponent(state.programRegistration.id),
+      placeholder: 'Search active terms...',
+      renderer: buildTermRenderer,
+      onSelect: function (item) {
+        state.termId = String(item?.termId || '').trim();
+        state.selectedClasses = [];
+        state.preview = null;
+        syncHiddenState();
+        renderAll();
+      }
+    });
+  });
+
+  document.getElementById('btnAddClass').addEventListener('click', async function () {
+    if (!state.programRegistration?.id) {
+      await showMsg({
+        title: 'Select Program',
+        icon: 'warning',
+        message: 'Select a registered program before adding classes.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+      return;
+    }
+    if (!state.termId) {
+      await showMsg({
+        title: 'Select Term',
+        icon: 'warning',
+        message: 'Select a term before adding classes.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+      return;
+    }
+
+    GenericPicker.open({
+      title: 'Add Eligible Class',
+      icon: 'bi-easel-fill',
+      apiEndpoint: '/school/programs/register-terms/eligible-classes?programRegistrationId=' + encodeURIComponent(state.programRegistration.id) + '&termId=' + encodeURIComponent(state.termId),
+      placeholder: 'Search eligible classes...',
+      multiselect: true,
+      renderer: buildClassRenderer,
+      onSelect: function (items) {
+        const rows = Array.isArray(items) ? items : [items];
+        rows.forEach(function (item) {
+          const next = normalizeClassItem(item);
+          if (!next.id) return;
+          if (state.selectedClasses.some(function (row) { return String(row.id || '') === next.id; })) return;
+          state.selectedClasses.push(next);
+        });
+        syncHiddenState();
+        renderSelectedClasses();
+        resetPreview();
+        const alertState = buildClassSelectionAlertState();
+        if (alertState.status === 'error' && alertState.messages.length) {
+          showMsg({
+            title: 'Term Credit Limit Exceeded',
+            icon: 'error',
+            message: alertState.messages.join('<br>'),
+            buttons: [{ text: 'Close', class: 'btn-danger' }]
+          });
+        }
+      }
+    });
+  });
+
+  document.getElementById('inp_effectiveDate').addEventListener('change', resetPreview);
+  document.getElementById('inp_externalReference').addEventListener('input', resetPreview);
+  document.getElementById('inp_note').addEventListener('input', resetPreview);
+  document.getElementById('btnPreview').addEventListener('click', runPreview);
+
+  document.getElementById('termRegistrationForm').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    if (!state.preview) {
+      await showMsg({
+        title: 'Run Preview First',
+        icon: 'warning',
+        message: 'Run preview before saving the draft term registration.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+      return;
+    }
+    if (state.preview.status === 'error') return;
+
+    const btn = document.getElementById('btnApply');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving draft...';
+
+    try {
+      syncHiddenState();
+      const body = new URLSearchParams({
+        studentId: state.student?.id || '',
+        programRegistrationId: state.programRegistration?.id || '',
+        termId: state.termId || '',
+        classIds: JSON.stringify(state.selectedClasses.map(function (row) { return row.id; })),
+        effectiveDate: document.getElementById('inp_effectiveDate').value || '',
+        externalReference: document.getElementById('inp_externalReference').value || '',
+        note: document.getElementById('inp_note').value || ''
+      });
+      if (actionStateId) body.set('actionStateId', actionStateId);
+
+      const response = await fetch('/school/programs/register-terms/apply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-AJAX-Request': 'true'
+        },
+        body: body.toString()
+      });
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Completed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (result.status === 'error') throw new Error(result.message || 'Registration failed.');
+
+      await showMsg({
+        title: result.status === 'warning' ? 'Draft Saved With Warnings' : 'Draft Saved',
+        icon: result.status === 'warning' ? 'warning' : 'success',
+        message: result.message || 'Term registration draft saved successfully.',
+        buttons: [{ text: 'Open Record', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+      });
+
+      if (result.registrationId) {
+        window.location.href = '/school/programs/term-registrations/' + encodeURIComponent(result.registrationId);
+      } else {
+        window.location.reload();
+      }
+    } catch (error) {
+      await showMsg({
+        title: 'Registration Error',
+        icon: 'error',
+        message: error.message || 'Failed to save term registration draft.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  });
+
+  document.querySelectorAll('button[data-approve-term-registration]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const registrationId = String(btn.getAttribute('data-approve-term-registration') || '').trim();
+      const studentName = String(btn.getAttribute('data-approve-term-student') || registrationId).trim();
+      if (!registrationId) return;
+
+      let confirmed = false;
+      if (typeof window.showMessageModal === 'function') {
+        const result = await window.showMessageModal({
+          title: 'Approve Draft?',
+          icon: 'warning',
+          message: 'Approve and post draft term registration for <b>' + escapeHtml(studentName) + '</b>?',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Approve & Post', class: 'btn-success' }
+          ]
+        });
+        confirmed = result === 'Approve & Post';
+      } else {
+        confirmed = window.confirm('Approve and post draft term registration for ' + studentName + '?');
+      }
+      if (!confirmed) return;
+
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Posting...';
+      try {
+        const body = new URLSearchParams({ note: 'Approved from Term Registration page' });
+        const response = await fetch('/school/programs/register-terms/approve/' + encodeURIComponent(registrationId), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: body.toString()
+        });
+        const result = await response.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Approval In Progress', replayTitle: 'Approval Already Processed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (result.status === 'error') throw new Error(result.message || 'Approval failed.');
+        await showMsg({
+          title: 'Approval Result',
+          icon: result.status === 'warning' ? 'warning' : 'success',
+          message: result.message || 'Draft approved.',
+          buttons: [{ text: 'OK', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+        });
+        window.location.reload();
+      } catch (error) {
+        await showMsg({
+          title: 'Approval Error',
+          icon: 'error',
+          message: error.message || 'Approval failed.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
+  });
+
+  document.querySelectorAll('button[data-rollback-term-registration]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const registrationId = String(btn.getAttribute('data-rollback-term-registration') || '').trim();
+      const studentName = String(btn.getAttribute('data-rollback-term-student') || registrationId).trim();
+      const status = String(btn.getAttribute('data-rollback-term-status') || '').toLowerCase();
+      const isDraft = status === 'draft';
+      if (!registrationId) return;
+
+      let confirmed = false;
+      if (typeof window.showMessageModal === 'function') {
+        const result = await window.showMessageModal({
+          title: isDraft ? 'Cancel Draft Term Registration?' : 'Rollback Term Registration?',
+          icon: 'warning',
+          message: (isDraft ? 'Cancel draft registration for <b>' : 'Rollback registration for <b>') + escapeHtml(studentName) + '</b>?',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: isDraft ? 'Cancel Draft' : 'Rollback', class: 'btn-danger' }
+          ]
+        });
+        confirmed = result === (isDraft ? 'Cancel Draft' : 'Rollback');
+      } else {
+        confirmed = window.confirm((isDraft ? 'Cancel draft registration for ' : 'Rollback registration for ') + studentName + '?');
+      }
+      if (!confirmed) return;
+
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + (isDraft ? 'Cancelling...' : 'Rolling back...');
+      try {
+        const body = new URLSearchParams({ note: isDraft ? 'Draft cancelled from Term Registration page' : 'Manual rollback from Term Registration page' });
+        const response = await fetch('/school/programs/register-terms/rollback/' + encodeURIComponent(registrationId), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-AJAX-Request': 'true'
+          },
+          body: body.toString()
+        });
+        const result = await response.json();
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Rollback In Progress', replayTitle: 'Rollback Already Processed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (result.status === 'error') throw new Error(result.message || 'Rollback failed.');
+        await showMsg({
+          title: 'Rollback Result',
+          icon: result.status === 'warning' ? 'warning' : 'success',
+          message: result.message || 'Rollback completed.',
+          buttons: [{ text: 'OK', class: result.status === 'warning' ? 'btn-warning' : 'btn-success' }]
+        });
+        window.location.reload();
+      } catch (error) {
+        await showMsg({
+          title: 'Rollback Error',
+          icon: 'error',
+          message: error.message || 'Rollback failed.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
+  });
+
+  syncHiddenState();
+  renderAll();
+})();
+</script>

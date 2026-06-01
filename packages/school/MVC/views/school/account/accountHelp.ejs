@@ -1,0 +1,307 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-journal-text me-2"></i><%= title %></h1>
+    <div class="d-flex gap-2">
+      <a href="/school/accounts/new" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> New Account</a>
+      <a href="/school/accounts" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back to Accounts</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">1. Account Hierarchy Model</h5>
+        <p class="mb-2">
+          School Accounts supports <span class="fw-bold">6 levels</span> maximum. Level starts at <span class="fw-bold">1</span> and ends at <span class="fw-bold">6</span>.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width: 15%;">Level</th>
+                <th style="width: 25%;">Purpose</th>
+                <th style="width: 30%;">Typical Example</th>
+                <th style="width: 30%;">Validation Rule</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="fw-bold">L1</td><td>Top category</td><td>Assets, Liabilities</td><td>No parent required</td></tr>
+              <tr><td class="fw-bold">L2</td><td>Main control group</td><td>Accounts Receivable</td><td>Must be child of L1</td></tr>
+              <tr><td class="fw-bold">L3</td><td>Operational subgroup</td><td>Student Accounts Receivable</td><td>Must be child of L2</td></tr>
+              <tr><td class="fw-bold">L4</td><td>Detailed branch</td><td>Program-specific sub-ledger</td><td>Must be child of L3</td></tr>
+              <tr><td class="fw-bold">L5</td><td>Fine-grained branch</td><td>Term-specific sub-ledger</td><td>Must be child of L4</td></tr>
+              <tr><td class="fw-bold">L6</td><td>Leaf node (max depth)</td><td>Student leaf account</td><td>Must be child of L5, cannot exceed 6</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="alert alert-warning border-warning-subtle mt-3 mb-0">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          If a parent is selected, child <span class="fw-bold">Level must be parent level + 1</span>, and child <span class="fw-bold">Type must match parent Type</span>.
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">2. Input Shape and Limits</h5>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width: 16%;">Field</th>
+                <th style="width: 12%;">Type</th>
+                <th style="width: 10%;">Required</th>
+                <th style="width: 30%;">Shape / Limit</th>
+                <th style="width: 32%;">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="fw-bold">Account ID</td>
+                <td>String</td>
+                <td>No</td>
+                <td><code>max 64</code>, pattern <code>^[A-Za-z0-9._-]+$</code></td>
+                <td>If blank, system auto-generates ID like <code>ACC_...</code>.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Code</td>
+                <td>String</td>
+                <td>Yes</td>
+                <td><code>max 40</code> chars, auto-normalized to uppercase</td>
+                <td>Must be unique in organization (case-insensitive).</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Name</td>
+                <td>String</td>
+                <td>Yes</td>
+                <td><code>max 160</code> chars</td>
+                <td>Must be unique in organization (case-insensitive, whitespace-normalized).</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Type</td>
+                <td>Enum</td>
+                <td>Yes</td>
+                <td><code>asset</code>, <code>liability</code>, <code>equity</code>, <code>income</code>, <code>expense</code></td>
+                <td>Child type must match parent type.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Status</td>
+                <td>Enum</td>
+                <td>Yes</td>
+                <td><code>active</code> or <code>inactive</code></td>
+                <td>Several uniqueness checks only apply to active records.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Level</td>
+                <td>Integer</td>
+                <td>Yes</td>
+                <td>Range <code>1..6</code></td>
+                <td>System checks exact parent/child level consistency.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Parent Account</td>
+                <td>ID</td>
+                <td>No</td>
+                <td>ID shape <code>^[A-Za-z0-9._-]+$</code>, <code>max 64</code></td>
+                <td>Parent must exist in same organization.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Normal Balance</td>
+                <td>Enum</td>
+                <td>Yes</td>
+                <td><code>debit</code> or <code>credit</code></td>
+                <td>Used as accounting behavior metadata.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Control Account</td>
+                <td>Boolean</td>
+                <td>No</td>
+                <td>Checkbox</td>
+                <td>Control/summary marker only.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Allow Posting</td>
+                <td>Boolean</td>
+                <td>No</td>
+                <td>Checkbox</td>
+                <td>Must be enabled for accounts used in direct posting templates.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Party Role Label</td>
+                <td>Enum</td>
+                <td>No</td>
+                <td><code>none</code>, <code>student</code>, <code>teacher</code>, <code>staff</code>, <code>parent</code>, <code>vendor</code>, <code>organization</code>, <code>other</code></td>
+                <td>Unique only when account is both <code>active</code> and <code>allowPost=true</code>.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Head Account For</td>
+                <td>Enum</td>
+                <td>No</td>
+                <td>
+                  <code>none</code>, <code>students</code>, <code>student_all</code>, <code>student_domestic</code>,
+                  <code>student_international</code>, <code>student_corporate</code>, <code>student_scholarship</code>,
+                  <code>student_government_funded</code>, <code>student_linc_alberta</code>, <code>student_wcb_alberta</code>,
+                  <code>student_other</code>, <code>teachers</code>, <code>staff</code>, <code>parents</code>,
+                  <code>vendors</code>, <code>organizations</code>, <code>other</code>
+                </td>
+                <td>Only one <span class="fw-bold">active</span> head account per category per organization.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Description</td>
+                <td>String</td>
+                <td>No</td>
+                <td><code>max 2000</code> chars</td>
+                <td>Internal explanatory note.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">3. Field-by-Field Meaning (Detailed)</h5>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width: 18%;">Field</th>
+                <th style="width: 27%;">What It Means</th>
+                <th style="width: 27%;">How to Use It</th>
+                <th style="width: 28%;">Common Mistake / Risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="fw-bold">Account ID</td>
+                <td>Technical unique key used by the system and references.</td>
+                <td>Leave blank unless you need a controlled custom ID policy.</td>
+                <td>Using manual IDs inconsistently can break external mapping conventions.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Code</td>
+                <td>Human accounting code used in reports and hierarchy readability.</td>
+                <td>Follow a chart schema (e.g., 1xxx assets, 2xxx liabilities).</td>
+                <td>Reusing similar/random codes makes reconciliation harder at scale.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Name</td>
+                <td>Business label shown to users and finance operations.</td>
+                <td>Use structured, explicit names (for example <code>Student_International</code>).</td>
+                <td>Ambiguous names make posting template mapping error-prone.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Type</td>
+                <td>Fundamental accounting class for the account (asset/liability/etc.).</td>
+                <td>Decide by accounting nature first, then keep all descendants same type.</td>
+                <td>Wrong type causes hierarchy validation errors and accounting misclassification.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Status</td>
+                <td>Operational availability flag.</td>
+                <td>Use <code>active</code> for live use; move to <code>inactive</code> when retiring.</td>
+                <td>Inactive accounts used in operational flows will fail validation checks.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Level</td>
+                <td>Depth of the account in the hierarchy tree.</td>
+                <td>Use lower levels for summary/control, deeper levels for operational details.</td>
+                <td>Manual level mismatch vs parent automatically fails save.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Parent Account</td>
+                <td>Direct container account for this record in the chart.</td>
+                <td>Pick a parent with correct org, type, and level relation.</td>
+                <td>Wrong parent choice breaks reporting rollups and validation.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Normal Balance</td>
+                <td>Expected natural side for this account (debit/credit).</td>
+                <td>Set based on accounting standards for the account type/purpose.</td>
+                <td>Incorrect side can confuse financial interpretation and controls.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Control Account</td>
+                <td>Marks this account as a summary/aggregation node rather than transactional leaf.</td>
+                <td>Set <code>true</code> for parent buckets such as <code>Student_All_Control</code> and category control accounts.</td>
+                <td>Marking leaf/posting accounts as control can blur operational design and posting intent.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Allow Posting</td>
+                <td>Determines whether this account can be used directly in postings/templates.</td>
+                <td>Set <code>false</code> for control/summary nodes, <code>true</code> for leaf transaction accounts.</td>
+                <td>Enabling posting on high-level control accounts can pollute aggregate balances.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Party Role Label</td>
+                <td>Dynamic substitution label for transaction templates by role (student/teacher/etc.).</td>
+                <td>Use only when this account is the designated operational role account.</td>
+                <td>Only one active+postable account per role is allowed per org.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Head Account For</td>
+                <td>System-recognized head marker for automatic child-account routing.</td>
+                <td>Use values like <code>student_all</code>, <code>student_international</code>, <code>teachers</code>, etc.</td>
+                <td>Duplicate active head category values are blocked by model validation.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Description</td>
+                <td>Free-text operational context for admins and finance users.</td>
+                <td>Document intended usage and boundaries (what should/should not post here).</td>
+                <td>Missing descriptions makes long-term maintenance and onboarding harder.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">4. Uniqueness and Integrity Rules</h5>
+        <ul class="mb-0">
+          <li><span class="fw-bold">Code</span> must be unique inside the same organization.</li>
+          <li><span class="fw-bold">Name</span> must be unique inside the same organization.</li>
+          <li><span class="fw-bold">Parent</span> must be in same organization as the child account.</li>
+          <li><span class="fw-bold">Parent Type</span> must match child Type.</li>
+          <li><span class="fw-bold">Child Level</span> must equal <code>parent level + 1</code>.</li>
+          <li>An account cannot be its own parent.</li>
+          <li>Account with children cannot be deleted.</li>
+          <li>For <span class="fw-bold">Party Role Label</span>: only one active + postable account per role in an org.</li>
+          <li>For <span class="fw-bold">Head Account For</span>: only one active account per head category in an org.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">5. Student Integration Rules</h5>
+        <p class="mb-2">Student admission logic currently follows this behavior:</p>
+        <ul>
+          <li>If student is <span class="fw-bold">self-funded</span>: system looks for active <code>Head Account For = student_all</code> (or legacy <code>students</code>), then routes to category control accounts such as <code>Student_International</code>, <code>Student_LINC_Alberta</code>, <code>Student_WCB_Alberta</code> based on Default Fee Category.</li>
+          <li>If student is <span class="fw-bold">funded</span>: system auto-creates a child student account under selected funder account.</li>
+          <li>If self-funded and no student head account exists: admission is blocked and returns an error.</li>
+        </ul>
+        <div class="alert alert-info border-info mb-0">
+          <i class="bi bi-lightbulb me-2"></i>
+          Recommended setup: keep <code>Student_All_Control</code> as the active student master head, with active category control children under it.
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">6. Quick Configuration Checklist</h5>
+        <ol class="mb-0">
+          <li>Create top-level chart categories (L1).</li>
+          <li>Create control branches (L2/L3).</li>
+          <li>Choose one account and set <code>Head Account For = student_all</code>.</li>
+          <li>Verify it is <code>active</code>.</li>
+          <li>Ensure parent levels leave room for child depth (max level is 6).</li>
+          <li>Use consistent account code schema (for example: <code>1xxx</code> assets, <code>2xxx</code> liabilities).</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>

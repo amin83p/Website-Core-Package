@@ -1,0 +1,364 @@
+<%
+  const t = term || {};
+  const isEdit = !!t.id;
+  const routeId = t.id || '';
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= title %></h1>
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-outline-primary btn-md" id="btn_copyFromTerm">
+        <i class="bi bi-copy me-1"></i> Copy From Term
+      </button>
+      <a href="/school/terms" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="termForm" action="<%= isEdit ? '/school/terms/edit/' + routeId : '/school/terms/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+
+      <ul class="nav nav-tabs mb-4" id="termTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General Info</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-schedule" type="button">Academic Calendar</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-registration" type="button">Registration & Finance</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-assessment" type="button">Assessment & Results</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-notes" type="button">Description & Notes</button></li>
+      </ul>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="tab-general">
+              <div class="row">
+                <div class="col-md-4 mb-3">
+                  <label class="form-label fw-bold">Term Code *</label>
+                  <input type="text" name="code" class="form-control size-md font-monospace" value="<%= t.code || '' %>" placeholder="e.g. FALL2026" required>
+                </div>
+                <div class="col-md-8 mb-3">
+                  <label class="form-label fw-bold">Term Name *</label>
+                  <input type="text" name="name" class="form-control size-md" value="<%= t.name || '' %>" placeholder="e.g. Fall 2026 Semester" required>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-4 mb-0">
+                  <label class="form-label fw-bold">Status *</label>
+                  <select name="status" class="form-select size-md" required>
+                    <% (termStatuses || []).forEach(status => { %>
+                      <option value="<%= status %>" <%= (t.status || 'draft') === status ? 'selected' : '' %>><%= status %></option>
+                    <% }) %>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-schedule">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Term Start Date *</label>
+                  <input type="date" name="startDate" class="form-control size-md" value="<%= t.startDate || '' %>" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Term End Date *</label>
+                  <input type="date" name="endDate" class="form-control size-md" value="<%= t.endDate || '' %>" required>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Classes Start Date</label>
+                  <input type="date" name="classesStartDate" class="form-control size-md" value="<%= t.classesStartDate || '' %>">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Classes End Date</label>
+                  <input type="date" name="classesEndDate" class="form-control size-md" value="<%= t.classesEndDate || '' %>">
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-0">
+                  <label class="form-label fw-bold">Census Date</label>
+                  <input type="date" name="censusDate" class="form-control size-md" value="<%= t.censusDate || '' %>">
+                </div>
+                <div class="col-md-6 mb-0">
+                  <label class="form-label fw-bold">Late Registration Deadline</label>
+                  <input type="date" name="lateRegistrationDeadline" class="form-control size-md" value="<%= t.lateRegistrationDeadline || '' %>">
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-registration">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Registration Open Date</label>
+                  <input type="date" name="registrationOpenDate" class="form-control size-md" value="<%= t.registrationOpenDate || '' %>">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Registration Close Date</label>
+                  <input type="date" name="registrationCloseDate" class="form-control size-md" value="<%= t.registrationCloseDate || '' %>">
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Add / Drop Deadline</label>
+                  <input type="date" name="addDropDeadline" class="form-control size-md" value="<%= t.addDropDeadline || '' %>">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Swap Deadline</label>
+                  <input type="date" name="swapDeadline" class="form-control size-md" value="<%= t.swapDeadline || '' %>">
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Withdraw Without Penalty Deadline</label>
+                  <input type="date" name="withdrawWithoutPenaltyDeadline" class="form-control size-md" value="<%= t.withdrawWithoutPenaltyDeadline || '' %>">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Final Withdraw Deadline</label>
+                  <input type="date" name="withdrawDeadline" class="form-control size-md" value="<%= t.withdrawDeadline || '' %>">
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-0">
+                  <label class="form-label fw-bold">Payment Due Date</label>
+                  <input type="date" name="paymentDueDate" class="form-control size-md" value="<%= t.paymentDueDate || '' %>">
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-assessment">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Final Exam Start Date</label>
+                  <input type="date" name="finalExamStartDate" class="form-control size-md" value="<%= t.finalExamStartDate || '' %>">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Final Exam End Date</label>
+                  <input type="date" name="finalExamEndDate" class="form-control size-md" value="<%= t.finalExamEndDate || '' %>">
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Grade Submission Deadline</label>
+                  <input type="date" name="gradeSubmissionDeadline" class="form-control size-md" value="<%= t.gradeSubmissionDeadline || '' %>">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Result Release Date</label>
+                  <input type="date" name="termResultReleaseDate" class="form-control size-md" value="<%= t.termResultReleaseDate || '' %>">
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-notes">
+              <div class="mb-3">
+                <label class="form-label fw-bold">Description</label>
+                <textarea name="description" class="form-control size-md" rows="3" placeholder="Public description for this term..."><%= t.description || '' %></textarea>
+              </div>
+
+              <div class="mb-0">
+                <label class="form-label fw-bold">Notes</label>
+                <textarea name="notes" class="form-control size-md" rows="3" placeholder="Internal notes..."><%= t.notes || '' %></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md fw-bold px-4">Save Term</button>
+        <a href="/school/terms" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/school/terms">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../../partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('termForm');
+  const tabsRoot = document.getElementById('termTabs');
+  const copyBtn = document.getElementById('btn_copyFromTerm');
+  const currentTermId = <%- JSON.stringify(routeId || '') %>;
+
+  function activateTab(targetSelector) {
+    if (!targetSelector) return;
+    const trigger = tabsRoot ? tabsRoot.querySelector(`[data-bs-target="${targetSelector}"]`) : null;
+    if (!trigger) return;
+    if (window.bootstrap && typeof window.bootstrap.Tab === 'function') {
+      window.bootstrap.Tab.getOrCreateInstance(trigger).show();
+      return;
+    }
+    trigger.click();
+  }
+
+  function activateTabForElement(element) {
+    if (!element) return;
+    const pane = element.closest('.tab-pane');
+    if (pane && pane.id) activateTab(`#${pane.id}`);
+  }
+
+  function activateTabForErrorMessage(message) {
+    const msg = String(message || '').toLowerCase();
+    if (!msg) return;
+    if (
+      msg.includes('registration') ||
+      msg.includes('payment') ||
+      msg.includes('add / drop') ||
+      msg.includes('add/drop') ||
+      msg.includes('swap') ||
+      msg.includes('withdraw')
+    ) return activateTab('#tab-registration');
+    if (
+      msg.includes('final exam') ||
+      msg.includes('grade submission') ||
+      msg.includes('result release')
+    ) return activateTab('#tab-assessment');
+    if (
+      msg.includes('start date') ||
+      msg.includes('end date') ||
+      msg.includes('classes start') ||
+      msg.includes('classes end') ||
+      msg.includes('census') ||
+      msg.includes('before') ||
+      msg.includes('after')
+    ) return activateTab('#tab-schedule');
+    if (msg.includes('description') || msg.includes('note')) return activateTab('#tab-notes');
+    if (msg.includes('code') || msg.includes('name') || msg.includes('status') || msg.includes('term')) return activateTab('#tab-general');
+  }
+
+  function applyTermTemplate(item) {
+    if (!item || typeof item !== 'object') return;
+    form.querySelector('input[name="code"]').value = item.code || '';
+    form.querySelector('input[name="name"]').value = item.name || '';
+    form.querySelector('select[name="status"]').value = item.status || 'draft';
+    form.querySelector('input[name="startDate"]').value = item.startDate || '';
+    form.querySelector('input[name="endDate"]').value = item.endDate || '';
+    form.querySelector('input[name="registrationOpenDate"]').value = item.registrationOpenDate || '';
+    form.querySelector('input[name="registrationCloseDate"]').value = item.registrationCloseDate || '';
+    form.querySelector('input[name="lateRegistrationDeadline"]').value = item.lateRegistrationDeadline || '';
+    form.querySelector('input[name="paymentDueDate"]').value = item.paymentDueDate || '';
+    form.querySelector('input[name="classesStartDate"]').value = item.classesStartDate || '';
+    form.querySelector('input[name="classesEndDate"]').value = item.classesEndDate || '';
+    form.querySelector('input[name="addDropDeadline"]').value = item.addDropDeadline || '';
+    form.querySelector('input[name="swapDeadline"]').value = item.swapDeadline || '';
+    form.querySelector('input[name="withdrawWithoutPenaltyDeadline"]').value = item.withdrawWithoutPenaltyDeadline || '';
+    form.querySelector('input[name="withdrawDeadline"]').value = item.withdrawDeadline || '';
+    form.querySelector('input[name="censusDate"]').value = item.censusDate || '';
+    form.querySelector('input[name="finalExamStartDate"]').value = item.finalExamStartDate || '';
+    form.querySelector('input[name="finalExamEndDate"]').value = item.finalExamEndDate || '';
+    form.querySelector('input[name="gradeSubmissionDeadline"]').value = item.gradeSubmissionDeadline || '';
+    form.querySelector('input[name="termResultReleaseDate"]').value = item.termResultReleaseDate || '';
+    form.querySelector('textarea[name="description"]').value = item.description || '';
+    form.querySelector('textarea[name="notes"]').value = item.notes || '';
+    activateTab('#tab-general');
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function () {
+      GenericPicker.open(GenericPickerPresets.term({
+        title: 'Copy From Term',
+        placeholder: 'Search terms to copy...',
+        onSelect: async function (item) {
+          if (!item || (currentTermId && String(item.id || '') === String(currentTermId))) return;
+          applyTermTemplate(item);
+          if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+              title: 'Template Applied',
+              icon: 'success',
+              message: 'Term fields were copied. Review and edit the values before saving.',
+              buttons: [{ text: 'OK', class: 'btn-success' }]
+            });
+          }
+        }
+      }));
+    });
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    try {
+      if (!form.checkValidity()) {
+        const firstInvalid = form.querySelector(':invalid');
+        activateTabForElement(firstInvalid);
+        form.reportValidity();
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        return;
+      }
+
+      const formData = new FormData(form);
+      const data = new URLSearchParams(formData);
+
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+        body: data.toString()
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Server returned non-JSON response (Status ${response.status})`);
+      }
+
+      const result = await response.json();
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+        : { stop: false };
+      if (guarded.stop) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        return;
+      }
+
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: result.status === 'success' ? 'Success' : 'Error',
+          icon: result.status === 'success' ? 'success' : 'error',
+          message: result.message || 'Operation completed.',
+          buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
+        });
+      } else {
+        alert(result.message || 'Operation completed.');
+      }
+
+      if (result.status === 'success') {
+        window.location.href = '/school/terms';
+      } else {
+        activateTabForErrorMessage(result.message);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+      }
+    } catch (error) {
+      console.error('Submission Error:', error);
+      activateTabForErrorMessage(error.message);
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'System Error',
+          icon: 'error',
+          message: error.message || 'An unexpected network error occurred.',
+          buttons: [{ text: 'Close', class: 'btn-secondary' }]
+        });
+      } else {
+        alert(error.message || 'An unexpected error occurred.');
+      }
+    }
+  });
+});
+</script>

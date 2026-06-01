@@ -1,0 +1,569 @@
+<%- include('./termRegistrationForm') %>
+
+<style>
+  #termRegistrationWizardGuide {
+    font-size: 1rem;
+  }
+  #termRegistrationWizardGuide .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    transition: all 0.2s ease;
+  }
+  #termRegistrationWizardGuide .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #termRegistrationWizardGuide .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #termRegistrationWizardGuide .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #termRegistrationWizardGuide .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  #termRegistrationWizardGuide .wizard-block {
+    border: 1px solid #d6e0ea;
+    border-radius: 0.7rem;
+    padding: 0.85rem 1rem;
+    height: 100%;
+    background: #fff;
+  }
+  #termRegistrationWizardGuide .wizard-block-title {
+    font-weight: 700;
+    color: #17324d;
+    margin-bottom: 0.5rem;
+  }
+  .term-registration-wizard-controls {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .term-registration-wizard-controls .wizard-step-label {
+    color: #17324d;
+    font-weight: 600;
+  }
+  .term-registration-wizard-controls .btn.btn-sm {
+    font-size: 1rem;
+    padding: 0.45rem 0.85rem;
+  }
+  .term-registration-wizard-hidden {
+    display: none !important;
+  }
+  .term-registration-input-surface {
+    background: #eef5ff;
+    border: 1px solid #d6e6ff;
+    border-radius: 0.65rem;
+    padding: 0.85rem;
+  }
+  .term-registration-page .selection-shell.term-registration-input-surface {
+    background: #eef5ff;
+    border: 1px solid #d6e6ff;
+  }
+  .term-registration-wizard-final-submit {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    padding: 0.9rem 1rem;
+  }
+  .term-registration-wizard-final-submit .wizard-final-note {
+    color: #17324d;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+</style>
+
+<script src="/scripts/wizardStepRail.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('termRegistrationForm');
+  if (!form) return;
+
+  const setupCard = Array.from(form.children).find(function (el) {
+    return el.classList
+      && el.classList.contains('card')
+      && (el.querySelector('#inp_studentLabel') || el.querySelector('#btnPickStudent'));
+  }) || null;
+  const setupBody = setupCard ? setupCard.querySelector('.card-body') : null;
+  const previewCard = Array.from(form.children).find(function (el) {
+    return el.classList && el.classList.contains('card') && el.querySelector('#previewSummary');
+  }) || null;
+
+  const container = form.closest('.form-container');
+  const recentCard = container
+    ? Array.from(container.children).find(function (el) {
+        return el !== form && el.classList && el.classList.contains('card') && String(el.textContent || '').includes('Recent Term Registrations');
+      }) || null
+    : null;
+
+  const topHeader = document.querySelector('.term-registration-page > .d-flex.align-items-center.justify-content-between.mb-4');
+  const dashboardBtn = topHeader ? topHeader.querySelector('a.school-navigator-dashboard') : null;
+  if (dashboardBtn) dashboardBtn.remove();
+
+  const programRow = document.getElementById('inp_studentLabel')?.closest('.row.g-3.align-items-end') || (setupBody ? setupBody.querySelector('.row.g-3.align-items-end') : null);
+  const studentCol = document.getElementById('btnPickStudent')?.closest('.col-lg-4') || null;
+  const programCol = document.getElementById('btnPickProgramRegistration')?.closest('.col-lg-4') || null;
+  const effectiveDateCol = document.getElementById('inp_effectiveDate')?.closest('.col-lg-2') || null;
+  const externalRefCol = document.getElementById('inp_externalReference')?.closest('.col-lg-2') || null;
+
+  const selectionShell = document.getElementById('studentSummaryLine')?.closest('.selection-shell') || (setupBody ? setupBody.querySelector('.selection-shell') : null);
+  const studentSummaryCol = document.getElementById('studentSummaryLine')?.closest('.col-md-4') || null;
+  const programSummaryCol = document.getElementById('programSummaryLine')?.closest('.col-md-4') || null;
+  const termPickerCol = document.getElementById('inp_termLabel')?.closest('.col-md-4') || null;
+
+  const classSectionHeader = document.getElementById('btnAddClass')?.closest('.mt-4.d-flex.justify-content-between.align-items-center') || null;
+  const classSelectionAlerts = document.getElementById('classSelectionAlerts');
+  const classTableWrap = document.getElementById('selectedClassesTbody')?.closest('.table-responsive') || null;
+  const noteSection = document.getElementById('inp_note')?.closest('.mt-3') || null;
+
+  const btnPreview = document.getElementById('btnPreview');
+  const btnApply = document.getElementById('btnApply');
+  const actionRow = btnPreview ? (btnPreview.closest('.d-flex.gap-2.mt-4') || btnPreview.closest('.d-flex.gap-2')) : null;
+
+  if (!setupCard) return;
+
+  const setupMajorSections = setupBody
+    ? Array.from(setupBody.children).filter(function (el) { return el && el.tagName === 'DIV'; })
+    : [];
+
+  const sectionMap = {
+    programRow: programRow,
+    selectionShell: selectionShell,
+    classSectionHeader: classSectionHeader,
+    classSelectionAlerts: classSelectionAlerts,
+    classTableWrap: classTableWrap,
+    noteSection: noteSection,
+    actionRow: actionRow,
+    previewCard: previewCard,
+    recentCard: recentCard
+  };
+
+  const columnMap = {
+    studentCol: studentCol,
+    programCol: programCol,
+    effectiveDateCol: effectiveDateCol,
+    externalRefCol: externalRefCol,
+    studentSummaryCol: studentSummaryCol,
+    programSummaryCol: programSummaryCol,
+    termPickerCol: termPickerCol
+  };
+
+  [
+    programRow,
+    selectionShell,
+    classSectionHeader,
+    classSelectionAlerts,
+    classTableWrap,
+    noteSection,
+    actionRow
+  ].forEach(function (section) {
+    if (section) section.classList.add('term-registration-input-surface');
+  });
+
+  function parseArrayFromField(id) {
+    try {
+      const raw = String(document.getElementById(id)?.value || '').trim();
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function hasPreviewRun() {
+    const summary = String(document.getElementById('previewSummary')?.textContent || '').trim().toLowerCase();
+    const badge = String(document.getElementById('previewStatusBadge')?.textContent || '').trim().toLowerCase();
+    return !!summary && !summary.includes('run preview to validate credits') && badge !== 'waiting';
+  }
+
+  const stepConfig = [
+    {
+      title: 'Date & Ref',
+      objective: [
+        'Start by setting base registration metadata.',
+        'Capture effective date and external referral/reference first.'
+      ],
+      instructions: [
+        'Set Effective Date.',
+        'Set External Ref if your process requires it.'
+      ],
+      impacts: [
+        'Effective date drives posting and registration timeline.',
+        'External reference supports external audit or workflow mapping.'
+      ],
+      quality: [
+        'Effective date is filled and valid.',
+        'External ref is set when needed.'
+      ],
+      required: [
+        { selector: '#inp_effectiveDate', label: 'Effective Date' }
+      ],
+      visibleSections: ['programRow'],
+      visibleCols: ['effectiveDateCol', 'externalRefCol'],
+      actionMode: 'none'
+    },
+    {
+      title: 'Student',
+      objective: [
+        'Select the student for term registration context.',
+        'Confirm student summary before selecting program.'
+      ],
+      instructions: [
+        'Pick Student.',
+        'Confirm student summary details.'
+      ],
+      impacts: [
+        'Student selection controls available registered programs.',
+        'Student profile drives downstream validation context.'
+      ],
+      quality: [
+        'Student is selected.',
+        'Student summary is correct.'
+      ],
+      required: [
+        { selector: '#hid_studentId', label: 'Student' }
+      ],
+      visibleSections: ['programRow', 'selectionShell'],
+      visibleCols: ['studentCol', 'studentSummaryCol'],
+      actionMode: 'none'
+    },
+    {
+      title: 'Program + Term',
+      objective: [
+        'Pick program registration and term sequentially.',
+        'Ensure term is valid for selected registered program.'
+      ],
+      instructions: [
+        'Pick Registered Program.',
+        'Pick Term from available options.'
+      ],
+      impacts: [
+        'Program+Term defines class eligibility and rules.',
+        'Term rules shape credit/validation outcomes.'
+      ],
+      quality: [
+        'Registered program is selected.',
+        'Term is selected and valid.'
+      ],
+      required: [
+        { selector: '#hid_programRegistrationId', label: 'Registered Program' },
+        { selector: '#hid_termId', label: 'Term' }
+      ],
+      visibleSections: ['programRow', 'selectionShell'],
+      visibleCols: ['programCol', 'programSummaryCol', 'termPickerCol'],
+      actionMode: 'none'
+    },
+    {
+      title: 'Classes',
+      objective: [
+        'Build class basket for selected term.',
+        'Review alerts and provide optional note.'
+      ],
+      instructions: [
+        'Add eligible classes.',
+        'Review alert panel and adjust basket.',
+        'Add optional registrar note.'
+      ],
+      impacts: [
+        'Class basket drives class-fee and academic posting behavior.',
+        'Credit and prerequisite checks run against selected classes.'
+      ],
+      quality: [
+        'At least one class selected.',
+        'No unresolved blocking class issue.'
+      ],
+      required: [],
+      customCheck: function () {
+        return parseArrayFromField('hid_classIds').length > 0 ? '' : 'Add at least one class.';
+      },
+      visibleSections: ['classSectionHeader', 'classSelectionAlerts', 'classTableWrap', 'noteSection'],
+      visibleCols: [],
+      actionMode: 'none'
+    },
+    {
+      title: 'Preview',
+      objective: [
+        'Run preview and validate the registration plan.',
+        'Review issues, warnings, and transaction impact.'
+      ],
+      instructions: [
+        'Click Preview Registration.',
+        'Review preview tables and fix issues if needed.'
+      ],
+      impacts: [
+        'Preview gates safe draft creation behavior.',
+        'Reduces invalid postings and rework.'
+      ],
+      quality: [
+        'Preview has been run.',
+        'Blocking issues are resolved.'
+      ],
+      required: [],
+      customCheck: function () {
+        return hasPreviewRun() ? '' : 'Run preview before moving to Apply.';
+      },
+      visibleSections: ['actionRow', 'previewCard'],
+      visibleCols: [],
+      actionMode: 'preview'
+    },
+    {
+      title: 'Save Draft & Verify',
+      objective: [
+        'Save term registration as draft and verify outputs.',
+        'Check recent registration outcomes.'
+      ],
+      instructions: [
+        'Click Save Draft Term Registration.',
+        'Open the saved draft and use Approve & Post to apply postings.'
+      ],
+      impacts: [
+        'Draft save stores registration without posting entries.',
+        'Only approved drafts create final academic/finance postings.'
+      ],
+      quality: [
+        'Save draft action is enabled.',
+        'Draft record is reviewed before approval.'
+      ],
+      required: [],
+      visibleSections: ['previewCard', 'recentCard'],
+      visibleCols: [],
+      actionMode: 'apply'
+    }
+  ];
+
+  function getStepSections(step) {
+    const keys = Array.isArray(step?.visibleSections) ? step.visibleSections : [];
+    return keys.map(function (key) { return sectionMap[key]; }).filter(Boolean);
+  }
+
+  function getStepCols(step) {
+    const keys = Array.isArray(step?.visibleCols) ? step.visibleCols : [];
+    return keys.map(function (key) { return columnMap[key]; }).filter(Boolean);
+  }
+
+  const guide = document.createElement('div');
+  guide.id = 'termRegistrationWizardGuide';
+  guide.className = 'card border-0 shadow-sm mb-3';
+  guide.innerHTML = [
+    '<div class="card-body">',
+      '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">',
+        '<div>',
+          '<div class="fw-bold text-primary">Term Registration Wizard</div>',
+          '<div class="text-muted">Step-by-step flow: Date/Ref -> Student -> Program+Term -> Classes -> Preview -> Apply.</div>',
+        '</div>',
+        '<span class="badge bg-light text-dark border" id="termRegistrationWizardStepBadge">Step 1 of ' + stepConfig.length + '</span>',
+      '</div>',
+      '<div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="termRegistrationWizardProgressBar"></div></div>',
+      '<div class="wizard-step-rail mb-3" id="termRegistrationWizardStepPills"></div>',
+      '<div class="row g-3">',
+        '<div class="col-xl-6"><div class="wizard-block"><div class="wizard-block-title">Step Objective</div><div id="termRegistrationWizardObjective"></div></div></div>',
+        '<div class="col-xl-6"><div class="wizard-block"><div class="wizard-block-title">What To Do</div><div id="termRegistrationWizardInstructions"></div></div></div>',
+        '<div class="col-xl-6"><div class="wizard-block"><div class="wizard-block-title">Downstream Impact</div><div id="termRegistrationWizardImpacts"></div></div></div>',
+        '<div class="col-xl-6"><div class="wizard-block"><div class="wizard-block-title">Quality Checklist</div><div id="termRegistrationWizardQuality"></div></div></div>',
+      '</div>',
+    '</div>'
+  ].join('');
+  form.parentNode.insertBefore(guide, form);
+
+  const controls = document.createElement('div');
+  controls.className = 'term-registration-wizard-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3';
+  controls.innerHTML = [
+    '<div class="wizard-step-label" id="termRegistrationWizardCurrentLabel"></div>',
+    '<div class="d-flex gap-2">',
+      '<a href="/school/programs/term-registrations" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle me-1"></i>Cancel</a>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="termRegistrationWizardPrevBtn"><i class="bi bi-arrow-left me-1"></i>Previous</button>',
+      '<button type="button" class="btn btn-primary btn-sm" id="termRegistrationWizardNextBtn">Next<i class="bi bi-arrow-right ms-1"></i></button>',
+    '</div>'
+  ].join('');
+  form.appendChild(controls);
+
+  const finalActionBar = document.createElement('div');
+  finalActionBar.id = 'termRegistrationWizardFinalAction';
+  finalActionBar.className = 'term-registration-wizard-final-submit d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 term-registration-wizard-hidden';
+  finalActionBar.innerHTML = '<div class="wizard-final-note">Final step action: save the term registration as draft from this bottom section.</div>';
+  if (btnApply) {
+    finalActionBar.appendChild(btnApply);
+  }
+  form.appendChild(finalActionBar);
+
+  const stepBadge = document.getElementById('termRegistrationWizardStepBadge');
+  const stepLabel = document.getElementById('termRegistrationWizardCurrentLabel');
+  const progressBar = document.getElementById('termRegistrationWizardProgressBar');
+  const stepPills = document.getElementById('termRegistrationWizardStepPills');
+  const objectiveEl = document.getElementById('termRegistrationWizardObjective');
+  const instructionsEl = document.getElementById('termRegistrationWizardInstructions');
+  const impactsEl = document.getElementById('termRegistrationWizardImpacts');
+  const qualityEl = document.getElementById('termRegistrationWizardQuality');
+  const btnPrev = document.getElementById('termRegistrationWizardPrevBtn');
+  const btnNext = document.getElementById('termRegistrationWizardNextBtn');
+
+  let currentIndex = 0;
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>\"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function renderList(items) {
+    const safe = Array.isArray(items) ? items : [];
+    if (!safe.length) return '<div class="text-muted">No notes.</div>';
+    return '<ul class="mb-0 ps-3">' + safe.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul>';
+  }
+
+  function findMissingRequired(step) {
+    const missing = [];
+    (step.required || []).forEach(function (rule) {
+      const el = document.querySelector(rule.selector);
+      const value = String(el?.value || '').trim();
+      if (!el || !value) missing.push({ label: rule.label, selector: rule.selector });
+    });
+    if (typeof step.customCheck === 'function') {
+      const customError = String(step.customCheck() || '').trim();
+      if (customError) missing.push({ label: customError, selector: '' });
+    }
+    return missing;
+  }
+
+  async function showWarning(message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title: 'Step Incomplete',
+        icon: 'warning',
+        message: message,
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  function setStepVisibility(step) {
+    const allSections = Array.from(new Set([].concat(setupMajorSections).concat(Object.values(sectionMap).filter(Boolean))));
+    allSections.forEach(function (section) {
+      section.classList.add('term-registration-wizard-hidden');
+    });
+    getStepSections(step).forEach(function (section) {
+      section.classList.remove('term-registration-wizard-hidden');
+    });
+
+    const allCols = Object.values(columnMap).filter(Boolean);
+    allCols.forEach(function (col) {
+      col.classList.add('term-registration-wizard-hidden');
+    });
+    getStepCols(step).forEach(function (col) {
+      col.classList.remove('term-registration-wizard-hidden');
+    });
+
+    const actionMode = String(step?.actionMode || 'none').toLowerCase();
+    if (btnPreview) btnPreview.classList.toggle('term-registration-wizard-hidden', actionMode !== 'preview');
+    if (btnApply) btnApply.classList.toggle('term-registration-wizard-hidden', actionMode !== 'apply');
+    if (finalActionBar) finalActionBar.classList.toggle('term-registration-wizard-hidden', actionMode !== 'apply');
+  }
+
+  function goToStep(index) {
+    const bounded = Math.max(0, Math.min(stepConfig.length - 1, Number(index)));
+    currentIndex = bounded;
+    const step = stepConfig[currentIndex];
+    const progress = ((currentIndex + 1) / stepConfig.length) * 100;
+
+    stepBadge.textContent = 'Step ' + (currentIndex + 1) + ' of ' + stepConfig.length;
+    stepLabel.textContent = step.title;
+    progressBar.style.width = progress.toFixed(2) + '%';
+    objectiveEl.innerHTML = renderList(step.objective);
+    instructionsEl.innerHTML = renderList(step.instructions);
+    impactsEl.innerHTML = renderList(step.impacts);
+    qualityEl.innerHTML = renderList(step.quality);
+    setStepVisibility(step);
+
+    stepPills.innerHTML = stepConfig.map(function (item, idx) {
+      const cls = idx === currentIndex ? 'active' : (idx < currentIndex ? 'completed' : '');
+      return '<button type="button" class="wizard-step-pill ' + cls + '" data-step-index="' + idx + '">' + (idx + 1) + '. ' + escapeHtml(item.title) + '</button>';
+    }).join('');
+    stepPills.querySelectorAll('[data-step-index]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        goToStep(Number(btn.getAttribute('data-step-index')));
+      });
+    });
+
+    if (window.WizardStepRail) window.WizardStepRail.sync(stepPills);
+    btnPrev.disabled = currentIndex <= 0;
+    btnNext.innerHTML = currentIndex >= stepConfig.length - 1
+      ? 'Review Submit<i class="bi bi-check2-circle ms-1"></i>'
+      : 'Next<i class="bi bi-arrow-right ms-1"></i>';
+
+    const firstVisible = getStepSections(step)[0] || setupCard;
+    if (firstVisible && typeof firstVisible.scrollIntoView === 'function') {
+      firstVisible.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  btnPrev?.addEventListener('click', function () {
+    goToStep(currentIndex - 1);
+  });
+
+  btnNext?.addEventListener('click', async function () {
+    const step = stepConfig[currentIndex];
+    if (currentIndex < stepConfig.length - 1) {
+      const missing = findMissingRequired(step);
+      if (missing.length) {
+        const message = 'Complete required data before moving to the next step:<br>' +
+          missing.map(function (item) { return '- ' + escapeHtml(item.label); }).join('<br>');
+        await showWarning(message);
+        const first = missing.find(function (item) { return item.selector; });
+        if (first?.selector) {
+          const el = document.querySelector(first.selector);
+          if (el) {
+            try { el.focus(); } catch (_) {}
+          }
+        }
+        return;
+      }
+      goToStep(currentIndex + 1);
+      return;
+    }
+
+    if (btnApply) {
+      btnApply.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      btnApply.classList.add('shadow');
+      setTimeout(function () { btnApply.classList.remove('shadow'); }, 1200);
+    }
+  });
+
+  form.addEventListener('submit', function () {
+    Array.from(new Set([].concat(setupMajorSections).concat(Object.values(sectionMap).filter(Boolean)))).forEach(function (section) {
+      section.classList.remove('term-registration-wizard-hidden');
+    });
+    Object.values(columnMap).filter(Boolean).forEach(function (col) {
+      col.classList.remove('term-registration-wizard-hidden');
+    });
+    if (btnPreview) btnPreview.classList.remove('term-registration-wizard-hidden');
+    if (btnApply) btnApply.classList.remove('term-registration-wizard-hidden');
+    if (finalActionBar) finalActionBar.classList.remove('term-registration-wizard-hidden');
+  });
+
+  goToStep(0);
+});
+</script>
+
+

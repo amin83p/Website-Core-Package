@@ -1,0 +1,193 @@
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  headerManageBtns: [
+    `<a href="/school/reports" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house me-1"></i>Report Home</a>`
+  ]
+}) %>
+
+<%
+  const instanceStateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const hasInstanceFiltersApplied = Boolean(
+    String(instanceStateFilters?.assignmentId || '').trim()
+    || String(instanceStateFilters?.q || '').trim()
+  );
+  const totalMatchedRows = Number(pagination?.totalItems ?? (Array.isArray(data) ? data.length : 0));
+%>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Report Instances</div>
+    <button
+      id="reportInstanceFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#reportInstanceFilterCollapse"
+      aria-expanded="<%= hasInstanceFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="reportInstanceFilterCollapse"
+      aria-label="<%= hasInstanceFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="reportInstanceFilterToggleIcon" class="bi <%= hasInstanceFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasInstanceFiltersApplied ? ' show' : '' %>" id="reportInstanceFilterCollapse">
+    <form method="GET" action="/school/reports/instances" id="reportInstanceFilterForm" class="card-body p-3">
+      <input type="hidden" name="q" value="<%= filters?.q || '' %>">
+      <% if (filters?.assignmentId) { %>
+        <div class="alert alert-light border py-2 px-3 mb-2">
+          Filtered by Assignment: <span class="font-monospace"><%= filters.assignmentId %></span>
+        </div>
+      <% } %>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-8 col-xl-6">
+          <label class="form-label">Assignment ID</label>
+          <input type="text" class="form-control font-monospace" name="assignmentId" value="<%= filters?.assignmentId || '' %>" placeholder="Filter by assignment id">
+        </div>
+        <div class="col-md-4 col-xl-6 d-flex justify-content-xl-end gap-2 pt-xl-4">
+          <button class="btn btn-filled btn-primary btn-md" type="submit"><i class="bi bi-funnel me-1"></i> Apply</button>
+          <a href="/school/reports/instances" class="btn btn-outline-secondary btn-md">Reset</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="small text-muted">
+      Matched rows: <span class="fw-bold text-dark"><%= totalMatchedRows.toLocaleString() %></span>
+    </div>
+    <div class="small text-muted">
+      Showing page: <span class="fw-bold text-dark"><%= Number(pagination?.currentPage || 1) %> / <%= Number(pagination?.totalPages || 1) %></span>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search report instances...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Instance</th>
+        <th>Class</th>
+        <th>Session Date</th>
+        <th>Template</th>
+        <th>Teacher</th>
+        <th>Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr><td colspan="7" class="text-center py-4 text-muted">No report instances found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((row) => { %>
+        <% const lifecycleMode = String(row?.classLifecycle?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based'; %>
+        <% const lifecycleCycleNo = Number(row?.classLifecycle?.cycleNo || 1) > 0 ? Number(row?.classLifecycle?.cycleNo || 1) : 1; %>
+        <% const lifecycleClosed = row?.classLifecycle?.isClosedForNewEnrollment === true || String(row?.classLifecycle?.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true'; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark font-monospace"><%= row.id %></div>
+            <div class="x-small text-muted">Assignment: <%= row.assignmentId || '-' %></div>
+          </td>
+          <td>
+            <div class="fw-bold"><%= row.classTitle %></div>
+            <% if (lifecycleMode === 'rolling') { %>
+              <div class="d-flex flex-wrap gap-1 mt-1">
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Rolling</span>
+                <span class="badge bg-light text-dark border">Cycle #<%= lifecycleCycleNo %></span>
+                <% if (lifecycleClosed) { %>
+                  <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed Enrollment</span>
+                <% } %>
+              </div>
+              <div class="x-small text-muted mt-1">Cycle Window: <%= row?.classLifecycle?.cycleStartDate || '?' %> -> <%= row?.classLifecycle?.cycleEndDate || 'Open' %></div>
+            <% } else { %>
+              <div class="mt-1"><span class="badge bg-light text-dark border">Term-Based</span></div>
+            <% } %>
+          </td>
+          <td><%= row.sessionDate || '-' %></td>
+          <td>
+            <div class="fw-bold text-dark"><%= row.templateTitle %></div>
+            <div class="x-small text-muted">v<%= Number(row.templateVersion || 1) %></div>
+          </td>
+          <td class="font-monospace"><%= row.teacherId || '-' %></td>
+          <td>
+            <% const status = String(row.status || '').toLowerCase(); %>
+            <span class="badge <%= status === 'submitted' ? 'bg-success' : (status === 'locked' ? 'bg-dark' : 'bg-warning text-dark') %>"><%= status || '-' %></span>
+          </td>
+          <td class="table-actions pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= row.id %>"
+                title="Instance Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <% if (row.classId) { %>
+                  <a href="/school/classes/edit-wizard/<%= encodeURIComponent(row.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-2"></i>Lifecycle</a>
+                <% } %>
+                <a href="/school/reports/instances/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right me-2"></i>Open</a>
+                <% if (row.hasDocxTemplate) { %>
+                  <a href="/school/reports/instances/export/<%= row.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm"><i class="bi bi-filetype-docx me-2"></i>DOCX</a>
+                <% } %>
+                <a href="/school/reports/instances/export/<%= row.id %>?download=1" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-2"></i>Payload</a>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="<%= newUrl %>" hidden></span>
+<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
+<%- include('../../partials/tablePages-end') %>
+
+<script>
+(() => {
+  function initCollapseToggleIcon(options = {}) {
+    const collapseEl = document.getElementById(String(options.collapseId || ''));
+    const buttonEl = document.getElementById(String(options.buttonId || ''));
+    const iconEl = document.getElementById(String(options.iconId || ''));
+    if (!collapseEl || !buttonEl || !iconEl) return;
+
+    const openIcon = String(options.openIcon || 'bi-chevron-down');
+    const closeIcon = String(options.closeIcon || 'bi-chevron-up');
+    const openLabel = String(options.openLabel || 'Open filters');
+    const closeLabel = String(options.closeLabel || 'Close filters');
+
+    const setState = (expanded) => {
+      iconEl.classList.remove(openIcon, closeIcon);
+      iconEl.classList.add(expanded ? closeIcon : openIcon);
+      buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', expanded ? closeLabel : openLabel);
+    };
+
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+    collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+  }
+
+  initCollapseToggleIcon({
+    collapseId: 'reportInstanceFilterCollapse',
+    buttonId: 'reportInstanceFilterToggleBtn',
+    iconId: 'reportInstanceFilterToggleIcon',
+    openIcon: 'bi-chevron-down',
+    closeIcon: 'bi-chevron-up',
+    openLabel: 'Open filters',
+    closeLabel: 'Close filters'
+  });
+})();
+</script>

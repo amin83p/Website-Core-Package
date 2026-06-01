@@ -1,0 +1,440 @@
+<%- include('./transactionDefinitionForm') %>
+
+<style>
+  #transactionTemplateWizardGuide {
+    font-size: 1rem;
+  }
+  #transactionTemplateWizardGuide .small {
+    font-size: 1rem !important;
+  }
+  .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .wizard-step-rail::-webkit-scrollbar {
+    display: none;
+  }
+  #transactionTemplateWizardGuide .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    transition: all 0.2s ease;
+  }
+  #transactionTemplateWizardGuide .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #transactionTemplateWizardGuide .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #transactionTemplateWizardGuide .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #transactionTemplateWizardGuide .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  .transaction-template-wizard-controls {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .transaction-template-wizard-controls .wizard-step-label {
+    color: #17324d;
+    font-weight: 600;
+  }
+  .transaction-template-wizard-controls .btn.btn-sm {
+    font-size: 1rem;
+    padding: 0.45rem 0.85rem;
+  }
+  #transactionDefinitionForm .tt-wizard-hidden {
+    display: none !important;
+  }
+</style>
+
+<script src="/scripts/wizardStepRail.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('transactionDefinitionForm');
+  if (!form) return;
+
+  const firstCard = form.querySelector('.card');
+  const buttonRow = form.querySelector('.button-row');
+  if (!firstCard || !buttonRow) return;
+
+  function parseEntries() {
+    try {
+      const raw = document.getElementById('hid_entries')?.value || '[]';
+      const rows = JSON.parse(raw);
+      return Array.isArray(rows) ? rows : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  const stepConfig = [
+    {
+      title: 'Template Identity',
+      focusSelector: 'input[name="code"]',
+      visibleSelectors: [
+        'input[name="transactionDefinitionId"]',
+        'input[name="code"]',
+        'select[name="status"]',
+        'input[name="validFrom"]'
+      ],
+      helper: [
+        'Define template code, name, status, and validity dates.',
+        'Keep code format stable because it is used in finance references.',
+        'Use validity dates only when lifecycle control is required.'
+      ],
+      impacts: [
+        'Template identity appears in Program, Department, and Class posting policies.',
+        'Status controls whether template is selectable in downstream setup forms.',
+        'Date window can block runtime usage if expired.'
+      ],
+      required: [
+        { selector: 'input[name="code"]', label: 'Code' },
+        { selector: 'input[name="name"]', label: 'Name' },
+        { selector: 'select[name="status"]', label: 'Status' }
+      ],
+      customCheck: function () {
+        const from = String(form.querySelector('input[name="validFrom"]')?.value || '').trim();
+        const to = String(form.querySelector('input[name="validTo"]')?.value || '').trim();
+        if (from && to && to < from) return 'Valid To cannot be earlier than Valid From.';
+        return '';
+      }
+    },
+    {
+      title: 'Entries Builder',
+      focusSelector: '#inp_debitRefType',
+      visibleSelectors: [
+        '.alert.alert-info.border-info',
+        '.alert.alert-warning.border-warning',
+        '#inp_debitRefType',
+        '#inp_creditRefType',
+        '#inp_amount',
+        '#inp_memoTemplate',
+        '#btnAddEntry',
+        '#memoPlaceholderPanel',
+        '#entriesTbody',
+        '#entryTemplateSummary'
+      ],
+      helper: [
+        'Set debit/credit mapping, enter posting values, and add rows.',
+        'For runtime templates, use Amount 0 and distribute rows by Percentage.',
+        'Review the entries table until debit/credit logic and totals are correct.'
+      ],
+      impacts: [
+        'This configuration drives actual debit/credit posting behavior.',
+        'Row quality here determines runtime distribution and ledger correctness.',
+        'Memo content and currency will be used directly in posted entries.'
+      ],
+      required: [],
+      customCheck: function () {
+        const rows = parseEntries();
+        if (!rows.length) return 'Add at least one posting entry.';
+        const runtimeRows = rows.filter(function (row) { return Number(row?.amount || 0) <= 0; });
+        if (!runtimeRows.length) return '';
+        const total = runtimeRows.reduce(function (sum, row) { return sum + Number(row?.percentage || 0); }, 0);
+        if (Math.abs(total - 100) > 0.01) return 'Runtime entry percentages must total 100%.';
+        return '';
+      }
+    },
+    {
+      title: 'Notes & Metadata',
+      focusSelector: 'textarea[name="notes"]',
+      visibleSelectors: [
+        'textarea[name="notes"]',
+        '#metadataField'
+      ],
+      helper: [
+        'Finalize internal notes and metadata JSON.',
+        'Use metadata for integrations and advanced tagging only.',
+        'Keep metadata valid JSON to avoid save errors.'
+      ],
+      impacts: [
+        'Notes support maintenance and audit clarity for finance teams.',
+        'Metadata may be consumed by downstream automation.',
+        'Invalid JSON blocks save and interrupts setup flow.'
+      ],
+      required: [],
+      customCheck: function () {
+        const metadataField = document.getElementById('metadataField');
+        const raw = String(metadataField?.value || '').trim();
+        if (!raw) return '';
+        try {
+          JSON.parse(raw);
+          return '';
+        } catch (err) {
+          return 'Metadata must be valid JSON.';
+        }
+      }
+    }
+  ];
+
+  const guide = document.createElement('div');
+  guide.id = 'transactionTemplateWizardGuide';
+  guide.className = 'card border-0 shadow-sm mb-3';
+  guide.innerHTML = [
+    '<div class="card-body">',
+      '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">',
+        '<div>',
+          '<div class="fw-bold text-primary">Transaction Template Wizard</div>',
+          '<div class="text-muted">Complete each step to define reliable posting templates for downstream finance flows.</div>',
+        '</div>',
+        '<div class="d-flex align-items-center gap-2">',
+          '<span class="badge bg-light text-dark border" id="ttWizardStepBadge">Step 1 of ' + stepConfig.length + '</span>',
+          '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="ttWizardProgressPct">0%</span>',
+        '</div>',
+      '</div>',
+      '<div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="ttWizardProgressBar"></div></div>',
+      '<div class="wizard-step-rail mb-3" id="ttWizardStepPills"></div>',
+      '<div class="row g-3">',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light-subtle">',
+            '<div class="fw-bold mb-2">Active Step Help</div>',
+            '<div id="ttWizardStepHelp"></div>',
+          '</div>',
+        '</div>',
+        '<div class="col-lg-6">',
+          '<div class="border rounded p-3 h-100 bg-light">',
+            '<div class="fw-bold mb-2">How Other Sections Use This Data</div>',
+            '<div id="ttWizardStepImpacts"></div>',
+          '</div>',
+        '</div>',
+      '</div>',
+    '</div>'
+  ].join('');
+  form.insertBefore(guide, firstCard);
+
+  const controls = document.createElement('div');
+  controls.className = 'transaction-template-wizard-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3';
+  controls.innerHTML = [
+    '<div class="wizard-step-label" id="ttWizardCurrentLabel"></div>',
+    '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="ttWizardPrevBtn"><i class="bi bi-arrow-left me-1"></i>Previous</button>',
+      '<button type="button" class="btn btn-primary btn-sm" id="ttWizardNextBtn">Next<i class="bi bi-arrow-right ms-1"></i></button>',
+    '</div>'
+  ].join('');
+  buttonRow.parentNode.insertBefore(controls, buttonRow);
+
+  const stepPills = document.getElementById('ttWizardStepPills');
+  const stepHelp = document.getElementById('ttWizardStepHelp');
+  const stepImpacts = document.getElementById('ttWizardStepImpacts');
+  const stepBadge = document.getElementById('ttWizardStepBadge');
+  const progressPct = document.getElementById('ttWizardProgressPct');
+  const stepLabel = document.getElementById('ttWizardCurrentLabel');
+  const progressBar = document.getElementById('ttWizardProgressBar');
+  const btnPrev = document.getElementById('ttWizardPrevBtn');
+  const btnNext = document.getElementById('ttWizardNextBtn');
+  const cardBody = firstCard.querySelector('.card-body');
+  const formBlocks = cardBody ? Array.from(cardBody.children).filter(function (el) { return el && el.nodeType === 1; }) : [];
+  const stepBlocksCache = new Map();
+  let currentIndex = 0;
+
+  function escapeHtml(input) {
+    return String(input || '').replace(/[&<>\"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  function renderList(items) {
+    const safe = Array.isArray(items) ? items : [];
+    if (!safe.length) return '<div class="text-muted">No additional notes for this step.</div>';
+    return '<ul class="mb-0 ps-3">' + safe.map(function (line) {
+      return '<li>' + escapeHtml(line) + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function focusStep(step) {
+    const selector = String(step?.focusSelector || '').trim();
+    if (!selector) return;
+    const el = form.querySelector(selector);
+    if (!el) return;
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus();
+    } catch (_) {}
+  }
+
+  function findMissingRequired(step) {
+    const missing = [];
+    (step.required || []).forEach(function (rule) {
+      const el = form.querySelector(rule.selector);
+      const value = String(el?.value || '').trim();
+      if (!el || !value) missing.push({ label: rule.label, selector: rule.selector });
+    });
+    if (typeof step.customCheck === 'function') {
+      const customError = String(step.customCheck() || '').trim();
+      if (customError) missing.push({ label: customError, selector: '' });
+    }
+    return missing;
+  }
+
+  async function showWarning(message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title: 'Step Incomplete',
+        icon: 'warning',
+        message,
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  function findBlockForElement(el) {
+    if (!el) return null;
+
+    // Map any nested control to the direct card-body child block that wizard visibility toggles.
+    let cursor = el;
+    while (cursor && cursor !== cardBody) {
+      if (formBlocks.includes(cursor)) return cursor;
+      cursor = cursor.parentElement;
+    }
+
+    if (el.id === 'entryTemplateSummary' && formBlocks.includes(el)) return el;
+    return el.closest('.row, .alert, .table-responsive') || null;
+  }
+
+  function getStepBlocks(stepIndex) {
+    if (stepBlocksCache.has(stepIndex)) return stepBlocksCache.get(stepIndex);
+    const step = stepConfig[stepIndex] || {};
+    const selectors = Array.isArray(step.visibleSelectors) ? step.visibleSelectors : [];
+    const blocks = [];
+    selectors.forEach(function (selector) {
+      const target = form.querySelector(selector);
+      const block = findBlockForElement(target);
+      if (block && !blocks.includes(block)) blocks.push(block);
+    });
+    stepBlocksCache.set(stepIndex, blocks);
+    return blocks;
+  }
+
+  function applyStepVisibility(stepIndex) {
+    const visible = new Set(getStepBlocks(stepIndex));
+    formBlocks.forEach(function (block) {
+      if (visible.has(block)) block.classList.remove('tt-wizard-hidden');
+      else block.classList.add('tt-wizard-hidden');
+    });
+    const isLastStep = stepIndex >= stepConfig.length - 1;
+    buttonRow.classList.toggle('tt-wizard-hidden', !isLastStep);
+  }
+
+  function buildMissingMessage(missing) {
+    return 'Complete required checks before moving on:<br>' +
+      missing.map(function (item) { return '- ' + escapeHtml(item.label); }).join('<br>');
+  }
+
+  function focusFirstMissing(missing) {
+    const first = (Array.isArray(missing) ? missing : []).find(function (item) { return item.selector; });
+    if (!first?.selector) return;
+    const el = form.querySelector(first.selector);
+    if (!el) return;
+    try { el.focus(); } catch (_) {}
+  }
+
+  async function tryGoToStep(targetIndex) {
+    const boundedTarget = Math.max(0, Math.min(stepConfig.length - 1, Number(targetIndex)));
+    if (boundedTarget <= currentIndex) {
+      showStep(boundedTarget);
+      return;
+    }
+
+    for (let idx = currentIndex; idx < boundedTarget; idx += 1) {
+      const missing = findMissingRequired(stepConfig[idx]);
+      if (missing.length) {
+        showStep(idx);
+        await showWarning(buildMissingMessage(missing));
+        focusFirstMissing(missing);
+        return;
+      }
+    }
+
+    showStep(boundedTarget);
+  }
+
+  function showStep(index, shouldFocus) {
+    const bounded = Math.max(0, Math.min(stepConfig.length - 1, Number(index)));
+    currentIndex = bounded;
+    applyStepVisibility(currentIndex);
+    renderWizardUi();
+    if (shouldFocus !== false) focusStep(stepConfig[currentIndex]);
+  }
+
+  function renderWizardUi() {
+    const step = stepConfig[currentIndex];
+    const progress = ((currentIndex + 1) / stepConfig.length) * 100;
+
+    stepBadge.textContent = 'Step ' + (currentIndex + 1) + ' of ' + stepConfig.length;
+    progressPct.textContent = Math.round(progress) + '%';
+    stepLabel.textContent = step.title;
+    progressBar.style.width = progress.toFixed(2) + '%';
+    stepHelp.innerHTML = renderList(step.helper);
+    stepImpacts.innerHTML = renderList(step.impacts);
+
+    stepPills.innerHTML = stepConfig.map(function (item, idx) {
+      const cls = idx === currentIndex ? 'active' : (idx < currentIndex ? 'completed' : '');
+      return '<button type="button" class="wizard-step-pill ' + cls + '" data-step-index="' + idx + '">' + (idx + 1) + '. ' + escapeHtml(item.title) + '</button>';
+    }).join('');
+
+    stepPills.querySelectorAll('[data-step-index]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        await tryGoToStep(Number(btn.getAttribute('data-step-index')));
+      });
+    });
+
+    if (window.WizardStepRail) window.WizardStepRail.sync(stepPills);
+    btnPrev.disabled = currentIndex <= 0;
+    btnNext.innerHTML = currentIndex >= stepConfig.length - 1
+      ? 'Review Save<i class="bi bi-check2-circle ms-1"></i>'
+      : 'Next<i class="bi bi-arrow-right ms-1"></i>';
+  }
+
+  btnPrev?.addEventListener('click', function () {
+    showStep(currentIndex - 1);
+  });
+
+  btnNext?.addEventListener('click', async function () {
+    if (currentIndex < stepConfig.length - 1) {
+      await tryGoToStep(currentIndex + 1);
+      return;
+    }
+    buttonRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const saveBtn = form.querySelector('button[type="submit"]');
+    if (saveBtn) {
+      saveBtn.classList.add('shadow');
+      setTimeout(function () { saveBtn.classList.remove('shadow'); }, 1200);
+    }
+  });
+
+  showStep(0, false);
+});
+</script>
+
+

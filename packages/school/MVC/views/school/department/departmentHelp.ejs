@@ -1,0 +1,153 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-journal-text me-2"></i><%= title %></h1>
+    <div class="d-flex gap-2">
+      <a href="/school/departments/new" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> New Department</a>
+      <a href="/school/departments" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back to Departments</a>
+    </div>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">1. Introduction</h5>
+        <p class="mb-2">
+          Departments are the <span class="fw-bold">organizational building blocks</span> used across the School domain. They help you group
+          curriculum and operations into clear units (for example: EAL, LINC, Computer Lab, Administration).
+        </p>
+        <div class="alert alert-info border-info mb-0">
+          <div class="fw-bold mb-1"><i class="bi bi-lightbulb me-2"></i>Where Departments are used</div>
+          <ul class="mb-0">
+            <li><span class="fw-bold">Programs</span> can be assigned to a Department.</li>
+            <li><span class="fw-bold">Classes</span> can set a Delivery Department for scheduling and registration context.</li>
+            <li><span class="fw-bold">Subjects</span> require a Department selection (Academic Unit).</li>
+            <li><span class="fw-bold">Teachers / Staff / Pay Rates</span> can be linked to a Department for reporting and payroll rules.</li>
+            <li><span class="fw-bold">Term Registration charges</span> can use Department Posting Policies as the default finance routing.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">2. Definition (Fields and Rules)</h5>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width: 18%;">Field</th>
+                <th style="width: 10%;">Required</th>
+                <th style="width: 28%;">Shape / Limit</th>
+                <th style="width: 44%;">Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="fw-bold">Code</td>
+                <td>Yes</td>
+                <td><code>max 40</code>, stored uppercase</td>
+                <td>Short identifier used in pickers and lists (example: <code>EAL</code>, <code>LINC</code>).</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Name</td>
+                <td>Yes</td>
+                <td><code>max 160</code></td>
+                <td>Human-friendly name (example: <code>English as an Additional Language</code>).</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Status</td>
+                <td>No</td>
+                <td><code>active</code> / <code>inactive</code></td>
+                <td>Use <code>inactive</code> to retire a Department without deleting it.</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Description</td>
+                <td>No</td>
+                <td><code>max 2000</code></td>
+                <td>Optional operational notes and boundaries (who/what belongs to this Department).</td>
+              </tr>
+              <tr>
+                <td class="fw-bold">Posting Policies</td>
+                <td>No</td>
+                <td>Rows per Fee Category</td>
+                <td>
+                  Default finance routing for class charges by Fee Category. Program and Class policies can override Department policies.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="alert alert-warning border-warning-subtle mt-3 mb-0">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <span class="fw-bold">Uniqueness:</span> Code and Name must be unique inside the same organization (case-insensitive).
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">3. Instructions (Common Tasks)</h5>
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="border rounded-3 p-3 h-100">
+              <div class="fw-bold mb-2"><i class="bi bi-plus-circle me-2"></i>Create a Department</div>
+              <ol class="mb-0">
+                <li>Open <span class="fw-bold">Departments</span> from the School dashboard.</li>
+                <li>Click <span class="fw-bold">New</span>.</li>
+                <li>Enter a unique <span class="fw-bold">Code</span> and <span class="fw-bold">Name</span>.</li>
+                <li>Leave Status as <code>active</code> unless you are preparing it for later use.</li>
+                <li>Click <span class="fw-bold">Save</span>.</li>
+              </ol>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="border rounded-3 p-3 h-100">
+              <div class="fw-bold mb-2"><i class="bi bi-pencil-square me-2"></i>Deactivate (Retire) a Department</div>
+              <ol class="mb-0">
+                <li>Edit the Department.</li>
+                <li>Set Status to <code>inactive</code>.</li>
+                <li>Save changes.</li>
+                <li>Update dependent records (Programs, Subjects, Teachers/Staff, Pay Rates) if needed.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-danger border-danger-subtle mt-3 mb-0">
+          <div class="fw-bold mb-1"><i class="bi bi-shield-exclamation me-2"></i>Deletion warning</div>
+          Deleting a Department can break references in Programs, Subjects, Classes, Pay Rates, Teachers, and Staff. Prefer setting Status to
+          <code>inactive</code> unless you are sure it is unused.
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">4. Posting Policies (Finance Routing)</h5>
+        <p class="mb-2">
+          Posting Policies map a Department + Fee Category to a Transaction Template. This helps the system build consistent postings during
+          Term Registration when class fees are applied.
+        </p>
+        <ul class="mb-3">
+          <li><span class="fw-bold">Fee Category</span> can be set to <code>All Categories</code> as a default fallback.</li>
+          <li>Only <span class="fw-bold">one policy per Fee Category</span> is allowed per Department.</li>
+          <li>The selected <span class="fw-bold">Transaction Template</span> must be accessible in your active organization (or System).</li>
+          <li>Use <span class="fw-bold">Notes</span> to document why the policy exists (auditing and onboarding).</li>
+        </ul>
+
+        <div class="border rounded-3 p-3">
+          <div class="fw-bold mb-2"><i class="bi bi-list-check me-2"></i>Quick setup checklist</div>
+          <ol class="mb-0">
+            <li>Create or confirm Transaction Templates in <span class="fw-bold">Transaction Definitions</span>.</li>
+            <li>Open the Department and go to the <span class="fw-bold">Posting Policies</span> tab.</li>
+            <li>Select a Fee Category (or <code>All Categories</code>).</li>
+            <li>Pick the Transaction Template and click <span class="fw-bold">Add</span>.</li>
+            <li>Save the Department.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
