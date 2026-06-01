@@ -1,1 +1,3 @@
-module.exports = require('../../../../MVC/models/fileQueue');
+const { fileQueueModel } = require('../services/pte/pteCoreContracts');
+
+module.exports = fileQueueModel;

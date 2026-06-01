@@ -101,6 +101,10 @@ const crudRepositoryContract = requireCoreModule('MVC/repositories/contracts/cru
 const userMembershipRepository = requireCoreModule('MVC/repositories/userMembershipRepository');
 const activityQuotaPackageAssignmentRepository = requireCoreModule('MVC/repositories/activityQuotaPackageAssignmentRepository');
 const mongoConnection = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
+const actionStateChangeTrackerService = requireCoreModule('MVC/services/actionStateChangeTrackerService');
+const securityService = requireCoreModule('MVC/services/security');
+const accessUiService = requireCoreModule('MVC/services/security/accessUiService');
+const fileQueueModel = requireCoreModule('MVC/models/fileQueue');
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
 const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
@@ -143,12 +147,18 @@ module.exports = {
   getGatewayTimeoutMs,
   uploadPathUtils,
   resolveCanonicalOrganizationName,
+  requireCoreModule,
   runByRepositoryBackend: repositoryBackendSelector.runByRepositoryBackend,
+  assertQueryableCrudRepository: crudRepositoryContract.assertQueryableCrudRepository,
   repositoryBackendSelector,
   mongoRepositoryUtils,
   crudRepositoryContract,
   userMembershipRepository,
   activityQuotaPackageAssignmentRepository,
+  actionStateChangeTrackerService,
+  securityService,
+  accessUiService,
+  fileQueueModel,
   mongoConnection,
   getMongoCollection: mongoConnection.getMongoCollection,
   requireAuth,

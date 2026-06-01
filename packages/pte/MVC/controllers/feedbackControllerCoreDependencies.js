@@ -4,7 +4,7 @@ const {
   buildDataServiceQuery,
   inferSearchableFields
 } = require('./pte/coreHelpers');
-const securityService = require('../../../../MVC/services/security');
+const { securityService } = require('../services/pte/pteCoreContracts');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
 module.exports = {

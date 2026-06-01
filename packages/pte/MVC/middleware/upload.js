@@ -1,1 +1,3 @@
-module.exports = require('../../../../MVC/middleware/upload');
+const { upload } = require('../services/pte/pteCoreContracts');
+
+module.exports = upload;

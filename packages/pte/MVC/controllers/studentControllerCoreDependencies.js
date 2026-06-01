@@ -2,11 +2,13 @@ const { paginate, isAjax, buildDataServiceQuery, inferSearchableFields } = requi
 const pteUploadPathUtils = require('../utils/pteUploadPathUtils');
 const { coreFilesService } = require('../services/coreFilesService');
 const uploadMiddleware = require('../middleware/upload');
-const settingService = require('../../../../MVC/services/settingService');
+const {
+  settingService,
+  adminChekersService
+} = require('../services/pte/pteCoreContracts');
 const pteQuestionBankDataService = require('../services/pte/pteQuestionBankDataService');
 const questionBankAiAutofillService = require('../services/pte/questionBankAiAutofillService');
 const pteQuestionScoringProfileService = require('../services/pte/pteQuestionScoringProfileService');
-const adminChekersService = require('../../../../MVC/services/adminChekersService');
 
 module.exports = {
   paginate,

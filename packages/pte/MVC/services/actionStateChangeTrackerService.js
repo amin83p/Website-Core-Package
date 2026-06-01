@@ -1,1 +1,3 @@
-module.exports = require('../../../../MVC/services/actionStateChangeTrackerService');
+const { actionStateChangeTrackerService } = require('./pte/pteCoreContracts');
+
+module.exports = actionStateChangeTrackerService;

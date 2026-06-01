@@ -1,4 +1,4 @@
-const accessUiService = require('../../../../MVC/services/security/accessUiService');
+const { accessUiService } = require('../services/pte/pteCoreContracts');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
 module.exports = {

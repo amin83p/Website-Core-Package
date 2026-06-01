@@ -1,1 +1,3 @@
-module.exports = require('../../../../MVC/utils/idAdapter');
+const { requireCoreModule } = require('../services/pte/pteCoreContracts');
+
+module.exports = requireCoreModule('MVC/utils/idAdapter');
