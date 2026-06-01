@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl, 
   newLabel,
@@ -16,7 +16,7 @@
 
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search subjects...',
   fields: []
 }) %>
@@ -89,10 +89,10 @@
 
 <span id="urlRef" data-id="school/subjects" hidden></span>
 
-<%- include('../../partials/pagination', { 
+<%- include('partials/pagination', { 
     pagination: pagination, 
     filters: filters, 
     baseUrlPath: 'school/subjects' 
 }) %>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>

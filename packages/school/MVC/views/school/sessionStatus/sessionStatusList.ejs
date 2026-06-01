@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -11,7 +11,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search session status definitions...',
   fields: [
     { name: 'active', label: 'Active', type: 'select', options: ['true', 'false'] },
@@ -82,10 +82,10 @@
 
 <span id="urlRef" data-id="school/session-statuses" hidden></span>
 
-<%- include('../../partials/pagination', {
+<%- include('partials/pagination', {
   pagination,
   filters,
   baseUrlPath: newUrl
 }) %>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>

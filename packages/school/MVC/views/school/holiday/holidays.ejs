@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title: 'School Holidays & Off Days',
   newUrl: 'school/holidays', // We will intercept this URL via JS below to open the modal
   newLabel: 'Add Holiday',
@@ -11,7 +11,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search holidays...',
   fields: [
       { name: 'type', label: 'Type', type: 'select', options: ['National Holiday','School Break','Staff Development','Weather Emergency','Other'] }
@@ -78,7 +78,7 @@
     </table>
 </div>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
 
 <div class="modal fade" id="holidayModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">

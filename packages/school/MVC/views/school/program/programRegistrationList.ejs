@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title, newUrl, newLabel: 'Register Students', newHref: '/school/programs/register-students', user, tableName, btn_export: true, print,
   manageBtns: [
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
@@ -7,7 +7,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search program registrations...',
   fields: [
     { name: 'status', label: 'Record Status', type: 'select', options: ['draft', 'registered', 'rolled_back', 'error', 'withdrawn', 'cancelled', 'completed'] },
@@ -93,8 +93,8 @@
 </div>
 
 <span id="urlRef" data-id="school/programs/registrations" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/programs/registrations' }) %>
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/programs/registrations' }) %>
+<%- include('partials/tablePages-end') %>
 
 <script>
 (function () {

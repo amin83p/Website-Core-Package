@@ -1,13 +1,25 @@
 {
   "packageId": "school",
-  "step": 1,
-  "status": "scaffolded",
+  "step": 5,
+  "status": "view-partials-normalized",
   "notes": [
-    "Pass 1 scaffold only: no runtime cutover yet.",
-    "Core dependencies must flow through packages/school/MVC/services/school/schoolCoreContracts.js.",
-    "School section constants are package-owned in packages/school/config/accessConstants.js."
+    "Passes 1-4 completed: scaffold, route wrappers, runtime wrappers, and School view mirror are in place.",
+    "Pass 5 normalizes package School view includes to stable partial include paths (partials/...).",
+    "Core dependencies remain behind packages/school/MVC/services/school/schoolCoreContracts.js."
   ],
   "scripts": [],
-  "docs": [],
-  "tests": []
+  "docs": [
+    "docs/school-package-pass1-foundation-2026-06-01.md",
+    "docs/school-package-pass2-route-layer-2026-06-01.md",
+    "docs/school-package-pass3-runtime-wrapper-surface-2026-06-01.md",
+    "docs/school-package-pass4-view-mirror-2026-06-01.md",
+    "docs/school-package-pass5-partials-2026-06-01.md"
+  ],
+  "tests": [
+    "test/school-package-certification-hardcoded-coupling.test.js",
+    "test/school-package-route-layer-pass2.test.js",
+    "test/school-package-runtime-wrapper-parity-pass3.test.js",
+    "test/school-package-view-parity-pass4.test.js",
+    "test/school-package-view-partials-pass5.test.js"
+  ]
 }

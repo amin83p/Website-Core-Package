@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl: 'school/accounts/archived',
   newLabel: 'Recover Account',
@@ -11,7 +11,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search archived accounts...',
   fields: [
     { name: 'type', label: 'Type', type: 'select', options: ['asset', 'liability', 'equity', 'income', 'expense'] },
@@ -78,8 +78,8 @@
 
 <span id="urlRef" data-id="school/accounts/archived" hidden></span>
 <span id="actionStateRef" data-id="<%= actionStateId || '' %>" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/accounts/archived' }) %>
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/accounts/archived' }) %>
+<%- include('partials/tablePages-end') %>
 
 <script>
 (function () {

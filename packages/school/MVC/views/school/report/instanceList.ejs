@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -68,7 +68,7 @@
   </div>
 </div>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search report instances...',
   fields: []
 }) %>
@@ -152,8 +152,8 @@
 </div>
 
 <span id="urlRef" data-id="<%= newUrl %>" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
+<%- include('partials/tablePages-end') %>
 
 <script>
 (() => {

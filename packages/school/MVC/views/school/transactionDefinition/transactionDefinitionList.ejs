@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title, newUrl, newLabel, user, tableName, btn_export: true, print,
   manageBtns: [
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
@@ -6,7 +6,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search transaction templates...',
   fields: [
     { name: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'inactive', 'archived'] }
@@ -83,5 +83,5 @@
 </div>
 
 <span id="urlRef" data-id="school/transactionTemplates" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/transactionTemplates' }) %>
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/transactionTemplates' }) %>
+<%- include('partials/tablePages-end') %>

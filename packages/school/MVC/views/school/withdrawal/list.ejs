@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl: 'school/withdrawal',
   newLabel: 'New Withdrawal',
@@ -13,7 +13,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search withdrawal records...',
   fields: [
     { name: 'type', label: 'Type', type: 'select', options: ['class', 'term', 'program'] },
@@ -108,7 +108,7 @@
 </div>
 
 <span id="urlRef" data-id="school/withdrawal" hidden></span>
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
 
 <style>
   .bg-info-subtle { background-color: #cff4fc !important; }

@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl, 
   newLabel,
@@ -11,7 +11,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search periods...',
   fields: [
       { name: 'status', label: 'Status', type: 'select', options: ['open', 'locked', 'processed'] }
@@ -61,10 +61,10 @@
 
 <span id="urlRef" data-id="<%= newUrl %>" hidden></span>
 
-<%- include('../../partials/pagination', { 
+<%- include('partials/pagination', { 
     pagination, 
     filters, 
     baseUrlPath: newUrl 
 }) %>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>

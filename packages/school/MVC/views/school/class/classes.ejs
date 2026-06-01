@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title: 'Class Management',
   newUrl: 'school/classes', 
   newLabel: 'New Class',
@@ -16,7 +16,7 @@
 
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search classes...',
   fields: []
 }) %>
@@ -154,10 +154,10 @@
 
 <span id="urlRef" data-id="school/classes" hidden></span>
 
-<%- include('../../partials/pagination', { 
+<%- include('partials/pagination', { 
     pagination: pagination, 
     filters: filters, 
     baseUrlPath: 'school/classes' 
 }) %>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>

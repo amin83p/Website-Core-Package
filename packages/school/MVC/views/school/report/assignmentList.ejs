@@ -9,7 +9,7 @@
   const totalMatchedRows = Number(pagination?.totalItems ?? (Array.isArray(data) ? data.length : 0));
 %>
 
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -74,7 +74,7 @@
   </div>
 </div>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search assignments...',
   fields: []
 }) %>
@@ -183,9 +183,9 @@
 </div>
 
 <span id="urlRef" data-id="<%= newUrl %>" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
-<%- include('../../partials/tablePages-end') %>
-<%- include('../../partials/modal_GenericPicker') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
+<%- include('partials/tablePages-end') %>
+<%- include('partials/modal_GenericPicker') %>
 
 <script>
   (function () {

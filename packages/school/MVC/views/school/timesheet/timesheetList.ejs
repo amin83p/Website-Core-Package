@@ -4,7 +4,7 @@
   if (!yearOptions.includes(selectedYear)) yearOptions.unshift(selectedYear);
 %>
 
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title: title, 
   newUrl, 
   newLabel, 
@@ -67,7 +67,7 @@
     </div>
 <% } %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search periods...',
   fields: [
       { name: 'tsStatus', label: 'Timesheet Status', type: 'select', options: ['not_started', 'draft', 'submitted', 'processed'] }
@@ -131,14 +131,14 @@
 
 <span id="urlRef" data-id="school/timesheets/my-timesheets" hidden></span>
 
-<%- include('../../partials/pagination', { 
+<%- include('partials/pagination', { 
     pagination, 
     filters, 
     baseUrlPath: 'school/timesheets/my-timesheets' 
 }) %>
 
-<%- include('../../partials/tablePages-end') %>
-<%- include('../../partials/modal_GenericPicker') %>
+<%- include('partials/tablePages-end') %>
+<%- include('partials/modal_GenericPicker') %>
 
 <script>
 function filterTimesheets() {

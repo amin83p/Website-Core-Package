@@ -88,7 +88,7 @@
 %>
 
 <div class="rolling-enrollment-page">
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title: 'Rolling Enrollment',
   newUrl: '',
   user,
@@ -101,7 +101,7 @@
   optionalBtnsBeforePrint: rollingOptionalBtnsBeforePrint
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search enrollment periods...',
   fields: []
 }) %>
@@ -129,7 +129,7 @@
     </table>
   </div>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
 </div>
 
 <div class="modal fade" id="addEnrollmentPeriodModal" tabindex="-1" aria-labelledby="addEnrollmentPeriodModalLabel" aria-hidden="true">
@@ -474,7 +474,7 @@
   </div>
 </div>
 
-<%- include('../../partials/modal_GenericPicker') %>
+<%- include('partials/modal_GenericPicker') %>
 
 <script>
 (() => {

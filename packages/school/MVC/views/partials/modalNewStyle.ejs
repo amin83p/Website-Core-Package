@@ -1,0 +1,236 @@
+<!-- GLOBAL MESSAGE MODAL -->
+<div class="modal fade" id="messageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header d-flex align-items-center">
+        <i id="messageModalIcon" class="bi"></i>
+        <h5 class="modal-title" id="messageModalTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="messageModalBody"></div>
+      <div class="modal-footer justify-content-end" id="messageModalButtons"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================================================
+//  PRIORITY MESSAGE MODAL (FREEZES OTHER MODALS)
+// ======================================================
+window.showMessageModal = function({ title = "", icon = null, message = "", size = "md", buttons = [], redirecting = null } = {}) {
+  return new Promise((resolve) => {
+
+    const modalEl = document.getElementById("messageModal");
+    if (!modalEl) {
+      console.error("❌ messageModal not found");
+      resolve("Error: Modal element missing");
+      return;
+    }
+
+    try {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+    } catch (_) {}
+
+    // 1. GET OR CREATE INSTANCE (Singleton Pattern)
+    // This prevents creating duplicate backdrops if called multiple times
+    let bsModal = bootstrap.Modal.getInstance(modalEl);
+    if (!bsModal) {
+      bsModal = new bootstrap.Modal(modalEl, { backdrop: "static", keyboard: false });
+    }
+
+    // Elements
+    const titleEl = document.getElementById("messageModalTitle");
+    const iconEl = document.getElementById("messageModalIcon");
+    const bodyEl = document.getElementById("messageModalBody");
+    const footerEl = document.getElementById("messageModalButtons");
+    const dialog = modalEl.querySelector(".modal-dialog");
+    const headerEl = modalEl.querySelector(".modal-header");
+
+    if (modalEl.__messageModalKeydownHandler) {
+      modalEl.removeEventListener('keydown', modalEl.__messageModalKeydownHandler);
+      delete modalEl.__messageModalKeydownHandler;
+    }
+
+    if (!titleEl || !iconEl || !bodyEl || !footerEl || !dialog) {
+      console.error("❌ Missing modal sub-elements");
+      resolve("Error: Incomplete modal structure");
+      return;
+    }
+
+    // Reset state
+    titleEl.textContent = "";
+    bodyEl.innerHTML = "";
+    footerEl.innerHTML = "";
+    iconEl.className = "bi";
+    headerEl.className = "modal-header d-flex align-items-center";
+
+    // Modal size
+    dialog.className = "modal-dialog modal-dialog-centered";
+    if (["sm", "lg"].includes(size)) dialog.classList.add(`modal-${size}`);
+
+    // Set title and text
+    titleEl.textContent = title;
+    bodyEl.innerHTML = message;
+
+    // Icon styling
+    if (icon) {
+      const iconMap = {
+        info: "bi-info-circle text-info",
+        success: "bi-check-circle text-success",
+        warning: "bi-exclamation-triangle text-warning",
+        error: "bi-x-circle text-danger",
+      };
+      const cls = iconMap[icon];
+      if (cls) {
+        iconEl.className = "bi " + cls;
+        headerEl.classList.add(cls.split(" ")[1]);
+      }
+    }
+
+    // Create buttons (unless redirect)
+    if (!redirecting) {
+      if (buttons.length === 0) {
+          buttons.push({ text: 'OK', class: 'btn-primary' });
+      }
+
+      buttons.forEach((btn) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.dataset.noWait = "true";
+        b.textContent = btn.text;
+        b.className = "btn " + (btn.class || "btn-primary") + " btn-filled";
+        b.addEventListener("click", () => {
+              const resultValue = btn.text; 
+              // Store result to retrieve in hidden handler
+              modalEl.dataset.resolveValue = resultValue; 
+              bsModal.hide(); 
+        });
+        footerEl.appendChild(b);
+      });
+
+      const actionButtons = Array.from(footerEl.querySelectorAll('button'));
+      let focusedButtonIndex = 0;
+
+      const focusButtonAt = (nextIndex) => {
+        if (!actionButtons.length) return;
+        const total = actionButtons.length;
+        focusedButtonIndex = ((Number(nextIndex) % total) + total) % total;
+        const button = actionButtons[focusedButtonIndex];
+        if (button && typeof button.focus === 'function') {
+          button.focus({ preventScroll: true });
+        }
+      };
+
+      const keydownHandler = (event) => {
+        if (!actionButtons.length) return;
+        const key = String(event.key || '');
+        if (key === 'ArrowRight' || key === 'ArrowDown') {
+          event.preventDefault();
+          focusButtonAt(focusedButtonIndex + 1);
+          return;
+        }
+        if (key === 'ArrowLeft' || key === 'ArrowUp') {
+          event.preventDefault();
+          focusButtonAt(focusedButtonIndex - 1);
+          return;
+        }
+        if (key === 'Enter' || key === ' ') {
+          event.preventDefault();
+          const activeEl = document.activeElement;
+          if (activeEl && actionButtons.includes(activeEl)) {
+            activeEl.click();
+            return;
+          }
+          const fallbackButton = actionButtons[focusedButtonIndex] || actionButtons[0];
+          if (fallbackButton) fallbackButton.click();
+        }
+      };
+
+      modalEl.__messageModalKeydownHandler = keydownHandler;
+      modalEl.addEventListener('keydown', keydownHandler);
+      modalEl.addEventListener('shown.bs.modal', () => focusButtonAt(0), { once: true });
+    }
+
+    // Freeze UI when showing
+    const freezeUI = () => {
+      document.querySelectorAll(".modal.show").forEach(m => {
+        if (m.id !== "messageModal") {
+          m.classList.add("freeze-ui");
+        }
+      });
+      document.body.style.pointerEvents = "none";
+      modalEl.style.pointerEvents = "auto";
+    };
+
+    // Restore UI when closing
+    const cleanup = () => {
+      if (modalEl.__messageModalKeydownHandler) {
+        modalEl.removeEventListener('keydown', modalEl.__messageModalKeydownHandler);
+        delete modalEl.__messageModalKeydownHandler;
+      }
+      document.querySelectorAll(".freeze-ui").forEach(m => m.classList.remove("freeze-ui"));
+      document.body.style.pointerEvents = "";
+
+      // ✅ FIX: Force removal of stuck backdrops
+      // If we are closing this modal, and no others are open, ensure screen is clear.
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      if (backdrops.length > 0) {
+          const anyOpen = document.querySelector('.modal.show');
+          if (!anyOpen) {
+              backdrops.forEach(bd => bd.remove());
+              document.body.classList.remove('modal-open');
+              document.body.style.paddingRight = '';
+              document.body.style.overflow = '';
+          }
+      }
+    };
+
+    // On modal close restore UI
+    // Remove old listeners to prevent stacking
+    const handleHidden = () => {
+        cleanup();
+        const resolveValue = modalEl.dataset.resolveValue || "closed"; 
+        delete modalEl.dataset.resolveValue; 
+        resolve(resolveValue);
+    };
+
+    // Use { once: true } to auto-remove, but we also ensure no duplicates
+    modalEl.addEventListener("hidden.bs.modal", handleHidden, { once: true });
+
+    // Show modal
+    try {
+      bsModal.show();
+      freezeUI();
+    } catch (e) {
+      cleanup();
+      resolve("Error: show failed");
+      return;
+    }
+
+    // Handle redirect mode
+    if (typeof redirecting === "string" && redirecting.trim() !== "") {
+      setTimeout(() => {
+        cleanup();
+        bsModal.hide();
+      }, 2000);
+
+      modalEl.addEventListener(
+        "hidden.bs.modal",
+        () => {
+          window.location.href = redirecting;
+        },
+        { once: true }
+      );
+    }
+  });
+} 
+</script>
+
+<style>
+/* Freeze effect for underlying modals */
+.freeze-ui {
+    filter: blur(1px) grayscale(0.5);
+    pointer-events: none;
+    transition: filter 0.3s ease;
+}
+</style>

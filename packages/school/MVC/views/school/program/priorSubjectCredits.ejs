@@ -12,7 +12,7 @@
   ];
 %>
 
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title: 'Prior Subject Credits',
   newUrl: 'school/programs/prior-subject-credits',
   newLabel: null,
@@ -25,7 +25,7 @@
   optionalBtnsBeforePrint: priorOptionalBtnsBeforePrint
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search credits (student, program, subject, id)…',
   fields: [
     { name: 'status', label: 'Status', type: 'select', options: ['', 'active', 'revoked'] }
@@ -87,13 +87,13 @@
 <span id="urlRef" data-id="school/programs/prior-subject-credits" hidden></span>
 <input type="hidden" id="hid_actionStateId" value="<%= asid %>">
 
-<%- include('../../partials/pagination', {
+<%- include('partials/pagination', {
   pagination,
   filters,
   baseUrlPath: 'school/programs/prior-subject-credits'
 }) %>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
 
 <div class="modal fade" id="addPriorCreditModal" tabindex="-1" aria-labelledby="addPriorCreditModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -153,7 +153,7 @@
   </div>
 </div>
 
-<%- include('../../partials/modal_GenericPicker') %>
+<%- include('partials/modal_GenericPicker') %>
 
 <script>
 (function () {

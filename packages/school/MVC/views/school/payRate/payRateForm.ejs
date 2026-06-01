@@ -1,4 +1,4 @@
-﻿<%
+<%
   const r = rate || {};
   const isEditMode = (typeof isEdit !== 'undefined') ? !!isEdit : !!r.ownerId;
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
@@ -64,7 +64,7 @@
   </div>
 </div>
 
-<%- include('../../partials/modal_GenericPicker') %>
+<%- include('partials/modal_GenericPicker') %>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {

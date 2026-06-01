@@ -7,7 +7,7 @@
   }
   const reviewQs = reviewQsParts.length ? `?${reviewQsParts.join('&')}` : '';
 %>
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -24,7 +24,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search exams by name, class, status...',
   fields: []
 }) %>
@@ -151,9 +151,9 @@
 </div>
 
 <span id="urlRef" data-id="" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/exams/teacher-assignments' }) %>
-<%- include('../../partials/tablePages-end') %>
-<%- include('../../partials/modal_GenericPicker') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/exams/teacher-assignments' }) %>
+<%- include('partials/tablePages-end') %>
+<%- include('partials/modal_GenericPicker') %>
 
 <script>
   (function () {

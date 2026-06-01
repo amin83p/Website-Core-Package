@@ -1,0 +1,248 @@
+<!-- GLOBAL MESSAGE MODAL -->
+<div class="modal fade" id="messageModal" tabindex="-1" aria-hidden="true" style="z-index: 12000;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+      <div class="modal-header d-flex align-items-center border-bottom-0 pb-0">
+        <i id="messageModalIcon" class="bi me-2 fs-4"></i>
+        <h5 class="modal-title fw-bold" id="messageModalTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-4" id="messageModalBody"></div>
+      <div class="modal-footer border-top-0 pt-0" id="messageModalButtons"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================================================
+//  ROBUST MESSAGE MODAL (SINGLETON PATTERN)
+// ======================================================
+window.showMessageModal = function({ title = "", icon = null, message = "", size = "md", buttons = [], redirecting = null } = {}) {
+  return new Promise((resolve) => {
+
+    const modalEl = document.getElementById("messageModal");
+    if (!modalEl) {
+      console.error("❌ messageModal not found in DOM");
+      resolve("Error: Modal missing");
+      return;
+    }
+
+    // Ensure global loading modal is cleared before message modal.
+    try {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+    } catch (_) {}
+
+    // 1. GET OR CREATE INSTANCE
+    // We check if an instance already exists to avoid re-initializing
+    let bsModal = bootstrap.Modal.getInstance(modalEl);
+    if (!bsModal) {
+      bsModal = new bootstrap.Modal(modalEl, { backdrop: "static", keyboard: false });
+    }
+
+    // Elements
+    const titleEl = document.getElementById("messageModalTitle");
+    const iconEl = document.getElementById("messageModalIcon");
+    const bodyEl = document.getElementById("messageModalBody");
+    const footerEl = document.getElementById("messageModalButtons");
+    const dialog = modalEl.querySelector(".modal-dialog");
+    const headerEl = modalEl.querySelector(".modal-header");
+
+    if (modalEl.__messageModalKeydownHandler) {
+      modalEl.removeEventListener('keydown', modalEl.__messageModalKeydownHandler);
+      delete modalEl.__messageModalKeydownHandler;
+    }
+
+    // Reset Content
+    titleEl.textContent = title || "Notification";
+    bodyEl.innerHTML = message;
+    footerEl.innerHTML = "";
+    
+    // Reset Classes
+    dialog.className = "modal-dialog modal-dialog-centered";
+    if (size === "sm") dialog.classList.add("modal-sm");
+    if (size === "lg") dialog.classList.add("modal-lg");
+    
+    iconEl.className = "bi me-2 fs-4";
+    headerEl.className = "modal-header d-flex align-items-center border-bottom-0 pb-0";
+
+    // Icon Logic
+    if (icon) {
+      const iconMap = {
+        info: "bi-info-circle-fill text-info",
+        success: "bi-check-circle-fill text-success",
+        warning: "bi-exclamation-triangle-fill text-warning",
+        error: "bi-x-circle-fill text-danger",
+      };
+      const cls = iconMap[icon] || "bi-info-circle text-secondary";
+      iconEl.className = `bi me-2 fs-4 ${cls}`;
+    } else {
+      iconEl.style.display = 'none';
+    }
+
+    // 2. CLEANUP HANDLER (Runs once per show)
+    const handleHidden = () => {
+        if (modalEl.__messageModalKeydownHandler) {
+          modalEl.removeEventListener('keydown', modalEl.__messageModalKeydownHandler);
+          delete modalEl.__messageModalKeydownHandler;
+        }
+
+        // Resolve Promise
+        const resolveValue = modalEl.dataset.resolveValue || "closed";
+        delete modalEl.dataset.resolveValue;
+        
+        // Force cleanup of any lingering backdrops
+        // This fixes the "Dark Screen" issue on pages with multiple modals
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        if (backdrops.length > 0) {
+            // Check if any OTHER modal is actually open
+            const anyOpen = document.querySelector('.modal.show');
+            if (!anyOpen) {
+                backdrops.forEach(bd => bd.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.paddingRight = '';
+                document.body.style.overflow = '';
+            }
+        }
+
+        resolve(resolveValue);
+    };
+
+    modalEl.removeEventListener('hidden.bs.modal', handleHidden); // Safety removal
+    modalEl.addEventListener('hidden.bs.modal', handleHidden, { once: true });
+
+    // 3. BUTTONS
+    if (!redirecting) {
+      if (buttons.length === 0) {
+          buttons.push({ text: 'OK', class: 'btn-primary' });
+      }
+      
+      buttons.forEach((btn) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.dataset.noWait = "true";
+        b.textContent = btn.text;
+        b.className = "btn " + (btn.class || "btn-primary") + " btn-filled btn-sm px-4";
+        b.style.borderRadius = "20px";
+        
+        b.addEventListener("click", () => {
+            modalEl.dataset.resolveValue = btn.text; // Store result
+            bsModal.hide(); // Trigger hidden.bs.modal
+        });
+        footerEl.appendChild(b);
+      });
+
+      const actionButtons = Array.from(footerEl.querySelectorAll('button'));
+      let focusedButtonIndex = 0;
+
+      const focusButtonAt = (nextIndex) => {
+        if (!actionButtons.length) return;
+        const total = actionButtons.length;
+        focusedButtonIndex = ((Number(nextIndex) % total) + total) % total;
+        const button = actionButtons[focusedButtonIndex];
+        if (button && typeof button.focus === 'function') {
+          button.focus({ preventScroll: true });
+        }
+      };
+
+      const keydownHandler = (event) => {
+        if (!actionButtons.length) return;
+        const key = String(event.key || '');
+        if (key === 'ArrowRight' || key === 'ArrowDown') {
+          event.preventDefault();
+          focusButtonAt(focusedButtonIndex + 1);
+          return;
+        }
+        if (key === 'ArrowLeft' || key === 'ArrowUp') {
+          event.preventDefault();
+          focusButtonAt(focusedButtonIndex - 1);
+          return;
+        }
+        if (key === 'Enter' || key === ' ') {
+          event.preventDefault();
+          const activeEl = document.activeElement;
+          if (activeEl && actionButtons.includes(activeEl)) {
+            activeEl.click();
+            return;
+          }
+          const fallbackButton = actionButtons[focusedButtonIndex] || actionButtons[0];
+          if (fallbackButton) fallbackButton.click();
+        }
+      };
+
+      modalEl.__messageModalKeydownHandler = keydownHandler;
+      modalEl.addEventListener('keydown', keydownHandler);
+      modalEl.addEventListener('shown.bs.modal', () => focusButtonAt(0), { once: true });
+    }
+
+    bsModal.show();
+
+    // Handle Redirect
+    if (redirecting) {
+      setTimeout(() => {
+        bsModal.hide();
+        window.location.href = redirecting;
+      }, 2000);
+    }
+  });
+};
+
+window.handleGuardedApiPayload = async function(payload, options = {}) {
+  const state = String(payload?.idempotency?.state || '').trim().toLowerCase();
+  if (!state) return { handled: false, state: '' };
+
+  const busyTitle = String(options.busyTitle || 'Please Wait').trim() || 'Please Wait';
+  const replayTitle = String(options.replayTitle || 'Already Processed').trim() || 'Already Processed';
+  const fallbackBusyMessage = 'This operation is already in progress. Please wait a moment and try again.';
+  const fallbackReplayMessage = 'This operation was already completed.';
+
+  if (state === 'busy') {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title: busyTitle,
+        icon: 'warning',
+        message: String(payload?.message || fallbackBusyMessage),
+        buttons: [{ text: 'OK', class: 'btn-warning' }]
+      });
+    }
+    return { handled: true, state };
+  }
+
+  if (state === 'replayed') {
+    if (typeof window.showMessageModal === 'function') {
+      await window.showMessageModal({
+        title: replayTitle,
+        icon: 'info',
+        message: String(payload?.message || fallbackReplayMessage),
+        buttons: [{ text: 'OK', class: 'btn-info text-dark' }]
+      });
+    }
+    return { handled: true, state };
+  }
+
+  return { handled: false, state };
+};
+
+window.applyGuardedApiResult = async function(result, options = {}) {
+  if (!result || typeof result !== 'object') {
+    return { result, stop: false, state: '' };
+  }
+
+  const idempotencyState = String(result?.idempotency?.state || '').trim().toLowerCase();
+  if (!idempotencyState || typeof window.handleGuardedApiPayload !== 'function') {
+    return { result, stop: false, state: idempotencyState };
+  }
+
+  const guardResult = await window.handleGuardedApiPayload(result, options);
+  const state = String(guardResult?.state || idempotencyState || '').trim().toLowerCase();
+  if (state === 'busy') {
+    return { result, stop: true, state };
+  }
+  if (state === 'replayed') {
+    if (String(result.status || '').trim().toLowerCase() === 'error') {
+      result.status = 'success';
+    }
+    return { result, stop: false, state };
+  }
+  return { result, stop: false, state };
+};
+</script>

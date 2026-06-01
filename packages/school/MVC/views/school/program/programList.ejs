@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel: (newLabel || 'New Program'),
@@ -12,7 +12,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search programs...',
   fields: [
     { name: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'inactive', 'archived'] }
@@ -72,5 +72,5 @@
 </div>
 
 <span id="urlRef" data-id="school/programs" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/programs' }) %>
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/programs' }) %>
+<%- include('partials/tablePages-end') %>

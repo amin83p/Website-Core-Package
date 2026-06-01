@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl: 'school/teachers/archived',
   newLabel: 'Recover Teacher',
@@ -11,7 +11,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search archived teachers...',
   fields: [
     { name: 'employmentType', label: 'Employment', type: 'select', options: ['Full-Time', 'Part-Time', 'Contract', 'Sessional', 'Substitute'] }
@@ -60,8 +60,8 @@
 
 <span id="urlRef" data-id="school/teachers/archived" hidden></span>
 <span id="actionStateRef" data-id="<%= actionStateId || '' %>" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/teachers/archived' }) %>
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/teachers/archived' }) %>
+<%- include('partials/tablePages-end') %>
 
 <script>
 (function () {

@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl: (typeof newUrl !== 'undefined' ? newUrl : null),
   newLabel,
@@ -16,7 +16,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search allocations...',
   fields: []
 }) %>
@@ -119,9 +119,9 @@
 </div>
 
 <span id="urlRef" data-id="<%= (typeof newUrl !== 'undefined' ? newUrl : '') %>" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/exams/allocations' }) %>
-<%- include('../../partials/tablePages-end') %>
-<%- include('../../partials/modal_GenericPicker') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/exams/allocations' }) %>
+<%- include('partials/tablePages-end') %>
+<%- include('partials/modal_GenericPicker') %>
 
 <script>
   (function () {

@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -15,7 +15,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search accounts...',
   fields: [
     { name: 'type', label: 'Type', type: 'select', options: ['asset', 'liability', 'equity', 'income', 'expense'] },
@@ -93,8 +93,8 @@
 </div>
 
 <span id="urlRef" data-id="school/accounts" hidden></span>
-<%- include('../../partials/pagination', { pagination, filters, baseUrlPath: 'school/accounts' }) %>
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: 'school/accounts' }) %>
+<%- include('partials/tablePages-end') %>
 
 <script>
   (function () {

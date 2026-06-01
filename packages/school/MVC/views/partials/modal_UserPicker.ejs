@@ -1,0 +1,212 @@
+<%
+  // 1. Resolve Active Organization Name
+  // We look into the user's allowedOrgs list to find the name corresponding to activeOrgId
+  let activeOrgName = 'System / Global';
+  if (user && user.activeOrgId && user.allowedOrgs) {
+    const orgObj = user.allowedOrgs.find(o => String(o.orgId) === String(user.activeOrgId));
+    if (orgObj) {
+      activeOrgName = orgObj.name || ('Org #' + orgObj.orgId);
+    }
+  }
+%>
+
+<!-- User Picker Modal -->
+<div class="modal fade" id="userPickerModal" tabindex="-1" aria-hidden="true">
+  <!-- 'modal-lg' makes it wider. Added style for specific width control -->
+  <div class="modal-dialog modal-dialog-centered modal-lg" style="max-width: 700px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+      
+      <!-- Header -->
+      <div class="modal-header border-bottom-0 pb-0 bg-white">
+        <h5 class="modal-title fw-bold text-primary">
+          <i class="bi bi-person-lines-fill me-2"></i>Select User
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body pt-2">
+        
+        <!-- Organization Context Hero -->
+        <div class="alert alert-light border shadow-sm d-flex align-items-center p-3 mb-4 rounded-3">
+          <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center me-3" 
+               style="width: 48px; height: 48px; min-width: 48px;">
+            <i class="bi bi-building fs-4"></i>
+          </div>
+          <div>
+            <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">Active Organization Scope</div>
+            <div class="fw-bold fs-5 text-dark"><%= activeOrgName %></div>
+          </div>
+        </div>
+
+        <!-- Search Controls -->
+        <div class="row g-3 align-items-center mb-3">
+          <div class="col-md-8">
+            <div class="position-relative">
+              <i class="bi bi-search position-absolute text-muted" style="left: 14px; top: 12px; font-size: 1.1rem;"></i>
+              <input type="text" id="userPickerSearch" class="form-control form-control-lg ps-5 border-2" 
+                     placeholder="Search by name, email, or ID..." autocomplete="off">
+            </div>
+          </div>
+          
+          <!-- Search Options -->
+          <div class="col-md-4">
+            <div class="form-check form-switch p-2 border rounded bg-light d-flex align-items-center gap-2 mb-0">
+              <input class="form-check-input ms-0" type="checkbox" id="searchMatchAny" checked style="cursor: pointer;">
+              <label class="form-check-label small fw-bold text-secondary cursor-pointer" for="searchMatchAny" style="cursor: pointer;">
+                Partial Match (Contains)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results List -->
+        <div class="list-group list-group-flush overflow-auto border rounded-3" id="userPickerResults" style="max-height: 350px; min-height: 100px; background-color: #f8f9fa;">
+          <div class="text-center text-muted py-5">
+            <i class="bi bi-search fs-1 opacity-25 mb-2 d-block"></i>
+            Type to search users...
+          </div>
+        </div>
+
+      </div>
+      
+      <div class="modal-footer bg-light border-top-0 py-2">
+        <small class="text-muted fst-italic me-auto">Showing top 20 matches</small>
+        <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const modalEl = document.getElementById('userPickerModal');
+  const input = document.getElementById('userPickerSearch');
+  const list = document.getElementById('userPickerResults');
+  const matchAnyCheckbox = document.getElementById('searchMatchAny');
+  let debounceTimer;
+
+  // Auto-focus input on open
+  modalEl.addEventListener('shown.bs.modal', () => {
+    input.focus();
+  });
+
+  // Re-trigger search when checkbox changes
+  matchAnyCheckbox.addEventListener('change', () => {
+    const term = input.value.trim();
+    if(term) fetchUsers(term);
+  });
+
+  input.addEventListener('input', (e) => {
+    const term = e.target.value.trim();
+    
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      fetchUsers(term);
+    }, 300); 
+  });
+
+  async function fetchUsers(term) {
+    if (term.length < 2) {
+      list.innerHTML = `
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-keyboard fs-1 opacity-25 mb-2 d-block"></i>
+          Type at least 2 characters...
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = `
+      <div class="text-center text-primary py-5">
+        <div class="spinner-border mb-2" role="status"></div>
+        <div>Searching...</div>
+      </div>`;
+
+    try {
+      // Determine search mode
+      const searchType = matchAnyCheckbox.checked ? 'contains' : 'starts_with';
+      
+      //const res = await fetch(`/users/api/search?q=${encodeURIComponent(term)}&type=${searchType}`);
+
+      const res = await fetch(`/users/api/search?q=${encodeURIComponent(term)}&type=${searchType}`, {
+        method: 'GET',
+        headers: {
+          'X-AJAX-Request': 'true'
+        }
+      });
+
+      const data = await res.json();
+
+      if (data.status === 'success') {
+        renderResults(data.results || []);
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      list.innerHTML = `
+        <div class="text-center text-danger py-5">
+          <i class="bi bi-exclamation-circle fs-1 opacity-25 mb-2 d-block"></i>
+          Error fetching users.
+        </div>`;
+    }
+  }
+
+  function renderResults(users) {
+    list.innerHTML = '';
+    if (users.length === 0) {
+      list.innerHTML = `
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-person-x fs-1 opacity-25 mb-2 d-block"></i>
+          No users found.
+        </div>`;
+      return;
+    }
+
+    users.forEach(u => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center px-4 py-3 border-bottom';
+      
+      // Status Badge Color Logic
+      let badgeClass = 'bg-secondary';
+      if (u.status === 'active') badgeClass = 'bg-success';
+      if (u.status === 'pending') badgeClass = 'bg-warning text-dark';
+      if (u.status === 'suspended') badgeClass = 'bg-danger';
+
+      item.innerHTML = `
+        <div class="d-flex align-items-center">
+          <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center me-3 fw-bold text-primary shadow-sm" 
+               style="width: 40px; height: 40px; font-size: 1.1rem;">
+            ${(u.name || '?').charAt(0).toUpperCase()}
+          </div>
+          <div class="text-start">
+            <div class="fw-bold text-dark">${u.name}</div>
+            <div class="text-muted small">
+              <i class="bi bi-envelope me-1"></i> ${u.email}
+              <span class="ms-2 border-start ps-2 text-secondary">ID: ${u.id}</span>
+            </div>
+          </div>
+        </div>
+        <span class="badge ${badgeClass} rounded-pill px-3 py-2 shadow-sm text-uppercase" style="font-size: 0.7rem;">
+          ${u.status}
+        </span>
+      `;
+
+      item.onclick = () => {
+        selectUser(u);
+      };
+
+      list.appendChild(item);
+    });
+  }
+
+  function selectUser(user) {
+    if (typeof onUserSelected === 'function') {
+      onUserSelected(user);
+    }
+    const bsModal = bootstrap.Modal.getInstance(modalEl);
+    bsModal.hide();
+  }
+});
+</script>

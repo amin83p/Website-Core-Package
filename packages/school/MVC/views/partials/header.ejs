@@ -1,0 +1,535 @@
+<header id="main-header">
+    <script>
+      (function () {
+        try {
+          if (!document.documentElement.classList.contains('header-pref-compact')) return;
+          const headerRoot = document.getElementById('main-header');
+          if (headerRoot) headerRoot.classList.add('header-minimized');
+          if (document.body) document.body.classList.add('header-layout-compact');
+        } catch (_) {}
+      })();
+    </script>
+    
+    <% 
+       const warnings = (typeof user !== 'undefined' && user && user.siteWarnings) ? 
+       user.siteWarnings : (typeof siteWarnings !== 'undefined' ? siteWarnings : []);
+       const displayName = (typeof user !== 'undefined' && user) ? (user.name || user.username || 'U') : 'U';
+       const avatarInitial = String(displayName || 'U').charAt(0).toUpperCase();
+       const headerAvatarUrl = (typeof user !== 'undefined' && user)
+         ? String(user.personAvatarUrl || user.userAvatarUrl || user.avatarUrl || user.avatar || '').trim()
+         : '';
+       const cleanNamePart = (value) => String(value || '').trim();
+       const firstToken = (value) => {
+         const token = cleanNamePart(value);
+         if (!token) return '';
+         return token.split(/\s+/).filter(Boolean)[0] || '';
+       };
+       const headerPreferredName = (typeof user !== 'undefined' && user)
+         ? cleanNamePart((user.name && typeof user.name === 'object' ? user.name.preferred : '') || user.preferredName || '')
+         : '';
+       const headerFirstName = (typeof user !== 'undefined' && user)
+         ? cleanNamePart((user.name && typeof user.name === 'object' ? user.name.first : '') || user.firstName || '')
+         : '';
+       const headerStringNameFirst = (typeof user !== 'undefined' && user)
+         ? firstToken(typeof user.name === 'string' ? user.name : '')
+         : '';
+       const headerDisplayNameFirst = (typeof user !== 'undefined' && user)
+         ? firstToken(user.displayName || (user.identity && user.identity.displayName) || '')
+         : '';
+       const headerUsernameFirst = (typeof user !== 'undefined' && user)
+         ? firstToken(user.username || '')
+         : '';
+       const headerShortName = headerPreferredName || headerFirstName || headerStringNameFirst || headerDisplayNameFirst || headerUsernameFirst || firstToken(displayName) || 'U';
+       const headerBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
+       const headerLogoUrl = headerBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
+       const headerLogoAlt = (headerBrand.appName || headerBrand.ownerDisplayName || 'Amin Paknejad') + ' Logo';
+       const headerTagline = headerBrand.tagline || 'Learn, work, and thrive in new places.';
+       const headerShowBuyMeACoffee = headerBrand.headerShowBuyMeACoffee !== false;
+       const headerBuyMeACoffeeUrl = String(headerBrand.headerBuyMeACoffeeUrl || 'https://www.buymeacoffee.com/paknejad').trim();
+       const headerBuyMeACoffeeLabel = String(headerBrand.headerBuyMeACoffeeLabel || 'Support').trim();
+       const headerBuyMeACoffeeText = String(headerBrand.headerBuyMeACoffeeText || 'Buy me a coffee').trim();
+       const headerBuyMeACoffeeTitle = String(headerBrand.headerBuyMeACoffeeTitle || 'Support the work - one coffee at a time.').trim();
+       const headerChatAccess = (typeof chatAccess !== 'undefined' && chatAccess && typeof chatAccess === 'object') ? chatAccess : {};
+       const canUseHeaderChat = !!(headerChatAccess.canRead || headerChatAccess.canReadAll);
+       const headerFallbackPublicMenu = [
+         { label: 'Home', href: '/', icon: 'bi-house', target: '_self', children: [] },
+         { label: 'Projects', href: '/whatIOffer', icon: 'bi-stars', target: '_self', children: [] },
+         { label: 'News', href: '/news', icon: 'bi-newspaper', target: '_self', children: [] },
+         { label: 'Biography', href: '/biography', icon: 'bi-person-badge', target: '_self', children: [] },
+         { label: 'Contact', href: '/contact', icon: 'bi-envelope', target: '_self', children: [] },
+         { label: 'About', href: '/about', icon: 'bi-info-circle', target: '_self', children: [] },
+         ...((typeof user !== 'undefined' && user) ? [] : [{ label: 'Sign In', href: '/login', icon: 'bi-box-arrow-in-right', target: '_self', children: [] }])
+       ];
+       const headerPublicMenuSource = (typeof publicMenu !== 'undefined' && Array.isArray(publicMenu) && publicMenu.length) ? publicMenu : headerFallbackPublicMenu;
+       const headerNormalizeProjectsMenu = (items) => (Array.isArray(items) ? items : []).map((item) => {
+         const next = { ...(item || {}) };
+         if (String(next.href || '').trim() === '/whatIOffer') {
+           next.label = 'Projects';
+         }
+         next.children = headerNormalizeProjectsMenu(next.children);
+         return next;
+       });
+       const headerPublicMenu = headerNormalizeProjectsMenu(headerPublicMenuSource);
+       const headerEscapeHtml = (value) => String(value ?? '')
+         .replace(/&/g, '&amp;')
+         .replace(/</g, '&lt;')
+         .replace(/>/g, '&gt;')
+         .replace(/"/g, '&quot;')
+         .replace(/'/g, '&#39;');
+       const headerTargetAttrs = (item) => item && item.target === '_blank' ? ' target="_blank" rel="noopener noreferrer"' : '';
+       const headerMenuIcon = (item) => item && item.icon ? `<i class="bi ${headerEscapeHtml(item.icon)} me-2"></i>` : '';
+       const headerMenuLabel = (item) => headerEscapeHtml(item && item.label ? item.label : 'Menu Item');
+       const headerHasMenuHref = (item) => Boolean(item && String(item.href || '').trim());
+       const headerMenuHref = (item) => headerEscapeHtml(item && item.href ? item.href : '');
+       const renderHeaderDropdownItems = (items) => (Array.isArray(items) ? items : []).map((item) => {
+         const children = Array.isArray(item.children) ? item.children : [];
+         const label = headerMenuLabel(item);
+         const href = headerMenuHref(item);
+         const hasHref = headerHasMenuHref(item);
+         const targetAttrs = headerTargetAttrs(item);
+         const icon = headerMenuIcon(item);
+         if (children.length) {
+           const openLink = hasHref
+             ? `<li><a class="dropdown-item py-2 fw-semibold" href="${href}"${targetAttrs}>${icon}Open ${label}</a></li><li><hr class="dropdown-divider my-1"></li>`
+             : '';
+           return `<li class="dropdown-submenu header-public-submenu">
+             <button class="dropdown-item py-2 d-flex align-items-center justify-content-between gap-2 header-public-submenu-toggle" type="button" aria-expanded="false" data-public-submenu-toggle="true">
+               <span>${icon}${label}</span><i class="bi bi-chevron-right small"></i>
+             </button>
+             <ul class="dropdown-menu shadow-lg border-0 py-2">
+               ${openLink}
+               ${renderHeaderDropdownItems(children)}
+             </ul>
+           </li>`;
+         }
+         if (!hasHref) return `<li><span class="dropdown-item py-2 text-muted">${icon}${label}</span></li>`;
+         return `<li><a class="dropdown-item py-2" href="${href}"${targetAttrs}>${icon}${label}</a></li>`;
+       }).join('');
+       const renderHeaderNavItems = (items) => (Array.isArray(items) ? items : []).map((item) => {
+         const children = Array.isArray(item.children) ? item.children : [];
+         const label = headerMenuLabel(item);
+         const href = headerMenuHref(item);
+         const hasHref = headerHasMenuHref(item);
+         const targetAttrs = headerTargetAttrs(item);
+         const icon = headerMenuIcon(item);
+         if (children.length) {
+           const openLink = hasHref
+             ? `<li><a class="dropdown-item py-2 fw-semibold" href="${href}"${targetAttrs}>${icon}Open ${label}</a></li><li><hr class="dropdown-divider my-1"></li>`
+             : '';
+           return `<li class="nav-item dropdown header-public-nav-dropdown">
+             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">${label}</a>
+             <ul class="dropdown-menu shadow-lg border-0 py-2">
+               ${openLink}
+               ${renderHeaderDropdownItems(children)}
+             </ul>
+           </li>`;
+         }
+         if (!hasHref) return `<li class="nav-item"><span class="nav-link disabled text-muted">${label}</span></li>`;
+         return `<li class="nav-item"><a class="nav-link" href="${href}"${targetAttrs}>${label}</a></li>`;
+       }).join('');
+    %>
+
+    <% if (warnings && warnings.length > 0) { %>
+        <div class="maintenance-banner-container d-flex flex-column">
+            <% warnings.forEach(msg => { %>
+                <div class="bg-warning text-dark text-center py-2 px-3 fw-bold border-bottom border-warning-subtle small d-flex align-items-center justify-content-center gap-2 shadow-sm" role="alert" style="position: relative; z-index: 1050;">
+                    <i class="bi bi-exclamation-triangle-fill fs-5 text-danger"></i>
+                    <span class="text-uppercase">ADMIN BYPASS ACTIVE:</span>
+                    <span class="fw-normal"><%= msg %></span>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+
+    <div class="header-content">
+        <div class="header-top-row">
+            <div class="logo-section">
+                <a href="/" class="text-decoration-none">
+                    <img src="<%= headerLogoUrl %>" alt="<%= headerLogoAlt %>" class="logo">
+                    <div class="tagline"><%= headerTagline %></div>
+                </a>
+            </div>
+
+            <div class="action-buttons d-flex align-items-center gap-2 <%= (typeof user !== 'undefined' && user !== null) ? 'action-buttons-auth' : 'action-buttons-guest' %>">
+                <div class="dropdown header-inline-menu-wrap">
+                    <button class="nav-pill-btn px-2 header-inline-menu-btn" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Menu">
+                        <i class="bi bi-list fs-4 text-secondary top-action-icon"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 py-2 header-inline-menu-dropdown">
+                        <%- renderHeaderDropdownItems(headerPublicMenu) %>
+                        <% if (typeof user !== 'undefined' && user !== null) { %>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li><a class="dropdown-item py-2" href="/dashboard">Dashboard</a></li>
+                        <% } %>
+                    </ul>
+                </div>
+
+                <% if (typeof user !== 'undefined' && user !== null) { %>
+                    <% if (canUseHeaderChat) { %>
+                        <ul class="navbar-nav flex-row">
+                            <li class="nav-item">
+                                <a class="nav-link position-relative px-2" href="#" data-bs-toggle="modal" data-bs-target="#chatInterfaceModal" id="chatGlobalTrigger" title="Messages (Alt+Shift+C)" aria-keyshortcuts="Alt+Shift+C">
+                                    <i class="bi bi-chat-dots-fill fs-4 text-secondary top-action-icon"></i>
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="chatGlobalBadge" style="font-size: 0.6rem; border: 2px solid #fff;">
+                                        0
+                                    </span>
+                                </a>
+                            </li>
+                        </ul>
+                    <% } %>
+                    
+                    <div class="position-relative d-flex align-items-center">
+                        <button id="headerStartMenuTrigger" class="nav-pill-btn px-2 search-btn" type="button" title="Start Menu (Alt+Shift+S)" aria-keyshortcuts="Alt+Shift+S" data-bs-toggle="modal" data-bs-target="#startMenuModal" style="position: relative; z-index: 11;">
+                            <i class="bi bi-windows text-secondary fs-5 top-action-icon"></i>
+                        </button>
+                    </div>
+
+                    <a id="headerDashboardTrigger" class="nav-pill-btn px-2" href="/dashboard" title="Dashboard (Alt+Shift+D)" aria-keyshortcuts="Alt+Shift+D">
+                         <i class="bi bi-grid-3x3-gap-fill fs-4 text-secondary top-action-icon"></i>
+                    </a>
+
+                    <div class="vr mx-1 text-muted opacity-25" style="height: 32px;"></div>
+
+                    <div class="dropdown">
+                        <button class="d-flex align-items-center gap-2 border-0 bg-transparent p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <div class="text-end d-none d-md-block" style="line-height: 1.2;">
+                                <div class="fw-bold text-dark small text-truncate" style="max-width: 120px;"><%= headerShortName %></div>
+                                <div class="text-muted x-small visually-hidden">ID: <%= user.id %></div>
+                            </div>
+                            <% if (headerAvatarUrl) { %>
+                                <img src="<%= headerAvatarUrl %>" alt="<%= displayName %>" class="rounded-circle border border-2 border-white shadow-sm header-avatar" style="width: 42px; height: 42px; object-fit: cover;">
+                            <% } else { %>
+                                <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center text-secondary fw-bold border border-2 border-white shadow-sm header-avatar" style="width: 42px; height: 42px; font-size: 1.1rem;">
+                                    <%= avatarInitial %>
+                                </div>
+                            <% } %>
+                        </button>
+
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-0" style="width: 300px; overflow: hidden;">
+                            <li class="px-3 py-3 bg-light border-bottom">
+                                <div class="fw-bold text-dark"><%= user.name || user.username %></div>
+                                <div class="small text-muted text-truncate"><%= user.email %></div>
+                                <div class="text-muted x-small">ID: <%= user.id %></div>
+                            </li>
+
+                            <li class="p-2">
+                                <h6 class="dropdown-header x-small text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Active Organization:</h6>
+                                <div class="px-2 mb-2">
+                                    <%- include('../partials/orgSwitcher') %>
+                                </div>
+
+                                <% if (user.canSwitchProfile) { %>
+                                    <% const isSystemMode = (user.currentProfileMode === 'SYSTEM'); %>
+                                    <div class="px-2">
+                                        <button type="button" id="profileModeSwitchBtn" 
+                                             class="btn btn-sm w-100 d-flex align-items-center justify-content-between border bg-white shadow-sm py-2 px-3"
+                                                onclick="event.stopPropagation(); toggleProfileMode('<%= isSystemMode ? 'LOCAL' : 'SYSTEM' %>')">
+                                              <div class="d-flex align-items-center overflow-hidden">
+                                                <i class="bi <%= isSystemMode ? 'bi-shield-lock-fill text-danger' : 'bi-person-badge-fill text-info' %> me-2"></i>
+                                                <span class="fw-bold text-dark text-truncate" style="font-size: 0.85rem; max-width: 180px;">
+                                                    <%= isSystemMode ? 'System Admin' : 'Local Member' %> 
+                                                </span>
+                                               </div>
+                                            <i class="bi bi-arrow-repeat text-muted ms-2"></i>
+                                        </button>
+                                     </div>
+                                <% } %>
+                            </li>
+                             
+                            <li><hr class="dropdown-divider m-0"></li>
+
+                            <li class="p-2">
+                                 <a class="dropdown-item rounded py-2" href="/profile/">
+                                    <i class="bi bi-person me-2 text-secondary"></i> My Profile
+                                </a>
+                                <a class="dropdown-item rounded py-2" href="/sessions/mysessions">
+                                    <i class="bi bi-laptop me-2 text-secondary"></i> My Sessions (Devices)
+                                </a>
+                            </li>
+
+	                            <li><hr class="dropdown-divider m-0"></li>
+
+	                            <% if (typeof buildVersionShort !== 'undefined' && buildVersionShort) { %>
+	                              <li class="px-2 py-1">
+	                                <div class="dropdown-item-text rounded py-2 px-2 small text-muted">
+	                                  <i class="bi bi-git me-2"></i>Build: <code><%= buildVersionShort %></code>
+	                                </div>
+	                              </li>
+	                              <li><hr class="dropdown-divider m-0"></li>
+	                            <% } %>
+
+	                            <li class="p-2">
+	                                 <a class="dropdown-item rounded py-2 text-danger fw-bold" href="/logout">
+	                                    <i class="bi bi-box-arrow-right me-2"></i> Sign Out
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                <% } %>
+                <% if (!(typeof user !== 'undefined' && user) && headerShowBuyMeACoffee && headerBuyMeACoffeeUrl) { %>
+
+
+                <a class="nav-pill-btn d-none d-xl-flex bmac-pill" href="<%= headerBuyMeACoffeeUrl %>"
+                   target="_blank" rel="noopener noreferrer"
+                   title="<%= headerBuyMeACoffeeTitle %>"
+                   aria-label="Buy me a coffee (opens in a new tab)">
+                    <span class="nav-pill-icon bmac-pill-icon">
+                        <i class="bi bi-cup-hot-fill"></i>
+                    </span>
+                    <span class="nav-pill-info">
+                        <span class="nav-pill-label"><%= headerBuyMeACoffeeLabel %></span>
+                        <span class="nav-pill-text"><%= headerBuyMeACoffeeText %></span>
+                    </span>
+                </a>
+                <% } %>
+
+                <button class="nav-pill-btn px-2 d-lg-none header-hamburger" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" title="Menu">
+                    <i class="bi bi-list fs-3 text-secondary top-action-icon"></i>
+                </button>
+             </div>
+        </div>
+        <div class="container-fluid header-nav-row">
+        <div class="row align-items-center mt-2">
+            <div class="col-12">
+            <nav class="navbar navbar-expand-lg mt-1 mt-lg-0 p-0">
+                <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav w-100 justify-content-lg-center gap-3">
+                    <%- renderHeaderNavItems(headerPublicMenu) %>
+                </ul>
+                </div>
+            </nav>
+            </div>
+        </div>
+        </div>
+        </div>
+
+        <div class="header-side-controls" aria-label="Header, organization, and display quick controls">
+            <button
+                type="button"
+                id="headerCompactToggle"
+                class="header-compact-toggle header-side-control-btn"
+                aria-label="Toggle compact header"
+                aria-pressed="false"
+                title="Minimize header"
+            >
+                <i class="bi bi-chevron-up" aria-hidden="true"></i>
+            </button>
+
+            <%
+                const headerAllowedOrgs = (typeof user !== 'undefined' && user && Array.isArray(user.allowedOrgs)) ? user.allowedOrgs : [];
+                const headerSwitchableOrgCount = headerAllowedOrgs.filter((org) => {
+                    const orgId = String(org?.orgId || '').trim();
+                    if (!orgId) return false;
+                    if (orgId === 'SYSTEM') return true;
+                    return org?.isSelectable !== false;
+                }).length;
+            %>
+            <% if (typeof user !== 'undefined' && user !== null && headerSwitchableOrgCount > 1) { %>
+                <button
+                    type="button"
+                    id="orgSwitchQuickButton"
+                    class="header-settings-toggle header-org-switch-toggle header-side-control-btn"
+                    aria-label="Open organization switcher"
+                    aria-keyshortcuts="Alt+Shift+O"
+                    data-bs-toggle="modal"
+                    data-bs-target="#orgSwitchModal"
+                    title="Switch Organization (Alt+Shift+O)"
+                >
+                    <i class="bi bi-diagram-3" aria-hidden="true"></i>
+                </button>
+            <% } %>
+
+            <button
+                type="button"
+                id="appSettingsModalToggle"
+                class="header-settings-toggle header-side-control-btn"
+                aria-label="Open display settings"
+                data-bs-toggle="modal"
+                data-bs-target="#appSettingsModal"
+                title="Display settings"
+            >
+                <i class="bi bi-gear-fill" aria-hidden="true"></i>
+            </button>
+        </div>
+    </header>
+
+    <style>
+      #main-header:not(.header-minimized) .header-nav-row,
+      #main-header:not(.header-minimized) .navbar,
+      #main-header:not(.header-minimized) .navbar-collapse,
+      #main-header:not(.header-minimized) .navbar-nav {
+        overflow: visible;
+      }
+
+      .header-public-nav-dropdown {
+        position: relative;
+      }
+
+      .header-public-nav-dropdown > .dropdown-menu {
+        left: 0;
+        margin-top: 0.35rem;
+        min-width: 15rem;
+        overflow: visible;
+        top: 100%;
+        z-index: 1065;
+      }
+
+      .header-public-submenu {
+        position: relative;
+      }
+
+      .header-public-submenu > .dropdown-menu {
+        display: none;
+        left: 100%;
+        margin-left: 0.1rem;
+        margin-top: -0.35rem;
+        min-width: 15rem;
+        overflow: visible;
+        position: absolute;
+        top: 0;
+        z-index: 1070;
+      }
+
+      .header-inline-menu-dropdown {
+        overflow: visible;
+      }
+
+      .header-public-submenu.is-open {
+        z-index: 1071;
+      }
+
+      .header-inline-menu-dropdown .header-public-submenu > .dropdown-menu {
+        left: auto;
+        margin-left: 0;
+        margin-right: 0.1rem;
+        right: 100%;
+      }
+
+      .header-public-submenu:hover > .dropdown-menu,
+      .header-public-submenu:focus-within > .dropdown-menu,
+      .header-public-submenu.is-open > .dropdown-menu,
+      .header-public-submenu > .dropdown-menu.show {
+        display: block;
+      }
+
+      .header-public-submenu-toggle {
+        min-width: 14rem;
+        text-align: left;
+        width: 100%;
+      }
+
+      .header-public-submenu.is-open > .header-public-submenu-toggle .bi-chevron-right {
+        transform: rotate(90deg);
+      }
+
+      .header-public-submenu-toggle .bi-chevron-right {
+        transition: transform 0.16s ease;
+      }
+
+      @media (max-width: 991.98px) {
+        .header-public-submenu > .dropdown-menu {
+          left: auto;
+          margin: 0.2rem 0 0.35rem 1rem;
+          position: static;
+          right: auto;
+        }
+
+        .header-public-submenu:hover > .dropdown-menu,
+        .header-public-submenu:focus-within > .dropdown-menu,
+        .header-public-submenu.is-open > .dropdown-menu,
+        .header-public-submenu > .dropdown-menu.show {
+          display: block;
+        }
+      }
+    </style>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.header-public-submenu-toggle').forEach((toggle) => {
+          toggle.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+
+            const submenu = toggle.closest('.header-public-submenu');
+            if (!submenu) return;
+            const wasOpen = submenu.classList.contains('is-open');
+
+            const siblingMenus = submenu.parentElement
+              ? Array.from(submenu.parentElement.children).filter((node) => node !== submenu)
+              : [];
+            siblingMenus.forEach((node) => {
+              if (!node.classList || !node.classList.contains('header-public-submenu')) return;
+              node.classList.remove('is-open');
+              Array.from(node.children || []).forEach((child) => {
+                if (child.classList && child.classList.contains('dropdown-menu')) child.classList.remove('show');
+              });
+              node.querySelectorAll('.header-public-submenu.is-open').forEach((child) => child.classList.remove('is-open'));
+              node.querySelectorAll('.header-public-submenu > .dropdown-menu.show').forEach((childMenu) => childMenu.classList.remove('show'));
+              node.querySelectorAll('.header-public-submenu-toggle[aria-expanded="true"]').forEach((childToggle) => childToggle.setAttribute('aria-expanded', 'false'));
+            });
+
+            submenu.classList.toggle('is-open', !wasOpen);
+            Array.from(submenu.children || []).forEach((child) => {
+              if (child.classList && child.classList.contains('dropdown-menu')) child.classList.toggle('show', !wasOpen);
+            });
+            toggle.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
+          });
+        });
+
+        document.querySelectorAll('.dropdown').forEach((dropdownRoot) => {
+          dropdownRoot.addEventListener('hidden.bs.dropdown', () => {
+            dropdownRoot.querySelectorAll('.header-public-submenu.is-open').forEach((submenu) => submenu.classList.remove('is-open'));
+            dropdownRoot.querySelectorAll('.header-public-submenu > .dropdown-menu.show').forEach((menu) => menu.classList.remove('show'));
+            dropdownRoot.querySelectorAll('.header-public-submenu-toggle[aria-expanded="true"]').forEach((toggle) => toggle.setAttribute('aria-expanded', 'false'));
+          });
+        });
+      });
+    </script>
+
+    <div class="modal fade" id="appSettingsModal" tabindex="-1" aria-labelledby="appSettingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <div class="modal-header bg-light border-bottom">
+                    <h5 class="modal-title fw-bold text-dark" id="appSettingsModalLabel">
+                        <i class="bi bi-gear-fill me-2"></i>Display Settings
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-3">
+                        Adjust display size and preview the effect instantly.
+                    </p>
+                    <div class="px-2 user-zoom-controls" id="appZoomMenuBlock">
+                        <h6 class="dropdown-header x-small text-uppercase fw-bold mb-2 px-0" style="font-size: 0.65rem;">Display Size</h6>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="range" class="form-range m-0 flex-grow-1" id="appZoomRange" min="80" max="130" step="5" value="100" aria-label="Display size slider">
+                            <div class="input-group input-group-sm app-zoom-number-wrap">
+                                <input type="number" class="form-control text-end" id="appZoomNumber" min="80" max="130" step="5" value="100" aria-label="Display size percent">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2 app-zoom-reset-btn" id="appZoomResetBtn">Reset</button>
+                        </div>
+                    </div>
+                    <hr class="dropdown-divider my-3">
+                    <div class="px-2 user-zoom-controls" id="appFontMenuBlock">
+                        <h6 class="dropdown-header x-small text-uppercase fw-bold mb-2 px-0" style="font-size: 0.65rem;">Font Scale</h6>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="range" class="form-range m-0 flex-grow-1" id="appFontRange" min="85" max="120" step="5" value="100" aria-label="Font scale slider">
+                            <div class="input-group input-group-sm app-zoom-number-wrap">
+                                <input type="number" class="form-control text-end" id="appFontNumber" min="85" max="120" step="5" value="100" aria-label="Font scale percent">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2 app-font-reset-btn" id="appFontResetBtn">Reset</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top-0 justify-content-end">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
