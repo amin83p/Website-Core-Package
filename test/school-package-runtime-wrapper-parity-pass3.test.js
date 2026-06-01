@@ -28,6 +28,11 @@ function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
+function readOwnershipRegistry() {
+  const registryPath = path.join(ROOT_DIR, 'test/school-package-ownership-registry.json');
+  return JSON.parse(read(registryPath));
+}
+
 const domains = [
   { label: 'controllers', coreDir: 'MVC/controllers/school', packageDir: 'packages/school/MVC/controllers/school' },
   { label: 'services', coreDir: 'MVC/services/school', packageDir: 'packages/school/MVC/services/school' },
@@ -35,41 +40,12 @@ const domains = [
   { label: 'models', coreDir: 'MVC/models/school', packageDir: 'packages/school/MVC/models/school' }
 ];
 
+const ownershipRegistry = readOwnershipRegistry();
 const packageOwnedByDomain = {
-  controllers: new Set([
-    'sessionController.js',
-    'termController.js',
-    'subjectController.js',
-    'holidayController.js',
-    'payRateController.js',
-    'sessionStatusController.js',
-    'timesheetPeriodController.js',
-    'schoolSampleDataController.js',
-    'departmentController.js',
-    'transactionDefinitionController.js',
-    'gradesMatrixController.js',
-    'schoolDashboardController.js',
-    'attendanceController.js',
-    'schoolAccountController.js',
-    'timesheetController.js',
-    'withdrawalController.js',
-    'programController.js',
-    'academicLedgerController.js',
-    'studentProgramPriorSubjectController.js',
-    'transactionsManagerController.js',
-    'staffController.js',
-    'teacherController.js',
-    'studentController.js',
-    'programRegistrationController.js',
-    'scheduleController.js',
-    'reportController.js',
-    'termRegistrationController.js',
-    'examController.js',
-    'classController.js'
-  ]),
-  services: new Set(),
-  repositories: new Set(),
-  models: new Set()
+  controllers: new Set(ownershipRegistry.controllers || []),
+  services: new Set(ownershipRegistry.services || []),
+  repositories: new Set(ownershipRegistry.repositories || []),
+  models: new Set(ownershipRegistry.models || [])
 };
 
 for (const domain of domains) {
