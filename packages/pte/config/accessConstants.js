@@ -1,4 +1,53 @@
-const { SECTIONS: CORE_SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const path = require('path');
+
+function cleanText(value = '', max = 4000) {
+  const out = String(value || '').trim();
+  return out.length > max ? out.slice(0, max) : out;
+}
+
+function normalizeFilePath(value = '') {
+  return cleanText(value).replace(/\\/g, '/');
+}
+
+function buildCoreRootCandidates() {
+  const unique = new Set();
+  const out = [];
+  const add = (value = '') => {
+    const resolved = path.resolve(value);
+    const key = normalizeFilePath(resolved).toLowerCase();
+    if (!key || unique.has(key)) return;
+    unique.add(key);
+    out.push(resolved);
+  };
+
+  // Optional explicit override.
+  add(process.env.PACKAGE_CORE_ROOT || '');
+  // Repository runtime: <root>/packages/pte/config
+  add(path.resolve(__dirname, '../../../'));
+  // Installed runtime: <root>/uploads/packages/pte/config
+  add(path.resolve(__dirname, '../../../../'));
+  // Final fallback.
+  add(process.cwd());
+  return out;
+}
+
+function requireCoreAccessConstants() {
+  let lastError = null;
+  const tried = [];
+  for (const root of buildCoreRootCandidates()) {
+    const candidate = path.resolve(root, 'config/accessConstants');
+    tried.push(candidate);
+    try {
+      return require(candidate);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  const suffix = lastError ? ` Last error: ${lastError.message}` : '';
+  throw new Error(`Unable to resolve core access constants. Tried: ${tried.join(', ')}.${suffix}`);
+}
+
+const { SECTIONS: CORE_SECTIONS, OPERATIONS } = requireCoreAccessConstants();
 
 const PTE_SECTIONS = Object.freeze({
   PTE: 'PTE',
