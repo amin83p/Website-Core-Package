@@ -60,6 +60,7 @@ const actionStateRetentionService = require('./MVC/services/actionStateRetention
 const { runWithRequestContext } = require('./MVC/utils/requestContextStore');
 const uploadPathUtils = require('./MVC/utils/uploadPathUtils');
 const { isRailwayProxyMode, getGatewayBaseUrl } = require('./MVC/utils/uploadModeUtils');
+const buildVersionResolver = require('./MVC/utils/buildVersionResolver');
 const { SESSION_SECRET } = require('./config/security');
 
 const PORT    = process.env.PORT || 3000;
@@ -74,6 +75,39 @@ const server = http.createServer(app); // Create explicit server
 app.set('trust proxy', 1);
 
 app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
+const BUILD_VERSION_CONFIG_PATH = path.join(__dirname, 'config', 'build-version.json');
+
+function readRepoBuildVersionValue() {
+  try {
+    if (!fs.existsSync(BUILD_VERSION_CONFIG_PATH)) return '';
+    const parsed = JSON.parse(fs.readFileSync(BUILD_VERSION_CONFIG_PATH, 'utf8'));
+    if (!parsed || typeof parsed !== 'object') return '';
+    return String(parsed.buildVersion || '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
+function cleanBuildVersionToken(value = '') {
+  const token = String(value || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{6}$/.test(token)) return '';
+  return token;
+}
+
+function refreshBuildVersionLocals() {
+  const settings = settingService.get();
+  const buildVersionOverride = String(settings?.app?.buildVersionOverride || '').trim();
+  app.locals.buildVersion = buildVersionResolver.resolveBuildVersion({
+    buildVersionOverride,
+    repoBuildVersion: readRepoBuildVersionValue()
+  });
+  app.locals.buildVersionShort = cleanBuildVersionToken(app.locals.buildVersion?.shortHash);
+  return app.locals.buildVersion;
+}
+
+app.locals.refreshBuildVersion = refreshBuildVersionLocals;
+app.locals.buildVersion = { shortHash: '', source: '' };
+app.locals.buildVersionShort = '';
 //------middleware-----
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'MVC/views'))
@@ -200,6 +234,7 @@ app.use((req, res, next) => {
   res.locals.appContactPage = appBrandingService.getContactPage();
   res.locals.publicMenu = appBrandingService.getPublicMenu(req.user || null);
   res.locals.publicMenuEndpointOptions = appBrandingService.getPublicMenuEndpointOptions();
+  res.locals.buildVersionShort = cleanBuildVersionToken(req.app?.locals?.buildVersionShort);
   next();
 });
 app.use(dataBackendRecoveryMiddleware.enforceRecoveryMode);
@@ -521,6 +556,7 @@ async function startServer() {
     app.locals.dataBackend = dataBackendRuntimeService.getPublicBackendStatus();
 
     await settingService.init();
+    refreshBuildVersionLocals();
     try {
       const packageLoaderHooks = packageRegistryInstallerService.createLoaderHooks({
         backendMode: dataBackend.mode

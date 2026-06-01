@@ -503,6 +503,45 @@ test('cleanup failed attempts controller returns summary and clears startup warn
   }
 });
 
+test('cleanup failed attempts controller returns warning status when partial cleanup fails', async () => {
+  const originalCleanup = systemSettingsPackageManagerService.cleanupFailedInstallAttempts;
+  const res = makeRenderResponse();
+
+  try {
+    systemSettingsPackageManagerService.cleanupFailedInstallAttempts = async () => ({
+      action: 'cleanup-failed-attempts',
+      candidateCount: 2,
+      cleanedCount: 1,
+      skippedCount: 0,
+      failedCount: 1,
+      preview: {
+        scannedCount: 2,
+        candidateCount: 2,
+        candidates: [
+          { packageId: 'pte', reasonCodes: ['INSTALL_STATUS_FAILED'], eligible: true },
+          { packageId: 'other', reasonCodes: ['STARTUP_FAILURE_METADATA'], eligible: true }
+        ]
+      },
+      results: [
+        { packageId: 'pte', result: 'cleaned' },
+        { packageId: 'other', result: 'failed' }
+      ],
+      warnings: ['Failed to clean 1 package install attempt(s).']
+    });
+
+    await systemSettingsController.cleanupFailedPackageAttemptsFromManager(
+      { body: {}, user: { id: 'USER_10' }, app: { locals: { packageLoadSummary: { failed: [] } } } },
+      res
+    );
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonPayload?.status, 'warning');
+    assert.equal(res.jsonPayload?.report?.preview?.candidateCount, 2);
+  } finally {
+    systemSettingsPackageManagerService.cleanupFailedInstallAttempts = originalCleanup;
+  }
+});
+
 test('uninstall preview controller returns success payload', async () => {
   const originalPreview = systemSettingsPackageManagerService.previewPackageUninstallImpact;
   const res = makeRenderResponse();
@@ -573,6 +612,8 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /Trusted signature keys configured/i);
   assert.match(html, /Clean Failed Attempts/);
   assert.match(html, /pkgCleanupFailedBtn/);
+  assert.match(html, /Completed With Warnings/);
+  assert.match(html, /buildCleanupWarningHtml/);
   assert.match(html, /Installed Packages/);
   assert.match(html, /Impact Preview/);
   assert.match(html, /Recent Lifecycle Transactions/);

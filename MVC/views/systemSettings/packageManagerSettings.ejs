@@ -1006,6 +1006,41 @@
     });
   }
 
+  function buildCleanupWarningHtml(result = {}) {
+    const report = result && typeof result === 'object' ? (result.report || result) : {};
+    const rows = Array.isArray(report?.results) ? report.results : [];
+    const failed = rows
+      .filter((row) => String(row?.result || '').trim().toLowerCase() === 'failed')
+      .map((row) => escapeHtml(row?.packageId || row?.name || '(unknown)'));
+    const skipped = rows
+      .filter((row) => String(row?.result || '').trim().toLowerCase() === 'skipped')
+      .map((row) => escapeHtml(row?.packageId || row?.name || '(unknown)'));
+    const warnings = Array.isArray(report?.warnings)
+      ? report.warnings.map((row) => escapeHtml(String(row || '').trim())).filter(Boolean)
+      : [];
+
+    const failedHtml = failed.length
+      ? `<div><b>Failed:</b> ${failed.map((id) => `<code>${id}</code>`).join(', ')}</div>`
+      : '';
+    const skippedHtml = skipped.length
+      ? `<div><b>Skipped:</b> ${skipped.map((id) => `<code>${id}</code>`).join(', ')}</div>`
+      : '';
+    const warningHtml = warnings.length
+      ? `<div class="mt-2 small text-muted">${warnings.join('<br>')}</div>`
+      : '';
+    const summaryHtml = `<div>${escapeHtml(result?.message || 'Cleanup completed with warnings.')}</div>`;
+    return `${summaryHtml}${failedHtml}${skippedHtml}${warningHtml}`;
+  }
+
+  async function showWarning(messageHtml) {
+    await showModal({
+      title: 'Completed With Warnings',
+      icon: 'warning',
+      message: messageHtml,
+      buttons: [{ text: 'OK', class: 'btn-warning' }]
+    });
+  }
+
   async function showError(message) {
     await showModal({
       title: 'Operation Failed',
@@ -1052,7 +1087,11 @@
         return;
       }
       setOutput('Cleanup Failed Attempts', result.report || result);
-      await showSuccess(result.message || 'Failed package attempts cleanup completed.');
+      if (String(result?.status || '').trim().toLowerCase() === 'warning') {
+        await showWarning(buildCleanupWarningHtml(result));
+      } else {
+        await showSuccess(result.message || 'Failed package attempts cleanup completed.');
+      }
       window.location.reload();
     } catch (error) {
       setOutput('Cleanup Failed Attempts Failed', {

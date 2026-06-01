@@ -47,7 +47,7 @@ function createUseRouteDeclaration(overrides = {}) {
     id: 'ROUTE_USE_1',
     method: 'USE',
     path: '/students',
-    router: 'MVC/routes/studentRoutes.js',
+    router: 'MVC/routes/pte/studentRoutes.js',
     active: true,
     ...overrides
   };
@@ -1033,6 +1033,84 @@ test('installPackage requires target org when builder payload marks remap as req
   assert.equal(report.packageId, 'pte');
   assert.equal(report.payloadSummary.orgRemapRequired, true);
   assert.equal(report.payloadSummary.targetOrgId, '900000');
+});
+
+test('cleanupFailedInstallAttempts does not remove package on generic warning text alone', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+
+  setup.deps.packageLoaderService.resolveManifestPath = async () => {
+    throw new Error('runtime route mount warning text from legacy note');
+  };
+
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: true,
+    installStatus: 'enabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.cleanupFailedInstallAttempts({ backendMode: 'json' });
+  const registryAfter = await setup.deps.packageRegistryService.getPackageRegistryById('pte');
+  const previewRow = (report.preview?.candidates || []).find((row) => row.packageId === 'pte');
+
+  assert.equal(report.candidateCount, 0);
+  assert.equal(report.cleanedCount, 0);
+  assert.equal(Boolean(registryAfter), true);
+  assert.equal(Array.isArray(previewRow?.reasonCodes), true);
+  assert.equal(previewRow?.reasonCodes.length, 0);
+});
+
+test('cleanupFailedInstallAttempts removes package for explicit failed status signal', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: false,
+    installStatus: 'failed',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.cleanupFailedInstallAttempts({ backendMode: 'json' });
+  const registryAfter = await setup.deps.packageRegistryService.getPackageRegistryById('pte');
+  const previewRow = (report.preview?.candidates || []).find((row) => row.packageId === 'pte');
+
+  assert.equal(report.candidateCount, 1);
+  assert.equal(report.cleanedCount, 1);
+  assert.equal(Boolean(registryAfter), false);
+  assert.equal(previewRow?.reasonCodes.includes('INSTALL_STATUS_FAILED'), true);
+});
+
+test('cleanupFailedInstallAttempts removes package when startup failure metadata is provided', async () => {
+  const setup = createBaseDeps();
+  const service = createService(setup.deps);
+
+  await setup.deps.packageRegistryService.upsertPackageRegistry({
+    packageId: 'pte',
+    version: '1.0.0',
+    enabled: false,
+    installStatus: 'disabled',
+    metadata: { packageName: 'PTE', manifestPath: 'packages/pte/package.manifest.json', mountPath: '/pte' }
+  });
+
+  const report = await service.cleanupFailedInstallAttempts({
+    backendMode: 'json',
+    startupFailureByPackage: {
+      pte: {
+        code: 'PACKAGE_RUNTIME_ROUTE_MOUNT_FAILED',
+        message: 'Runtime route mount reported zero mounted routes.',
+        autoDisabled: true
+      }
+    }
+  });
+  const previewRow = (report.preview?.candidates || []).find((row) => row.packageId === 'pte');
+
+  assert.equal(report.candidateCount, 1);
+  assert.equal(report.cleanedCount, 1);
+  assert.equal(previewRow?.reasonCodes.includes('STARTUP_FAILURE_METADATA'), true);
 });
 
 test('installPackageZip verifies signature and installs package into packages directory', async () => {

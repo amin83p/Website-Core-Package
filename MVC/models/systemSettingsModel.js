@@ -115,6 +115,7 @@ const DEFAULTS = {
   app: {                        // NEW SECTION
     defaultPageSize: 30,
     searchDefaultKeyword: 'aaa',
+    buildVersionOverride: '',
     uploadsPath: 'uploads', // Store as string, resolve at runtime
     uploadFolders: uploadFolderSettingsService.getDefaultUploadFolders(),
     schoolCanonicalEnrollmentRead: false,

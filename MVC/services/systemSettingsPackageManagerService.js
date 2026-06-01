@@ -425,6 +425,13 @@ function createDependencies(overrides = {}) {
 function createService(overrides = {}) {
   const deps = createDependencies(overrides);
   const zipLimits = getZipInstallLimits(overrides.env || process.env);
+  const FAILED_ATTEMPT_MACHINE_MARKER = '[PACKAGE_FAILED_ATTEMPT]';
+  const FAILED_ATTEMPT_REASON_CODES = {
+    INSTALL_STATUS_FAILED: 'INSTALL_STATUS_FAILED',
+    STARTUP_FAILURE_METADATA: 'STARTUP_FAILURE_METADATA',
+    MACHINE_MARKER_WARNING: 'MACHINE_MARKER_WARNING',
+    MACHINE_MARKER_ERROR: 'MACHINE_MARKER_ERROR'
+  };
 
   async function fileExists(filePath = '') {
     try {
@@ -1449,6 +1456,12 @@ function createService(overrides = {}) {
 
       const manifest = manifestInfo?.manifest || null;
       const metadata = row?.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+      const startupFailureMap = options?.startupFailureByPackage && typeof options.startupFailureByPackage === 'object'
+        ? options.startupFailureByPackage
+        : {};
+      const startupFailure = startupFailureMap[packageId] && typeof startupFailureMap[packageId] === 'object'
+        ? startupFailureMap[packageId]
+        : null;
       installedPackages.push({
         packageId,
         name: cleanText(manifest?.name || metadata.packageName || packageId.toUpperCase(), 200),
@@ -1466,6 +1479,14 @@ function createService(overrides = {}) {
         installedAt: cleanText(row?.installedAt || row?.audit?.createDateTime, 80),
         lastError: cleanText(row?.lastError, 2000),
         lastWarning: cleanText(row?.lastWarning, 1200),
+        startupFailure: startupFailure
+          ? {
+              code: cleanText(startupFailure?.code, 120).toUpperCase(),
+              message: cleanText(startupFailure?.message, 1200),
+              missingManifest: startupFailure?.missingManifest === true,
+              autoDisabled: startupFailure?.autoDisabled === true
+            }
+          : null,
         declarationCounts: metadata?.declarationCounts || (manifest ? countDeclarations(manifest) : {}),
         warnings
       });
@@ -2508,21 +2529,44 @@ function createService(overrides = {}) {
     };
   }
 
-  function isFailedInstallSnapshotCandidate(row = {}) {
+  function buildFailedAttemptCandidatePreview(row = {}) {
+    const reasonCodes = [];
     const status = cleanText(row?.installStatus, 80).toLowerCase();
-    if (status === 'failed') return true;
-    const warningBlob = [
-      cleanText(row?.lastError, 1200),
-      cleanText(row?.lastWarning, 1200),
-      ...sanitizeArray(row?.warnings).map((item) => cleanText(item, 1200))
-    ].join(' | ').toLowerCase();
-    if (!warningBlob) return false;
-    return (
-      warningBlob.includes('runtime route mount')
-      || warningBlob.includes('auto-disabled at startup')
-      || warningBlob.includes('manifest file was not found')
-      || warningBlob.includes('package runtime route mount failed')
-    );
+    if (status === 'failed') {
+      reasonCodes.push(FAILED_ATTEMPT_REASON_CODES.INSTALL_STATUS_FAILED);
+    }
+
+    const startupFailure = row?.startupFailure && typeof row.startupFailure === 'object'
+      ? row.startupFailure
+      : null;
+    if (
+      startupFailure
+      && (
+        startupFailure?.missingManifest === true
+        || startupFailure?.autoDisabled === true
+        || cleanText(startupFailure?.code, 120)
+        || cleanText(startupFailure?.message, 1200)
+      )
+    ) {
+      reasonCodes.push(FAILED_ATTEMPT_REASON_CODES.STARTUP_FAILURE_METADATA);
+    }
+
+    const lastWarning = cleanText(row?.lastWarning, 1200);
+    const lastError = cleanText(row?.lastError, 1200);
+    if (lastWarning.includes(FAILED_ATTEMPT_MACHINE_MARKER)) {
+      reasonCodes.push(FAILED_ATTEMPT_REASON_CODES.MACHINE_MARKER_WARNING);
+    }
+    if (lastError.includes(FAILED_ATTEMPT_MACHINE_MARKER)) {
+      reasonCodes.push(FAILED_ATTEMPT_REASON_CODES.MACHINE_MARKER_ERROR);
+    }
+
+    return {
+      packageId: normalizePackageId(row?.packageId),
+      name: cleanText(row?.name, 200),
+      installStatus: cleanText(row?.installStatus, 80),
+      reasonCodes: Array.from(new Set(reasonCodes)),
+      eligible: reasonCodes.length > 0
+    };
   }
 
   async function runFallbackFailedAttemptCleanup(packageId = '', options = {}) {
@@ -2625,9 +2669,15 @@ function createService(overrides = {}) {
     const backendMode = cleanText(options.backendMode, 30) || undefined;
     const snapshot = await listPackageSnapshot({ ...options, backendMode });
     const rows = sanitizeArray(snapshot?.installedPackages);
-    const candidates = rows.filter(isFailedInstallSnapshotCandidate);
+    const previewRows = rows.map((row) => buildFailedAttemptCandidatePreview(row));
+    const candidates = previewRows.filter((row) => row.eligible === true);
     const report = {
       action: 'cleanup-failed-attempts',
+      preview: {
+        scannedCount: rows.length,
+        candidateCount: candidates.length,
+        candidates: previewRows
+      },
       candidateCount: candidates.length,
       cleanedCount: 0,
       skippedCount: 0,
@@ -2642,6 +2692,7 @@ function createService(overrides = {}) {
         packageId,
         name: cleanText(row?.name, 200),
         installStatus: cleanText(row?.installStatus, 80),
+        reasonCodes: sanitizeArray(row?.reasonCodes).map((token) => cleanText(token, 120)).filter(Boolean),
         result: 'pending',
         transactionId: '',
         mode: '',

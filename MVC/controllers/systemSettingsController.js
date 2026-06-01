@@ -582,6 +582,7 @@ exports.updateAppSettings = async (req, res) => {
       app: {
         defaultPageSize: parseInt(req.body.defaultPageSize, 10),
         searchDefaultKeyword: req.body.searchDefaultKeyword,
+        buildVersionOverride: cleanFormText(req.body.buildVersionOverride, 120),
         // Save raw string exactly as typed (e.g., "uploads" or "/app/uploads")
         uploadsPath: req.body.uploadsPath,
         brand: {
@@ -666,6 +667,9 @@ exports.updateAppSettings = async (req, res) => {
     
     // 2. Refresh Cache
     await settingService.refresh();
+    if (req.app?.locals && typeof req.app.locals.refreshBuildVersion === 'function') {
+      req.app.locals.refreshBuildVersion();
+    }
 
     if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'Application defaults saved.' });
     const returnTo = cleanFormText(req.body?.returnTo, 240);
@@ -1243,6 +1247,25 @@ function buildPackageTrustedKeyContext(settingsInput = null) {
   return { trustedPublicKeys };
 }
 
+function buildStartupFailureByPackageMap(appRef = null) {
+  const summary = appRef && appRef.locals && typeof appRef.locals === 'object'
+    ? appRef.locals.packageLoadSummary
+    : null;
+  const rows = Array.isArray(summary?.failed) ? summary.failed : [];
+  const out = {};
+  rows.forEach((row) => {
+    const packageId = cleanFormText(row?.packageId, 120).toLowerCase();
+    if (!packageId) return;
+    out[packageId] = {
+      code: cleanFormText(row?.code, 120).toUpperCase(),
+      message: cleanFormText(row?.message, 1200),
+      missingManifest: row?.missingManifest === true,
+      autoDisabled: row?.autoDisabled === true
+    };
+  });
+  return out;
+}
+
 function buildPackageManagerOptions(req = {}) {
   const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
   const keyContext = buildPackageTrustedKeyContext();
@@ -1252,7 +1275,8 @@ function buildPackageManagerOptions(req = {}) {
     targetOrgId: cleanFormText(req.body?.targetOrgId || req.query?.targetOrgId || '', 120),
     actor: req.user || null,
     app: req.app || null,
-    packageRuntimeRouter: req.app?.locals?.packageRuntimeRouter || null
+    packageRuntimeRouter: req.app?.locals?.packageRuntimeRouter || null,
+    startupFailureByPackage: buildStartupFailureByPackageMap(req.app || null)
   };
 }
 

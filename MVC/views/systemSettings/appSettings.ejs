@@ -599,6 +599,12 @@
             </div>
 
             <div class="mb-4">
+                <label class="form-label fw-bold">Build Version Override</label>
+                <input type="text" name="buildVersionOverride" class="form-control font-monospace" value="<%= settings.app.buildVersionOverride || '' %>" placeholder="Optional commit hash override">
+                <div class="form-text">Optional per-app override. Leave empty to use repo `config/build-version.json`, then env/git fallback.</div>
+            </div>
+
+            <div class="mb-4">
                 <label class="form-label fw-bold text-primary">Uploads Directory (Absolute or Relative)</label>
                 <input type="text" name="uploadsPath" class="form-control font-monospace" 
                        value="<%= settings.app.uploadsPath %>" placeholder="/app/uploads or uploads">
