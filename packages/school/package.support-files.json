@@ -1,0 +1,13 @@
+{
+  "packageId": "school",
+  "step": 1,
+  "status": "scaffolded",
+  "notes": [
+    "Pass 1 scaffold only: no runtime cutover yet.",
+    "Core dependencies must flow through packages/school/MVC/services/school/schoolCoreContracts.js.",
+    "School section constants are package-owned in packages/school/config/accessConstants.js."
+  ],
+  "scripts": [],
+  "docs": [],
+  "tests": []
+}

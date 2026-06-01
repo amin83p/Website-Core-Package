@@ -1,0 +1,47 @@
+{
+  "id": "school",
+  "name": "School",
+  "version": "0.1.0",
+  "mountPath": "/school",
+  "enabledByDefault": false,
+  "routes": [
+    {
+      "method": "USE",
+      "path": "/school",
+      "router": "MVC/routes/schoolMainRoute.js",
+      "metadataOnly": false,
+      "active": true
+    }
+  ],
+  "queryExecutors": [],
+  "views": {
+    "id": "school-package-views",
+    "path": "packages/school/MVC/views",
+    "namespace": "school",
+    "active": true
+  },
+  "assets": {
+    "id": "school-package-public-scripts",
+    "path": "packages/school/public/scripts",
+    "publicPath": "/scripts",
+    "metadataOnly": true,
+    "active": true
+  },
+  "operations": [],
+  "roles": [],
+  "sections": [],
+  "symbols": [],
+  "accesses": [],
+  "uploadFolders": [],
+  "dataEntities": [],
+  "dataSchemas": [],
+  "upgradeGuards": [],
+  "quotaDefinitions": [],
+  "mongoIndexes": [],
+  "settings": [],
+  "menuEntries": [],
+  "dashboardEntries": [],
+  "seeders": [],
+  "migrations": [],
+  "dependencies": []
+}
