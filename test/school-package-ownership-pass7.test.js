@@ -47,3 +47,17 @@ test('school package pass7 owns sessionRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.showSessionListPage/);
   assert.match(routeSource, /ctrl\.getSessionsApi/);
 });
+
+test('school package pass7 owns sessionStatusRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/sessionStatusRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/sessionStatusRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/sessionStatusController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STATUSES,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STATUSES,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STATUSES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SESSION_STATUSES,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listSessionStatuses/);
+  assert.match(routeSource, /ctrl\.saveSessionStatus/);
+  assert.match(routeSource, /ctrl\.deleteSessionStatus/);
+});
