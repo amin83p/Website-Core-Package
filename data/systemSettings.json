@@ -8,8 +8,7 @@
     "allowFreeRegistration": true,
     "defaultTrialDays": 14,
     "freeOrgId": 900000,
-    "freeOrgName": "Free User",
-    "pteJoinOrgId": 900000
+    "freeOrgName": "Free User"
   },
   "access": {
     "highAccessMin": 8,

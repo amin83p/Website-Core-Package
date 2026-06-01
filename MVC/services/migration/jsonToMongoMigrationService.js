@@ -361,24 +361,6 @@ function buildCatalog() {
       }
     },
 
-    // PTE
-    { key: 'pte.teachers', domain: 'PTE', section: 'Teachers', source: 'pteTeachers.json', collection: 'pteTeachers' },
-    { key: 'pte.applicants', domain: 'PTE', section: 'Applicants', source: 'pteApplicants.json', collection: 'pteApplicants' },
-    { key: 'pte.applicantPackageAssignments', domain: 'PTE', section: 'Applicant Package Assignments', source: 'pteApplicantPackageAssignments.json', collection: 'pteApplicantPackageAssignments' },
-    { key: 'pte.courses', domain: 'PTE', section: 'Courses', source: 'pteCourses.json', collection: 'pteCourses' },
-    { key: 'pte.publicPageSettings', domain: 'PTE', section: 'Public Page Settings', source: 'ptePublicPageSettings.json', collection: 'ptePublicPageSettings' },
-    { key: 'pte.aiProviders', domain: 'PTE', section: 'AI Providers', source: 'pteAiProviders.json', collection: 'pteAiProviders' },
-    { key: 'pte.aiScoringSettings', domain: 'PTE', section: 'AI Scoring Settings', source: 'pteAiScoringSettings.json', collection: 'pteAiScoringSettings' },
-    { key: 'pte.aiTokenUsages', domain: 'PTE', section: 'AI Token Usages', source: 'pteAiTokenUsages.json', collection: 'pteAiTokenUsages' },
-    { key: 'pte.questionVersions', domain: 'PTE', section: 'Question Versions', source: 'pteQuestionVersions.json', collection: 'pteQuestionVersions' },
-    { key: 'pte.testVersions', domain: 'PTE', section: 'Test Versions', source: 'pteTestVersions.json', collection: 'pteTestVersions' },
-    { key: 'pte.attemptSessions', domain: 'PTE', section: 'Attempt Sessions', source: 'pteAttemptSessions.json', collection: 'pteAttemptSessions' },
-    { key: 'pte.attemptItems', domain: 'PTE', section: 'Attempt Items', source: 'pteAttemptItems.json', collection: 'pteAttemptItems' },
-    { key: 'pte.attemptArtifacts', domain: 'PTE', section: 'Attempt Artifacts', source: 'pteAttemptArtifacts.json', collection: 'pteAttemptArtifacts' },
-    { key: 'pte.attemptLedgerEvents', domain: 'PTE', section: 'Attempt Ledger Events', source: 'pteAttemptLedgerEvents.json', collection: 'pteAttemptLedgerEvents' },
-    { key: 'pte.questionTypeScoringProfiles', domain: 'PTE', section: 'Question Type Scoring Profiles', source: 'pteQuestionTypeScoringProfiles.json', collection: 'pteQuestionTypeScoringProfiles' },
-    { key: 'pte.questionTypeScoringProfileHistory', domain: 'PTE', section: 'Scoring Profile History', source: 'pteQuestionTypeScoringProfileHistory.json', collection: 'pteQuestionTypeScoringProfileHistory' },
-
     // IELTS
     { key: 'ielts.task2Samples', domain: 'IELTS', section: 'Task 2 Samples', source: 'ielts/task2samples.json', collection: 'ieltsTask2Samples' },
     { key: 'ielts.microAssessments', domain: 'IELTS', section: 'Micro Assessments', source: 'ielts/microAssessments.json', collection: 'ieltsMicroAssessments' },

@@ -33,19 +33,14 @@
             
             <h6 class="fw-bold text-muted mb-3">Free Tier Settings</h6>
             <div class="row">
-                <div class="col-md-4 mb-3">
+                <div class="col-md-6 mb-3">
                     <label class="form-label">Free Org ID</label>
                     <input type="number" name="freeOrgId" class="form-control font-monospace" value="<%= settings.organization.freeOrgId %>">
                     <div class="form-text">System ID used for the default free organization.</div>
                 </div>
-                 <div class="col-md-4 mb-3">
+                 <div class="col-md-6 mb-3">
                     <label class="form-label">Free Org Name</label>
                     <input type="text" name="freeOrgName" class="form-control" value="<%= settings.organization.freeOrgName %>">
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label class="form-label">PTE Join Org ID</label>
-                    <input type="number" name="pteJoinOrgId" class="form-control font-monospace" value="<%= settings.organization.pteJoinOrgId || '' %>" placeholder="Optional">
-                    <div class="form-text">Used by <code>/pte/join</code>. If empty, Free Org ID is used.</div>
                 </div>
             </div>
 

@@ -25,6 +25,18 @@ async function showPtePublicJoinForm(req, res) {
         ? 'Your current account already has public PTE access.'
         : 'Use your current account to join public PTE packages and practice access.',
       existingUserContinueHref: joinState.alreadyJoined ? '/pte/packages' : '/pte',
+      existingUserCancelHref: '/pte',
+      existingUserAccessTitle: 'PTE Access Active',
+      existingUserAccountTitle: 'PTE Account',
+      existingUserAlreadyJoinedHeading: 'Public PTE access is already active.',
+      existingUserJoinHeading: 'Join public PTE without creating another login.',
+      existingUserAlreadyJoinedCopy: `${currentUser.name || currentUser.username || currentUser.email || 'Your account'}${currentUser.email ? ` (${currentUser.email})` : ''} already has public PTE access. Your public packages can continue using this same account.`,
+      existingUserJoinCopy: `We will add public PTE access to ${currentUser.name || currentUser.username || currentUser.email || 'your account'}${currentUser.email ? ` (${currentUser.email})` : ''}. Your existing roles stay active, and public PTE packages can be connected to this same account.`,
+      existingUserBadgePrimary: 'PTE Public Student',
+      existingUserBadgeSecondary: 'Use Same Login',
+      existingUserBadgeTertiary: 'Public Packages',
+      existingUserSuccessTitle: 'PTE Access Ready',
+      existingUserSuccessMessage: 'Public PTE access has been added to your account.',
       submitButtonLabel: joinState.alreadyJoined ? 'Browse Public Packages' : 'Join Public PTE'
     });
   }

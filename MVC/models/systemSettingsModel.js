@@ -104,8 +104,7 @@ const DEFAULTS = {
     allowFreeRegistration: true,
     defaultTrialDays: 14,
     freeOrgId: 900000,          // NEW
-    freeOrgName: 'Free User',   // NEW
-    pteJoinOrgId: ''            // Optional org override for /pte/join (falls back to freeOrgId)
+    freeOrgName: 'Free User'   // NEW
   },
   access: {                     // NEW SECTION
     highAccessMin: 8,

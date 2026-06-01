@@ -7,7 +7,19 @@
   const resolvedExistingUserAlreadyJoined = (typeof existingUserAlreadyJoined !== 'undefined' && existingUserAlreadyJoined === true);
   const resolvedExistingUserName = (typeof existingUserName === 'string' && existingUserName.trim()) ? existingUserName.trim() : 'your current account';
   const resolvedExistingUserEmail = (typeof existingUserEmail === 'string' && existingUserEmail.trim()) ? existingUserEmail.trim() : '';
-  const resolvedExistingUserContinueHref = (typeof existingUserContinueHref === 'string' && existingUserContinueHref.trim()) ? existingUserContinueHref.trim() : '/pte';
+  const resolvedExistingUserContinueHref = (typeof existingUserContinueHref === 'string' && existingUserContinueHref.trim()) ? existingUserContinueHref.trim() : '/dashboard';
+  const resolvedExistingUserCancelHref = (typeof existingUserCancelHref === 'string' && existingUserCancelHref.trim()) ? existingUserCancelHref.trim() : '/login';
+  const resolvedExistingUserAccessTitle = (typeof existingUserAccessTitle === 'string' && existingUserAccessTitle.trim()) ? existingUserAccessTitle.trim() : 'Access active';
+  const resolvedExistingUserAccountTitle = (typeof existingUserAccountTitle === 'string' && existingUserAccountTitle.trim()) ? existingUserAccountTitle.trim() : 'Current account';
+  const resolvedExistingUserAlreadyJoinedHeading = (typeof existingUserAlreadyJoinedHeading === 'string' && existingUserAlreadyJoinedHeading.trim()) ? existingUserAlreadyJoinedHeading.trim() : 'Access is already active.';
+  const resolvedExistingUserJoinHeading = (typeof existingUserJoinHeading === 'string' && existingUserJoinHeading.trim()) ? existingUserJoinHeading.trim() : 'Join without creating another login.';
+  const resolvedExistingUserAlreadyJoinedCopy = (typeof existingUserAlreadyJoinedCopy === 'string' && existingUserAlreadyJoinedCopy.trim()) ? existingUserAlreadyJoinedCopy.trim() : '';
+  const resolvedExistingUserJoinCopy = (typeof existingUserJoinCopy === 'string' && existingUserJoinCopy.trim()) ? existingUserJoinCopy.trim() : '';
+  const resolvedExistingUserBadgePrimary = (typeof existingUserBadgePrimary === 'string' && existingUserBadgePrimary.trim()) ? existingUserBadgePrimary.trim() : 'Member Access';
+  const resolvedExistingUserBadgeSecondary = (typeof existingUserBadgeSecondary === 'string' && existingUserBadgeSecondary.trim()) ? existingUserBadgeSecondary.trim() : 'Use Same Login';
+  const resolvedExistingUserBadgeTertiary = (typeof existingUserBadgeTertiary === 'string' && existingUserBadgeTertiary.trim()) ? existingUserBadgeTertiary.trim() : 'Available Packages';
+  const resolvedExistingUserSuccessTitle = (typeof existingUserSuccessTitle === 'string' && existingUserSuccessTitle.trim()) ? existingUserSuccessTitle.trim() : 'Access Ready';
+  const resolvedExistingUserSuccessMessage = (typeof existingUserSuccessMessage === 'string' && existingUserSuccessMessage.trim()) ? existingUserSuccessMessage.trim() : 'Access has been added to your account.';
 %>
 
 <div class="d-flex align-items-center justify-content-center  bg-light py-5">
@@ -34,23 +46,31 @@
                 <i class="bi <%= resolvedExistingUserAlreadyJoined ? 'bi-check-circle-fill' : 'bi-stars' %>"></i>
               </div>
               <div class="flex-grow-1">
-                <div class="text-uppercase text-primary fw-bold small mb-2"><%= resolvedExistingUserAlreadyJoined ? 'Access active' : 'Current account' %></div>
+                <div class="text-uppercase text-primary fw-bold small mb-2"><%= resolvedExistingUserAlreadyJoined ? resolvedExistingUserAccessTitle : resolvedExistingUserAccountTitle %></div>
                 <h4 class="fw-bold text-dark mb-2">
-                  <%= resolvedExistingUserAlreadyJoined ? 'Public PTE access is already active.' : 'Join public PTE without creating another login.' %>
+                  <%= resolvedExistingUserAlreadyJoined ? resolvedExistingUserAlreadyJoinedHeading : resolvedExistingUserJoinHeading %>
                 </h4>
                 <p class="text-muted mb-3">
                   <% if (resolvedExistingUserAlreadyJoined) { %>
-                    <strong><%= resolvedExistingUserName %></strong><%= resolvedExistingUserEmail ? ' (' + resolvedExistingUserEmail + ')' : '' %> already has public PTE access.
-                    Your public packages can continue using this same account.
+                    <% if (resolvedExistingUserAlreadyJoinedCopy) { %>
+                      <%= resolvedExistingUserAlreadyJoinedCopy %>
+                    <% } else { %>
+                      <strong><%= resolvedExistingUserName %></strong><%= resolvedExistingUserEmail ? ' (' + resolvedExistingUserEmail + ')' : '' %> already has access.
+                      You can continue using this same account.
+                    <% } %>
                   <% } else { %>
-                    We will add public PTE access to <strong><%= resolvedExistingUserName %></strong><%= resolvedExistingUserEmail ? ' (' + resolvedExistingUserEmail + ')' : '' %>.
-                    Your existing roles stay active, and public PTE packages can be connected to this same account.
+                    <% if (resolvedExistingUserJoinCopy) { %>
+                      <%= resolvedExistingUserJoinCopy %>
+                    <% } else { %>
+                      We will add access to <strong><%= resolvedExistingUserName %></strong><%= resolvedExistingUserEmail ? ' (' + resolvedExistingUserEmail + ')' : '' %>.
+                      Your existing roles stay active, and packages can be connected to this same account.
+                    <% } %>
                   <% } %>
                 </p>
                 <div class="d-flex flex-wrap gap-2">
-                  <span class="badge rounded-pill text-bg-primary">PTE Public Student</span>
-                  <span class="badge rounded-pill text-bg-success">Use Same Login</span>
-                  <span class="badge rounded-pill text-bg-info">Public Packages</span>
+                  <span class="badge rounded-pill text-bg-primary"><%= resolvedExistingUserBadgePrimary %></span>
+                  <span class="badge rounded-pill text-bg-success"><%= resolvedExistingUserBadgeSecondary %></span>
+                  <span class="badge rounded-pill text-bg-info"><%= resolvedExistingUserBadgeTertiary %></span>
                 </div>
               </div>
             </div>
@@ -65,7 +85,7 @@
               <button type="submit" class="btn btn-primary btn-lg btn-filled shadow-sm fw-bold">
                 <%= resolvedSubmitButtonLabel %>
               </button>
-              <a href="/pte" class="btn btn-link text-decoration-none text-muted">Cancel</a>
+              <a href="<%= resolvedExistingUserCancelHref %>" class="btn btn-link text-decoration-none text-muted">Cancel</a>
             <% } %>
           </div>
         <% } else { %>
@@ -305,12 +325,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 await safeShowModal({
-                    title: result.existingUserAlreadyJoined ? 'Already Joined' : 'PTE Access Ready',
+                    title: result.existingUserAlreadyJoined ? 'Already Joined' : resolvedExistingUserSuccessTitle,
                     icon: 'success',
-                    message: result.message || 'Public PTE access has been added to your account.',
+                    message: result.message || resolvedExistingUserSuccessMessage,
                     buttons: [{ text: 'Continue', class: 'btn-primary' }]
                 });
-                window.location.href = result.redirect || '/pte';
+                window.location.href = result.redirect || resolvedExistingUserContinueHref;
             } else {
                 throw new Error(result.message || 'Registration failed.');
             }

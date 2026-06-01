@@ -22,7 +22,9 @@ function createPtePublicJoinService(overrides = {}) {
 
   function resolvePteJoinOrgSettingId() {
     const fallbackFreeOrgId = deps.publicRegistrationService.resolveFreeOrgSettingId();
-    return deps.publicRegistrationService.resolveConfiguredOrgId('pteJoinOrgId', fallbackFreeOrgId);
+    const envParsed = Number.parseInt(String(process.env.PTE_JOIN_ORG_ID ?? '').trim(), 10);
+    if (Number.isFinite(envParsed) && envParsed > 0) return envParsed;
+    return fallbackFreeOrgId;
   }
 
   async function resolvePteJoinOrgName() {

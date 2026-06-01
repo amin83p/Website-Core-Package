@@ -146,17 +146,12 @@ exports.showOrganizationSettings = async (req, res) => {
 
 exports.updateOrganizationSettings = async (req, res) => {
   try {
-    const pteJoinOrgIdRaw = String(req.body.pteJoinOrgId || '').trim();
-    const parsedPteJoinOrgId = Number.parseInt(pteJoinOrgIdRaw, 10);
     const formData = {
       organization: {
         allowFreeRegistration: req.body.allowFreeRegistration === 'true',
         defaultTrialDays: parseInt(req.body.defaultTrialDays || '0', 10),
         freeOrgId: parseInt(req.body.freeOrgId, 10),
-        freeOrgName: req.body.freeOrgName,
-        pteJoinOrgId: Number.isFinite(parsedPteJoinOrgId) && parsedPteJoinOrgId > 0
-          ? parsedPteJoinOrgId
-          : ''
+        freeOrgName: req.body.freeOrgName
       }
     };
     
@@ -535,7 +530,7 @@ function parsePublicDefaultHomePath(body = {}) {
   const token = cleanPublicMenuText(body.publicHomePath, 1200);
   if (!token) return '/';
   if (!(token === '/' || /^\/(?!\/)/.test(token))) {
-    throw new Error('Default Home page must be an internal route beginning with "/" (for example, "/", "/news", "/pte").');
+    throw new Error('Default Home page must be an internal route beginning with "/" (for example, "/", "/news", "/about").');
   }
   if (/[\s"'`<>\\]/.test(token)) {
     throw new Error('Default Home page URL contains unsupported characters.');
