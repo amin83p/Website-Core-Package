@@ -160,3 +160,63 @@ test('school package pass10 owns sampleDataRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.clearTransactionalData/);
   assert.match(routeSource, /ctrl\.deleteSelectedSamplePeople/);
 });
+
+test('school package pass11 owns staffRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/staffRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/staffRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/staffController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_STAFF,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_STAFF,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_STAFF,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_STAFF,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listStaff/);
+  assert.match(routeSource, /ctrl\.listArchivedStaff/);
+  assert.match(routeSource, /ctrl\.recoverStaff/);
+  assert.match(routeSource, /ctrl\.saveStaff/);
+});
+
+test('school package pass11 owns teacherRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/teacherRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/teacherRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/teacherController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TEACHERS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TEACHERS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TEACHERS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TEACHERS,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listTeachers/);
+  assert.match(routeSource, /ctrl\.listArchivedTeachers/);
+  assert.match(routeSource, /ctrl\.recoverTeacher/);
+  assert.match(routeSource, /ctrl\.saveTeacher/);
+});
+
+test('school package pass11 owns subjectRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/subjectRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/subjectRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/subjectController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SUBJECTS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SUBJECTS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SUBJECTS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_SUBJECTS,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listSubjects/);
+  assert.match(routeSource, /ctrl\.showAddWizardForm/);
+  assert.match(routeSource, /ctrl\.showEditWizardForm/);
+  assert.match(routeSource, /ctrl\.editSubject/);
+});
+
+test('school package pass11 owns departmentRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/departmentRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/departmentRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/departmentController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_DEPARTMENTS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_DEPARTMENTS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_DEPARTMENTS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_DEPARTMENTS,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listDepartments/);
+  assert.match(routeSource, /ctrl\.getDepartmentsApi/);
+  assert.match(routeSource, /ctrl\.showCreateWizardForm/);
+  assert.match(routeSource, /ctrl\.saveDepartment/);
+});

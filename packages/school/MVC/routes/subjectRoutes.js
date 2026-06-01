@@ -1,3 +1,56 @@
-const { requireCoreModule } = require('../services/school/schoolCoreContracts');
+const express = require('express');
+const router = express.Router();
+const ctrl = require('../controllers/school/subjectController');
+const {
+  requireAuth,
+  requireAccess,
+  trackActionState,
+  SECTIONS,
+  OPERATIONS
+} = require('./schoolRouteDependencies');
 
-module.exports = requireCoreModule('MVC/routes/school/subjectRoutes');
+router.use(requireAuth);
+
+router.get('/',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.READ_ALL),
+  ctrl.listSubjects);
+
+router.get('/new',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.CREATE),
+  ctrl.showAddForm);
+
+router.get('/new-wizard',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.CREATE),
+  ctrl.showAddWizardForm);
+router.post('/new',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.CREATE, { requireToken: true }),
+  ctrl.addSubject);
+
+router.get('/edit/:id',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),
+  ctrl.showEditForm);
+
+router.get('/edit-wizard/:id',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),
+  ctrl.showEditWizardForm);
+router.post('/edit/:id',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.UPDATE, { requireToken: true }),
+  ctrl.editSubject);
+
+router.get('/delete/:id',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.DELETE),
+  ctrl.deleteSubject);
+router.delete('/delete/:id',
+  requireAccess(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SUBJECTS, OPERATIONS.DELETE, { requireToken: true }),
+  ctrl.deleteSubject);
+
+module.exports = router;

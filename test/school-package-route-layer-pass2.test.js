@@ -88,7 +88,11 @@ test('school package route wrappers should resolve core routes through core cont
     'termRoutes.js',
     'timesheetRoutes.js',
     'attendanceRoutes.js',
-    'sampleDataRoutes.js'
+    'sampleDataRoutes.js',
+    'staffRoutes.js',
+    'teacherRoutes.js',
+    'subjectRoutes.js',
+    'departmentRoutes.js'
   ]);
 
   const offenders = [];
