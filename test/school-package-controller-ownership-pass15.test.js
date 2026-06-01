@@ -75,3 +75,36 @@ test('school package pass16 owns schoolSampleDataController implementation', () 
   assert.match(source, /requireCoreModule\('MVC\/utils\/generalTools'\)/);
   assert.match(source, /exports\.deleteSelectedSamplePeople/);
 });
+
+test('school package pass17 owns departmentController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/departmentController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/departmentController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/paginationHelper'\)/);
+  assert.match(source, /exports\.listDepartments/);
+});
+
+test('school package pass17 owns transactionDefinitionController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/transactionDefinitionController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/transactionDefinitionController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/adminChekersService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/orgContextUtils'\)/);
+  assert.match(source, /exports\.saveTransactionDefinition/);
+});
+
+test('school package pass17 owns gradesMatrixController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/gradesMatrixController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/gradesMatrixController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/dataService'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/utils\/idAdapter'\)/);
+  assert.match(source, /module\.exports\s*=\s*\{/);
+});
+
+test('school package pass17 owns schoolDashboardController implementation', () => {
+  const source = read('packages/school/MVC/controllers/school/schoolDashboardController.js');
+  assert.equal(source.includes("requireCoreModule('MVC/controllers/school/schoolDashboardController.js')"), false);
+  assert.match(source, /requireCoreModule\('MVC\/services\/security'\)/);
+  assert.match(source, /requireCoreModule\('MVC\/controllers\/dashboardController'\)/);
+  assert.match(source, /config\/accessConstants/);
+  assert.match(source, /module\.exports\s*=\s*\{/);
+});
