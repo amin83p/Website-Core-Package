@@ -142,3 +142,58 @@ test('metadata-only PTE assets are prepared but not mounted', async () => {
   assert.equal(assetSummary.results[0].metadataOnly, true);
   assert.equal(path.resolve(assetSummary.results[0].root), path.resolve(__dirname, '../packages/pte/public/scripts'));
 });
+
+test('legacy package-prefixed view and asset paths resolve from installed package root candidates', async () => {
+  const tmpRoot = await fs.mkdtemp(path.resolve(__dirname, '../tmp/pva-legacy-'));
+  const packageRoot = path.join(tmpRoot, 'legacypkg');
+  const manifestPath = path.join(packageRoot, 'package.manifest.json');
+  const packageViewsRoot = path.join(packageRoot, 'MVC/views');
+  const packageAssetsRoot = path.join(packageRoot, 'public/scripts');
+
+  await fs.mkdir(packageViewsRoot, { recursive: true });
+  await fs.mkdir(packageAssetsRoot, { recursive: true });
+  await fs.writeFile(manifestPath, '{}', 'utf8');
+
+  const app = createAppStub(path.resolve(__dirname, '../MVC/views'));
+  const viewSummary = await packageViewAssetService.registerManifestViews({
+    app,
+    packageId: 'legacypkg',
+    manifestPath,
+    manifest: {
+      id: 'legacypkg',
+      views: {
+        id: 'legacypkg-views',
+        path: 'packages/legacypkg/MVC/views'
+      }
+    }
+  }, { logger: makeSilentLogger() });
+
+  const assetSummary = await packageViewAssetService.registerManifestAssets({
+    app,
+    packageId: 'legacypkg',
+    manifestPath,
+    manifest: {
+      id: 'legacypkg',
+      assets: {
+        id: 'legacypkg-assets',
+        path: 'packages/legacypkg/public/scripts',
+        publicPath: '/legacy-assets',
+        metadataOnly: false
+      }
+    }
+  }, {
+    logger: makeSilentLogger(),
+    staticFactory: () => function packageAssetStaticMiddleware(_req, _res, next) {
+      if (typeof next === 'function') next();
+    }
+  });
+
+  assert.equal(viewSummary.failed, 0);
+  assert.equal(viewSummary.registered, 1);
+  assert.ok(app.get('views').some((viewRoot) => path.resolve(viewRoot) === path.resolve(packageViewsRoot)));
+
+  assert.equal(assetSummary.failed, 0);
+  assert.equal(assetSummary.mounted, 1);
+  assert.equal(path.resolve(assetSummary.results[0].root), path.resolve(packageAssetsRoot));
+  assert.equal(app.calls.some((call) => call[0] === '/legacy-assets'), true);
+});

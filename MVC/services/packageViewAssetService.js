@@ -3,6 +3,7 @@ const path = require('path');
 const express = require('express');
 
 const startupLogger = require('../utils/startupLogger');
+const packageModuleResolverService = require('./packageModuleResolverService');
 
 let mountedAssetKeys = new Set();
 
@@ -18,6 +19,13 @@ function normalizePackageId(value = '') {
 
 function resolveProjectRoot() {
   return path.resolve(__dirname, '../../');
+}
+
+function hasParentTraversal(value = '') {
+  return cleanText(value, 1600)
+    .replace(/\\/g, '/')
+    .split('/')
+    .some((segment) => segment === '..');
 }
 
 function toArray(value) {
@@ -39,6 +47,26 @@ function unique(values = []) {
   return out;
 }
 
+function uniqueResolvedPaths(values = []) {
+  return unique(values.map((value) => path.resolve(String(value || ''))));
+}
+
+function isInsideRoot(resolvedPath = '', rootPath = '') {
+  if (!resolvedPath || !rootPath) return false;
+  const rel = path.relative(path.resolve(rootPath), path.resolve(resolvedPath));
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+function isInsideAllowedRoot(resolvedPath = '', allowedRoots = []) {
+  return allowedRoots.some((rootPath) => isInsideRoot(resolvedPath, rootPath));
+}
+
+function assertInsideAllowedRoot(resolvedPath = '', originalPath = '', allowedRoots = []) {
+  if (!isInsideAllowedRoot(resolvedPath, allowedRoots)) {
+    throw new Error(`${originalPath} must stay inside project root or package root.`);
+  }
+}
+
 function resolveInsideProject(inputPath = '', label = 'path') {
   const token = cleanText(inputPath, 1600);
   if (!token) throw new Error(`${label} is required.`);
@@ -51,6 +79,56 @@ function resolveInsideProject(inputPath = '', label = 'path') {
     throw new Error(`${label} must stay inside project root: ${token}`);
   }
   return resolved;
+}
+
+function resolvePackageAwarePath(inputPath = '', label = 'path', context = {}, options = {}) {
+  const token = cleanText(inputPath, 1600);
+  if (!token) throw new Error(`${label} is required.`);
+  if (hasParentTraversal(token)) {
+    throw new Error(`${label} must not include parent traversal: ${token}`);
+  }
+
+  const normalized = token.replace(/\\/g, '/');
+  const projectRoot = resolveProjectRoot();
+  const packageId = normalizePackageId(context?.packageId || context?.manifest?.id || options?.packageId || '');
+  const packageRootCandidates = packageModuleResolverService.resolvePackageRootCandidates(context, options);
+  const allowedRoots = uniqueResolvedPaths([projectRoot, ...packageRootCandidates]);
+  const candidates = [];
+
+  if (path.isAbsolute(normalized)) {
+    const resolved = path.resolve(normalized);
+    assertInsideAllowedRoot(resolved, label, allowedRoots);
+    candidates.push(resolved);
+  } else {
+    packageRootCandidates.forEach((packageRoot) => {
+      candidates.push(path.resolve(packageRoot, normalized));
+    });
+    candidates.push(path.resolve(projectRoot, normalized));
+
+    // Compatibility: legacy package manifests may still use "packages/<id>/..." paths.
+    if (packageId) {
+      const legacyPrefix = `packages/${packageId}/`;
+      if (normalized.toLowerCase().startsWith(legacyPrefix)) {
+        const suffix = normalized.slice(legacyPrefix.length);
+        if (suffix) {
+          packageRootCandidates.forEach((packageRoot) => {
+            candidates.push(path.resolve(packageRoot, suffix));
+          });
+        }
+      }
+    }
+  }
+
+  const uniqueCandidates = uniqueResolvedPaths(candidates)
+    .filter((candidate) => isInsideAllowedRoot(candidate, allowedRoots));
+  let firstAllowedCandidate = '';
+  for (const candidate of uniqueCandidates) {
+    if (!firstAllowedCandidate) firstAllowedCandidate = candidate;
+    if (pathExists(candidate)) return candidate;
+  }
+
+  if (firstAllowedCandidate) return firstAllowedCandidate;
+  throw new Error(`${label} could not be resolved inside project/package roots: ${token}`);
 }
 
 function pathExists(directoryPath = '') {
@@ -202,7 +280,7 @@ async function registerManifestViews(context = {}, options = {}) {
 
     let roots;
     try {
-      roots = declaration.paths.map((candidate) => resolveInsideProject(candidate, 'views path'));
+      roots = declaration.paths.map((candidate) => resolvePackageAwarePath(candidate, 'views path', context, options));
       const missing = roots.find((candidate) => !pathExists(candidate));
       if (missing) throw new Error(`View path does not exist: ${path.relative(resolveProjectRoot(), missing)}`);
     } catch (error) {
@@ -277,7 +355,7 @@ async function registerManifestAssets(context = {}, options = {}) {
 
     let assetRoot;
     try {
-      assetRoot = resolveInsideProject(declaration.path, 'assets path');
+      assetRoot = resolvePackageAwarePath(declaration.path, 'assets path', context, options);
       if (!pathExists(assetRoot)) {
         throw new Error(`Asset path does not exist: ${path.relative(resolveProjectRoot(), assetRoot)}`);
       }
