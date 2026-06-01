@@ -265,6 +265,90 @@ test('package manager ZIP install POST keeps protected middleware contract', asy
   });
 });
 
+test('package manager install preview POST keeps protected middleware contract', async () => {
+  await withStubbedSystemSettingsRoutes(async (router) => {
+    const app = express();
+    app.use(express.urlencoded({ extended: false }));
+    app.use('/systemSettings', router);
+
+    await withServer(app, async (baseUrl) => {
+      const missingToken = await fetch(`${baseUrl}/systemSettings/packages/install-preview`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ installMethod: 'path', manifestPath: 'packages/pte/package.manifest.json' }).toString()
+      });
+      assert.equal(missingToken.status, 403);
+      assert.equal((await missingToken.json()).status, 'token_required');
+
+      const allowed = await fetch(`${baseUrl}/systemSettings/packages/install-preview`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'x-admin-verified': 'yes',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          installMethod: 'path',
+          manifestPath: 'packages/pte/package.manifest.json',
+          actionStateId: 'STATE_PREVIEW_INSTALL_1'
+        }).toString()
+      });
+      assert.equal(allowed.status, 200);
+      const body = await allowed.json();
+      assert.equal(body.handler, 'previewInstallPackageFromManager');
+      assert.equal(body.actionState.requireToken, true);
+      assert.equal(body.actionState.actionStateId, 'STATE_PREVIEW_INSTALL_1');
+    });
+  });
+});
+
+test('package manager ZIP install preview POST keeps protected middleware contract', async () => {
+  await withStubbedSystemSettingsRoutes(async (router) => {
+    const app = express();
+    app.use('/systemSettings', router);
+
+    await withServer(app, async (baseUrl) => {
+      const missingTokenForm = new FormData();
+      missingTokenForm.set('packageZip', new Blob(['zip-bytes']), 'addon.zip');
+      missingTokenForm.set('packageSig', new Blob(['sig-bytes']), 'addon.sig');
+      const missingToken = await fetch(`${baseUrl}/systemSettings/packages/install-zip-preview`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes'
+        },
+        body: missingTokenForm
+      });
+      assert.equal(missingToken.status, 403);
+      assert.equal((await missingToken.json()).status, 'token_required');
+
+      const allowedForm = new FormData();
+      allowedForm.set('actionStateId', 'STATE_ZIP_PREVIEW_1');
+      allowedForm.set('packageZip', new Blob(['zip-bytes']), 'addon.zip');
+      allowedForm.set('packageSig', new Blob(['sig-bytes']), 'addon.sig');
+      const allowed = await fetch(`${baseUrl}/systemSettings/packages/install-zip-preview`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'x-admin-verified': 'yes'
+        },
+        body: allowedForm
+      });
+      assert.equal(allowed.status, 200);
+      const body = await allowed.json();
+      assert.equal(body.handler, 'previewInstallPackageZipFromManager');
+      assert.equal(body.actionState.requireToken, true);
+      assert.equal(body.actionState.actionStateId, 'STATE_ZIP_PREVIEW_1');
+    });
+  });
+});
+
 test('package manager remove POST keeps protected middleware contract', async () => {
   await withStubbedSystemSettingsRoutes(async (router) => {
     const app = express();
@@ -286,60 +370,6 @@ test('package manager remove POST keeps protected middleware contract', async ()
       const body = await response.json();
       assert.equal(body.handler, 'removePackageFromManager');
       assert.equal(body.actionState.requireToken, true);
-      assert.deepEqual(body.accessCheck, {
-        sectionId: SECTIONS.SYSTEM_PACKAGE_MANAGER,
-        operationId: OPERATIONS.UPDATE
-      });
-    });
-  });
-});
-
-test('package manager cleanup-failed POST keeps protected middleware contract', async () => {
-  await withStubbedSystemSettingsRoutes(async (router) => {
-    const app = express();
-    app.use(express.urlencoded({ extended: false }));
-    app.use('/systemSettings', router);
-
-    await withServer(app, async (baseUrl) => {
-      const missingToken = await fetch(`${baseUrl}/systemSettings/packages/cleanup-failed`, {
-        method: 'POST',
-        headers: {
-          authorization: 'Bearer allowed',
-          'x-allow-access': 'yes',
-          'content-type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({}).toString()
-      });
-      assert.equal(missingToken.status, 403);
-      assert.equal((await missingToken.json()).status, 'token_required');
-
-      const missingAdmin = await fetch(`${baseUrl}/systemSettings/packages/cleanup-failed`, {
-        method: 'POST',
-        headers: {
-          authorization: 'Bearer allowed',
-          'x-allow-access': 'yes',
-          'content-type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({ actionStateId: 'STATE_CLEAN_1' }).toString()
-      });
-      assert.equal(missingAdmin.status, 403);
-      assert.equal((await missingAdmin.json()).status, 'admin_required');
-
-      const allowed = await fetch(`${baseUrl}/systemSettings/packages/cleanup-failed`, {
-        method: 'POST',
-        headers: {
-          authorization: 'Bearer allowed',
-          'x-allow-access': 'yes',
-          'x-admin-verified': 'yes',
-          'content-type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({ actionStateId: 'STATE_CLEAN_2' }).toString()
-      });
-      assert.equal(allowed.status, 200);
-      const body = await allowed.json();
-      assert.equal(body.handler, 'cleanupFailedPackageAttemptsFromManager');
-      assert.equal(body.actionState.requireToken, true);
-      assert.equal(body.actionState.actionStateId, 'STATE_CLEAN_2');
       assert.deepEqual(body.accessCheck, {
         sectionId: SECTIONS.SYSTEM_PACKAGE_MANAGER,
         operationId: OPERATIONS.UPDATE
@@ -401,6 +431,60 @@ test('package manager transactions GET uses package manager access scope', async
       assert.equal(response.status, 200);
       const body = await response.json();
       assert.equal(body.handler, 'listPackageTransactionsFromManager');
+      assert.deepEqual(body.accessCheck, {
+        sectionId: SECTIONS.SYSTEM_PACKAGE_MANAGER,
+        operationId: OPERATIONS.UPDATE
+      });
+    });
+  });
+});
+
+test('package manager cleanup-failed POST keeps protected middleware contract', async () => {
+  await withStubbedSystemSettingsRoutes(async (router) => {
+    const app = express();
+    app.use(express.urlencoded({ extended: false }));
+    app.use('/systemSettings', router);
+
+    await withServer(app, async (baseUrl) => {
+      const missingToken = await fetch(`${baseUrl}/systemSettings/packages/cleanup-failed`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({}).toString()
+      });
+      assert.equal(missingToken.status, 403);
+      assert.equal((await missingToken.json()).status, 'token_required');
+
+      const missingAdmin = await fetch(`${baseUrl}/systemSettings/packages/cleanup-failed`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ actionStateId: 'STATE_CLEAN_1' }).toString()
+      });
+      assert.equal(missingAdmin.status, 403);
+      assert.equal((await missingAdmin.json()).status, 'admin_required');
+
+      const allowed = await fetch(`${baseUrl}/systemSettings/packages/cleanup-failed`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer allowed',
+          'x-allow-access': 'yes',
+          'x-admin-verified': 'yes',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ actionStateId: 'STATE_CLEAN_2' }).toString()
+      });
+      assert.equal(allowed.status, 200);
+      const body = await allowed.json();
+      assert.equal(body.handler, 'cleanupFailedPackageAttemptsFromManager');
+      assert.equal(body.actionState.requireToken, true);
+      assert.equal(body.actionState.actionStateId, 'STATE_CLEAN_2');
       assert.deepEqual(body.accessCheck, {
         sectionId: SECTIONS.SYSTEM_PACKAGE_MANAGER,
         operationId: OPERATIONS.UPDATE

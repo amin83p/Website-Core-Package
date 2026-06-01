@@ -1311,6 +1311,10 @@ function sendPackageManagerError(res, error, fallbackMessage = 'Package operatio
     message = 'This package includes org-bound exported data/files. Select a target organization and retry install.';
   } else if (code === 'BUILDER_PAYLOAD_IMPORT_FAILED') {
     message = 'Package install stopped because payload data import failed. Review details and retry after fixing the record conflict.';
+  } else if (code === 'PACKAGE_UPGRADE_PREVIEW_REQUIRED') {
+    message = 'Upgrade compatibility preview must be reviewed and confirmed before applying this package upgrade.';
+  } else if (code === 'PACKAGE_UPGRADE_PREVIEW_ACK_INVALID' || code === 'PACKAGE_UPGRADE_PREVIEW_ACK_MISMATCH') {
+    message = 'Upgrade confirmation token is invalid or stale. Re-run install preview and confirm again.';
   } else if (code === 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED') {
     message = 'Package Builder is disabled until PACKAGE_SIGNING_ED25519_PRIVATE_KEY_FILE or PACKAGE_SIGNING_ED25519_PRIVATE_KEY_BASE64 is configured with a valid private key and the app is restarted.';
   }
@@ -1414,7 +1418,8 @@ exports.installPackageFromManager = async (req, res) => {
       installMethod: cleanFormText(req.body?.installMethod, 40),
       localManifestPath: cleanFormText(req.body?.localManifestPath, 1600),
       manifestPath: cleanFormText(req.body?.manifestPath, 1600),
-      manifestJson: String(req.body?.manifestJson || '')
+      manifestJson: String(req.body?.manifestJson || ''),
+      upgradeAckToken: cleanFormText(req.body?.upgradeAckToken, 240)
     }, buildPackageManagerOptions(req));
     removeStartupFailureForPackage(req.app, report?.packageId, report);
 
@@ -1428,13 +1433,34 @@ exports.installPackageFromManager = async (req, res) => {
   }
 };
 
+exports.previewInstallPackageFromManager = async (req, res) => {
+  try {
+    const report = await systemSettingsPackageManagerService.previewPackageInstall({
+      installMethod: cleanFormText(req.body?.installMethod, 40),
+      localManifestPath: cleanFormText(req.body?.localManifestPath, 1600),
+      manifestPath: cleanFormText(req.body?.manifestPath, 1600),
+      manifestJson: String(req.body?.manifestJson || '')
+    }, buildPackageManagerOptions(req));
+    return res.json({
+      status: 'success',
+      message: report.isUpgrade
+        ? `Upgrade preview completed for "${report.packageId}" (${report.currentVersion || 'none'} -> ${report.nextVersion || ''}).`
+        : `Install preview completed for "${report.packageId}".`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'Package install preview failed.');
+  }
+};
+
 exports.installPackageZipFromManager = async (req, res) => {
   try {
     const packageZip = Array.isArray(req.files?.packageZip) ? req.files.packageZip[0] : null;
     const packageSig = Array.isArray(req.files?.packageSig) ? req.files.packageSig[0] : null;
     const report = await systemSettingsPackageManagerService.installPackageZip({
       zipBuffer: packageZip?.buffer,
-      signatureBuffer: packageSig?.buffer
+      signatureBuffer: packageSig?.buffer,
+      upgradeAckToken: cleanFormText(req.body?.upgradeAckToken, 240)
     }, buildPackageManagerOptions(req));
     removeStartupFailureForPackage(req.app, report?.packageId, report);
 
@@ -1445,6 +1471,26 @@ exports.installPackageZipFromManager = async (req, res) => {
     });
   } catch (error) {
     return sendPackageManagerError(res, error, 'ZIP package install failed.');
+  }
+};
+
+exports.previewInstallPackageZipFromManager = async (req, res) => {
+  try {
+    const packageZip = Array.isArray(req.files?.packageZip) ? req.files.packageZip[0] : null;
+    const packageSig = Array.isArray(req.files?.packageSig) ? req.files.packageSig[0] : null;
+    const report = await systemSettingsPackageManagerService.previewPackageInstallZip({
+      zipBuffer: packageZip?.buffer,
+      signatureBuffer: packageSig?.buffer
+    }, buildPackageManagerOptions(req));
+    return res.json({
+      status: 'success',
+      message: report.isUpgrade
+        ? `ZIP upgrade preview completed for "${report.packageId}" (${report.currentVersion || 'none'} -> ${report.nextVersion || ''}).`
+        : `ZIP install preview completed for "${report.packageId}".`,
+      report
+    });
+  } catch (error) {
+    return sendPackageManagerError(res, error, 'ZIP package install preview failed.');
   }
 };
 

@@ -353,6 +353,69 @@ test('install ZIP package controller returns clear message when trusted key is m
   }
 });
 
+test('install preview controller returns upgrade compatibility report', async () => {
+  const originalPreview = systemSettingsPackageManagerService.previewPackageInstall;
+  const res = makeRenderResponse();
+
+  try {
+    systemSettingsPackageManagerService.previewPackageInstall = async () => ({
+      action: 'install-preview',
+      isUpgrade: true,
+      packageId: 'pte',
+      currentVersion: '1.0.0',
+      nextVersion: '1.1.0',
+      blockingFindings: [{ code: 'NEW_ENTITY' }],
+      warningFindings: [],
+      ackToken: 'ACK_TOKEN_1'
+    });
+    await systemSettingsController.previewInstallPackageFromManager(
+      {
+        body: { installMethod: 'path', manifestPath: 'packages/pte/package.manifest.json' },
+        user: { id: 'USER_PREVIEW_1' },
+        app: {}
+      },
+      res
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonPayload?.status, 'success');
+    assert.equal(res.jsonPayload?.report?.ackToken, 'ACK_TOKEN_1');
+  } finally {
+    systemSettingsPackageManagerService.previewPackageInstall = originalPreview;
+  }
+});
+
+test('ZIP install preview controller returns upgrade compatibility report', async () => {
+  const originalPreview = systemSettingsPackageManagerService.previewPackageInstallZip;
+  const res = makeRenderResponse();
+
+  try {
+    systemSettingsPackageManagerService.previewPackageInstallZip = async () => ({
+      action: 'install-zip-preview',
+      isUpgrade: false,
+      packageId: 'pte',
+      blockingFindings: [],
+      warningFindings: [],
+      ackToken: ''
+    });
+    await systemSettingsController.previewInstallPackageZipFromManager(
+      {
+        files: {
+          packageZip: [{ buffer: Buffer.from('zip') }],
+          packageSig: [{ buffer: Buffer.from('sig') }]
+        },
+        user: { id: 'USER_PREVIEW_ZIP_1' },
+        app: {}
+      },
+      res
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonPayload?.status, 'success');
+    assert.equal(res.jsonPayload?.report?.action, 'install-zip-preview');
+  } finally {
+    systemSettingsPackageManagerService.previewPackageInstallZip = originalPreview;
+  }
+});
+
 test('install package controller returns structured payload import failure details', async () => {
   const originalInstall = systemSettingsPackageManagerService.installPackage;
   const res = makeRenderResponse();
@@ -606,7 +669,9 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /Package Manager/);
   assert.match(html, /Install \/ Enable Package/);
   assert.match(html, /\/systemSettings\/packages\/install/);
+  assert.match(html, /\/systemSettings\/packages\/install-preview/);
   assert.match(html, /\/systemSettings\/packages\/install-zip/);
+  assert.match(html, /\/systemSettings\/packages\/install-zip-preview/);
   assert.match(html, /\/systemSettings\/packages\/cleanup-failed/);
   assert.match(html, /ZIP Upload/);
   assert.match(html, /Trusted signature keys configured/i);
@@ -619,6 +684,8 @@ test('package manager EJS compiles and includes expected controls', () => {
   assert.match(html, /Recent Lifecycle Transactions/);
   assert.match(html, /Startup Package Load Warnings \(Registry State Unchanged\)/i);
   assert.match(html, /showRemoveInventoryWizard/);
+  assert.match(html, /showInstallUpgradeWizard/);
+  assert.match(html, /Upgrade Compatibility Preview/);
   assert.match(html, /Critical \(Always Removed\)/);
   assert.match(html, /Tables \(Selectable\)/);
   assert.match(html, /Files \(Selectable\)/);

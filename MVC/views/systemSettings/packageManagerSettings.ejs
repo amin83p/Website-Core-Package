@@ -834,17 +834,207 @@
     return selected === 'Clean Failed Attempts';
   }
 
-  async function installPackage() {
-    const installMethod = String(installMethodEl.value || '').trim();
-    const targetOrgId = String(targetOrgEl?.value || '').trim();
-    const progressSteps = getInstallProgressSteps(installMethod);
-    await requireAdminVerification();
+  function buildInstallPreviewListHtml(rows = [], renderer = null, emptyText = 'No items.') {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+      return `<div class="small text-muted">${escapeHtml(emptyText)}</div>`;
+    }
+    const itemRenderer = typeof renderer === 'function'
+      ? renderer
+      : ((row) => `<div class="small mb-2"><code>${escapeHtml(row?.entityType || row?.id || '')}</code></div>`);
+    return list.map((row) => itemRenderer(row)).join('');
+  }
+
+  function buildInstallWizardStepHtml(preview = {}, stepIndex = 0) {
+    const safeStep = Math.max(0, Math.min(2, Number(stepIndex) || 0));
+    const stepNumber = safeStep + 1;
+    const steps = [
+      {
+        title: 'New Tables/Entities',
+        hint: 'Review new data entities introduced by this upgrade.',
+        rows: Array.isArray(preview?.newEntities) ? preview.newEntities : [],
+        renderer: (row) => `
+          <div class="small mb-2">
+            <span class="fw-semibold"><code>${escapeHtml(row?.entityType || '')}</code></span>
+            <span class="text-muted ms-1">${escapeHtml(row?.reasonCode || '')}</span>
+          </div>
+        `,
+        emptyText: 'No new entities detected.'
+      },
+      {
+        title: 'Structure Changes',
+        hint: 'Review schema contract differences between current and incoming manifests.',
+        rows: Array.isArray(preview?.schemaChanges) ? preview.schemaChanges : [],
+        renderer: (row) => `
+          <div class="small mb-2">
+            <span class="fw-semibold"><code>${escapeHtml(row?.entityType || '')}</code></span>
+            <span class="text-muted ms-1">(${escapeHtml(row?.changeType || 'changed')})</span>
+            <div class="text-muted">from <code>${escapeHtml(row?.previousSignature || '-')}</code> to <code>${escapeHtml(row?.nextSignature || '-')}</code></div>
+          </div>
+        `,
+        emptyText: 'No schema signature changes detected.'
+      },
+      {
+        title: 'Behavior Compatibility Checks',
+        hint: 'Review guard outcomes for data compatibility requirements.',
+        rows: Array.isArray(preview?.behaviorChecks) ? preview.behaviorChecks : [],
+        renderer: (row) => `
+          <div class="small mb-2">
+            <span class="fw-semibold"><code>${escapeHtml(row?.guardId || '')}</code></span>
+            <span class="badge ms-1 ${String(row?.status || '').toLowerCase() === 'ok' ? 'bg-success-subtle text-success-emphasis border border-success-subtle' : (String(row?.status || '').toLowerCase() === 'warning' ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : (String(row?.status || '').toLowerCase() === 'skipped' ? 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle' : 'bg-danger-subtle text-danger-emphasis border border-danger-subtle'))}">
+              ${escapeHtml(String(row?.status || 'unknown').toUpperCase())}
+            </span>
+            <div class="text-muted">${escapeHtml(row?.message || '')}</div>
+          </div>
+        `,
+        emptyText: 'No upgrade guards declared.'
+      }
+    ];
+    const model = steps[safeStep];
+    const blockingCount = Array.isArray(preview?.blockingFindings) ? preview.blockingFindings.length : 0;
+    const warningCount = Array.isArray(preview?.warningFindings) ? preview.warningFindings.length : 0;
+    return `
+      <div class="small">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+          <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">Step ${stepNumber} of 3</span>
+          <span class="text-muted"><code>${escapeHtml(preview?.packageId || '')}</code> ${escapeHtml(preview?.currentVersion || '-')} -> ${escapeHtml(preview?.nextVersion || '-')}</span>
+        </div>
+        <div class="mb-2">
+          <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle me-1">Blocking: ${blockingCount}</span>
+          <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Warning: ${warningCount}</span>
+        </div>
+        <div class="border rounded p-2">
+          <div class="fw-semibold mb-1">${escapeHtml(model.title)}</div>
+          <div class="text-muted small mb-2">${escapeHtml(model.hint)}</div>
+          <div class="border rounded p-2" style="height: 260px; overflow:auto;">
+            ${buildInstallPreviewListHtml(model.rows, model.renderer, model.emptyText)}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function showInstallUpgradeWizard(preview = {}) {
+    if (!(preview?.isUpgrade === true) || preview?.requiresAcknowledgement !== true) {
+      return {
+        status: 'ready',
+        ackToken: String(preview?.ackToken || '').trim()
+      };
+    }
+    let stepIndex = 0;
+    while (true) {
+      const buttons = stepIndex === 0
+        ? [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Next', class: 'btn-primary' }
+        ]
+        : (stepIndex === 1
+          ? [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Back', class: 'btn-outline-secondary' },
+            { text: 'Next', class: 'btn-primary' }
+          ]
+          : [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Back', class: 'btn-outline-secondary' },
+            { text: 'Confirm Upgrade', class: 'btn-danger' }
+          ]);
+      const decision = await showModal({
+        title: 'Upgrade Compatibility Preview',
+        icon: 'warning',
+        size: 'lg',
+        message: buildInstallWizardStepHtml(preview, stepIndex),
+        buttons
+      });
+      if (decision === 'Cancel' || decision === 'closed') {
+        return { status: 'cancelled', ackToken: '' };
+      }
+      if (decision === 'Back') {
+        stepIndex = Math.max(0, stepIndex - 1);
+        continue;
+      }
+      if (decision === 'Next') {
+        stepIndex = Math.min(2, stepIndex + 1);
+        continue;
+      }
+      if (decision === 'Confirm Upgrade') {
+        return {
+          status: 'ready',
+          ackToken: String(preview?.ackToken || '').trim()
+        };
+      }
+      return { status: 'cancelled', ackToken: '' };
+    }
+  }
+
+  async function runInstallPreview(installMethod, targetOrgId) {
     if (installMethod === 'zip') {
       const zipFile = document.getElementById('pkgZipFile')?.files?.[0] || null;
       const sigFile = document.getElementById('pkgSigFile')?.files?.[0] || null;
       const formData = new FormData();
       formData.set('actionStateId', actionStateId);
       if (targetOrgId) formData.set('targetOrgId', targetOrgId);
+      if (zipFile) formData.set('packageZip', zipFile);
+      if (sigFile) formData.set('packageSig', sigFile);
+      return runWithWaiting('Preview Package ZIP Upgrade', async () => fetchJson('/systemSettings/packages/install-zip-preview', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: formData
+      }), {
+        note: 'Running upgrade compatibility checks for ZIP package...',
+        operation: 'ZIP Install Preview'
+      });
+    }
+    const payload = {
+      installMethod,
+      localManifestPath: document.getElementById('pkgLocalManifestPath').value || '',
+      manifestPath: document.getElementById('pkgManualManifestPath').value || '',
+      manifestJson: document.getElementById('pkgManifestJson').value || '',
+      actionStateId
+    };
+    if (targetOrgId) payload.targetOrgId = targetOrgId;
+    return runWithWaiting('Preview Package Upgrade', async () => fetchJson('/systemSettings/packages/install-preview', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'X-AJAX-Request': 'true'
+      },
+      body: new URLSearchParams(payload).toString()
+    }), {
+      note: 'Running upgrade compatibility checks...',
+      operation: 'Install Preview'
+    });
+  }
+
+  async function installPackage() {
+    const installMethod = String(installMethodEl.value || '').trim();
+    const targetOrgId = String(targetOrgEl?.value || '').trim();
+    const progressSteps = getInstallProgressSteps(installMethod);
+    await requireAdminVerification();
+    const previewResult = await runInstallPreview(installMethod, targetOrgId);
+    const preview = previewResult?.report || {};
+    const wizard = await showInstallUpgradeWizard(preview);
+    if (wizard?.status === 'cancelled') {
+      return {
+        status: 'cancelled',
+        report: preview
+      };
+    }
+    const upgradeAckToken = String(wizard?.ackToken || '').trim();
+
+    if (installMethod === 'zip') {
+      const zipFile = document.getElementById('pkgZipFile')?.files?.[0] || null;
+      const sigFile = document.getElementById('pkgSigFile')?.files?.[0] || null;
+      const formData = new FormData();
+      formData.set('actionStateId', actionStateId);
+      if (targetOrgId) formData.set('targetOrgId', targetOrgId);
+      if (upgradeAckToken) formData.set('upgradeAckToken', upgradeAckToken);
       if (zipFile) formData.set('packageZip', zipFile);
       if (sigFile) formData.set('packageSig', sigFile);
       return runWithWaiting('Installing Package ZIP', async () => fetchJson('/systemSettings/packages/install-zip', {
@@ -869,6 +1059,7 @@
       manifestJson: document.getElementById('pkgManifestJson').value || '',
       actionStateId
     };
+    if (upgradeAckToken) payload.upgradeAckToken = upgradeAckToken;
     if (targetOrgId) payload.targetOrgId = targetOrgId;
     return runWithWaiting('Installing Package', async () => fetchJson('/systemSettings/packages/install', {
       method: 'POST',
@@ -1059,6 +1250,10 @@
     installBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running...';
     try {
       const result = await installPackage();
+      if (result?.status === 'cancelled') {
+        setOutput('Cancelled', { action: 'install-preview-or-upgrade-confirmation' });
+        return;
+      }
       setOutput('Install / Enable', result.report || result);
       await showSuccess(result.message || 'Package operation completed.');
       window.location.reload();

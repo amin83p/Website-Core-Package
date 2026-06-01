@@ -43,6 +43,7 @@ function normalizeInstallMethod(value = '') {
   if (token === 'local') return 'local';
   if (token === 'path') return 'path';
   if (token === 'json') return 'json';
+  if (token === 'zip') return 'zip';
   return '';
 }
 
@@ -325,6 +326,11 @@ function sanitizeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function normalizeIdList(value = []) {
+  const source = Array.isArray(value) ? value : [];
+  return Array.from(new Set(source.map((row) => cleanText(row, 220)).filter(Boolean)));
+}
+
 function countExpectedRuntimeUseRouteDeclarations(manifest = {}) {
   const declarations = Array.isArray(manifest?.routes) ? manifest.routes : [];
   return declarations.filter((row) => {
@@ -425,6 +431,11 @@ function createDependencies(overrides = {}) {
 function createService(overrides = {}) {
   const deps = createDependencies(overrides);
   const zipLimits = getZipInstallLimits(overrides.env || process.env);
+  const upgradePreviewSessions = new Map();
+  const UPGRADE_PREVIEW_TTL_MS = readPositiveInt(
+    (overrides.env || process.env).PACKAGE_UPGRADE_PREVIEW_TTL_SECONDS,
+    1800
+  ) * 1000;
   const FAILED_ATTEMPT_MACHINE_MARKER = '[PACKAGE_FAILED_ATTEMPT]';
   const FAILED_ATTEMPT_REASON_CODES = {
     INSTALL_STATUS_FAILED: 'INSTALL_STATUS_FAILED',
@@ -432,6 +443,94 @@ function createService(overrides = {}) {
     MACHINE_MARKER_WARNING: 'MACHINE_MARKER_WARNING',
     MACHINE_MARKER_ERROR: 'MACHINE_MARKER_ERROR'
   };
+
+  function cleanupExpiredUpgradePreviewSessions(nowMs = Date.now()) {
+    for (const [token, row] of upgradePreviewSessions.entries()) {
+      const expiresAtMs = Number(row?.expiresAtMs || 0);
+      if (!expiresAtMs || expiresAtMs <= nowMs) {
+        upgradePreviewSessions.delete(token);
+      }
+    }
+  }
+
+  function issueUpgradePreviewAckToken(preview = {}, options = {}) {
+    const isUpgrade = preview?.isUpgrade === true;
+    if (!isUpgrade || preview?.requiresAcknowledgement !== true) return '';
+    cleanupExpiredUpgradePreviewSessions();
+    const token = crypto.randomBytes(24).toString('hex');
+    const nowMs = Date.now();
+    const expiresAtMs = nowMs + UPGRADE_PREVIEW_TTL_MS;
+    upgradePreviewSessions.set(token, {
+      token,
+      packageId: normalizePackageId(preview?.packageId),
+      currentVersion: cleanText(preview?.currentVersion, 120),
+      nextVersion: cleanText(preview?.nextVersion, 120),
+      installMethod: normalizeInstallMethod(options.installMethod || preview?.installMethod || ''),
+      manifestChecksum: cleanText(options.manifestChecksum || '', 120),
+      expiresAtMs,
+      generatedAt: new Date(nowMs).toISOString(),
+      previewSummary: {
+        blockingCount: Number(preview?.blockingFindings?.length || 0),
+        warningCount: Number(preview?.warningFindings?.length || 0)
+      }
+    });
+    return token;
+  }
+
+  function validateUpgradePreviewAckToken(preview = {}, inputToken = '', options = {}) {
+    const token = cleanText(inputToken, 240);
+    if (!preview?.isUpgrade || preview?.requiresAcknowledgement !== true) {
+      return { accepted: true, reason: 'not_required' };
+    }
+    cleanupExpiredUpgradePreviewSessions();
+    if (!token) {
+      const error = new Error('Upgrade preview acknowledgement is required before applying this package upgrade.');
+      error.code = 'PACKAGE_UPGRADE_PREVIEW_REQUIRED';
+      error.details = {
+        packageId: normalizePackageId(preview?.packageId),
+        currentVersion: cleanText(preview?.currentVersion, 120),
+        nextVersion: cleanText(preview?.nextVersion, 120),
+        blockingFindings: sanitizeArray(preview?.blockingFindings),
+        warningFindings: sanitizeArray(preview?.warningFindings)
+      };
+      throw error;
+    }
+    const session = upgradePreviewSessions.get(token);
+    if (!session) {
+      const error = new Error('Upgrade preview acknowledgement token is invalid or expired. Re-run preview and confirm again.');
+      error.code = 'PACKAGE_UPGRADE_PREVIEW_ACK_INVALID';
+      throw error;
+    }
+    const expectedPackageId = normalizePackageId(preview?.packageId);
+    const expectedNextVersion = cleanText(preview?.nextVersion, 120);
+    const expectedMethod = normalizeInstallMethod(options.installMethod || preview?.installMethod || '');
+    const expectedChecksum = cleanText(options.manifestChecksum || '', 120);
+    const mismatched = (
+      session.packageId !== expectedPackageId
+      || session.nextVersion !== expectedNextVersion
+      || (expectedMethod && session.installMethod && session.installMethod !== expectedMethod)
+      || (expectedChecksum && session.manifestChecksum && session.manifestChecksum !== expectedChecksum)
+    );
+    if (mismatched) {
+      const error = new Error('Upgrade preview acknowledgement does not match the selected package build. Re-run preview and confirm again.');
+      error.code = 'PACKAGE_UPGRADE_PREVIEW_ACK_MISMATCH';
+      error.details = {
+        expected: {
+          packageId: expectedPackageId,
+          nextVersion: expectedNextVersion,
+          installMethod: expectedMethod
+        },
+        actual: {
+          packageId: session.packageId,
+          nextVersion: session.nextVersion,
+          installMethod: session.installMethod
+        }
+      };
+      throw error;
+    }
+    upgradePreviewSessions.delete(token);
+    return { accepted: true, reason: 'acknowledged' };
+  }
 
   async function fileExists(filePath = '') {
     try {
@@ -947,6 +1046,7 @@ function createService(overrides = {}) {
     }
     const reinstallRecovery = versionDecision.reinstallRecovery === true;
     const isUpgrade = Boolean(previousRegistry);
+    const upgradePreflight = sanitizeObject(resolved?.upgradePreflight);
     const txAction = cleanText(resolved.action, 80) || (isUpgrade ? 'upgrade' : 'install');
     const transaction = resolved.transactionId
       ? { id: cleanText(resolved.transactionId, 160) }
@@ -960,11 +1060,13 @@ function createService(overrides = {}) {
           activationMode: cleanText(resolved.activationMode, 120),
           manifestPath: toStoredManifestPath(resolved.manifestPath || ''),
           previousVersion,
-          reinstallRecovery
+          reinstallRecovery,
+          upgradePreflightRequiredAck: upgradePreflight?.requiresAcknowledgement === true
         },
         artifacts: {
           previousRegistry,
-          fileMutation: sanitizeObject(resolved.fileMutation)
+          fileMutation: sanitizeObject(resolved.fileMutation),
+          upgradePreflight
         }
       }, { backendMode, actor });
     const transactionId = cleanText(transaction?.id, 160);
@@ -973,7 +1075,10 @@ function createService(overrides = {}) {
     await markLifecyclePhase(transactionId, 'preflight', 'completed', {
       packageId,
       previousVersion: previousVersion || '',
-      nextVersion
+      nextVersion,
+      upgradePreflightRequiredAck: upgradePreflight?.requiresAcknowledgement === true,
+      upgradePreflightBlockingCount: Number(upgradePreflight?.blockingFindings?.length || 0),
+      upgradePreflightWarningCount: Number(upgradePreflight?.warningFindings?.length || 0)
     }, { backendMode, actor });
     await markLifecyclePhase(transactionId, 'apply', 'in_progress', {}, { backendMode, actor });
 
@@ -1142,7 +1247,8 @@ function createService(overrides = {}) {
           beforeSnapshots,
           afterSnapshots,
           dataLifecycleReport,
-          builderPayloadReport
+          builderPayloadReport,
+          upgradePreflight
         },
         summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations)
       }, { backendMode, actor });
@@ -1169,6 +1275,7 @@ function createService(overrides = {}) {
         skippedSteps: sanitizeArray(dataLifecycleReport?.skippedSteps),
         failedStep: dataLifecycleReport?.failedStep || null,
         rollbackApplied: dataLifecycleReport?.rollbackApplied === true,
+        upgradePreflight,
         registry: {
           enabled: result?.enabled === true,
           installStatus: cleanText(result?.installStatus, 80),
@@ -1282,7 +1389,8 @@ function createService(overrides = {}) {
           previousRegistry,
           fileMutation: sanitizeObject(resolved.fileMutation),
           beforeSnapshots,
-          dataLifecycleReport
+          dataLifecycleReport,
+          upgradePreflight
         },
         summaryByEntity: createLifecycleSummaryByEntity(lifecycleOperations)
       }, { backendMode, actor }).catch(() => null);
@@ -1433,6 +1541,344 @@ function createService(overrides = {}) {
       existing,
       resolved,
       manifestResolutionError
+    };
+  }
+
+  function collectManifestEntityTypes(manifest = {}) {
+    const out = new Set();
+    sanitizeArray(manifest?.dataEntities).forEach((row) => {
+      if (typeof row === 'string') {
+        const entity = cleanText(row, 200);
+        if (entity) out.add(entity);
+        return;
+      }
+      const source = sanitizeObject(row);
+      const entity = cleanText(source.entityType || source.table || source.id, 200);
+      if (entity) out.add(entity);
+    });
+    return Array.from(out);
+  }
+
+  async function collectBuilderPayloadEntityTypes(manifestContext = {}, options = {}) {
+    if (
+      !deps.packageBuilderService
+      || typeof deps.packageBuilderService.previewBuilderPayloadDeletionInventory !== 'function'
+    ) {
+      return [];
+    }
+    try {
+      const inventory = await deps.packageBuilderService.previewBuilderPayloadDeletionInventory({
+        backendMode: cleanText(options.backendMode, 30) || undefined,
+        packageId: cleanText(manifestContext?.manifest?.id, 120),
+        packageName: cleanText(manifestContext?.manifest?.name, 200),
+        manifest: manifestContext?.manifest || {},
+        manifestPath: cleanText(manifestContext?.manifestPath, 2000)
+      }, {
+        backendMode: cleanText(options.backendMode, 30) || undefined,
+        targetOrgId: cleanText(options.targetOrgId, 160)
+      });
+      return normalizeIdList(
+        sanitizeArray(inventory?.tableRows).map((row) => cleanText(row?.entityType || row?.id, 200))
+      );
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function buildDataSchemaMap(manifest = {}) {
+    const map = new Map();
+    sanitizeArray(manifest?.dataSchemas).forEach((row) => {
+      const entityType = cleanText(row?.entityType, 200);
+      if (!entityType) return;
+      const key = entityType.toLowerCase();
+      const signature = cleanText(row?.signature || row?.schemaHash, 200);
+      map.set(key, {
+        entityType,
+        signature,
+        fields: normalizeIdList(sanitizeArray(row?.fields).map((item) => cleanText(item, 240)))
+      });
+    });
+    return map;
+  }
+
+  function resolveGuardScriptPath(packageDir = '', relativeScriptPath = '') {
+    const safePackageDir = path.resolve(cleanText(packageDir, 2000));
+    const scriptPath = cleanText(relativeScriptPath, 1800).replace(/\\/g, '/');
+    if (!safePackageDir) throw new Error('Guard package directory is required.');
+    if (!scriptPath) throw new Error('Guard script path is required.');
+    if (path.isAbsolute(scriptPath)) throw new Error('Guard script path must be relative to package folder.');
+    const absPath = path.resolve(safePackageDir, scriptPath);
+    const rel = path.relative(safePackageDir, absPath);
+    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+      throw new Error(`Guard script escapes package boundary: ${relativeScriptPath}`);
+    }
+    return absPath;
+  }
+
+  async function executeUpgradeGuard(guard = {}, context = {}, options = {}) {
+    const packageDir = path.dirname(path.resolve(cleanText(context?.manifestPath, 2000)));
+    const scriptPath = resolveGuardScriptPath(packageDir, guard.script);
+    if (!(await fileExists(scriptPath))) {
+      throw new Error(`Upgrade guard script not found: ${guard.script}`);
+    }
+    let loaded;
+    delete require.cache[require.resolve(scriptPath)];
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    loaded = require(scriptPath);
+    const executable = typeof loaded === 'function'
+      ? loaded
+      : (typeof loaded?.run === 'function'
+        ? loaded.run
+        : (typeof loaded?.default === 'function' ? loaded.default : null));
+    if (typeof executable !== 'function') {
+      throw new Error(`Upgrade guard "${guard.id}" script does not export a runnable function.`);
+    }
+    const result = await Promise.resolve(executable({
+      packageId: cleanText(context?.manifest?.id, 120),
+      packageName: cleanText(context?.manifest?.name, 200),
+      nextVersion: cleanText(context?.manifest?.version, 120),
+      previousVersion: cleanText(context?.previousVersion, 120),
+      currentManifest: context?.currentManifest || null,
+      incomingManifest: context?.manifest || {},
+      backendMode: cleanText(options.backendMode, 30) || 'json',
+      targetOrgId: cleanText(options.targetOrgId, 120),
+      operationContext: sanitizeObject(options.operationContext)
+    }));
+    const normalized = sanitizeObject(result);
+    const status = cleanText(normalized.status, 40).toLowerCase() || 'ok';
+    const message = cleanText(normalized.message, 1200);
+    const warnings = sanitizeArray(normalized.warnings).map((row) => cleanText(row, 1200)).filter(Boolean);
+    return {
+      status,
+      message,
+      warnings,
+      details: sanitizeObject(normalized.details)
+    };
+  }
+
+  function buildPreflightFinding(category = '', code = '', severity = 'warning', message = '', details = {}) {
+    return {
+      category: cleanText(category, 80) || 'upgrade_preflight',
+      code: cleanText(code, 120) || 'UPGRADE_PREFLIGHT',
+      severity: cleanText(severity, 20).toLowerCase() === 'blocking' ? 'blocking' : 'warning',
+      message: cleanText(message, 1600) || 'Upgrade compatibility review finding.',
+      details: sanitizeObject(details)
+    };
+  }
+
+  async function buildUpgradeCompatibilityPreview(resolved = {}, presence = {}, options = {}) {
+    const manifest = resolved?.manifest || {};
+    const packageId = normalizePackageId(manifest?.id);
+    const packageName = cleanText(manifest?.name, 200);
+    const nextVersion = cleanText(manifest?.version, 120);
+    const currentVersion = cleanText(presence?.existing?.version, 120);
+    const isUpgrade = Boolean(presence?.existing) && compareSemver(nextVersion, currentVersion || '0.0.0') > 0;
+    const installMethod = normalizeInstallMethod(resolved?.installMethod || options.installMethod || '');
+    const currentManifest = presence?.resolved?.manifest || null;
+    const incomingManifestContext = {
+      manifest,
+      manifestPath: resolved?.manifestPath
+    };
+    const currentManifestContext = {
+      manifest: currentManifest || {},
+      manifestPath: presence?.resolved?.manifestPath || ''
+    };
+
+    const incomingEntities = new Set(collectManifestEntityTypes(manifest));
+    const currentEntities = new Set(collectManifestEntityTypes(currentManifest || {}));
+    const incomingPayloadEntities = await collectBuilderPayloadEntityTypes(incomingManifestContext, options);
+    incomingPayloadEntities.forEach((entity) => incomingEntities.add(entity));
+    if (currentManifest) {
+      const currentPayloadEntities = await collectBuilderPayloadEntityTypes(currentManifestContext, options);
+      currentPayloadEntities.forEach((entity) => currentEntities.add(entity));
+    }
+
+    const newEntities = Array.from(incomingEntities)
+      .filter((entity) => !currentEntities.has(entity))
+      .sort((a, b) => a.localeCompare(b))
+      .map((entityType) => ({ entityType, reasonCode: 'NEW_ENTITY' }));
+
+    const incomingSchemaMap = buildDataSchemaMap(manifest);
+    const currentSchemaMap = buildDataSchemaMap(currentManifest || {});
+    const schemaChanges = [];
+    const keys = new Set([...incomingSchemaMap.keys(), ...currentSchemaMap.keys()]);
+    keys.forEach((key) => {
+      const nextRow = incomingSchemaMap.get(key) || null;
+      const prevRow = currentSchemaMap.get(key) || null;
+      if (!prevRow && nextRow) {
+        schemaChanges.push({
+          entityType: nextRow.entityType,
+          changeType: 'added',
+          previousSignature: '',
+          nextSignature: nextRow.signature || '',
+          reasonCode: 'DATA_SCHEMA_ADDED'
+        });
+        return;
+      }
+      if (prevRow && !nextRow) {
+        schemaChanges.push({
+          entityType: prevRow.entityType,
+          changeType: 'removed',
+          previousSignature: prevRow.signature || '',
+          nextSignature: '',
+          reasonCode: 'DATA_SCHEMA_REMOVED'
+        });
+        return;
+      }
+      if (!prevRow || !nextRow) return;
+      if (cleanText(prevRow.signature, 200) !== cleanText(nextRow.signature, 200)) {
+        schemaChanges.push({
+          entityType: nextRow.entityType,
+          changeType: 'signature_changed',
+          previousSignature: prevRow.signature || '',
+          nextSignature: nextRow.signature || '',
+          reasonCode: 'DATA_SCHEMA_SIGNATURE_CHANGED'
+        });
+      }
+    });
+
+    const behaviorChecks = [];
+    if (isUpgrade) {
+      const guardRows = sanitizeArray(manifest?.upgradeGuards);
+      for (const guard of guardRows) {
+        const guardVersion = cleanText(guard?.version, 120);
+        if (currentVersion && compareSemver(guardVersion, currentVersion) <= 0) {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+        const backendModes = sanitizeArray(guard?.backendModes).map((row) => cleanText(row, 40).toLowerCase());
+        const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+        if (backendModes.length && !backendModes.includes(backendMode)) {
+          behaviorChecks.push({
+            guardId: cleanText(guard?.id, 200),
+            version: guardVersion,
+            severity: cleanText(guard?.severity, 20) || 'blocking',
+            status: 'skipped',
+            code: 'UPGRADE_GUARD_SKIPPED_BACKEND',
+            message: `Guard skipped for backend "${backendMode}".`,
+            details: {}
+          });
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const result = await executeUpgradeGuard(guard, {
+            manifest,
+            manifestPath: resolved?.manifestPath,
+            currentManifest,
+            previousVersion: currentVersion
+          }, options);
+          const status = result.status === 'blocking' || result.status === 'warning'
+            ? result.status
+            : 'ok';
+          behaviorChecks.push({
+            guardId: cleanText(guard?.id, 200),
+            version: guardVersion,
+            severity: cleanText(guard?.severity, 20) || 'blocking',
+            status,
+            code: status === 'ok' ? 'UPGRADE_GUARD_OK' : 'UPGRADE_GUARD_REPORTED',
+            message: result.message || `Upgrade guard "${cleanText(guard?.id, 200)}" completed.`,
+            details: result.details || {},
+            warnings: result.warnings || []
+          });
+        } catch (error) {
+          behaviorChecks.push({
+            guardId: cleanText(guard?.id, 200),
+            version: guardVersion,
+            severity: cleanText(guard?.severity, 20) || 'blocking',
+            status: 'blocking',
+            code: 'UPGRADE_GUARD_EXECUTION_FAILED',
+            message: cleanText(error?.message || String(error), 1200) || 'Upgrade guard execution failed.',
+            details: {}
+          });
+        }
+      }
+    }
+
+    const findings = [];
+    newEntities.forEach((row) => {
+      findings.push(buildPreflightFinding(
+        'new_entities',
+        row.reasonCode || 'NEW_ENTITY',
+        'blocking',
+        `New entity/table "${row.entityType}" will be introduced by this package upgrade.`,
+        row
+      ));
+    });
+    schemaChanges.forEach((row) => {
+      findings.push(buildPreflightFinding(
+        'schema_changes',
+        row.reasonCode || 'DATA_SCHEMA_CHANGED',
+        'blocking',
+        `Data schema contract changed for "${row.entityType}" (${row.changeType}).`,
+        row
+      ));
+    });
+    behaviorChecks.forEach((row) => {
+      const status = cleanText(row?.status, 20).toLowerCase();
+      if (status === 'ok' || status === 'skipped') return;
+      const guardSeverity = cleanText(row?.severity, 20).toLowerCase() === 'warning' ? 'warning' : 'blocking';
+      const effectiveSeverity = status === 'blocking' ? 'blocking' : guardSeverity;
+      findings.push(buildPreflightFinding(
+        'behavior_compat',
+        cleanText(row?.code, 120) || 'UPGRADE_GUARD_REPORTED',
+        effectiveSeverity,
+        row?.message || `Upgrade guard "${row?.guardId || ''}" reported compatibility issues.`,
+        row
+      ));
+    });
+
+    if (isUpgrade && (!sanitizeArray(manifest?.dataSchemas).length || !sanitizeArray(currentManifest?.dataSchemas).length)) {
+      findings.push(buildPreflightFinding(
+        'contract',
+        'DATA_SCHEMA_CONTRACT_INCOMPLETE',
+        'warning',
+        'Data schema contract is missing in current or incoming manifest. Confirm upgrade impact before apply.',
+        {
+          currentHasDataSchemas: sanitizeArray(currentManifest?.dataSchemas).length > 0,
+          nextHasDataSchemas: sanitizeArray(manifest?.dataSchemas).length > 0
+        }
+      ));
+    }
+    if (isUpgrade && !sanitizeArray(manifest?.upgradeGuards).length) {
+      findings.push(buildPreflightFinding(
+        'contract',
+        'UPGRADE_GUARD_CONTRACT_MISSING',
+        'warning',
+        'Incoming manifest does not declare upgrade compatibility guards. Confirm upgrade manually before apply.',
+        {}
+      ));
+    }
+
+    const blockingFindings = findings.filter((row) => row.severity === 'blocking');
+    const warningFindings = findings.filter((row) => row.severity !== 'blocking');
+    const requiresAcknowledgement = isUpgrade && findings.length > 0;
+    const manifestChecksum = hashPayload({
+      id: packageId,
+      version: nextVersion,
+      dataSchemas: sanitizeArray(manifest?.dataSchemas),
+      upgradeGuards: sanitizeArray(manifest?.upgradeGuards),
+      dataEntities: sanitizeArray(manifest?.dataEntities)
+    });
+
+    return {
+      action: 'install-preview',
+      isUpgrade,
+      installMethod,
+      packageId,
+      packageName,
+      currentVersion,
+      nextVersion,
+      newEntities,
+      schemaChanges,
+      behaviorChecks,
+      blockingFindings,
+      warningFindings,
+      requiresAcknowledgement,
+      manifestChecksum,
+      ackToken: '',
+      warnings: []
     };
   }
 
@@ -1649,6 +2095,41 @@ function createService(overrides = {}) {
     };
   }
 
+  function buildPreviewResponse(preview = {}, options = {}) {
+    const installMethod = normalizeInstallMethod(options.installMethod || preview?.installMethod || '');
+    const token = issueUpgradePreviewAckToken(preview, {
+      installMethod,
+      manifestChecksum: cleanText(preview?.manifestChecksum, 120)
+    });
+    const session = token ? upgradePreviewSessions.get(token) : null;
+    return {
+      ...preview,
+      action: cleanText(options.action, 80) || 'install-preview',
+      installMethod,
+      ackToken: token,
+      ackExpiresAt: session ? new Date(Number(session.expiresAtMs || 0)).toISOString() : '',
+      generatedAt: new Date().toISOString()
+    };
+  }
+
+  async function previewPackageInstall(input = {}, options = {}) {
+    const resolved = await resolveInstallManifest(input, options);
+    const backendMode = cleanText(options.backendMode, 30) || undefined;
+    const packageId = normalizePackageId(resolved?.manifest?.id || '');
+    const presence = packageId
+      ? await inspectPackagePresence(packageId, { ...options, backendMode })
+      : { existing: null, resolved: null };
+    const preview = await buildUpgradeCompatibilityPreview(resolved, presence, {
+      ...options,
+      installMethod: resolved?.installMethod || 'path',
+      backendMode
+    });
+    return buildPreviewResponse(preview, {
+      action: 'install-preview',
+      installMethod: resolved?.installMethod || 'path'
+    });
+  }
+
   async function installPackage(input = {}, options = {}) {
     const resolved = await resolveInstallManifest(input, options);
     const backendMode = cleanText(options.backendMode, 30) || undefined;
@@ -1656,13 +2137,70 @@ function createService(overrides = {}) {
     const presence = packageId
       ? await inspectPackagePresence(packageId, { ...options, backendMode })
       : { resolved: null, missingFilesRecoveryEligible: false };
+    const preflight = await buildUpgradeCompatibilityPreview(resolved, presence, {
+      ...options,
+      installMethod: resolved?.installMethod || 'path',
+      backendMode
+    });
+    validateUpgradePreviewAckToken(preflight, cleanText(input?.upgradeAckToken, 240), {
+      installMethod: resolved?.installMethod || 'path',
+      manifestChecksum: cleanText(preflight?.manifestChecksum, 120)
+    });
     return installResolvedManifest({
       ...resolved,
       action: 'install',
       packageSource: 'manual',
       previousResolved: presence.resolved || null,
-      allowSameVersionRecovery: presence.missingFilesRecoveryEligible === true
+      allowSameVersionRecovery: presence.missingFilesRecoveryEligible === true,
+      upgradePreflight: preflight
     }, options);
+  }
+
+  async function previewPackageInstallZip(input = {}, options = {}) {
+    const zipBuffer = input?.zipBuffer;
+    const signatureBuffer = input?.signatureBuffer;
+    if (!Buffer.isBuffer(zipBuffer) || !zipBuffer.length) {
+      throw new Error('Package ZIP file is required.');
+    }
+    if (!Buffer.isBuffer(signatureBuffer) || !signatureBuffer.length) {
+      throw new Error('Package signature file is required.');
+    }
+    if (zipBuffer.length > zipLimits.maxUploadBytes) {
+      throw new Error('Package ZIP exceeds configured maximum upload size.');
+    }
+    await verifyZipSignature(zipBuffer, signatureBuffer, options);
+
+    const stagingRoot = await deps.fs.mkdtemp(path.join(os.tmpdir(), 'pkg-preview-zip-'));
+    try {
+      const extracted = await extractZipToStaging(zipBuffer, stagingRoot);
+      const rawManifest = JSON.parse(await deps.fs.readFile(extracted.manifestPath, 'utf8'));
+      const manifest = deps.packageManifestService.validatePackageManifest(rawManifest, { knownIds: [] });
+      const topFolderId = normalizePackageId(extracted.topFolder);
+      if (!topFolderId || topFolderId !== manifest.id) {
+        throw new Error(
+          `ZIP folder identity mismatch. Top-level folder "${extracted.topFolder}" must match manifest id "${manifest.id}".`
+        );
+      }
+      const backendMode = cleanText(options.backendMode, 30) || undefined;
+      const presence = await inspectPackagePresence(manifest.id, { ...options, backendMode });
+      const resolved = {
+        installMethod: 'zip',
+        manifest,
+        manifestPath: extracted.manifestPath,
+        activationMode: 'manual-zip-preview'
+      };
+      const preview = await buildUpgradeCompatibilityPreview(resolved, presence, {
+        ...options,
+        installMethod: 'zip',
+        backendMode
+      });
+      return buildPreviewResponse(preview, {
+        action: 'install-zip-preview',
+        installMethod: 'zip'
+      });
+    } finally {
+      await deps.fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
+    }
   }
 
   async function installPackageZip(input = {}, options = {}) {
@@ -1703,6 +2241,20 @@ function createService(overrides = {}) {
       const existing = presence.existing;
       const existingVersion = cleanText(existing?.version, 120);
       const previousResolved = presence.resolved || null;
+      const preflight = await buildUpgradeCompatibilityPreview({
+        installMethod: 'zip',
+        manifest,
+        manifestPath: extracted.manifestPath,
+        activationMode: 'manual-zip'
+      }, presence, {
+        ...options,
+        installMethod: 'zip',
+        backendMode
+      });
+      validateUpgradePreviewAckToken(preflight, cleanText(input?.upgradeAckToken, 240), {
+        installMethod: 'zip',
+        manifestChecksum: cleanText(preflight?.manifestChecksum, 120)
+      });
       const transaction = await startLifecycleTransaction({
         packageId: manifest.id,
         packageName: cleanText(manifest?.name, 200),
@@ -1741,7 +2293,8 @@ function createService(overrides = {}) {
         transactionId,
         previousResolved,
         fileMutation,
-        allowSameVersionRecovery: presence.missingFilesRecoveryEligible === true
+        allowSameVersionRecovery: presence.missingFilesRecoveryEligible === true,
+        upgradePreflight: preflight
       }, options);
       report.signature = { verified: true };
       report.source = 'manual-zip';
@@ -2852,6 +3405,8 @@ function createService(overrides = {}) {
   return {
     discoverLocalManifests,
     listPackageSnapshot,
+    previewPackageInstall,
+    previewPackageInstallZip,
     installPackage,
     installPackageZip,
     enablePackage,

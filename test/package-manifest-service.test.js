@@ -271,3 +271,66 @@ test('manifest rejects invalid lifecycle ordering and backend/seed mode values',
     });
   }, /unsupported backend mode|mode is invalid/i);
 });
+
+test('manifest accepts valid data schema and upgrade guard declarations', () => {
+  const out = manifestService.validatePackageManifest({
+    id: 'addon',
+    name: 'Addon',
+    version: '2.0.0',
+    mountPath: '/addon',
+    dataSchemas: [
+      {
+        entityType: 'addonItems',
+        fields: ['id', 'name', 'updatedAt']
+      }
+    ],
+    upgradeGuards: [
+      {
+        id: 'guard-001',
+        version: '2.0.0',
+        script: 'upgradeGuards/guard-001.js',
+        severity: 'warning',
+        backendModes: ['json']
+      }
+    ]
+  });
+
+  assert.equal(out.dataSchemas.length, 1);
+  assert.equal(out.dataSchemas[0].entityType, 'addonItems');
+  assert.match(String(out.dataSchemas[0].signature || ''), /^fields:/i);
+  assert.equal(out.upgradeGuards.length, 1);
+  assert.equal(out.upgradeGuards[0].id, 'guard-001');
+  assert.equal(out.upgradeGuards[0].severity, 'warning');
+});
+
+test('manifest rejects invalid data schema and upgrade guard declarations', () => {
+  assert.throws(() => {
+    manifestService.validatePackageManifest({
+      id: 'addon',
+      name: 'Addon',
+      version: '2.0.0',
+      mountPath: '/addon',
+      dataSchemas: [
+        { entityType: 'addonItems' },
+        { entityType: 'addonItems', signature: 'x' }
+      ]
+    });
+  }, /requires either signature|Duplicate data schema entityType/i);
+
+  assert.throws(() => {
+    manifestService.validatePackageManifest({
+      id: 'addon',
+      name: 'Addon',
+      version: '2.0.0',
+      mountPath: '/addon',
+      upgradeGuards: [
+        {
+          id: 'guard-002',
+          version: '2.0.0',
+          script: '../escape.js',
+          severity: 'critical'
+        }
+      ]
+    });
+  }, /inside package folder|severity is invalid/i);
+});

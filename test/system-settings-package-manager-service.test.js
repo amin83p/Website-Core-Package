@@ -1301,3 +1301,284 @@ test('installPackageZip rejects unsafe ZIP entry traversal payloads', async () =
     await setup.cleanup();
   }
 });
+
+test('installPackageZip requires upgrade preview acknowledgement when upgrade findings exist', async () => {
+  const setup = await createZipInstallDeps();
+  const service = createService(setup.deps);
+  const currentManifestPath = path.join(setup.packageRootDir, 'pte', 'package.manifest.json');
+  const currentManifest = createManifest({
+    id: 'pte',
+    name: 'PTE',
+    version: '1.0.0',
+    mountPath: '/pte',
+    dataEntities: [{ entityType: 'pteApplicants' }],
+    dataSchemas: [{ entityType: 'pteApplicants', signature: 'fields:v1' }]
+  });
+  const nextManifest = createManifest({
+    id: 'pte',
+    name: 'PTE',
+    version: '1.1.0',
+    mountPath: '/pte',
+    dataEntities: [{ entityType: 'pteApplicants' }, { entityType: 'pteAttemptArtifacts' }],
+    dataSchemas: [{ entityType: 'pteApplicants', signature: 'fields:v2' }],
+    upgradeGuards: []
+  });
+  const fixture = createSignedPackageZip(nextManifest);
+
+  try {
+    await fs.mkdir(path.dirname(currentManifestPath), { recursive: true });
+    await fs.writeFile(currentManifestPath, JSON.stringify(currentManifest, null, 2), 'utf8');
+    await setup.deps.packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      version: '1.0.0',
+      enabled: true,
+      installStatus: 'enabled',
+      metadata: {
+        packageName: 'PTE',
+        mountPath: '/pte',
+        manifestPath: currentManifestPath
+      }
+    });
+    setup.deps.packageLoaderService.resolveManifestPath = async (_packageId, row = {}) => String(row?.metadata?.manifestPath || '');
+    setup.deps.packageLoaderService.readManifestFile = async (manifestPath) => JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+
+    await assert.rejects(
+      () => service.installPackageZip({
+        zipBuffer: fixture.zipBuffer,
+        signatureBuffer: fixture.signatureBuffer
+      }, {
+        backendMode: 'json',
+        packageRootDir: setup.packageRootDir,
+        trustedPublicKeys: [fixture.publicKeyPem]
+      }),
+      (error) => error && String(error.code || '').toUpperCase() === 'PACKAGE_UPGRADE_PREVIEW_REQUIRED'
+    );
+
+    const preview = await service.previewPackageInstallZip({
+      zipBuffer: fixture.zipBuffer,
+      signatureBuffer: fixture.signatureBuffer
+    }, {
+      backendMode: 'json',
+      packageRootDir: setup.packageRootDir,
+      trustedPublicKeys: [fixture.publicKeyPem]
+    });
+
+    const report = await service.installPackageZip({
+      zipBuffer: fixture.zipBuffer,
+      signatureBuffer: fixture.signatureBuffer,
+      upgradeAckToken: preview.ackToken
+    }, {
+      backendMode: 'json',
+      packageRootDir: setup.packageRootDir,
+      trustedPublicKeys: [fixture.publicKeyPem]
+    });
+    assert.equal(report.action, 'upgrade');
+    assert.equal(report.packageId, 'pte');
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test('previewPackageInstall reports new entities, schema changes, guard findings, and ack token for upgrades', async () => {
+  const setup = await createZipInstallDeps();
+  const service = createService(setup.deps);
+
+  const currentManifest = createManifest({
+    id: 'pte',
+    name: 'PTE',
+    version: '1.0.0',
+    mountPath: '/pte',
+    dataEntities: [{ entityType: 'pteApplicants' }],
+    dataSchemas: [
+      { entityType: 'pteApplicants', signature: 'fields:old-signature' }
+    ]
+  });
+  const nextManifestDir = path.join(setup.tmpRoot, 'incoming-pte');
+  const nextManifestPath = path.join(nextManifestDir, 'package.manifest.json');
+  const nextGuardPath = path.join(nextManifestDir, 'upgradeGuards', 'guard-001.js');
+  const nextManifest = createManifest({
+    id: 'pte',
+    name: 'PTE',
+    version: '1.1.0',
+    mountPath: '/pte',
+    dataEntities: [{ entityType: 'pteApplicants' }, { entityType: 'pteAttemptSessions' }],
+    dataSchemas: [
+      { entityType: 'pteApplicants', signature: 'fields:new-signature' }
+    ],
+    upgradeGuards: [
+      { id: 'guard-001', version: '1.1.0', script: 'upgradeGuards/guard-001.js', severity: 'warning', backendModes: ['json'] }
+    ]
+  });
+
+  try {
+    await fs.mkdir(path.join(setup.packageRootDir, 'pte'), { recursive: true });
+    await fs.writeFile(path.join(setup.packageRootDir, 'pte', 'package.manifest.json'), JSON.stringify(currentManifest, null, 2), 'utf8');
+    await fs.mkdir(path.dirname(nextGuardPath), { recursive: true });
+    await fs.writeFile(nextGuardPath, 'module.exports = async () => ({ status: "warning", message: "Data backfill required." });\n', 'utf8');
+    await fs.mkdir(nextManifestDir, { recursive: true });
+    await fs.writeFile(nextManifestPath, JSON.stringify(nextManifest, null, 2), 'utf8');
+
+    await setup.deps.packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      version: '1.0.0',
+      enabled: true,
+      installStatus: 'enabled',
+      metadata: {
+        packageName: 'PTE',
+        mountPath: '/pte',
+        manifestPath: path.join(setup.packageRootDir, 'pte', 'package.manifest.json')
+      }
+    });
+
+    setup.deps.packageLoaderService.resolveManifestPath = async (_packageId, row = {}) => String(row?.metadata?.manifestPath || '');
+    setup.deps.packageLoaderService.readManifestFile = async (manifestPath) => JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+
+    const preview = await service.previewPackageInstall({
+      installMethod: 'path',
+      manifestPath: nextManifestPath
+    }, {
+      backendMode: 'json',
+      packageRootDir: setup.packageRootDir
+    });
+
+    assert.equal(preview.isUpgrade, true);
+    assert.equal(preview.packageId, 'pte');
+    assert.equal(preview.currentVersion, '1.0.0');
+    assert.equal(preview.nextVersion, '1.1.0');
+    assert.equal(preview.newEntities.some((row) => row.entityType === 'pteAttemptSessions'), true);
+    assert.equal(preview.schemaChanges.some((row) => row.entityType === 'pteApplicants'), true);
+    assert.equal(preview.behaviorChecks.some((row) => row.guardId === 'guard-001'), true);
+    assert.equal(preview.requiresAcknowledgement, true);
+    assert.equal(Boolean(preview.ackToken), true);
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test('installPackage blocks upgrade apply when preview acknowledgement is missing', async () => {
+  const setup = await createZipInstallDeps();
+  const service = createService(setup.deps);
+
+  const currentManifest = createManifest({
+    id: 'pte',
+    name: 'PTE',
+    version: '1.0.0',
+    mountPath: '/pte',
+    dataEntities: [{ entityType: 'pteApplicants' }],
+    dataSchemas: [{ entityType: 'pteApplicants', signature: 'fields:v1' }]
+  });
+  const nextManifestDir = path.join(setup.tmpRoot, 'incoming-pte-block');
+  const nextManifestPath = path.join(nextManifestDir, 'package.manifest.json');
+  const nextManifest = createManifest({
+    id: 'pte',
+    name: 'PTE',
+    version: '1.1.0',
+    mountPath: '/pte',
+    dataEntities: [{ entityType: 'pteApplicants' }, { entityType: 'pteAttemptItems' }],
+    dataSchemas: [{ entityType: 'pteApplicants', signature: 'fields:v2' }],
+    upgradeGuards: []
+  });
+
+  try {
+    await fs.mkdir(path.join(setup.packageRootDir, 'pte'), { recursive: true });
+    await fs.writeFile(path.join(setup.packageRootDir, 'pte', 'package.manifest.json'), JSON.stringify(currentManifest, null, 2), 'utf8');
+    await fs.mkdir(nextManifestDir, { recursive: true });
+    await fs.writeFile(nextManifestPath, JSON.stringify(nextManifest, null, 2), 'utf8');
+
+    await setup.deps.packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      version: '1.0.0',
+      enabled: true,
+      installStatus: 'enabled',
+      metadata: {
+        packageName: 'PTE',
+        mountPath: '/pte',
+        manifestPath: path.join(setup.packageRootDir, 'pte', 'package.manifest.json')
+      }
+    });
+    setup.deps.packageLoaderService.resolveManifestPath = async (_packageId, row = {}) => String(row?.metadata?.manifestPath || '');
+    setup.deps.packageLoaderService.readManifestFile = async (manifestPath) => JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+
+    await assert.rejects(
+      () => service.installPackage({
+        installMethod: 'path',
+        manifestPath: nextManifestPath
+      }, {
+        backendMode: 'json',
+        packageRootDir: setup.packageRootDir
+      }),
+      (error) => error && String(error.code || '').toUpperCase() === 'PACKAGE_UPGRADE_PREVIEW_REQUIRED'
+    );
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test('installPackage accepts valid upgrade preview acknowledgement token', async () => {
+  const setup = await createZipInstallDeps();
+  const service = createService(setup.deps);
+
+  const currentManifest = createManifest({
+    id: 'pte',
+    name: 'PTE',
+    version: '1.0.0',
+    mountPath: '/pte',
+    dataEntities: [{ entityType: 'pteApplicants' }],
+    dataSchemas: [{ entityType: 'pteApplicants', signature: 'fields:v1' }]
+  });
+  const nextManifestDir = path.join(setup.tmpRoot, 'incoming-pte-allow');
+  const nextManifestPath = path.join(nextManifestDir, 'package.manifest.json');
+  const nextManifest = createManifest({
+    id: 'pte',
+    name: 'PTE',
+    version: '1.1.0',
+    mountPath: '/pte',
+    dataEntities: [{ entityType: 'pteApplicants' }, { entityType: 'pteAttemptLedgerEvents' }],
+    dataSchemas: [{ entityType: 'pteApplicants', signature: 'fields:v2' }],
+    upgradeGuards: []
+  });
+
+  try {
+    await fs.mkdir(path.join(setup.packageRootDir, 'pte'), { recursive: true });
+    await fs.writeFile(path.join(setup.packageRootDir, 'pte', 'package.manifest.json'), JSON.stringify(currentManifest, null, 2), 'utf8');
+    await fs.mkdir(nextManifestDir, { recursive: true });
+    await fs.writeFile(nextManifestPath, JSON.stringify(nextManifest, null, 2), 'utf8');
+
+    await setup.deps.packageRegistryService.upsertPackageRegistry({
+      packageId: 'pte',
+      version: '1.0.0',
+      enabled: true,
+      installStatus: 'enabled',
+      metadata: {
+        packageName: 'PTE',
+        mountPath: '/pte',
+        manifestPath: path.join(setup.packageRootDir, 'pte', 'package.manifest.json')
+      }
+    });
+    setup.deps.packageLoaderService.resolveManifestPath = async (_packageId, row = {}) => String(row?.metadata?.manifestPath || '');
+    setup.deps.packageLoaderService.readManifestFile = async (manifestPath) => JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+
+    const preview = await service.previewPackageInstall({
+      installMethod: 'path',
+      manifestPath: nextManifestPath
+    }, {
+      backendMode: 'json',
+      packageRootDir: setup.packageRootDir
+    });
+    const report = await service.installPackage({
+      installMethod: 'path',
+      manifestPath: nextManifestPath,
+      upgradeAckToken: preview.ackToken
+    }, {
+      backendMode: 'json',
+      packageRootDir: setup.packageRootDir
+    });
+
+    assert.equal(report.action, 'upgrade');
+    assert.equal(report.packageId, 'pte');
+    assert.equal(report.version, '1.1.0');
+    assert.equal(report.registry.enabled, true);
+  } finally {
+    await setup.cleanup();
+  }
+});

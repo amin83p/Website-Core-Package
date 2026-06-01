@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 const DECLARATION_ARRAY_KEYS = Object.freeze([
   'routes',
   'queryExecutors',
@@ -15,6 +17,8 @@ const DECLARATION_ARRAY_KEYS = Object.freeze([
   'dataEntities',
   'seeders',
   'migrations',
+  'dataSchemas',
+  'upgradeGuards',
   'dependencies'
 ]);
 
@@ -29,6 +33,7 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?
 const SAFE_RELATIVE_PATH_PATTERN = /^[a-zA-Z0-9._/-]+$/;
 const ALLOWED_BACKEND_MODES = new Set(['json', 'mongo']);
 const ALLOWED_SEEDER_MODES = new Set(['upsert', 'append', 'replace']);
+const ALLOWED_UPGRADE_GUARD_SEVERITIES = new Set(['blocking', 'warning']);
 
 function cleanText(value, max = 500) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -270,6 +275,88 @@ function validateSeederDeclarations(rawSeeders = []) {
   return out;
 }
 
+function normalizeSchemaFieldList(rawFields = [], label = 'fields') {
+  return normalizeArrayDeclaration(rawFields, label)
+    .map((row) => cleanText(row, 240))
+    .filter(Boolean);
+}
+
+function hashSchemaSignature(fields = []) {
+  const hash = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(fields))
+    .digest('hex');
+  return `fields:${hash}`;
+}
+
+function validateDataSchemaDeclarations(rawDataSchemas = []) {
+  const seenEntityTypes = new Set();
+  const out = normalizeArrayDeclaration(rawDataSchemas, 'dataSchemas').map((row, index) => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      throw new Error(`dataSchemas[${index}] must be an object.`);
+    }
+    const entityType = cleanText(row.entityType || row.table || row.id, 200);
+    if (!entityType) throw new Error(`dataSchemas[${index}].entityType is required.`);
+    const entityKey = entityType.toLowerCase();
+    if (seenEntityTypes.has(entityKey)) {
+      throw new Error(`Duplicate data schema entityType "${entityType}" is not allowed.`);
+    }
+    seenEntityTypes.add(entityKey);
+    const fields = normalizeSchemaFieldList(row.fields, `dataSchemas[${index}].fields`);
+    const signature = cleanText(row.signature || row.schemaHash, 200);
+    if (!signature && !fields.length) {
+      throw new Error(`dataSchemas[${index}] requires either signature/schemaHash or fields.`);
+    }
+    return {
+      entityType,
+      label: cleanText(row.label, 200) || entityType,
+      fields,
+      signature: signature || hashSchemaSignature(fields)
+    };
+  });
+  return out;
+}
+
+function validateUpgradeGuardDeclarations(rawUpgradeGuards = []) {
+  const seenIds = new Set();
+  const out = normalizeArrayDeclaration(rawUpgradeGuards, 'upgradeGuards').map((row, index) => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      throw new Error(`upgradeGuards[${index}] must be an object.`);
+    }
+    const id = cleanText(row.id, 200);
+    if (!id) throw new Error(`upgradeGuards[${index}].id is required.`);
+    if (seenIds.has(id)) throw new Error(`Duplicate upgrade guard id "${id}" is not allowed.`);
+    seenIds.add(id);
+    const version = assertValidVersion(row.version);
+    const script = assertValidRelativeScriptPath(
+      row.script || row.run,
+      `upgradeGuards[${index}].script`
+    );
+    const severity = cleanText(row.severity, 40).toLowerCase() || 'blocking';
+    if (!ALLOWED_UPGRADE_GUARD_SEVERITIES.has(severity)) {
+      throw new Error(`upgradeGuards[${index}].severity is invalid. Use blocking or warning.`);
+    }
+    const backendModes = normalizeBackendModes(row.backendModes, `upgradeGuards[${index}].backendModes`);
+    return {
+      id,
+      version,
+      description: cleanText(row.description, 500) || id,
+      script,
+      severity,
+      backendModes
+    };
+  });
+
+  for (let index = 1; index < out.length; index += 1) {
+    const prev = out[index - 1];
+    const curr = out[index];
+    if (compareSemver(curr.version, prev.version) < 0) {
+      throw new Error('upgradeGuards must be ordered by non-decreasing semantic version.');
+    }
+  }
+  return out;
+}
+
 function assertNoUnknownKeys(manifest = {}, allowedKeys = []) {
   const unknownKeys = Object.keys(manifest || {}).filter((key) => !allowedKeys.includes(key));
   if (unknownKeys.length) {
@@ -336,6 +423,8 @@ function validatePackageManifest(rawManifest = {}, options = {}) {
   });
   manifest.migrations = validateMigrationDeclarations(source.migrations);
   manifest.seeders = validateSeederDeclarations(source.seeders);
+  manifest.dataSchemas = validateDataSchemaDeclarations(source.dataSchemas);
+  manifest.upgradeGuards = validateUpgradeGuardDeclarations(source.upgradeGuards);
   const lifecycleIds = new Set();
   [...manifest.migrations, ...manifest.seeders].forEach((row) => {
     const id = cleanText(row.id, 200);

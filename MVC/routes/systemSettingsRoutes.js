@@ -259,6 +259,16 @@ router.post('/packages/install',
           ),
           adminApproval,
           ctrl.installPackageFromManager);
+router.post('/packages/install-preview',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.previewInstallPackageFromManager);
 router.post('/packages/install-zip',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
@@ -270,6 +280,17 @@ router.post('/packages/install-zip',
           ),
           adminApproval,
           ctrl.installPackageZipFromManager);
+router.post('/packages/install-zip-preview',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
+          handlePackageZipUpload,
+          trackActionState(
+            SECTIONS.SYSTEM_PACKAGE_MANAGER,
+            OPERATIONS.UPDATE,
+            { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
+          ),
+          adminApproval,
+          ctrl.previewInstallPackageZipFromManager);
 router.post('/packages/cleanup-failed',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
