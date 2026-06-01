@@ -75,3 +75,32 @@ test('school package pass7 owns holidayRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.saveHoliday/);
   assert.match(routeSource, /ctrl\.deleteHoliday/);
 });
+
+test('school package pass8 owns payRateRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/payRateRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/payRateRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/payRateController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_PAY_RATES,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_PAY_RATES,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_PAY_RATES,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_PAY_RATES,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.eligiblePersons/);
+  assert.match(routeSource, /ctrl\.listPayRates/);
+  assert.match(routeSource, /ctrl\.savePayRate/);
+  assert.match(routeSource, /ctrl\.deletePayRate/);
+});
+
+test('school package pass8 owns timesheetPeriodRoutes implementation', () => {
+  const routeSource = read('packages/school/MVC/routes/timesheetPeriodRoutes.js');
+
+  assert.equal(routeSource.includes("requireCoreModule('MVC/routes/school/timesheetPeriodRoutes')"), false);
+  assert.match(routeSource, /const\s+ctrl\s*=\s*require\('\.\.\/controllers\/school\/timesheetPeriodController'\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TIMESHEET_PERIODS,\s*OPERATIONS\.READ_ALL\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TIMESHEET_PERIODS,\s*OPERATIONS\.CREATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TIMESHEET_PERIODS,\s*OPERATIONS\.UPDATE\)/);
+  assert.match(routeSource, /requireAccess\(SECTIONS\.SCHOOL_TIMESHEET_PERIODS,\s*OPERATIONS\.DELETE\)/);
+  assert.match(routeSource, /ctrl\.listTimesheetPeriods/);
+  assert.match(routeSource, /ctrl\.saveTimesheetPeriod/);
+  assert.match(routeSource, /ctrl\.deleteTimesheetPeriod/);
+});
