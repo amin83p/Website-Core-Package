@@ -1,0 +1,19 @@
+Entity Resolution Error (sections/SCHOOL_STUDENTS): dataService.fetchData is not a function
+Entity Resolution Error (operations/READ_ALL): dataService.fetchData is not a function
+(node:22752) Warning: Accessing non-existent property 'getDataById' of module exports inside circular dependency
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22752) Warning: Accessing non-existent property 'fetchData' of module exports inside circular dependency
+(node:22752) Warning: Accessing non-existent property 'getDataById' of module exports inside circular dependency
+(node:22752) Warning: Accessing non-existent property 'fetchData' of module exports inside circular dependency
+Entity Resolution Error (sections/SCHOOL_TEACHERS): dataService.fetchData is not a function
+Entity Resolution Error (operations/READ_ALL): dataService.fetchData is not a function
+(node:22752) Warning: Accessing non-existent property 'getDataById' of module exports inside circular dependency
+(node:22752) Warning: Accessing non-existent property 'fetchData' of module exports inside circular dependency
+(node:22752) Warning: Accessing non-existent property 'getDataById' of module exports inside circular dependency
+(node:22752) Warning: Accessing non-existent property 'fetchData' of module exports inside circular dependency
+Entity Resolution Error (sections/SCHOOL_STAFF): dataService.fetchData is not a function
+Entity Resolution Error (operations/READ_ALL): dataService.fetchData is not a function
+(node:22752) Warning: Accessing non-existent property 'getDataById' of module exports inside circular dependency
+(node:22752) Warning: Accessing non-existent property 'fetchData' of module exports inside circular dependency
+(node:22752) Warning: Accessing non-existent property 'getDataById' of module exports inside circular dependency
+(node:22752) Warning: Accessing non-existent property 'fetchData' of module exports inside circular dependency

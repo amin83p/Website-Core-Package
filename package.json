@@ -56,6 +56,7 @@
     "school:enrollment-periods:backfill:apply": "node scripts/school/migration/backfillClassEnrollmentPeriods.js --apply",
     "school:class-mode:migration:dry-run": "node scripts/school/migration/migrateClassRegistrationMode.js",
     "school:class-mode:migration:apply": "node scripts/school/migration/migrateClassRegistrationMode.js --apply",
+    "school:smoke:pass40": "node scripts/school/smoke-pass40.js",
     "ielts:micro-contracts:audit": "node scripts/ielts/microAssessmentContractAudit.js",
     "ielts:micro-contracts:apply": "node scripts/ielts/microAssessmentContractAudit.js --apply",
     "ielts:impact:compare": "node scripts/ielts/scoringPatchImpactReport.js",

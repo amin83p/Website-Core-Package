@@ -437,8 +437,8 @@ async function executeTermWithdrawal({
   }
 
   const finalWarnings = Array.from(new Set([
-    ...((Array.isArray(withdrawalRecord?.warnings) ? withdrawalRecord.warnings : []).map((item) => String(item || '').trim()).filter(Boolean),
-    ...((Array.isArray(settlementResult.warnings) ? settlementResult.warnings : []).map((item) => `Financial settlement warning: ${String(item || '').trim()}`).filter(Boolean)
+    ...((Array.isArray(withdrawalRecord?.warnings) ? withdrawalRecord.warnings : []).map((item) => String(item || '').trim()).filter(Boolean)),
+    ...((Array.isArray(settlementResult.warnings) ? settlementResult.warnings : []).map((item) => `Financial settlement warning: ${String(item || '').trim()}`).filter(Boolean))
   ]));
 
   const finalStatus = errors.length > 0 ? 'error' : 'completed';

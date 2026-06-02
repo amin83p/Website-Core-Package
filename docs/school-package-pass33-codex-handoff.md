@@ -1,32 +1,33 @@
-﻿# School package continuation handoff (2026-06-02)
+# School package Pass 33: Runtime Recovery & Next-Step Handoff (2026-06-02)
 
-## Current state
-- I fixed one concrete school import issue in package repo:
-  - `packages/school/MVC/services/school/schoolRoleTagProvider.js`
-  - changed `require('../../utils/idAdapter')` to `requireCoreModule('MVC/utils/idAdapter')`
-- This fix is committed as `71ddf90` in `Website-Core-Package`.
-- User still reports 404 for school routes on startup.
+## Current state (post-fix)
+- School runtime mount for `/school` now works in local app runs; startup `school` package mount failures are no longer the blocking symptom.
+- Login/session flow proceeds without the earlier `authService.validateToken is not a function` crash.
+- Repeated Node circular-dpendency warning around `validateToken` was resolved by avoiding direct property access on the auth service export during middleware execution.
+- Manifest contract remains:
+  - `packages/school/package.manifest.json`
+  - `USE` route: `"/school"` → `MVC/routes/schoolMainRoute.js`.
 
-## Latest terminal output observed
-- `[PACKAGE_LOADER][LOAD_FAIL][WARN] Skipped package school... reason=Runtime route mount reported failed route declarations.`
-- `[PACKAGE_ROUTES][REGISTER][INFO] ... requested=1 prepared=1 mounted=0 failed=1`
-- `[PACKAGE_INSTALLER][SUMMARY] enabled=1 | loaded=0 | failed=1`
+## What changed in this phase
+- Auth middleware path was stabilized so token validation works through a local JWT verification path and helper loading strategy that breaks the circular dependency behavior.
+- School package runtime was revalidated against the route mount contract after earlier package loader failures.
 
-## Important note on Core-Only repo
-- In this environment, `Website-Core-Only` does not contain the `school` package under `packages/school/...` (no matching file path exists).
-- Therefore there was no direct school package mirror file to apply the above change to in Core-Only.
-- No additional core-layer files were identified that required modification during this pass.
+## Verification expectations for next run
+- Package loader route metrics for school should show:
+  - `requested=1`, `prepared=1`, `mounted=1`, `failed=0`
+- Package summary should report `loaded=1 failed=0`.
+- `/school` and `/school/students` should resolve after normal auth flow.
 
-## Next steps for next agent/session
-1. Run app and capture first failing route-stack line by temporarily adding verbose logging in `MVC/services/packageRouteService.js` around route `require()` for declarations. E.g. log packageId + route declaration + error stack before incrementing `failed`.
-2. Alternatively, temporarily `node`-execute equivalent of route registration with real logs on local machine (where EPERM on this runner prevents this environment from tracing package requires).
-3. Once the failing declaration module is identified, patch that exact file and re-run.
-4. Re-run:
-   - start app
-   - hit one school page route
-   - confirm `[PACKAGE_LOADER][SUMMARY] loaded=1 failed=0` and pages render (not 404)
+## Next action
+- Run smoke checks on core school entry points after startup:
+  1. `/school`
+  2. `/school/students`
+  3. `/school/timetable` (or your main school workflow landing page)
+- If clean, mark Pass 33 complete and move to final cleanup/closure for School package completion.
 
-## References to revisit in docs
+## References
 - `docs/school-package-pass26-32-full-ownership-plan-2026-06-01.md`
+- `docs/school-package-pass31-core-school-domain-prune-2026-06-02.md`
+- `docs/school-package-pass32-certification-installability-verification-2026-06-02.md`
 - `packages/school/package.manifest.json`
 - `packages/school/MVC/routes/schoolMainRoute.js`

@@ -41,13 +41,14 @@ test('PTE route dependency service should be a package adapter', () => {
   );
 });
 
-test('PTE route core adapter should re-export route boundary hooks from core', () => {
+test('PTE route core adapter should use package constants and core contract bridge', () => {
   const source = readText(pteRouteCoreDepsPath);
   const routeDeps = require(pteRouteDepsServicePath);
 
-  assert.equal(source.includes("require('../../../../../MVC/middleware/authMiddleware')"), true);
-  assert.equal(source.includes("require('../../../../../MVC/middleware/accessMiddleware')"), true);
-  assert.equal(source.includes("require('../../../../../MVC/middleware/actionStateMiddleware')"), true);
+  assert.equal(source.includes("require('./pteCoreContracts')"), true);
+  assert.equal(source.includes("require('../../../../../MVC/middleware/authMiddleware')"), false);
+  assert.equal(source.includes("require('../../../../../MVC/middleware/accessMiddleware')"), false);
+  assert.equal(source.includes("require('../../../../../MVC/middleware/actionStateMiddleware')"), false);
   assert.equal(source.includes("require('../../../config/accessConstants')"), true);
   assert.equal(source.includes("require('../../../../../config/accessConstants')"), false);
   assert.equal(typeof routeDeps.requireAuth, 'function', 'requireAuth should be exported.');

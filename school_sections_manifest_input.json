@@ -1,0 +1,2377 @@
+[
+  {
+    "id": "111874",
+    "name": "SCHOOL_TRANSACTIONS",
+    "category": "SCHOOL",
+    "description": "Manage manual double-entry transaction journals with draft/post workflow.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/transactions",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "122740",
+    "name": "SCHOOL",
+    "category": "SCHOOL",
+    "description": "This is the command centre of the school features.",
+    "active": true,
+    "trackState": false,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": true,
+    "navigatorSection": true,
+    "homeURL": "",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [],
+    "subsections": [
+      {
+        "id": "330563"
+      },
+      {
+        "id": "225382"
+      },
+      {
+        "id": "139382"
+      },
+      {
+        "id": "445561"
+      },
+      {
+        "id": "445571"
+      },
+      {
+        "id": "938980"
+      },
+      {
+        "id": "445574"
+      }
+    ],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "290216",
+    "name": "SCHOOL_HOLIDAYS",
+    "category": "SCHOOL",
+    "description": "To manage the holidays at school to manage the schedule of students and teachers.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/holidays/",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1010",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "332225",
+    "name": "SCHOOL_ACCOUNTS",
+    "category": "SCHOOL",
+    "description": "Manage school chart of accounts and account hierarchy.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/accounts",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "332226",
+    "name": "SCHOOL_TRANSACTION_TEMPLATES",
+    "category": "SCHOOL",
+    "description": "Manage reusable school transaction and fee definition templates.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/transactionTemplates",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "332227",
+    "name": "SCHOOL_PAY_RATES",
+    "category": "SCHOOL",
+    "description": "Manage pay rate profiles used for teacher and staff compensation.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/payRates",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "332228",
+    "name": "SCHOOL_PROGRAMS",
+    "category": "SCHOOL",
+    "description": "Manage academic programs and their registration configuration.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/programs",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "332229",
+    "name": "SCHOOL_STAFF",
+    "category": "SCHOOL",
+    "description": "Manage school staff records and administrative assignments.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/staff",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "332230",
+    "name": "SCHOOL_STUDENTS",
+    "category": "SCHOOL",
+    "description": "Manage student profiles, enrollment identity, and school status.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/students",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "332231",
+    "name": "SCHOOL_TEACHERS",
+    "category": "SCHOOL",
+    "description": "Manage teacher profiles, teaching assignments, and employment data.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/teachers",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "358609",
+    "name": "SCHOOL_SESSIONS",
+    "category": "SCHOOL",
+    "description": "To manages sessions",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/sessions",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1010",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1023",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "442039",
+    "name": "SCHOOL_CLASSES",
+    "category": "SCHOOL",
+    "description": "Add or edit classes and managing the class feature",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/classes",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1010",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1021",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1023",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445561",
+    "name": "SCHOOL_SAMPLE_DATA",
+    "category": "SCHOOL",
+    "description": "Generate sample students, teachers, and staff for testing school workflows.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/sample-data",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445562",
+    "name": "SCHOOL_TERMS",
+    "category": "SCHOOL",
+    "description": "Define academic terms and semesters with lifecycle status and date windows for programs and class eligibility.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/terms",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445563",
+    "name": "SCHOOL_ACADEMIC_LEDGER",
+    "category": "SCHOOL",
+    "description": "Track academic registrations, term progression, class enrollment, scores, and final academic results.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/academic-ledger",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445564",
+    "name": "SCHOOL_PROGRAM_REGISTRATIONS",
+    "category": "SCHOOL",
+    "description": "Register students into programs, review registration records, and manage manual rollback actions.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/programs/registrations",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445565",
+    "name": "SCHOOL_TERM_REGISTRATIONS",
+    "category": "SCHOOL",
+    "description": "Register students into program terms, validate class baskets, and manage rollback of finance, academic, and roster side effects.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/programs/term-registrations",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445567",
+    "name": "SCHOOL_TIMESHEET_PERIODS",
+    "category": "SCHOOL",
+    "description": "Manage payroll period windows used by teacher and staff timesheets.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/timesheetPeriods",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445568",
+    "name": "SCHOOL_TIMESHEETS",
+    "category": "SCHOOL",
+    "description": "Review and submit teacher and staff timesheets, including controlled edits and approvals.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/timesheets/my-timesheets",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445569",
+    "name": "SCHOOL_SESSION_STATUSES",
+    "category": "SCHOOL",
+    "description": "Define session statuses, formulas, and behavior rules used by schedules and timesheets.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/session-statuses",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445570",
+    "name": "SCHOOL_WITHDRAWAL",
+    "category": "SCHOOL",
+    "description": "Manage student withdrawals from classes, terms, and programs with refund calculations and academic record updates.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/withdrawal",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445571",
+    "name": "SCHOOL_REPORTS",
+    "category": "SCHOOL",
+    "description": "Design report templates, assign reports to sessions, and collect report submissions.",
+    "active": true,
+    "trackState": false,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": true,
+    "homeURL": "/school/reports",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [
+      {
+        "id": "446101"
+      },
+      {
+        "id": "446102"
+      },
+      {
+        "id": "446103"
+      }
+    ],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "445572",
+    "name": "SCHOOL_CLASS_ENROLLMENT_PERIODS",
+    "category": "SCHOOL",
+    "description": "Manage canonical class enrollment periods for rolling lifecycle.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": false,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/classes",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1010",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1021",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1023",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [
+      {
+        "id": "442039"
+      }
+    ],
+    "adoptExisting": true
+  },
+  {
+    "id": "445573",
+    "name": "SCHOOL_CLASS_CYCLES",
+    "category": "SCHOOL",
+    "description": "Manage class cycle rollover and carry-forward lifecycle actions.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": false,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/classes",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1010",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1021",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1023",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [
+      {
+        "id": "442039"
+      }
+    ],
+    "adoptExisting": true
+  },
+  {
+    "id": "445574",
+    "name": "SCHOOL_EXAMS",
+    "category": "SCHOOL",
+    "description": "Build, version, and manage exam/test templates, revisions, and question banks.",
+    "active": true,
+    "trackState": false,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": true,
+    "homeURL": "",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [],
+    "subsections": [
+      {
+        "id": "446001"
+      },
+      {
+        "id": "446002"
+      },
+      {
+        "id": "446003"
+      },
+      {
+        "id": "446004"
+      }
+    ],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "446001",
+    "name": "SCHOOL_EXAMS_TEMPLATE",
+    "category": "SCHOOL",
+    "description": "Exam templates, revisions, question bank, publish, and revision copies.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/exams/templates",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "446002",
+    "name": "SCHOOL_EXAMS_ALLOCATION",
+    "category": "SCHOOL",
+    "description": "Exam allocations, assignment generation, student add/exempt, and allocation lifecycle.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/exams/allocations",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "446003",
+    "name": "SCHOOL_EXAMS_TAKING",
+    "category": "SCHOOL",
+    "description": "Student take-exam flow: list assignments, attempts, save answers, submit.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/exams/take",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1024",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1025",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "446004",
+    "name": "SCHOOL_EXAMS_REVIEW",
+    "category": "SCHOOL",
+    "description": "Teacher review: assignment queue, per-student status, grading and attempt cleanup.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/exams/teacher-assignments",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "446101",
+    "name": "SCHOOL_REPORTS_TEMPLATE",
+    "category": "SCHOOL",
+    "description": "Manage report templates and DOCX mappings.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/reports/templates",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "446102",
+    "name": "SCHOOL_REPORTS_ASSIGNMENT",
+    "category": "SCHOOL",
+    "description": "Manage report assignments and target scope.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/reports/assignments",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "446103",
+    "name": "SCHOOL_REPORTS_INSTANCES",
+    "category": "SCHOOL",
+    "description": "Manage report instances, edits, and exports.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/reports/instances",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "536458",
+    "name": "SCHOOL_SUBJECTS",
+    "category": "SCHOOL",
+    "description": "This is the section which allows you to create different subjects/courses.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/subjects/",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1010",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "688865",
+    "name": "SCHOOL_DEPARTMENTS",
+    "category": "SCHOOL",
+    "description": "In this section we manage the departments of this school.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/departments",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "778768",
+    "name": "SCHOOL_ATTENDANCES",
+    "category": "SCHOOL",
+    "description": "This section provide the management for attendance lists.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/attendances",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1010",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "778769",
+    "name": "SCHOOL_GRADEBOOK",
+    "category": "SCHOOL",
+    "description": "Session grades matrix: gradebooks, quizzes, assignments, and weighted final scores.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/grades-matrix",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1010",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  },
+  {
+    "id": "938980",
+    "name": "SCHOOL_SCHEDULES",
+    "category": "SCHOOL",
+    "description": "Managing the schedules of teachers and students.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 5,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/schedules/",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1004",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1010",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1012",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1013",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1022",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
+  }
+]

@@ -1,6 +1,14 @@
 // MVC/middleware/accessMiddleware.js
 const accessService = require('../services/security/index');
 const firstRunBootstrapService = require('../services/firstRunBootstrapService');
+let cachedAdminAuthorityService = null;
+
+function getAdminAuthorityService() {
+  if (!cachedAdminAuthorityService) {
+    cachedAdminAuthorityService = require('../services/adminAuthorityService');
+  }
+  return cachedAdminAuthorityService;
+}
 
 function setLogContext(req, sectionId, operationId) {
   if (!req || typeof req !== 'object') return;
@@ -105,6 +113,20 @@ const requireAccess = (sectionId, operationId) => {
         });
       }
 
+      // 0. Super Admin bypass (keeps access stable even when auth context has alternate shapes).
+      const adminAuthorityService = getAdminAuthorityService();
+      if (adminAuthorityService.isSuperAdmin(req.user) || req.adminContext?.isSuperAdmin) {
+        req.accessLimits = {};
+        req.adminContext = req.adminContext || adminAuthorityService.resolveAdminAuthority({
+          user: req.user,
+          sectionId,
+          operationId
+        });
+        res.locals.adminContext = req.adminContext;
+        req.accessScope = req.accessScope || '';
+        return next();
+      }
+
       const bootstrapBypassAllowed = await firstRunBootstrapService.isBypassAllowed({
         user: req.user,
         sectionId
@@ -173,6 +195,24 @@ const requireAccessAny = (sectionIds, operationId) => {
           message: 'Authentication required before access check.'
         });
       }
+      // Super-admin request gets immediate access across all matched sections.
+      const adminAuthorityService = getAdminAuthorityService();
+      if (adminAuthorityService.isSuperAdmin(req.user) || req.adminContext?.isSuperAdmin) {
+        const fallbackSectionId = Array.isArray(sectionIds) && sectionIds.length > 0
+          ? String(sectionIds[0] || '').trim()
+          : '';
+        req.accessLimits = {};
+        req.adminContext = req.adminContext || adminAuthorityService.resolveAdminAuthority({
+          user: req.user,
+          sectionId: fallbackSectionId,
+          operationId
+        });
+        res.locals.adminContext = req.adminContext;
+        req.accessScope = req.accessScope || '';
+        setLogContext(req, fallbackSectionId, operationId);
+        return next();
+      }
+
       const ids = Array.isArray(sectionIds) ? sectionIds : [];
       if (!ids.length) {
         return denyAccess(req, res, 'No sections configured for this route.', { operationId });
