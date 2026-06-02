@@ -1,9 +1,9 @@
-const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = requireCoreModule('MVC/services/school/schoolCoreModuleResolver');
 // MVC/models/school/payRateModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/payRates.json');
 
@@ -271,5 +271,3 @@ module.exports = {
   sanitizePeriodInput,
   assertNoPeriodConflict
 };
-
-

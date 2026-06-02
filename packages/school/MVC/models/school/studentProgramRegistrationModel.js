@@ -1,9 +1,9 @@
-const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = requireCoreModule('MVC/services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
-const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/MVC/utils/idAdapter');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/studentProgramRegistrations.json');
 
@@ -181,5 +181,3 @@ module.exports = {
   updateRegistration,
   clearRegistrationsByOrg
 };
-
-

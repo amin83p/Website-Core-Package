@@ -1,8 +1,8 @@
-const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = requireCoreModule('MVC/services/school/schoolCoreModuleResolver');
 // MVC/models/school/schoolIndexModel.js
 const fs = require('fs').promises;
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/models/fileQueue'); // Ensures file lock safety
+const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue'); // Ensures file lock safety
 
 const teachersIndexPath = path.join(resolveCoreRoot(), 'data/school/teacher_schedules.json');
 const studentsIndexPath = path.join(resolveCoreRoot(), 'data/school/student_enrollments.json');
@@ -51,4 +51,3 @@ module.exports = {
     saveTeacherIndex,
     saveStudentIndex
 };
-
