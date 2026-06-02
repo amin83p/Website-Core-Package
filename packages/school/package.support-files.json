@@ -1,7 +1,7 @@
 {
     "packageId":  "school",
-    "step":  31,
-    "status":  "core-school-domain-prune-in-progress",
+    "step":  32,
+    "status":  "certification-installability-verified",
     "notes":  [
                   "Passes 1-6 completed: scaffold through runtime mount cutover.",
                   "Passes 7-14 completed route ownership; passes 15-25 completed controller ownership.",
@@ -10,6 +10,7 @@
                   "Pass 28 converted remaining School models and repositories to package-owned implementations.",
                   "Pass 29 and Pass 30 converted remaining School services to package-owned implementations.",
                   "Pass 31 prunes redundant core School domain artifacts from MVC/services/school and MVC/views/school in the package repository.",
+                  "Pass 32 completed certification + installability verification and updated tests for package route-module resolution diagnostics.",
                   "School package runtime now owns all school controllers; shared dependencies are bridged via packages/school/MVC/services/school/schoolCoreContracts.js where applicable."
               ],
     "scripts":  [
@@ -50,6 +51,7 @@
                  "docs/school-package-pass26-32-full-ownership-plan-2026-06-01.md",
                  "docs/school-package-pass27-model-ownership-batch1-2026-06-01.md"
                  ,"docs/school-package-pass31-core-school-domain-prune-2026-06-02.md"
+                 ,"docs/school-package-pass32-certification-installability-verification-2026-06-02.md"
              ],
     "tests":  [
                   "test/school-package-certification-hardcoded-coupling.test.js",

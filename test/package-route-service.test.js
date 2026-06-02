@@ -192,7 +192,7 @@ test('route service does not bridge legacy relative core imports for uploaded pa
     assert.equal(summary.failed, 1);
     assert.equal(summary.mounted, 0);
     assert.equal(app.calls.length, 0);
-    assert.match(summary.results[0].message, /Cannot find module|Failed to load router module/i);
+    assert.match(summary.results[0].message, /Cannot find module|Failed to load router module|Package module path could not be resolved inside project root/i);
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
   }
