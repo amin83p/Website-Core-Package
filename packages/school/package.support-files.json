@@ -1,12 +1,15 @@
 {
     "packageId":  "school",
-    "step":  27,
-    "status":  "model-ownership-batch1-in-progress",
+    "step":  31,
+    "status":  "core-school-domain-prune-in-progress",
     "notes":  [
                   "Passes 1-6 completed: scaffold through runtime mount cutover.",
                   "Passes 7-14 completed route ownership; passes 15-25 completed controller ownership.",
                   "Pass 26 baselined ownership guardrails via registry-driven parity checks for upcoming model/service/repository migration.",
                   "Pass 27 converted first model ownership batch (16 School models) from wrappers to package-owned implementations with core contract bridging.",
+                  "Pass 28 converted remaining School models and repositories to package-owned implementations.",
+                  "Pass 29 and Pass 30 converted remaining School services to package-owned implementations.",
+                  "Pass 31 prunes redundant core School domain artifacts from MVC/services/school and MVC/views/school in the package repository.",
                   "School package runtime now owns all school controllers; shared dependencies are bridged via packages/school/MVC/services/school/schoolCoreContracts.js where applicable."
               ],
     "scripts":  [
@@ -46,6 +49,7 @@
                  "docs/school-package-pass26-domain-ownership-guardrails-2026-06-01.md",
                  "docs/school-package-pass26-32-full-ownership-plan-2026-06-01.md",
                  "docs/school-package-pass27-model-ownership-batch1-2026-06-01.md"
+                 ,"docs/school-package-pass31-core-school-domain-prune-2026-06-02.md"
              ],
     "tests":  [
                   "test/school-package-certification-hardcoded-coupling.test.js",
@@ -57,6 +61,9 @@
                   "test/school-package-ownership-pass7.test.js",
                   "test/school-package-controller-ownership-pass15.test.js",
                   "test/school-package-ownership-registry-pass26.test.js",
-                  "test/school-package-model-ownership-pass27.test.js"
+                  "test/school-package-model-ownership-pass27.test.js",
+                  "test/school-package-model-repository-ownership-pass28.test.js",
+                  "test/school-package-service-ownership-pass29.test.js",
+                  "test/school-package-service-ownership-pass30.test.js"
               ]
 }
