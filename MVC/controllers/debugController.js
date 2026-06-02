@@ -9,7 +9,14 @@ try {
   if (error.code !== 'MODULE_NOT_FOUND') {
     throw error;
   }
-  schoolDataService = require('../../packages/school/MVC/services/school/schoolDataService');
+  try {
+    schoolDataService = require('../../packages/school/MVC/services/school/schoolDataService');
+  } catch (secondaryError) {
+    if (secondaryError.code !== 'MODULE_NOT_FOUND') {
+      throw secondaryError;
+    }
+    schoolDataService = null;
+  }
 }
 const securityService = require('../services/security');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
@@ -247,6 +254,9 @@ function auditRoleRecords(records, personsById, accountsById, roleName, entityTy
 
 async function runIntegrityAudit(req, res) {
   try {
+    if (!schoolDataService || typeof schoolDataService.fetchData !== 'function') {
+      return res.status(500).json({ status: 'error', message: 'School data service is not available.' });
+    }
     const [persons, users, students, teachers, staff, schoolAccounts] = await Promise.all([
       dataService.fetchData('persons', {}, SYSTEM_CONTEXT, PERSON_QUERY_OPTIONS),
       dataService.fetchData('users', {}, SYSTEM_CONTEXT),
