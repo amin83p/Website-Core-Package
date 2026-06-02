@@ -6,16 +6,11 @@ let schoolDataService;
 try {
   schoolDataService = require('../services/school/schoolDataService');
 } catch (error) {
-  if (error.code !== 'MODULE_NOT_FOUND') {
-    throw error;
-  }
   try {
     schoolDataService = require('../../packages/school/MVC/services/school/schoolDataService');
   } catch (secondaryError) {
-    if (secondaryError.code !== 'MODULE_NOT_FOUND') {
-      throw secondaryError;
-    }
     schoolDataService = null;
+    console.warn('[debug] schoolDataService unavailable from package fallback:', secondaryError?.message || secondaryError);
   }
 }
 const securityService = require('../services/security');
