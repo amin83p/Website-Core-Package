@@ -1,4 +1,5 @@
-const { toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const schoolRepositories = require('../../repositories/school');
 
 function addRoleToIndex(index, personId, roleTag) {
