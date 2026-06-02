@@ -1,7 +1,8 @@
 const { DEFAULT_SESSION_STATUS_TEMPLATES } = require('../../models/school/sessionStatusModel');
 const schoolRepositories = require('../../repositories/school');
-const { toPublicId, idsEqual } = require('../../utils/idAdapter');
-const { evaluateSimpleFormula } = require('../../utils/simpleFormulaEvaluator');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { evaluateSimpleFormula } = requireCoreModule('MVC/utils/simpleFormulaEvaluator');
 
 const CACHE_TTL_MS = 60 * 1000;
 const statusCache = new Map();

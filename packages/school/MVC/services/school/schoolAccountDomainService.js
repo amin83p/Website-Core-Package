@@ -1,6 +1,7 @@
 const schoolDataService = require('./schoolDataService');
-const dataServiceGlobal = require('../dataService');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function boolFromBody(value) {

@@ -1,5 +1,6 @@
-const schoolRepositories = require('../../../repositories/school');
-const { idsEqual, toPublicId } = require('../../../utils/idAdapter');
+const { requireCoreModule } = require('../../../../packages/school/MVC/services/school/schoolCoreContracts');
+const schoolRepositories = require('../../../../packages/school/MVC/repositories/school');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function asIdArray(value) {
   return Array.from(new Set((Array.isArray(value) ? value : [])
@@ -464,3 +465,5 @@ module.exports = {
   settleRefundFromTransactions,
   settleRefundWithManualEntries
 };
+
+

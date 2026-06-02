@@ -1,4 +1,5 @@
-const settingService = require('../settingService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const settingService = requireCoreModule('MVC/services/settingService');
 
 const DEFAULT_POLICY = Object.freeze({
   allowImmediateReentry: true,

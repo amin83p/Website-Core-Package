@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
-const fileAssetStorage = require('../fileAssetStorageService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 
 function normalizeTokenKey(rawToken) {
   const clean = String(rawToken || '').trim();

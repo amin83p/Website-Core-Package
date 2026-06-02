@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/subjectModel.js
 const fs = require('fs').promises;
 const path = require('path');
@@ -287,4 +287,5 @@ module.exports = {
   clearStorageByOrg,
   normalizeDefaultScoreRules
 };
+
 

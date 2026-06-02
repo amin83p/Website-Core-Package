@@ -1,5 +1,6 @@
 const schoolDataService = require('./schoolDataService');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const OPEN_PERIOD_STATUSES = new Set(['active', 'planned']);
 

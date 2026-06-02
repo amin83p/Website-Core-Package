@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const schoolRepositories = require('../../repositories/school');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const ACTIVE_QUESTION_STATUSES = new Set(['draft', 'active']);
 

@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/payRateModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -271,4 +271,5 @@ module.exports = {
   sanitizePeriodInput,
   assertNoPeriodConflict
 };
+
 

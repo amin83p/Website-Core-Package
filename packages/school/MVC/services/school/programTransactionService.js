@@ -1,7 +1,8 @@
 const globalTransactionLedgerModel = require('../../models/school/globalTransactionLedgerModel');
 const transactionDefinitionModel = require('../../models/school/transactionDefinitionModel');
 const { ALL_FEE_CATEGORIES_KEY } = require('../../models/school/feeCategoryCatalog');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function collectFeeLinesForCategory(feeGroups, feeCategory) {
   const normalizedCategory = String(feeCategory || '').trim();

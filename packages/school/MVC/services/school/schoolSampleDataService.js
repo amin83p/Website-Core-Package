@@ -1,14 +1,15 @@
 const path = require('path');
 const fs = require('fs').promises;
 const dataService = require('../../services/school/schoolDataService');
-const dataServiceGlobal = require('../../services/dataService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
 const schoolRepositories = require('../../repositories/school');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const indexService = require('./schoolIndexService');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
-const { resolveCanonicalOrganizationName } = require('../../utils/organizationDisplay');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { resolveCanonicalOrganizationName } = requireCoreModule('MVC/utils/organizationDisplay');
 
 const MIGRATION_LOG_FILES = Object.freeze([
   'classRegistrationModeMigration.report.json',

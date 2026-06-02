@@ -1,7 +1,8 @@
 const schoolRepositories = require('../../repositories/school');
 const academicSnapshotService = require('./academicSnapshotService');
 const academicRuleResolverService = require('./academicRuleResolverService');
-const { recordTransactionOperation } = require('../transactionContextService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
 
 function nowDate() {
   return new Date().toISOString().slice(0, 10);

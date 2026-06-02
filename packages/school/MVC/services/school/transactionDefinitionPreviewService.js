@@ -1,6 +1,7 @@
 const globalTransactionLedgerModel = require('../../models/school/globalTransactionLedgerModel');
 const { parseAccountRef } = require('../../models/school/transactionDefinitionModel');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function parseJsonSafe(value, fallback) {
   if (value === undefined || value === null || value === '') return fallback;

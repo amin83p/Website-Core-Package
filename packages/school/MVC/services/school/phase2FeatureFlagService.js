@@ -1,4 +1,5 @@
-const settingService = require('../settingService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const settingService = requireCoreModule('MVC/services/settingService');
 
 function parseBoolean(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback;

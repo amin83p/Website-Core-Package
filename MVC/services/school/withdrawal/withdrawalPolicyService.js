@@ -1,6 +1,6 @@
 // MVC/services/school/withdrawal/withdrawalPolicyService.js
 
-const { WITHDRAWAL_REASONS, WITHDRAWAL_REASON_LABELS } = require('../../../models/school/withdrawalModel');
+const { WITHDRAWAL_REASONS, WITHDRAWAL_REASON_LABELS } = require('../../../../packages/school/MVC/models/school/withdrawalModel');
 
 const REFUND_POLICIES = Object.freeze({
   FULL_REFUND: 'full_refund',

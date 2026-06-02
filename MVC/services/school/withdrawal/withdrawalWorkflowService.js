@@ -1,12 +1,13 @@
-const schoolDataService = require('../schoolDataService');
-const schoolRepositories = require('../../../repositories/school');
-const withdrawalRepository = require('../../../repositories/school/withdrawalRepository');
-const adminChekersService = require('../../adminChekersService');
+const { requireCoreModule } = require('../../../../packages/school/MVC/services/school/schoolCoreContracts');
+const schoolDataService = require('../../../../packages/school/MVC/services/school/schoolDataService');
+const schoolRepositories = require('../../../../packages/school/MVC/repositories/school');
+const withdrawalRepository = require('../../../../packages/school/MVC/repositories/school/withdrawalRepository');
+const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const classWithdrawalService = require('./classWithdrawalService');
 const termWithdrawalService = require('./termWithdrawalService');
 const programWithdrawalService = require('./programWithdrawalService');
 const withdrawalPolicyService = require('./withdrawalPolicyService');
-const { idsEqual, toPublicId } = require('../../../utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const PENDING_STATUSES = new Set(['draft', 'submitted', 'pending_approval', 'pending_program_admin_approval']);
 const ACTIVE_REQUEST_STATUSES = new Set(['draft', 'submitted', 'pending_approval', 'pending_program_admin_approval', 'processing']);
@@ -619,3 +620,6 @@ module.exports = {
   finalizePendingWithdrawal,
   rejectPendingWithdrawal
 };
+
+
+

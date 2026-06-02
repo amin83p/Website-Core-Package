@@ -1,11 +1,12 @@
 const schoolDataService = require('./schoolDataService');
 const reportRuleEngineService = require('./reportRuleEngineService');
-const dataServiceGlobal = require('../dataService');
-const uploadMiddleware = require('../../middleware/upload');
-const adminChekersService = require('../adminChekersService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
+const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
+const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function parseJsonSafe(v, fallback) {

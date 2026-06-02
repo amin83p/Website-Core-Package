@@ -1,5 +1,7 @@
-const adminChekersService = require('../adminChekersService');
-const { toPublicId, idsEqual } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+
+const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function getScopedActiveOrgId(requestingUser) {
   if (!requestingUser) return null;

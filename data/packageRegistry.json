@@ -36,5 +36,43 @@
       "lastUpdateUser": "SYSTEM",
       "lastUpdateDateTime": "2026-05-23T03:05:41.357Z"
     }
+  },
+  {
+    "packageId": "school",
+    "version": "0.1.0",
+    "enabled": true,
+    "installStatus": "enabled",
+    "metadata": {
+      "packageName": "School",
+      "mountPath": "/school",
+      "manifestPath": "packages/school/package.manifest.json",
+      "activatedBy": "manual-local-fix",
+      "activationMode": "manual",
+      "declarationCounts": {
+        "routes": 1,
+        "views": 1,
+        "assets": 1,
+        "operations": 0,
+        "roles": 0,
+        "sections": 0,
+        "symbols": 0,
+        "accesses": 0,
+        "uploadFolders": 0,
+        "menuEntries": 0,
+        "dashboardEntries": 0,
+        "queryExecutors": 0
+      }
+    },
+    "id": "school",
+    "installedAt": "2026-06-02T00:00:00.000Z",
+    "updatedAt": "2026-06-02T00:00:00.000Z",
+    "lastError": "",
+    "lastWarning": "",
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-06-02T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-06-02T00:00:00.000Z"
+    }
   }
 ]

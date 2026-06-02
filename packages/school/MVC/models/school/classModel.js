@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/classModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -416,7 +416,7 @@ async function clearEnrollmentsByOrg(orgId, options = {}) {
 }
 
 /**
- * Deletes classes_storage/<classId>/ for each id (ENOENT ignored). Does not use fileQueue — safe to call from mongo cleanup.
+ * Deletes classes_storage/<classId>/ for each id (ENOENT ignored). Does not use fileQueue â€” safe to call from mongo cleanup.
  */
 async function removePhysicalClassStorageByClassIds(classIds) {
   const ids = (Array.isArray(classIds) ? classIds : [])
@@ -557,4 +557,5 @@ module.exports = {
   saveClassSessions,
   removePhysicalClassStorageByClassIds
 };
+
 

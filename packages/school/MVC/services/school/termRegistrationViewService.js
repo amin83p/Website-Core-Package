@@ -1,12 +1,13 @@
 const dataService = require('./schoolDataService');
-const dataServiceGlobal = require('../dataService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const schoolRepositories = require('../../repositories/school');
 const academicSnapshotService = require('./academicSnapshotService');
 const programTransactionService = require('./programTransactionService');
 const programRegistrationDraftService = require('./programRegistrationDraftService');
 const registrationIntegrityService = require('./registrationIntegrityService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function asIdArray(value) {

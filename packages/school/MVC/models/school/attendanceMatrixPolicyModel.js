@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
@@ -68,7 +68,7 @@ function normalizePolicyFromStored(input = {}) {
 }
 
 /**
- * Full policy from POST body. Checkbox omitted when unchecked → combined rule off.
+ * Full policy from POST body. Checkbox omitted when unchecked â†’ combined rule off.
  */
 function normalizePolicyFromForm(input = {}) {
   const out = { ...DEFAULT_POLICY };
@@ -226,4 +226,5 @@ module.exports = {
   pickStoredPolicyFields,
   orgKey
 };
+
 

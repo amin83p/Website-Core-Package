@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -304,4 +304,5 @@ module.exports = {
   JOURNAL_TYPES: Object.freeze([...JOURNAL_TYPES]),
   JOURNAL_LINE_DIRECTIONS: Object.freeze([...JOURNAL_LINE_DIRECTIONS])
 };
+
 

@@ -1,4 +1,5 @@
-const { idsEqual } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function resolveProgramSubjectRule(program, subjectId) {
   const subjects = Array.isArray(program?.subjects) ? program.subjects : [];

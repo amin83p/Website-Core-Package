@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const FEE_CATEGORIES = Object.freeze([
   'Domestic',
   'International',
@@ -38,3 +38,4 @@ module.exports = {
   isValidFeeCategory,
   getFeeCategoryLabel
 };
+

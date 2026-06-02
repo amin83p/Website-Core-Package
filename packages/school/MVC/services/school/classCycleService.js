@@ -1,7 +1,8 @@
 const schoolRepositories = require('../../repositories/school');
 const classEnrollmentPeriodService = require('./classEnrollmentPeriodService');
 const classEnrollmentPolicyService = require('./classEnrollmentPolicyService');
-const { toPublicId, idsEqual } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 const OPEN_PERIOD_STATUSES = new Set(['draft', 'planned', 'active']);
 

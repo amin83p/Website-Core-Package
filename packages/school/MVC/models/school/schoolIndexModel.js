@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/schoolIndexModel.js
 const fs = require('fs').promises;
 const path = require('path');
@@ -13,7 +13,7 @@ async function safeReadJSON(filePath, defaultStructure = {}) {
     const data = await fs.readFile(filePath, 'utf8');
     const parsed = JSON.parse(data);
 
-    // ✅ Hard guard: if file contains null / non-object, reset
+    // âœ… Hard guard: if file contains null / non-object, reset
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       await fs.writeFile(filePath, JSON.stringify(defaultStructure, null, 2));
       return defaultStructure;
@@ -51,4 +51,5 @@ module.exports = {
     saveTeacherIndex,
     saveStudentIndex
 };
+
 

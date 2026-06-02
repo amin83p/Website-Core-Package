@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const path = require('path');
 const {
   isPlainObject,
@@ -166,3 +166,4 @@ module.exports = {
   deleteQuestion: store.remove,
   clearByOrg: store.clearByOrg
 };
+

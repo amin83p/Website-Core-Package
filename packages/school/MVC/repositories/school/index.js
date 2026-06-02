@@ -31,6 +31,7 @@ const studentProgramRegistrationModel = require('../../models/school/studentProg
 const studentProgramPriorSubjectModel = require('../../models/school/studentProgramPriorSubjectModel');
 const studentTermRegistrationModel = require('../../models/school/studentTermRegistrationModel');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
+const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { getEntityQueryExecutor } = requireCoreModule('MVC/models/queryExecutionBridge');

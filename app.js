@@ -291,6 +291,7 @@ const fileGatewayRoutes = require('./MVC/routes/internal/fileGatewayRoutes');
 
 app.use('/', authRoutes);
 app.use('/', homeRoutes);          //   /(home page)
+app.use('/', restrictedRoutes);
 app.use('/contact', contactRoutes);
 
 app.use('/websitePolicy', websitePolicyRoutes);

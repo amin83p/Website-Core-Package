@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/programModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -618,4 +618,5 @@ module.exports = {
   ALL_FEE_CATEGORIES_KEY,
   SUBJECT_TYPES: Object.freeze([...SUBJECT_TYPES])
 };
+
 

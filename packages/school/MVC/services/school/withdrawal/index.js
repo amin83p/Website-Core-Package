@@ -1,2 +1,2 @@
-const { requireCoreModule } = require('../schoolCoreContracts');
-module.exports = requireCoreModule('MVC/services/school/withdrawal/index.js');
+module.exports = require('../../../../../../MVC/services/school/withdrawal/index.js');
+

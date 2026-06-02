@@ -1,5 +1,6 @@
-const uploadMiddleware = require('../../middleware/upload');
-const { toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const WINDOW_POLICY_OPTIONS = new Set(['strict_fixed_window', 'suggested_window']);
 const QUESTION_PRESENTATION_MODE_OPTIONS = new Set(['sequential_one_by_one', 'all_questions_on_one_page']);

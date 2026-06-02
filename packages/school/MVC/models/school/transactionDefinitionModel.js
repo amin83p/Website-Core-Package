@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/transactionDefinitionModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -491,4 +491,5 @@ module.exports = {
   TRANSACTION_DEFINITION_STATUSES: Object.freeze([...TRANSACTION_DEFINITION_STATUSES]),
   ACCOUNT_REF_KINDS
 };
+
 

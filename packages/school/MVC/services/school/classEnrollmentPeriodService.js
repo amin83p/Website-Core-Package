@@ -1,6 +1,7 @@
 const schoolRepositories = require('../../repositories/school');
+const { requireCoreModule } = require('./schoolCoreContracts');
 const classEnrollmentPolicyService = require('./classEnrollmentPolicyService');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const TERMINAL_STATUSES = new Set(['cancelled', 'archived', 'error']);
 const OPEN_STATUSES = new Set(['draft', 'planned', 'active']);

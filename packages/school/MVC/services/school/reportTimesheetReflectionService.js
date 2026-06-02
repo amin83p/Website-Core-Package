@@ -3,7 +3,8 @@
  * for the period that contains the assignment target date.
  */
 const schoolDataService = require('./schoolDataService');
-const { idsEqual } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function normalizeId(value) {
   return String(value || '').trim();

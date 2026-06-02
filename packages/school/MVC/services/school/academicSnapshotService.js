@@ -1,5 +1,6 @@
 const schoolRepositories = require('../../repositories/school');
-const { toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function unique(values) {
   return [...new Set((Array.isArray(values) ? values : []).map((v) => toPublicId(v)).filter(Boolean))];

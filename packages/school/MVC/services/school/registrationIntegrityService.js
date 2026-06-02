@@ -4,8 +4,9 @@ const postingPolicyService = require('./postingPolicyService');
 const academicSnapshotService = require('./academicSnapshotService');
 const indexService = require('./schoolIndexService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
-const { recordTransactionOperation } = require('../transactionContextService');
-const { idsEqual, toPublicId } = require('../../utils/idAdapter');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function normalizeStatus(status) {
   return String(status || '').trim().toLowerCase();

@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
+﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const path = require('path');
 const crypto = require('crypto');
 const {
@@ -115,3 +115,4 @@ module.exports = {
   deleteRevision: store.remove,
   clearByOrg: store.clearByOrg
 };
+

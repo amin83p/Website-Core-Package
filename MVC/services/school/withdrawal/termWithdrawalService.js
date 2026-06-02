@@ -1,12 +1,13 @@
 // MVC/services/school/withdrawal/termWithdrawalService.js
 
-const schoolDataService = require('../schoolDataService');
-const schoolRepositories = require('../../../repositories/school');
+const { requireCoreModule } = require('../../../../packages/school/MVC/services/school/schoolCoreContracts');
+const schoolDataService = require('../../../../packages/school/MVC/services/school/schoolDataService');
+const schoolRepositories = require('../../../../packages/school/MVC/repositories/school');
 const withdrawalPolicyService = require('./withdrawalPolicyService');
 const classWithdrawalService = require('./classWithdrawalService');
 const withdrawalSettlementService = require('./withdrawalSettlementService');
-const withdrawalRepository = require('../../../repositories/school/withdrawalRepository');
-const { idsEqual } = require('../../../utils/idAdapter');
+const withdrawalRepository = require('../../../../packages/school/MVC/repositories/school/withdrawalRepository');
+const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function roundMoney(value) {
   const num = Number(value || 0);
@@ -499,3 +500,5 @@ module.exports = {
   getTermRegistrationWithDetails,
   getActiveClassesForTermRegistration
 };
+
+
