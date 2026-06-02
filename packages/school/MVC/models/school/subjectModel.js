@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = requireCoreModule('MVC/services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
 // MVC/models/school/subjectModel.js
 const fs = require('fs').promises;
 const path = require('path');

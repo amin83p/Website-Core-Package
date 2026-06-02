@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = requireCoreModule('MVC/services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
 const {
   isValidFeeCategory,
   ALL_FEE_CATEGORIES_KEY

@@ -1,4 +1,4 @@
-const { requireCoreModule, resolveCoreRoot } = requireCoreModule('MVC/services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
