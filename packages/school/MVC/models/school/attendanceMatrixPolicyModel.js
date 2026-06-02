@@ -1,10 +1,10 @@
 const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
-const { runByRepositoryBackend } = requireCoreModule('MVC/MVC/repositories/backend/repositoryBackendSelector');
-const { getMongoCollection } = requireCoreModule('MVC/MVC/infrastructure/mongo/mongoConnection');
-const { normalizeMongoDocument } = requireCoreModule('MVC/MVC/repositories/backend/mongoRepositoryUtils');
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const { runByRepositoryBackend } = requireCoreModule('MVC/repositories/backend/repositoryBackendSelector');
+const { getMongoCollection } = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
+const { normalizeMongoDocument } = requireCoreModule('MVC/repositories/backend/mongoRepositoryUtils');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/attendanceMatrixPolicy.json');
 
@@ -226,3 +226,4 @@ module.exports = {
   pickStoredPolicyFields,
   orgKey
 };
+

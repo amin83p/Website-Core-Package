@@ -31,12 +31,12 @@ const studentProgramRegistrationModel = require('../../models/school/studentProg
 const studentProgramPriorSubjectModel = require('../../models/school/studentProgramPriorSubjectModel');
 const studentTermRegistrationModel = require('../../models/school/studentTermRegistrationModel');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
-const { applyGenericFilter } = requireCoreModule('MVC/MVC/utils/queryEngine');
-const { toPublicId, idsEqual } = requireCoreModule('MVC/MVC/utils/idAdapter');
-const { getEntityQueryExecutor } = requireCoreModule('MVC/MVC/models/queryExecutionBridge');
-const { assertQueryableCrudRepository } = requireCoreModule('MVC/MVC/repositories/contracts/crudRepositoryContract');
-const { runByRepositoryBackend } = requireCoreModule('MVC/MVC/repositories/backend/repositoryBackendSelector');
-const { getMongoCollection } = requireCoreModule('MVC/MVC/infrastructure/mongo/mongoConnection');
+const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
+const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { getEntityQueryExecutor } = requireCoreModule('MVC/models/queryExecutionBridge');
+const { assertQueryableCrudRepository } = requireCoreModule('MVC/repositories/contracts/crudRepositoryContract');
+const { runByRepositoryBackend } = requireCoreModule('MVC/repositories/backend/repositoryBackendSelector');
+const { getMongoCollection } = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
 const {
   buildMongoFilterFromQuery,
   buildMongoSortFromQuery,
@@ -46,7 +46,7 @@ const {
   resolveMongoIdFilter,
   generateUniqueStringId,
   deepMerge
-} = requireCoreModule('MVC/MVC/repositories/backend/mongoRepositoryUtils');
+} = requireCoreModule('MVC/repositories/backend/mongoRepositoryUtils');
 
 const DEFAULT_DATE_FIELDS = ['audit.createDateTime', 'audit.lastUpdateDateTime', 'createdAt', 'date'];
 
@@ -1610,3 +1610,4 @@ assertQueryableCrudRepository('schoolRepositories.studentTermRegistrations', sch
 assertQueryableCrudRepository('schoolRepositories.classEnrollmentPeriods', schoolRepositories.classEnrollmentPeriods);
 
 module.exports = schoolRepositories;
+

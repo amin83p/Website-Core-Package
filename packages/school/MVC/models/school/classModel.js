@@ -3,10 +3,10 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
-const fileAssetStorage = requireCoreModule('MVC/MVC/services/fileAssetStorageService');
-const uploadFolderSettingsService = requireCoreModule('MVC/MVC/services/uploadFolderSettingsService');
+const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/classes.json');
 const legacyStorageBasePath = path.join(resolveCoreRoot(), 'data/school/classes_storage');
@@ -557,3 +557,4 @@ module.exports = {
   saveClassSessions,
   removePhysicalClassStorageByClassIds
 };
+

@@ -2,8 +2,8 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
-const { idsEqual, toPublicId } = requireCoreModule('MVC/MVC/utils/idAdapter');
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/reportAssignments.json');
 
@@ -370,3 +370,4 @@ module.exports = {
   deleteAssignment,
   clearByOrg
 };
+

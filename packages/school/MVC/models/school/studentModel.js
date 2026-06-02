@@ -3,7 +3,7 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue'); 
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue'); 
 const { FEE_CATEGORIES, FEE_CATEGORY_SET } = require('./feeCategoryCatalog');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/students.json');
@@ -279,3 +279,4 @@ module.exports = {
     ACADEMIC_STATUSES: Object.freeze([...ACADEMIC_STATUSES]),
     FEE_CATEGORIES
 };
+

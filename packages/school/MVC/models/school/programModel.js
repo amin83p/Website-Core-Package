@@ -3,7 +3,7 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { FEE_CATEGORIES, ALL_FEE_CATEGORIES_KEY } = require('./feeCategoryCatalog');
 const { TERM_STATUSES, OPTIONAL_DATE_FIELDS } = require('./termModel');
 const { normalizePostingPolicyRows } = require('./postingPolicyModel');
@@ -618,3 +618,4 @@ module.exports = {
   ALL_FEE_CATEGORIES_KEY,
   SUBJECT_TYPES: Object.freeze([...SUBJECT_TYPES])
 };
+

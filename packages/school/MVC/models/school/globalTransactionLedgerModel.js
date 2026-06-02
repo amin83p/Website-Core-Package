@@ -3,8 +3,8 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
-const { idsEqual } = requireCoreModule('MVC/MVC/utils/idAdapter');
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 const dataDir = path.join(__dirname, '../../../data/school');
 const dataPath = path.join(dataDir, 'globalTransactionLedger.json');
@@ -617,3 +617,4 @@ module.exports = {
   TX_DIRECTIONS: Object.freeze([...TX_DIRECTIONS]),
   RECON_STATUSES: Object.freeze([...RECON_STATUSES])
 };
+

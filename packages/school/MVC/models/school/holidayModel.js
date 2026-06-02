@@ -2,7 +2,7 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 // MVC/models/school/holidayModel.js
 const fs = require('fs').promises;
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/holidays.json');
 
@@ -158,3 +158,4 @@ module.exports = {
     updateHoliday,
     deleteHoliday
 };
+

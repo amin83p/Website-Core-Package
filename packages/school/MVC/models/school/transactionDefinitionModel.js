@@ -3,7 +3,7 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const schoolAccountModel = require('./schoolAccountModel');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/transactionDefinitions.json');
@@ -491,3 +491,4 @@ module.exports = {
   TRANSACTION_DEFINITION_STATUSES: Object.freeze([...TRANSACTION_DEFINITION_STATUSES]),
   ACCOUNT_REF_KINDS
 };
+

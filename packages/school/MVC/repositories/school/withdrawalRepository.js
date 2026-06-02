@@ -1,9 +1,9 @@
 const withdrawalModel = require('../../models/school/withdrawalModel');
-const { applyGenericFilter } = requireCoreModule('MVC/MVC/utils/queryEngine');
-const { assertQueryableCrudRepository } = requireCoreModule('MVC/MVC/repositories/contracts/crudRepositoryContract');
-const { runByRepositoryBackend } = requireCoreModule('MVC/MVC/repositories/backend/repositoryBackendSelector');
-const { getMongoCollection } = requireCoreModule('MVC/MVC/infrastructure/mongo/mongoConnection');
-const { toPublicId } = requireCoreModule('MVC/MVC/utils/idAdapter');
+const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
+const { assertQueryableCrudRepository } = requireCoreModule('MVC/repositories/contracts/crudRepositoryContract');
+const { runByRepositoryBackend } = requireCoreModule('MVC/repositories/backend/repositoryBackendSelector');
+const { getMongoCollection } = requireCoreModule('MVC/infrastructure/mongo/mongoConnection');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const {
   buildMongoFilterFromQuery,
   buildMongoSortFromQuery,
@@ -13,7 +13,7 @@ const {
   resolveMongoIdFilter,
   generateUniqueStringId,
   deepMerge
-} = requireCoreModule('MVC/MVC/repositories/backend/mongoRepositoryUtils');
+} = requireCoreModule('MVC/repositories/backend/mongoRepositoryUtils');
 
 function stripPaginationFromQuery(query = {}) {
   if (!query || typeof query !== 'object') return {};
@@ -201,3 +201,4 @@ const withdrawalRepository = {
 assertQueryableCrudRepository('withdrawalRepository', withdrawalRepository);
 
 module.exports = withdrawalRepository;
+

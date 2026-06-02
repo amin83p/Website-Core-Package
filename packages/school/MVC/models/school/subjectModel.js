@@ -2,10 +2,10 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 // MVC/models/school/subjectModel.js
 const fs = require('fs').promises;
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue'); 
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue'); 
 const { isValidFeeCategory } = require('./feeCategoryCatalog');
-const fileAssetStorage = requireCoreModule('MVC/MVC/services/fileAssetStorageService');
-const uploadFolderSettingsService = requireCoreModule('MVC/MVC/services/uploadFolderSettingsService');
+const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/subjects.json');
 const legacyStorageBasePath = path.join(resolveCoreRoot(), 'data/school/subjects_storage');
@@ -287,3 +287,4 @@ module.exports = {
   clearStorageByOrg,
   normalizeDefaultScoreRules
 };
+

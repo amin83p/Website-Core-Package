@@ -2,7 +2,7 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 
 const dataDir = path.join(__dirname, '../../../data/school');
 const dataPath = path.join(dataDir, 'transactionJournals.json');
@@ -304,3 +304,4 @@ module.exports = {
   JOURNAL_TYPES: Object.freeze([...JOURNAL_TYPES]),
   JOURNAL_LINE_DIRECTIONS: Object.freeze([...JOURNAL_LINE_DIRECTIONS])
 };
+

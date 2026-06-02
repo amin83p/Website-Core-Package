@@ -2,7 +2,7 @@ const { requireCoreModule, resolveCoreRoot } = require('../services/school/schoo
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { queueWrite } = requireCoreModule('MVC/MVC/models/fileQueue');
+const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/sessionStatuses.json');
 
@@ -348,3 +348,4 @@ module.exports = {
   ensureOrgDefaultSessionStatuses,
   DEFAULT_SESSION_STATUS_TEMPLATES
 };
+
