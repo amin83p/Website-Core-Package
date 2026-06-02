@@ -50,7 +50,20 @@
     "schoolSampleDataService.js",
     "sessionStatusPolicyService.js",
     "termRegistrationViewService.js",
-    "transactionDefinitionPreviewService.js"
+    "transactionDefinitionPreviewService.js",
+    "classCycleService.js",
+    "classEnrollmentPeriodService.js",
+    "classEnrollmentPolicyService.js",
+    "classEnrollmentReadService.js",
+    "examBuilderService.js",
+    "examValidationService.js",
+    "finalGradesWorkflowService.js",
+    "reportDocxRenderService.js",
+    "reportIntegrityService.js",
+    "reportRuleEngineService.js",
+    "reportService.js",
+    "reportTimesheetReflectionService.js",
+    "reportViewService.js"
   ],
   "repositories": [
     "index.js",
