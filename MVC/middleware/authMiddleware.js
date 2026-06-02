@@ -1,7 +1,27 @@
 // MVC/middleware/authMiddleware.js
-const authService = require('../services/authService');
+const jwt = require('jsonwebtoken');
+const { SECRET_KEY } = require('../../config/security');
 const adminAuthorityService = require('../services/adminAuthorityService');
 const effectiveAccessResolverService = require('../services/security/effectiveAccessResolverService');
+
+let cachedAuthService = null;
+
+function getAuthService() {
+  if (!cachedAuthService) {
+    cachedAuthService = require('../services/authService');
+  }
+  return cachedAuthService;
+}
+
+function hasValidToken(token) {
+  if (!token) return false;
+  try {
+    jwt.verify(token, SECRET_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function attachAdminContext(req, res) {
   const adminContext = adminAuthorityService.resolveAdminAuthority({
@@ -99,7 +119,7 @@ async function requireAuth(req, res, next) {
     return res.redirect('/login');
   }
   // 2. Invalid signature? Clear and redirect.
-  if (!authService.validateToken(token)) {
+  if (!hasValidToken(token)) {
     res.clearCookie('auth_token');
     if (isAjaxRequest) {
       return res.status(401).json({
@@ -115,7 +135,7 @@ async function requireAuth(req, res, next) {
     // 3. Hydrate User Context
     // This is where "No active organization" errors are thrown
     if(typeof req.user === 'undefined' || !req.user){
-      const user = await authService.getUserFromToken(token);
+      const user = await getAuthService().getUserFromToken(token);
       //console.log(JSON.stringify(user));
       req.user = user; // Attach user to request
     }
@@ -181,8 +201,8 @@ async function softAuth(req, res, next) {
       return next();
   }
   try {
-      if (!authService.validateToken(token)) throw new Error('Invalid Token');
-      const user = await authService.getUserFromToken(token);
+      if (!hasValidToken(token)) throw new Error('Invalid Token');
+      const user = await getAuthService().getUserFromToken(token);
       req.user = user;
       attachAdminContext(req, res);
   } catch (error) {
