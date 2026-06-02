@@ -1,12 +1,20 @@
 // MVC/controllers/debugController.js
 const heicConvert = require('heic-convert'); 
 const dataService = require('../services/dataService');
-const schoolDataService = require('../services/school/schoolDataService');
+const path = require('path');
+let schoolDataService;
+try {
+  schoolDataService = require('../services/school/schoolDataService');
+} catch (error) {
+  if (error.code !== 'MODULE_NOT_FOUND') {
+    throw error;
+  }
+  schoolDataService = require('../../packages/school/MVC/services/school/schoolDataService');
+}
 const securityService = require('../services/security');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { loadMergedProfileByIds } = require('../services/security/profileMergeService');
 const { normalizeOrgRoles, getOrgRolesDisplay, getPrimaryOrgRole } = require('../utils/orgContextUtils');
-const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
 const fileAssetStorage = require('../services/fileAssetStorageService');

@@ -4,9 +4,11 @@ const { runByRepositoryBackend } = require('./backend/repositoryBackendSelector'
 const { getMongoCollection } = require('../infrastructure/mongo/mongoConnection');
 const { toPublicId, toIdArray, idsEqual } = require('../utils/idAdapter');
 const { projectPersonForRead } = require('../services/person/personTagProjectionService');
-const { buildSchoolRoleIndex } = require('../services/school/schoolRoleTagProvider');
+const path = require('path');
+const coreSchoolRoleTagProviderFallback = resolveSchoolRoleTagProvider();
+const { buildSchoolRoleIndex } = coreSchoolRoleTagProviderFallback;
 const roleRegistryService = require('../services/person/roleRegistryService');
-const {
+const { 
   buildMongoFilterFromQuery,
   buildMongoSortFromQuery,
   resolveMongoPagination,
@@ -16,6 +18,23 @@ const {
   generateUniqueStringId,
   deepMerge
 } = require('./backend/mongoRepositoryUtils');
+
+function resolveSchoolRoleTagProvider() {
+  const localProviderPath = path.join(__dirname, '../services/school/schoolRoleTagProvider');
+  try {
+    return require(localProviderPath);
+  } catch (error) {
+    if (error.code !== 'MODULE_NOT_FOUND') throw error;
+  }
+
+  const packageProviderPath = path.join(__dirname, '../../packages/school/MVC/services/school/schoolRoleTagProvider');
+  try {
+    return require(packageProviderPath);
+  } catch (error) {
+    if (error.code !== 'MODULE_NOT_FOUND') throw error;
+    return { buildSchoolRoleIndex: async () => new Map() };
+  }
+}
 
 function stripPaginationFromQuery(query = {}) {
   if (!query || typeof query !== 'object') return {};

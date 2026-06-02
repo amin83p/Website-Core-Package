@@ -233,7 +233,17 @@ function getSchoolRoleTagProvider() {
   try {
     cachedSchoolRoleTagProvider = require('../services/school/schoolRoleTagProvider');
   } catch (error) {
-    cachedSchoolRoleTagProvider = null;
+    if (error.code !== 'MODULE_NOT_FOUND') {
+      throw error;
+    }
+    try {
+      cachedSchoolRoleTagProvider = require('../../packages/school/MVC/services/school/schoolRoleTagProvider');
+    } catch (secondaryError) {
+      if (secondaryError.code !== 'MODULE_NOT_FOUND') {
+        throw secondaryError;
+      }
+      cachedSchoolRoleTagProvider = null;
+    }
   }
   return cachedSchoolRoleTagProvider;
 }
