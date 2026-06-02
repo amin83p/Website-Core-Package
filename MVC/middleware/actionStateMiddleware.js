@@ -1,5 +1,4 @@
 // MVC/middleware/actionStateMiddleware.js
-const dataService = require('../services/dataService'); 
 const { resolveEntity } = require('../utils/entityResolver'); 
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const {
@@ -22,6 +21,62 @@ function parseJsonLikeString(value) {
     } catch (_) {
         return value;
     }
+}
+
+const DATA_SERVICE_PATH = '../services/dataService';
+let cachedDataService = null;
+
+function getCachedDataService() {
+  const modulePath = require.resolve(DATA_SERVICE_PATH);
+  const cached = require.cache[modulePath];
+  if (cached?.loaded && cached.exports) return cached.exports;
+  return null;
+}
+
+async function resolveDataServiceWithRetry(maxAttempts = 6) {
+  let dataService = getCachedDataService();
+  if (dataService) return dataService;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      require(DATA_SERVICE_PATH);
+    } catch (error) {
+      console.error('ActionState Middleware: failed to require dataService module:', error.message);
+      break;
+    }
+
+    dataService = getCachedDataService();
+    if (dataService) return dataService;
+
+    if (attempt < maxAttempts) {
+      const waitMs = Math.min(6 + (attempt * 3), 30);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+
+  return getCachedDataService();
+}
+
+async function requireTrackingDataService() {
+  const dataService = await resolveDataServiceWithRetry();
+  if (!dataService) {
+    console.error('ActionState Middleware: dataService is not available yet');
+    return null;
+  }
+  const requiredMethods = [
+    'logActionStateAttempt',
+    'updateActionStateProgress',
+    'completeActionState',
+    'recordActionStateRetryableError',
+    'failActionState'
+  ];
+  const missingMethod = requiredMethods.find((method) => typeof dataService?.[method] !== 'function');
+  if (missingMethod) {
+    console.error(`ActionState Middleware: dataService.${missingMethod} is not available yet`);
+    return null;
+  }
+  cachedDataService = dataService;
+  return cachedDataService;
 }
 
 function normalizePayloadValue(value) {
@@ -59,6 +114,12 @@ function buildActionStatePayload(method, reqBody, bodyOrChunk) {
 const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
     return async (req, res, next) => {
         try {
+            const dataService = await requireTrackingDataService();
+            if (!dataService) {
+              // Action-state tracking is best-effort and should not block page flow.
+              return next();
+            }
+
             // 1. RESOLVE ENTITIES
             const [section, operation] = await Promise.all([
                 resolveEntity('sections', sectionIdOrName),

@@ -1,6 +1,6 @@
 {
     "packageId": "school",
-    "step": 43,
+    "step": 44,
     "status": "smoke-auth-verified",
     "notes": [
         "Passes 1-6 completed: scaffold through runtime mount cutover.",
@@ -26,7 +26,10 @@
         "Pass 43 completed auth-session smoke execution on port 3100 with `--cookie=\"auth_token=<jwt>`: unauth route checks returned expected 302 `/login`; auth checks for `/school`, `/school/students`, `/school/teachers`, `/school/staff`, and `/dashboard/section-nav/SCHOOL` passed with dashboard status 200 and valid menu links.",
         "Pass 43 completed with explicit external app startup + `--no-server-start` smoke path in local test environment; unauth and auth routes passed and menu probe reported teachersLink=true and staffLink=true.",
         "Pass 43 closeout run captured route/mount evidence in app startup logs: `requested=1 | prepared=1 | mounted=1 | failed=0` and `Package loader finished ... enabled=2 | loaded=2 | failed=0`.",
-        "Pass 43 run captured loader evidence: school route mount `requested=1 | prepared=1 | mounted=1 | failed=0` and package summary `enabled=2 | loaded=2 | failed=0`."
+        "Pass 43 run captured loader evidence: school route mount `requested=1 | prepared=1 | mounted=1 | failed=0` and package summary `enabled=2 | loaded=2 | failed=0`.",
+        "Pass 44 validated Core-only host compatibility surface by comparing `Website-Core-Package` and `Website-Core-Only` runtime host shims (`MVC/middleware/authMiddleware.js`, `MVC/models/personModel.js`, `MVC/repositories/personRepository.js`, `MVC/controllers/debugController.js`): no functional diffs were found.",
+        "Pass 44 confirmed `Website-Core-Only` repo currently keeps package payload out of source (`packages/school/*` not tracked), with only host install tooling present under `scripts/packages`.",
+        "Pass 44 readiness gap remains: execute one Core-only install-and-run smoke using built school install artifact (`school-*.zip` + `.sig`) to confirm `/school*` behavior under an authorized session."
     ],
     "scripts": [
         {
@@ -125,7 +128,8 @@
         "docs/school-package-pass40-accesses-menu-dashboard-2026-06-02.md",
         "docs/school-package-pass42-auth-smoke-next-step-2026-06-02.md",
         "docs/school-package-pass43-auth-smoke-complete-2026-06-02.md",
-        "docs/school-package-pass43-closeout-smoke-run-2026-06-02.md"
+        "docs/school-package-pass43-closeout-smoke-run-2026-06-02.md",
+        "docs/school-package-pass44-core-only-host-sync-2026-06-02.md"
     ],
     "tests": [
         "test/school-package-certification-hardcoded-coupling.test.js",

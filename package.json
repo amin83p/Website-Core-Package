@@ -51,6 +51,8 @@
     "pte:signing:bootstrap": "node scripts/packages/bootstrap-package-signing-keys.js",
     "pte:signing:bootstrap:apply": "node scripts/packages/bootstrap-package-signing-keys.js --apply",
     "pte:build:install-zip": "node scripts/packages/build-pte-install-zip.js",
+    "package:build:install-zip": "node scripts/packages/build-package-install-zip.js",
+    "school:build:install-zip": "node scripts/packages/build-package-install-zip.js --package-id school",
     "membership:period-org:migrate": "node scripts/migrate-membership-period-org-scope.js",
     "school:enrollment-periods:backfill": "node scripts/school/migration/backfillClassEnrollmentPeriods.js",
     "school:enrollment-periods:backfill:apply": "node scripts/school/migration/backfillClassEnrollmentPeriods.js --apply",
