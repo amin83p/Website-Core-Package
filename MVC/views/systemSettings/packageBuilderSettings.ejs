@@ -6,12 +6,12 @@
   const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
   const packageRoot = String(typeof packageStorageRoot !== 'undefined' ? packageStorageRoot : '').trim();
   const orgRows = Array.isArray(organizations) ? organizations : [];
-  const activeOrgId = String(typeof activeOrgId !== 'undefined' ? activeOrgId : '').trim();
+  const activeOrgIdValue = String(typeof activeOrgId !== 'undefined' ? activeOrgId : '').trim();
   const activeOrgName = (() => {
-    if (!activeOrgId) return '';
-    const org = orgRows.find((row) => String(row?.id || row?.orgId || '').trim() === activeOrgId);
+    if (!activeOrgIdValue) return '';
+    const org = orgRows.find((row) => String(row?.id || row?.orgId || '').trim() === activeOrgIdValue);
     const name = String(org?.name || org?.displayName || org?.identity?.displayName || org?.identity?.legalName || '').trim();
-    return name ? `${name} (#${activeOrgId})` : activeOrgId;
+    return name ? `${name} (#${activeOrgIdValue})` : activeOrgIdValue;
   })();
 %>
 
@@ -62,7 +62,7 @@
         <div class="col-lg-6">
           <label class="form-label small fw-bold">Origin Organization</label>
           <div class="input-group">
-            <input type="hidden" id="builderOriginOrgId" value="<%= activeOrgId %>">
+            <input type="hidden" id="builderOriginOrgId" value="<%= activeOrgIdValue %>">
             <input
               type="text"
               id="builderOriginOrgName"
