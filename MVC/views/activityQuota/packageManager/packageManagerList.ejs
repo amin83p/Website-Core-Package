@@ -47,7 +47,9 @@
         <tr>
           <td class="ps-4">
             <div class="fw-bold text-dark"><%= item.id || '-' %></div>
-            <div class="x-small text-muted font-monospace">Org: <%= item.orgId || '-' %></div>
+            <div class="x-small text-muted font-monospace">
+              Org: <%= item.orgName ? `${item.orgName} (#${item.orgId || '-'})` : (item.orgId || '-') %>
+            </div>
             <div class="x-small text-muted mt-1">
               Profiles: <%= Number(summary.accessProfileCount || 0) %>,
               Credits: <%= Number(summary.ledgerEntryCount || 0) %>,

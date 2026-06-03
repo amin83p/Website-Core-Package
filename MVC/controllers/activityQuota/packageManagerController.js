@@ -2,6 +2,7 @@ const paginate = require('../../utils/paginationHelper');
 const packageManagerDataService = require('../../services/activityQuota/packageManagerDataService');
 const activityQuotaUiService = require('../../services/activityQuota/activityQuotaUiService');
 const { SECTIONS } = require('../../../config/accessConstants');
+const { toPublicId } = require('../../utils/idAdapter');
 const {
   isAjax,
   buildDataServiceQuery,
@@ -44,6 +45,27 @@ const PICKER_USER_QUERY_OPTIONS = Object.freeze({
   allowMetaKeys: true
 });
 
+function buildOrgLabelLookup(user = {}) {
+  const map = new Map();
+  const orgs = Array.isArray(user?.allowedOrgs) ? user.allowedOrgs : [];
+  orgs.forEach((org) => {
+    const key = toPublicId(org?.orgId || org?.id || '');
+    if (!key) return;
+    const name = (org?.name || org?.orgName || org?.organizationName || '').toString().trim();
+    if (name) map.set(key, name);
+  });
+  return map;
+}
+
+function getOrgDisplayName(orgId = '', orgLabelMap = new Map()) {
+  const token = toPublicId(orgId);
+  if (!token) return '';
+  if (token.toUpperCase() === 'SYSTEM' || token.toUpperCase() === 'GLOBAL') {
+    return 'System / Global';
+  }
+  return orgLabelMap.get(token) || '';
+}
+
 function splitPagination(query = {}) {
   const source = query && typeof query === 'object' ? query : {};
   const page = Number.parseInt(source.page, 10) || 1;
@@ -72,8 +94,13 @@ async function listAssignments(req, res) {
     const rows = await packageManagerDataService.listAssignments(query, req.user, {
       scopeId: req.accessScope
     });
+    const orgLabelMap = buildOrgLabelLookup(req.user || {});
+    const rowsWithOrgName = (Array.isArray(rows) ? rows : []).map((row) => ({
+      ...row,
+      orgName: getOrgDisplayName(row?.orgId, orgLabelMap)
+    }));
     const searchableFields = await inferSearchableFields(rows, { exclude: ['audit', 'packageSnapshot'] });
-    const { data, pagination } = paginate(rows, req.query.page, req.query.limit);
+    const { data, pagination } = paginate(rowsWithOrgName, req.query.page, req.query.limit);
     const accessUi = await activityQuotaUiService.buildCrudFlags(req, SECTIONS.ACTIVITY_QUOTA_PACKAGE_MANAGER);
     const manageBtns = await activityQuotaUiService.buildManageButtons(req, {
       exclude: ['packageManager'],
