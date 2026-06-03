@@ -608,7 +608,19 @@ async function startServer() {
 
     server.listen(PORT, () => {
       startupLogger.success('APP', 'HTTP_SERVER', 'Server listening.', { url: `http://localhost:${PORT}` });
-      startupLogger.info('APP', 'SETTINGS_SNAPSHOT', 'Loaded settings.', { app: JSON.stringify(settingService.get().app || {}) });
+      const appSettingsSnapshot = (() => {
+        const appSettings = settingService.get().app || {};
+        return {
+          appName: appSettings.brand?.appName || '',
+          appShortName: appSettings.brand?.appShortName || '',
+          defaultPageSize: appSettings.defaultPageSize || 0,
+          buildVersion: appSettings.buildVersionOverride || '',
+          publicMenuItems: Array.isArray(appSettings.publicMenu?.items) ? appSettings.publicMenu.items.length : 0,
+          uploadsPath: appSettings.uploadsPath || '',
+          dataBackend: appSettings.dataBackend || 'json'
+        };
+      })();
+      startupLogger.info('APP', 'SETTINGS_SNAPSHOT', 'Loaded settings summary.', appSettingsSnapshot);
     });
   } catch (err) {
     startupLogger.error('APP', 'BOOT', 'Failed to start server with current settings/backend configuration.', { error: err?.message || String(err) });
