@@ -391,6 +391,58 @@
     return payload;
   }
 
+  function toBoolean(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+    }
+    return false;
+  }
+
+  function toText(value) {
+    return String(value || '').trim();
+  }
+
+  function coerceInstallPreviewPayload(payload = {}) {
+    if (!payload || typeof payload !== 'object') return {};
+    if (payload?.report && typeof payload.report === 'object') return payload.report;
+    if (payload?.result && typeof payload.result === 'object') return payload.result;
+    if (payload?.data && typeof payload.data === 'object') return payload.data;
+    if (payload?.payload && typeof payload.payload === 'object') return payload.payload;
+    return payload;
+  }
+
+  function getInstallPreviewAckToken(preview = {}) {
+    return toText(
+      preview?.ackToken
+      || preview?.upgradeAckToken
+      || preview?.ack_token
+      || preview?.upgradeAckTokenPreview
+      || preview?.previewAckToken
+    );
+  }
+
+  function previewIsUpgrade(preview = {}) {
+    return toBoolean(preview?.isUpgrade)
+      || toBoolean(preview?.isUpgraded)
+      || toBoolean(preview?.upgradeRequired);
+  }
+
+  function previewRequiresAcknowledgement(preview = {}) {
+    return toBoolean(preview?.requiresAcknowledgement)
+      || toBoolean(preview?.requires_acknowledgement)
+      || toBoolean(preview?.requiresAcknowledgment)
+      || toBoolean(preview?.requires_acknowledgment)
+      || toBoolean(preview?.requireAcknowledgement)
+      || toBoolean(preview?.require_acknowledgement)
+      || toBoolean(preview?.upgradePreflightRequiredAck)
+      || toBoolean(preview?.upgradePreflightRequiredAckToken)
+      || toBoolean(preview?.needsUpgradeAcknowledgement)
+      || toBoolean(preview?.needsAcknowledgement);
+  }
+
   function renderTransactions(packageId, rows = []) {
     if (!transactionTableEl) return;
     const tbody = transactionTableEl.querySelector('tbody');
@@ -940,10 +992,11 @@
   }
 
   async function showInstallUpgradeWizard(preview = {}) {
-    if (!(preview?.isUpgrade === true) || preview?.requiresAcknowledgement !== true) {
+    const requiresAcknowledgement = previewRequiresAcknowledgement(preview);
+    if (!previewIsUpgrade(preview) || !requiresAcknowledgement) {
       return {
         status: 'ready',
-        ackToken: String(preview?.ackToken || '').trim()
+        ackToken: getInstallPreviewAckToken(preview)
       };
     }
     let stepIndex = 0;
@@ -985,7 +1038,7 @@
       if (decision === 'Confirm Upgrade') {
         return {
           status: 'ready',
-          ackToken: String(preview?.ackToken || '').trim()
+          ackToken: getInstallPreviewAckToken(preview)
         };
       }
       return { status: 'cancelled', ackToken: '' };
@@ -1043,7 +1096,7 @@
     const progressSteps = getInstallProgressSteps(installMethod);
     await requireAdminVerification();
     const previewResult = await runInstallPreview(installMethod, targetOrgId);
-    const preview = previewResult?.report || {};
+    const preview = coerceInstallPreviewPayload(previewResult);
     const wizard = await showInstallUpgradeWizard(preview);
     if (wizard?.status === 'cancelled') {
       return {
