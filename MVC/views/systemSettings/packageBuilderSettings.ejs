@@ -6,6 +6,13 @@
   const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
   const packageRoot = String(typeof packageStorageRoot !== 'undefined' ? packageStorageRoot : '').trim();
   const orgRows = Array.isArray(organizations) ? organizations : [];
+  const activeOrgId = String(typeof activeOrgId !== 'undefined' ? activeOrgId : '').trim();
+  const activeOrgName = (() => {
+    if (!activeOrgId) return '';
+    const org = orgRows.find((row) => String(row?.id || row?.orgId || '').trim() === activeOrgId);
+    const name = String(org?.name || org?.displayName || org?.identity?.displayName || org?.identity?.legalName || '').trim();
+    return name ? `${name} (#${activeOrgId})` : activeOrgId;
+  })();
 %>
 
 <div class="sections-page package-builder-page">
@@ -53,13 +60,23 @@
           </select>
         </div>
         <div class="col-lg-6">
-          <label class="form-label small fw-bold">Origin Org</label>
-          <select id="builderOriginOrgId" class="form-select">
-            <option value="">Select origin org</option>
-            <% orgRows.forEach((org) => { %>
-              <option value="<%= org.id || org.orgId %>"><%= org.name || org.displayName || org.id || org.orgId %> (<%= org.id || org.orgId %>)</option>
-            <% }) %>
-          </select>
+          <label class="form-label small fw-bold">Origin Organization</label>
+          <div class="input-group">
+            <input type="hidden" id="builderOriginOrgId" value="<%= activeOrgId %>">
+            <input
+              type="text"
+              id="builderOriginOrgName"
+              class="form-control size-md bg-white border-primary fw-bold"
+              value="<%= activeOrgName %>"
+              placeholder="Select organization..."
+              readonly>
+            <button type="button" class="btn btn-outline-primary" id="builderPickOriginOrgBtn">
+              <i class="bi bi-search"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="builderClearOriginOrgBtn" title="Clear selected organization">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -189,7 +206,10 @@
   const actionStateId = document.getElementById('builderActionStateId')?.value || '';
   const packageEl = document.getElementById('builderPackageId');
   const versionEl = document.getElementById('builderVersion');
-  const originOrgEl = document.getElementById('builderOriginOrgId');
+  const originOrgIdEl = document.getElementById('builderOriginOrgId');
+  const originOrgNameEl = document.getElementById('builderOriginOrgName');
+  const originOrgPickBtn = document.getElementById('builderPickOriginOrgBtn');
+  const originOrgClearBtn = document.getElementById('builderClearOriginOrgBtn');
   const entityListEl = document.getElementById('builderEntityList');
   const fileFieldListEl = document.getElementById('builderFileFieldList');
   const fileRefsEl = document.getElementById('builderSelectedFileRefs');
@@ -243,6 +263,15 @@
       .split(/\r?\n/)
       .map((row) => row.trim())
       .filter(Boolean);
+  }
+
+  function setBuilderOriginOrgSelection(orgId, orgName = '') {
+    const normalizedOrgId = String(orgId || '').trim();
+    if (originOrgIdEl) originOrgIdEl.value = normalizedOrgId;
+    if (originOrgNameEl) {
+      const fallbackName = normalizedOrgId ? `Organization #${normalizedOrgId}` : 'Select organization...';
+      originOrgNameEl.value = String(orgName || fallbackName).trim();
+    }
   }
 
   function getSelectedEntities() {
@@ -595,7 +624,7 @@
 
   async function preflightBuild() {
     const packageId = String(packageEl?.value || '').trim();
-    const originOrgId = String(originOrgEl?.value || '').trim();
+    const originOrgId = String(originOrgIdEl?.value || '').trim();
     if (!packageId) {
       showError(new Error('Select a package first.'));
       return;
@@ -652,7 +681,7 @@
   async function buildPackage() {
     const packageId = String(packageEl?.value || '').trim();
     const version = String(versionEl?.value || '').trim();
-    const originOrgId = String(originOrgEl?.value || '').trim();
+    const originOrgId = String(originOrgIdEl?.value || '').trim();
     if (!packageId) {
       showError(new Error('Select a package first.'));
       return;
@@ -709,7 +738,7 @@
 
   async function loadEntityCatalog() {
     const packageId = String(packageEl?.value || '').trim();
-    const originOrgId = String(originOrgEl?.value || '').trim();
+    const originOrgId = String(originOrgIdEl?.value || '').trim();
     if (!packageId) {
       selectedFileFieldsByEntity = {};
       renderEntityList([]);
@@ -810,8 +839,30 @@
     if (version && !versionEl.value.trim()) versionEl.value = version;
     loadEntityCatalog().catch(showError);
   });
-  originOrgEl?.addEventListener('change', () => {
-    if (packageEl?.value) loadEntityCatalog().catch(showError);
+  originOrgPickBtn?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets || !window.GenericPickerContexts) {
+      showError(new Error('Generic organization picker is not ready yet.'));
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.organization({
+      title: 'Select Origin Organization',
+      context: window.GenericPickerContexts.allOrganizations(),
+      onSelect: (item) => {
+        setBuilderOriginOrgSelection(
+          item?.id,
+          item?.identity?.displayName || item?.name || `Organization #${item?.id}`
+        );
+        if (packageEl?.value) loadEntityCatalog().catch(showError);
+      }
+    }));
+  });
+  originOrgClearBtn?.addEventListener('click', () => {
+    setBuilderOriginOrgSelection('', '');
+    entityCatalog = [];
+    selectedFileFieldsByEntity = {};
+    renderEntityList([]);
+    renderFileFieldList([]);
+    fileRefsEl.value = '';
   });
   if (packageEl?.value) {
     loadEntityCatalog().catch(showError);

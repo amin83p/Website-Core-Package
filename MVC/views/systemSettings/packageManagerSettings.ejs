@@ -17,6 +17,12 @@
     ? (typeof organizations !== 'undefined' ? organizations : [])
     : [];
   const activeOrg = String(typeof activeOrgId !== 'undefined' ? activeOrgId : '').trim();
+  const activeOrgName = (() => {
+    if (!activeOrg) return '';
+    const org = orgRows.find((row) => String(row?.id || row?.orgId || '').trim() === activeOrg);
+    const name = String(org?.name || org?.displayName || org?.identity?.displayName || org?.identity?.legalName || '').trim();
+    return name ? `${name} (#${activeOrg})` : activeOrg;
+  })();
   const trustedZipKeysCount = Number.isFinite(Number(typeof zipTrustedKeysCount !== 'undefined' ? zipTrustedKeysCount : 0))
     ? Number(typeof zipTrustedKeysCount !== 'undefined' ? zipTrustedKeysCount : 0)
     : 0;
@@ -91,16 +97,22 @@
         </div>
         <div class="col-lg-3 col-md-6">
           <label class="form-label small fw-bold">Target Organization</label>
-          <select class="form-select" id="pkgTargetOrgId">
-            <option value="">Select organization</option>
-            <% orgRows.forEach((org) => { %>
-              <% const orgValue = String(org.id || org.orgId || '').trim(); %>
-              <% if (!orgValue) return; %>
-              <option value="<%= orgValue %>" <%= activeOrg && activeOrg === orgValue ? 'selected' : '' %>>
-                <%= org.name || org.displayName || orgValue %> (<%= orgValue %>)
-              </option>
-            <% }) %>
-          </select>
+          <input type="hidden" id="pkgTargetOrgId" value="<%= activeOrg %>">
+          <div class="input-group">
+            <input
+              type="text"
+              id="pkgTargetOrgName"
+              class="form-control size-md bg-white border-primary fw-bold"
+              value="<%= activeOrgName %>"
+              placeholder="Select organization..."
+              readonly>
+            <button type="button" class="btn btn-outline-primary" id="pkgPickTargetOrgBtn">
+              <i class="bi bi-search"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="pkgClearTargetOrgBtn" title="Clear selected organization">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
           <div class="small text-muted mt-1">Required when installing packages with org placeholders.</div>
         </div>
         <div class="col-lg-6 col-md-12">
@@ -301,6 +313,9 @@
   const outputEl = document.getElementById('pkgOutput');
   const installMethodEl = document.getElementById('pkgInstallMethod');
   const targetOrgEl = document.getElementById('pkgTargetOrgId');
+  const targetOrgNameEl = document.getElementById('pkgTargetOrgName');
+  const targetOrgPickBtn = document.getElementById('pkgPickTargetOrgBtn');
+  const targetOrgClearBtn = document.getElementById('pkgClearTargetOrgBtn');
   const installBtn = document.getElementById('pkgInstallBtn');
   const cleanupFailedBtn = document.getElementById('pkgCleanupFailedBtn');
   const tableEl = document.getElementById('packageManagerTable');
@@ -323,6 +338,15 @@
   function setOutput(title, payload) {
     const stamp = new Date().toISOString();
     outputEl.textContent = `[${stamp}] ${title}\n${JSON.stringify(payload || {}, null, 2)}`;
+  }
+
+  function setTargetOrgSelection(orgId, orgName = '') {
+    const normalizedOrgId = String(orgId || '').trim();
+    if (targetOrgEl) targetOrgEl.value = normalizedOrgId;
+    if (targetOrgNameEl) {
+      const fallbackName = normalizedOrgId ? `Organization #${normalizedOrgId}` : 'Select organization...';
+      targetOrgNameEl.value = String(orgName || fallbackName).trim();
+    }
   }
 
   function showInstallPanel(method) {
@@ -1243,6 +1267,22 @@
 
   installMethodEl.addEventListener('change', () => showInstallPanel(installMethodEl.value));
   showInstallPanel(installMethodEl.value);
+  targetOrgPickBtn?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets || !window.GenericPickerContexts) {
+      showError('Generic organization picker is not ready yet.');
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.organization({
+      title: 'Select Target Organization',
+      context: window.GenericPickerContexts.allOrganizations(),
+      onSelect: (item) => {
+        setTargetOrgSelection(item?.id, item?.identity?.displayName || item?.name || `Organization #${item?.id}`);
+      }
+    }));
+  });
+  targetOrgClearBtn?.addEventListener('click', () => {
+    setTargetOrgSelection('', '');
+  });
 
   installBtn.addEventListener('click', async () => {
     const original = installBtn.innerHTML;

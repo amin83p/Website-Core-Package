@@ -1669,6 +1669,7 @@ exports.showPackageBuilderPage = async (req, res) => {
       title: 'Package Builder',
       settings,
       runtimeBackend,
+      activeOrgId: cleanFormText(req.user?.activeOrgId || req.user?.primaryOrgId || '', 120),
       packageStorageRoot,
       packages: discovered,
       packageWarnings: discovered.filter((row) => row.valid !== true || row.manifestResolved !== true),
