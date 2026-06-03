@@ -11,6 +11,7 @@ const packageManifestService = require('./packageManifestService');
 const packageDataOwnershipService = require('./packageDataOwnershipService');
 const coreFilesService = require('./coreFilesService');
 const fileGatewayClientService = require('./fileGatewayClientService');
+const jsonToMongoMigrationService = require('./migration/jsonToMongoMigrationService');
 const { getMongoCollection, getMongoDbOrNull } = require('../infrastructure/mongo/mongoConnection');
 const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 const uploadPathUtils = require('../utils/uploadPathUtils');
@@ -33,6 +34,7 @@ const REMAP_ORG_FIELDS = new Set([
 const ORG_TOKEN_EXACT_REGEX = /^ORG_[A-Za-z0-9_-]+$/i;
 const ORG_UPLOAD_SEGMENT_REGEX = /\/uploads\/(ORG_[^/]+)/ig;
 const UPLOAD_URL_MATCH_REGEX = /\/uploads\/[^"'` ]+/ig;
+let cachedCatalogCollectionMap = null;
 
 function cleanText(value, max = 4000) {
   const out = String(value || '').replace(/\0/g, '').trim();
@@ -118,6 +120,58 @@ async function pathExists(filePath = '') {
   } catch (_) {
     return false;
   }
+}
+
+function getMigrationCatalogCollectionMap() {
+  if (cachedCatalogCollectionMap) return cachedCatalogCollectionMap;
+  const map = new Map();
+  const catalogRows = typeof jsonToMongoMigrationService?.buildCatalog === 'function'
+    ? jsonToMongoMigrationService.buildCatalog()
+    : [];
+  sanitizeArray(catalogRows).forEach((row) => {
+    const rawKey = cleanText(row?.key, 240);
+    const separator = rawKey.indexOf('.');
+    if (separator <= 0) return;
+    const packageId = normalizePackageId(rawKey.slice(0, separator));
+    const keyEntityType = cleanText(rawKey.slice(separator + 1), 220);
+    if (!packageId || !keyEntityType) return;
+
+    const collectionName = cleanText(row?.collection, 200);
+    if (!collectionName) return;
+
+    const byPackage = map.get(packageId) || new Map();
+    const normalizedCollectionName = collectionName;
+
+    const addAlias = (entityAlias = '') => {
+      const alias = cleanText(entityAlias, 240);
+      if (!alias) return;
+      byPackage.set(alias, normalizedCollectionName);
+      byPackage.set(alias.toLowerCase(), normalizedCollectionName);
+    };
+
+    addAlias(keyEntityType);
+
+    const source = cleanText(row?.source, 400).replace(/\\/g, '/');
+    if (source) {
+      const sourceEntity = cleanText(source.split('/').pop(), 240).replace(/\.json$/i, '');
+      if (sourceEntity) addAlias(sourceEntity);
+    }
+
+    map.set(packageId, byPackage);
+  });
+  cachedCatalogCollectionMap = map;
+  return cachedCatalogCollectionMap;
+}
+
+function resolvePackageCollectionFromMigrationCatalog(packageId = '', entityType = '') {
+  const normalizedPackageId = normalizePackageId(packageId);
+  const normalizedEntityType = cleanText(entityType, 220);
+  if (!normalizedPackageId || !normalizedEntityType) return null;
+  const packageMap = getMigrationCatalogCollectionMap().get(normalizedPackageId);
+  if (!packageMap || !packageMap.size) return null;
+  return packageMap.get(normalizedEntityType)
+    || packageMap.get(normalizedEntityType.toLowerCase())
+    || null;
 }
 
 function normalizeManualFileRef(raw = '') {
@@ -1203,19 +1257,57 @@ function createService(overrides = {}) {
 
   async function fetchEntityRows(entityType = '', options = {}) {
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    const normalizedPackageId = normalizePackageId(options.packageId);
+    const normalizedEntityType = cleanText(entityType, 220);
+    const warnings = sanitizeArray(options.warnings);
     try {
-      const rows = await deps.dataService.fetchData(entityType, {}, SYSTEM_CONTEXT, {
+      const rows = await deps.dataService.fetchData(normalizedEntityType, {}, SYSTEM_CONTEXT, {
         backendMode: options.backendMode
       });
       return Array.isArray(rows) ? rows : [];
     } catch (error) {
       if (!isUnknownEntityTypeError(error)) throw error;
+      const attempted = [];
+      const pushWarning = (message = '') => {
+        const text = cleanText(message, 800);
+        if (text && warnings) warnings.push(text);
+      };
 
       if (backendMode === 'json') {
-        const filePath = deps.path.join(process.cwd(), 'data', `${entityType}.json`);
-        if (!(await pathExists(filePath))) return [];
-        const payload = readJsonFile(filePath);
-        return Array.isArray(payload) ? payload : [];
+        if (normalizedPackageId) {
+          const packageScopedPath = deps.path.join(process.cwd(), 'data', normalizedPackageId, `${normalizedEntityType}.json`);
+          attempted.push(`json:${packageScopedPath}`);
+          if (await pathExists(packageScopedPath)) {
+            const payload = readJsonFile(packageScopedPath);
+            if (Array.isArray(payload)) {
+              if (!payload.length) {
+                pushWarning(`Package fallback returned zero rows for entity "${normalizedEntityType}" from ${packageScopedPath}.`);
+              }
+              return payload;
+            }
+            pushWarning(`Package fallback for entity "${normalizedEntityType}" was found at ${packageScopedPath} but was not a JSON array.`);
+          } else {
+            pushWarning(`Package fallback JSON path was missing for entity "${normalizedEntityType}": ${packageScopedPath}.`);
+          }
+        }
+
+        const fallbackPath = deps.path.join(process.cwd(), 'data', `${normalizedEntityType}.json`);
+        attempted.push(`json:${fallbackPath}`);
+        if (!(await pathExists(fallbackPath))) {
+          if (attempted.length) {
+            pushWarning(`JSON fallback was attempted but none of the following files existed for "${normalizedEntityType}": ${attempted.join(', ')}.`);
+          }
+          return [];
+        }
+        const payload = readJsonFile(fallbackPath);
+        if (Array.isArray(payload)) {
+          if (!payload.length) {
+            pushWarning(`JSON fallback returned zero rows for entity "${normalizedEntityType}" from ${fallbackPath}.`);
+          }
+          return payload;
+        }
+        pushWarning(`JSON fallback for entity "${normalizedEntityType}" was found at ${fallbackPath} but was not a JSON array.`);
+        return [];
       }
 
       if (backendMode === 'mongo') {
@@ -1225,15 +1317,42 @@ function createService(overrides = {}) {
         if (typeof deps.getMongoCollection !== 'function') {
           throw new Error(`Mongo collection resolver is unavailable for fallback entity read: ${entityType}`);
         }
-        const collection = deps.getMongoCollection(entityType);
-        const docs = await collection.find({}).toArray();
-        return Array.isArray(docs) ? docs.map((row) => {
-          if (!row || typeof row !== 'object') return row;
-          if (row._id !== undefined && row.id === undefined) {
-            return { ...row, id: String(row._id) };
+        const fallbackTargets = [];
+        const resolvedCollection = resolvePackageCollectionFromMigrationCatalog(
+          normalizedPackageId,
+          normalizedEntityType
+        );
+        if (resolvedCollection) fallbackTargets.push({ source: `migration catalog for package "${normalizedPackageId}"`, collection: resolvedCollection });
+        if (normalizedEntityType) fallbackTargets.push({ source: 'legacy unknown entity collection', collection: normalizedEntityType });
+
+        for (const candidate of fallbackTargets) {
+          const collectionName = cleanText(candidate?.collection, 200);
+          if (!collectionName) continue;
+          attempted.push(`mongo:${collectionName}`);
+          const collection = deps.getMongoCollection(collectionName);
+          if (!collection) {
+            pushWarning(`Mongo fallback for entity "${normalizedEntityType}" did not resolve collection "${collectionName}" via ${candidate?.source || 'unknown source'}.`);
+            continue;
           }
-          return row;
-        }) : [];
+          const docs = await collection.find({}).toArray().catch(() => null);
+          if (!Array.isArray(docs)) continue;
+          if (!docs.length) {
+            pushWarning(`Mongo fallback returned zero rows for entity "${normalizedEntityType}" from collection "${collectionName}" (${candidate?.source || 'unknown source'}).`);
+            continue;
+          }
+          return docs.map((row) => {
+            if (!row || typeof row !== 'object') return row;
+            if (row._id !== undefined && row.id === undefined) {
+              return { ...row, id: String(row._id) };
+            }
+            return row;
+          });
+        }
+
+        if (attempted.length) {
+          pushWarning(`Mongo fallback for entity "${normalizedEntityType}" returned zero rows after trying: ${attempted.join(', ')}.`);
+        }
+        return [];
       }
 
       throw new Error(`Unsupported backend mode "${backendMode}" for unknown entity fallback: ${entityType}`);
@@ -1441,7 +1560,11 @@ function createService(overrides = {}) {
         : (selectedDataEntityTokens.has(entity.entityType) || selectedDataEntityTokens.has(entity.id));
       try {
         // eslint-disable-next-line no-await-in-loop
-        const rowsRaw = await fetchEntityRows(entity.entityType, { backendMode });
+        const rowsRaw = await fetchEntityRows(entity.entityType, {
+          backendMode,
+          packageId,
+          warnings
+        });
         const scoped = filterRowsByOriginScope(rowsRaw, originOrgId);
         const rows = scoped.rows;
         const fileFieldCandidates = collectFileFieldCandidates(rowsRaw);
@@ -2016,6 +2139,7 @@ function createService(overrides = {}) {
     const tablePayload = {};
     const remapFieldMap = {};
     const remapState = { rewrittenUrlCount: 0, rewrittenFieldCount: 0, rewrittenExactTokenCount: 0 };
+    const buildWarnings = sanitizeArray(preflight?.warnings);
     const originScopeSummary = {
       inspectedRows: 0,
       includedRows: 0,
@@ -2027,7 +2151,11 @@ function createService(overrides = {}) {
       const entityType = cleanText(entity?.entityType, 200);
       if (!entityType) continue;
       // eslint-disable-next-line no-await-in-loop
-      const rowsRaw = await fetchEntityRows(entityType, { backendMode });
+      const rowsRaw = await fetchEntityRows(entityType, {
+        backendMode,
+        packageId,
+        warnings: buildWarnings
+      });
       const scoped = filterRowsByOriginScope(rowsRaw, originOrgId);
       const rows = scoped.rows;
       const entityRemapFieldMap = normalizeRemapFieldMapEntry(
@@ -2243,7 +2371,7 @@ function createService(overrides = {}) {
         downloadLinks: sanitizeArray(publishedArtifacts?.files)
           .map((row) => row.uploadsUrl)
           .filter(Boolean),
-        warnings: [...copiedTableFileReport.warnings, ...copiedGlobalFileReport.warnings]
+        warnings: [...buildWarnings, ...copiedTableFileReport.warnings, ...copiedGlobalFileReport.warnings]
       };
     } finally {
       await deps.fs.rm(stageRoot, { recursive: true, force: true }).catch(() => {});
