@@ -22,6 +22,15 @@ function resolveConfiguredRoot(value = '') {
   return normalizeAbsolutePath(path.resolve(process.cwd(), token));
 }
 
+function parsePackageStorageRootList(value = '') {
+  const token = cleanString(value);
+  if (!token) return [];
+  return token
+    .split(/[;,]/)
+    .map((item) => cleanString(item))
+    .filter(Boolean);
+}
+
 function isWindowsStylePathToken(value = '') {
   const token = cleanString(value);
   if (!token) return false;
@@ -91,30 +100,46 @@ function buildCandidate(source = '', token = '', rootPath = '') {
   };
 }
 
-function getPackageStorageRootResolution(options = {}) {
-  const ensureExists = options?.ensureExists === true;
+function getPackageStorageRootCandidateSources(options = {}) {
   const explicitToken = cleanString(options?.packageRootDir);
-  const envToken = cleanString(process.env.PACKAGE_STORAGE_ROOT || '');
   const platformOverride = cleanString(options?.platform);
   const platform = platformOverride || process.platform;
-  const warnings = [];
+  const envSingleToken = cleanString(process.env.PACKAGE_STORAGE_ROOT || '');
+  const envTokenList = parsePackageStorageRootList(process.env.PACKAGE_STORAGE_ROOTS || '');
 
   const candidates = [];
+
   if (explicitToken) {
     candidates.push(buildCandidate('explicit', explicitToken, resolveConfiguredRoot(explicitToken)));
-  }
-  if (envToken) {
-    candidates.push(buildCandidate('env', envToken, resolveConfiguredRoot(envToken)));
+    return { candidates, platform, envToken: '', explicitToken };
   }
 
-  // Prefer Railway persistent default on Linux if explicit/env are invalid or unusable.
+  if (envTokenList.length > 0) {
+    envTokenList.forEach((token) => {
+      candidates.push(buildCandidate('env', token, resolveConfiguredRoot(token)));
+    });
+  } else if (envSingleToken) {
+    candidates.push(buildCandidate('env', envSingleToken, resolveConfiguredRoot(envSingleToken)));
+  }
+
   if (platform !== 'win32') {
     candidates.push(buildCandidate('railway-default', RAILWAY_PACKAGE_ROOT, resolveConfiguredRoot(RAILWAY_PACKAGE_ROOT)));
   }
   candidates.push(buildCandidate('default', DEFAULT_PACKAGE_ROOT, DEFAULT_PACKAGE_ROOT));
 
+  return { candidates, platform, envToken: envSingleToken, explicitToken };
+}
+
+function getPackageStorageRootResolution(options = {}) {
+  const ensureExists = options?.ensureExists === true;
+  const packageRootInfo = getPackageStorageRootCandidateSources(options);
+  const envToken = packageRootInfo.envToken;
+  const explicitToken = packageRootInfo.explicitToken;
+  const candidates = packageRootInfo.candidates;
+  const warnings = [];
+
   for (const candidate of candidates) {
-    const validity = validateRootToken(candidate.token || candidate.rootPath, platform);
+    const validity = validateRootToken(candidate.token || candidate.rootPath, packageRootInfo.platform);
     if (!validity.valid) {
       warnings.push(`Ignored ${candidate.source} package root "${candidate.token}" (${validity.reason}).`);
       continue;
@@ -162,6 +187,30 @@ function getPackageStorageRootResolution(options = {}) {
   };
 }
 
+function getPackageStorageRootCandidatesAbsolute(options = {}) {
+  const packageRootInfo = getPackageStorageRootCandidateSources(options);
+  const normalized = [];
+  const seen = new Set();
+  for (const candidate of packageRootInfo.candidates) {
+    const validity = validateRootToken(candidate.token || candidate.rootPath, packageRootInfo.platform);
+    if (!validity.valid) continue;
+    const rootPath = normalizeAbsolutePath(candidate.rootPath);
+    if (!rootPath) continue;
+    const key = rootPath.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(rootPath);
+  }
+  if (!normalized.length && !packageRootInfo.explicitToken) {
+    const fallbackRoot = normalizeAbsolutePath(DEFAULT_PACKAGE_ROOT);
+    const key = fallbackRoot.toLowerCase();
+    if (fallbackRoot && !seen.has(key) && isExistingDirectory(fallbackRoot)) {
+      normalized.push(fallbackRoot);
+    }
+  }
+  return normalized;
+}
+
 function getPackageStorageRootAbsolute(options = {}) {
   const resolution = getPackageStorageRootResolution(options);
   return resolution.effectiveRoot;
@@ -172,5 +221,6 @@ module.exports = {
   RAILWAY_PACKAGE_ROOT,
   getPackageStorageRootAbsolute,
   getPackageStorageRootResolution,
+  getPackageStorageRootCandidatesAbsolute,
   validateRootToken
 };

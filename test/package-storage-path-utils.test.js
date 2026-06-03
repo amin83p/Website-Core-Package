@@ -9,6 +9,7 @@ const {
   RAILWAY_PACKAGE_ROOT,
   getPackageStorageRootAbsolute,
   getPackageStorageRootResolution,
+  getPackageStorageRootCandidatesAbsolute,
   validateRootToken
 } = require('../MVC/utils/packageStoragePathUtils');
 
@@ -61,6 +62,32 @@ test('validateRootToken rejects Windows token for linux runtime and accepts for 
   assert.equal(linuxCheck.valid, false);
   assert.equal(linuxCheck.reason, 'windows_path_on_non_windows');
   assert.equal(windowsCheck.valid, true);
+});
+
+test('getPackageStorageRootCandidatesAbsolute supports multiple roots from PACKAGE_STORAGE_ROOTS', async () => {
+  const previousRoots = process.env.PACKAGE_STORAGE_ROOTS;
+  const previousRoot = process.env.PACKAGE_STORAGE_ROOT;
+  const rootA = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-root-A-'));
+  const rootB = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-root-B-'));
+  const rootC = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-root-C-'));
+  process.env.PACKAGE_STORAGE_ROOT = '';
+  process.env.PACKAGE_STORAGE_ROOTS = `${rootA}, ${rootB};${rootC};${rootA}`;
+
+  try {
+    const roots = getPackageStorageRootCandidatesAbsolute();
+    assert.equal(Array.isArray(roots), true);
+    assert.equal(roots.includes(path.resolve(rootA)), true);
+    assert.equal(roots.includes(path.resolve(rootB)), true);
+    assert.equal(roots.includes(path.resolve(rootC)), true);
+  } finally {
+    if (previousRoots === undefined) delete process.env.PACKAGE_STORAGE_ROOTS;
+    else process.env.PACKAGE_STORAGE_ROOTS = previousRoots;
+    if (previousRoot === undefined) delete process.env.PACKAGE_STORAGE_ROOT;
+    else process.env.PACKAGE_STORAGE_ROOT = previousRoot;
+    await fs.rm(rootA, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(rootB, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(rootC, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 test('getPackageStorageRootResolution falls back to railway/default when configured token is invalid for runtime platform', () => {

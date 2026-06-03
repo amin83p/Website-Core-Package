@@ -19,7 +19,11 @@ const symbolRepository = require('../repositories/symbolRepository');
 const accessRepository = require('../repositories/accessRepository');
 const systemSettingsRepository = require('../repositories/systemSettingsRepository');
 const uploadFolderSettingsService = require('./uploadFolderSettingsService');
-const { DEFAULT_PACKAGE_ROOT, getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
+const {
+  DEFAULT_PACKAGE_ROOT,
+  getPackageStorageRootAbsolute,
+  getPackageStorageRootCandidatesAbsolute
+} = require('../utils/packageStoragePathUtils');
 
 const SYSTEM_ACTOR_ID = 'SYSTEM_SETTINGS_PACKAGE_MANAGER';
 
@@ -1407,49 +1411,66 @@ function createService(overrides = {}) {
   }
 
   async function discoverLocalManifests(options = {}) {
-    const packageRootDir = getPackageStorageRootAbsolute({ packageRootDir: options.packageRootDir });
-    let dirEntries = [];
-    try {
-      dirEntries = await deps.fs.readdir(packageRootDir, { withFileTypes: true });
-    } catch (_) {
-      return [];
-    }
+    const packageRootDirs = getPackageStorageRootCandidatesAbsolute({ packageRootDir: options.packageRootDir });
+    const manifestsByPackageId = new Map();
 
-    const manifests = [];
-    for (const entry of dirEntries) {
-      if (!entry || !entry.isDirectory()) continue;
-      const manifestPath = path.join(packageRootDir, entry.name, 'package.manifest.json');
-      // eslint-disable-next-line no-await-in-loop
-      if (!(await fileExists(manifestPath))) continue;
+    for (const packageRootDir of packageRootDirs) {
+      let dirEntries = [];
       try {
         // eslint-disable-next-line no-await-in-loop
-        const raw = JSON.parse(await deps.fs.readFile(manifestPath, 'utf8'));
-        const manifest = deps.packageManifestService.validatePackageManifest(raw, { knownIds: [] });
-        manifests.push({
-          packageId: manifest.id,
-          name: manifest.name,
-          version: manifest.version,
-          mountPath: manifest.mountPath,
-          manifestPath: manifestPath.replace(/\\/g, '/'),
-          storedManifestPath: toStoredManifestPath(manifestPath),
-          declarationCounts: countDeclarations(manifest),
-          valid: true
-        });
-      } catch (error) {
-        manifests.push({
-          packageId: normalizePackageId(entry.name),
-          name: cleanText(entry.name, 180),
-          version: '',
-          mountPath: '',
-          manifestPath: manifestPath.replace(/\\/g, '/'),
-          storedManifestPath: toStoredManifestPath(manifestPath),
-          declarationCounts: {},
-          valid: false,
-          error: cleanText(error?.message || String(error), 2000)
-        });
+        dirEntries = await deps.fs.readdir(packageRootDir, { withFileTypes: true });
+      } catch (_) {
+        continue;
+      }
+
+      for (const entry of dirEntries) {
+        if (!entry || !entry.isDirectory()) continue;
+        const manifestPath = path.join(packageRootDir, entry.name, 'package.manifest.json');
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await fileExists(manifestPath))) continue;
+
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const raw = JSON.parse(await deps.fs.readFile(manifestPath, 'utf8'));
+          const manifest = deps.packageManifestService.validatePackageManifest(raw, { knownIds: [] });
+          const normalizedPackageId = normalizePackageId(manifest.id);
+          const candidateManifestPath = manifestPath.replace(/\\/g, '/');
+          const existing = manifestsByPackageId.get(normalizedPackageId);
+          const row = {
+            packageId: manifest.id,
+            name: manifest.name,
+            version: manifest.version,
+            mountPath: manifest.mountPath,
+            manifestPath: candidateManifestPath,
+            storedManifestPath: toStoredManifestPath(candidateManifestPath),
+            declarationCounts: countDeclarations(manifest),
+            valid: true
+          };
+          if (!existing || existing.valid !== true) {
+            manifestsByPackageId.set(normalizedPackageId, row);
+          }
+        } catch (error) {
+          const normalizedPackageId = normalizePackageId(entry.name);
+          const candidateManifestPath = manifestPath.replace(/\\/g, '/');
+          const existing = manifestsByPackageId.get(normalizedPackageId);
+          if (!existing) {
+            manifestsByPackageId.set(normalizedPackageId, {
+              packageId: normalizedPackageId || '',
+              name: cleanText(entry.name, 180),
+              version: '',
+              mountPath: '',
+              manifestPath: candidateManifestPath,
+              storedManifestPath: toStoredManifestPath(candidateManifestPath),
+              declarationCounts: {},
+              valid: false,
+              error: cleanText(error?.message || String(error), 2000)
+            });
+          }
+        }
       }
     }
 
+    const manifests = Array.from(manifestsByPackageId.values());
     manifests.sort((a, b) => String(a.packageId || '').localeCompare(String(b.packageId || '')));
     return manifests;
   }

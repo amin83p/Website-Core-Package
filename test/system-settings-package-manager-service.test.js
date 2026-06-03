@@ -353,6 +353,117 @@ test('listPackageSnapshot includes discovered local manifests and installed rows
   assert.equal(snapshot.installedPackages[0].enabled, true);
 });
 
+test('discoverLocalManifests merges package roots and dedupes duplicate package IDs', async () => {
+  const setup = await createZipInstallDeps();
+  const service = createService(setup.deps);
+  const packageRootA = path.join(setup.tmpRoot, 'local-root-a');
+  const packageRootB = path.join(setup.tmpRoot, 'local-root-b');
+  const previousRoots = process.env.PACKAGE_STORAGE_ROOTS;
+  const previousSingleRoot = process.env.PACKAGE_STORAGE_ROOT;
+  process.env.PACKAGE_STORAGE_ROOT = '';
+
+  try {
+    await fs.mkdir(packageRootA, { recursive: true });
+    await fs.mkdir(packageRootB, { recursive: true });
+    await fs.mkdir(path.join(packageRootA, 'pte'), { recursive: true });
+    await fs.mkdir(path.join(packageRootA, 'school'), { recursive: true });
+    await fs.mkdir(path.join(packageRootB, 'pte'), { recursive: true });
+    await fs.writeFile(
+      path.join(packageRootA, 'pte', 'package.manifest.json'),
+      JSON.stringify(createManifest({
+      id: 'pte',
+      name: 'PTE',
+      version: '1.0.0',
+      mountPath: '/pte'
+    }), 'utf8'));
+    await fs.writeFile(
+      path.join(packageRootA, 'school', 'package.manifest.json'),
+      JSON.stringify(createManifest({
+      id: 'school',
+      name: 'School',
+      version: '0.0.1',
+      mountPath: '/school'
+    }), 'utf8'));
+    await fs.writeFile(
+      path.join(packageRootB, 'pte', 'package.manifest.json'),
+      JSON.stringify(createManifest({
+      id: 'pte',
+      name: 'PTE Duplicate',
+      version: '1.1.0',
+      mountPath: '/pte'
+    }), 'utf8'));
+
+    process.env.PACKAGE_STORAGE_ROOTS = `${packageRootA}, ${packageRootB}`;
+    const snapshot = await service.listPackageSnapshot({ backendMode: 'json' });
+
+    const manifestIds = snapshot.localManifests.map((row) => row.packageId).sort();
+    assert.equal(snapshot.localManifests.length, 2);
+    assert.equal(manifestIds[0], 'pte');
+    assert.equal(manifestIds[1], 'school');
+  } finally {
+    if (previousRoots === undefined) delete process.env.PACKAGE_STORAGE_ROOTS;
+    else process.env.PACKAGE_STORAGE_ROOTS = previousRoots;
+    if (previousSingleRoot === undefined) delete process.env.PACKAGE_STORAGE_ROOT;
+    else process.env.PACKAGE_STORAGE_ROOT = previousSingleRoot;
+    await setup.cleanup();
+  }
+});
+
+test('previewPackageInstall reports upgrade for disabled baseline package registry row', async () => {
+  const setup = await createZipInstallDeps();
+  const service = createService(setup.deps);
+  const packageRootDir = setup.packageRootDir;
+  const currentManifestPath = path.join(packageRootDir, 'school', 'package.manifest.json');
+  const nextManifestDir = path.join(setup.tmpRoot, 'incoming-school');
+  const nextManifestPath = path.join(nextManifestDir, 'package.manifest.json');
+
+  try {
+    await fs.mkdir(path.join(packageRootDir, 'school'), { recursive: true });
+    await fs.writeFile(currentManifestPath, JSON.stringify(createManifest({
+      id: 'school',
+      name: 'School',
+      version: '0.0.0',
+      mountPath: '/school',
+      dataEntities: [{ entityType: 'students' }]
+    }), 'utf8'));
+    await fs.mkdir(path.dirname(nextManifestPath), { recursive: true });
+    await fs.writeFile(nextManifestPath, JSON.stringify(createManifest({
+      id: 'school',
+      name: 'School',
+      version: '0.1.0',
+      mountPath: '/school',
+      dataEntities: [{ entityType: 'students' }, { entityType: 'teachers' }]
+    }), 'utf8'));
+
+    await setup.deps.packageRegistryService.upsertPackageRegistry({
+      packageId: 'school',
+      version: '0.0.0',
+      enabled: false,
+      installStatus: 'disabled',
+      metadata: {
+        packageName: 'School',
+        mountPath: '/school',
+        manifestPath: currentManifestPath
+      }
+    });
+    setup.deps.packageLoaderService.resolveManifestPath = async (_packageId, row = {}) => String(row?.metadata?.manifestPath || '');
+    setup.deps.packageLoaderService.readManifestFile = async (manifestPath) => JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+
+    const preview = await service.previewPackageInstall({
+      installMethod: 'path',
+      manifestPath: nextManifestPath
+    }, { backendMode: 'json' });
+
+    assert.equal(preview.isUpgrade, true);
+    assert.equal(preview.currentVersion, '0.0.0');
+    assert.equal(preview.nextVersion, '0.1.0');
+    assert.equal(preview.packageId, 'school');
+    assert.equal(preview.requiresAcknowledgement, true);
+  } finally {
+    await setup.cleanup();
+  }
+});
+
 test('enablePackage recovers from stale registry manifest path by local package-id discovery', async () => {
   const setup = createBaseDeps();
   setup.deps.fs.readdir = async () => [createDirent('pte')];
