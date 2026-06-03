@@ -104,3 +104,20 @@ test('getPackageStorageRootResolution falls back to railway/default when configu
     else process.env.PACKAGE_STORAGE_ROOT = previous;
   }
 });
+
+test('getPackageStorageRootResolution accepts POSIX absolute paths on win32', async () => {
+  const previous = process.env.PACKAGE_STORAGE_ROOT;
+  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pkg-root-posix-win-'));
+  process.env.PACKAGE_STORAGE_ROOT = tmpRoot.replace(/\\/g, '/');
+  try {
+    const resolved = getPackageStorageRootResolution({ ensureExists: false, platform: 'win32' });
+    assert.equal(resolved.source, 'env');
+    assert.equal(path.resolve(resolved.effectiveRoot), path.resolve(process.env.PACKAGE_STORAGE_ROOT));
+    assert.equal(Array.isArray(resolved.warnings), true);
+    assert.equal(resolved.warnings.some((msg) => /posix_path_on_windows/i.test(String(msg || ''))), false);
+  } finally {
+    if (previous === undefined) delete process.env.PACKAGE_STORAGE_ROOT;
+    else process.env.PACKAGE_STORAGE_ROOT = previous;
+    await fs.rm(tmpRoot, { recursive: true, force: true }).catch(() => {});
+  }
+});

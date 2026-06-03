@@ -48,7 +48,7 @@ function validateRootToken(token = '', platform = process.platform) {
   if (!raw) return { valid: true, reason: '' };
 
   if (platform === 'win32' && isPosixAbsoluteToken(raw) && !isWindowsStylePathToken(raw)) {
-    return { valid: false, reason: 'posix_path_on_windows' };
+    return { valid: true, reason: '' };
   }
   if (platform !== 'win32' && isWindowsStylePathToken(raw)) {
     return { valid: false, reason: 'windows_path_on_non_windows' };
