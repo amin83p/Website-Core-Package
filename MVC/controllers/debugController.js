@@ -3,22 +3,33 @@ const heicConvert = require('heic-convert');
 const dataService = require('../services/dataService');
 const fs = require('fs');
 const path = require('path');
-let schoolDataService;
-try {
-  const schoolCoreServicePath = path.resolve(__dirname, '../services/school/schoolDataService.js');
-  const schoolPackageServicePath = path.resolve(__dirname, '../../packages/school/MVC/services/school/schoolDataService.js');
-  if (fs.existsSync(schoolCoreServicePath)) {
-    schoolDataService = require(schoolCoreServicePath);
-  } else if (fs.existsSync(schoolPackageServicePath)) {
-    schoolDataService = require('../../packages/school/MVC/services/school/schoolDataService');
-  } else {
+
+const schoolCoreServicePath = path.resolve(__dirname, '../services/school/schoolDataService.js');
+const schoolPackageServicePath = path.resolve(__dirname, '../../packages/school/MVC/services/school/schoolDataService.js');
+let schoolDataService = null;
+let hasResolvedSchoolDataService = false;
+
+function getSchoolDataService() {
+  if (hasResolvedSchoolDataService) return schoolDataService;
+  hasResolvedSchoolDataService = true;
+
+  try {
+    if (fs.existsSync(schoolCoreServicePath)) {
+      schoolDataService = require(schoolCoreServicePath);
+      return schoolDataService;
+    }
+
+    if (fs.existsSync(schoolPackageServicePath)) {
+      schoolDataService = require('../../packages/school/MVC/services/school/schoolDataService.js');
+      return schoolDataService;
+    }
+  } catch (error) {
     schoolDataService = null;
-    console.debug('[debug] schoolDataService unavailable from core or package fallback.',
-      `core: ${schoolCoreServicePath}`, `package: ${schoolPackageServicePath}`);
+    console.debug('[debug] schoolDataService fallback load failed:', error?.message || error);
   }
-} catch (error) {
+
   schoolDataService = null;
-  console.warn('[debug] schoolDataService fallback load failed:', error?.message || error);
+  return schoolDataService;
 }
 const securityService = require('../services/security');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
@@ -255,16 +266,18 @@ function auditRoleRecords(records, personsById, accountsById, roleName, entityTy
 
 async function runIntegrityAudit(req, res) {
   try {
-    if (!schoolDataService || typeof schoolDataService.fetchData !== 'function') {
+    const schoolService = getSchoolDataService();
+
+    if (!schoolService || typeof schoolService.fetchData !== 'function') {
       return res.status(500).json({ status: 'error', message: 'School data service is not available.' });
     }
     const [persons, users, students, teachers, staff, schoolAccounts] = await Promise.all([
       dataService.fetchData('persons', {}, SYSTEM_CONTEXT, PERSON_QUERY_OPTIONS),
       dataService.fetchData('users', {}, SYSTEM_CONTEXT),
-      schoolDataService.fetchData('students', {}, null),
-      schoolDataService.fetchData('teachers', {}, null),
-      schoolDataService.fetchData('staff', {}, null),
-      schoolDataService.fetchData('schoolAccounts', {}, null)
+      schoolService.fetchData('students', {}, null),
+      schoolService.fetchData('teachers', {}, null),
+      schoolService.fetchData('staff', {}, null),
+      schoolService.fetchData('schoolAccounts', {}, null)
     ]);
 
     const issues = [];
