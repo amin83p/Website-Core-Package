@@ -1,0 +1,77 @@
+[
+  {
+    "packageId": "pte",
+    "version": "1.0.0",
+    "enabled": true,
+    "installStatus": "enabled",
+    "metadata": {
+      "packageName": "PTE",
+      "mountPath": "/pte",
+      "manifestPath": "packages/pte/package.manifest.json",
+      "activatedBy": "scripts/packages/enable-pte-package.js",
+      "activationMode": "manual",
+      "declarationCounts": {
+        "routes": 6,
+        "views": 1,
+        "assets": 1,
+        "operations": 1,
+        "roles": 5,
+        "sections": 26,
+        "symbols": 25,
+        "accesses": 1,
+        "uploadFolders": 9,
+        "menuEntries": 4,
+        "dashboardEntries": 3,
+        "queryExecutors": 0
+      }
+    },
+    "id": "pte",
+    "installedAt": "2026-05-23T03:05:41.357Z",
+    "updatedAt": "2026-05-23T03:05:41.357Z",
+    "lastError": "",
+    "lastWarning": "",
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-23T03:05:41.357Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-23T03:05:41.357Z"
+    }
+  },
+  {
+    "packageId": "school",
+    "version": "0.0.0",
+    "enabled": false,
+    "installStatus": "disabled",
+    "metadata": {
+      "packageName": "School",
+      "mountPath": "/school",
+      "manifestPath": "packages/school/package.manifest.json",
+      "activatedBy": "manual-coreonly-baseline",
+      "activationMode": "manual",
+      "declarationCounts": {
+        "routes": 1,
+        "views": 1,
+        "assets": 1,
+        "operations": 0,
+        "sections": 0,
+        "symbols": 0,
+        "accesses": 0,
+        "uploadFolders": 0,
+        "menuEntries": 0,
+        "dashboardEntries": 0,
+        "queryExecutors": 0
+      }
+    },
+    "id": "school",
+    "installedAt": "2026-05-23T03:05:41.357Z",
+    "updatedAt": "2026-05-23T03:05:41.357Z",
+    "lastError": "",
+    "lastWarning": "",
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-05-23T03:05:41.357Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-05-23T03:05:41.357Z"
+    }
+  }
+]
