@@ -5137,7 +5137,62 @@
       ]
     }
   ],
-  "uploadFolders": [],
+  "uploadFolders": [
+    {
+      "key": "school.students",
+      "packageName": "SCHOOL",
+      "group": "School Uploads",
+      "label": "School Student Attachments",
+      "defaultTemplate": "students/{personId}",
+      "placeholders": [
+        "personId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "school.reportTemplates",
+      "packageName": "SCHOOL",
+      "group": "School Uploads",
+      "label": "School Report Templates",
+      "defaultTemplate": "reports",
+      "placeholders": [],
+      "applyDefault": true
+    },
+    {
+      "key": "school.examMedia",
+      "packageName": "SCHOOL",
+      "group": "School Uploads",
+      "label": "School Exam Media",
+      "defaultTemplate": "school-exams/{templateId}/{questionId}",
+      "placeholders": [
+        "templateId",
+        "questionId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "school.classWorkspace",
+      "packageName": "SCHOOL",
+      "group": "School Uploads",
+      "label": "School Class Workspaces",
+      "defaultTemplate": "school/classes/{classId}",
+      "placeholders": [
+        "classId"
+      ],
+      "applyDefault": true
+    },
+    {
+      "key": "school.subjectWorkspace",
+      "packageName": "SCHOOL",
+      "label": "School Subject Workspaces",
+      "group": "School Uploads",
+      "defaultTemplate": "school/subjects/{subjectId}",
+      "placeholders": [
+        "subjectId"
+      ],
+      "applyDefault": true
+    }
+  ],
   "dataEntities": [
     { "entityType": "accounts", "label": "School Accounts" },
     { "entityType": "academicLedger", "label": "Academic Ledger" },

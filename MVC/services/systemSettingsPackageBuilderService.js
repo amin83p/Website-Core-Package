@@ -368,7 +368,7 @@ function collectRemapFieldMapFromRows(rows = []) {
 
       const terminalFieldKey = cleanText(resolveTerminalFieldKey(fieldPath), 200).toLowerCase();
       const normalizedOrgToken = normalizeOrgToken(value);
-      const hasScopedUploadUrl = /\/uploads\/ORG_[^/]+/i.test(value);
+      const hasScopedUploadUrl = /\/uploads\/(?:ORG_[^/]+|GLOBAL|\{\{ORG_ID\}\})/i.test(value);
 
       if (REMAP_ORG_FIELDS.has(terminalFieldKey) && normalizedOrgToken) {
         orgFieldPaths.add(fieldPath);
@@ -440,10 +440,13 @@ function remapMappedUploadUrlValue(value, targetUploadScope = '', state = {}) {
     ? '{{ORG_ID}}'
     : normalizeOrgToken(rawTarget);
   if (!nextUploadScope) return value;
-  const regex = /\/uploads\/(?:ORG_[^/]+|\{\{ORG_ID\}\})/ig;
+  const regex = /\/uploads\/(?:ORG_[^/]+|GLOBAL|\{\{ORG_ID\}\})/ig;
   const matches = String(value).match(regex) || [];
   if (!matches.length) return value;
-  const next = String(value).replace(regex, `/uploads/${nextUploadScope}`);
+  const replacement = nextUploadScope === 'GLOBAL'
+    ? '/uploads/GLOBAL'
+    : `/uploads/${nextUploadScope}`;
+  const next = String(value).replace(regex, replacement);
   if (next !== value) {
     state.rewrittenUrlCount = Number(state.rewrittenUrlCount || 0) + matches.length;
   }
