@@ -455,7 +455,10 @@
   }
 
   function previewRequiresAcknowledgement(preview = {}) {
-    return toBoolean(preview?.requiresAcknowledgement)
+    const findingCount = Number(Array.isArray(preview?.blockingFindings) ? preview.blockingFindings.length : 0)
+      + Number(Array.isArray(preview?.warningFindings) ? preview.warningFindings.length : 0);
+    return findingCount > 0
+      || toBoolean(preview?.requiresAcknowledgement)
       || toBoolean(preview?.requires_acknowledgement)
       || toBoolean(preview?.requiresAcknowledgment)
       || toBoolean(preview?.requires_acknowledgment)

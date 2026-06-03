@@ -459,7 +459,11 @@ function createService(overrides = {}) {
 
   function issueUpgradePreviewAckToken(preview = {}, options = {}) {
     const isUpgrade = preview?.isUpgrade === true;
-    if (!isUpgrade || preview?.requiresAcknowledgement !== true) return '';
+    const hasAckRequiredFindings = (
+      Number(Array.isArray(preview?.blockingFindings) ? preview.blockingFindings.length : 0)
+      + Number(Array.isArray(preview?.warningFindings) ? preview.warningFindings.length : 0)
+    ) > 0;
+    if (!isUpgrade || (preview?.requiresAcknowledgement !== true && !hasAckRequiredFindings)) return '';
     cleanupExpiredUpgradePreviewSessions();
     const token = crypto.randomBytes(24).toString('hex');
     const nowMs = Date.now();
@@ -483,7 +487,11 @@ function createService(overrides = {}) {
 
   function validateUpgradePreviewAckToken(preview = {}, inputToken = '', options = {}) {
     const token = cleanText(inputToken, 240);
-    if (!preview?.isUpgrade || preview?.requiresAcknowledgement !== true) {
+    const hasAckRequiredFindings = (
+      Number(Array.isArray(preview?.blockingFindings) ? preview.blockingFindings.length : 0)
+      + Number(Array.isArray(preview?.warningFindings) ? preview.warningFindings.length : 0)
+    ) > 0;
+    if (!preview?.isUpgrade || (preview?.requiresAcknowledgement !== true && !hasAckRequiredFindings)) {
       return { accepted: true, reason: 'not_required' };
     }
     cleanupExpiredUpgradePreviewSessions();
@@ -1490,6 +1498,12 @@ function createService(overrides = {}) {
     };
   }
 
+  function normalizeManifestCandidatePath(inputPath = '') {
+    const token = cleanText(inputPath, 1600).replace(/\\/g, '/');
+    if (!token) return '';
+    return token.replace(/\/+/g, '/');
+  }
+
   async function resolveManifestForRegistryRow(row = {}, options = {}) {
     const packageId = normalizePackageId(row?.packageId || row?.id || '');
     if (!packageId) return null;
@@ -2091,7 +2105,12 @@ function createService(overrides = {}) {
       const localPath = cleanText(input.localManifestPath, 1600);
       if (!localPath) throw new Error('Select one local manifest path.');
       const localRows = await discoverLocalManifests(options);
-      const selected = localRows.find((row) => row.storedManifestPath === localPath || row.manifestPath === localPath);
+      const normalizedLocalPath = normalizeManifestCandidatePath(localPath);
+      const selected = localRows.find((row) => {
+        const rowStoredPath = normalizeManifestCandidatePath(row?.storedManifestPath);
+        const rowManifestPath = normalizeManifestCandidatePath(row?.manifestPath);
+        return rowStoredPath === normalizedLocalPath || rowManifestPath === normalizedLocalPath;
+      });
       if (!selected) {
         throw new Error('Selected local manifest was not found. Refresh and try again.');
       }

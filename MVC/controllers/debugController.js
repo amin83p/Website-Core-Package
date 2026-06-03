@@ -1,23 +1,29 @@
 // MVC/controllers/debugController.js
 const heicConvert = require('heic-convert'); 
 const dataService = require('../services/dataService');
+const fs = require('fs');
 const path = require('path');
 let schoolDataService;
 try {
-  schoolDataService = require('../services/school/schoolDataService');
-} catch (error) {
-  try {
+  const schoolCoreServicePath = path.resolve(__dirname, '../services/school/schoolDataService.js');
+  const schoolPackageServicePath = path.resolve(__dirname, '../../packages/school/MVC/services/school/schoolDataService.js');
+  if (fs.existsSync(schoolCoreServicePath)) {
+    schoolDataService = require(schoolCoreServicePath);
+  } else if (fs.existsSync(schoolPackageServicePath)) {
     schoolDataService = require('../../packages/school/MVC/services/school/schoolDataService');
-  } catch (secondaryError) {
+  } else {
     schoolDataService = null;
-    console.warn('[debug] schoolDataService unavailable from package fallback:', secondaryError?.message || secondaryError);
+    console.debug('[debug] schoolDataService unavailable from core or package fallback.',
+      `core: ${schoolCoreServicePath}`, `package: ${schoolPackageServicePath}`);
   }
+} catch (error) {
+  schoolDataService = null;
+  console.warn('[debug] schoolDataService fallback load failed:', error?.message || error);
 }
 const securityService = require('../services/security');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { loadMergedProfileByIds } = require('../services/security/profileMergeService');
 const { normalizeOrgRoles, getOrgRolesDisplay, getPrimaryOrgRole } = require('../utils/orgContextUtils');
-const fs = require('fs');
 const { randomUUID } = require('crypto');
 const fileAssetStorage = require('../services/fileAssetStorageService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
