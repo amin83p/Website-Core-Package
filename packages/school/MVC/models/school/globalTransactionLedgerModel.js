@@ -6,7 +6,7 @@ const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
-const dataDir = path.join(__dirname, '../../../data/school');
+const dataDir = path.join(resolveCoreRoot(), 'data/school');
 const dataPath = path.join(dataDir, 'globalTransactionLedger.json');
 
 if (!fsSync.existsSync(dataDir)) {

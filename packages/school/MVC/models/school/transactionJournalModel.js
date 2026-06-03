@@ -4,7 +4,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 
-const dataDir = path.join(__dirname, '../../../data/school');
+const dataDir = path.join(resolveCoreRoot(), 'data/school');
 const dataPath = path.join(dataDir, 'transactionJournals.json');
 
 if (!fsSync.existsSync(dataDir)) {

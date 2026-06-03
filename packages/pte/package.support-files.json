@@ -232,6 +232,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "docs/pte-package-certification-checklist-2026-05-31.md",
+      "target": "packages/pte/docs/pte-package-certification-checklist-2026-05-31.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "docs/pte-package-completion-roadmap-2026-05-24.md",
       "target": "packages/pte/docs/pte-package-completion-roadmap-2026-05-24.md",
       "category": "package-preparation",
@@ -318,6 +325,13 @@
     {
       "source": "docs/pte-package-hard-delete-attempts-step29.md",
       "target": "packages/pte/docs/pte-package-hard-delete-attempts-step29.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/pte-package-install-uninstall-json-checklist-current.md",
+      "target": "packages/pte/docs/pte-package-install-uninstall-json-checklist-current.md",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -596,13 +610,6 @@
       "targetStatus": "package-mirrored"
     },
     {
-      "source": "docs/pte/postman/README.md",
-      "target": "packages/pte/docs/pte/postman/README.md",
-      "category": "package-preparation",
-      "status": "root-active",
-      "targetStatus": "package-mirrored"
-    },
-    {
       "source": "docs/pte/postman/pte-attempt-runtime.local.postman_environment.json",
       "target": "packages/pte/docs/pte/postman/pte-attempt-runtime.local.postman_environment.json",
       "category": "package-preparation",
@@ -612,6 +619,34 @@
     {
       "source": "docs/pte/postman/pte-attempt-runtime.postman_collection.json",
       "target": "packages/pte/docs/pte/postman/pte-attempt-runtime.postman_collection.json",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/pte/postman/README.md",
+      "target": "packages/pte/docs/pte/postman/README.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/school-package-pass36-ptelike-parity-planning-2026-06-02.md",
+      "target": "packages/pte/docs/school-package-pass36-ptelike-parity-planning-2026-06-02.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/school-package-pass37-ptelike-surface-seeding-2026-06-02.md",
+      "target": "packages/pte/docs/school-package-pass37-ptelike-surface-seeding-2026-06-02.md",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/school-package-template-from-pte-2026-05-31.md",
+      "target": "packages/pte/docs/school-package-template-from-pte-2026-05-31.md",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"
@@ -696,6 +731,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "test/pte-package-certification-hardcoded-coupling.test.js",
+      "target": "packages/pte/test/pte-package-certification-hardcoded-coupling.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "test/pte-package-controller-core-dependency-boundary-step51.test.js",
       "target": "packages/pte/test/pte-package-controller-core-dependency-boundary-step51.test.js",
       "category": "package-preparation",
@@ -747,6 +789,13 @@
     {
       "source": "test/pte-package-hard-delete-all-pte-attempts-step29.test.js",
       "target": "packages/pte/test/pte-package-hard-delete-all-pte-attempts-step29.test.js",
+      "category": "package-preparation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/pte-package-install-uninstall-checklist-json.test.js",
+      "target": "packages/pte/test/pte-package-install-uninstall-checklist-json.test.js",
       "category": "package-preparation",
       "status": "root-active",
       "targetStatus": "package-mirrored"

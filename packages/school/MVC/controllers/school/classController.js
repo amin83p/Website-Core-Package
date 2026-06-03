@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const schoolDataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
+const { resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const dataService = requireCoreModule('MVC/services/dataService'); 
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const indexService = require('../../services/school/schoolIndexService');
@@ -106,7 +107,7 @@ async function cleanupClassRelatedFolders(classData) {
         }
     };
 
-    const classStorageBase = path.resolve(__dirname, '../../../data/school/classes_storage');
+    const classStorageBase = path.join(resolveCoreRoot(), 'data/school/classes_storage');
     await tryDelete(classStorageBase, [classId]);
 
     const storedWorkspace = String(classData?.uploadWorkspace?.relativePath || '').trim();

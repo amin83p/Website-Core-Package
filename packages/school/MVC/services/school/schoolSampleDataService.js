@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const dataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
+const { resolveCoreRoot } = require('./schoolCoreModuleResolver');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
@@ -17,7 +18,7 @@ const MIGRATION_LOG_FILES = Object.freeze([
 ]);
 
 async function removeOptionalMigrationLogFiles() {
-  const base = path.join(__dirname, '../../../data/school');
+  const base = path.join(resolveCoreRoot(), 'data/school');
   let removed = 0;
   const errors = [];
   for (const name of MIGRATION_LOG_FILES) {

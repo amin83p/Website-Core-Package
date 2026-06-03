@@ -22,11 +22,6 @@ const PASS27_MODELS = new Set([
   'transactionJournalModel.js',
   'withdrawalModel.js'
 ]);
-const MODELS_WITHOUT_DIRECT_DATA_PATH = new Set([
-  'examModelUtils.js',
-  'feeCategoryCatalog.js',
-  'postingPolicyModel.js'
-]);
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -59,19 +54,6 @@ function findMissingRelativeRequire(filePath, source) {
   return '';
 }
 
-function usesSchoolCoreModuleResolver(source = '') {
-  return (
-    source.includes("require('../../services/school/schoolCoreModuleResolver')")
-    || source.includes('require("../../services/school/schoolCoreModuleResolver")')
-    || source.includes("requireCoreModule('MVC/services/school/schoolCoreModuleResolver')")
-    || source.includes('requireCoreModule("MVC/services/school/schoolCoreModuleResolver")')
-  );
-}
-
-function usesRootedSchoolDataPath(source = '') {
-  return /path\.join\(\s*resolveCoreRoot\(\)\s*,\s*['"]data\/school(?:\/|['"])/.test(source);
-}
-
 test('school package pass28 owns remaining school models and rewires shared requires to core contracts', () => {
   const registry = readOwnershipRegistry();
   const allModels = new Set((registry.models || []).map(String));
@@ -94,10 +76,10 @@ test('school package pass28 owns remaining school models and rewires shared requ
     if (source.includes(`requireCoreModule('')`)) {
       offenders.push(`${fileName}: unresolved converted require`);
     }
-    if (!usesSchoolCoreModuleResolver(source)) {
+    if (!source.includes("requireCoreModule('MVC/services/school/schoolCoreModuleResolver')")) {
       offenders.push(`${fileName}: missing schoolCoreModuleResolver import`);
     }
-    if (!MODELS_WITHOUT_DIRECT_DATA_PATH.has(fileName) && !usesRootedSchoolDataPath(source)) {
+    if (!source.includes('path.join(resolveCoreRoot(), \'data/school/')) {
       offenders.push(`${fileName}: data path is not rooted from resolveCoreRoot`);
     }
 

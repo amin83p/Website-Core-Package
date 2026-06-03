@@ -82,68 +82,441 @@
         }
     ],
     "docs": [
-        "docs/school-package-pass1-foundation-2026-06-01.md",
-        "docs/school-package-pass2-route-layer-2026-06-01.md",
-        "docs/school-package-pass3-runtime-wrapper-surface-2026-06-01.md",
-        "docs/school-package-pass4-view-mirror-2026-06-01.md",
-        "docs/school-package-pass5-partials-2026-06-01.md",
-        "docs/school-package-pass6-runtime-cutover-2026-06-01.md",
-        "docs/school-package-pass7-ownership-begin-2026-06-01.md",
-        "docs/school-package-pass7-ownership-slice2-2026-06-01.md",
-        "docs/school-package-pass7-ownership-slice3-2026-06-01.md",
-        "docs/school-package-pass7-ownership-slice4-2026-06-01.md",
-        "docs/school-package-pass7-ownership-slice5-2026-06-01.md",
-        "docs/school-package-pass7-ownership-slice6-2026-06-01.md",
-        "docs/school-package-pass8-route-ownership-batch1-2026-06-01.md",
-        "docs/school-package-pass9-route-ownership-batch2-2026-06-01.md",
-        "docs/school-package-pass10-route-ownership-batch3-2026-06-01.md",
-        "docs/school-package-pass11-route-ownership-batch4-2026-06-01.md",
-        "docs/school-package-pass12-route-ownership-batch5-2026-06-01.md",
-        "docs/school-package-pass13-route-ownership-batch6-2026-06-01.md",
-        "docs/school-package-pass14-route-ownership-batch7-2026-06-01.md",
-        "docs/school-package-pass15-controller-ownership-batch1-2026-06-01.md",
-        "docs/school-package-pass16-controller-ownership-batch2-2026-06-01.md",
-        "docs/school-package-pass17-controller-ownership-batch3-2026-06-01.md",
-        "docs/school-package-pass18-controller-ownership-batch4-2026-06-01.md",
-        "docs/school-package-pass19-controller-ownership-batch5-2026-06-01.md",
-        "docs/school-package-pass20-controller-ownership-batch6-2026-06-01.md",
-        "docs/school-package-pass21-controller-ownership-batch7-2026-06-01.md",
-        "docs/school-package-pass22-controller-ownership-batch8-2026-06-01.md",
-        "docs/school-package-pass23-controller-ownership-batch9-2026-06-01.md",
-        "docs/school-package-pass24-controller-ownership-batch10-2026-06-01.md",
-        "docs/school-package-pass25-controller-ownership-batch11-2026-06-01.md",
-        "docs/school-package-pass26-domain-ownership-guardrails-2026-06-01.md",
-        "docs/school-package-pass26-32-full-ownership-plan-2026-06-01.md",
-        "docs/school-package-pass27-model-ownership-batch1-2026-06-01.md",
-        "docs/school-package-pass31-core-school-domain-prune-2026-06-02.md",
-        "docs/school-package-pass32-certification-installability-verification-2026-06-02.md",
-        "docs/school-package-pass33-codex-handoff.md",
-        "docs/school-package-pass34-runtime-smoke-verification-2026-06-02.md",
-        "docs/school-package-pass35-finalization-handoff-2026-06-02.md",
-        "docs/school-package-pass36-ptelike-parity-planning-2026-06-02.md",
-        "docs/school-package-pass37-ptelike-surface-seeding-2026-06-02.md",
-        "docs/school-package-pass38-package-script-shims-2026-06-02.md",
-        "docs\\school-package-pass39-manifest-surface-seeding-2026-06-02.md",
-        "docs/school-package-pass41-smoke-runbook-progress-2026-06-02.md",
-        "docs/school-package-pass40-accesses-menu-dashboard-2026-06-02.md",
-        "docs/school-package-pass42-auth-smoke-next-step-2026-06-02.md",
-        "docs/school-package-pass43-auth-smoke-complete-2026-06-02.md",
-        "docs/school-package-pass43-closeout-smoke-run-2026-06-02.md",
-        "docs/school-package-pass44-core-only-host-sync-2026-06-02.md"
+        {
+            "source": "docs/school-package-pass1-foundation-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass1-foundation-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass10-route-ownership-batch3-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass10-route-ownership-batch3-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass11-route-ownership-batch4-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass11-route-ownership-batch4-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass12-route-ownership-batch5-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass12-route-ownership-batch5-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass13-route-ownership-batch6-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass13-route-ownership-batch6-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass14-route-ownership-batch7-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass14-route-ownership-batch7-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass15-controller-ownership-batch1-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass15-controller-ownership-batch1-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass16-controller-ownership-batch2-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass16-controller-ownership-batch2-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass17-controller-ownership-batch3-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass17-controller-ownership-batch3-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass18-controller-ownership-batch4-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass18-controller-ownership-batch4-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass19-controller-ownership-batch5-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass19-controller-ownership-batch5-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass2-route-layer-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass2-route-layer-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass20-controller-ownership-batch6-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass20-controller-ownership-batch6-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass21-controller-ownership-batch7-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass21-controller-ownership-batch7-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass22-controller-ownership-batch8-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass22-controller-ownership-batch8-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass23-controller-ownership-batch9-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass23-controller-ownership-batch9-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass24-controller-ownership-batch10-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass24-controller-ownership-batch10-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass25-controller-ownership-batch11-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass25-controller-ownership-batch11-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass26-32-full-ownership-plan-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass26-32-full-ownership-plan-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass26-domain-ownership-guardrails-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass26-domain-ownership-guardrails-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass27-model-ownership-batch1-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass27-model-ownership-batch1-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass3-runtime-wrapper-surface-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass3-runtime-wrapper-surface-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass31-core-school-domain-prune-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass31-core-school-domain-prune-2026-06-02.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass32-certification-installability-verification-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass32-certification-installability-verification-2026-06-02.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass33-codex-handoff.md",
+            "target": "packages/school/docs/school-package-pass33-codex-handoff.md",
+            "category": "handover",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass34-runtime-smoke-verification-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass34-runtime-smoke-verification-2026-06-02.md",
+            "category": "smoke-verification",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass35-finalization-handoff-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass35-finalization-handoff-2026-06-02.md",
+            "category": "handover",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass36-ptelike-parity-planning-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass36-ptelike-parity-planning-2026-06-02.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass37-ptelike-surface-seeding-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass37-ptelike-surface-seeding-2026-06-02.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass38-package-script-shims-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass38-package-script-shims-2026-06-02.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass39-manifest-surface-seeding-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass39-manifest-surface-seeding-2026-06-02.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass4-view-mirror-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass4-view-mirror-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass40-accesses-menu-dashboard-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass40-accesses-menu-dashboard-2026-06-02.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass41-smoke-runbook-progress-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass41-smoke-runbook-progress-2026-06-02.md",
+            "category": "smoke-verification",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass42-auth-smoke-next-step-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass42-auth-smoke-next-step-2026-06-02.md",
+            "category": "smoke-verification",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass43-auth-smoke-complete-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass43-auth-smoke-complete-2026-06-02.md",
+            "category": "smoke-verification",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass43-closeout-smoke-run-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass43-closeout-smoke-run-2026-06-02.md",
+            "category": "smoke-verification",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass44-core-only-host-sync-2026-06-02.md",
+            "target": "packages/school/docs/school-package-pass44-core-only-host-sync-2026-06-02.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass5-partials-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass5-partials-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass6-runtime-cutover-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass6-runtime-cutover-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass7-ownership-begin-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass7-ownership-begin-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass7-ownership-slice2-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass7-ownership-slice2-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass7-ownership-slice3-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass7-ownership-slice3-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass7-ownership-slice4-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass7-ownership-slice4-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass7-ownership-slice5-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass7-ownership-slice5-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass7-ownership-slice6-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass7-ownership-slice6-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass8-route-ownership-batch1-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass8-route-ownership-batch1-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "docs/school-package-pass9-route-ownership-batch2-2026-06-01.md",
+            "target": "packages/school/docs/school-package-pass9-route-ownership-batch2-2026-06-01.md",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        }
     ],
     "tests": [
-        "test/school-package-certification-hardcoded-coupling.test.js",
-        "test/school-package-route-layer-pass2.test.js",
-        "test/school-package-runtime-wrapper-parity-pass3.test.js",
-        "test/school-package-view-parity-pass4.test.js",
-        "test/school-package-view-partials-pass5.test.js",
-        "test/school-package-runtime-cutover-pass6.test.js",
-        "test/school-package-ownership-pass7.test.js",
-        "test/school-package-controller-ownership-pass15.test.js",
-        "test/school-package-ownership-registry-pass26.test.js",
-        "test/school-package-model-ownership-pass27.test.js",
-        "test/school-package-model-repository-ownership-pass28.test.js",
-        "test/school-package-service-ownership-pass29.test.js",
-        "test/school-package-service-ownership-pass30.test.js"
+        {
+            "source": "test/school-package-certification-hardcoded-coupling.test.js",
+            "target": "packages/school/test/school-package-certification-hardcoded-coupling.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-controller-ownership-pass15.test.js",
+            "target": "packages/school/test/school-package-controller-ownership-pass15.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-model-ownership-pass27.test.js",
+            "target": "packages/school/test/school-package-model-ownership-pass27.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-model-repository-ownership-pass28.test.js",
+            "target": "packages/school/test/school-package-model-repository-ownership-pass28.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-ownership-pass7.test.js",
+            "target": "packages/school/test/school-package-ownership-pass7.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-ownership-registry-pass26.test.js",
+            "target": "packages/school/test/school-package-ownership-registry-pass26.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-pte-structure-parity.test.js",
+            "target": "packages/school/test/school-package-pte-structure-parity.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-route-layer-pass2.test.js",
+            "target": "packages/school/test/school-package-route-layer-pass2.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-runtime-cutover-pass6.test.js",
+            "target": "packages/school/test/school-package-runtime-cutover-pass6.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-runtime-wrapper-parity-pass3.test.js",
+            "target": "packages/school/test/school-package-runtime-wrapper-parity-pass3.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-service-ownership-pass29.test.js",
+            "target": "packages/school/test/school-package-service-ownership-pass29.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-service-ownership-pass30.test.js",
+            "target": "packages/school/test/school-package-service-ownership-pass30.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-view-parity-pass4.test.js",
+            "target": "packages/school/test/school-package-view-parity-pass4.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-package-view-partials-pass5.test.js",
+            "target": "packages/school/test/school-package-view-partials-pass5.test.js",
+            "category": "package-preparation",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
+        }
     ]
 }
