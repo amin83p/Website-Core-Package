@@ -60,6 +60,52 @@ function stripPaginationFromQuery(query = {}) {
   return out;
 }
 
+function buildOrgLabelLookup(user = {}) {
+  const map = new Map();
+
+  const addOrg = (org = {}) => {
+    const key = toPublicId(org?.orgId || org?.id || org?.org_code || '');
+    if (!key) return;
+    const name = String(
+      org?.name || org?.orgName || org?.identity?.displayName || org?.identity?.legalName || ''
+    ).trim();
+    if (name) map.set(key, name);
+  };
+
+  const organizations = Array.isArray(user?.organizations) ? user.organizations : [];
+  organizations.forEach(addOrg);
+
+  const allowedOrgs = Array.isArray(user?.allowedOrgs) ? user.allowedOrgs : [];
+  allowedOrgs.forEach(addOrg);
+
+  addOrg({
+    orgId: user?.orgId,
+    name: user?.orgName
+  });
+
+  return map;
+}
+
+function resolveOrganizationNameFromMemberships(memberships = [], orgId = '') {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) return '';
+  const match = Array.isArray(memberships)
+    ? memberships.find((org) => idsEqual(toPublicId(org?.orgId || org?.id || ''), targetOrgId))
+    : null;
+  if (!match) return '';
+  return String(
+    match?.name || match?.orgName || match?.identity?.displayName || match?.identity?.legalName || ''
+  ).trim();
+}
+
+function resolveOrganizationName(orgId = '', orgLabelLookup = new Map(), memberships = []) {
+  const normalizedOrgId = toPublicId(orgId);
+  if (!normalizedOrgId) return '';
+  const lookupName = String(orgLabelLookup.get(normalizedOrgId) || '').trim();
+  if (lookupName) return lookupName;
+  return resolveOrganizationNameFromMemberships(memberships, normalizedOrgId);
+}
+
 function resolveActiveOrgId(requestingUser) {
   return toPublicId(requestingUser?.activeOrgId || requestingUser?.primaryOrgId) || '';
 }
@@ -832,10 +878,12 @@ const packageManagerDataService = {
     assertReadableVisibility(visibility);
     const activeOrgId = toPublicId(visibility.activeOrgId || '');
     if (!activeOrgId) return [];
+    const orgLabelLookup = buildOrgLabelLookup(requestingUser);
 
     const packageRecord = await packageDataService.getPackageById(packageId, requestingUser, accessContext, options);
     if (!packageRecord) throw new Error('Select a valid package first.');
     const requiredRoles = normalizeRoleList(packageRecord.eligibleRoles || []);
+    const orgName = resolveOrganizationName(activeOrgId, orgLabelLookup);
 
     const normalizedQuery = normalizeQueryOptions(stripPaginationFromQuery(query));
     const rows = await dataService.fetchData('users', {
@@ -853,6 +901,8 @@ const packageManagerDataService = {
       const roles = extractRoleTokensForOrg(row, activeOrgId);
       return {
         id: toPublicId(row?.id || ''),
+        orgId: activeOrgId,
+        orgName,
         name: cleanString(row?.name, { max: 220, allowEmpty: true })
           || cleanString(row?.username, { max: 120, allowEmpty: true })
           || cleanString(row?.email, { max: 200, allowEmpty: true })

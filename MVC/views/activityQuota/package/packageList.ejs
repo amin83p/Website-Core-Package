@@ -67,7 +67,9 @@
             </div>
           </td>
           <td>
-            <div class="small font-monospace text-dark"><%= item.orgId || '-' %></div>
+            <div class="small font-monospace text-dark">
+              <%= item.orgName ? `${item.orgName} (#${item.orgId || '-'})` : (item.orgId || '-') %>
+            </div>
           </td>
           <td>
             <div class="small text-dark"><span class="fw-bold"><%= Number(price.amount || 0) %></span> <%= price.currencyCode || 'USD' %></div>

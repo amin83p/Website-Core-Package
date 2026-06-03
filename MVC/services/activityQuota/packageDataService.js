@@ -153,13 +153,57 @@ function collectUserOrgIds(user = {}) {
   return Array.from(out);
 }
 
+function buildOrgLabelLookup(user = {}) {
+  const map = new Map();
+
+  const addOrg = (org = {}) => {
+    const token = toPublicId(org?.orgId || org?.id || org?.org_code || '');
+    if (!token) return;
+    const name = String(org?.name || org?.orgName || org?.identity?.displayName || org?.identity?.legalName || '').trim();
+    if (name) map.set(token, name);
+  };
+
+  const organizations = Array.isArray(user?.organizations) ? user.organizations : [];
+  organizations.forEach(addOrg);
+
+  const allowedOrgs = Array.isArray(user?.allowedOrgs) ? user.allowedOrgs : [];
+  allowedOrgs.forEach(addOrg);
+
+  addOrg({
+    orgId: user?.orgId,
+    name: user?.orgName
+  });
+
+  return map;
+}
+
+function resolveOrganizationNameFromMemberships(memberships = [], orgId = '') {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) return '';
+  const match = Array.isArray(memberships)
+    ? memberships.find((org) => idsEqual(toPublicId(org?.orgId || org?.id || ''), targetOrgId))
+    : null;
+  if (!match) return '';
+  return String(
+    match?.name || match?.orgName || match?.identity?.displayName || match?.identity?.legalName || match?.organizationName || ''
+  ).trim();
+}
+
+function resolveOrganizationName(orgId = '', orgLabelLookup = new Map(), memberships = []) {
+  const normalizedOrgId = toPublicId(orgId);
+  if (!normalizedOrgId) return '';
+  const lookupName = String(orgLabelLookup.get(normalizedOrgId) || '').trim();
+  if (lookupName) return lookupName;
+  return resolveOrganizationNameFromMemberships(memberships, normalizedOrgId);
+}
+
 function userBelongsToOrg(user = {}, orgId = '') {
   const targetOrgId = toPublicId(orgId);
   if (!targetOrgId) return false;
   return collectUserOrgIds(user).some((item) => idsEqual(item, targetOrgId));
 }
 
-function toPickerUser(row = {}, visibility = {}) {
+function toPickerUser(row = {}, visibility = {}, orgLabelLookup = new Map()) {
   const id = toPublicId(row?.id || '');
   const username = cleanString(row?.username, { max: 120, allowEmpty: true }) || '';
   const email = cleanString(row?.email, { max: 200, allowEmpty: true }) || '';
@@ -171,6 +215,7 @@ function toPickerUser(row = {}, visibility = {}) {
   const activeOrg = visibility?.activeOrgId && orgIds.find((item) => idsEqual(item, visibility.activeOrgId))
     ? visibility.activeOrgId
     : (orgIds[0] || '');
+  const orgName = resolveOrganizationName(activeOrg, orgLabelLookup, row?.organizations || []);
 
   return {
     id,
@@ -178,6 +223,7 @@ function toPickerUser(row = {}, visibility = {}) {
     username,
     email,
     orgId: activeOrg,
+    orgName,
     organizations: orgIds
   };
 }
@@ -225,13 +271,15 @@ function toPickerOperation(operationRow = {}, sectionRef = {}) {
   };
 }
 
-function toPickerAccessProfile(row = {}) {
+function toPickerAccessProfile(row = {}, orgLabelLookup = new Map()) {
   const id = toPublicId(row?.id || '');
+  const orgId = toPublicId(row?.orgId || '');
   return {
     id,
     name: cleanString(row?.name, { max: 200, allowEmpty: true }) || id,
     description: cleanString(row?.description, { max: 300, allowEmpty: true }) || '',
-    orgId: toPublicId(row?.orgId || ''),
+    orgId,
+    orgName: resolveOrganizationName(orgId, orgLabelLookup),
     active: row?.active !== false
   };
 }
@@ -827,6 +875,7 @@ const packageDataService = {
   async listPackages(query = {}, requestingUser, accessContext = {}, options = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext);
     assertReadableVisibility(visibility);
+    const orgLabelLookup = buildOrgLabelLookup(requestingUser);
 
     const normalizedQuery = normalizeQueryOptions(query || {});
     const rows = await activityQuotaPackageRepository.list({
@@ -841,6 +890,7 @@ const packageDataService = {
       .filter((row) => isVisiblePackageRow(row, visibility))
       .map((row) => ({
         ...row,
+        orgName: resolveOrganizationName(row?.orgId, orgLabelLookup),
         summary: buildPackageSummary(row)
       }));
   },
@@ -971,6 +1021,7 @@ const packageDataService = {
   async listPickerUsers(query = {}, requestingUser, accessContext = {}, options = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext);
     assertReadableVisibility(visibility);
+    const orgLabelLookup = buildOrgLabelLookup(requestingUser);
 
     const normalizedQuery = normalizeQueryOptions(stripPaginationFromQuery(query));
     const repositoryOptions = options?.backendMode ? { backendMode: options.backendMode } : {};
@@ -981,7 +1032,7 @@ const packageDataService = {
 
     return (Array.isArray(rows) ? rows : [])
       .filter((row) => canTargetUserByVisibility(row, visibility))
-      .map((row) => toPickerUser(row, visibility));
+      .map((row) => toPickerUser(row, visibility, orgLabelLookup));
   },
 
   async listPickerSections(query = {}, requestingUser, accessContext = {}, options = {}) {
@@ -1034,6 +1085,8 @@ const packageDataService = {
   async listPickerAccessProfiles(query = {}, requestingUser, accessContext = {}, options = {}) {
     const visibility = await resolveVisibility(requestingUser, accessContext);
     assertReadableVisibility(visibility);
+    const orgLabelLookup = buildOrgLabelLookup(requestingUser);
+
     const activeOrgId = toPublicId(visibility.activeOrgId || '');
     if (!activeOrgId) return [];
 
@@ -1046,7 +1099,7 @@ const packageDataService = {
 
     const scopedRows = (Array.isArray(rows) ? rows : [])
       .filter((row) => idsEqual(row?.orgId, activeOrgId));
-    const pickerRows = scopedRows.map((row) => toPickerAccessProfile(row));
+    const pickerRows = scopedRows.map((row) => toPickerAccessProfile(row, orgLabelLookup));
     return applyGenericFilter(pickerRows, normalizedQuery, {
       defaultSearchFields: ['id', 'name', 'description'],
       dateFields: []
@@ -1085,12 +1138,15 @@ const packageDataService = {
 
   async listPickerPackages(query = {}, requestingUser, accessContext = {}, options = {}) {
     const rows = await this.listPackages(query, requestingUser, accessContext, options);
+    const orgLabelLookup = buildOrgLabelLookup(requestingUser);
+
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
       category: normalizeCategoryValue(row.category, { allowEmpty: true }) || '',
       eligibleRoles: Array.isArray(row.eligibleRoles) ? row.eligibleRoles : [],
       orgId: row.orgId,
+      orgName: resolveOrganizationName(row?.orgId, orgLabelLookup),
       visibility: row.visibility,
       active: row.active !== false
     }));

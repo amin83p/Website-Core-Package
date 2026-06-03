@@ -414,7 +414,8 @@ document.addEventListener('DOMContentLoaded', () => {
     state.accessProfiles.push({
       id: id,
       name: String(row.name || id).trim(),
-      orgId: String(row.orgId || '').trim()
+      orgId: String(row.orgId || '').trim(),
+      orgName: String(row.orgName || '').trim()
     });
   }
 
@@ -431,11 +432,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     accessProfilesContainer.innerHTML = state.accessProfiles.map((row) => {
+      const orgLabel = row.orgName
+        ? (row.orgId ? `${row.orgName} (#${row.orgId})` : row.orgName)
+        : (row.orgId ? `Org ${row.orgId}` : '');
       return ''
         + '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-3 py-2 mb-2">'
         + '  <div class="overflow-hidden">'
         + '    <div class="fw-bold text-truncate">' + escapeHtml(row.name || row.id) + '</div>'
-        + '    <div class="x-small text-muted font-monospace text-truncate">' + escapeHtml(row.id) + (row.orgId ? (' | Org ' + escapeHtml(row.orgId)) : '') + '</div>'
+        + '    <div class="x-small text-muted font-monospace text-truncate">' + escapeHtml(row.id) + (orgLabel ? (' | ' + escapeHtml(orgLabel)) : '') + '</div>'
         + '  </div>'
         + '  <button type="button" class="btn btn-outline-danger btn-sm" data-aq-remove-access-profile="' + escapeHtml(row.id) + '">'
         + '    <i class="bi bi-x-lg"></i>'
@@ -495,7 +499,8 @@ document.addEventListener('DOMContentLoaded', () => {
       name: String(row.name || id).trim(),
       username: String(row.username || '').trim(),
       email: String(row.email || '').trim(),
-      orgId: String(row.orgId || '').trim()
+      orgId: String(row.orgId || '').trim(),
+      orgName: String(row.orgName || '').trim()
     });
   }
 
@@ -515,7 +520,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const subtitleParts = [];
       if (row.username) subtitleParts.push(row.username);
       if (row.email) subtitleParts.push(row.email);
-      if (row.orgId) subtitleParts.push('Org ' + row.orgId);
+      if (row.orgName) {
+        subtitleParts.push(row.orgId ? `${row.orgName} (#${row.orgId})` : row.orgName);
+      } else if (row.orgId) {
+        subtitleParts.push('Org ' + row.orgId);
+      }
       const subtitle = subtitleParts.join(' | ');
       return ''
         + '<div class="d-flex align-items-center justify-content-between gap-2 border rounded bg-white px-3 py-2 mb-2">'
