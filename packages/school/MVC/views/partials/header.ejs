@@ -127,6 +127,25 @@
          if (!hasHref) return `<li class="nav-item"><span class="nav-link disabled text-muted">${label}</span></li>`;
          return `<li class="nav-item"><a class="nav-link" href="${href}"${targetAttrs}>${label}</a></li>`;
        }).join('');
+       const renderHeaderAppMenuStatus = (variant) => `<li><span class="dropdown-item py-2 text-muted small" data-header-app-menu-status="${headerEscapeHtml(variant)}"><i class="bi bi-hourglass-split me-2"></i>Loading menu...</span></li>`;
+       const renderHeaderAppMenuInline = () => `<li><hr class="dropdown-divider my-2 header-auto-menu-divider"></li>
+         <li class="dropdown-submenu header-public-submenu header-app-menu-root" data-header-app-menu-root="inline">
+           <button class="dropdown-item py-2 d-flex align-items-center justify-content-between gap-2 header-public-submenu-toggle" type="button" aria-expanded="false" data-public-submenu-toggle="true" data-header-app-menu-trigger="true">
+             <span><i class="bi bi-grid-3x3-gap-fill me-2"></i>Main Menu</span><i class="bi bi-chevron-right small"></i>
+           </button>
+           <ul class="dropdown-menu shadow-lg border-0 py-2 header-app-menu-dropdown" data-header-app-menu-list="inline">
+             ${renderHeaderAppMenuStatus('inline')}
+           </ul>
+         </li>`;
+       const renderHeaderAppMenuNav = () => `<li class="nav-item header-auto-menu-separator" aria-hidden="true"><span class="header-auto-menu-separator-line"></span></li>
+         <li class="nav-item dropdown header-public-nav-dropdown header-app-menu-root" data-header-app-menu-root="nav">
+           <a class="nav-link dropdown-toggle d-flex align-items-center gap-1" href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" data-header-app-menu-trigger="true">
+             <i class="bi bi-grid-3x3-gap-fill"></i><span>Main Menu</span>
+           </a>
+           <ul class="dropdown-menu shadow-lg border-0 py-2 header-app-menu-dropdown" data-header-app-menu-list="nav">
+             ${renderHeaderAppMenuStatus('nav')}
+           </ul>
+         </li>`;
     %>
 
     <% if (warnings && warnings.length > 0) { %>
@@ -158,8 +177,7 @@
                     <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 py-2 header-inline-menu-dropdown">
                         <%- renderHeaderDropdownItems(headerPublicMenu) %>
                         <% if (typeof user !== 'undefined' && user !== null) { %>
-                            <li><hr class="dropdown-divider my-1"></li>
-                            <li><a class="dropdown-item py-2" href="/dashboard">Dashboard</a></li>
+                            <%- renderHeaderAppMenuInline() %>
                         <% } %>
                     </ul>
                 </div>
@@ -298,6 +316,9 @@
                 <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav w-100 justify-content-lg-center gap-3">
                     <%- renderHeaderNavItems(headerPublicMenu) %>
+                    <% if (typeof user !== 'undefined' && user !== null) { %>
+                        <%- renderHeaderAppMenuNav() %>
+                    <% } %>
                 </ul>
                 </div>
             </nav>
@@ -429,12 +450,59 @@
         transition: transform 0.16s ease;
       }
 
+      .header-auto-menu-separator {
+        align-items: center;
+        display: flex;
+        padding: 0 0.1rem;
+      }
+
+      .header-auto-menu-separator-line {
+        background: rgba(108, 117, 125, 0.35);
+        display: block;
+        height: 1.65rem;
+        width: 1px;
+      }
+
+      .header-auto-menu-divider {
+        opacity: 0.65;
+      }
+
+      .header-app-menu-dropdown {
+        min-width: 16rem;
+        overflow: visible;
+        overscroll-behavior: contain;
+      }
+
+      .header-app-menu-dropdown .dropdown-item {
+        white-space: normal;
+      }
+
+      .header-app-menu-icon,
+      .header-app-menu-icon svg {
+        display: inline-flex;
+        height: 1rem;
+        width: 1rem;
+      }
+
+      .header-app-menu-icon svg {
+        flex: 0 0 auto;
+      }
+
       @media (max-width: 991.98px) {
+        .header-auto-menu-separator {
+          display: none;
+        }
+
         .header-public-submenu > .dropdown-menu {
           left: auto;
           margin: 0.2rem 0 0.35rem 1rem;
           position: static;
           right: auto;
+        }
+
+        .header-app-menu-dropdown {
+          max-height: min(70vh, 34rem);
+          overflow-y: auto;
         }
 
         .header-public-submenu:hover > .dropdown-menu,
@@ -448,36 +516,36 @@
 
     <script>
       document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.header-public-submenu-toggle').forEach((toggle) => {
-          toggle.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+        document.addEventListener('click', (event) => {
+          const toggle = event.target && event.target.closest ? event.target.closest('.header-public-submenu-toggle') : null;
+          if (!toggle) return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
 
-            const submenu = toggle.closest('.header-public-submenu');
-            if (!submenu) return;
-            const wasOpen = submenu.classList.contains('is-open');
+          const submenu = toggle.closest('.header-public-submenu');
+          if (!submenu) return;
+          const wasOpen = submenu.classList.contains('is-open');
 
-            const siblingMenus = submenu.parentElement
-              ? Array.from(submenu.parentElement.children).filter((node) => node !== submenu)
-              : [];
-            siblingMenus.forEach((node) => {
-              if (!node.classList || !node.classList.contains('header-public-submenu')) return;
-              node.classList.remove('is-open');
-              Array.from(node.children || []).forEach((child) => {
-                if (child.classList && child.classList.contains('dropdown-menu')) child.classList.remove('show');
-              });
-              node.querySelectorAll('.header-public-submenu.is-open').forEach((child) => child.classList.remove('is-open'));
-              node.querySelectorAll('.header-public-submenu > .dropdown-menu.show').forEach((childMenu) => childMenu.classList.remove('show'));
-              node.querySelectorAll('.header-public-submenu-toggle[aria-expanded="true"]').forEach((childToggle) => childToggle.setAttribute('aria-expanded', 'false'));
+          const siblingMenus = submenu.parentElement
+            ? Array.from(submenu.parentElement.children).filter((node) => node !== submenu)
+            : [];
+          siblingMenus.forEach((node) => {
+            if (!node.classList || !node.classList.contains('header-public-submenu')) return;
+            node.classList.remove('is-open');
+            Array.from(node.children || []).forEach((child) => {
+              if (child.classList && child.classList.contains('dropdown-menu')) child.classList.remove('show');
             });
-
-            submenu.classList.toggle('is-open', !wasOpen);
-            Array.from(submenu.children || []).forEach((child) => {
-              if (child.classList && child.classList.contains('dropdown-menu')) child.classList.toggle('show', !wasOpen);
-            });
-            toggle.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
+            node.querySelectorAll('.header-public-submenu.is-open').forEach((child) => child.classList.remove('is-open'));
+            node.querySelectorAll('.header-public-submenu > .dropdown-menu.show').forEach((childMenu) => childMenu.classList.remove('show'));
+            node.querySelectorAll('.header-public-submenu-toggle[aria-expanded="true"]').forEach((childToggle) => childToggle.setAttribute('aria-expanded', 'false'));
           });
+
+          submenu.classList.toggle('is-open', !wasOpen);
+          Array.from(submenu.children || []).forEach((child) => {
+            if (child.classList && child.classList.contains('dropdown-menu')) child.classList.toggle('show', !wasOpen);
+          });
+          toggle.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
         });
 
         document.querySelectorAll('.dropdown').forEach((dropdownRoot) => {

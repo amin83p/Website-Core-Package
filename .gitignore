@@ -8,5 +8,6 @@ node_modules/
 .env
 /.local-runtime/
 /install_packages/
+/logs/
 test/pte-package-certification-hardcoded-coupling.test.js
 test/pte-package-route-dependency-core-adapter-step45.test.js

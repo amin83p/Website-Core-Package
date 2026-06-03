@@ -470,9 +470,7 @@ function getPublicMenu(user = null) {
   const sourceItems = Array.isArray(raw.items) && raw.items.length ? raw.items : DEFAULT_PUBLIC_MENU_ITEMS;
   const filteredBaseItems = packageNavigationService.filterMenuItemsAgainstDisabledPackages(sourceItems);
   const cleanedBaseItems = removeDeprecatedPublicMenuItems(filteredBaseItems);
-  const packageItems = packageNavigationService.getPublicMenuEntries(user);
-  const cleanedPackageItems = removeDeprecatedPublicMenuItems(packageItems);
-  const mergedItems = dedupeMenuItems([...(cleanedBaseItems || []), ...(cleanedPackageItems || [])]);
+  const mergedItems = dedupeMenuItems(cleanedBaseItems || []);
   const normalized = normalizePublicMenuItems(mergedItems, user, 0);
   if (normalized.length) return normalized;
   const fallbackItems = packageNavigationService.filterMenuItemsAgainstDisabledPackages(DEFAULT_PUBLIC_MENU_ITEMS);

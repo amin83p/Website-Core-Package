@@ -878,6 +878,157 @@ window.addEventListener('load', () => scheduleHeaderOffsetRefresh({ syncTagline:
 window.addEventListener('resize', () => scheduleHeaderOffsetRefresh({ syncTagline: false }));
 //#endregion
 
+//#region 2b. UI: Header Main Menu
+// =============================================================================
+function initHeaderApplicationMenu() {
+    const menuLists = Array.from(document.querySelectorAll('[data-header-app-menu-list]'));
+    if (!menuLists.length) return;
+
+    let loadPromise = null;
+    let rootNodes = [];
+    let loadedOnce = false;
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function renderRawSvgIcon(value) {
+        const raw = String(value || '').trim();
+        const match = raw.match(/<svg[\s\S]*<\/svg>/i);
+        return match ? match[0] : '';
+    }
+
+    function renderIcon(icon) {
+        const fallback = '<i class="bi bi-grid-fill me-2"></i>';
+        if (!icon || !icon.value) return fallback;
+        const type = String(icon.type || '').toLowerCase();
+        const value = String(icon.value || '').trim();
+        if (!value) return fallback;
+        if (type === 'class') return `<i class="${escapeHtml(value)} me-2"></i>`;
+        if (type === 'image') return `<img src="${escapeHtml(value)}" alt="" class="me-2" style="width:1rem;height:1rem;object-fit:contain;">`;
+        if (type === 'raw') {
+            const svg = renderRawSvgIcon(value);
+            return svg ? `<span class="header-app-menu-icon me-2">${svg}</span>` : fallback;
+        }
+        return fallback;
+    }
+
+    function nodeLabel(node) {
+        return escapeHtml(node?.title || node?.name || node?.id || 'Menu Item');
+    }
+
+    function nodeUrl(node) {
+        return String(node?.url || '').trim();
+    }
+
+    function renderStatus(message, iconClass = 'bi-hourglass-split') {
+        return `<li><span class="dropdown-item py-2 text-muted small"><i class="bi ${escapeHtml(iconClass)} me-2"></i>${escapeHtml(message)}</span></li>`;
+    }
+
+    function renderNode(node) {
+        const children = Array.isArray(node?.children) ? node.children : [];
+        const label = nodeLabel(node);
+        const href = escapeHtml(nodeUrl(node));
+        const icon = renderIcon(node?.icon);
+
+        if (children.length) {
+            const openLink = href
+                ? `<li><a class="dropdown-item py-2 fw-semibold" href="${href}" data-no-wait="true">${icon}Open ${label}</a></li><li><hr class="dropdown-divider my-1"></li>`
+                : '';
+            return `<li class="dropdown-submenu header-public-submenu">
+                <button class="dropdown-item py-2 d-flex align-items-center justify-content-between gap-2 header-public-submenu-toggle" type="button" aria-expanded="false" data-public-submenu-toggle="true">
+                    <span>${icon}${label}</span><i class="bi bi-chevron-right small"></i>
+                </button>
+                <ul class="dropdown-menu shadow-lg border-0 py-2">
+                    ${openLink}
+                    ${children.map(renderNode).join('')}
+                </ul>
+            </li>`;
+        }
+
+        if (!href) return `<li><span class="dropdown-item py-2 text-muted">${icon}${label}</span></li>`;
+        return `<li><a class="dropdown-item py-2" href="${href}" data-no-wait="true">${icon}${label}</a></li>`;
+    }
+
+    function renderMenus() {
+        const content = rootNodes.length
+            ? rootNodes.map(renderNode).join('')
+            : renderStatus('No application menu items are available.', 'bi-info-circle');
+
+        menuLists.forEach((listEl) => {
+            listEl.innerHTML = content;
+        });
+    }
+
+    function setLoadingState() {
+        menuLists.forEach((listEl) => {
+            listEl.innerHTML = renderStatus('Loading menu...');
+        });
+    }
+
+    function setErrorState() {
+        menuLists.forEach((listEl) => {
+            listEl.innerHTML = renderStatus('Could not load menu items.', 'bi-exclamation-circle');
+        });
+    }
+
+    async function loadMenu() {
+        if (loadedOnce) {
+            renderMenus();
+            return;
+        }
+        if (loadPromise) {
+            await loadPromise;
+            return;
+        }
+
+        setLoadingState();
+        loadPromise = (async () => {
+            try {
+                const res = await fetch('/sections/start-menu', { credentials: 'include' });
+                const data = await res.json();
+                if (!res.ok || data.status !== 'success') {
+                    throw new Error(data.message || 'Failed to load header menu.');
+                }
+                rootNodes = Array.isArray(data.sections) ? data.sections : [];
+                loadedOnce = true;
+                renderMenus();
+            } catch (error) {
+                console.error('[HeaderAppMenu] Error:', error);
+                rootNodes = [];
+                setErrorState();
+            } finally {
+                loadPromise = null;
+            }
+        })();
+        await loadPromise;
+    }
+
+    document.querySelectorAll('[data-header-app-menu-trigger]').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            loadMenu();
+        });
+        trigger.addEventListener('mouseenter', () => {
+            loadMenu();
+        }, { once: true });
+        trigger.addEventListener('focus', () => {
+            loadMenu();
+        }, { once: true });
+    });
+
+    document.querySelectorAll('[data-header-app-menu-root]').forEach((root) => {
+        root.addEventListener('show.bs.dropdown', () => {
+            loadMenu();
+        });
+    });
+}
+//#endregion
+
 //#region 3. Logic: Global Actions (Delete & Cancel)
 // =============================================================================
 function initGlobalActions() {
@@ -3029,6 +3180,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initAppZoomControls();
     initAppFontControls();
     initHeaderInteractions();
+    initHeaderApplicationMenu();
     initHeaderShortcuts();
     initGlobalActions();
     initFloatingRowActionMenus();

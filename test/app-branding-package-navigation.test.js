@@ -34,7 +34,7 @@ async function writeManifest(packageRootDir, packageId, payload) {
   return manifestPath;
 }
 
-test('app branding menu hides disabled package links and includes enabled package menu entries', async () => {
+test('app branding public menu stays curated while settings options include enabled package entries', async () => {
   await withTempPackageWorkspace(async ({ packageRootDir }) => {
     await writeManifest(packageRootDir, 'beta', {
       id: 'beta',
@@ -71,7 +71,7 @@ test('app branding menu hides disabled package links and includes enabled packag
 
     const publicMenu = appBrandingService.getPublicMenu(null);
     assert.equal(publicMenu.some((entry) => entry.href === '/pte'), false);
-    assert.equal(publicMenu.some((entry) => entry.href === '/beta' && entry.label === 'Beta Home'), true);
+    assert.equal(publicMenu.some((entry) => entry.href === '/beta' && entry.label === 'Beta Home'), false);
 
     const endpointOptions = appBrandingService.getPublicMenuEndpointOptions();
     assert.equal(endpointOptions.some((entry) => entry.href === '/pte'), false);
