@@ -3,6 +3,14 @@ const express = require('express');
 const router = express.Router();
 const { SECTIONS } = require('./schoolRouteDependencies');
 
+const SCHOOL_MOUNT_GUARD_KEY = '__schoolMainRouteMounted';
+
+router.use((req, _res, next) => {
+  if (req?.[SCHOOL_MOUNT_GUARD_KEY]) return next('router');
+  req[SCHOOL_MOUNT_GUARD_KEY] = true;
+  next();
+});
+
 router.use((req, res, next) => {
   res.locals.schoolSectionDashboardHref = `/dashboard/section-nav/${encodeURIComponent(SECTIONS.SCHOOL || 'SCHOOL')}`;
   next();
