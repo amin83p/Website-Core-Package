@@ -1269,8 +1269,15 @@ function buildStartupFailureByPackageMap(appRef = null) {
 function buildPackageManagerOptions(req = {}) {
   const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
   const keyContext = buildPackageTrustedKeyContext();
+  const packageRootDir = (() => {
+    const explicitPackageRoot = cleanFormText(req.body?.packageRootDir || req.query?.packageRootDir || '', 1600);
+    if (explicitPackageRoot) return explicitPackageRoot;
+    const localManifestPath = cleanFormText(req.body?.localManifestPath || req.query?.localManifestPath || '', 1600);
+    return resolvePackageRootFromLocalManifestPath(localManifestPath);
+  })();
   return {
     backendMode: runtimeBackend?.mode || '',
+    packageRootDir,
     trustedPublicKeys: keyContext.trustedPublicKeys,
     targetOrgId: cleanFormText(req.body?.targetOrgId || req.query?.targetOrgId || '', 120),
     actor: req.user || null,
@@ -1278,6 +1285,19 @@ function buildPackageManagerOptions(req = {}) {
     packageRuntimeRouter: req.app?.locals?.packageRuntimeRouter || null,
     startupFailureByPackage: buildStartupFailureByPackageMap(req.app || null)
   };
+}
+
+function resolvePackageRootFromLocalManifestPath(localManifestPath = '') {
+  const normalized = cleanFormText(localManifestPath, 1600).replace(/\\/g, '/');
+  if (!normalized) return '';
+  const manifestMarker = '/package.manifest.json';
+  const markerIndex = normalized.lastIndexOf(manifestMarker);
+  if (markerIndex <= 0) return '';
+
+  const packageDir = normalized.slice(0, markerIndex);
+  const separatorIndex = packageDir.lastIndexOf('/');
+  if (separatorIndex < 0) return packageDir;
+  return packageDir.slice(0, separatorIndex);
 }
 
 function assertPackageBuilderSigningKeyReady() {

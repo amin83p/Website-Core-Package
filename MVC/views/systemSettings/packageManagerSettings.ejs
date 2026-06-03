@@ -10,6 +10,7 @@
   const actionStateValue = typeof actionStateId !== 'undefined' ? actionStateId : '';
   const storageRoot = String(typeof packageStorageRoot !== 'undefined' ? packageStorageRoot : '').trim();
   const storageRootSource = String(typeof packageStorageRootSource !== 'undefined' ? packageStorageRootSource : '').trim();
+  const packageRoot = storageRoot;
   const storageRootWarnings = Array.isArray(typeof packageStorageRootWarnings !== 'undefined' ? packageStorageRootWarnings : [])
     ? (typeof packageStorageRootWarnings !== 'undefined' ? packageStorageRootWarnings : [])
     : [];
@@ -305,6 +306,7 @@
   </div>
 
   <input type="hidden" id="pkgActionStateId" value="<%= actionStateValue %>">
+  <input type="hidden" id="pkgPackageRootDir" value="<%= packageRoot %>">
 </div>
 <%- include('../partials/modal_GenericPicker', { user: locals?.user }) %>
 
@@ -327,6 +329,8 @@
   const pathPanel = document.getElementById('pkgInstallPathPanel');
   const jsonPanel = document.getElementById('pkgInstallJsonPanel');
   const zipPanel = document.getElementById('pkgInstallZipPanel');
+  const localManifestEl = document.getElementById('pkgLocalManifestPath');
+  const packageRootInput = document.getElementById('pkgPackageRootDir');
 
   const actionMap = {
     enable: { endpoint: (id) => `/systemSettings/packages/${encodeURIComponent(id)}/enable`, label: 'Enable' },
@@ -389,6 +393,26 @@
       throw error;
     }
     return payload;
+  }
+
+  function resolvePackageRootFromLocalManifestPath(localManifestPath) {
+    const rawPath = String(localManifestPath || '').replace(/\\/g, '/').trim();
+    const manifestMarker = '/package.manifest.json';
+    const markerIndex = rawPath.lastIndexOf(manifestMarker);
+    if (markerIndex <= 0) return '';
+    const packageDirectory = rawPath.slice(0, markerIndex);
+    const separatorIndex = packageDirectory.lastIndexOf('/');
+    if (separatorIndex < 0) return packageDirectory;
+    return packageDirectory.slice(0, separatorIndex);
+  }
+
+  function syncPackageRootFromLocalSelection() {
+    if (!packageRootInput || !localManifestEl) return;
+    const selectedManifest = localManifestEl.value || '';
+    const resolvedRoot = resolvePackageRootFromLocalManifestPath(selectedManifest);
+    if (resolvedRoot) {
+      packageRootInput.value = resolvedRoot;
+    }
   }
 
   function toBoolean(value) {
@@ -1072,6 +1096,7 @@
       localManifestPath: document.getElementById('pkgLocalManifestPath').value || '',
       manifestPath: document.getElementById('pkgManualManifestPath').value || '',
       manifestJson: document.getElementById('pkgManifestJson').value || '',
+      packageRootDir: packageRootInput?.value || '',
       actionStateId
     };
     if (targetOrgId) payload.targetOrgId = targetOrgId;
@@ -1135,6 +1160,7 @@
       localManifestPath: document.getElementById('pkgLocalManifestPath').value || '',
       manifestPath: document.getElementById('pkgManualManifestPath').value || '',
       manifestJson: document.getElementById('pkgManifestJson').value || '',
+      packageRootDir: packageRootInput?.value || '',
       actionStateId
     };
     if (upgradeAckToken) payload.upgradeAckToken = upgradeAckToken;
@@ -1321,6 +1347,8 @@
 
   installMethodEl.addEventListener('change', () => showInstallPanel(installMethodEl.value));
   showInstallPanel(installMethodEl.value);
+  localManifestEl?.addEventListener('change', syncPackageRootFromLocalSelection);
+  syncPackageRootFromLocalSelection();
   targetOrgPickBtn?.addEventListener('click', () => {
     if (!window.GenericPicker || !window.GenericPickerPresets || !window.GenericPickerContexts) {
       showError('Generic organization picker is not ready yet.');
