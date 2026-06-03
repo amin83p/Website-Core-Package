@@ -1023,23 +1023,33 @@ function createService(overrides = {}) {
     return match;
   }
 
-  async function inferDataEntitiesFromDataDirectory(packageId = '') {
-    const rows = [];
-    const prefix = normalizePackageId(packageId);
-    const dataDir = deps.path.join(process.cwd(), 'data');
-    const entries = await deps.fs.readdir(dataDir, { withFileTypes: true }).catch(() => []);
-    entries.forEach((entry) => {
-      if (!entry?.isFile?.() || !entry.name.endsWith('.json')) return;
-      const name = entry.name.replace(/\.json$/i, '');
-      if (!name.toLowerCase().startsWith(prefix)) return;
-      rows.push({
-        id: name,
-        entityType: name,
-        label: name,
-        source: 'data-directory-fallback'
+  async function inferDataEntitiesFromDataDirectory(packageId = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+
+    if (backendMode === 'mongo') {
+      return inferDataEntitiesFromMongoCollections();
+    }
+
+    if (backendMode === 'json') {
+      const rows = [];
+      const prefix = normalizePackageId(packageId);
+      const dataDir = deps.path.join(process.cwd(), 'data');
+      const entries = await deps.fs.readdir(dataDir, { withFileTypes: true }).catch(() => []);
+      entries.forEach((entry) => {
+        if (!entry?.isFile?.() || !entry.name.endsWith('.json')) return;
+        const name = entry.name.replace(/\.json$/i, '');
+        if (!name.toLowerCase().startsWith(prefix)) return;
+        rows.push({
+          id: name,
+          entityType: name,
+          label: name,
+          source: 'data-directory-fallback'
+        });
       });
-    });
-    return rows;
+      return rows;
+    }
+
+    throw new Error(`Unsupported backend mode "${backendMode}" for data entity discovery.`);
   }
 
   async function resolveDataEntities(manifest = {}, packageId = '', options = {}) {
@@ -1079,7 +1089,9 @@ function createService(overrides = {}) {
     }
     if (normalizedRows.length) return normalizedRows;
 
-    const inferred = await inferDataEntitiesFromDataDirectory(packageId);
+    const inferred = await inferDataEntitiesFromDataDirectory(packageId, {
+      backendMode: options.backendMode
+    });
     inferred.forEach((row) => pushEntity(row.entityType, row.source, row.label));
     return normalizedRows;
   }
@@ -1187,6 +1199,7 @@ function createService(overrides = {}) {
   }
 
   async function fetchEntityRows(entityType = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
     try {
       const rows = await deps.dataService.fetchData(entityType, {}, SYSTEM_CONTEXT, {
         backendMode: options.backendMode
@@ -1195,7 +1208,6 @@ function createService(overrides = {}) {
     } catch (error) {
       if (!isUnknownEntityTypeError(error)) throw error;
 
-      const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
       if (backendMode === 'json') {
         const filePath = deps.path.join(process.cwd(), 'data', `${entityType}.json`);
         if (!(await pathExists(filePath))) return [];
@@ -1221,8 +1233,43 @@ function createService(overrides = {}) {
         }) : [];
       }
 
-      throw error;
+      throw new Error(`Unsupported backend mode "${backendMode}" for unknown entity fallback: ${entityType}`);
     }
+  }
+
+  function assertMongoConnectedForBuilder(context = '') {
+    const normalizedContext = cleanText(context, 120) || 'operation';
+    if (typeof deps.getMongoDbOrNull !== 'function') {
+      throw new Error(`Mongo DB helper is unavailable for ${normalizedContext}.`);
+    }
+    if (!deps.getMongoDbOrNull()) {
+      throw new Error(`Mongo is not connected for ${normalizedContext}.`);
+    }
+  }
+
+  async function inferDataEntitiesFromMongoCollections() {
+    assertMongoConnectedForBuilder('collection discovery');
+    const db = deps.getMongoDbOrNull();
+    const cursor = db && typeof db.listCollections === 'function'
+      ? db.listCollections({}, { nameOnly: true })
+      : null;
+    if (!cursor || typeof cursor.toArray !== 'function') {
+      throw new Error('Mongo collection discovery failed: listCollections() is unavailable.');
+    }
+    const collections = await cursor.toArray();
+    const rows = [];
+    sanitizeArray(collections).forEach((row) => {
+      const name = cleanText(row?.name, 200);
+      if (!name) return;
+      if (name.startsWith('system.')) return;
+      rows.push({
+        id: name,
+        entityType: name,
+        label: name,
+        source: 'mongo-collection-fallback'
+      });
+    });
+    return rows;
   }
 
   async function resolveOriginOrgId(inputOriginOrgId = '', options = {}) {
@@ -1341,6 +1388,9 @@ function createService(overrides = {}) {
     const packageId = normalizePackageId(input.packageId);
     if (!packageId) throw new Error('packageId is required.');
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    if (backendMode === 'mongo') {
+      assertMongoConnectedForBuilder('package builder preflight');
+    }
     const originOrgId = await resolveOriginOrgId(input.originOrgId, {
       backendMode,
       actor: options.actor || null
