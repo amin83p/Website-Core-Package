@@ -247,7 +247,8 @@ test('package builder EJS compiles and includes expected controls', () => {
     ],
     packageWarnings: [{ packageId: 'broken', warning: 'Manifest missing' }],
     organizations: [{ id: 'ORG_900000', name: 'Primary Org' }],
-    actionStateId: 'STATE_VIEW_BUILDER'
+    actionStateId: 'STATE_VIEW_BUILDER',
+    user: { id: 'USER_VIEW_BUILDER' }
   });
 
   assert.match(html, /Package Builder/);
@@ -275,10 +276,11 @@ test('package builder EJS compiles and includes expected controls', () => {
   assert.match(html, /Published Artifacts/);
   assert.match(html, /Package Storage Root/);
   assert.match(html, /Unavailable: Missing\/Invalid Manifest/);
+  assert.match(html, /\['school', 'pte', 'ielts'\]\.includes/);
 
   const packageIdx = html.indexOf('Package-Owned Tables / Collections');
   const fileFieldsIdx = html.indexOf('File Fields By Table');
-  const versionIdx = html.indexOf('Target Version');
+  const versionIdx = html.indexOf('id="builderVersion"');
   const manualIdx = html.indexOf('Manual File/Folder Refs (one per line)');
   assert.ok(packageIdx > -1 && fileFieldsIdx > packageIdx);
   assert.ok(versionIdx > fileFieldsIdx);

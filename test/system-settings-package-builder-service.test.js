@@ -56,6 +56,35 @@ function createBaseManifest(version = '1.0.0', options = {}) {
   return manifest;
 }
 
+function createIeltsManifest(version = '0.1.0') {
+  return {
+    id: 'ielts',
+    name: 'IELTS',
+    version,
+    mountPath: '/ielts',
+    routes: [],
+    operations: [
+      { id: 'IELTS_TEMPLATE_OPERATION', name: 'IELTS_TEMPLATE_OPERATION' }
+    ],
+    roles: [
+      { id: 'IELTS_TEMPLATE_ROLE', name: 'IELTS_TEMPLATE_ROLE' }
+    ],
+    sections: [
+      { id: 'IELTS_TEMPLATE_SECTION', name: 'IELTS Template Section', category: 'IELTS' }
+    ],
+    symbols: [
+      { id: 'IELTS_TEMPLATE_SYMBOL', name: 'IELTS_TEMPLATE_SYMBOL', type: 'class', value: 'bi-journal-text', tags: ['IELTS'] }
+    ],
+    accesses: [
+      { id: 'IELTS_TEMPLATE_ACCESS', name: 'IELTS_TEMPLATE_ACCESS', roleId: 'IELTS_TEMPLATE_ROLE', operationId: 'IELTS_TEMPLATE_OPERATION' }
+    ],
+    uploadFolders: [],
+    dataEntities: [
+      { entityType: 'ieltsPrompts', label: 'IELTS Prompts' }
+    ]
+  };
+}
+
 test('preflightBuild discovers manifest data entities and upload refs', async () => {
   await withTempCwd('pkg-builder-preflight-', async (tempRoot) => {
     writeJson(path.join(tempRoot, 'packages', 'pte', 'package.manifest.json'), createBaseManifest());
@@ -155,6 +184,90 @@ test('preflightBuild resolves symbol catalog with live symbol value overlay', as
     assert.equal(report.filePlan.detectedFromSymbols.includes('/uploads/ORG_900000/symbols/live.png'), true);
     assert.equal(report.filePlan.detectedFromSymbols.includes('/uploads/ORG_900000/symbols/stale.png'), false);
   });
+});
+
+test('generateLivePackageManifest supports IELTS declarations from live backend rows', async () => {
+  const service = packageBuilderModule.createService({
+    dataService: {
+      async fetchData(entityType) {
+        if (entityType === 'sections') {
+          return [
+            { id: 'IELTS_SCORING', name: 'IELTS Scoring', category: 'IELTS', operationId: 'VIEW_IELTS_SCORING' },
+            { id: 'PTE_HOME', name: 'PTE Home', category: 'PTE' }
+          ];
+        }
+        if (entityType === 'symbols') {
+          return [
+            { id: 'SYM_IELTS', name: 'IELTS_LOGO', type: 'class', value: 'bi-journal-check', tags: ['IELTS'] },
+            { id: 'SYM_PTE', name: 'PTE_LOGO', type: 'class', value: 'bi-book', tags: ['PTE'] }
+          ];
+        }
+        if (entityType === 'roles') {
+          return [
+            { id: 'IELTS_MARKER', name: 'IELTS Marker', tags: ['ielts'] }
+          ];
+        }
+        if (entityType === 'accesses') {
+          return [
+            { id: 'IELTS_SCORING_ACCESS', roleId: 'IELTS_MARKER', operationId: 'VIEW_IELTS_SCORING', tags: ['ielts'] }
+          ];
+        }
+        if (entityType === 'operations') {
+          return [
+            { id: 'VIEW_IELTS_SCORING', name: 'View IELTS Scoring' },
+            { id: 'VIEW_PTE_SCORING', name: 'View PTE Scoring' }
+          ];
+        }
+        return [];
+      }
+    }
+  });
+
+  const report = await service.generateLivePackageManifest({
+    packageId: 'ielts',
+    packageName: 'IELTS',
+    manifest: createIeltsManifest()
+  }, {
+    backendMode: 'json'
+  });
+
+  assert.equal(report.summary.packageId, 'ielts');
+  assert.equal(report.summary.mode, 'live');
+  assert.equal(report.manifest.sections.length, 1);
+  assert.equal(report.manifest.symbols.length, 1);
+  assert.equal(report.manifest.roles.length, 1);
+  assert.equal(report.manifest.accesses.length, 1);
+  assert.equal(report.manifest.operations.length, 1);
+  assert.equal(report.manifest.sections[0].id, 'IELTS_SCORING');
+  assert.equal(report.manifest.symbols[0].name, 'IELTS_LOGO');
+  assert.equal(report.manifest.operations[0].id, 'VIEW_IELTS_SCORING');
+});
+
+test('generateLivePackageManifest preserves IELTS template declarations when live backend is empty', async () => {
+  const service = packageBuilderModule.createService({
+    dataService: {
+      async fetchData() {
+        return [];
+      }
+    }
+  });
+  const template = createIeltsManifest();
+
+  const report = await service.generateLivePackageManifest({
+    packageId: 'ielts',
+    packageName: 'IELTS',
+    manifest: template
+  }, {
+    backendMode: 'json'
+  });
+
+  assert.deepEqual(report.manifest.sections, template.sections);
+  assert.deepEqual(report.manifest.symbols, template.symbols);
+  assert.deepEqual(report.manifest.roles, template.roles);
+  assert.deepEqual(report.manifest.accesses, template.accesses);
+  assert.deepEqual(report.manifest.operations, template.operations);
+  assert.ok(report.warnings.some((row) => /zero sections/i.test(String(row || ''))));
+  assert.ok(report.warnings.some((row) => /zero symbols/i.test(String(row || ''))));
 });
 
 test('buildPackage creates signed artifacts and payload markers', async () => {
@@ -677,7 +790,7 @@ test('preflightBuild falls back to package-prefixed data files when manifest and
       originOrgId: 'ORG_900000',
       selectedDataEntities: []
     }, {
-      backendMode: 'mongo',
+      backendMode: 'json',
       packageRootDir: path.join(tempRoot, 'packages')
     });
 
