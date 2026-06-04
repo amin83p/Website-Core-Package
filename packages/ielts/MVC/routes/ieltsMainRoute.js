@@ -1,0 +1,13 @@
+const express = require('express');
+const router = express.Router();
+const { requireCoreModule } = require('../services/ielts/ieltsCoreModuleResolver');
+const { SECTIONS } = requireCoreModule('config/accessConstants');
+
+router.use((req, res, next) => {
+  res.locals.ieltsSectionDashboardHref = `/dashboard/section-nav/${encodeURIComponent(SECTIONS.IELTS)}`;
+  next();
+});
+
+router.use(require('./ieltsRoutes'));
+
+module.exports = router;
