@@ -393,6 +393,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "test/package-ielts-build-install-zip-script.test.js",
+      "target": "packages/ielts/test/package-ielts-build-install-zip-script.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "test/school-ielts.step6.test.js",
       "target": "packages/ielts/test/school-ielts.step6.test.js",
       "category": "behavior-test",
