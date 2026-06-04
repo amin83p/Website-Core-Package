@@ -1038,6 +1038,8 @@ const ccRules = {
   },
 
   "CC6-3": (ctx) => {
+    if (String(ctx?.currentItem?.scope || '').toLowerCase() === 'paragraph') return null;
+
     const cohesion = cohesionQualityProfile(ctx);
     const blockers = ccMidBandBlockerProfile(ctx);
     const boundaryRecovery = ccBand6HighContentBoundaryRecoveryProfile(ctx);
@@ -1429,15 +1431,21 @@ const ccRules = {
   "CC9-1": (ctx) => {
     const cohesion = cohesionQualityProfile(ctx);
     const rawCohesion = ctx?.step2?.cohesion || {};
-    const totalConnectorsExcludingBasic = toFiniteNumber(
-      rawCohesion?.totalConnectorsExcludingBasic ?? rawCohesion?.totalConnectors,
-      0
+    const usageMap = (rawCohesion?.usageMapExcludingBasic && typeof rawCohesion.usageMapExcludingBasic === 'object')
+      ? rawCohesion.usageMapExcludingBasic
+      : (rawCohesion?.usageMap && typeof rawCohesion.usageMap === 'object' ? rawCohesion.usageMap : null);
+    const usageMapTotal = usageMap
+      ? Object.values(usageMap).reduce((sum, value) => sum + toFiniteNumber(value, 0), 0)
+      : 0;
+    const totalConnectorsExcludingBasic = Math.max(
+      toFiniteNumber(rawCohesion?.totalConnectorsExcludingBasic ?? rawCohesion?.totalConnectors, 0),
+      usageMapTotal
     );
     if (repetitionOrMechanicalLinkingBlocksBand9(ctx)) return "No";
     if (!paragraphingShowsBand9Control(ctx)) return "No";
     if (!conclusionSupportIsBand9Safe(ctx)) return "No";
     if (paragraphingOnlySupportsBand8(ctx)) return "No";
-    if (totalConnectorsExcludingBasic < 8) return "No";
+    if (totalConnectorsExcludingBasic < 5) return "No";
     if (cohesionAttractsNoAttention(ctx)) return "Yes";
     if (cohesion.distinctExBasic < 5 || cohesion.referencingDensity < 1.7) return "No";
     if (!cohesion.balancedCohesion || !cohesion.strongProgression) return "No";
@@ -1447,16 +1455,22 @@ const ccRules = {
   "CC9-2": (ctx) => {
     const cohesion = cohesionQualityProfile(ctx);
     const rawCohesion = ctx?.step2?.cohesion || {};
-    const totalConnectorsExcludingBasic = toFiniteNumber(
-      rawCohesion?.totalConnectorsExcludingBasic ?? rawCohesion?.totalConnectors,
-      0
+    const usageMap = (rawCohesion?.usageMapExcludingBasic && typeof rawCohesion.usageMapExcludingBasic === 'object')
+      ? rawCohesion.usageMapExcludingBasic
+      : (rawCohesion?.usageMap && typeof rawCohesion.usageMap === 'object' ? rawCohesion.usageMap : null);
+    const usageMapTotal = usageMap
+      ? Object.values(usageMap).reduce((sum, value) => sum + toFiniteNumber(value, 0), 0)
+      : 0;
+    const totalConnectorsExcludingBasic = Math.max(
+      toFiniteNumber(rawCohesion?.totalConnectorsExcludingBasic ?? rawCohesion?.totalConnectors, 0),
+      usageMapTotal
     );
     if (!paragraphingShowsBand9Control(ctx)) return "No";
     if (!conclusionSupportIsBand9Safe(ctx)) return "No";
     if (cohesion.heavyRepetition || cohesion.mechanicalCohesion || cohesion.weakReferencing) return "No";
     if (paragraphingOnlySupportsBand8(ctx)) return "No";
     if (!cohesion.balancedCohesion) return "No";
-    if (totalConnectorsExcludingBasic < 8) return "No";
+    if (totalConnectorsExcludingBasic < 5) return "No";
     if (
       cohesion.strongProgression &&
       cohesion.referencingDensity >= 1.7 &&

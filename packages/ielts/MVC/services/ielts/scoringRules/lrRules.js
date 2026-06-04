@@ -1075,6 +1075,14 @@ const lrRules = {
       const collocationUsable = collocationGood || collocationMixed;
       const awkwardControlled = ['none', 'few'].includes(lexicalControl.awkwardExpressionCountBand);
       const repetitionControlled = ['none', 'mild'].includes(lexicalControl.repetitionImpact);
+      const sufficientMixedBoundary =
+        lexicalControl.rangeBand === 'sufficient' &&
+        lexicalControl.precisionBand === 'good' &&
+        lexicalControl.clarityImpactFromLexis === 'minor' &&
+        awkwardControlled &&
+        repetitionControlled &&
+        ['none', 'minor'].includes(lexicalControl.spellingImpact) &&
+        ['none', 'minor'].includes(lexicalControl.wordFormationImpact);
       const mixedBand7Safe =
         lexicalControl.rangeBand === 'wide' &&
         lexicalControl.clarityImpactFromLexis === 'none' &&
@@ -1092,7 +1100,7 @@ const lrRules = {
         return "Yes";
       }
       if (rangeStrong && precisionStrong && collocationMixed) {
-        return mixedBand7Safe ? "Yes" : "No";
+        return (mixedBand7Safe || sufficientMixedBoundary) ? "Yes" : "No";
       }
       if (rangeStrong && precisionStrong && clarityStable && collocationUsable) {
         return "No";

@@ -77,12 +77,9 @@ function hasTaskEchoSignals(taskEcho) {
 
 function withTaskEchoSignals(step2Features, essayObj, taskPrompt) {
   const baseStep2 = (step2Features && typeof step2Features === 'object') ? step2Features : {};
-  // Runtime-consistency guard:
-  // If Step 2 already produced a complete taskEcho payload, keep it unchanged.
-  // Recomputing here can create drift between the captured Step 2 output and Step 4 rule execution.
-  if (hasTaskEchoSignals(baseStep2.taskEcho)) return baseStep2;
-
   const promptText = String(taskPrompt || '').trim();
+  if (hasTaskEchoSignals(baseStep2.taskEcho) && !promptText) return baseStep2;
+
   const computedTaskEcho = essayAnalysisService.computeTaskEchoSignals(essayObj || {}, promptText);
 
   return {

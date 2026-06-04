@@ -850,12 +850,20 @@ const graRules = {
       if (grammarControl.errorFrequency === 'occasional') {
         if (
           stableClarity &&
-          mixedOrWeakCount <= 2 &&
-          (grammarControl.errorFreeSentenceShareBand === 'high' || (
-            grammarControl.errorFreeSentenceShareBand === 'moderate' &&
-            grammarControl.complexSentenceControl === 'good' &&
-            weakCount <= 1
-          ))
+          (
+            mixedOrWeakCount <= 2 ||
+            (
+              grammarControl.errorFreeSentenceShareBand === 'moderate' &&
+              grammarControl.structureRange === 'varied' &&
+              grammarControl.complexSentenceControl === 'good' &&
+              weakCount === 0 &&
+              mixedOrWeakCount <= 4
+            )
+          ) &&
+          (
+            grammarControl.errorFreeSentenceShareBand === 'high' ||
+            grammarControl.errorFreeSentenceShareBand === 'moderate'
+          )
         ) {
           return "rarely";
         }
@@ -1145,8 +1153,8 @@ const graRules = {
         stableClarity &&
         ['rare', 'occasional'].includes(grammarControl.errorFrequency) &&
         (highShare || moderateShare) &&
-        weakCount === 0 &&
-        mixedOrWeakCount <= (highShare ? 1 : 0)
+        weakCount <= (highShare ? 1 : 0) &&
+        mixedOrWeakCount <= (highShare ? 2 : 0)
       ) {
         return "Yes";
       }
