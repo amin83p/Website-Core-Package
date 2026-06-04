@@ -286,9 +286,6 @@ const docsRoutes = require('./MVC/routes/docsRoutes');
 const emailManagementRoutes = require('./MVC/routes/emailManagementRoutes');
 const activityQuotaRoutes = require('./MVC/routes/activityQuota/activityQuotaMainRoute');
 const fileGatewayRoutes = require('./MVC/routes/internal/fileGatewayRoutes');
-// const ieltsRoutes = require(); // ✅ 1. Import Here
-
-
 app.use('/', authRoutes);
 app.use('/', homeRoutes);          //   /(home page)
 app.use('/', restrictedRoutes);
@@ -329,9 +326,6 @@ app.use('/help', helpRoutes);
 app.use('/docs', docsRoutes);
 app.use('/email-management', emailManagementRoutes);
 app.use('/activity-quota', activityQuotaRoutes);
-//
-app.use('/ielts', require('./MVC/routes/ielts/ieltsMainRoute'));
-
 app.use('/benchpath', require('./MVC/routes/benchpath/benchpathMainRoute'));
 
 app.use('/credit', require('./MVC/routes/credit/creditRoutes'));
