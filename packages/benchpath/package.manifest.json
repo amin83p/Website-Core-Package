@@ -13,7 +13,86 @@
       "active": true
     }
   ],
-  "queryExecutors": [],
+  "queryExecutors": [
+    {
+      "entity": "benchpath.sources",
+      "source": "benchpath",
+      "repository": "sources",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.sourceFragments",
+      "source": "benchpath",
+      "repository": "sourceFragments",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbFrameworks",
+      "source": "benchpath",
+      "repository": "clbFrameworks",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbStages",
+      "source": "benchpath",
+      "repository": "clbStages",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbSkills",
+      "source": "benchpath",
+      "repository": "clbSkills",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbCompetencyAreas",
+      "source": "benchpath",
+      "repository": "clbCompetencyAreas",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbBenchmarks",
+      "source": "benchpath",
+      "repository": "clbBenchmarks",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbCompetencies",
+      "source": "benchpath",
+      "repository": "clbCompetencies",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbIndicators",
+      "source": "benchpath",
+      "repository": "clbIndicators",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbProfileOfAbility",
+      "source": "benchpath",
+      "repository": "clbProfileOfAbility",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbFeaturesOfCommunication",
+      "source": "benchpath",
+      "repository": "clbFeaturesOfCommunication",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.clbSampleTaskLabels",
+      "source": "benchpath",
+      "repository": "clbSampleTaskLabels",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    },
+    {
+      "entity": "benchpath.tasks",
+      "source": "benchpath",
+      "repository": "benchpathTasks",
+      "modulePath": "packages/benchpath/MVC/repositories/benchpath/index.js"
+    }
+  ],
   "views": {
     "id": "benchpath-package-views",
     "path": "packages/benchpath/MVC/views",
@@ -29,8 +108,1307 @@
   },
   "operations": [],
   "roles": [],
-  "sections": [],
-  "symbols": [],
+  "sections": [
+    {
+      "id": "554656",
+      "active": true,
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-23T17:10:39.709Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Navigator for BenchPath reference entities.",
+      "homeURL": "",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_REFERENCE",
+      "navigatorSection": true,
+      "operations": [],
+      "related": [],
+      "subsections": [
+        {
+          "id": "775101"
+        },
+        {
+          "id": "775102"
+        },
+        {
+          "id": "775103"
+        },
+        {
+          "id": "775104"
+        },
+        {
+          "id": "775105"
+        },
+        {
+          "id": "775106"
+        },
+        {
+          "id": "775107"
+        },
+        {
+          "id": "775108"
+        },
+        {
+          "id": "775109"
+        },
+        {
+          "id": "775110"
+        },
+        {
+          "id": "775111"
+        },
+        {
+          "id": "775112"
+        }
+      ],
+      "trackState": false
+    },
+    {
+      "id": "775100",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "BenchPath dashboard and reference data management root section.",
+      "homeURL": "",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": true,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH",
+      "navigatorSection": true,
+      "operations": [],
+      "related": [],
+      "subsections": [
+        {
+          "id": "554656"
+        },
+        {
+          "id": "775113"
+        }
+      ],
+      "trackState": false
+    },
+    {
+      "id": "775101",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage BenchPath reference sources.",
+      "homeURL": "/benchpath/sources",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_SOURCES",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775102",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage BenchPath source fragments.",
+      "homeURL": "/benchpath/source-fragments",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_SOURCE_FRAGMENTS",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775103",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB framework definitions in BenchPath.",
+      "homeURL": "/benchpath/clb-framework",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_FRAMEWORK",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775104",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB stage definitions in BenchPath.",
+      "homeURL": "/benchpath/clb-stages",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_STAGES",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775105",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB skill definitions in BenchPath.",
+      "homeURL": "/benchpath/clb-skills",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_SKILLS",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775106",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB competency areas in BenchPath.",
+      "homeURL": "/benchpath/clb-competency-areas",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_COMPETENCY_AREAS",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775107",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB benchmark records in BenchPath.",
+      "homeURL": "/benchpath/clb-benchmarks",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_BENCHMARKS",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775108",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB competency records in BenchPath.",
+      "homeURL": "/benchpath/clb-competencies",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_COMPETENCIES",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775109",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB indicator records in BenchPath.",
+      "homeURL": "/benchpath/clb-indicators",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_INDICATORS",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775110",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB profile-of-ability records in BenchPath.",
+      "homeURL": "/benchpath/clb-profile-of-ability",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_PROFILE_OF_ABILITY",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775111",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB features-of-communication records in BenchPath.",
+      "homeURL": "/benchpath/clb-features-of-communication",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_FEATURES_OF_COMMUNICATION",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775112",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Manage CLB sample task labels in BenchPath.",
+      "homeURL": "/benchpath/clb-sample-task-labels",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_CLB_SAMPLE_TASK_LABELS",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "775113",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-22T05:38:49.367Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:21.614Z"
+      },
+      "category": "BENCHPATH",
+      "dashboardDisplay": true,
+      "description": "Generate and manage CLB/PBLA-aligned teacher-authored tasks with the BenchPath wizard.",
+      "homeURL": "/benchpath/tasks",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "BENCHPATH_TASK_AUTHORING",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    }
+  ],
+  "symbols": [
+    {
+      "id": "SYM_SYSTEM_029",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-22T05:51:49.635Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH",
+        "CLBPATH",
+        "PBLAPATH"
+      ],
+      "type": "image",
+      "value": "/uploads/GLOBAL/symbols/CCLB_EN_no_address_RB_1774158709630.png"
+    },
+    {
+      "id": "SYM_SYSTEM_030",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-22T05:51:49.635Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_TASK_AUTHORING",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_TASK_AUTHORING",
+        "775113"
+      ],
+      "type": "class",
+      "value": "bi bi-pencil-square"
+    },
+    {
+      "id": "SYM_SYSTEM_060",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_SOURCES",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_SOURCES",
+        "775101"
+      ],
+      "type": "class",
+      "value": "bi bi-diagram-3-fill"
+    },
+    {
+      "id": "SYM_SYSTEM_061",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_SOURCE_FRAGMENTS",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_SOURCE_FRAGMENTS",
+        "775102"
+      ],
+      "type": "class",
+      "value": "bi bi-blockquote-left"
+    },
+    {
+      "id": "SYM_SYSTEM_062",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_FRAMEWORK",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_FRAMEWORK",
+        "775103"
+      ],
+      "type": "class",
+      "value": "bi bi-diagram-2-fill"
+    },
+    {
+      "id": "SYM_SYSTEM_063",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_STAGES",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_STAGES",
+        "775104"
+      ],
+      "type": "class",
+      "value": "bi bi-signpost-split-fill"
+    },
+    {
+      "id": "SYM_SYSTEM_064",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_SKILLS",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_SKILLS",
+        "775105"
+      ],
+      "type": "class",
+      "value": "bi bi-list-check"
+    },
+    {
+      "id": "SYM_SYSTEM_065",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_COMPETENCY_AREAS",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_COMPETENCY_AREAS",
+        "775106"
+      ],
+      "type": "class",
+      "value": "bi bi-diagram-3"
+    },
+    {
+      "id": "SYM_SYSTEM_066",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_BENCHMARKS",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_BENCHMARKS",
+        "775107"
+      ],
+      "type": "class",
+      "value": "bi bi-123"
+    },
+    {
+      "id": "SYM_SYSTEM_067",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_COMPETENCIES",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_COMPETENCIES",
+        "775108"
+      ],
+      "type": "class",
+      "value": "bi bi-ui-checks"
+    },
+    {
+      "id": "SYM_SYSTEM_068",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_INDICATORS",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_INDICATORS",
+        "775109"
+      ],
+      "type": "class",
+      "value": "bi bi-bullseye"
+    },
+    {
+      "id": "SYM_SYSTEM_069",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_PROFILE_OF_ABILITY",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_PROFILE_OF_ABILITY",
+        "775110"
+      ],
+      "type": "class",
+      "value": "bi bi-person-lines-fill"
+    },
+    {
+      "id": "SYM_SYSTEM_070",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_FEATURES_OF_COMMUNICATION",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_FEATURES_OF_COMMUNICATION",
+        "775111"
+      ],
+      "type": "class",
+      "value": "bi bi-chat-square-text"
+    },
+    {
+      "id": "SYM_SYSTEM_071",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_CLB_SAMPLE_TASK_LABELS",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_CLB_SAMPLE_TASK_LABELS",
+        "775112"
+      ],
+      "type": "class",
+      "value": "bi bi-card-list"
+    },
+    {
+      "id": "SYM_SYSTEM_074",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T12:00:00.000Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-23T17:27:29.707Z"
+      },
+      "name": "BENCHPATH_REFERENCE",
+      "orgId": "SYSTEM",
+      "tags": [
+        "BENCHPATH_REFERENCE",
+        "554656"
+      ],
+      "type": "class",
+      "value": "bi bi-collection-fill"
+    }
+  ],
   "accesses": [],
   "uploadFolders": [
     {
@@ -41,7 +1419,177 @@
   ],
   "menuEntries": [],
   "dashboardEntries": [],
-  "dataEntities": [],
+  "dataEntities": [
+    {
+      "entityType": "benchpathSources",
+      "label": "BenchPath Sources",
+      "source": "data/benchpath/reference/source.json",
+      "collectionName": "benchpathSources",
+      "repository": "sources",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/source.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathSourceFragments",
+      "label": "BenchPath Source Fragments",
+      "source": "data/benchpath/reference/source-fragments.json",
+      "collectionName": "benchpathSourceFragments",
+      "repository": "sourceFragments",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/source-fragments.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbFrameworks",
+      "label": "BenchPath CLB Frameworks",
+      "source": "data/benchpath/reference/clb.framework.json",
+      "collectionName": "benchpathClbFrameworks",
+      "repository": "clbFrameworks",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.framework.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbStages",
+      "label": "BenchPath CLB Stages",
+      "source": "data/benchpath/reference/clb.stages.json",
+      "collectionName": "benchpathClbStages",
+      "repository": "clbStages",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.stages.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbSkills",
+      "label": "BenchPath CLB Skills",
+      "source": "data/benchpath/reference/clb.skills.json",
+      "collectionName": "benchpathClbSkills",
+      "repository": "clbSkills",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.skills.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbCompetencyAreas",
+      "label": "BenchPath CLB Competency Areas",
+      "source": "data/benchpath/reference/clb.competency-areas.json",
+      "collectionName": "benchpathClbCompetencyAreas",
+      "repository": "clbCompetencyAreas",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.competency-areas.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbBenchmarks",
+      "label": "BenchPath CLB Benchmarks",
+      "source": "data/benchpath/reference/clb.benchmarks.json",
+      "collectionName": "benchpathClbBenchmarks",
+      "repository": "clbBenchmarks",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.benchmarks.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbCompetencies",
+      "label": "BenchPath CLB Competencies",
+      "source": "data/benchpath/reference/clb.competencies.json",
+      "collectionName": "benchpathClbCompetencies",
+      "repository": "clbCompetencies",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.competencies.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbIndicators",
+      "label": "BenchPath CLB Indicators",
+      "source": "data/benchpath/reference/clb.indicators.json",
+      "collectionName": "benchpathClbIndicators",
+      "repository": "clbIndicators",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.indicators.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbProfileOfAbility",
+      "label": "BenchPath CLB Profile Of Ability",
+      "source": "data/benchpath/reference/clb.profile-of-ability.json",
+      "collectionName": "benchpathClbProfileOfAbility",
+      "repository": "clbProfileOfAbility",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.profile-of-ability.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbFeaturesOfCommunication",
+      "label": "BenchPath CLB Features Of Communication",
+      "source": "data/benchpath/reference/clb.features-of-communication.json",
+      "collectionName": "benchpathClbFeaturesOfCommunication",
+      "repository": "clbFeaturesOfCommunication",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.features-of-communication.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathClbSampleTaskLabels",
+      "label": "BenchPath CLB Sample Task Labels",
+      "source": "data/benchpath/reference/clb.sample-task-labels.json",
+      "collectionName": "benchpathClbSampleTaskLabels",
+      "repository": "clbSampleTaskLabels",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/reference/clb.sample-task-labels.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    },
+    {
+      "entityType": "benchpathTasks",
+      "label": "BenchPath Tasks",
+      "source": "data/benchpath/runtime/tasks.json",
+      "collectionName": "benchpathTasks",
+      "repository": "benchpathTasks",
+      "storageType": "json",
+      "storageTarget": "data/benchpath/runtime/tasks.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
+    }
+  ],
   "migrations": [],
   "seeders": [],
   "dataSchemas": [],

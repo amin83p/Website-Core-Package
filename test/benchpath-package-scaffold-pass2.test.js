@@ -36,8 +36,8 @@ test('BenchPath package pass2 scaffold declares a valid package manifest', () =>
     && route.router === 'MVC/routes/benchpath/benchpathMainRoute.js'
     && route.metadataOnly === false
   )));
-  assert.equal(manifest.queryExecutors.length, 0);
-  assert.equal(manifest.dataEntities.length, 0);
+  assert.equal(manifest.queryExecutors.length, 13);
+  assert.equal(manifest.dataEntities.length, 13);
   assert.ok(manifest.uploadFolders.some((folder) => folder.key === 'generated.benchpathReports'));
 });
 
@@ -72,7 +72,7 @@ test('BenchPath package pass2 activation script builds dry-run registry payload'
   assert.equal(payload.metadata.declarationCounts.views, 1);
   assert.equal(payload.metadata.declarationCounts.assets, 1);
   assert.equal(payload.metadata.declarationCounts.uploadFolders, 1);
-  assert.equal(payload.metadata.declarationCounts.queryExecutors, 0);
+  assert.equal(payload.metadata.declarationCounts.queryExecutors, 13);
 });
 
 test('BenchPath package pass2 scaffold does not create package-local runtime data', () => {
