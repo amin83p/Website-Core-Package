@@ -1,0 +1,298 @@
+<%
+  const isEdit = !!(sourceData && sourceData.id);
+  const formAction = isEdit ? `/benchpath/source-fragments/edit/${sourceData.id}` : '/benchpath/source-fragments/new';
+  const selectedUsageTags = Array.isArray(sourceData?.usageTags) ? sourceData.usageTags : [];
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Source Fragment' : 'Create Source Fragment' %></h1>
+    <div class="d-flex align-items-center gap-2">
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border">ID: <%= sourceData.id %></span>
+      <% } else { %>
+        <span class="badge bg-success border">New Item</span>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="form-container" style="width: 100%; max-width: 1400px;">
+    <form id="sourceFragmentForm" method="POST" action="<%= formAction %>">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+
+      <ul class="nav nav-tabs mb-3" id="fragmentFormTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="core-tab" data-bs-toggle="tab" data-bs-target="#core-pane" type="button" role="tab" aria-controls="core-pane" aria-selected="true">
+            <i class="bi bi-shield-check me-1"></i> Core Fields
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="metadata-tab" data-bs-toggle="tab" data-bs-target="#metadata-pane" type="button" role="tab" aria-controls="metadata-pane" aria-selected="false">
+            <i class="bi bi-journal-text me-1"></i> Metadata & Mapping
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
+        <div class="tab-pane fade show active" id="core-pane" role="tabpanel" aria-labelledby="core-tab" tabindex="0">
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">ID <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="id" value="<%= sourceData?.id || '' %>" <%= isEdit ? 'readonly' : '' %> required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Slug <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="slug" value="<%= sourceData?.slug || '' %>" required>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Source <span class="text-danger">*</span></label>
+              <select name="sourceId" class="form-select" required>
+                <option value="">Select source...</option>
+                <% (sources || []).forEach((src) => { %>
+                  <option value="<%= src.id %>" <%= sourceData?.sourceId === src.id ? 'selected' : '' %>><%= src.title %> (<%= src.id %>)</option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="title" value="<%= sourceData?.title || '' %>" required>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Fragment Type <span class="text-danger">*</span></label>
+              <select class="form-select" name="fragmentType" required>
+                <option value="">Select...</option>
+                <% fragmentTypeOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.fragmentType === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Language <span class="text-danger">*</span></label>
+              <select class="form-select" name="language" required>
+                <option value="">Select...</option>
+                <% languageOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.language === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Text <span class="text-danger">*</span></label>
+            <textarea class="form-control" name="text" rows="4" required><%= sourceData?.text || '' %></textarea>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Semantic Role <span class="text-danger">*</span></label>
+              <select class="form-select" name="semanticRole" required>
+                <option value="">Select...</option>
+                <% semanticRoleOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.semanticRole === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Extraction Method <span class="text-danger">*</span></label>
+              <select class="form-select" name="extractionMethod" required>
+                <option value="">Select...</option>
+                <% extractionMethodOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.extractionMethod === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
+              <select class="form-select" name="status" required>
+                <option value="">Select...</option>
+                <% statusOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.status === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Review Status <span class="text-danger">*</span></label>
+              <select class="form-select" name="reviewStatus" required>
+                <option value="">Select...</option>
+                <% reviewStatusOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.reviewStatus === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="d-flex gap-4 pt-2">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="isActive" name="isActive" value="true" <%= sourceData ? (sourceData.isActive ? 'checked' : '') : 'checked' %>>
+              <label class="form-check-label fw-bold" for="isActive">isActive</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="isSystem" name="isSystem" value="true" <%= sourceData?.isSystem ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="isSystem">isSystem</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="isLocked" name="isLocked" value="true" <%= sourceData?.isLocked ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="isLocked">isLocked</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="metadata-pane" role="tabpanel" aria-labelledby="metadata-tab" tabindex="0">
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Code</label>
+              <input type="text" class="form-control" name="code" value="<%= sourceData?.code || '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Short Title</label>
+              <input type="text" class="form-control" name="shortTitle" value="<%= sourceData?.shortTitle || '' %>">
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Page Start</label>
+              <input type="number" min="1" class="form-control" name="pageStart" value="<%= sourceData?.pageStart ?? '' %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Page End</label>
+              <input type="number" min="1" class="form-control" name="pageEnd" value="<%= sourceData?.pageEnd ?? '' %>">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Quote Confidence (0-1)</label>
+              <input type="number" min="0" max="1" step="0.01" class="form-control" name="quoteConfidence" value="<%= sourceData?.quoteConfidence ?? '' %>">
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Section Path (&gt; separated)</label>
+              <input type="text" class="form-control" name="sectionPath" value="<%= Array.isArray(sourceData?.sectionPath) ? sourceData.sectionPath.join(' > ') : '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Context Tags (comma separated)</label>
+              <input type="text" class="form-control" name="contextTags" value="<%= Array.isArray(sourceData?.contextTags) ? sourceData.contextTags.join(', ') : '' %>">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Usage Tags <span class="text-danger">*</span></label>
+            <div class="row g-2 border rounded p-2">
+              <% usageTagOptions.forEach((opt) => { %>
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="usageTag_<%= opt %>" name="usageTags" value="<%= opt %>" <%= selectedUsageTags.includes(opt) ? 'checked' : '' %>>
+                    <label class="form-check-label small" for="usageTag_<%= opt %>"><%= opt %></label>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+            <div class="form-text">Select one or more values.</div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Mapped Entity Type</label>
+              <select class="form-select" name="mappedEntityType">
+                <option value="">Select...</option>
+                <% mappedEntityTypeOptions.forEach((opt) => { %>
+                  <option value="<%= opt %>" <%= sourceData?.mappedEntityType === opt ? 'selected' : '' %>><%= opt %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Mapped Entity IDs (comma separated) <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="mappedEntityIds" value="<%= Array.isArray(sourceData?.mappedEntityIds) ? sourceData.mappedEntityIds.join(', ') : '' %>" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Summary</label>
+            <textarea class="form-control" name="summary" rows="2"><%= sourceData?.summary || '' %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Normalized Text</label>
+            <textarea class="form-control" name="normalizedText" rows="2"><%= sourceData?.normalizedText || '' %></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" name="notes" rows="2"><%= sourceData?.notes || '' %></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-save me-1"></i> Save</button>
+        <a href="/benchpath/source-fragments" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/benchpath/source-fragments">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const form = document.getElementById('sourceFragmentForm');
+    if (!form) return;
+
+    let isSubmitting = false;
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (isSubmitting) return;
+
+      isSubmitting = true;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const payload = new URLSearchParams(new FormData(form));
+        const response = await fetch(form.action, {
+          method: (form.method || 'POST').toUpperCase(),
+          headers: {
+            'x-ajax-request': '1',
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+          },
+          body: payload
+        });
+
+        const result = await response.json().catch(() => ({ status: 'error', message: `Server returned HTTP ${response.status}.` }));
+        const isSuccess = response.ok && result?.status === 'success';
+
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: isSuccess ? 'Saved' : 'Save Failed',
+            icon: isSuccess ? 'success' : 'error',
+            message: result?.message || (isSuccess ? 'Saved successfully.' : 'Unable to save.'),
+            buttons: [{ text: 'OK', class: isSuccess ? 'btn-success' : 'btn-danger' }]
+          });
+        }
+
+        if (isSuccess) {
+          window.location.href = '/benchpath/source-fragments';
+        }
+      } catch (error) {
+        if (typeof window.showMessageModal === 'function') {
+          await window.showMessageModal({
+            title: 'Save Failed',
+            icon: 'error',
+            message: error?.message || 'Unexpected network error.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        }
+      } finally {
+        isSubmitting = false;
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  })();
+</script>

@@ -1,0 +1,58 @@
+<div class="row g-2">
+  <div class="col-md-3 mb-3">
+    <label class="form-label fw-bold">Scope Type</label>
+    <select class="form-select" name="scopeType">
+      <option value="">Select...</option>
+      <% ['benchmark', 'competency', 'skill', 'global'].forEach((scopeValue) => { %>
+        <option value="<%= scopeValue %>" <%= itemData?.scopeType === scopeValue ? 'selected' : '' %>><%= scopeValue %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3 mb-3">
+    <label class="form-label fw-bold">Scope Skill</label>
+    <select class="form-select" name="scopeSkillId" id="scopeSkillId">
+      <option value="">Select skill...</option>
+      <% (options.skills || []).forEach((row) => { %>
+        <option value="<%= row.id %>" data-framework-id="<%= row.frameworkId || '' %>" <%= itemData?.scopeSkillId === row.id ? 'selected' : '' %>>
+          <%= row.title || row.id %> (<%= row.id %>)
+        </option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3 mb-3">
+    <label class="form-label fw-bold">Scope Benchmark</label>
+    <select class="form-select" name="scopeBenchmarkId" id="scopeBenchmarkId">
+      <option value="">Select benchmark...</option>
+      <% (options.benchmarks || []).forEach((row) => { %>
+        <option value="<%= row.id %>" data-framework-id="<%= row.frameworkId || '' %>" data-skill-id="<%= row.skillId || '' %>" <%= itemData?.scopeBenchmarkId === row.id ? 'selected' : '' %>>
+          <%= row.title || row.id %> (<%= row.id %>)
+        </option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3 mb-3">
+    <label class="form-label fw-bold">Scope Competency</label>
+    <select class="form-select" name="scopeCompetencyId" id="scopeCompetencyId">
+      <option value="">Select competency...</option>
+      <% (options.competencies || []).forEach((row) => { %>
+        <option value="<%= row.id %>" data-framework-id="<%= row.frameworkId || '' %>" data-skill-id="<%= row.skillId || '' %>" data-benchmark-id="<%= row.benchmarkId || '' %>" <%= itemData?.scopeCompetencyId === row.id ? 'selected' : '' %>>
+          <%= row.title || row.id %> (<%= row.id %>)
+        </option>
+      <% }) %>
+    </select>
+  </div>
+</div>
+<div class="row g-2">
+  <div class="col-md-4 mb-3">
+    <label class="form-label fw-bold">Feature Dimension</label>
+    <input class="form-control" name="featureDimension" value="<%= itemData?.featureDimension || '' %>">
+  </div>
+  <div class="col-md-4 mb-3">
+    <label class="form-label fw-bold">Complexity Level</label>
+    <input class="form-control" name="complexityLevel" value="<%= itemData?.complexityLevel || '' %>">
+  </div>
+  <div class="col-md-4 mb-3">
+    <label class="form-label fw-bold">Feature Value</label>
+    <input class="form-control" name="featureValue" value="<%= itemData?.featureValue || '' %>">
+  </div>
+</div>

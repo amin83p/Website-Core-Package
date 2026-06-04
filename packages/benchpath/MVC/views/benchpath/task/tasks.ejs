@@ -1,0 +1,106 @@
+<%- include('../../partials/tablePages-start', {
+  title,
+  newUrl: 'benchpath/tasks',
+  newHref: '/benchpath/tasks/new-wizard/1',
+  newLabel: 'New Task Wizard',
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  manageBtns: [
+    `<a href="/benchpath" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>`
+  ]
+}) %>
+
+<%- include('../../partials/tablePages-search', {
+  placeholder: 'Search task drafts...',
+  fields: searchableFields || []
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Title</th>
+        <th>Skill</th>
+        <th>Benchmark</th>
+        <th>Task Type</th>
+        <th>Status</th>
+        <th>Wizard</th>
+        <th>Validation</th>
+        <th>Updated</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if ((data || []).length === 0) { %>
+        <tr><td colspan="10" class="text-center py-4 text-muted">No tasks found.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const wizardStep = item.wizardStep || item.wizardLastSavedStep || 1; %>
+        <% const wizardUrl = item.status === 'draft'
+          ? `/benchpath/tasks/new-wizard/${wizardStep}?draftId=${encodeURIComponent(item.id)}`
+          : `/benchpath/tasks/edit-wizard/${item.id}/${wizardStep}`; %>
+        <tr>
+          <td class="font-monospace small"><%= item.id %></td>
+          <td>
+            <div class="fw-bold"><%= item.title || '-' %></div>
+            <div class="small text-muted"><%= item.slug || '-' %></div>
+          </td>
+          <td><%= item.skill || '-' %></td>
+          <td><%= item.selectedBenchmarkId || '-' %></td>
+          <td>
+            <span class="badge <%= item.taskType === 'assessment' ? 'bg-success' : 'bg-warning text-dark' %>">
+              <%= item.taskType || '-' %>
+            </span>
+          </td>
+          <td><span class="badge bg-secondary"><%= item.status || '-' %></span></td>
+          <td><span class="badge bg-light text-dark border">Step <%= wizardStep %></span></td>
+          <td>
+            <% const validation = item.validation || {}; %>
+            <% if (validation.isValid === true) { %>
+              <span class="badge bg-success">Valid</span>
+            <% } else if (validation && Object.keys(validation).length > 0) { %>
+              <span class="badge bg-danger">Issues</span>
+            <% } else { %>
+              <span class="badge bg-light text-dark border">Pending</span>
+            <% } %>
+          </td>
+          <td><%= item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '-' %></td>
+          <td class="table-actions text-end pe-4">
+            <a href="<%= wizardUrl %>" class="btn btn-sm btn-outline-info me-1"><%= item.status === 'draft' ? 'Resume Wizard' : 'Edit Wizard' %></a>
+            <a href="/benchpath/tasks/view/<%= item.id %>" class="btn btn-sm btn-filled btn-edit me-1">View</a>
+            <a href="/benchpath/tasks/package/<%= item.id %>" class="btn btn-sm btn-outline-primary me-1">Package</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="benchpath/tasks" hidden></span>
+
+<%- include('../../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: 'benchpath/tasks'
+}) %>
+
+<% if (noticeMessage) { %>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.showMessageModal !== 'function') return;
+    const icon = '<%= noticeType === "error" ? "error" : noticeType === "warning" ? "warning" : "success" %>';
+    window.showMessageModal({
+      title: 'BenchPath Tasks',
+      message: '<%= noticeMessage.replace(/'/g, "\\'") %>',
+      icon,
+      buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-danger' : icon === 'warning' ? 'btn-warning' : 'btn-success' }]
+    });
+  });
+</script>
+<% } %>
+
+<%- include('../../partials/tablePages-end') %>
