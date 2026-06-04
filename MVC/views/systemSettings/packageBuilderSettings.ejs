@@ -85,9 +85,9 @@
           <label class="form-label small fw-bold">Manifest Source</label>
           <select id="builderManifestMode" class="form-select">
             <option value="static">Static manifest from package folder</option>
-            <option value="live">Live backend manifest (School only)</option>
+            <option value="live">Live backend manifest</option>
           </select>
-          <div class="small text-muted mt-1">Live mode rebuilds School declarations from the active backend while keeping package routes, views, assets, upload folders, and data entities from the template manifest.</div>
+          <div class="small text-muted mt-1">Live mode rebuilds supported package declarations from the active backend while keeping package routes, views, assets, upload folders, and data entities from the template manifest.</div>
         </div>
         <div class="col-lg-6">
           <label class="form-label small fw-bold">Suggested Target Version</label>
@@ -317,12 +317,12 @@
       versionEl.value = suggested;
     }
     if (manifestModeEl) {
-      const isSchool = packageId.toLowerCase() === 'school';
+      const supportsLiveManifest = ['school', 'pte'].includes(packageId.toLowerCase());
       Array.from(manifestModeEl.options).forEach((option) => {
-        if (option.value === 'live') option.disabled = !isSchool;
+        if (option.value === 'live') option.disabled = !supportsLiveManifest;
       });
-      if (!isSchool && manifestModeEl.value === 'live') manifestModeEl.value = 'static';
-      if (isSchool && force) manifestModeEl.value = 'live';
+      if (!supportsLiveManifest && manifestModeEl.value === 'live') manifestModeEl.value = 'static';
+      if (supportsLiveManifest && force) manifestModeEl.value = 'live';
     }
   }
 

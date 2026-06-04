@@ -34,6 +34,7 @@ const REMAP_ORG_FIELDS = new Set([
 const ORG_TOKEN_EXACT_REGEX = /^ORG_[A-Za-z0-9_-]+$/i;
 const ORG_UPLOAD_SEGMENT_REGEX = /\/uploads\/(ORG_[^/]+)/ig;
 const UPLOAD_URL_MATCH_REGEX = /\/uploads\/[^"'` ]+/ig;
+const LIVE_MANIFEST_SUPPORTED_PACKAGES = new Set(['school', 'pte']);
 let cachedCatalogCollectionMap = null;
 
 function cleanText(value, max = 4000) {
@@ -1287,8 +1288,8 @@ function createService(overrides = {}) {
     if (!mode || mode === 'static') return 'static';
     if (mode === 'live' || mode === 'backend' || mode === 'live-backend') {
       const normalizedPackageId = normalizePackageId(packageId);
-      if (normalizedPackageId !== 'school') {
-        throw new Error('Live backend manifest generation is currently available for the School package only.');
+      if (!LIVE_MANIFEST_SUPPORTED_PACKAGES.has(normalizedPackageId)) {
+        throw new Error('Live backend manifest generation is currently available for School and PTE packages only.');
       }
       return 'live';
     }
@@ -1316,10 +1317,13 @@ function createService(overrides = {}) {
     return scrub(cloned);
   }
 
-  function declarationMentionsSchool(row = {}, type = '') {
+  function declarationMentionsPackage(row = {}, packageIdRaw = '', type = '') {
+    const targetPackageId = normalizePackageId(packageIdRaw);
+    if (!LIVE_MANIFEST_SUPPORTED_PACKAGES.has(targetPackageId)) return false;
+    const targetUpper = targetPackageId.toUpperCase();
     const key = normalizeDeclarationKey(row);
     const category = cleanText(row?.category || row?.sectionCategory || row?.group || row?.domain || '', 240).toLowerCase();
-    const packageId = normalizePackageId(row?.packageId || row?.packageName || row?.sourcePackage || '');
+    const rowPackageId = normalizePackageId(row?.packageId || row?.packageName || row?.sourcePackage || '');
     const tags = sanitizeArray(row?.tags).map((item) => cleanText(item, 120).toLowerCase());
     const text = [
       key,
@@ -1331,12 +1335,14 @@ function createService(overrides = {}) {
       row?.role,
       row?.roleName
     ].map((item) => cleanText(item, 240).toLowerCase()).filter(Boolean).join(' ');
-    if (packageId === 'school') return true;
-    if (category === 'school' || category.startsWith('school')) return true;
-    if (tags.includes('school')) return true;
-    if (key.toUpperCase().startsWith('SCHOOL')) return true;
-    if (type === 'section' && text.includes('school')) return true;
-    if (type !== 'operation' && /\bschool\b|^school[_:-]|[_:-]school[_:-]?/i.test(text)) return true;
+    const textPattern = new RegExp(`\\b${targetPackageId}\\b|^${targetPackageId}[_:-]|[_:-]${targetPackageId}[_:-]?`, 'i');
+    if (rowPackageId === targetPackageId) return true;
+    if (category === targetPackageId || category.startsWith(targetPackageId)) return true;
+    if (tags.includes(targetPackageId)) return true;
+    if (tags.some((tag) => tag.toUpperCase().startsWith(targetUpper))) return true;
+    if (key.toUpperCase().startsWith(targetUpper)) return true;
+    if (type === 'section' && text.includes(targetPackageId)) return true;
+    if (type !== 'operation' && textPattern.test(text)) return true;
     return false;
   }
 
@@ -1419,13 +1425,14 @@ function createService(overrides = {}) {
   }
 
   async function generateLivePackageManifest(packageRow = {}, options = {}) {
-    const packageId = normalizePackageId(packageRow?.packageId || packageRow?.manifest?.packageId || '');
-    if (packageId !== 'school') {
-      throw new Error('Live backend manifest generation is currently available for the School package only.');
+    const packageId = normalizePackageId(packageRow?.packageId || packageRow?.manifest?.id || packageRow?.manifest?.packageId || '');
+    if (!LIVE_MANIFEST_SUPPORTED_PACKAGES.has(packageId)) {
+      throw new Error('Live backend manifest generation is currently available for School and PTE packages only.');
     }
+    const packageLabel = cleanText(packageRow?.manifest?.name || packageRow?.packageName || packageId.toUpperCase(), 120) || packageId.toUpperCase();
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
     if (backendMode === 'mongo') {
-      assertMongoConnectedForBuilder('live School manifest generation');
+      assertMongoConnectedForBuilder(`live ${packageLabel} manifest generation`);
     }
     const warnings = [];
     const template = cloneStructured(packageRow.manifest || {});
@@ -1441,24 +1448,24 @@ function createService(overrides = {}) {
       fetchDeclarationCatalog('operations', { backendMode, warnings })
     ]);
 
-    const sections = dedupeDeclarations(sectionRows.filter((row) => declarationMentionsSchool(row, 'section')));
-    const symbols = dedupeDeclarations(symbolRows.filter((row) => declarationMentionsSchool(row, 'symbol')));
-    const roles = dedupeDeclarations(roleRows.filter((row) => declarationMentionsSchool(row, 'role')));
-    const accesses = dedupeDeclarations(accessRows.filter((row) => declarationMentionsSchool(row, 'access')));
+    const sections = dedupeDeclarations(sectionRows.filter((row) => declarationMentionsPackage(row, packageId, 'section')));
+    const symbols = dedupeDeclarations(symbolRows.filter((row) => declarationMentionsPackage(row, packageId, 'symbol')));
+    const roles = dedupeDeclarations(roleRows.filter((row) => declarationMentionsPackage(row, packageId, 'role')));
+    const accesses = dedupeDeclarations(accessRows.filter((row) => declarationMentionsPackage(row, packageId, 'access')));
     const referencedOperations = new Set();
     sections.forEach((row) => collectOperationReferencesFromDeclaration(row, referencedOperations));
     accesses.forEach((row) => collectOperationReferencesFromDeclaration(row, referencedOperations));
     const operationRefLower = new Set(Array.from(referencedOperations).map((row) => cleanText(row, 240).toLowerCase()).filter(Boolean));
     const operations = dedupeDeclarations(operationRows.filter((row) => {
       const key = normalizeDeclarationKey(row).toLowerCase();
-      return declarationMentionsSchool(row, 'operation') || (key && operationRefLower.has(key));
+      return declarationMentionsPackage(row, packageId, 'operation') || (key && operationRefLower.has(key));
     }));
 
     const applyLiveRows = (field, rows) => {
       if (rows.length) {
         generated[field] = rows;
       } else {
-        warnings.push(`Live School manifest found zero ${field}; preserved template ${field} to avoid an empty declaration set.`);
+        warnings.push(`Live ${packageLabel} manifest found zero ${field}; preserved template ${field} to avoid an empty declaration set.`);
       }
     };
     applyLiveRows('sections', sections);
