@@ -328,7 +328,6 @@ app.use('/help', helpRoutes);
 app.use('/docs', docsRoutes);
 app.use('/email-management', emailManagementRoutes);
 app.use('/activity-quota', activityQuotaRoutes);
-app.use('/benchpath', require('./MVC/routes/benchpath/benchpathMainRoute'));
 
 app.use('/credit', require('./MVC/routes/credit/creditRoutes'));
 

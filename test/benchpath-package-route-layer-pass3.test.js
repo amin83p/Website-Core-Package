@@ -37,9 +37,9 @@ test('BenchPath package pass3 manifest exposes the package route mount', () => {
   )));
 });
 
-test('BenchPath package pass3 keeps root app mount active before cutover', () => {
+test('BenchPath package route mount is no longer hardcoded after cutover', () => {
   const appSource = read(path.join(ROOT_DIR, 'app.js'));
-  assert.match(appSource, /app\.use\('\/benchpath', require\('\.\/MVC\/routes\/benchpath\/benchpathMainRoute'\)\)/);
+  assert.equal(/app\.use\('\/benchpath',\s*require\('\.\/MVC\/routes\/benchpath\/benchpathMainRoute'\)\)/.test(appSource), false);
 });
 
 test('BenchPath package routes bridge shared core dependencies through resolver', () => {

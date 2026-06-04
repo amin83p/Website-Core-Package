@@ -66,7 +66,7 @@ test('BenchPath package pass1 keeps runtime data app-level and out of package so
   assert.equal(fs.existsSync(packageDataRoot), false, 'packages/benchpath/data should not carry runtime payload');
 });
 
-test('BenchPath package pass1 captures current declaration and pre-cutover registry state', () => {
+test('BenchPath package pass1 captures current declaration and registry state', () => {
   const sections = filterBenchpathRows(repoPath('data/sections.json'));
   const symbols = filterBenchpathRows(repoPath('data/symbols.json'));
   const packageRegistry = readJson(repoPath('data/packageRegistry.json'));
@@ -75,7 +75,11 @@ test('BenchPath package pass1 captures current declaration and pre-cutover regis
 
   assert.equal(sections.length, 15, 'BenchPath should have 15 section declarations before package extraction');
   assert.equal(symbols.length, 15, 'BenchPath should have 15 symbol declarations before package extraction');
-  assert.equal(benchpathRegistryRows.length, 0, 'BenchPath package registry row should not exist until runtime cutover');
+  assert.equal(benchpathRegistryRows.length <= 1, true, 'BenchPath package registry should have at most one row');
+  if (benchpathRegistryRows.length) {
+    assert.equal(benchpathRegistryRows[0].enabled, true, 'BenchPath registry row should be enabled after cutover');
+    assert.equal(benchpathRegistryRows[0].metadata?.manifestPath, 'packages/benchpath/package.manifest.json');
+  }
 
   const globalImageSymbol = symbols.find((row) => String(row?.value || '').includes('/uploads/GLOBAL/symbols/'));
   assert.ok(globalImageSymbol, 'BenchPath should keep image-backed symbols in GLOBAL symbol storage');

@@ -113,5 +113,44 @@
       "lastUpdateUser": "SYSTEM",
       "lastUpdateDateTime": "2026-06-04T00:00:00.000Z"
     }
+  },
+  {
+    "packageId": "benchpath",
+    "version": "0.1.0",
+    "enabled": true,
+    "installStatus": "enabled",
+    "metadata": {
+      "packageName": "BenchPath",
+      "mountPath": "/benchpath",
+      "manifestPath": "packages/benchpath/package.manifest.json",
+      "activatedBy": "scripts/packages/enable-benchpath-package.js",
+      "activationMode": "manual",
+      "declarationCounts": {
+        "routes": 1,
+        "views": 1,
+        "assets": 1,
+        "operations": 0,
+        "roles": 0,
+        "sections": 15,
+        "symbols": 15,
+        "accesses": 0,
+        "uploadFolders": 1,
+        "menuEntries": 0,
+        "dashboardEntries": 0,
+        "queryExecutors": 13,
+        "dataEntities": 13
+      }
+    },
+    "id": "benchpath",
+    "installedAt": "2026-06-04T00:00:00.000Z",
+    "updatedAt": "2026-06-04T00:00:00.000Z",
+    "lastError": "",
+    "lastWarning": "",
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-06-04T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-06-04T00:00:00.000Z"
+    }
   }
 ]
