@@ -1430,13 +1430,8 @@ function createService(overrides = {}) {
     const warnings = [];
     const template = cloneStructured(packageRow.manifest || {});
     const generated = cloneStructured(template);
-    generated.packageId = template.packageId || packageId;
-    generated.generatedFromLiveBackend = {
-      packageId,
-      backendMode,
-      generatedAt: new Date().toISOString(),
-      source: 'package-builder'
-    };
+    delete generated.packageId;
+    delete generated.generatedFromLiveBackend;
 
     const [sectionRows, symbolRows, roleRows, accessRows, operationRows] = await Promise.all([
       fetchDeclarationCatalog('sections', { backendMode, warnings }),
@@ -2490,7 +2485,8 @@ function createService(overrides = {}) {
         : stagedManifestSource;
       const stagedManifest = applyResolvedSymbolCatalogToManifest(stagedManifestBase, globalSymbolCatalog);
       stagedManifest.version = requestedVersion;
-      await deps.fs.writeFile(stagedManifestPath, JSON.stringify(stagedManifest, null, 2));
+      const validatedStagedManifest = deps.packageManifestService.validatePackageManifest(stagedManifest, { knownIds: [] });
+      await deps.fs.writeFile(stagedManifestPath, JSON.stringify(validatedStagedManifest, null, 2));
       const noteLines = [
         `# ${packageId} ${requestedVersion}`,
         '',
@@ -2524,12 +2520,17 @@ function createService(overrides = {}) {
         if (!entityType) continue;
         const rows = sanitizeArray(tablePayload[entityType]);
         const fileName = `${entityType}.json`;
+        const storage = buildPayloadTableStorageMetadata(packageId, entityType, backendMode);
         // eslint-disable-next-line no-await-in-loop
         await deps.fs.writeFile(deps.path.join(payloadTablesDir, fileName), JSON.stringify(rows, null, 2));
         tableIndex.push({
           entityType,
           file: `tables/${fileName}`,
-          rowCount: rows.length
+          rowCount: rows.length,
+          storageType: storage?.storageType || '',
+          storageTarget: storage?.storageTarget || '',
+          collectionName: storage?.collectionName || '',
+          storage: storage || null
         });
       }
 
@@ -2778,6 +2779,85 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     }
   }
 
+  function resolvePackagePayloadStorageTarget(packageId = '', entityType = '', backendMode = '') {
+    const normalizedPackageId = normalizePackageId(packageId);
+    const normalizedEntityType = cleanText(entityType, 200);
+    const mode = cleanText(backendMode, 40).toLowerCase() || 'json';
+    if (!normalizedPackageId || !normalizedEntityType) return null;
+    const collectionName = resolvePackageCollectionFromMigrationCatalog(normalizedPackageId, normalizedEntityType);
+    if (!collectionName) return null;
+    if (mode === 'mongo') {
+      return {
+        packageId: normalizedPackageId,
+        entityType: normalizedEntityType,
+        backendMode: mode,
+        storageType: 'mongo',
+        storageTarget: collectionName,
+        collectionName
+      };
+    }
+    if (mode === 'json') {
+      const filePath = path.join(process.cwd(), 'data', normalizedPackageId, `${normalizedEntityType}.json`);
+      return {
+        packageId: normalizedPackageId,
+        entityType: normalizedEntityType,
+        backendMode: mode,
+        storageType: 'json',
+        storageTarget: filePath,
+        filePath,
+        collectionName
+      };
+    }
+    return null;
+  }
+
+  function resolvePackagePayloadStorageTargetFromTable(tableRow = {}, packageId = '', backendMode = '') {
+    const normalizedPackageId = normalizePackageId(packageId);
+    const entityType = cleanText(tableRow?.entityType || tableRow?.id || '', 200);
+    const mode = cleanText(backendMode, 40).toLowerCase() || 'json';
+    const declaredCollection = cleanText(tableRow?.collectionName || tableRow?.storage?.collectionName, 200);
+    const declaredStorageTarget = cleanText(tableRow?.storageTarget || tableRow?.storage?.storageTarget, 2000);
+    const declaredStorageType = cleanText(tableRow?.storageType || tableRow?.storage?.storageType, 40).toLowerCase();
+    if (!normalizedPackageId || !entityType) return null;
+    if (mode === 'mongo' && declaredCollection) {
+      return {
+        packageId: normalizedPackageId,
+        entityType,
+        backendMode: mode,
+        storageType: 'mongo',
+        storageTarget: declaredCollection,
+        collectionName: declaredCollection
+      };
+    }
+    if (mode === 'json' && (declaredStorageType === 'json' || declaredStorageTarget)) {
+      const filePath = path.join(process.cwd(), 'data', normalizedPackageId, `${entityType}.json`);
+      return {
+        packageId: normalizedPackageId,
+        entityType,
+        backendMode: mode,
+        storageType: 'json',
+        storageTarget: filePath,
+        filePath,
+        collectionName: declaredCollection || resolvePackageCollectionFromMigrationCatalog(normalizedPackageId, entityType) || ''
+      };
+    }
+    return resolvePackagePayloadStorageTarget(normalizedPackageId, entityType, mode);
+  }
+
+  function buildPayloadTableStorageMetadata(packageId = '', entityType = '', backendMode = '') {
+    const target = resolvePackagePayloadStorageTarget(packageId, entityType, backendMode);
+    if (!target) return null;
+    const jsonTarget = `data/${target.packageId}/${target.entityType}.json`;
+    return {
+      packageId: target.packageId,
+      entityType: target.entityType,
+      backendMode: target.backendMode,
+      storageType: target.storageType,
+      storageTarget: target.storageType === 'mongo' ? target.collectionName : jsonTarget,
+      collectionName: target.collectionName || ''
+    };
+  }
+
   async function upsertUnknownEntityJson(entityType = '', row = {}, rowId = '') {
     const filePath = path.join(process.cwd(), 'data', `${entityType}.json`);
     const exists = await pathExists(filePath);
@@ -2837,6 +2917,77 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     return 'insert';
   }
 
+  async function upsertPackagePayloadEntityJson(target = {}, row = {}, rowId = '') {
+    const filePath = cleanText(target?.filePath, 2000);
+    if (!filePath) throw new Error(`Package payload JSON target is missing for entity "${target?.entityType || ''}".`);
+    const exists = await pathExists(filePath);
+    let rows = [];
+    if (exists) {
+      const payload = readJsonFile(filePath);
+      if (!Array.isArray(payload)) {
+        throw new Error(`Package payload JSON store is not an array for entity "${target?.entityType || ''}".`);
+      }
+      rows = payload;
+    }
+    const matchIndex = rows.findIndex((candidate) => {
+      const candidateId = cleanText(candidate?.id || candidate?._id || '', 200);
+      return candidateId && candidateId === rowId;
+    });
+    const normalizedRow = row && typeof row === 'object'
+      ? { ...row, id: rowId }
+      : { id: rowId };
+    const operation = matchIndex >= 0 ? 'update' : 'insert';
+    if (operation === 'update') rows[matchIndex] = normalizedRow;
+    else rows.push(normalizedRow);
+    await fsp.mkdir(path.dirname(filePath), { recursive: true });
+    await fsp.writeFile(filePath, `${JSON.stringify(rows, null, 2)}\n`, 'utf8');
+    return operation;
+  }
+
+  async function upsertPackagePayloadEntityMongo(target = {}, row = {}, rowId = '') {
+    const collectionName = cleanText(target?.collectionName || target?.storageTarget, 200);
+    if (!collectionName) throw new Error(`Package payload Mongo collection is missing for entity "${target?.entityType || ''}".`);
+    if (typeof deps.getMongoDbOrNull === 'function' && !deps.getMongoDbOrNull()) {
+      throw new Error(`Mongo is not connected for package payload write: ${target?.entityType || collectionName}`);
+    }
+    if (typeof deps.getMongoCollection !== 'function') {
+      throw new Error(`Mongo collection resolver is unavailable for package payload write: ${target?.entityType || collectionName}`);
+    }
+    const collection = deps.getMongoCollection(collectionName);
+    if (!collection) {
+      throw new Error(`Mongo collection was not resolved for package payload write: ${collectionName}`);
+    }
+
+    const normalizedRow = row && typeof row === 'object'
+      ? { ...row, id: rowId }
+      : { id: rowId };
+    delete normalizedRow._id;
+
+    let existing = await collection.findOne({ id: rowId });
+    if (!existing) existing = await collection.findOne({ _id: rowId });
+    if (existing) {
+      const updateQuery = existing?._id !== undefined ? { _id: existing._id } : { id: rowId };
+      await collection.updateOne(updateQuery, { $set: normalizedRow }, { upsert: false });
+      return 'update';
+    }
+
+    await collection.insertOne({
+      ...normalizedRow,
+      _id: rowId
+    });
+    return 'insert';
+  }
+
+  async function upsertPackagePayloadEntityRow(target = {}, row = {}) {
+    const rowId = cleanText(row?.id || '', 200);
+    if (!rowId) {
+      throw new Error(`Package payload import requires a stable row.id for "${target?.entityType || ''}".`);
+    }
+    if (target?.storageType === 'json') return upsertPackagePayloadEntityJson(target, row, rowId);
+    if (target?.storageType === 'mongo') return upsertPackagePayloadEntityMongo(target, row, rowId);
+    throw new Error(`Unsupported package payload storage target for "${target?.entityType || ''}".`);
+  }
+
   async function upsertUnknownEntityRow(entityType = '', row = {}, options = {}) {
     const normalizedEntityType = cleanText(entityType, 200);
     const rowId = cleanText(row?.id || '', 200);
@@ -2894,6 +3045,49 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     const result = await collection.deleteOne(removeQuery);
     if (Number(result?.deletedCount || 0) <= 0) return 'missing';
     return 'deleted';
+  }
+
+  async function dropPackagePayloadEntityTable(target = {}) {
+    const storageType = cleanText(target?.storageType, 40).toLowerCase();
+    if (storageType === 'json') {
+      const filePath = cleanText(target?.filePath, 2000);
+      if (!filePath) throw new Error(`Package payload JSON target is missing for table drop: ${target?.entityType || ''}.`);
+      const exists = await pathExists(filePath);
+      if (!exists) return { operation: 'missing', removedRows: 0 };
+      const payload = readJsonFile(filePath);
+      const rowCount = Array.isArray(payload) ? payload.length : 0;
+      await deps.fs.rm(filePath, { force: true });
+      return { operation: 'deleted', removedRows: rowCount };
+    }
+    if (storageType === 'mongo') {
+      const collectionName = cleanText(target?.collectionName || target?.storageTarget, 200);
+      if (!collectionName) throw new Error(`Package payload Mongo collection is missing for table drop: ${target?.entityType || ''}.`);
+      if (typeof deps.getMongoDbOrNull === 'function' && !deps.getMongoDbOrNull()) {
+        throw new Error(`Mongo is not connected for package payload table drop: ${target?.entityType || collectionName}`);
+      }
+      if (typeof deps.getMongoCollection !== 'function') {
+        throw new Error(`Mongo collection resolver is unavailable for package payload table drop: ${target?.entityType || collectionName}`);
+      }
+      const collection = deps.getMongoCollection(collectionName);
+      if (!collection) {
+        throw new Error(`Mongo collection was not resolved for package payload table drop: ${collectionName}`);
+      }
+      let rowCount = 0;
+      try {
+        rowCount = Number(await collection.countDocuments({})) || 0;
+      } catch (_) {}
+      try {
+        await collection.drop();
+        return { operation: 'deleted', removedRows: rowCount };
+      } catch (error) {
+        const message = cleanText(error?.message || String(error), 600).toLowerCase();
+        if (message.includes('ns not found') || message.includes('namespace not found')) {
+          return { operation: 'missing', removedRows: 0 };
+        }
+        throw error;
+      }
+    }
+    throw new Error(`Unsupported package payload storage target for table drop: ${target?.entityType || ''}.`);
   }
 
   async function removeUnknownEntityRow(entityType = '', row = {}, options = {}) {
@@ -3176,6 +3370,7 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
 
     const payload = loadedPayload.manifest;
     const orgRemapRequired = loadedPayload.orgRemapRequired === true;
+    const payloadPackageId = normalizePackageId(payload?.packageId || context?.packageId || '');
     const targetOrgId = normalizeBusinessOrgId(options.targetOrgId || '');
     const targetUploadScope = normalizeOrgToken(options.targetOrgId || '');
     if (orgRemapRequired && !targetOrgId) {
@@ -3189,6 +3384,11 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
       backendMode,
       targetOrgId: targetOrgId || ''
     });
+    const payloadTableByEntity = new Map(
+      sanitizeArray(payload?.tables)
+        .map((row) => [cleanText(row?.entityType || row?.id, 200), row])
+        .filter((entry) => entry[0])
+    );
     const report = {
       applied: true,
       payloadFound: true,
@@ -3253,6 +3453,11 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     for (const tableRow of sanitizeArray(inventory.tableRows)) {
       const tableId = cleanText(tableRow?.id, 200);
       const entityType = cleanText(tableRow?.entityType || tableId, 200);
+      const packageTarget = resolvePackagePayloadStorageTargetFromTable(
+        payloadTableByEntity.get(entityType) || tableRow,
+        payloadPackageId,
+        backendMode
+      );
       const estimatedRowCount = Number(tableRow?.estimatedRowCount || 0) || 0;
       if (!tableId || !entityType) continue;
       if (!selectedTableIds.has(tableId)) {
@@ -3263,7 +3468,9 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
       report.tableSummary.selected += 1;
       try {
         // eslint-disable-next-line no-await-in-loop
-        const outcome = await dropEntityTable(entityType, { backendMode });
+        const outcome = packageTarget
+          ? await dropPackagePayloadEntityTable(packageTarget)
+          : await dropEntityTable(entityType, { backendMode });
         if (outcome?.operation === 'deleted') {
           report.tableSummary.deleted += 1;
           report.rowSummary.deleted += Number(outcome?.removedRows || estimatedRowCount || 0) || 0;
@@ -3359,6 +3566,7 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     const payloadData = sanitizeObject(loadedPayload.data);
     const payloadTableAllowList = collectPayloadTableAllowList(payload);
     const requiredSymbolSummary = summarizeRequiredSymbolAssets(payload);
+    const payloadPackageId = normalizePackageId(payload?.packageId || context?.packageId || '');
     const orgRemapRequired = loadedPayload.orgRemapRequired === true;
     const targetOrgId = normalizeBusinessOrgId(options.targetOrgId || '');
     const targetUploadScope = normalizeOrgToken(options.targetOrgId || '');
@@ -3398,10 +3606,34 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
     let upserted = 0;
     const warnings = [];
+    const tableImportSummary = [];
     let symbolGlobalRewriteCount = 0;
     const entityNames = Object.keys(payloadData);
+    const payloadTableByEntity = new Map(
+      sanitizeArray(payload?.tables)
+        .map((row) => [cleanText(row?.entityType || row?.id, 200), row])
+        .filter((entry) => entry[0])
+    );
     for (const entityType of entityNames) {
       const normalizedEntityType = cleanText(entityType, 200);
+      const packageTarget = resolvePackagePayloadStorageTargetFromTable(
+        payloadTableByEntity.get(normalizedEntityType) || { entityType: normalizedEntityType },
+        payloadPackageId,
+        backendMode
+      );
+      const tableSummary = {
+        entityType: normalizedEntityType,
+        packageId: payloadPackageId || '',
+        backendMode,
+        storageType: packageTarget?.storageType || 'dataService',
+        storageTarget: packageTarget?.storageTarget || normalizedEntityType,
+        inserted: 0,
+        updated: 0,
+        upserted: 0
+      };
+      if (payloadPackageId && payloadTableAllowList.has(normalizedEntityType) && !packageTarget) {
+        warnings.push(`Package payload table "${normalizedEntityType}" for package "${payloadPackageId}" did not resolve to package storage; generic data service import will be used.`);
+      }
       const entityRemapFieldMap = normalizeRemapFieldMapEntry(payloadRemapFieldMap[normalizedEntityType] || {});
       const rows = sanitizeArray(payloadData[entityType]).map((row) => {
         let mapped = row;
@@ -3426,6 +3658,15 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
         const rowId = cleanText(row?.id, 200);
         let operation = 'insert';
         try {
+          if (packageTarget) {
+            // eslint-disable-next-line no-await-in-loop
+            operation = await upsertPackagePayloadEntityRow(packageTarget, row);
+            if (operation === 'update') tableSummary.updated += 1;
+            else tableSummary.inserted += 1;
+            tableSummary.upserted += 1;
+            upserted += 1;
+            continue;
+          }
           if (rowId) {
             // eslint-disable-next-line no-await-in-loop
             const existing = await deps.dataService.getDataById(entityType, rowId, SYSTEM_CONTEXT, { backendMode });
@@ -3433,12 +3674,16 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
               operation = 'update';
               // eslint-disable-next-line no-await-in-loop
               await deps.dataService.updateData(entityType, rowId, row, SYSTEM_CONTEXT, { backendMode });
+              tableSummary.updated += 1;
+              tableSummary.upserted += 1;
               upserted += 1;
               continue;
             }
           }
           // eslint-disable-next-line no-await-in-loop
           await deps.dataService.addData(entityType, row, SYSTEM_CONTEXT, { backendMode });
+          tableSummary.inserted += 1;
+          tableSummary.upserted += 1;
           upserted += 1;
         } catch (error) {
           let resolvedError = error;
@@ -3447,6 +3692,9 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
               assertUnknownEntityFallbackAllowed(entityType, payloadTableAllowList);
               // eslint-disable-next-line no-await-in-loop
               operation = await upsertUnknownEntityRow(entityType, row, { backendMode });
+              if (operation === 'update') tableSummary.updated += 1;
+              else tableSummary.inserted += 1;
+              tableSummary.upserted += 1;
               upserted += 1;
               continue;
             } catch (fallbackError) {
@@ -3468,6 +3716,7 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
           throw importError;
         }
       }
+      tableImportSummary.push(tableSummary);
     }
 
     const sourceFilesRoot = path.join(packageDir, '__builder_payload__', loadedPayload.artifactsRoot || 'files');
@@ -3563,7 +3812,8 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
       targetOrgId: targetOrgId || '',
       dataSummary: {
         entityCount: entityNames.length,
-        upserted
+        upserted,
+        tables: tableImportSummary
       },
       fileSummary: {
         copied: copiedFiles,
