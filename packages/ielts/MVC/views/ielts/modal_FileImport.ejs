@@ -1,0 +1,204 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title"><i class="bi bi-file-earmark-arrow-up me-2"></i>Import Questions</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        
+        <div id="importStep1">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Select File (CSV or JSON)</label>
+                <input type="file" id="importFile" class="form-control" accept=".csv, .json">
+                <div class="form-text">Supported formats: CSV (comma delimited), JSON array.</div>
+            </div>
+        </div>
+
+        <div id="importStep2" class="d-none">
+            <div class="alert alert-info py-2 small">
+                <i class="bi bi-info-circle me-1"></i> 
+                We found <strong><span id="importRowCount">0</span></strong> rows. Please map your file columns to the required fields below.
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-borderless align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 40%">System Field</th>
+                            <th style="width: 60%">Map to File Column</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mappingTableBody">
+                        </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-3">
+                <label class="form-label fw-bold small">Preview First Row</label>
+                <div class="bg-light p-2 rounded border font-monospace small text-muted text-truncate" id="importPreview"></div>
+            </div>
+        </div>
+
+        <div id="importError" class="alert alert-danger mt-3 d-none"></div>
+
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnProcessImport" disabled>
+            <i class="bi bi-check-lg me-1"></i> Import Selected Data
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    let importedData = [];
+    let fileHeaders = [];
+
+    // 1. File Selection Listener
+    document.getElementById('importFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        resetImportUI();
+
+        if (file.name.endsWith('.csv')) {
+            parseCSV(file);
+        } else if (file.name.endsWith('.json')) {
+            parseJSON(file);
+        } else {
+            showError("Unsupported file type. Please upload CSV or JSON.");
+        }
+    });
+
+    // 2. Parsers
+    function parseCSV(file) {
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                if (results.data && results.data.length > 0) {
+                    processParsedData(results.data, results.meta.fields);
+                } else {
+                    showError("File appears to be empty.");
+                }
+            },
+            error: function(err) {
+                showError("Error parsing CSV: " + err.message);
+            }
+        });
+    }
+
+    function parseJSON(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const json = JSON.parse(e.target.result);
+                if (Array.isArray(json) && json.length > 0) {
+                    const headers = Object.keys(json[0]);
+                    processParsedData(json, headers);
+                } else {
+                    showError("Invalid JSON structure. Expected an array of objects.");
+                }
+            } catch (err) {
+                showError("Error parsing JSON: " + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // 3. Process & Show Mapping UI
+    function processParsedData(data, headers) {
+        importedData = data;
+        fileHeaders = headers;
+
+        document.getElementById('importStep2').classList.remove('d-none');
+        document.getElementById('importRowCount').textContent = data.length;
+        document.getElementById('importPreview').textContent = JSON.stringify(data[0]);
+        document.getElementById('btnProcessImport').disabled = false;
+
+        // Generate Mapping Dropdowns based on "requiredFields" defined in the parent page
+        const tbody = document.getElementById('mappingTableBody');
+        tbody.innerHTML = '';
+
+        if (typeof requiredImportFields !== 'undefined') {
+            requiredImportFields.forEach(field => {
+                const tr = document.createElement('tr');
+                
+                // Try to auto-match headers (case-insensitive fuzzy match)
+                const likelyMatch = headers.find(h => 
+                    h.toLowerCase().includes(field.key.toLowerCase()) || 
+                    field.key.toLowerCase().includes(h.toLowerCase())
+                ) || "";
+
+                let options = `<option value="">-- Ignore --</option>`;
+                headers.forEach(h => {
+                    const selected = h === likelyMatch ? 'selected' : '';
+                    options += `<option value="${h}" ${selected}>${h}</option>`;
+                });
+
+                tr.innerHTML = `
+                    <td>
+                        <span class="fw-bold text-dark">${field.label}</span>
+                        ${field.required ? '<span class="text-danger">*</span>' : ''}
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm map-select" data-target="${field.key}">
+                            ${options}
+                        </select>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    }
+
+    function resetImportUI() {
+        document.getElementById('importStep2').classList.add('d-none');
+        document.getElementById('importError').classList.add('d-none');
+        document.getElementById('btnProcessImport').disabled = true;
+        importedData = [];
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('importError');
+        el.textContent = msg;
+        el.classList.remove('d-none');
+    }
+
+    // 4. Final Import Action
+    document.getElementById('btnProcessImport').addEventListener('click', () => {
+        // Build map: TargetField -> SourceHeader
+        const map = {};
+        document.querySelectorAll('.map-select').forEach(select => {
+            if(select.value) map[select.dataset.target] = select.value;
+        });
+
+        // Convert data
+        const finalRows = importedData.map(row => {
+            const newRow = {};
+            for (const [targetField, sourceHeader] of Object.entries(map)) {
+                newRow[targetField] = row[sourceHeader];
+            }
+            return newRow;
+        });
+
+        // Send to Parent
+        if (typeof onImportDataReady === 'function') {
+            onImportDataReady(finalRows);
+            
+            // Close Modal
+            const modalEl = document.getElementById('importModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+            
+            // Cleanup
+            document.getElementById('importFile').value = '';
+            resetImportUI();
+        }
+    });
+</script>

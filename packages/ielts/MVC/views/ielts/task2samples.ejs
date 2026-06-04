@@ -1,0 +1,142 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  manageBtns: [
+    '<a href="' + ieltsSectionDashboardHref + '" class="ielts-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> IELTS Dashboard</a>'
+  ]
+}) %>
+
+  <%- include('../partials/tablePages-search', {
+    placeholder: 'Search samples by title or content...',
+    fields: []
+  }) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="type">
+          Type <span class="sort-icon"></span>
+        </th>
+        
+        <th class="draggable" data-column="refName">
+          Reference Name <span class="sort-icon"></span>
+        </th>
+
+        <th class="draggable" data-column="refAddress">
+          Source / Address <span class="sort-icon"></span>
+        </th>
+
+        <th class="draggable" data-column="question">Question <span class="sort-icon"></span></th>
+        
+        <th class="draggable" data-column="bandScore">
+          Band <span class="sort-icon"></span>
+        </th>
+    
+        <th class="draggable" data-column="text">
+          Content Preview <span class="sort-icon"></span>
+        </th>
+
+        <th class="draggable" data-column="attachment">
+          Attachment <span class="sort-icon"></span>
+        </th>
+        
+        <th class="draggable" data-column="updatedAt">Last Updated <span class="sort-icon"></span></th>
+    
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach(sample => { %>
+        <tr>
+          <td>
+              <% 
+                let badgeClass = 'bg-secondary';
+                if(sample.type === 'ONLINE') badgeClass = 'bg-info text-dark';
+                if(sample.type === 'BOOK') badgeClass = 'bg-primary';
+                if(sample.type === 'ARTICLE') badgeClass = 'bg-success';
+                if(sample.type === 'STUDENT_SUBMISSION') badgeClass = 'bg-warning text-dark';
+                if(sample.type === 'MODEL_ANSWER') badgeClass = 'bg-dark text-white';
+              %>
+              <span class="badge <%= badgeClass %>"><%= sample.type %></span>
+          </td>
+
+          <td class="fw-bold text-primary"><%= sample.refName %></td>
+          <td>
+             <% if(sample.refAddress && sample.refAddress.startsWith('http')) { %>
+                <a href="<%= sample.refAddress %>" target="_blank" class="small text-truncate d-inline-block" style="max-width: 150px;">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Link
+                </a>
+             <% } else { %>
+                <span class="small text-muted text-truncate d-inline-block" style="max-width: 150px;"><%= sample.refAddress || '-' %></span>
+             <% } %>
+          </td>
+
+          <td>
+            <div class="text-dark small text-truncate" style="max-width: 250px;" title="<%= sample.question %>">
+                <%= sample.question || 'No question provided' %>
+            </div>
+          </td>
+          
+          <td>
+            <% if (sample.bandScore) { %>
+                <span class="badge bg-light text-dark border border-dark"><%= sample.bandScore %></span>
+            <% } else { %>
+                <span class="text-muted small">-</span>
+            <% } %>
+          </td>
+
+          <td>
+            <div class="text-muted small text-truncate" style="max-width: 200px;">
+                <%= sample.text ? sample.text.replace(/<[^>]*>?/gm, '') : 'No text content' %>
+            </div>
+          </td>
+
+          <td>
+            <% if (sample.attachment && sample.attachment.url) { %>
+                <% const isImg = sample.attachment.mimetype && sample.attachment.mimetype.startsWith('image'); %>
+                <% if(isImg) { %>
+                    <i class="bi bi-file-image text-primary cursor-pointer" 
+                       onclick="ImageViewer.open('<%= sample.attachment.url %>', '<%= sample.attachment.filename %>', '<%= sample.attachment.mimetype %>')" 
+                       title="View Image"></i>
+                <% } else { %>
+                    <a href="<%= sample.attachment.url %>" target="_blank" class="text-dark"><i class="bi bi-paperclip"></i></a>
+                <% } %>
+            <% } else { %>
+                <span class="text-muted opacity-25">-</span>
+            <% } %>
+          </td>
+
+          <td>
+            <% if (sample.updatedAt) { %>
+              <%= new Date(sample.updatedAt).toLocaleDateString() %>
+            <% } else { %>
+              —
+            <% } %>
+          </td>
+    
+          <td class="table-actions">
+            <a href="/<%=newUrl%>/edit/<%= sample.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= sample.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+    
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/modal_ImageViewer') %>
+
+<%- include('../partials/tablePages-end') %>

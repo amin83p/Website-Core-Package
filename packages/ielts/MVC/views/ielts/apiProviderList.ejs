@@ -1,0 +1,250 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  manageBtns: [
+    '<a href="' + ieltsSectionDashboardHref + '" class="ielts-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> IELTS Dashboard</a>',
+    '<button type="button" id="btnOpenDefaultApiPicker" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-key-fill me-1"></i> Default API</button>'
+  ]
+}) %>
+
+<%- include('../partials/tablePages-search', {
+  placeholder: 'Search by name, provider, model, or notes...',
+  fields: ['id', 'name', 'providerId', 'modelId', 'project', 'location', 'notes']
+}) %>
+
+<div class="table-scroll-wrapper">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable" data-column="name">Name <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="providerId">Provider <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="modelId">Model <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="project">Project <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="location">Location <span class="sort-icon"></span></th>
+        <th>Key</th>
+        <th class="draggable" data-column="isDefault">Default <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="isActive">Status <span class="sort-icon"></span></th>
+        <th class="draggable" data-column="updatedAt">Updated <span class="sort-icon"></span></th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach((item) => { %>
+        <tr>
+          <td class="fw-semibold"><%= item.name || item.id %></td>
+          <td><span class="badge bg-info text-dark"><%= item.providerId || '-' %></span></td>
+          <td><%= item.modelId || '-' %></td>
+          <td><%= item.project || '-' %></td>
+          <td><%= item.location || '-' %></td>
+          <td><span class="badge bg-light text-dark border"><%= item.apiKeyMasked || 'Not set' %></span></td>
+          <td>
+            <% if (item.isDefault) { %>
+              <span class="badge bg-primary">Default</span>
+            <% } else { %>
+              <span class="badge bg-secondary">No</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (item.isActive === false) { %>
+              <span class="badge bg-secondary">Inactive</span>
+            <% } else { %>
+              <span class="badge bg-success">Active</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (item.updatedAt) { %>
+              <%= new Date(item.updatedAt).toLocaleDateString() %>
+            <% } else { %>
+              -
+            <% } %>
+          </td>
+          <td class="table-actions">
+            <a href="/<%= newUrl %>/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', {
+  pagination: pagination,
+  filters: filters,
+  baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+<%- include('../partials/modal_GenericPicker', { user }) %>
+<%- include('../partials/modal') %>
+
+<script>
+  const btnOpenDefaultApiPicker = document.getElementById('btnOpenDefaultApiPicker');
+
+  function getActionStateId() {
+    return document.getElementById('actionStateIdRef')?.dataset?.id || '';
+  }
+
+  async function showErrorModal(title, message) {
+    if (typeof showMessageModal === 'function') {
+      return showMessageModal({
+        title,
+        icon: 'error',
+        message,
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    }
+    alert(message);
+  }
+
+  async function setDefaultProvider(providerId) {
+    const resolvedId = String(providerId || '').trim();
+    if (!resolvedId) {
+      await showErrorModal('Default API', 'Please choose one active API provider.');
+      return;
+    }
+
+    const pickerDoneBtn = document.getElementById('gp-add-selected-btn');
+    const originalText = pickerDoneBtn ? pickerDoneBtn.innerHTML : '';
+    if (pickerDoneBtn) {
+      pickerDoneBtn.disabled = true;
+      pickerDoneBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Saving...';
+    }
+
+    try {
+      const payload = new URLSearchParams();
+      payload.set('providerId', resolvedId);
+      const actionStateId = getActionStateId();
+      if (actionStateId) payload.set('actionStateId', actionStateId);
+
+      const response = await fetch('/ielts/api-providers/default', {
+        method: 'POST',
+        headers: {
+          'x-ajax-request': 'true',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        },
+        body: payload.toString()
+      });
+      const json = await response.json();
+      if (!response.ok || json.status !== 'success') {
+        throw new Error(json.message || 'Unable to update default API provider.');
+      }
+
+      if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Default Updated',
+          icon: 'success',
+          message: json.message || 'Default API provider updated.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+      }
+      window.location.reload();
+    } catch (error) {
+      await showErrorModal('Update Failed', error.message || 'Unable to update default API provider.');
+    } finally {
+      if (pickerDoneBtn) {
+        pickerDoneBtn.disabled = false;
+        pickerDoneBtn.innerHTML = originalText;
+      }
+    }
+  }
+
+  btnOpenDefaultApiPicker?.addEventListener('click', async () => {
+    if (!window.GenericPicker) {
+      await showErrorModal('Picker Unavailable', 'Generic picker is not available on this page.');
+      return;
+    }
+
+    const configFactory = (window.GenericPickerPresets && typeof window.GenericPickerPresets.ieltsApiProvider === 'function')
+      ? window.GenericPickerPresets.ieltsApiProvider
+      : ((overrides = {}) => (window.GenericPickerPresets?.normalizeConfig
+        ? window.GenericPickerPresets.normalizeConfig({
+            title: 'Select Default API',
+            icon: 'bi-key-fill',
+            apiEndpoint: '/ielts/api-providers',
+            placeholder: 'Search API providers (type --- to show all)...',
+            searchFields: 'id,name,providerId,modelId,project,location,notes',
+            ...overrides
+          })
+        : {
+            title: 'Select Default API',
+            icon: 'bi-key-fill',
+            apiEndpoint: '/ielts/api-providers',
+            placeholder: 'Search API providers (type --- to show all)...',
+            searchFields: 'id,name,providerId,modelId,project,location,notes',
+            ...overrides
+          }));
+
+    window.GenericPicker.open(configFactory({
+      context: window.GenericPickerContexts?.activeOrganizationScope
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization API Keys' })
+        : null,
+      multiselect: false,
+      onSelect: async (item) => {
+        const row = item || {};
+        const providerId = String(row.id || '').trim();
+        if (!providerId) {
+          await showErrorModal('Default API', 'Selected API record is invalid.');
+          return;
+        }
+        if (row.isActive === false) {
+          await showErrorModal('Default API', 'Inactive API providers cannot be set as default.');
+          return;
+        }
+        await setDefaultProvider(providerId);
+      }
+    }));
+  });
+
+  document.querySelectorAll('.delete-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      if (!id) return;
+
+      let allowDelete = false;
+      if (typeof showMessageModal === 'function') {
+        const result = await showMessageModal({
+          title: 'Delete API Provider',
+          icon: 'warning',
+          message: `Are you sure you want to delete <b>${id}</b>?`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Delete', class: 'btn-warning' }
+          ]
+        });
+        allowDelete = result === 'Delete';
+      } else {
+        allowDelete = confirm(`Delete ${id}?`);
+      }
+
+      if (!allowDelete) return;
+
+      try {
+        const actionStateId = getActionStateId();
+        const payload = new URLSearchParams();
+        if (actionStateId) payload.set('actionStateId', actionStateId);
+        const response = await fetch(`/ielts/api-providers/delete/${encodeURIComponent(id)}`, {
+          method: 'POST',
+          headers: {
+            'x-ajax-request': 'true',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+          },
+          body: payload.toString()
+        });
+        const json = await response.json();
+        if (!response.ok || json.status !== 'success') {
+          throw new Error(json.message || 'Delete failed.');
+        }
+        window.location.reload();
+      } catch (error) {
+        await showErrorModal('Delete Failed', error.message || 'Unable to delete API provider.');
+      }
+    });
+  });
+</script>
+

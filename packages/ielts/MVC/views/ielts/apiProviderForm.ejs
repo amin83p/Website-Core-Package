@@ -1,0 +1,230 @@
+<%
+  const isEdit = Boolean(apiProvider && apiProvider.id);
+  const record = apiProvider || {};
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit API Provider' : 'Create API Provider' %></h1>
+    <% if (isEdit) { %>
+      <span class="badge bg-primary border">ID: <%= record.id %></span>
+    <% } else { %>
+      <span class="badge bg-success border">New API Provider</span>
+    <% } %>
+  </div>
+
+  <div class="form-container" style="width: 100%; max-width: 1400px;">
+    <form id="apiProviderForm" action="<%= isEdit ? '/ielts/api-providers/edit/' + record.id : '/ielts/api-providers/new' %>" method="POST">
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+
+      <div class="row">
+        <div class="col-md-7 mb-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-bold text-primary">
+              <i class="bi bi-key-fill me-2"></i>Provider Configuration
+            </div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Label <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" name="name" value="<%= record.name || '' %>" placeholder="My Gemini Key" required>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Provider <span class="text-danger">*</span></label>
+                <select class="form-select" name="providerId" required>
+                  <option value="">Select provider</option>
+                  <% (providerOptions || []).forEach((row) => { %>
+                    <option value="<%= row.id %>" <%= String(record.providerId || '') === String(row.id) ? 'selected' : '' %>><%= row.label %></option>
+                  <% }) %>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">API Key <%= isEdit ? '' : '<span class="text-danger">*</span>' %></label>
+                <input type="password" class="form-control" name="apiKey" placeholder="<%= isEdit ? 'Leave blank to keep current key' : 'Paste provider API key' %>" <%= isEdit ? '' : 'required' %>>
+                <% if (isEdit && record.apiKeyMasked) { %>
+                  <div class="form-text">Current key: <b><%= record.apiKeyMasked %></b></div>
+                <% } %>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Model (Optional)</label>
+                <input type="text" class="form-control" name="modelId" value="<%= record.modelId || '' %>" placeholder="gemini-2.5-flash">
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Project (Optional)</label>
+                  <input type="text" class="form-control" name="project" value="<%= record.project || '' %>" placeholder="my-gcp-project-id">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-uppercase">Location (Optional)</label>
+                  <input type="text" class="form-control" name="location" value="<%= record.location || '' %>" placeholder="us-central1">
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted text-uppercase">Notes</label>
+                <textarea class="form-control" name="notes" rows="4" placeholder="Optional notes for this key..."><%= record.notes || '' %></textarea>
+              </div>
+
+              <div class="d-flex flex-wrap align-items-center gap-4 pt-2">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="isDefault" name="isDefault" <%= record.isDefault ? 'checked' : '' %>>
+                  <label class="form-check-label fw-bold small" for="isDefault">Use as default key</label>
+                </div>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="isActive" name="isActive" <%= record.isActive === false ? '' : 'checked' %>>
+                  <label class="form-check-label fw-bold small" for="isActive">Active</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-5 mb-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-bold text-primary">
+              <i class="bi bi-shield-lock me-2"></i>Usage Notes
+            </div>
+            <div class="card-body">
+              <ul class="mb-0 ps-3">
+                <li class="mb-2">Each user only sees and manages their own API keys.</li>
+                <li class="mb-2">Keys are stored encrypted at rest.</li>
+                <li class="mb-2">Set one record as default to reduce model selection friction.</li>
+                <li class="mb-2">Keep inactive keys for audit/history if needed.</li>
+                <li class="mb-2">You can rotate keys by editing and pasting a new value.</li>
+                <li class="mb-0">For Google Vertex AI, Project/Location enables project-scoped endpoints; with API key only, express mode (<code>publishers/google/models/*</code>) is also supported.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">
+          <i class="bi bi-save me-1"></i> Save
+        </button>
+        <a href="/ielts/api-providers" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal') %>
+
+<script>
+  async function showSaveResultModal({ title, icon, message }) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title,
+        icon,
+        message,
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+      return;
+    }
+    alert(message);
+  }
+
+  const apiProviderForm = document.getElementById('apiProviderForm');
+  const apiProviderSaveBtn = apiProviderForm ? apiProviderForm.querySelector('button[type="submit"]') : null;
+  const apiProviderCancelBtn = document.getElementById('btnCancelAction');
+  let isSubmitting = false;
+
+  function cacheButtonHtml(button) {
+    if (!button) return;
+    if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+  }
+
+  function setButtonBusy(button, label) {
+    if (!button) return;
+    cacheButtonHtml(button);
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + (label || 'Working...');
+    if (button.tagName === 'A') {
+      button.classList.add('disabled');
+      button.setAttribute('aria-disabled', 'true');
+      button.style.pointerEvents = 'none';
+    }
+  }
+
+  function restoreButton(button) {
+    if (!button) return;
+    if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+    button.disabled = false;
+    if (button.tagName === 'A') {
+      button.classList.remove('disabled');
+      button.removeAttribute('aria-disabled');
+      button.style.pointerEvents = '';
+    }
+  }
+
+  cacheButtonHtml(apiProviderSaveBtn);
+  cacheButtonHtml(apiProviderCancelBtn);
+
+  if (apiProviderCancelBtn) {
+    apiProviderCancelBtn.addEventListener('click', (event) => {
+      if (isSubmitting) {
+        event.preventDefault();
+        return;
+      }
+      setButtonBusy(apiProviderCancelBtn, 'Cancelling...');
+      if (apiProviderSaveBtn) apiProviderSaveBtn.disabled = true;
+    });
+  }
+
+  apiProviderForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    isSubmitting = true;
+    const form = e.currentTarget;
+
+    try {
+      setButtonBusy(apiProviderSaveBtn, 'Saving...');
+      if (apiProviderCancelBtn) apiProviderCancelBtn.disabled = true;
+
+      const formData = new FormData(form);
+      const payload = new URLSearchParams();
+      for (const [key, value] of formData.entries()) {
+        payload.append(key, value);
+      }
+
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'x-ajax-request': 'true'
+        },
+        body: payload.toString()
+      });
+
+      let result = null;
+      try {
+        result = await response.json();
+      } catch (_) {
+        result = { status: 'error', message: 'Unexpected response while saving record.' };
+      }
+
+      if (!response.ok || result.status !== 'success') {
+        throw new Error(result.message || 'Failed to save API provider.');
+      }
+
+      await showSaveResultModal({
+        title: 'Saved',
+        icon: 'success',
+        message: result.message || 'API provider saved successfully.'
+      });
+      window.location.href = '/ielts/api-providers';
+    } catch (error) {
+      await showSaveResultModal({
+        title: 'Save Failed',
+        icon: 'error',
+        message: error.message || 'Unable to save API provider.'
+      });
+      isSubmitting = false;
+      restoreButton(apiProviderSaveBtn);
+      restoreButton(apiProviderCancelBtn);
+    }
+  });
+</script>

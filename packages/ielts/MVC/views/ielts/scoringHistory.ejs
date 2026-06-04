@@ -1,0 +1,1850 @@
+<%
+  const isArchiveView = String(filters?.archiveView || '').trim().toLowerCase() === 'archived';
+  const archiveToggleHref = isArchiveView ? '/ielts/scoring/history' : '/ielts/scoring/history?archiveView=archived';
+  const archiveToggleIcon = isArchiveView ? 'bi-list-ul' : 'bi-archive';
+  const archiveToggleLabel = isArchiveView ? 'Main Scoring List' : 'Archived Items';
+%>
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newHref: newUrl,
+  newLabel: null,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  headerManageBtns: [
+    '<a href="' + ieltsSectionDashboardHref + '" class="ielts-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> IELTS Dashboard</a>',
+    '<a href="/ielts/scoring/dashboard" class="btn btn-filled btn-outline-secondary btn-md mb-2"><i class="bi bi-graph-up-arrow me-1"></i> Scoring Dashboard</a>'
+  ],
+  manageBtns: [
+    '<a href="' + archiveToggleHref + '" class="btn btn-filled btn-outline-primary btn-md mb-2"><i class="bi ' + archiveToggleIcon + ' me-1"></i> ' + archiveToggleLabel + '</a>'
+  ]
+}) %>
+
+<%- include('../partials/tablePages-search', {
+    placeholder: 'Search history...',
+    fields: []
+}) %>
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <div class="d-flex align-items-center gap-3 flex-nowrap">
+    <div class="d-flex align-items-center gap-2 flex-nowrap">
+      <label for="historyTypeFilter" class="small fw-bold text-muted m-0">Result Type</label>
+      <select id="historyTypeFilter" class="form-select form-select-sm w-auto" style="min-width: 165px;" onchange="applyHistoryTypeFilter(this.value)">
+        <% const selectedType = String(filters?.resultType || 'all'); %>
+        <option value="all" <%= selectedType === 'all' ? 'selected' : '' %>>All Types</option>
+        <option value="full" <%= selectedType === 'full' ? 'selected' : '' %>>Full Pipeline</option>
+        <option value="step3_tuning" <%= selectedType === 'step3_tuning' ? 'selected' : '' %>>Step 3 Tuning</option>
+        <option value="step4_tuning" <%= selectedType === 'step4_tuning' ? 'selected' : '' %>>Step 4 Tuning</option>
+      </select>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-nowrap">
+      <label for="scoringViewFilter" class="small fw-bold text-muted m-0">Scoring View</label>
+      <select id="scoringViewFilter" class="form-select form-select-sm w-auto" style="min-width: 190px;" onchange="applyScoringViewFilter(this.value)">
+        <% const selectedScoringView = String(filters?.scoringView || 'all'); %>
+        <option value="all" <%= selectedScoringView === 'all' ? 'selected' : '' %>>All Views</option>
+        <option value="scoringV0225" <%= selectedScoringView === 'scoringV0225' ? 'selected' : '' %>>scoringV0225.ejs</option>
+        <option value="scoringV0323" <%= selectedScoringView === 'scoringV0323' ? 'selected' : '' %>>scoringV0323.ejs</option>
+        <option value="scoringV0326" <%= selectedScoringView === 'scoringV0326' ? 'selected' : '' %>>scoringV0326.ejs</option>
+        <option value="scoringStandard" <%= selectedScoringView === 'scoringStandard' ? 'selected' : '' %>>scoringStandard.ejs</option>
+      </select>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-nowrap">
+      <label for="runCategoryFilter" class="small fw-bold text-muted m-0">Category</label>
+      <% const selectedRunCategory = String(filters?.runCategory || 'all'); %>
+      <% const categoryOptions = Array.isArray(runCategoryOptions) ? runCategoryOptions : []; %>
+      <select id="runCategoryFilter" class="form-select form-select-sm w-auto" style="min-width: 210px;" onchange="applyRunCategoryFilter(this.value)">
+        <option value="all" <%= selectedRunCategory === 'all' ? 'selected' : '' %>>All Categories</option>
+        <option value="uncategorized" <%= selectedRunCategory === 'uncategorized' ? 'selected' : '' %>>Uncategorized</option>
+        <% categoryOptions.forEach((opt) => { %>
+          <% const optKey = String(opt?.key || '').trim(); %>
+          <% if (!optKey) return; %>
+          <option value="<%= optKey %>" <%= selectedRunCategory === optKey ? 'selected' : '' %>>
+            <%= String(opt?.label || optKey) %><%= String(opt?.color || '').trim() ? (' (' + String(opt?.color || '').trim() + ')') : '' %>
+          </option>
+        <% }) %>
+      </select>
+    </div>
+  </div>
+  <div class="small text-muted">
+    <% if (isArchiveView) { %>
+      Archive View: showing archived sessions only.
+    <% } else { %>
+      Comparison is available for Full Pipeline and Step 3 Tuning (same-type selection required).
+    <% } %>
+  </div>
+</div>
+
+<div id="compareToolbar" class="alert alert-info d-flex justify-content-between align-items-center mb-3 d-none">
+    <div>
+        <i class="bi bi-check-square-fill me-2"></i>
+        <span class="fw-bold" id="compareCount">0</span> sessions selected
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <% if (isSuperUser) { %>
+        <button id="cloneSelectedBtn" class="btn btn-warning btn-sm fw-bold d-none" onclick="openCloneModal()">
+          <i class="bi bi-copy me-1"></i> Create Synthetic Copies
+        </button>
+      <% } %>
+      <button class="btn btn-primary btn-sm fw-bold" onclick="goToComparison()">
+          <i class="bi bi-columns-gap me-1"></i> Compare Selected
+      </button>
+      <button id="saveSelectedToFileBtn" class="btn btn-outline-primary btn-sm fw-bold d-none" onclick="saveSelectedSessionsToFile()">
+          <i class="bi bi-download me-1"></i> Save to File
+      </button>
+      <button id="categorySelectedBtn" class="btn btn-outline-secondary btn-sm fw-bold d-none" onclick="openCategoryModal()">
+          <i class="bi bi-palette me-1"></i> Set Category
+      </button>
+      <button id="clearCategorySelectedBtn" class="btn btn-outline-danger btn-sm fw-bold d-none" onclick="clearCategoryForSelected()">
+          <i class="bi bi-eraser me-1"></i> Clear Category
+      </button>
+      <button
+        id="archiveSelectedBtn"
+        class="btn <%= isArchiveView ? 'btn-success' : 'btn-warning' %> btn-sm fw-bold d-none"
+        onclick="archiveSelectedSessions()">
+        <i class="bi <%= isArchiveView ? 'bi-arrow-counterclockwise' : 'bi-archive' %> me-1"></i>
+        <%= isArchiveView ? 'Restore Selected' : 'Archive Selected' %>
+      </button>
+      <button id="deleteSelectedBtn" class="btn btn-danger btn-sm fw-bold d-none" onclick="deleteSelectedSessions()">
+          <i class="bi bi-trash me-1"></i> Delete Selected
+      </button>
+    </div>
+</div>
+<% if (isSuperUser) { %>
+<div class="modal fade" id="cloneSessionModal" tabindex="-1" aria-hidden="true" style="z-index: 1080;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-copy me-2"></i>Create Synthetic Copies</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="cloneSourceSessionId" value="">
+        <div class="small text-muted mb-2">Selected Session</div>
+        <div id="cloneSourceSessionText" class="font-monospace small bg-light border rounded p-2 mb-3">-</div>
+        <label for="cloneCopiesInput" class="form-label fw-bold">Number of Copies</label>
+        <input type="number" class="form-control" id="cloneCopiesInput" min="1" max="100" value="9">
+        <div class="form-text">
+          Step 1 to Step 4 results are copied, Step 5 is removed, and all time fields are regenerated between source save time and now.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-filled" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="confirmCloneBtn" class="btn btn-warning btn-filled" onclick="confirmCloneSelected()">
+          <i class="bi bi-magic me-1"></i> Create Copies
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+<div class="modal fade" id="categorySessionModal" tabindex="-1" aria-hidden="true" style="z-index: 1086;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-sm">
+      <div class="modal-header">
+        <h5 class="modal-title mb-0"><i class="bi bi-palette me-2"></i>Set Category</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small text-muted mb-2">
+          This category (label + color) will be assigned to all selected sessions.
+          If a session already has a category, it will be replaced.
+        </div>
+        <div class="mb-3">
+          <label for="runCategoryLabelInput" class="form-label fw-bold">Category Label</label>
+          <input id="runCategoryLabelInput" type="text" class="form-control" maxlength="60" placeholder="e.g., Round 1 Baseline">
+        </div>
+        <div class="mb-1">
+          <label for="runCategoryColorInput" class="form-label fw-bold">Background Color</label>
+          <input id="runCategoryColorInput" type="color" class="form-control form-control-color" value="#FFD966" title="Choose category color">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-filled" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="confirmCategoryBtn" class="btn btn-primary btn-filled" onclick="applyCategoryToSelected()">
+          <i class="bi bi-check2-circle me-1"></i> Apply Category
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="bandBreakdownModal" tabindex="-1" aria-hidden="true" style="z-index: 1085;">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-sm">
+      <div class="modal-header py-2">
+        <h6 class="modal-title mb-0">
+          <i class="bi bi-bar-chart-steps me-2"></i>Band Breakdown
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-3">
+        <div class="d-flex justify-content-center mb-3">
+          <div class="band-breakdown-pie" id="bandBreakdownPie" style="--pie-percent: 0;">
+            <div class="band-breakdown-pie-inner">
+              <div class="text-muted small">Overall</div>
+              <div class="fw-bold fs-4 text-primary lh-1" id="bandBreakdownOverall">-</div>
+              <div class="small text-muted" id="bandBreakdownOverallPercent">0%</div>
+            </div>
+          </div>
+        </div>
+        <div class="d-grid gap-2">
+          <div class="band-breakdown-row border rounded px-2 py-2 bg-primary-subtle border-primary-subtle">
+            <div class="d-flex align-items-center justify-content-between">
+              <span class="fw-semibold text-primary">TR</span>
+              <span class="fw-bold text-primary">
+                <span id="bandBreakdownTR">-</span>
+                <span class="small text-muted ms-1" id="bandBreakdownTRPercent">0%</span>
+              </span>
+            </div>
+            <div class="band-breakdown-track mt-1">
+              <div class="band-breakdown-fill is-tr" id="bandBreakdownTRBar"></div>
+            </div>
+          </div>
+          <div class="band-breakdown-row border rounded px-2 py-2 bg-success-subtle border-success-subtle">
+            <div class="d-flex align-items-center justify-content-between">
+              <span class="fw-semibold text-success">CC</span>
+              <span class="fw-bold text-success">
+                <span id="bandBreakdownCC">-</span>
+                <span class="small text-muted ms-1" id="bandBreakdownCCPercent">0%</span>
+              </span>
+            </div>
+            <div class="band-breakdown-track mt-1">
+              <div class="band-breakdown-fill is-cc" id="bandBreakdownCCBar"></div>
+            </div>
+          </div>
+          <div class="band-breakdown-row border rounded px-2 py-2 bg-warning-subtle border-warning-subtle">
+            <div class="d-flex align-items-center justify-content-between">
+              <span class="fw-semibold text-warning-emphasis">LR</span>
+              <span class="fw-bold text-warning-emphasis">
+                <span id="bandBreakdownLR">-</span>
+                <span class="small text-muted ms-1" id="bandBreakdownLRPercent">0%</span>
+              </span>
+            </div>
+            <div class="band-breakdown-track mt-1">
+              <div class="band-breakdown-fill is-lr" id="bandBreakdownLRBar"></div>
+            </div>
+          </div>
+          <div class="band-breakdown-row border rounded px-2 py-2 bg-info-subtle border-info-subtle">
+            <div class="d-flex align-items-center justify-content-between">
+              <span class="fw-semibold text-info-emphasis">GRA</span>
+              <span class="fw-bold text-info-emphasis">
+                <span id="bandBreakdownGRA">-</span>
+                <span class="small text-muted ms-1" id="bandBreakdownGRAPercent">0%</span>
+              </span>
+            </div>
+            <div class="band-breakdown-track mt-1">
+              <div class="band-breakdown-fill is-gra" id="bandBreakdownGRABar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  #bandBreakdownModal .band-breakdown-pie {
+    --pie-percent: 0;
+    width: 108px;
+    height: 108px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: conic-gradient(var(--bs-primary) calc(var(--pie-percent) * 1%), #e9ecef 0);
+  }
+  #bandBreakdownModal .band-breakdown-pie-inner {
+    width: 78px;
+    height: 78px;
+    border-radius: 50%;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.12);
+  }
+  #bandBreakdownModal .band-breakdown-track {
+    height: 8px;
+    width: 100%;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+  }
+  #bandBreakdownModal .band-breakdown-fill {
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    transition: width 180ms ease;
+  }
+  #bandBreakdownModal .band-breakdown-fill.is-tr { background: var(--bs-primary); }
+  #bandBreakdownModal .band-breakdown-fill.is-cc { background: var(--bs-success); }
+  #bandBreakdownModal .band-breakdown-fill.is-lr { background: #d69e2e; }
+  #bandBreakdownModal .band-breakdown-fill.is-gra { background: var(--bs-info); }
+</style>
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+
+    <thead>
+      <tr>
+        <th style="width: 60px;" class="text-center ps-4" data-column="select" title="Select all / Deselect all">
+            <label class="d-flex align-items-center gap-1 mb-0" for="selectAll" style="cursor: pointer;">
+                <input type="checkbox" class="form-check-input" id="selectAll" onclick="toggleAll(this)">
+                <span class="small text-muted">Select</span>
+            </label>
+        </th>
+        <th class="draggable dragable" data-column="savedAt">Date <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="sampleName">Essay / Sample <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="pipelineMode">Type <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="scoringView">Scoring Page <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="overallBand">Band <span class="sort-icon"></span></th>
+        <th class="draggable dragable" data-column="status">Status <span class="sort-icon"></span></th>
+        <th class="text-end pe-4" data-column="actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if((data || []).length === 0) { %>
+        <tr>
+          <td colspan="8" class="text-center py-4 text-muted">No scoring sessions found.</td>
+        </tr>
+      <% } %>
+      <% data.forEach(item => { %>
+        <tr style="<%= String(item.rowStyle || '') %>">
+          <td class="text-center ps-4">
+             <input type="checkbox" class="form-check-input session-checkbox" value="<%= item.id %>" data-type="<%= item.pipelineMode || 'full' %>" onchange="updateCompareState()">
+          </td>
+          <td>
+             <span class="text-muted small">
+                <%= new Date(item.savedAt).toLocaleDateString() %> 
+                <span class="text-muted opacity-50"><%= new Date(item.savedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) %></span>
+             </span>
+          </td>
+
+          <td>
+             <div class="fw-bold text-dark"><%= item.sampleName %></div>
+             <div class="small text-muted font-monospace"><%= item.id %></div>
+             <% if (item.runCategoryAssigned && item.runCategoryLabel && item.runCategoryColor) { %>
+                <div class="mt-1">
+                  <span class="badge border" style="background-color: <%= item.runCategoryColor %>; color: #111;">
+                    <i class="bi bi-palette-fill me-1"></i><%= item.runCategoryLabel %>
+                  </span>
+                </div>
+             <% } %>
+          </td>
+
+          <td>
+            <% const step3ModelUsed = String(item.step3ModelUsed || '').trim(); %>
+            <% const step4ModelUsed = String(item.step4ModelUsed || '').trim(); %>
+            <% const step5ModelUsed = String(item.step5ModelUsed || '').trim(); %>
+            <% if ((item.pipelineMode || 'full') === 'step3_tuning') { %>
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Step 3 Tuning</span>
+            <% } else if ((item.pipelineMode || 'full') === 'step4_tuning') { %>
+              <span class="badge bg-success-subtle text-success border border-success-subtle">Step 4 Tuning</span>
+            <% } else { %>
+              <span class="badge bg-light text-dark border">Full Pipeline</span>
+            <% } %>
+            <% if (step3ModelUsed || step4ModelUsed || step5ModelUsed) { %>
+              <div class="small text-muted mt-1 lh-sm">
+                <% if (step3ModelUsed) { %>
+                  <div><span class="fw-semibold">S3:</span> <span class="font-monospace"><%= step3ModelUsed %></span></div>
+                <% } %>
+                <% if (step4ModelUsed) { %>
+                  <div><span class="fw-semibold">S4:</span> <span class="font-monospace"><%= step4ModelUsed %></span></div>
+                <% } %>
+                <% if (step5ModelUsed) { %>
+                  <div><span class="fw-semibold">S5:</span> <span class="font-monospace"><%= step5ModelUsed %></span></div>
+                <% } %>
+              </div>
+            <% } %>
+          </td>
+
+          <td>
+            <% const scoringView = String(item.scoringView || 'scoringV0225'); %>
+            <% if (scoringView === 'scoringV0326') { %>
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle">scoringV0326.ejs</span>
+            <% } else if (scoringView === 'scoringV0323') { %>
+              <span class="badge bg-warning-subtle text-warning border border-warning-subtle">scoringV0323.ejs</span>
+            <% } else if (scoringView === 'scoringStandard') { %>
+              <span class="badge bg-info-subtle text-info border border-info-subtle">scoringStandard.ejs</span>
+            <% } else { %>
+              <span class="badge bg-light text-dark border">scoringV0225.ejs</span>
+            <% } %>
+          </td>
+          
+          <td>
+             <% const criterionScores = item.criterionScores || {}; %>
+             <% const trScore = (criterionScores.TR !== undefined && criterionScores.TR !== null) ? criterionScores.TR : ''; %>
+             <% const ccScore = (criterionScores.CC !== undefined && criterionScores.CC !== null) ? criterionScores.CC : ''; %>
+             <% const lrScore = (criterionScores.LR !== undefined && criterionScores.LR !== null) ? criterionScores.LR : ''; %>
+             <% const graScore = (criterionScores.GRA !== undefined && criterionScores.GRA !== null) ? criterionScores.GRA : ''; %>
+             <% if(item.overallBand && item.overallBand !== 'N/A') { %>
+                <button
+                  type="button"
+                  class="badge bg-primary fs-6 border-0 js-open-band-breakdown"
+                  style="cursor: pointer;"
+                  data-overall="<%= item.overallBand %>"
+                  data-tr="<%= trScore %>"
+                  data-cc="<%= ccScore %>"
+                  data-lr="<%= lrScore %>"
+                  data-gra="<%= graScore %>"
+                  title="Show TR/CC/LR/GRA breakdown">
+                  <%= item.overallBand %>
+                </button>
+             <% } else { %>
+                <span class="text-muted small">—</span>
+             <% } %>
+             <div class="small text-muted mt-1">
+                Examiner Ref:
+                <% if(item.examinerBandScore !== undefined && item.examinerBandScore !== null && item.examinerBandScore !== '') { %>
+                  <span class="badge bg-light text-dark border font-monospace"><%= item.examinerBandScore %></span>
+                <% } else { %>
+                  <span class="font-monospace">-</span>
+                <% } %>
+             </div>
+          </td>
+
+          <td>
+            <% if(item.status === 'Complete') { %>
+                <span class="badge bg-success bg-opacity-10 text-success border border-success">Complete</span>
+            <% } else { %>
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">In Progress</span>
+            <% } %>
+            <% if (item.isArchived) { %>
+              <div class="mt-1">
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Archived</span>
+              </div>
+            <% } %>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                data-load-url="<%= item.loadUrl || ('/ielts/scoring-standard?loadId=' + item.id) %>"
+                title="Session Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="<%= item.loadUrl || ('/ielts/scoring-standard?loadId=' + item.id) %>" class="btn btn-outline-secondary btn-sm js-reload-session" data-load-url="<%= item.loadUrl || ('/ielts/scoring-standard?loadId=' + item.id) %>">
+                  <i class="bi bi-arrow-clockwise me-2"></i>Reload
+                </a>
+                <button type="button" class="btn btn-outline-secondary btn-sm js-save-session-file" data-session-id="<%= item.id %>" data-sample-name="<%= item.sampleName || '' %>">
+                  <i class="bi bi-download me-2"></i>Save to File
+                </button>
+                <% if ((item.pipelineMode || 'full') === 'full') { %>
+                  <button type="button" class="btn btn-outline-primary btn-sm js-create-up-to-step" data-session-id="<%= item.id %>" data-up-to-step="1">
+                    <i class="bi bi-1-circle me-2"></i>Create new up to Step 1
+                  </button>
+                  <button type="button" class="btn btn-outline-primary btn-sm js-create-up-to-step" data-session-id="<%= item.id %>" data-up-to-step="2">
+                    <i class="bi bi-2-circle me-2"></i>Create new up to Step 2
+                  </button>
+                  <button type="button" class="btn btn-outline-primary btn-sm js-create-up-to-step" data-session-id="<%= item.id %>" data-up-to-step="3">
+                    <i class="bi bi-3-circle me-2"></i>Create new up to Step 3
+                  </button>
+                  <button type="button" class="btn btn-outline-primary btn-sm js-create-up-to-step" data-session-id="<%= item.id %>" data-up-to-step="4">
+                    <i class="bi bi-4-circle me-2"></i>Create new up to Step 4
+                  </button>
+                  <% if (isSuperUser) { %>
+                    <button type="button" class="btn btn-outline-warning btn-sm js-open-clone-modal" data-session-id="<%= item.id %>" data-type="<%= item.pipelineMode || 'full' %>">
+                      <i class="bi bi-copy me-2"></i>Create Synthetic Copies
+                    </button>
+                  <% } %>
+                <% } else { %>
+                  <button type="button" class="btn btn-outline-secondary btn-sm disabled" disabled title="Available for Full Pipeline sessions only">
+                    <i class="bi bi-info-circle me-2"></i>Up-to-step options need Full Pipeline
+                  </button>
+                <% } %>
+                <% if (item.isArchived) { %>
+                  <button type="button" class="btn btn-outline-success btn-sm js-unarchive-session" data-session-id="<%= item.id %>">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Restore to Main List
+                  </button>
+                <% } else { %>
+                  <button type="button" class="btn btn-outline-warning btn-sm js-archive-session" data-session-id="<%= item.id %>">
+                    <i class="bi bi-archive me-2"></i>Move to Archive
+                  </button>
+                <% } %>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pagination', { 
+    pagination: pagination, 
+    filters: filters, 
+    baseUrlPath: newUrl
+}) %>
+
+<%- include('../partials/tablePages-end') %>
+<script>
+    const CAN_CREATE_SYNTHETIC_COPIES = <%= isSuperUser ? 'true' : 'false' %>;
+    const SCORING_HISTORY_IS_ARCHIVE_VIEW = <%= isArchiveView ? 'true' : 'false' %>;
+    const SCORING_HISTORY_TOTAL_ITEMS = <%= Number(pagination?.totalItems || 0) %>;
+    let cloneModalSourceSessionId = '';
+    let cloneModalSourceType = '';
+
+    function getSelectedSessionNodes() {
+        return Array.from(document.querySelectorAll('.session-checkbox:checked'));
+    }
+
+    function getSelectedSessionIds() {
+        return getSelectedSessionNodes().map((cb) => String(cb.value || '').trim()).filter(Boolean);
+    }
+
+    function getSingleSelectedSessionId() {
+        const selected = getSelectedSessionIds();
+        if (selected.length !== 1) return null;
+        return selected[0];
+    }
+
+    function updateCompareState() {
+        const checkboxes = document.querySelectorAll('.session-checkbox');
+        const selected = document.querySelectorAll('.session-checkbox:checked');
+        const bar = document.getElementById('compareToolbar');
+        const count = document.getElementById('compareCount');
+        const selectAll = document.getElementById('selectAll');
+        const cloneBtn = document.getElementById('cloneSelectedBtn');
+        const saveSelectedToFileBtn = document.getElementById('saveSelectedToFileBtn');
+        const categorySelectedBtn = document.getElementById('categorySelectedBtn');
+        const clearCategorySelectedBtn = document.getElementById('clearCategorySelectedBtn');
+        const archiveSelectedBtn = document.getElementById('archiveSelectedBtn');
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+
+        if (selected.length > 0) {
+            bar.classList.remove('d-none');
+            count.textContent = selected.length;
+        } else {
+            bar.classList.add('d-none');
+        }
+
+        if (cloneBtn && CAN_CREATE_SYNTHETIC_COPIES) {
+            const singleNode = selected.length === 1 ? selected[0] : null;
+            const isSingleFull = singleNode && String(singleNode.dataset?.type || 'full').toLowerCase() === 'full';
+            cloneBtn.classList.toggle('d-none', !isSingleFull);
+        }
+        if (saveSelectedToFileBtn) {
+            saveSelectedToFileBtn.classList.toggle('d-none', selected.length <= 1);
+        }
+        if (categorySelectedBtn) {
+            categorySelectedBtn.classList.toggle('d-none', selected.length <= 0);
+        }
+        if (clearCategorySelectedBtn) {
+            clearCategorySelectedBtn.classList.toggle('d-none', selected.length <= 0);
+        }
+        if (archiveSelectedBtn) {
+            archiveSelectedBtn.classList.toggle('d-none', selected.length <= 1);
+        }
+        if (deleteSelectedBtn) {
+            deleteSelectedBtn.classList.toggle('d-none', selected.length <= 2);
+        }
+
+        if (selectAll && checkboxes.length > 0) {
+            selectAll.checked = selected.length === checkboxes.length;
+            selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+        }
+    }
+
+    function toggleAll(source) {
+        document.querySelectorAll('.session-checkbox').forEach(cb => cb.checked = source.checked);
+        const selectAll = document.getElementById('selectAll');
+        if (selectAll) selectAll.indeterminate = false;
+        updateCompareState();
+    }
+
+    function shouldExpandCategorySelectionToAllFiltered(selectedIds = []) {
+      const selectAll = document.getElementById('selectAll');
+      const visibleCount = document.querySelectorAll('.session-checkbox').length;
+      const selectedCount = Array.isArray(selectedIds) ? selectedIds.length : 0;
+      if (!selectAll || !selectAll.checked) return false;
+      if (visibleCount <= 0 || selectedCount < visibleCount) return false;
+      return SCORING_HISTORY_TOTAL_ITEMS > selectedCount;
+    }
+
+    async function fetchAllFilteredSessionIds() {
+      const idSet = new Set();
+      const baseParams = new URLSearchParams(window.location.search || '');
+      baseParams.delete('page');
+      baseParams.set('limit', '250');
+      let page = 1;
+      let totalPages = 1;
+
+      while (page <= totalPages) {
+        const params = new URLSearchParams(baseParams.toString());
+        params.set('page', String(page));
+        const query = params.toString();
+        const response = await fetch(query ? `${window.location.pathname}?${query}` : window.location.pathname, {
+          headers: { 'X-AJAX-Request': 'true' }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.status !== 'success') {
+          throw new Error(payload?.message || `Unable to load filtered sessions (status ${response.status}).`);
+        }
+
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        rows.forEach((row) => {
+          const id = String(row?.id || row?.sessionId || '').trim();
+          if (id) idSet.add(id);
+        });
+
+        const nextTotalPages = Number.parseInt(payload?.pagination?.totalPages, 10);
+        totalPages = Number.isFinite(nextTotalPages) && nextTotalPages > 0 ? nextTotalPages : page;
+        page += 1;
+      }
+
+      return Array.from(idSet);
+    }
+
+    async function resolveCategoryTargetIds(selectedIds = []) {
+      const uniqueSelectedIds = Array.from(new Set(
+        (Array.isArray(selectedIds) ? selectedIds : [])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean)
+      ));
+      if (!uniqueSelectedIds.length) {
+        return { ids: [], expanded: false };
+      }
+      if (!shouldExpandCategorySelectionToAllFiltered(uniqueSelectedIds)) {
+        return { ids: uniqueSelectedIds, expanded: false };
+      }
+
+      const allFilteredIds = await fetchAllFilteredSessionIds();
+      if (!allFilteredIds.length) {
+        return { ids: uniqueSelectedIds, expanded: false };
+      }
+      return { ids: allFilteredIds, expanded: true };
+    }
+
+    function openCategoryModal() {
+      const selectedIds = getSelectedSessionIds();
+      if (!selectedIds.length) {
+        if (typeof showMessageModal === 'function') {
+          showMessageModal({
+            title: 'Select Sessions',
+            icon: 'warning',
+            message: 'Please select at least one session first.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        } else {
+          alert('Please select at least one session first.');
+        }
+        return;
+      }
+
+      const modalEl = document.getElementById('categorySessionModal');
+      if (!modalEl || typeof bootstrap === 'undefined') return;
+
+      if (modalEl.parentElement !== document.body) {
+        document.body.appendChild(modalEl);
+      }
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    async function applyCategoryToSelected() {
+      const selectedIds = getSelectedSessionIds();
+      if (!selectedIds.length) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Select Sessions',
+            icon: 'warning',
+            message: 'Please select at least one session first.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        } else {
+          alert('Please select at least one session first.');
+        }
+        return;
+      }
+
+      const labelInput = document.getElementById('runCategoryLabelInput');
+      const colorInput = document.getElementById('runCategoryColorInput');
+      const label = String(labelInput?.value || '').trim();
+      const color = String(colorInput?.value || '').trim();
+      if (!label) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Label Required',
+            icon: 'warning',
+            message: 'Please enter a category label.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        } else {
+          alert('Please enter a category label.');
+        }
+        return;
+      }
+      if (!/^#([A-Fa-f0-9]{6})$/.test(color)) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Color Required',
+            icon: 'warning',
+            message: 'Please choose a valid category color.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        } else {
+          alert('Please choose a valid category color.');
+        }
+        return;
+      }
+
+      const btn = document.getElementById('confirmCategoryBtn');
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Preparing...';
+      }
+
+      try {
+        const targetInfo = await resolveCategoryTargetIds(selectedIds);
+        const targetIds = targetInfo.ids;
+        if (!targetIds.length) {
+          throw new Error('No valid sessions were selected.');
+        }
+        if (btn) {
+          btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Applying to ${targetIds.length}...`;
+        }
+        const response = await fetch('/ielts/scoring/history/category-many', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+          body: JSON.stringify({
+            ids: targetIds,
+            label,
+            color
+          })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.status !== 'success') {
+          throw new Error(payload?.message || `Category assignment failed with status ${response.status}`);
+        }
+
+        const modalEl = document.getElementById('categorySessionModal');
+        if (modalEl && typeof bootstrap !== 'undefined') {
+          bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }
+
+        if (typeof showMessageModal === 'function') {
+          const failedCount = Array.isArray(payload?.failed) ? payload.failed.length : 0;
+          const actionTitle = failedCount > 0 ? 'Category Applied Partially' : 'Category Applied';
+          const expandedNote = targetInfo.expanded ? ' Applied to all filtered sessions (all pages).' : '';
+          await showMessageModal({
+            title: actionTitle,
+            icon: failedCount > 0 ? 'warning' : 'success',
+            message: `${payload?.message || 'Category was assigned successfully.'}${expandedNote}`,
+            buttons: [{ text: 'Reload History', class: 'btn-success' }]
+          });
+        }
+        window.location.reload();
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Category Assignment Failed',
+            icon: 'error',
+            message: error?.message || 'Unable to assign category to selected sessions.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(error?.message || 'Unable to assign category to selected sessions.');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    }
+
+    async function clearCategoryForSelected() {
+      const selectedIds = getSelectedSessionIds();
+      if (!selectedIds.length) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Select Sessions',
+            icon: 'warning',
+            message: 'Please select at least one session first.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        } else {
+          alert('Please select at least one session first.');
+        }
+        return;
+      }
+
+      let approved = true;
+      if (typeof showMessageModal === 'function') {
+        const decision = await showMessageModal({
+          title: 'Clear Category',
+          icon: 'question',
+          message: `Clear category from ${selectedIds.length} selected session${selectedIds.length === 1 ? '' : 's'}?`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Clear Category', class: 'btn-danger' }
+          ]
+        });
+        approved = decision === 'Clear Category';
+      } else {
+        approved = window.confirm(`Clear category from ${selectedIds.length} selected session${selectedIds.length === 1 ? '' : 's'}?`);
+      }
+      if (!approved) return;
+
+      const btn = document.getElementById('clearCategorySelectedBtn');
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Preparing...';
+      }
+
+      try {
+        const targetInfo = await resolveCategoryTargetIds(selectedIds);
+        const targetIds = targetInfo.ids;
+        if (!targetIds.length) {
+          throw new Error('No valid sessions were selected.');
+        }
+        if (btn) {
+          btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Clearing ${targetIds.length}...`;
+        }
+        const response = await fetch('/ielts/scoring/history/category-many', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+          body: JSON.stringify({
+            ids: targetIds,
+            clear: true
+          })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.status !== 'success') {
+          throw new Error(payload?.message || `Category clear failed with status ${response.status}`);
+        }
+
+        if (typeof showMessageModal === 'function') {
+          const failedCount = Array.isArray(payload?.failed) ? payload.failed.length : 0;
+          const actionTitle = failedCount > 0 ? 'Category Cleared Partially' : 'Category Cleared';
+          const expandedNote = targetInfo.expanded ? ' Cleared on all filtered sessions (all pages).' : '';
+          await showMessageModal({
+            title: actionTitle,
+            icon: failedCount > 0 ? 'warning' : 'success',
+            message: `${payload?.message || 'Category was cleared successfully.'}${expandedNote}`,
+            buttons: [{ text: 'Reload History', class: 'btn-success' }]
+          });
+        }
+        window.location.reload();
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Clear Category Failed',
+            icon: 'error',
+            message: error?.message || 'Unable to clear category for selected sessions.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(error?.message || 'Unable to clear category for selected sessions.');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    }
+
+    function openCloneModal(sourceSessionId = null, sourceType = null) {
+      if (!CAN_CREATE_SYNTHETIC_COPIES) return;
+      const selectedId = String(sourceSessionId || getSingleSelectedSessionId() || '').trim();
+      const selectedNode = getSelectedSessionNodes()[0] || null;
+      const selectedType = String(
+        sourceType ||
+        selectedNode?.dataset?.type ||
+        'full'
+      ).toLowerCase();
+      if (!selectedId) {
+        if (typeof showMessageModal === 'function') {
+          showMessageModal({
+            title: 'Select One Session',
+            icon: 'warning',
+            message: 'Please select exactly one session to create synthetic copies.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        }
+        return;
+      }
+      if (selectedType !== 'full') {
+        if (typeof showMessageModal === 'function') {
+          showMessageModal({
+            title: 'Full Pipeline Only',
+            icon: 'info',
+            message: 'Synthetic copies are available for Full Pipeline sessions only.',
+            buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+        }
+        return;
+      }
+
+      cloneModalSourceSessionId = selectedId;
+      cloneModalSourceType = selectedType;
+      const sourceIdInput = document.getElementById('cloneSourceSessionId');
+      if (sourceIdInput) sourceIdInput.value = selectedId;
+
+      const sourceTextEl = document.getElementById('cloneSourceSessionText');
+      if (sourceTextEl) sourceTextEl.textContent = selectedId;
+
+      const countInput = document.getElementById('cloneCopiesInput');
+      if (countInput) {
+        const current = Number.parseInt(countInput.value || '9', 10);
+        if (!Number.isFinite(current) || current <= 0) countInput.value = '9';
+      }
+
+      const modalEl = document.getElementById('cloneSessionModal');
+      if (!modalEl || typeof bootstrap === 'undefined') return;
+
+      // Keep this modal above any residual backdrop from other modal flows.
+      if (modalEl.parentElement !== document.body) {
+        document.body.appendChild(modalEl);
+      }
+      const noOpenModal = !document.querySelector('.modal.show');
+      if (noOpenModal) {
+        document.querySelectorAll('.modal-backdrop').forEach((bd) => bd.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.paddingRight = '';
+        document.body.style.overflow = '';
+      }
+
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    async function confirmCloneSelected() {
+      if (!CAN_CREATE_SYNTHETIC_COPIES) return;
+      const sourceIdInput = document.getElementById('cloneSourceSessionId');
+      const selectedId = String(
+        sourceIdInput?.value ||
+        cloneModalSourceSessionId ||
+        getSingleSelectedSessionId() ||
+        ''
+      ).trim();
+      const selectedNode = getSelectedSessionNodes()[0] || null;
+      const selectedType = String(
+        cloneModalSourceType ||
+        selectedNode?.dataset?.type ||
+        'full'
+      ).toLowerCase();
+      if (!selectedId) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Select One Session',
+            icon: 'warning',
+            message: 'Please select exactly one session to create synthetic copies.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        }
+        return;
+      }
+      if (selectedType !== 'full') {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Full Pipeline Only',
+            icon: 'info',
+            message: 'Synthetic copies are available for Full Pipeline sessions only.',
+            buttons: [{ text: 'OK', class: 'btn-primary' }]
+          });
+        }
+        return;
+      }
+
+      const inputEl = document.getElementById('cloneCopiesInput');
+      const copies = Number.parseInt(String(inputEl?.value || '0').trim(), 10);
+      if (!Number.isFinite(copies) || copies < 1 || copies > 100) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Invalid Count',
+            icon: 'warning',
+            message: 'Please enter a copy count between 1 and 100.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        }
+        return;
+      }
+
+      const btn = document.getElementById('confirmCloneBtn');
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Creating...';
+      }
+
+      try {
+        const response = await fetch('/ielts/scoring/history/duplicate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: selectedId, copies })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.status !== 'success') {
+          throw new Error(payload?.message || `Request failed with status ${response.status}`);
+        }
+
+        const modalEl = document.getElementById('cloneSessionModal');
+        if (modalEl && typeof bootstrap !== 'undefined') {
+          bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }
+
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Copies Created',
+            icon: 'success',
+            message: payload?.message || 'Synthetic copies were created successfully.',
+            buttons: [{ text: 'Reload History', class: 'btn-success' }]
+          });
+        }
+        window.location.reload();
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Copy Failed',
+            icon: 'error',
+            message: error?.message || 'Unable to create synthetic copies.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(error?.message || 'Unable to create synthetic copies.');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    }
+
+    async function openUrlWithMode(loadUrl, openInNewTab = false) {
+      const safeUrl = String(loadUrl || '').trim();
+      if (!safeUrl) return;
+      if (!openInNewTab) {
+        window.location.href = safeUrl;
+        return;
+      }
+
+      const opened = window.open(safeUrl, '_blank');
+      if (opened) {
+        try { opened.focus(); } catch (_) {}
+        return;
+      }
+
+      let fallbackChoice = 'Cancel';
+      if (typeof showMessageModal === 'function') {
+        fallbackChoice = await showMessageModal({
+          title: 'Popup Blocked',
+          icon: 'warning',
+          message: 'Your browser blocked opening a new tab. Open this session in the current tab instead?',
+          buttons: [
+            { text: 'Open Here', class: 'btn-primary' },
+            { text: 'Cancel', class: 'btn-secondary' }
+          ]
+        });
+      } else {
+        const allowHere = window.confirm('Your browser blocked a new tab. Open in this tab instead?');
+        fallbackChoice = allowHere ? 'Open Here' : 'Cancel';
+      }
+      if (fallbackChoice === 'Open Here') {
+        window.location.href = safeUrl;
+      }
+    }
+
+    async function createSessionUpToStep(sessionId, upToStep, triggerButton, options = {}) {
+      const safeSessionId = String(sessionId || '').trim();
+      const safeStep = Number.parseInt(String(upToStep || '').trim(), 10);
+      const openInNewTab = Boolean(options?.openInNewTab);
+      if (!safeSessionId) return;
+      if (!Number.isFinite(safeStep) || safeStep < 1 || safeStep > 4) return;
+
+      const btn = triggerButton || null;
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Creating...';
+      }
+
+      try {
+        const response = await fetch('/ielts/scoring/history/clone-up-to-step', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+          body: JSON.stringify({ sessionId: safeSessionId, upToStep: safeStep })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.status !== 'success') {
+          throw new Error(payload?.message || `Request failed with status ${response.status}`);
+        }
+
+        const loadUrl = String(payload?.loadUrl || '').trim();
+        if (loadUrl) {
+          await openUrlWithMode(loadUrl, openInNewTab);
+          return;
+        }
+        window.location.href = '/ielts/scoringV0326';
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Create Failed',
+            icon: 'error',
+            message: error?.message || 'Unable to create a new session from this record.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(error?.message || 'Unable to create a new session from this record.');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    }
+
+    async function setArchiveState(sessionId, shouldArchive, triggerButton) {
+      const safeSessionId = String(sessionId || '').trim();
+      if (!safeSessionId) return;
+
+      const actionLabel = shouldArchive ? 'Move to Archive' : 'Restore to Main List';
+      const actionVerb = shouldArchive ? 'archive' : 'restore';
+      const confirmationMessage = shouldArchive
+        ? 'This session will be hidden from the main list and moved to Archive.'
+        : 'This session will be moved back to the main scoring history list.';
+
+      let approved = true;
+      if (typeof showMessageModal === 'function') {
+        const choice = await showMessageModal({
+          title: actionLabel,
+          icon: 'question',
+          message: confirmationMessage,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: actionLabel, class: shouldArchive ? 'btn-warning' : 'btn-success' }
+          ]
+        });
+        approved = choice === actionLabel;
+      } else {
+        approved = window.confirm(`Do you want to ${actionVerb} this session?`);
+      }
+      if (!approved) return;
+
+      const btn = triggerButton || null;
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> ${shouldArchive ? 'Archiving...' : 'Restoring...'}`;
+      }
+
+      try {
+        const endpoint = shouldArchive ? '/ielts/scoring/history/archive' : '/ielts/scoring/history/unarchive';
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+          body: JSON.stringify({ id: safeSessionId })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.status !== 'success') {
+          throw new Error(payload?.message || `Request failed with status ${response.status}`);
+        }
+
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: shouldArchive ? 'Session Archived' : 'Session Restored',
+            icon: 'success',
+            message: payload?.message || `Session ${shouldArchive ? 'archived' : 'restored'} successfully.`,
+            buttons: [{ text: 'Reload', class: 'btn-success' }]
+          });
+        }
+        window.location.reload();
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: shouldArchive ? 'Archive Failed' : 'Restore Failed',
+            icon: 'error',
+            message: error?.message || 'Operation failed.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(error?.message || 'Operation failed.');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    }
+
+    async function archiveSelectedSessions() {
+      const selectedIds = getSelectedSessionIds();
+      if (selectedIds.length <= 1) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Select More Sessions',
+            icon: 'warning',
+            message: 'Please select at least 2 sessions for this bulk action.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        } else {
+          alert('Please select at least 2 sessions for this bulk action.');
+        }
+        return;
+      }
+
+      const isRestoreMode = SCORING_HISTORY_IS_ARCHIVE_VIEW === true;
+      const actionLabel = isRestoreMode ? 'Restore Selected' : 'Archive Selected';
+      const actionProgressLabel = isRestoreMode ? 'Restoring...' : 'Archiving...';
+      const actionEndpoint = isRestoreMode
+        ? '/ielts/scoring/history/unarchive-many'
+        : '/ielts/scoring/history/archive-many';
+
+      let approved = true;
+      if (typeof showMessageModal === 'function') {
+        const decision = await showMessageModal({
+          title: actionLabel,
+          icon: 'question',
+          message: isRestoreMode
+            ? `You are about to restore <b>${selectedIds.length}</b> selected sessions back to the main list.`
+            : `You are about to archive <b>${selectedIds.length}</b> selected sessions. Archived sessions are hidden from the main list.`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: actionLabel, class: isRestoreMode ? 'btn-success' : 'btn-warning' }
+          ]
+        });
+        approved = decision === actionLabel;
+      } else {
+        approved = window.confirm(
+          isRestoreMode
+            ? `Restore ${selectedIds.length} selected sessions to the main list?`
+            : `Archive ${selectedIds.length} selected sessions?`
+        );
+      }
+      if (!approved) return;
+
+      const btn = document.getElementById('archiveSelectedBtn');
+      const originalHtml = btn ? btn.innerHTML : '';
+      let buttonRestored = false;
+      const restoreBulkArchiveButton = () => {
+        if (!btn || buttonRestored) return;
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        buttonRestored = true;
+      };
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> ${actionProgressLabel}`;
+      }
+
+      try {
+        const response = await fetch(actionEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+          body: JSON.stringify({ ids: selectedIds })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.status !== 'success') {
+          throw new Error(payload?.message || `Operation failed with status ${response.status}`);
+        }
+
+        const failedCount = Array.isArray(payload?.failed) ? payload.failed.length : 0;
+        restoreBulkArchiveButton();
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: failedCount > 0 ? 'Completed With Warnings' : 'Completed',
+            icon: failedCount > 0 ? 'warning' : 'success',
+            message: payload?.message || `${actionLabel} completed successfully.`,
+            buttons: [{ text: 'Reload History', class: failedCount > 0 ? 'btn-warning' : 'btn-success' }]
+          });
+        }
+        window.location.reload();
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Bulk Action Failed',
+            icon: 'error',
+            message: error?.message || 'Unable to update selected sessions.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(error?.message || 'Unable to update selected sessions.');
+        }
+      } finally {
+        restoreBulkArchiveButton();
+      }
+    }
+
+    async function deleteSelectedSessions() {
+      const selectedIds = getSelectedSessionIds();
+      if (selectedIds.length <= 2) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Select More Sessions',
+            icon: 'warning',
+            message: 'Please select at least 3 sessions to use bulk delete.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        } else {
+          alert('Please select at least 3 sessions to use bulk delete.');
+        }
+        return;
+      }
+
+      let approved = true;
+      if (typeof showMessageModal === 'function') {
+        const decision = await showMessageModal({
+          title: 'Delete Selected Sessions',
+          icon: 'warning',
+          message: `You are about to delete <b>${selectedIds.length}</b> selected sessions. This action cannot be undone.`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Delete Selected', class: 'btn-danger' }
+          ]
+        });
+        approved = decision === 'Delete Selected';
+      } else {
+        approved = window.confirm(`Delete ${selectedIds.length} selected sessions? This action cannot be undone.`);
+      }
+      if (!approved) return;
+
+      const btn = document.getElementById('deleteSelectedBtn');
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Deleting...';
+      }
+
+      try {
+        const response = await fetch('/ielts/scoring/history/delete-many', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+          body: JSON.stringify({ ids: selectedIds })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.status !== 'success') {
+          throw new Error(payload?.message || `Delete failed with status ${response.status}`);
+        }
+
+        const failedCount = Array.isArray(payload?.failed) ? payload.failed.length : 0;
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: failedCount > 0 ? 'Delete Completed With Warnings' : 'Delete Completed',
+            icon: failedCount > 0 ? 'warning' : 'success',
+            message: payload?.message || 'Selected sessions were deleted.',
+            buttons: [{ text: 'Reload History', class: failedCount > 0 ? 'btn-warning' : 'btn-success' }]
+          });
+        }
+        window.location.reload();
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Delete Failed',
+            icon: 'error',
+            message: error?.message || 'Unable to delete selected sessions.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(error?.message || 'Unable to delete selected sessions.');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    }
+
+    async function goToComparison() {
+        const selectedNodes = Array.from(document.querySelectorAll('.session-checkbox:checked'));
+        const selected = selectedNodes.map(cb => cb.value);
+        const types = Array.from(new Set(selectedNodes.map(cb => String(cb.dataset.type || 'full').toLowerCase())));
+        if(selected.length < 2){
+          if (typeof showMessageModal === "function"){
+            return await showMessageModal({
+                  title: "Comparing Items",
+                  icon: "warning",
+                  message: "Please select at least 2 sessions to compare.",
+                  buttons: [{ text: "OK", class: "btn-warning" }]
+                });
+          }
+          return alert("Please select at least 2 sessions to compare.");
+        }
+        if (types.length > 1) {
+          if (typeof showMessageModal === "function"){
+            return await showMessageModal({
+                  title: "Mixed Types",
+                  icon: "warning",
+                  message: "Comparison is only possible for similar output types. Please select sessions from a single type.",
+                  buttons: [{ text: "OK", class: "btn-warning" }]
+                });
+          }
+          return alert("Please select sessions of the same type only.");
+        }
+        const compareType = types[0] || 'full';
+        if (compareType === 'step3_tuning') {
+          window.location.href = `/ielts/scoring/compare?ids=${selected.join(',')}`;
+          return;
+        }
+        if (compareType === 'step4_tuning') {
+          window.location.href = `/ielts/scoring/tuning/step4/compare?ids=${selected.join(',')}`;
+          return;
+        }
+        if (compareType !== 'full') {
+          if (typeof showMessageModal === "function"){
+            return await showMessageModal({
+                  title: "Comparison Not Ready",
+                  icon: "info",
+                  message: "Comparison for this result type will be added in the next phase.",
+                  buttons: [{ text: "OK", class: "btn-primary" }]
+                });
+          }
+          return alert("Comparison for this type will be added later.");
+        }
+        window.location.href = `/ielts/scoring/compare?ids=${selected.join(',')}`;
+    }
+
+    async function saveSelectedSessionsToFile() {
+      const selectedIds = getSelectedSessionIds();
+      if (selectedIds.length <= 1) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Select More Sessions',
+            icon: 'warning',
+            message: 'Please select at least 2 sessions to save them in one file.',
+            buttons: [{ text: 'OK', class: 'btn-warning' }]
+          });
+        } else {
+          alert('Please select at least 2 sessions to save them in one file.');
+        }
+        return;
+      }
+
+      const btn = document.getElementById('saveSelectedToFileBtn');
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...';
+      }
+
+      try {
+        const settled = await Promise.all(
+          selectedIds.map(async (id) => {
+            const response = await fetch(`/ielts/scoring/load/${encodeURIComponent(id)}`, {
+              method: 'GET',
+              headers: { 'X-AJAX-Request': 'true' }
+            });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload || typeof payload !== 'object') {
+              throw new Error(payload?.message || `Session ${id} could not be loaded.`);
+            }
+            return payload;
+          })
+        );
+
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+        const exportBundle = {
+          exportedAt: new Date().toISOString(),
+          source: 'ielts/scoring/history',
+          mode: 'bulk_selected_sessions',
+          selectedCount: selectedIds.length,
+          selectedIds,
+          sessions: settled
+        };
+        downloadJson(`scoring-history-selected-${selectedIds.length}-${stamp}.json`, exportBundle);
+
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Saved',
+            icon: 'check',
+            message: `${selectedIds.length} selected sessions were saved into one JSON file.`,
+            buttons: [{ text: 'OK', class: 'btn-success' }]
+          });
+        }
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Save Failed',
+            icon: 'error',
+            message: error?.message || 'Unable to save selected sessions.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(error?.message || 'Unable to save selected sessions.');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    }
+
+    function downloadJson(filename, obj) {
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function sanitizeFilenamePart(value, fallback = 'unknown-sample') {
+      const raw = String(value || '').trim();
+      if (!raw) return fallback;
+
+      const normalized = raw
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/['"`]/g, '')
+        .replace(/[^A-Za-z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^[-_.]+|[-_.]+$/g, '')
+        .slice(0, 80);
+
+      return normalized || fallback;
+    }
+
+    function resolveSessionSamplePart(session, fallbackName = '') {
+      const sampleName = String(
+        session?.metadata?.sampleRefName ||
+        session?.metadata?.sampleName ||
+        session?.sampleName ||
+        session?.metadata?.sampleId ||
+        session?.sampleId ||
+        fallbackName ||
+        ''
+      ).trim();
+      return sanitizeFilenamePart(sampleName);
+    }
+
+    function buildScoringSessionExportFileName(session, fallbackName = '') {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      const samplePart = resolveSessionSamplePart(session, fallbackName);
+      return `scoring-session-${samplePart}-${stamp}.json`;
+    }
+
+    function formatBandBreakdownValue(value) {
+      if (value === undefined || value === null) return '-';
+      const txt = String(value).trim();
+      if (!txt) return '-';
+      const numeric = Number(txt);
+      if (!Number.isFinite(numeric)) return txt;
+      return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1);
+    }
+
+    function parseBandBreakdownNumeric(value) {
+      if (value === undefined || value === null) return null;
+      const txt = String(value).trim();
+      if (!txt || txt === '-') return null;
+      const numeric = Number(txt);
+      return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    function scoreToPercent(score) {
+      if (!Number.isFinite(score)) return 0;
+      const raw = (score / 9) * 100;
+      return Math.max(0, Math.min(100, raw));
+    }
+
+    function formatPercentLabel(percent) {
+      if (!Number.isFinite(percent)) return '0%';
+      const rounded = Math.round(percent * 10) / 10;
+      return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+    }
+
+    function openBandBreakdownModal(triggerEl) {
+      if (!triggerEl || typeof bootstrap === 'undefined') return;
+      const overall = formatBandBreakdownValue(triggerEl.getAttribute('data-overall'));
+      const tr = formatBandBreakdownValue(triggerEl.getAttribute('data-tr'));
+      const cc = formatBandBreakdownValue(triggerEl.getAttribute('data-cc'));
+      const lr = formatBandBreakdownValue(triggerEl.getAttribute('data-lr'));
+      const gra = formatBandBreakdownValue(triggerEl.getAttribute('data-gra'));
+      const overallNumeric = parseBandBreakdownNumeric(triggerEl.getAttribute('data-overall'));
+      const trNumeric = parseBandBreakdownNumeric(triggerEl.getAttribute('data-tr'));
+      const ccNumeric = parseBandBreakdownNumeric(triggerEl.getAttribute('data-cc'));
+      const lrNumeric = parseBandBreakdownNumeric(triggerEl.getAttribute('data-lr'));
+      const graNumeric = parseBandBreakdownNumeric(triggerEl.getAttribute('data-gra'));
+
+      const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+      };
+
+      setText('bandBreakdownOverall', overall);
+      setText('bandBreakdownTR', tr);
+      setText('bandBreakdownCC', cc);
+      setText('bandBreakdownLR', lr);
+      setText('bandBreakdownGRA', gra);
+
+      const setPercentText = (id, numericValue) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = formatPercentLabel(scoreToPercent(numericValue));
+      };
+
+      const setBarWidth = (id, numericValue) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.width = `${scoreToPercent(numericValue)}%`;
+      };
+
+      const pieEl = document.getElementById('bandBreakdownPie');
+      if (pieEl) {
+        pieEl.style.setProperty('--pie-percent', String(scoreToPercent(overallNumeric)));
+      }
+
+      setPercentText('bandBreakdownOverallPercent', overallNumeric);
+      setPercentText('bandBreakdownTRPercent', trNumeric);
+      setPercentText('bandBreakdownCCPercent', ccNumeric);
+      setPercentText('bandBreakdownLRPercent', lrNumeric);
+      setPercentText('bandBreakdownGRAPercent', graNumeric);
+      setBarWidth('bandBreakdownTRBar', trNumeric);
+      setBarWidth('bandBreakdownCCBar', ccNumeric);
+      setBarWidth('bandBreakdownLRBar', lrNumeric);
+      setBarWidth('bandBreakdownGRABar', graNumeric);
+
+      const modalEl = document.getElementById('bandBreakdownModal');
+      if (!modalEl) return;
+
+      // Keep this modal above any residual backdrop and avoid stacking glitches.
+      if (modalEl.parentElement !== document.body) {
+        document.body.appendChild(modalEl);
+      }
+      const noOpenModal = !document.querySelector('.modal.show');
+      if (noOpenModal) {
+        document.querySelectorAll('.modal-backdrop').forEach((bd) => bd.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.paddingRight = '';
+        document.body.style.overflow = '';
+      }
+
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    async function saveSessionToFile(sessionId, triggerButton, fallbackSampleName = '') {
+      const safeSessionId = String(sessionId || '').trim();
+      if (!safeSessionId) return;
+
+      const btn = triggerButton || null;
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...';
+      }
+
+      try {
+        const response = await fetch(`/ielts/scoring/load/${encodeURIComponent(safeSessionId)}`, {
+          method: 'GET',
+          headers: { 'X-AJAX-Request': 'true' }
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(payload?.message || `Request failed with status ${response.status}`);
+        }
+        if (!payload || typeof payload !== 'object') {
+          throw new Error('Session data is not available for export.');
+        }
+
+        const filename = buildScoringSessionExportFileName(payload, fallbackSampleName);
+        downloadJson(filename, payload);
+
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Saved',
+            icon: 'check',
+            message: 'Session saved as raw JSON (no HTML).',
+            buttons: [{ text: 'OK', class: 'btn-success' }]
+          });
+        }
+      } catch (error) {
+        if (typeof showMessageModal === 'function') {
+          await showMessageModal({
+            title: 'Save Failed',
+            icon: 'error',
+            message: error?.message || 'Unable to save session file.',
+            buttons: [{ text: 'OK', class: 'btn-danger' }]
+          });
+        } else {
+          alert(error?.message || 'Unable to save session file.');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      updateCompareState();
+
+      // Row-action buttons/links manage their own loading states on this page.
+      // Opt out from global auto-wait to avoid spinner state conflicts.
+      document.querySelectorAll('.row-actions-menu a, .row-actions-menu button, .row-actions-menu input[type="button"]').forEach((node) => {
+        if (node && node.dataset && !node.dataset.noWait) {
+          node.dataset.noWait = 'true';
+        }
+      });
+
+      // Ctrl/Cmd + click on row action toggle opens the session directly in a new tab.
+      // Capture phase ensures this runs before the shared floating-menu toggle listener.
+      document.addEventListener('click', function(event) {
+        const toggleBtn = event.target.closest('.btn-row-actions-toggle');
+        if (!toggleBtn) return;
+        const wantsNewTab = Boolean(event.ctrlKey || event.metaKey);
+        if (!wantsNewTab) return;
+
+        const loadUrl = String(toggleBtn.getAttribute('data-load-url') || '').trim();
+        if (!loadUrl) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') {
+          event.stopImmediatePropagation();
+        }
+
+        const anchor = document.createElement('a');
+        anchor.href = loadUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }, true);
+
+      document.addEventListener('click', function(event) {
+        const bandBtn = event.target.closest('.js-open-band-breakdown');
+        if (bandBtn) {
+          event.preventDefault();
+          openBandBreakdownModal(bandBtn);
+          return;
+        }
+
+        const reloadBtn = event.target.closest('.js-reload-session');
+        if (reloadBtn) {
+          event.preventDefault();
+          const loadUrl = String(reloadBtn.getAttribute('data-load-url') || reloadBtn.getAttribute('href') || '').trim();
+          if (!loadUrl) return;
+
+          (async () => {
+            let openMode = 'Open Here';
+            if (typeof showMessageModal === 'function') {
+              openMode = await showMessageModal({
+                title: 'Open Saved Session',
+                icon: 'question',
+                message: 'Where do you want to open this saved session?',
+                buttons: [
+                  { text: 'Open Here', class: 'btn-primary' },
+                  { text: 'Open in New Tab', class: 'btn-success' }
+                ]
+              });
+            } else {
+              const openNew = window.confirm('Press OK to open in a new tab, or Cancel to open here.');
+              openMode = openNew ? 'Open in New Tab' : 'Open Here';
+            }
+            if (!openMode || openMode === 'closed') return;
+            await openUrlWithMode(loadUrl, openMode === 'Open in New Tab');
+          })();
+          return;
+        }
+
+        const createBtn = event.target.closest('.js-create-up-to-step');
+        if (createBtn) {
+          event.preventDefault();
+          const sessionId = String(createBtn.getAttribute('data-session-id') || '').trim();
+          const upToStep = Number.parseInt(String(createBtn.getAttribute('data-up-to-step') || '').trim(), 10);
+          (async () => {
+            let openMode = 'Open Here';
+            if (typeof showMessageModal === 'function') {
+              openMode = await showMessageModal({
+                title: `Create New up to Step ${upToStep}`,
+                icon: 'question',
+                message: 'Where do you want to open the new scoring session?',
+                buttons: [
+                  { text: 'Open Here', class: 'btn-primary' },
+                  { text: 'Open in New Tab', class: 'btn-success' }
+                ]
+              });
+            } else {
+              const openNew = window.confirm('Press OK to open in a new tab, or Cancel to open here.');
+              openMode = openNew ? 'Open in New Tab' : 'Open Here';
+            }
+            if (!openMode || openMode === 'closed') return;
+            const wantsNewTab = openMode === 'Open in New Tab';
+            await createSessionUpToStep(sessionId, upToStep, createBtn, {
+              openInNewTab: wantsNewTab
+            });
+          })();
+          return;
+        }
+
+        const saveToFileBtn = event.target.closest('.js-save-session-file');
+        if (saveToFileBtn) {
+          event.preventDefault();
+          const sessionId = String(saveToFileBtn.getAttribute('data-session-id') || '').trim();
+          const sampleName = String(saveToFileBtn.getAttribute('data-sample-name') || '').trim();
+          saveSessionToFile(sessionId, saveToFileBtn, sampleName);
+          return;
+        }
+
+        const cloneMenuBtn = event.target.closest('.js-open-clone-modal');
+        if (cloneMenuBtn) {
+          event.preventDefault();
+          const sessionId = String(cloneMenuBtn.getAttribute('data-session-id') || '').trim();
+          const sessionType = String(cloneMenuBtn.getAttribute('data-type') || 'full').trim();
+          openCloneModal(sessionId, sessionType);
+          return;
+        }
+
+        const archiveBtn = event.target.closest('.js-archive-session');
+        if (archiveBtn) {
+          event.preventDefault();
+          const sessionId = String(archiveBtn.getAttribute('data-session-id') || '').trim();
+          setArchiveState(sessionId, true, archiveBtn);
+          return;
+        }
+
+        const unarchiveBtn = event.target.closest('.js-unarchive-session');
+        if (unarchiveBtn) {
+          event.preventDefault();
+          const sessionId = String(unarchiveBtn.getAttribute('data-session-id') || '').trim();
+          setArchiveState(sessionId, false, unarchiveBtn);
+        }
+      });
+    });
+
+    function applyHistoryTypeFilter(type) {
+      const nextType = String(type || 'all').toLowerCase();
+      const params = new URLSearchParams(window.location.search || '');
+      if (!nextType || nextType === 'all') params.delete('resultType');
+      else params.set('resultType', nextType);
+      params.delete('page');
+      const query = params.toString();
+      window.location.href = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    }
+
+    function applyScoringViewFilter(view) {
+      const nextView = String(view || 'all').trim();
+      const params = new URLSearchParams(window.location.search || '');
+      if (!nextView || nextView.toLowerCase() === 'all') params.delete('scoringView');
+      else params.set('scoringView', nextView);
+      params.delete('page');
+      const query = params.toString();
+      window.location.href = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    }
+
+    function applyRunCategoryFilter(category) {
+      const nextCategory = String(category || 'all').trim();
+      const params = new URLSearchParams(window.location.search || '');
+      if (!nextCategory || nextCategory.toLowerCase() === 'all') params.delete('runCategory');
+      else params.set('runCategory', nextCategory);
+      params.delete('page');
+      const query = params.toString();
+      window.location.href = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    }
+</script>

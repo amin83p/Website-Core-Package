@@ -1,0 +1,932 @@
+<%
+  const isEdit = !!(assessment && assessment.id);
+  const selectedOrgId = isEdit ? String(assessment.orgId || assessment.org || assessment.organizationId || '').trim() : '';
+  const orgChoices = Array.isArray(user?.allowedOrgs) ? user.allowedOrgs : [];
+  const matchedOrg = isEdit ? orgChoices.find((org) => String(org?.orgId || '').trim() === selectedOrgId) : null;
+  const selectedOrgName = String(
+    matchedOrg?.name ||
+    matchedOrg?.orgName ||
+    ''
+  ).trim();
+  const toAnswerText = (seed) => {
+    if (Array.isArray(seed)) return seed.join('\n');
+    const raw = String(seed || '').trim();
+    if (!raw) return '';
+    if (raw.startsWith('[') && raw.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map((v) => String(v || '').trim()).filter(Boolean).join('\n');
+      } catch (e) {}
+    }
+    return raw.split(/[\n,]+/).map((v) => String(v || '').trim()).filter(Boolean).join('\n');
+  };
+%>
+
+<style>
+  .micro-form-tabs .nav-link {
+    font-weight: 600;
+    color: #495057;
+  }
+  .micro-form-tabs .nav-link.active {
+    color: #0b5ed7;
+    background: #eef5ff;
+    border-color: #cfe2ff #cfe2ff #fff;
+  }
+  .micro-tab-content {
+    background: #fff;
+  }
+  .contract-preset-btn {
+    text-align: left;
+    border-width: 2px;
+    font-weight: 600;
+  }
+  .contract-preset-btn small {
+    display: block;
+    font-weight: 500;
+    opacity: 0.8;
+    margin-top: 2px;
+  }
+  .contract-feature {
+    border-color: #198754;
+    color: #146c43;
+    background: #f4fff8;
+  }
+  .contract-fault {
+    border-color: #fd7e14;
+    color: #a34b00;
+    background: #fff7ee;
+  }
+  .contract-derived {
+    border-color: #6c757d;
+    color: #495057;
+    background: #f8f9fa;
+  }
+  .answer-token-list {
+    min-height: 44px;
+    border: 1px dashed #c7ced6;
+    border-radius: 8px;
+    padding: 8px;
+    background: #fbfcfe;
+  }
+  .answer-token-empty {
+    color: #6c757d;
+    font-size: 0.85rem;
+  }
+  .answer-token {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 999px;
+    padding: 4px 10px;
+    margin: 3px;
+    font-size: 0.82rem;
+  }
+  .answer-token button {
+    border: 0;
+    background: transparent;
+    color: #dc3545;
+    line-height: 1;
+    padding: 0;
+  }
+</style>
+
+<div class="sections-page">
+  
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0">            
+      <%= isEdit ? 'Edit Assessment Item' : 'Create New Assessment Item' %>
+    </h1>
+    <div class="d-flex flex-column align-items-end gap-1">
+      <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        <% if (isEdit) { %>
+          <span class="badge bg-primary border">ID: <%= assessment.id %></span>
+          <span class="badge bg-light text-dark border">
+            Organization: <%= selectedOrgName || 'N/A' %><%= selectedOrgId ? ` (#${selectedOrgId})` : '' %>
+          </span>
+        <% } else { %>
+          <span class="badge bg-success border">New Item</span>
+        <% } %>
+        <% if (typeof copySourceId !== 'undefined' && copySourceId) { %>
+            <span class="badge bg-light text-dark border">Copied from: <%= copySourceId %></span>
+        <% } %>
+      </div>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromAssessment">
+        <i class="bi bi-copy me-1"></i> Copy From Assessment
+      </button>
+    </div>
+  </div>
+
+  <div class="form-container" style="width: 100%; max-width: 100%;">
+    <form id="assessmentForm" action="<%= isEdit ? '/ielts/microAssessments/edit/' + assessment.id  : '/ielts/microAssessments/new' %>" method="POST">
+      
+      <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
+
+      <div class="row">
+        
+        <div class="col-md-5 mb-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-light fw-bold text-primary">
+                    <i class="bi bi-sliders me-2"></i>Configuration
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs micro-form-tabs" id="configTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="config-core-tab" data-bs-toggle="tab" data-bs-target="#config-core-pane" type="button" role="tab" aria-controls="config-core-pane" aria-selected="true">
+                                Core
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="config-scoring-tab" data-bs-toggle="tab" data-bs-target="#config-scoring-pane" type="button" role="tab" aria-controls="config-scoring-pane" aria-selected="false">
+                                Scoring Contract
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="config-routing-tab" data-bs-toggle="tab" data-bs-target="#config-routing-pane" type="button" role="tab" aria-controls="config-routing-pane" aria-selected="false">
+                                Routing
+                            </button>
+                        </li>
+                    </ul>
+                    <div class="tab-content micro-tab-content border border-top-0 rounded-bottom p-3">
+                        <div class="tab-pane fade show active" id="config-core-pane" role="tabpanel" aria-labelledby="config-core-tab" tabindex="0">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Question Key <span class="text-danger">*</span></label>
+                                <input type="text" name="question_key" class="form-control"
+                                       value="<%= assessment ? assessment.question_key : '' %>"
+                                       placeholder="e.g. TR7-3" required>
+                                <div class="form-text small">Unique key for this micro-question. Keep it stable once used in reports.</div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label fw-bold small text-muted text-uppercase">Band <span class="text-danger">*</span></label>
+                                    <select name="band" class="form-select" required>
+                                        <option value="" disabled <%= !assessment ? 'selected' : '' %>>Select...</option>
+                                        <% for(let i=0; i<=9; i++) { %>
+                                            <option value="<%= i %>" <%= (assessment && assessment.band == i) ? 'selected' : '' %>><%= i %></option>
+                                        <% } %>
+                                    </select>
+                                    <div class="form-text small">Target IELTS band gate for this item.</div>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold small text-muted text-uppercase">Criterion <span class="text-danger">*</span></label>
+                                    <select name="criterion" class="form-select" required>
+                                        <% ['TR','CC','LR','GRA'].forEach(c => { %>
+                                            <option value="<%= c %>" <%= (assessment && assessment.criterion === c) ? 'selected' : '' %>><%= c %></option>
+                                        <% }) %>
+                                    </select>
+                                    <div class="form-text small">Criterion this item contributes to.</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Weight</label>
+                                <input type="number" step="0.1" name="weight" class="form-control"
+                                       value="<%= assessment ? assessment.weight : '1' %>">
+                                <div class="form-text small">Relative contribution at the same band gate.</div>
+                            </div>
+                            <div class="pt-2 border-top mt-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="isActiveSwitch" name="is_active"
+                                           <%= (!assessment || assessment.is_active !== false) ? 'checked' : '' %>>
+                                    <label class="form-check-label fw-bold small" for="isActiveSwitch">Is Active?</label>
+                                </div>
+                                <div class="form-text small">Inactive items remain stored but are skipped in scoring runs.</div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="config-scoring-pane" role="tabpanel" aria-labelledby="config-scoring-tab" tabindex="0">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Answer Type</label>
+                                <% const t = assessment ? assessment.answer_type : 'Boolean'; %>
+                                <input list="answerTypeOptions" name="answer_type" class="form-control" value="<%= t %>" placeholder="e.g. Boolean, Count, Ordinal (none/some/...)">
+                                <datalist id="answerTypeOptions">
+                                    <option value="Boolean"></option>
+                                    <option value="Count"></option>
+                                    <option value="Ordinal (none/some/most)"></option>
+                                    <option value="Categorical (absent/confusing/ok)"></option>
+                                    <option value="Text"></option>
+                                </datalist>
+                                <div class="form-text small">Defines the allowed answer style used by Step 4 and report tables.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Possible Options (Derived)</label>
+                                <div id="answerTypeOptionsPreview" class="border rounded bg-light p-2 small text-muted">
+                                    No explicit options detected from answer type.
+                                </div>
+                                <div class="form-text small">
+                                    Parsed from <code>answer_type</code>. For boolean, options default to <code>yes</code>/<code>no</code>.
+                                </div>
+                            </div>
+
+                            <% const scoredSeed = assessment ? (assessment.scoredAnswers || assessment.scored_answers || '') : ''; %>
+                            <% const notScoredSeed = assessment ? (assessment.notScoredAnswers || assessment.not_scored_answers || '') : ''; %>
+                            <% const scoredText = toAnswerText(scoredSeed); %>
+                            <% const notScoredText = toAnswerText(notScoredSeed); %>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Scoring Contract Presets</label>
+                                <div class="row g-2">
+                                    <div class="col-12 col-md-4">
+                                        <button type="button" class="btn contract-preset-btn contract-feature w-100" id="btnSetFeatureContract">
+                                            <i class="bi bi-check2-circle me-1"></i> Feature Check
+                                            <small>yes is scored</small>
+                                        </button>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <button type="button" class="btn contract-preset-btn contract-fault w-100" id="btnSetFaultContract">
+                                            <i class="bi bi-shield-exclamation me-1"></i> Fault Check
+                                            <small>no is scored</small>
+                                        </button>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <button type="button" class="btn contract-preset-btn contract-derived w-100" id="btnSetDerivedContract">
+                                            <i class="bi bi-magic me-1"></i> Derived
+                                            <small>first option scored</small>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-text small mt-2">
+                                    These buttons quickly populate lists below. You can still edit tokens manually.
+                                </div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-12 col-lg-6">
+                                    <label class="form-label fw-bold small text-muted text-uppercase">Scored Answers</label>
+                                    <div class="input-group mb-2">
+                                        <input type="text" id="scoredAnswersTokenInput" class="form-control" placeholder="Type answer then Add (e.g. yes)">
+                                        <button type="button" class="btn btn-outline-success" id="btnAddScoredAnswer"><i class="bi bi-plus-lg me-1"></i>Add</button>
+                                    </div>
+                                    <div id="scoredAnswersTokenList" class="answer-token-list"></div>
+                                    <textarea name="scoredAnswers" id="scoredAnswersInput" class="d-none"><%= scoredText %></textarea>
+                                    <div class="form-text small">Any answer in this list counts as a pass. Saved in lowercase.</div>
+                                </div>
+                                <div class="col-12 col-lg-6">
+                                    <label class="form-label fw-bold small text-muted text-uppercase">Not Scored Answers</label>
+                                    <div class="input-group mb-2">
+                                        <input type="text" id="notScoredAnswersTokenInput" class="form-control" placeholder="Type answer then Add (e.g. no)">
+                                        <button type="button" class="btn btn-outline-danger" id="btnAddNotScoredAnswer"><i class="bi bi-plus-lg me-1"></i>Add</button>
+                                    </div>
+                                    <div id="notScoredAnswersTokenList" class="answer-token-list"></div>
+                                    <textarea name="notScoredAnswers" id="notScoredAnswersInput" class="d-none"><%= notScoredText %></textarea>
+                                    <div class="form-text small">Any answer in this list counts as fail/weak. Saved in lowercase.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="config-routing-pane" role="tabpanel" aria-labelledby="config-routing-tab" tabindex="0">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <label class="form-label fw-bold small text-muted text-uppercase m-0">Step 3 Routing & Signals</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="btnSuggestSignals">
+                                    <i class="bi bi-magic me-1"></i>Suggest
+                                </button>
+                            </div>
+                            <div class="form-text small mb-3">
+                                Choose how this question should be answered in Step 3. Deterministic/hybrid routes reduce AI usage.
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Prompt Group</label>
+                                    <% const pg = assessment ? (assessment.prompt_group || '') : ''; %>
+                                    <select name="prompt_group" class="form-select">
+                                        <option value="" <%= !pg ? 'selected' : '' %>>Auto (by criterion)</option>
+                                        <option value="PROMPT_A_TR_CC" <%= pg==='PROMPT_A_TR_CC'?'selected':'' %>>PROMPT_A_TR_CC (TR + CC)</option>
+                                        <option value="PROMPT_B_LR_GRA" <%= pg==='PROMPT_B_LR_GRA'?'selected':'' %>>PROMPT_B_LR_GRA (LR + GRA)</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Signal Kind</label>
+                                    <% const sk = assessment ? (assessment.signal_kind || (assessment.signal_source && assessment.signal_source.kind) || '') : ''; %>
+                                    <select name="signal_kind" class="form-select">
+                                        <option value="" <%= !sk ? 'selected' : '' %>>Auto (recommended)</option>
+                                        <option value="deterministic" <%= sk==='deterministic'?'selected':'' %>>deterministic</option>
+                                        <option value="hybrid" <%= sk==='hybrid'?'selected':'' %>>hybrid</option>
+                                        <option value="ai" <%= sk==='ai'?'selected':'' %>>ai</option>
+                                        <option value="external" <%= sk==='external'?'selected':'' %>>external</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small text-muted">Signals (one per line or comma-separated)</label>
+                                <% const sigArr = assessment ? (assessment.signal_signals || (assessment.signal_source && assessment.signal_source.signals) || []) : []; %>
+                                <% const sigText = Array.isArray(sigArr) ? sigArr.join('\n') : (sigArr || ''); %>
+                                <textarea name="signal_signals" class="form-control" rows="4" placeholder="e.g. position.stance\ncohesion.densityPer100ExcludingBasic"><%= sigText %></textarea>
+                                <div class="form-text small">
+                                    These are extraction paths (for example <code>position.stance</code>, <code>answersBySubquestion</code>, <code>cohesion.distinctConnectorsExcludingBasic</code>).
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-7 mb-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-light fw-bold text-primary">
+                    <i class="bi bi-file-text me-2"></i>Content & Metadata
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs micro-form-tabs" id="contentTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="content-main-tab" data-bs-toggle="tab" data-bs-target="#content-main-pane" type="button" role="tab" aria-controls="content-main-pane" aria-selected="true">
+                                Question Content
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="content-meta-tab" data-bs-toggle="tab" data-bs-target="#content-meta-pane" type="button" role="tab" aria-controls="content-meta-pane" aria-selected="false">
+                                Metadata
+                            </button>
+                        </li>
+                    </ul>
+                    <div class="tab-content micro-tab-content border border-top-0 rounded-bottom p-3">
+                        <div class="tab-pane fade show active" id="content-main-pane" role="tabpanel" aria-labelledby="content-main-tab" tabindex="0">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Title / Group Name <span class="text-danger">*</span></label>
+                                <input type="text" name="title" class="form-control"
+                                       value="<%= assessment ? assessment.title : '' %>"
+                                       placeholder="e.g. Coherence & Cohesion - Band 7" required>
+                                <div class="form-text">Used to group related micro-questions in listing/report views.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Question Text (Atomic) <span class="text-danger">*</span></label>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="small text-muted">Keep wording short and measurable.</div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCleanText">
+                                        <i class="bi bi-brush me-1"></i>Clean spacing
+                                    </button>
+                                </div>
+                                <textarea name="atomic_question" class="form-control" rows="3"
+                                          placeholder="The actual question text..." required><%= assessment ? assessment.atomic_question : '' %></textarea>
+                                <div class="form-text">This text appears in scoring prompts and result rows.</div>
+                            </div>
+
+                            <div class="mb-1">
+                                <label class="form-label fw-bold">Rubric Anchor <span class="text-danger">*</span></label>
+                                <textarea name="rubric_anchor" class="form-control bg-light" rows="2"
+                                          placeholder="Standard from the IELTS Rubric..." required><%= assessment ? assessment.rubric_anchor : '' %></textarea>
+                                <div class="form-text">Reference rubric statement that justifies this check.</div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="content-meta-pane" role="tabpanel" aria-labelledby="content-meta-tab" tabindex="0">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">Tags</label>
+                                    <input type="text" name="tags" class="form-control form-control-sm"
+                                           value="<%= assessment ? assessment.tags : '' %>" placeholder="comma, separated">
+                                    <div class="form-text">For filtering and bulk maintenance.</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">Internal Notes</label>
+                                    <input type="text" name="notes" class="form-control form-control-sm"
+                                           value="<%= assessment ? assessment.notes : '' %>" placeholder="Private notes...">
+                                    <div class="form-text">Visible to maintainers only.</div>
+                                </div>
+                            </div>
+                            <div class="alert alert-info mt-3 mb-0 py-2 small">
+                                Tip: keep <strong>question_key</strong>, <strong>answer_type</strong>, and scoring lists aligned to avoid ambiguous scoring.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-save me-1"></i> Save Item
+        </button>
+        <a href="/ielts/microAssessments" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction"> Cancel </a>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/modal') %>
+<%- include('../partials/modal_GenericPicker') %>
+
+<script>
+    const currentAssessmentId = <%- JSON.stringify(isEdit ? assessment.id : '') %>;
+
+    // --- Helpers: lightweight client-side cleanup & signal suggestions ---
+    function cleanSpacing(text) {
+        if (!text) return '';
+        let t = String(text);
+        // Fix common OCR/import artifacts
+        const reps = [
+            [/\bpositi\s+on\b/ig, 'position'],
+            [/\bconclusi\s+on\b/ig, 'conclusion'],
+            [/\bprogressi\s+on\b/ig, 'progression'],
+            [/\bpunctuati\s+on\b/ig, 'punctuation'],
+            [/\bcommunicati\s+on\b/ig, 'communication'],
+            [/\bformati\s+on\b/ig, 'formation'],
+            [/\bsubordinati\s+on\b/ig, 'subordination'],
+            [/\bexplanati\s+on\b/ig, 'explanation'],
+            [/\bthereno\b/ig, 'there no'],
+            [/\btheresome\b/ig, 'there some'],
+            [/\bideasnot\b/ig, 'ideas not'],
+            [/\bonlypartially\b/ig, 'only partially'],
+            [/\berrorsnoticeable\b/ig, 'errors noticeable'],
+            [/\berrorspredominate\b/ig, 'errors predominate'],
+        ];
+        reps.forEach(([re, rep]) => t = t.replace(re, rep));
+        // Ensure space after punctuation
+        t = t.replace(/\?([A-Za-z])/g, '? $1').replace(/\.([A-Za-z])/g, '. $1');
+        // Collapse whitespace
+        t = t.replace(/\s{2,}/g, ' ').trim();
+        // Add '?' if it looks like a question and doesn't end with one
+        const starts = ['is ', 'are ', 'do ', 'does ', 'can ', 'may ', 'has ', 'have '];
+        if (t && !t.endsWith('?') && starts.some(s => t.toLowerCase().startsWith(s))) t += '?';
+        return t;
+    }
+
+    function inferPromptGroup(criterion) {
+        return (criterion === 'TR' || criterion === 'CC') ? 'PROMPT_A_TR_CC' : 'PROMPT_B_LR_GRA';
+    }
+
+    const scoringContractState = { scored: [], notScored: [] };
+
+    function normalizeAnswerToken(value) {
+        return String(value ?? '').trim().toLowerCase();
+    }
+
+    function dedupeAnswerTokens(tokens) {
+        const out = [];
+        const seen = new Set();
+        (tokens || []).forEach((token) => {
+            const normalized = normalizeAnswerToken(token);
+            if (!normalized || seen.has(normalized)) return;
+            seen.add(normalized);
+            out.push(normalized);
+        });
+        return out;
+    }
+
+    function parseAnswerTokensFromRaw(raw) {
+        if (raw === undefined || raw === null) return [];
+        const text = Array.isArray(raw) ? raw.join('\n') : String(raw);
+        return dedupeAnswerTokens(text.split(/[\n,]+/));
+    }
+
+    function parseAnswerTypeOptions(answerTypeRaw) {
+        const answerType = String(answerTypeRaw || '').trim();
+        if (!answerType) return [];
+        if (/^boolean$/i.test(answerType)) return ['yes', 'no'];
+
+        const parenMatch = answerType.match(/\(([^)]+)\)/);
+        if (parenMatch && parenMatch[1]) {
+            return dedupeAnswerTokens(parenMatch[1].split(/[\/|,]+/));
+        }
+        return [];
+    }
+
+    function renderAnswerTypeOptionsPreview() {
+        const answerTypeInput = document.querySelector('input[name="answer_type"]');
+        const preview = document.getElementById('answerTypeOptionsPreview');
+        if (!answerTypeInput || !preview) return [];
+        const options = parseAnswerTypeOptions(answerTypeInput.value);
+        if (!options.length) {
+            preview.textContent = 'No explicit options detected from answer type.';
+            return [];
+        }
+        preview.innerHTML = '';
+        options.forEach((option) => {
+            const chip = document.createElement('span');
+            chip.className = 'badge bg-white text-dark border me-1 mb-1';
+            chip.textContent = option;
+            preview.appendChild(chip);
+        });
+        return options;
+    }
+
+    function syncScoringContractHiddenInputs() {
+        const scoredInput = document.getElementById('scoredAnswersInput');
+        const notScoredInput = document.getElementById('notScoredAnswersInput');
+        if (scoredInput) scoredInput.value = scoringContractState.scored.join('\n');
+        if (notScoredInput) notScoredInput.value = scoringContractState.notScored.join('\n');
+    }
+
+    function renderTokenList(kind) {
+        const listId = kind === 'scored' ? 'scoredAnswersTokenList' : 'notScoredAnswersTokenList';
+        const container = document.getElementById(listId);
+        if (!container) return;
+        const tokens = kind === 'scored' ? scoringContractState.scored : scoringContractState.notScored;
+        container.innerHTML = '';
+        if (!tokens.length) {
+            const empty = document.createElement('div');
+            empty.className = 'answer-token-empty';
+            empty.textContent = 'No answers added yet.';
+            container.appendChild(empty);
+            return;
+        }
+        tokens.forEach((token, index) => {
+            const badge = document.createElement('span');
+            badge.className = 'answer-token';
+            badge.textContent = token;
+
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.innerHTML = '<i class="bi bi-x-lg"></i>';
+            remove.setAttribute('aria-label', `Remove ${token}`);
+            remove.dataset.kind = kind;
+            remove.dataset.index = String(index);
+            remove.className = 'token-remove';
+
+            badge.appendChild(remove);
+            container.appendChild(badge);
+        });
+    }
+
+    function renderScoringContract() {
+        renderTokenList('scored');
+        renderTokenList('notScored');
+        syncScoringContractHiddenInputs();
+    }
+
+    function setScoringContract(scored, notScored) {
+        const nextScored = dedupeAnswerTokens(scored);
+        const scoredSet = new Set(nextScored);
+        const nextNotScored = dedupeAnswerTokens(notScored).filter((token) => !scoredSet.has(token));
+        scoringContractState.scored = nextScored;
+        scoringContractState.notScored = nextNotScored;
+        renderScoringContract();
+    }
+
+    function addTokenToContract(kind, rawToken) {
+        const token = normalizeAnswerToken(rawToken);
+        if (!token) return;
+        if (kind === 'scored') {
+            scoringContractState.notScored = scoringContractState.notScored.filter((item) => item !== token);
+            scoringContractState.scored = dedupeAnswerTokens([...scoringContractState.scored, token]);
+        } else {
+            scoringContractState.scored = scoringContractState.scored.filter((item) => item !== token);
+            scoringContractState.notScored = dedupeAnswerTokens([...scoringContractState.notScored, token]);
+        }
+        renderScoringContract();
+    }
+
+    function removeTokenFromContract(kind, index) {
+        const idx = Number(index);
+        if (Number.isNaN(idx) || idx < 0) return;
+        if (kind === 'scored') {
+            scoringContractState.scored = scoringContractState.scored.filter((_, i) => i !== idx);
+        } else {
+            scoringContractState.notScored = scoringContractState.notScored.filter((_, i) => i !== idx);
+        }
+        renderScoringContract();
+    }
+
+    function bindTokenInput(inputId, addButtonId, kind) {
+        const input = document.getElementById(inputId);
+        const addButton = document.getElementById(addButtonId);
+        if (!input || !addButton) return;
+
+        const submitToken = () => {
+            const normalized = normalizeAnswerToken(input.value);
+            if (!normalized) return;
+            addTokenToContract(kind, normalized);
+            input.value = '';
+        };
+
+        input.addEventListener('blur', () => {
+            input.value = normalizeAnswerToken(input.value);
+        });
+        input.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            submitToken();
+        });
+        addButton.addEventListener('click', submitToken);
+    }
+
+    function initScoringContractUI() {
+        const answerTypeInput = document.querySelector('input[name="answer_type"]');
+        const btnFeature = document.getElementById('btnSetFeatureContract');
+        const btnFault = document.getElementById('btnSetFaultContract');
+        const btnDerived = document.getElementById('btnSetDerivedContract');
+        const scoredInput = document.getElementById('scoredAnswersInput');
+        const notScoredInput = document.getElementById('notScoredAnswersInput');
+
+        const getDerivedOptions = () => renderAnswerTypeOptionsPreview();
+
+        if (answerTypeInput) {
+            answerTypeInput.addEventListener('input', renderAnswerTypeOptionsPreview);
+            answerTypeInput.addEventListener('change', renderAnswerTypeOptionsPreview);
+            renderAnswerTypeOptionsPreview();
+        }
+
+        bindTokenInput('scoredAnswersTokenInput', 'btnAddScoredAnswer', 'scored');
+        bindTokenInput('notScoredAnswersTokenInput', 'btnAddNotScoredAnswer', 'notScored');
+
+        if (btnFeature) {
+            btnFeature.addEventListener('click', () => {
+                const options = getDerivedOptions();
+                if (options.length === 2 && options.includes('yes') && options.includes('no')) {
+                    return setScoringContract(['yes'], ['no']);
+                }
+                if (options.length > 1) return setScoringContract([options[options.length - 1]], options.slice(0, options.length - 1));
+                return setScoringContract(['yes'], ['no']);
+            });
+        }
+
+        if (btnFault) {
+            btnFault.addEventListener('click', () => {
+                const options = getDerivedOptions();
+                if (options.length === 2 && options.includes('yes') && options.includes('no')) {
+                    return setScoringContract(['no'], ['yes']);
+                }
+                if (options.length > 1) return setScoringContract([options[0]], options.slice(1));
+                return setScoringContract(['no'], ['yes']);
+            });
+        }
+
+        if (btnDerived) {
+            btnDerived.addEventListener('click', () => {
+                const options = getDerivedOptions();
+                if (!options.length) return;
+                setScoringContract([options[0]], options.slice(1));
+            });
+        }
+
+        const seedScored = parseAnswerTokensFromRaw(scoredInput ? scoredInput.value : '');
+        const seedNotScored = parseAnswerTokensFromRaw(notScoredInput ? notScoredInput.value : '');
+        setScoringContract(seedScored, seedNotScored);
+
+        document.addEventListener('click', (event) => {
+            const target = event.target.closest('.token-remove');
+            if (!target) return;
+            removeTokenFromContract(target.dataset.kind, target.dataset.index);
+        });
+    }
+
+    function suggestSignals({ criterion, questionText }) {
+        const q = (questionText || '').toLowerCase();
+        let kind = 'hybrid';
+        let signals = [];
+
+        if (criterion === 'TR') {
+            // stance / coverage
+            if (q.includes('position') || q.includes('opinion') || q.includes('agree') || q.includes('disagree')) {
+                kind = 'deterministic';
+                signals = ['position.stance', 'position.stanceSentenceIndex', 'position.contradictionSentenceIndices'];
+            } else if (q.includes('address') || q.includes('parts of the task') || q.includes('all parts')) {
+                kind = 'deterministic';
+                signals = ['answersBySubquestion'];
+            } else {
+                kind = 'hybrid';
+                signals = ['bodySupport[*].hasExplanation', 'bodySupport[*].hasExample', 'bodySupport[*].evidenceSentenceIndices'];
+            }
+        } else if (criterion === 'CC') {
+            if (q.includes('paragraph')) {
+                kind = 'deterministic';
+                signals = ['structure.paragraphCount', 'structure.paragraphRoles', 'structure.paragraphSentenceCounts'];
+            } else if (q.includes('inaccurate') && q.includes('cohesive')) {
+                kind = 'ai';
+                signals = ['ai_cohesion_misuse.issueSentenceIndices'];
+            } else {
+                kind = 'hybrid';
+                signals = [
+                    'cohesion.densityPer100ExcludingBasic',
+                    'cohesion.distinctConnectorsExcludingBasic',
+                    'cohesion.usageMapExcludingBasic',
+                    'topicSentenceByParagraph[*].topicSentenceIndex'
+                ];
+            }
+        } else if (criterion === 'LR') {
+            if (q.includes('spelling') || q.includes('word formation')) {
+                kind = 'external';
+                signals = ['spellcheck.errorCount', 'spellcheck.errorRate'];
+            } else if (q.includes('repetit')) {
+                kind = 'deterministic';
+                signals = ['lexical.topRepeatedWords', 'lexical.referencingDensity'];
+            } else {
+                kind = 'hybrid';
+                signals = ['lexical.sophisticationProfile', 'lexical_error_profile.frequency'];
+            }
+        } else if (criterion === 'GRA') {
+            kind = 'external';
+            if (q.includes('punctuation')) {
+                signals = ['grammarcheck.punctuationErrorCount', 'grammarcheck.punctuationErrorRate'];
+            } else if (q.includes('complex') || q.includes('subordination') || q.includes('structures')) {
+                signals = ['syntax.complexStructureCounts', 'syntax.complexStructureVariety'];
+            } else {
+                signals = ['grammarcheck.grammarErrorCount', 'grammarcheck.errorFreeSentenceRatio'];
+            }
+        }
+
+        return { kind, signals };
+    }
+
+    // Wire up UI buttons (non-blocking if elements missing)
+    (function initRoutingUI() {
+        const btn = document.getElementById('btnSuggestSignals');
+        const btnClean = document.getElementById('btnCleanText');
+        const btnCopyFromAssessment = document.getElementById('btnCopyFromAssessment');
+        if (btnClean) {
+            btnClean.addEventListener('click', () => {
+                const qTa = document.querySelector('textarea[name="atomic_question"]');
+                const rTa = document.querySelector('textarea[name="rubric_anchor"]');
+                if (qTa) qTa.value = cleanSpacing(qTa.value);
+                if (rTa) rTa.value = cleanSpacing(rTa.value);
+            });
+        }
+        if (btnCopyFromAssessment) {
+            btnCopyFromAssessment.addEventListener('click', async () => {
+                if (!window.GenericPicker) {
+                    if (typeof showMessageModal === 'function') {
+                        await showMessageModal({
+                            title: 'Unavailable',
+                            icon: 'warning',
+                            message: 'Assessment picker is not available on this page.',
+                            buttons: [{ text: 'Close', class: 'btn-warning' }]
+                        });
+                    } else {
+                        alert('Assessment picker is not available.');
+                    }
+                    return;
+                }
+
+                const onSelect = async (selectedItem) => {
+                        const sourceId = String(selectedItem?.id || '').trim();
+                        if (!sourceId) return;
+                        if (currentAssessmentId && sourceId === String(currentAssessmentId)) {
+                            if (typeof showMessageModal === 'function') {
+                                await showMessageModal({
+                                    title: 'Invalid Selection',
+                                    icon: 'warning',
+                                    message: 'Select a different assessment to copy from.',
+                                    buttons: [{ text: 'Close', class: 'btn-warning' }]
+                                });
+                            } else {
+                                alert('Select a different assessment to copy from.');
+                            }
+                            return;
+                        }
+                        window.location.href = `/ielts/microAssessments/copy/${encodeURIComponent(sourceId)}`;
+                };
+
+                const pickerConfig = (typeof window.GenericPickerPresets?.microAssessment === 'function')
+                    ? window.GenericPickerPresets.microAssessment({
+                        title: 'Copy From Assessment',
+                        placeholder: 'Search by question key, title, or text...',
+                        onSelect
+                    })
+                    : {
+                        title: 'Copy From Assessment',
+                        icon: 'bi-card-checklist',
+                        apiEndpoint: '/ielts/microAssessments',
+                        placeholder: 'Search by question key, title, or text...',
+                        searchFields: 'question_key,title,atomic_question,criterion,prompt_group,signal_kind',
+                        onSelect
+                    };
+
+                GenericPicker.open(pickerConfig);
+            });
+        }
+        if (btn) {
+            btn.addEventListener('click', () => {
+                const crit = document.querySelector('select[name="criterion"]')?.value;
+                const qText = document.querySelector('textarea[name="atomic_question"]')?.value;
+                const rec = suggestSignals({ criterion: crit, questionText: qText });
+
+                // Auto set prompt group if empty
+                const pgSel = document.querySelector('select[name="prompt_group"]');
+                if (pgSel && !pgSel.value) pgSel.value = inferPromptGroup(crit);
+
+                const kindSel = document.querySelector('select[name="signal_kind"]');
+                if (kindSel) kindSel.value = rec.kind;
+
+                const sigTa = document.querySelector('textarea[name="signal_signals"]');
+                if (sigTa) sigTa.value = (rec.signals || []).join('\n');
+            });
+        }
+    })();
+
+    initScoringContractUI();
+
+    const assessmentForm = document.getElementById('assessmentForm');
+    const assessmentSaveBtn = assessmentForm ? assessmentForm.querySelector('button[type="submit"]') : null;
+    const assessmentCancelBtn = document.getElementById('btnCancelAction');
+    let isSubmitting = false;
+
+    function cacheButtonHtml(button) {
+        if (!button) return;
+        if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+    }
+
+    function setButtonBusy(button, label) {
+        if (!button) return;
+        cacheButtonHtml(button);
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + (label || 'Working...');
+        if (button.tagName === 'A') {
+            button.classList.add('disabled');
+            button.setAttribute('aria-disabled', 'true');
+            button.style.pointerEvents = 'none';
+        }
+    }
+
+    function restoreButton(button) {
+        if (!button) return;
+        if (button.dataset.defaultHtml) button.innerHTML = button.dataset.defaultHtml;
+        button.disabled = false;
+        if (button.tagName === 'A') {
+            button.classList.remove('disabled');
+            button.removeAttribute('aria-disabled');
+            button.style.pointerEvents = '';
+        }
+    }
+
+    cacheButtonHtml(assessmentSaveBtn);
+    cacheButtonHtml(assessmentCancelBtn);
+
+    if (assessmentCancelBtn) {
+        assessmentCancelBtn.addEventListener('click', (event) => {
+            if (isSubmitting) {
+                event.preventDefault();
+                return;
+            }
+            setButtonBusy(assessmentCancelBtn, 'Cancelling...');
+            if (assessmentSaveBtn) assessmentSaveBtn.disabled = true;
+        });
+    }
+
+    assessmentForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (isSubmitting) return;
+        isSubmitting = true;
+        
+        const form = this;
+        const btn = assessmentSaveBtn;
+        
+        // 1. Prepare Data
+        const formData = new FormData(form);
+        const payload = Object.fromEntries(formData.entries());
+        
+        // Handle Checkbox manually
+        payload.is_active = form.querySelector('#isActiveSwitch').checked;
+
+        // 2. Loading State
+        setButtonBusy(btn, 'Saving...');
+        if (assessmentCancelBtn) assessmentCancelBtn.disabled = true;
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-AJAX-Request': 'true' 
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                if(typeof showMessageModal === 'function') {
+                    await showMessageModal({ 
+                        title: 'Success', 
+                        icon: 'success', 
+                        message: result.message || 'Saved successfully.', 
+                        buttons: [{ 
+                            text: 'OK', 
+                            class: 'btn-success',
+                            handler: () => window.location.href = '/ielts/microAssessments'
+                        }] 
+                    });
+                    // Fallback in case handler isn't immediate
+                    setTimeout(() => window.location.href = '/ielts/microAssessments', 1500);
+                } else {
+                    alert('Success: ' + (result.message || 'Saved successfully.'));
+                    window.location.href = '/ielts/microAssessments';
+                }
+            } else {
+                const msg = result.message || 'Failed to save.';
+                if(typeof showMessageModal === 'function') {
+                    showMessageModal({ title: 'Error', icon: 'error', message: msg, buttons: [{ text: 'Close', class: 'btn-danger' }] });
+                } else { 
+                    alert('Error: ' + msg); 
+                }
+                isSubmitting = false;
+                restoreButton(assessmentSaveBtn);
+                restoreButton(assessmentCancelBtn);
+            }
+        } catch (error) {
+            console.error(error);
+            if(typeof showMessageModal === 'function') {
+                showMessageModal({ title: 'System Error', icon: 'error', message: 'Unexpected network error.', buttons: [{ text: 'Close', class: 'btn-danger' }] });
+            } else { 
+                alert('Network Error'); 
+            }
+            isSubmitting = false;
+            restoreButton(assessmentSaveBtn);
+            restoreButton(assessmentCancelBtn);
+        }
+    });
+</script>
