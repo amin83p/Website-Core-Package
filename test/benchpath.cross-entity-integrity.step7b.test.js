@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   validateBenchpathCrossEntityIntegrity
-} = require('../MVC/services/benchpath/data/integrityValidationService');
+} = require('../packages/benchpath/MVC/services/benchpath/data/integrityValidationService');
 
 function makeResolver(recordsByEntity = {}) {
   return async (entityType, id) => {

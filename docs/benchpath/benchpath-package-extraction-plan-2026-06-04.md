@@ -10,7 +10,9 @@ BenchPath is currently a core-owned domain. The app mounts `/benchpath` directly
 
 The migration is intentionally pass-based. Each pass should be small, test-backed, and committed before the next pass starts.
 
-## Current Inventory
+Update 2026-06-04: runtime cutover is complete and the root `MVC/*/benchpath` domain folders have been retired. BenchPath runtime code now resolves from `packages/benchpath`; root support scripts/tests that remain are convenience entrypoints and must import package-owned BenchPath modules.
+
+## Original Inventory
 
 - Controllers: 9 files under `MVC/controllers/benchpath`.
 - Routes: 17 files under `MVC/routes/benchpath`.
@@ -134,3 +136,4 @@ The migration is intentionally pass-based. Each pass should be small, test-backe
 - Pass 6 Package Builder/support mirrors committed: `1da45ec`.
 - Pass 7 runtime cutover committed: `a0e136d`.
 - Pass 8 adds BenchPath signed ZIP coverage and this closeout evidence.
+- Pass 9 retires root `MVC/*/benchpath` folders and updates root support entrypoints to use package-owned BenchPath services.

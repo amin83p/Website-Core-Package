@@ -4,7 +4,7 @@ const uploadFolderSettingsService = require('../MVC/services/uploadFolderSetting
 const {
   applyBenchpathNormalizationMigration,
   writeBenchpathMigrationDryRunReport
-} = require('../MVC/services/benchpath/data/migrationDryRunService');
+} = require('../packages/benchpath/MVC/services/benchpath/data/migrationDryRunService');
 
 function buildTimestamp() {
   return new Date().toISOString().replace(/[:.]/g, '-');

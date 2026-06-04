@@ -1,11 +1,12 @@
 {
   "packageId": "benchpath",
-  "step": 6,
-  "status": "support-mirrored",
+  "step": 9,
+  "status": "root-mvc-retired",
   "notes": [
-    "Targets describe package-local support mirrors for the BenchPath package extraction.",
-    "Root BenchPath support files remain active until package-local scripts and tests are intentionally made runnable.",
-    "Package-local copied tests are inventory mirrors until their imports are adjusted for package-local execution.",
+    "Targets describe package-local support files for the BenchPath package extraction.",
+    "Root BenchPath MVC domain folders are retired; package code must resolve BenchPath domain modules from packages/benchpath.",
+    "Root support scripts and tests remain as convenience entrypoints, but they import package-owned BenchPath services.",
+    "Package-local behavior tests are runnable with package-local MVC imports.",
     "Runtime data remains app-level under data/benchpath and is not mirrored into packages/benchpath/data."
   ],
   "scripts": [
@@ -116,14 +117,14 @@
       "target": "packages/benchpath/test/benchpath.payload-contract.step0.test.js",
       "category": "behavior-contract",
       "status": "root-active",
-      "targetStatus": "package-mirrored"
+      "targetStatus": "package-active"
     },
     {
       "source": "test/benchpath.cross-entity-integrity.step7b.test.js",
       "target": "packages/benchpath/test/benchpath.cross-entity-integrity.step7b.test.js",
       "category": "behavior-contract",
       "status": "root-active",
-      "targetStatus": "package-mirrored"
+      "targetStatus": "package-active"
     }
   ]
 }

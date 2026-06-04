@@ -26,20 +26,38 @@ function assertRegistryFilesExist(rows = [], rootRelativePath = '', label = '') 
   });
 }
 
+function assertRegistryPathsAbsent(rows = [], rootRelativePath = '', label = '') {
+  rows.forEach((row) => {
+    const normalized = String(row || '').replace(/\\/g, '/');
+    assert.ok(normalized, `${label} registry row should not be empty`);
+    assert.equal(
+      fs.existsSync(repoPath(rootRelativePath, ...normalized.split('/'))),
+      false,
+      `${label} registry path should be retired from root MVC: ${rootRelativePath}/${normalized}`
+    );
+  });
+}
+
 function filterBenchpathRows(filePath) {
   const rows = readJson(filePath);
   return (Array.isArray(rows) ? rows : []).filter((row) => /benchpath/i.test(JSON.stringify(row)));
 }
 
-test('BenchPath package pass1 registry captures current root-owned domain surface', () => {
+test('BenchPath package registry captures package-owned domain surface after root MVC retirement', () => {
   const registry = readJson(REGISTRY_PATH);
 
-  assertRegistryFilesExist(registry.controllers, 'MVC/controllers/benchpath', 'controller');
-  assertRegistryFilesExist(registry.routes, 'MVC/routes/benchpath', 'route');
-  assertRegistryFilesExist(registry.models, 'MVC/models/benchpath', 'model');
-  assertRegistryFilesExist(registry.repositories, 'MVC/repositories/benchpath', 'repository');
-  assertRegistryFilesExist(registry.services, 'MVC/services/benchpath', 'service');
-  assertRegistryFilesExist(registry.views, 'MVC/views/benchpath', 'view');
+  assertRegistryFilesExist(registry.controllers, 'packages/benchpath/MVC/controllers/benchpath', 'package controller');
+  assertRegistryFilesExist(registry.routes, 'packages/benchpath/MVC/routes/benchpath', 'package route');
+  assertRegistryFilesExist(registry.models, 'packages/benchpath/MVC/models/benchpath', 'package model');
+  assertRegistryFilesExist(registry.repositories, 'packages/benchpath/MVC/repositories/benchpath', 'package repository');
+  assertRegistryFilesExist(registry.services, 'packages/benchpath/MVC/services/benchpath', 'package service');
+  assertRegistryFilesExist(registry.views, 'packages/benchpath/MVC/views/benchpath', 'package view');
+  assertRegistryPathsAbsent(registry.controllers, 'MVC/controllers/benchpath', 'controller');
+  assertRegistryPathsAbsent(registry.routes, 'MVC/routes/benchpath', 'route');
+  assertRegistryPathsAbsent(registry.models, 'MVC/models/benchpath', 'model');
+  assertRegistryPathsAbsent(registry.repositories, 'MVC/repositories/benchpath', 'repository');
+  assertRegistryPathsAbsent(registry.services, 'MVC/services/benchpath', 'service');
+  assertRegistryPathsAbsent(registry.views, 'MVC/views/benchpath', 'view');
   assertRegistryFilesExist(registry.scripts, '', 'script');
   assertRegistryFilesExist(registry.tests, 'test', 'test');
 

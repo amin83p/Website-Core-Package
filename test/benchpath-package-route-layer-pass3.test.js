@@ -4,8 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const ROOT_ROUTES_DIR = path.join(ROOT_DIR, 'MVC/routes/benchpath');
 const PACKAGE_ROUTES_DIR = path.join(ROOT_DIR, 'packages/benchpath/MVC/routes/benchpath');
+const REGISTRY_PATH = path.join(ROOT_DIR, 'test/benchpath-package-ownership-registry.json');
 
 function listFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true })
@@ -18,12 +18,17 @@ function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
-test('BenchPath package pass3 mirrors root route file inventory', () => {
-  const rootRoutes = listFiles(ROOT_ROUTES_DIR);
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+test('BenchPath package owns route file inventory after root route retirement', () => {
+  const registry = readJson(REGISTRY_PATH);
   const packageRoutes = listFiles(PACKAGE_ROUTES_DIR);
 
-  assert.equal(rootRoutes.length, 17);
-  assert.deepEqual(packageRoutes, rootRoutes);
+  assert.equal(fs.existsSync(path.join(ROOT_DIR, 'MVC/routes/benchpath')), false);
+  assert.equal(packageRoutes.length, 17);
+  assert.deepEqual(packageRoutes, [...registry.routes].sort());
 });
 
 test('BenchPath package pass3 manifest exposes the package route mount', () => {

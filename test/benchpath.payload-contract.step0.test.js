@@ -5,7 +5,7 @@ const {
   normalizeBenchpathPayload,
   validateBenchpathPayloadShape,
   deriveSourceSnapshotFields
-} = require('../MVC/services/benchpath/data/payloadContractService');
+} = require('../packages/benchpath/MVC/services/benchpath/data/payloadContractService');
 
 test('sources fixture normalizes write shape', () => {
   const payload = {

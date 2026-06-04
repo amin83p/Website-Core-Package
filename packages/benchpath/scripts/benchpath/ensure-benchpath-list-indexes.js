@@ -3,7 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
-const { ensureMongoIndexes } = require('../../MVC/infrastructure/mongo/mongoIndexManager');
+const {
+  requireCoreModule,
+  resolveCoreRoot
+} = require('../../MVC/services/benchpath/benchpathCoreModuleResolver');
+const { ensureMongoIndexes } = requireCoreModule('MVC/infrastructure/mongo/mongoIndexManager');
 
 function readJsonFileSafe(filePath) {
   try {
@@ -54,7 +58,7 @@ function inferDbNameFromUri(uri = '') {
 }
 
 function resolveConnectionConfig(args = {}) {
-  const repoRoot = path.resolve(__dirname, '..', '..');
+  const repoRoot = resolveCoreRoot();
   const settingsPath = path.join(repoRoot, 'data', 'systemSettings.json');
   const settings = readJsonFileSafe(settingsPath) || {};
   const uri = String(

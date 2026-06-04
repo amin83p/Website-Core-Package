@@ -1,10 +1,11 @@
 const path = require('path');
-const uploadPathUtils = require('../MVC/utils/uploadPathUtils');
-const uploadFolderSettingsService = require('../MVC/services/uploadFolderSettingsService');
+const { requireCoreModule } = require('../../MVC/services/benchpath/benchpathCoreModuleResolver');
+const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
+const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const {
   applyBenchpathNormalizationMigration,
   writeBenchpathMigrationDryRunReport
-} = require('../MVC/services/benchpath/data/migrationDryRunService');
+} = require('../../MVC/services/benchpath/data/migrationDryRunService');
 
 function buildTimestamp() {
   return new Date().toISOString().replace(/[:.]/g, '-');

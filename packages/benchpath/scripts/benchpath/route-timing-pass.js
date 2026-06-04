@@ -3,10 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
-const settingService = require('../../MVC/services/settingService');
+const { requireCoreModule } = require('../../MVC/services/benchpath/benchpathCoreModuleResolver');
+const settingService = requireCoreModule('MVC/services/settingService');
 const benchpathDataService = require('../../MVC/services/benchpath/benchpathDataService');
-const { applyGenericFilter } = require('../../MVC/utils/queryEngine');
-const paginate = require('../../MVC/utils/paginationHelper');
+const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
+const paginate = requireCoreModule('MVC/utils/paginationHelper');
 
 const IN_MEMORY_DEFAULT_SORT_THRESHOLD = 500;
 

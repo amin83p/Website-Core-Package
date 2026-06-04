@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
 const settingService = require('../../MVC/services/settingService');
-const benchpathDataService = require('../../MVC/services/benchpath/benchpathDataService');
+const benchpathDataService = require('../../packages/benchpath/MVC/services/benchpath/benchpathDataService');
 const { applyGenericFilter } = require('../../MVC/utils/queryEngine');
 const paginate = require('../../MVC/utils/paginationHelper');
 
