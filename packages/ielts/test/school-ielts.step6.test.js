@@ -1,14 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const schoolDataService = require('../MVC/services/school/schoolDataService');
+const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
 const ieltsDataService = require('../MVC/services/ielts/ieltsDataService');
-const schoolRepositories = require('../MVC/repositories/school');
+const schoolRepositories = require('../packages/school/MVC/repositories/school');
 const ieltsRepositories = require('../MVC/repositories/ielts');
 
-const transactionDefinitionModel = require('../MVC/models/school/transactionDefinitionModel');
-const timesheetModel = require('../MVC/models/school/timesheetModel');
-const timesheetPeriodModel = require('../MVC/models/school/timesheetPeriodModel');
+const transactionDefinitionModel = require('../packages/school/MVC/models/school/transactionDefinitionModel');
+const timesheetModel = require('../packages/school/MVC/models/school/timesheetModel');
+const timesheetPeriodModel = require('../packages/school/MVC/models/school/timesheetPeriodModel');
 const microAssessmentModel = require('../MVC/models/ielts/microAssessmentModel');
 
 function createRestoreStack() {
@@ -82,8 +82,8 @@ test('school transaction definition repository includes SYSTEM rows when fallbac
   ]));
 
   try {
-    delete require.cache[require.resolve('../MVC/repositories/school')];
-    const freshSchoolRepositories = require('../MVC/repositories/school');
+    delete require.cache[require.resolve('../packages/school/MVC/repositories/school')];
+    const freshSchoolRepositories = require('../packages/school/MVC/repositories/school');
     const rows = await freshSchoolRepositories.transactionDefinitions.list({
       scope: {
         denyAll: false,
@@ -111,8 +111,8 @@ test('school timesheet repository resolves org from period when missing on row',
   ]));
 
   try {
-    delete require.cache[require.resolve('../MVC/repositories/school')];
-    const freshSchoolRepositories = require('../MVC/repositories/school');
+    delete require.cache[require.resolve('../packages/school/MVC/repositories/school')];
+    const freshSchoolRepositories = require('../packages/school/MVC/repositories/school');
     const rows = await freshSchoolRepositories.timesheets.list({
       scope: {
         denyAll: false,
@@ -159,6 +159,7 @@ test('ielts repository preserves legacy q search for assessment questions', asyn
 
   try {
     delete require.cache[require.resolve('../MVC/repositories/ielts')];
+    delete require.cache[require.resolve('../packages/ielts/MVC/repositories/ielts')];
     const freshIeltsRepositories = require('../MVC/repositories/ielts');
     const rows = await freshIeltsRepositories.microAssessments.list({
       query: { q: 'grammar' },

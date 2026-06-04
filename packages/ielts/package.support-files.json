@@ -169,6 +169,13 @@
       "targetStatus": "package-mirrored"
     },
     {
+      "source": "test/ielts-package-root-shim-retirement-pass14.test.js",
+      "target": "packages/ielts/test/ielts-package-root-shim-retirement-pass14.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
       "source": "test/ielts-package-route-layer-pass3.test.js",
       "target": "packages/ielts/test/ielts-package-route-layer-pass3.test.js",
       "category": "package-test",
