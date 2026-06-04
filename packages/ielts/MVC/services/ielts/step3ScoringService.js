@@ -75,10 +75,25 @@ function hasTaskEchoSignals(taskEcho) {
   );
 }
 
+function isGeneratedNoPromptTaskEcho(taskEcho) {
+  if (!hasTaskEchoSignals(taskEcho)) return false;
+  return (
+    String(taskEcho.detectionVersion || '') === 'v2_robust_phrase' &&
+    Number(taskEcho.wordOverlapRatio || 0) === 0 &&
+    Number(taskEcho.reusedPromptPhraseCount || 0) === 0 &&
+    Number(taskEcho.reusedPromptSentenceLikeCount || 0) === 0 &&
+    Number(taskEcho.copiedWordEstimate || 0) === 0 &&
+    Number(taskEcho.anchorReuseCount || 0) === 0 &&
+    String(taskEcho.severity || '').toLowerCase() === 'none'
+  );
+}
+
 function withTaskEchoSignals(step2Features, essayObj, taskPrompt) {
   const baseStep2 = (step2Features && typeof step2Features === 'object') ? step2Features : {};
   const promptText = String(taskPrompt || '').trim();
-  if (hasTaskEchoSignals(baseStep2.taskEcho) && !promptText) return baseStep2;
+  if (hasTaskEchoSignals(baseStep2.taskEcho) && (!promptText || !isGeneratedNoPromptTaskEcho(baseStep2.taskEcho))) {
+    return baseStep2;
+  }
 
   const computedTaskEcho = essayAnalysisService.computeTaskEchoSignals(essayObj || {}, promptText);
 

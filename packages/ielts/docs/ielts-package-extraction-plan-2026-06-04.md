@@ -214,17 +214,30 @@ The migration is intentionally pass-based. Each pass should be small, test-backe
   - `node test/ielts.tr-cc-runprofile.step6q.test.js`
   - `node test/ielts.step3-extraction-guard.step6j.test.js`
 
-### Residual Behavior Tests
+### Behavior Regression Follow-Up
 
-The package extraction and runtime/package-manager checks are green. A full `test/ielts.*.test.js` sweep still has scoring-calibration failures that are separate from the packaging path changes:
+The five scoring-calibration behavior failures recorded during package closeout were fixed in commit `a16aa41 Fix IELTS scoring behavior regressions`.
 
-- `test/ielts.high-band-alignment.step6k.test.js`
-- `test/ielts.lr-instability.step6m.test.js`
-- `test/ielts.prompt-echo-stance-regression.step6n.test.js`
-- `test/ielts.step3.paragraph-deterministic-regression.test.js`
-- `test/ielts.step3-language-evidence.step6i.test.js`
+Verified green after the follow-up:
 
-These failures involve deterministic IELTS scoring expectations and AI fallback behavior, not package discovery, route loading, support-file mirroring, symbol artifacts, or install ZIP generation.
+- `node test/ielts.high-band-alignment.step6k.test.js`
+- `node test/ielts.lr-instability.step6m.test.js`
+- `node test/ielts.prompt-echo-stance-regression.step6n.test.js`
+- `node test/ielts.step3.paragraph-deterministic-regression.test.js`
+- `node test/ielts.step3-language-evidence.step6i.test.js`
+
+The fix stayed in package-owned IELTS scoring files and did not change package discovery, route loading, support-file mirroring, symbol artifacts, or install ZIP generation.
+
+Full-sweep follow-up also tightened two boundary cases:
+
+- Step 3 now preserves a complete runtime `taskEcho` payload, but recomputes generated no-prompt placeholders when a task prompt is provided.
+- CC9 connector volume checks require explicit non-basic connector totals to meet the stricter Band-9 threshold while still allowing legacy fixtures to infer connector evidence from usage maps when no explicit total exists.
+
+### Full IELTS Sweep Status
+
+- Passed: full `test/ielts*.test.js` sweep after the behavior follow-up.
+- Command shape: sorted `Get-ChildItem test -Filter "ielts*.test.js"` loop running each file with `node`.
+- Result: 37 IELTS test files completed, 0 failed.
 
 ### Manual Smoke Status
 
