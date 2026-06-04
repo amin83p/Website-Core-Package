@@ -1,0 +1,41 @@
+{
+  "phaseId": "phase-6-6.5",
+  "description": "Band 6.0-6.5 validity stabilization with strict small-pack gating.",
+  "runtimeProfile": {
+    "step3Model": "gemini-flash-latest",
+    "step4Model": "gemini-3-flash-preview",
+    "enforceBeforeModelMatch": true,
+    "step4RequestProfile": {
+      "batchSize": 5,
+      "concurrency": 4,
+      "providerId": "google-gemini",
+      "modelId": "gemini-3-flash-preview"
+    }
+  },
+  "samplePack": {
+    "enforceExactSet": true,
+    "targets": [
+      {
+        "sampleName": "Cambridge 15/Test 04",
+        "minDelta": 0.5
+      },
+      {
+        "sampleName": "Cambridge 13/Test 04",
+        "minDelta": 0.5
+      }
+    ],
+    "guards": [
+      {
+        "sampleName": "Cambridge 17/Test 02",
+        "maxNegativeDelta": 0
+      }
+    ]
+  },
+  "acceptance": {
+    "targetMinDelta": 0.5,
+    "requiredTargetPassCount": 1,
+    "guardMaxNegativeDelta": 0,
+    "requiredGuardPassCount": 1,
+    "requireLowBandGateGreen": true
+  }
+}

@@ -1,13 +1,91 @@
 {
   "packageId": "ielts",
-  "step": 2,
-  "status": "scaffolded",
+  "step": 13,
+  "status": "support-mirrored",
   "notes": [
-    "Pass 2 creates the package scaffold only.",
-    "Root IELTS domain files remain active until route, view, controller, model, service, repository, and runtime cutover passes complete.",
-    "Runtime data remains app-level under data/ielts and must not be copied into packages/ielts/data."
+    "Targets describe package-local support mirrors for the IELTS package extraction.",
+    "Root IELTS support files remain active until package-local scripts and tests are intentionally made runnable.",
+    "Package-local copied tests are inventory mirrors only until their imports are adjusted for package-local execution.",
+    "Runtime data remains app-level under data/ielts and is not mirrored into packages/ielts/data."
   ],
   "scripts": [
+    {
+      "source": "scripts/backfillIeltsOrgId.js",
+      "target": "packages/ielts/scripts/migration/backfillIeltsOrgId.js",
+      "category": "migration",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/backfillIeltsScoringSessionType.js",
+      "target": "packages/ielts/scripts/migration/backfillIeltsScoringSessionType.js",
+      "category": "migration",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/ielts/README.scoring-hardening.md",
+      "target": "packages/ielts/scripts/ielts/README.scoring-hardening.md",
+      "category": "script-doc",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/ielts/behaviorFreezeBaseline.js",
+      "target": "packages/ielts/scripts/ielts/behaviorFreezeBaseline.js",
+      "category": "scoring-hardening",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/ielts/microAssessmentContractAudit.js",
+      "target": "packages/ielts/scripts/ielts/microAssessmentContractAudit.js",
+      "category": "scoring-hardening",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/ielts/phaseProfiles/current.json",
+      "target": "packages/ielts/scripts/ielts/phaseProfiles/current.json",
+      "category": "scoring-profile",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/ielts/phaseProfiles/phase-6-6.5.json",
+      "target": "packages/ielts/scripts/ielts/phaseProfiles/phase-6-6.5.json",
+      "category": "scoring-profile",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/ielts/scoringBaselineGuardCheck.js",
+      "target": "packages/ielts/scripts/ielts/scoringBaselineGuardCheck.js",
+      "category": "scoring-hardening",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/ielts/scoringPatchImpactReport.js",
+      "target": "packages/ielts/scripts/ielts/scoringPatchImpactReport.js",
+      "category": "scoring-hardening",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/ielts/tuningPreflight.js",
+      "target": "packages/ielts/scripts/ielts/tuningPreflight.js",
+      "category": "scoring-hardening",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/ieltsCommitHelper.ps1",
+      "target": "packages/ielts/scripts/maintenance/ieltsCommitHelper.ps1",
+      "category": "scoring-hardening",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
     {
       "source": "scripts/packages/enable-ielts-package.js",
       "target": "packages/ielts/scripts/maintenance/enable-ielts-package.js",
@@ -17,6 +95,302 @@
       "targetStatus": "package-owned"
     }
   ],
-  "docs": [],
-  "tests": []
+  "docs": [
+    {
+      "source": "docs/dissertation/ielts-prompt-policy-delta-matrix.docx",
+      "target": "packages/ielts/docs/dissertation/ielts-prompt-policy-delta-matrix.docx",
+      "category": "dissertation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/dissertation/ielts-prompt-policy-delta-matrix.md",
+      "target": "packages/ielts/docs/dissertation/ielts-prompt-policy-delta-matrix.md",
+      "category": "dissertation",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/ielts/ielts-package-extraction-plan-2026-06-04.md",
+      "target": "packages/ielts/docs/ielts-package-extraction-plan-2026-06-04.md",
+      "category": "package-plan",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/ielts/tuning-history.json",
+      "target": "packages/ielts/docs/tuning-history.json",
+      "category": "tuning-history",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    }
+  ],
+  "tests": [
+    {
+      "source": "test/ielts-package-controller-ownership-pass5.test.js",
+      "target": "packages/ielts/test/ielts-package-controller-ownership-pass5.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-manifest-declarations-pass9.test.js",
+      "target": "packages/ielts/test/ielts-package-manifest-declarations-pass9.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-model-ownership-pass6.test.js",
+      "target": "packages/ielts/test/ielts-package-model-ownership-pass6.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-ownership-registry-pass1.test.js",
+      "target": "packages/ielts/test/ielts-package-ownership-registry-pass1.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-ownership-registry.json",
+      "target": "packages/ielts/test/ielts-package-ownership-registry.json",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-query-executor-pass8.test.js",
+      "target": "packages/ielts/test/ielts-package-query-executor-pass8.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-route-layer-pass3.test.js",
+      "target": "packages/ielts/test/ielts-package-route-layer-pass3.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-runtime-cutover-pass12.test.js",
+      "target": "packages/ielts/test/ielts-package-runtime-cutover-pass12.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-scaffold-pass2.test.js",
+      "target": "packages/ielts/test/ielts-package-scaffold-pass2.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-service-ownership-pass7.test.js",
+      "target": "packages/ielts/test/ielts-package-service-ownership-pass7.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-support-files-pass13.test.js",
+      "target": "packages/ielts/test/ielts-package-support-files-pass13.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-symbol-artifacts-pass10.test.js",
+      "target": "packages/ielts/test/ielts-package-symbol-artifacts-pass10.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts-package-view-parity-pass4.test.js",
+      "target": "packages/ielts/test/ielts-package-view-parity-pass4.test.js",
+      "category": "package-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.behavior-freeze.step6t.test.js",
+      "target": "packages/ielts/test/ielts.behavior-freeze.step6t.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.explicit-answer-contract.step6e.test.js",
+      "target": "packages/ielts/test/ielts.explicit-answer-contract.step6e.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.high-band-alignment.step6k.test.js",
+      "target": "packages/ielts/test/ielts.high-band-alignment.step6k.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.low-band-activation.step6.test.js",
+      "target": "packages/ielts/test/ielts.low-band-activation.step6.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.low-band-calibration.step6c.test.js",
+      "target": "packages/ielts/test/ielts.low-band-calibration.step6c.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.low-band-followup.step6b.test.js",
+      "target": "packages/ielts/test/ielts.low-band-followup.step6b.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.low-band-polarity-regression.step6d.test.js",
+      "target": "packages/ielts/test/ielts.low-band-polarity-regression.step6d.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.lr-instability.step6m.test.js",
+      "target": "packages/ielts/test/ielts.lr-instability.step6m.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.micro-contract-audit.step6g.test.js",
+      "target": "packages/ielts/test/ielts.micro-contract-audit.step6g.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.microassessment-runtime-hardening.step6u.test.js",
+      "target": "packages/ielts/test/ielts.microassessment-runtime-hardening.step6u.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.prompt-echo-stance-regression.step6n.test.js",
+      "target": "packages/ielts/test/ielts.prompt-echo-stance-regression.step6n.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.rule-patch-hardening.step6s.test.js",
+      "target": "packages/ielts/test/ielts.rule-patch-hardening.step6s.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.runtime-consistency.step6v.test.js",
+      "target": "packages/ielts/test/ielts.runtime-consistency.step6v.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.stability-accuracy.step6r.test.js",
+      "target": "packages/ielts/test/ielts.stability-accuracy.step6r.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.step3-calibration.step6l.test.js",
+      "target": "packages/ielts/test/ielts.step3-calibration.step6l.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.step3-extraction-guard.step6j.test.js",
+      "target": "packages/ielts/test/ielts.step3-extraction-guard.step6j.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.step3-language-evidence.step6i.test.js",
+      "target": "packages/ielts/test/ielts.step3-language-evidence.step6i.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.step3.paragraph-deterministic-regression.test.js",
+      "target": "packages/ielts/test/ielts.step3.paragraph-deterministic-regression.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.step4-aggregation-denominator.step6f.test.js",
+      "target": "packages/ielts/test/ielts.step4-aggregation-denominator.step6f.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.step4-evidence-binding.step6n.test.js",
+      "target": "packages/ielts/test/ielts.step4-evidence-binding.step6n.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.step4-reliability.step6h.test.js",
+      "target": "packages/ielts/test/ielts.step4-reliability.step6h.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.task-echo-robustness.step6p.test.js",
+      "target": "packages/ielts/test/ielts.task-echo-robustness.step6p.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.tr-cc-runprofile.step6q.test.js",
+      "target": "packages/ielts/test/ielts.tr-cc-runprofile.step6q.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/ielts.virtual-sentence-recovery.step6o.test.js",
+      "target": "packages/ielts/test/ielts.virtual-sentence-recovery.step6o.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/school-ielts.step6.test.js",
+      "target": "packages/ielts/test/school-ielts.step6.test.js",
+      "category": "behavior-test",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    }
+  ]
 }
