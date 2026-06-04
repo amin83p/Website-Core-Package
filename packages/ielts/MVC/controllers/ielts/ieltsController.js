@@ -1,18 +1,18 @@
 ﻿// MVC/controllers/ielts/ieltsController.js
 const { requireCoreModule, resolveCoreRoot } = require('../../services/ielts/ieltsCoreModuleResolver');
-const ieltsService = requireCoreModule('MVC/services/ielts/ieltsDataService');
+const ieltsService = require('../../services/ielts/ieltsDataService');
 const { getDashboardSection } = requireCoreModule('MVC/controllers/dashboardController');
 
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
-const aiService = requireCoreModule('MVC/services/ielts/aiService'); // Import the service
-const essayPreprocessingService = requireCoreModule('MVC/services/ielts/essayPreprocessingService');
-const essayAnalysisService = requireCoreModule('MVC/services/ielts/essayAnalysisService');
-const aiExtractionService = requireCoreModule('MVC/services/ielts/aiExtractionService');
-const step3ScoringService = requireCoreModule('MVC/services/ielts/step3ScoringService');
-const step5FeedbackService = requireCoreModule('MVC/services/ielts/step5FeedbackService');
-const repeatedRunAnalysisService = requireCoreModule('MVC/services/ielts/repeatedRunAnalysisService');
-const calibrationEvaluationService = requireCoreModule('MVC/services/ielts/calibrationEvaluationService');
-const scoringRunControlService = requireCoreModule('MVC/services/ielts/scoringRunControlService');
+const aiService = require('../../services/ielts/aiService'); // Import the service
+const essayPreprocessingService = require('../../services/ielts/essayPreprocessingService');
+const essayAnalysisService = require('../../services/ielts/essayAnalysisService');
+const aiExtractionService = require('../../services/ielts/aiExtractionService');
+const step3ScoringService = require('../../services/ielts/step3ScoringService');
+const step5FeedbackService = require('../../services/ielts/step5FeedbackService');
+const repeatedRunAnalysisService = require('../../services/ielts/repeatedRunAnalysisService');
+const calibrationEvaluationService = require('../../services/ielts/calibrationEvaluationService');
+const scoringRunControlService = require('../../services/ielts/scoringRunControlService');
 const { buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
 const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const {

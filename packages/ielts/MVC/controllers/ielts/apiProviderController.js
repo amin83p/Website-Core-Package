@@ -1,5 +1,5 @@
 const { requireCoreModule } = require('../../services/ielts/ieltsCoreModuleResolver');
-const ieltsService = requireCoreModule('MVC/services/ielts/ieltsDataService');
+const ieltsService = require('../../services/ielts/ieltsDataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 
 const PROVIDER_OPTIONS = Object.freeze([
