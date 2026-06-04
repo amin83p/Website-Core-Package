@@ -1,0 +1,50 @@
+{
+  "id": "benchpath",
+  "name": "BenchPath",
+  "version": "0.1.0",
+  "mountPath": "/benchpath",
+  "enabledByDefault": false,
+  "routes": [
+    {
+      "method": "USE",
+      "path": "/benchpath",
+      "router": "MVC/routes/benchpathMainRoute.js",
+      "metadataOnly": false,
+      "active": true
+    }
+  ],
+  "queryExecutors": [],
+  "views": {
+    "id": "benchpath-package-views",
+    "path": "packages/benchpath/MVC/views",
+    "namespace": "benchpath",
+    "active": true
+  },
+  "assets": {
+    "id": "benchpath-package-public-assets",
+    "path": "packages/benchpath/public",
+    "publicPath": "/benchpath",
+    "metadataOnly": true,
+    "active": true
+  },
+  "operations": [],
+  "roles": [],
+  "sections": [],
+  "symbols": [],
+  "accesses": [],
+  "uploadFolders": [
+    {
+      "key": "generated.benchpathReports",
+      "relativePath": "benchpath/reports",
+      "description": "Generated BenchPath migration and validation reports."
+    }
+  ],
+  "menuEntries": [],
+  "dashboardEntries": [],
+  "dataEntities": [],
+  "migrations": [],
+  "seeders": [],
+  "dataSchemas": [],
+  "upgradeGuards": [],
+  "dependencies": []
+}

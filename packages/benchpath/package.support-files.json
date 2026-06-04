@@ -1,0 +1,29 @@
+{
+  "packageId": "benchpath",
+  "step": 2,
+  "status": "scaffolded",
+  "notes": [
+    "Targets describe package-local support mirrors for the BenchPath package extraction.",
+    "Root BenchPath support files remain active until package-local scripts and tests are intentionally made runnable.",
+    "Runtime data remains app-level under data/benchpath and is not mirrored into packages/benchpath/data."
+  ],
+  "scripts": [
+    {
+      "source": "scripts/packages/enable-benchpath-package.js",
+      "target": "packages/benchpath/scripts/maintenance/enable-benchpath-package.js",
+      "category": "activation",
+      "status": "root-active",
+      "targetStatus": "package-active"
+    }
+  ],
+  "docs": [
+    {
+      "source": "docs/benchpath/benchpath-package-extraction-plan-2026-06-04.md",
+      "target": "packages/benchpath/docs/benchpath-package-extraction-plan-2026-06-04.md",
+      "category": "migration-plan",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    }
+  ],
+  "tests": []
+}
