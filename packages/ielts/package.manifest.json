@@ -66,8 +66,1263 @@
   },
   "operations": [],
   "roles": [],
-  "sections": [],
-  "symbols": [],
+  "sections": [
+    {
+      "id": "123317",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-02-08T01:46:36.748Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-04-10T06:51:12.313Z"
+      },
+      "category": "IELTS",
+      "dashboardDisplay": true,
+      "description": "IELTS domain hub: writing samples, micro assessments, scoring pipelines and history, prompt tuning, and commit helper.",
+      "homeURL": "",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": true,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "IELTS",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1006",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1010",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP0101",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP0102",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP0103",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP0104",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP0105",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP0106",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1021",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [
+        {
+          "id": "938720"
+        },
+        {
+          "id": "955023"
+        },
+        {
+          "id": "296981"
+        },
+        {
+          "id": "602825"
+        },
+        {
+          "id": "359513"
+        },
+        {
+          "id": "103381"
+        },
+        {
+          "id": "852111"
+        },
+        {
+          "id": "669513"
+        }
+      ],
+      "trackState": true
+    },
+    {
+      "name": "IELTS_AI_TOKEN_USAGE",
+      "category": "IELTS",
+      "description": "Track IELTS AI token consumption by user/provider/model for billing and audit.",
+      "homeURL": "/ielts/ai-token-usage",
+      "message": "",
+      "inactiveMessage": "",
+      "active": true,
+      "mainDashboardDisplay": false,
+      "dashboardDisplay": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "navigatorSection": false,
+      "subsections": [],
+      "related": [],
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-28T02:01:24.310Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-03-28T02:01:24.310Z"
+      },
+      "id": "669513"
+    },
+    {
+      "name": "IELTS_API_PROVIDERS",
+      "category": "IELTS",
+      "description": "User-owned AI provider/API key settings for IELTS tools.",
+      "homeURL": "/ielts/api-providers",
+      "message": "",
+      "inactiveMessage": "",
+      "active": true,
+      "mainDashboardDisplay": false,
+      "dashboardDisplay": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "navigatorSection": false,
+      "subsections": [],
+      "related": [],
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-27T06:28:35.230Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-03-27T06:28:35.230Z"
+      },
+      "id": "852111"
+    },
+    {
+      "id": "103381",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-24T16:57:20.976Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T16:57:20.976Z"
+      },
+      "category": "IELTS",
+      "dashboardDisplay": true,
+      "description": "Commit helper for model output and ingest workflows.",
+      "homeURL": "/ielts/commit-helper",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "IELTS_COMMIT_HELPER",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "955023",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-24T16:57:20.976Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T16:57:20.976Z"
+      },
+      "category": "IELTS",
+      "dashboardDisplay": true,
+      "description": "Micro assessments for Task 2 evaluation workflows.",
+      "homeURL": "/ielts/microAssessments",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "IELTS_MICRO_ASSESSMENTS",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "359513",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-24T16:57:20.976Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T16:57:20.976Z"
+      },
+      "category": "IELTS",
+      "dashboardDisplay": true,
+      "description": "Prompt templates and tuning for IELTS AI flows.",
+      "homeURL": "/ielts/prompts",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "IELTS_PROMPT_TUNING",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "602825",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-24T16:57:20.976Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T16:57:20.976Z"
+      },
+      "category": "IELTS",
+      "dashboardDisplay": true,
+      "description": "Saved scoring sessions and history.",
+      "homeURL": "/ielts/scoring/history",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "IELTS_SCORING_HISTORY",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    },
+    {
+      "id": "446201",
+      "name": "IELTS_SCORING_PIPELINE_CLASSIC",
+      "category": "IELTS",
+      "description": "Classic IELTS scoring pipeline.",
+      "homeURL": "/ielts/scoring/classic",
+      "message": "",
+      "inactiveMessage": "",
+      "active": true,
+      "mainDashboardDisplay": false,
+      "dashboardDisplay": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "navigatorSection": false,
+      "subsections": [],
+      "related": [],
+      "operations": [
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1024",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "446204",
+      "name": "IELTS_SCORING_PIPELINE_STANDARD",
+      "category": "IELTS",
+      "description": "Standard scoring pipeline.",
+      "homeURL": "/ielts/scoring-standard",
+      "message": "",
+      "inactiveMessage": "",
+      "active": true,
+      "mainDashboardDisplay": false,
+      "dashboardDisplay": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "navigatorSection": false,
+      "subsections": [],
+      "related": [],
+      "operations": [
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1024",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "446206",
+      "name": "IELTS_SCORING_PIPELINE_TUNING_STEP3",
+      "category": "IELTS",
+      "description": "Step 3 tuning lab.",
+      "homeURL": "/ielts/scoring/tuning/step3",
+      "message": "",
+      "inactiveMessage": "",
+      "active": true,
+      "mainDashboardDisplay": false,
+      "dashboardDisplay": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "navigatorSection": false,
+      "subsections": [],
+      "related": [],
+      "operations": [
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1024",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "446207",
+      "name": "IELTS_SCORING_PIPELINE_TUNING_STEP4",
+      "category": "IELTS",
+      "description": "Step 4 tuning lab.",
+      "homeURL": "/ielts/scoring/tuning/step4",
+      "message": "",
+      "inactiveMessage": "",
+      "active": true,
+      "mainDashboardDisplay": false,
+      "dashboardDisplay": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "navigatorSection": false,
+      "subsections": [],
+      "related": [],
+      "operations": [
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1024",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "446202",
+      "name": "IELTS_SCORING_PIPELINE_V0225",
+      "category": "IELTS",
+      "description": "V0225 scoring pipeline.",
+      "homeURL": "/ielts/scoringV0225",
+      "message": "",
+      "inactiveMessage": "",
+      "active": true,
+      "mainDashboardDisplay": false,
+      "dashboardDisplay": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "navigatorSection": false,
+      "subsections": [],
+      "related": [],
+      "operations": [
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1024",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "446203",
+      "name": "IELTS_SCORING_PIPELINE_V0323",
+      "category": "IELTS",
+      "description": "V0323 scoring pipeline.",
+      "homeURL": "/ielts/scoringV0323",
+      "message": "",
+      "inactiveMessage": "",
+      "active": true,
+      "mainDashboardDisplay": false,
+      "dashboardDisplay": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "navigatorSection": false,
+      "subsections": [],
+      "related": [],
+      "operations": [
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1024",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "446205",
+      "name": "IELTS_SCORING_PIPELINE_V0326",
+      "category": "IELTS",
+      "description": "V0326 scoring pipeline.",
+      "homeURL": "/ielts/scoringV0326",
+      "message": "",
+      "inactiveMessage": "",
+      "active": true,
+      "mainDashboardDisplay": false,
+      "dashboardDisplay": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "navigatorSection": false,
+      "subsections": [],
+      "related": [],
+      "operations": [
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1024",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "296981",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-24T16:57:20.976Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-04-10T06:53:57.480Z"
+      },
+      "category": "IELTS",
+      "dashboardDisplay": true,
+      "description": "Navigator for all IELTS scoring pipeline variants and tuning labs.",
+      "homeURL": "",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "IELTS_SCORING_PIPELINES",
+      "navigatorSection": true,
+      "operations": [],
+      "related": [],
+      "subsections": [
+        {
+          "id": "446201"
+        },
+        {
+          "id": "446204"
+        },
+        {
+          "id": "446202"
+        },
+        {
+          "id": "446203"
+        },
+        {
+          "id": "446205"
+        },
+        {
+          "id": "446206"
+        },
+        {
+          "id": "446207"
+        }
+      ],
+      "trackState": false
+    },
+    {
+      "id": "938720",
+      "active": true,
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-03-24T16:57:20.976Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T16:57:20.976Z"
+      },
+      "category": "IELTS",
+      "dashboardDisplay": true,
+      "description": "IELTS Writing Task 2 sample essays and attachments.",
+      "homeURL": "/ielts/task2samples",
+      "inactiveMessage": "",
+      "mainDashboardDisplay": false,
+      "message": "",
+      "minimumAccessRequirement": 5,
+      "name": "IELTS_WRITING_TASK2_SAMPLES",
+      "navigatorSection": false,
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1023",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "related": [],
+      "subsections": [],
+      "trackState": true
+    }
+  ],
+  "symbols": [
+    {
+      "id": "SYM_SYSTEM_024",
+      "audit": {
+        "createUser": "SYS_ROOT_001",
+        "createDateTime": "2026-02-13T21:13:58.193Z",
+        "lastUpdateUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-02-13T21:14:34.400Z"
+      },
+      "name": "IELTS",
+      "orgId": "SYSTEM",
+      "tags": [
+        "IELTS"
+      ],
+      "type": "image",
+      "value": "/uploads/GLOBAL/symbols/iddwYN9lAI_1771016557992_1771017274394.svg"
+    },
+    {
+      "id": "SYM_SYSTEM_080",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T20:00:00.000Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T20:00:00.000Z"
+      },
+      "name": "IELTS_COMMIT_HELPER",
+      "orgId": "SYSTEM",
+      "tags": [
+        "IELTS_COMMIT_HELPER",
+        "103381"
+      ],
+      "type": "class",
+      "value": "bi bi-journal-check"
+    },
+    {
+      "id": "SYM_SYSTEM_076",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T20:00:00.000Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T20:00:00.000Z"
+      },
+      "name": "IELTS_MICRO_ASSESSMENTS",
+      "orgId": "SYSTEM",
+      "tags": [
+        "IELTS_MICRO_ASSESSMENTS",
+        "955023"
+      ],
+      "type": "class",
+      "value": "bi bi-ui-checks"
+    },
+    {
+      "id": "SYM_SYSTEM_079",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T20:00:00.000Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T20:00:00.000Z"
+      },
+      "name": "IELTS_PROMPT_TUNING",
+      "orgId": "SYSTEM",
+      "tags": [
+        "IELTS_PROMPT_TUNING",
+        "359513"
+      ],
+      "type": "class",
+      "value": "bi bi-sliders"
+    },
+    {
+      "id": "SYM_SYSTEM_078",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T20:00:00.000Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T20:00:00.000Z"
+      },
+      "name": "IELTS_SCORING_HISTORY",
+      "orgId": "SYSTEM",
+      "tags": [
+        "IELTS_SCORING_HISTORY",
+        "602825"
+      ],
+      "type": "class",
+      "value": "bi bi-archive-fill"
+    },
+    {
+      "name": "IELTS_SCORING_PIPELINE_CLASSIC",
+      "orgId": "SYSTEM",
+      "audit": {
+        "createDateTime": "2026-04-10T06:55:26.092Z",
+        "createUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-10T06:55:26.092Z",
+        "lastUpdateUser": "SYS_ROOT_001"
+      },
+      "id": "SYM_IELTS_PIPE_446201",
+      "tags": [
+        "IELTS_SCORING_PIPELINE_CLASSIC",
+        "446201"
+      ],
+      "type": "class",
+      "value": "bi bi-bezier2"
+    },
+    {
+      "name": "IELTS_SCORING_PIPELINE_STANDARD",
+      "orgId": "SYSTEM",
+      "audit": {
+        "createDateTime": "2026-04-10T06:55:26.092Z",
+        "createUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-10T06:55:26.092Z",
+        "lastUpdateUser": "SYS_ROOT_001"
+      },
+      "id": "SYM_IELTS_PIPE_446204",
+      "tags": [
+        "IELTS_SCORING_PIPELINE_STANDARD",
+        "446204"
+      ],
+      "type": "class",
+      "value": "bi bi-ui-radios-grid"
+    },
+    {
+      "name": "IELTS_SCORING_PIPELINE_TUNING_STEP3",
+      "orgId": "SYSTEM",
+      "audit": {
+        "createDateTime": "2026-04-10T06:55:26.092Z",
+        "createUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-10T06:55:26.092Z",
+        "lastUpdateUser": "SYS_ROOT_001"
+      },
+      "id": "SYM_IELTS_PIPE_446206",
+      "tags": [
+        "IELTS_SCORING_PIPELINE_TUNING_STEP3",
+        "446206"
+      ],
+      "type": "class",
+      "value": "bi bi-sliders2-vertical"
+    },
+    {
+      "name": "IELTS_SCORING_PIPELINE_TUNING_STEP4",
+      "orgId": "SYSTEM",
+      "audit": {
+        "createDateTime": "2026-04-10T06:55:26.092Z",
+        "createUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-10T06:55:26.092Z",
+        "lastUpdateUser": "SYS_ROOT_001"
+      },
+      "id": "SYM_IELTS_PIPE_446207",
+      "tags": [
+        "IELTS_SCORING_PIPELINE_TUNING_STEP4",
+        "446207"
+      ],
+      "type": "class",
+      "value": "bi bi-funnel-fill"
+    },
+    {
+      "name": "IELTS_SCORING_PIPELINE_V0225",
+      "orgId": "SYSTEM",
+      "audit": {
+        "createDateTime": "2026-04-10T06:55:26.092Z",
+        "createUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-10T06:55:26.092Z",
+        "lastUpdateUser": "SYS_ROOT_001"
+      },
+      "id": "SYM_IELTS_PIPE_446202",
+      "tags": [
+        "IELTS_SCORING_PIPELINE_V0225",
+        "446202"
+      ],
+      "type": "class",
+      "value": "bi bi-cpu-fill"
+    },
+    {
+      "name": "IELTS_SCORING_PIPELINE_V0323",
+      "orgId": "SYSTEM",
+      "audit": {
+        "createDateTime": "2026-04-10T06:55:26.092Z",
+        "createUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-10T06:55:26.092Z",
+        "lastUpdateUser": "SYS_ROOT_001"
+      },
+      "id": "SYM_IELTS_PIPE_446203",
+      "tags": [
+        "IELTS_SCORING_PIPELINE_V0323",
+        "446203"
+      ],
+      "type": "class",
+      "value": "bi bi-cpu"
+    },
+    {
+      "name": "IELTS_SCORING_PIPELINE_V0326",
+      "orgId": "SYSTEM",
+      "audit": {
+        "createDateTime": "2026-04-10T06:55:26.092Z",
+        "createUser": "SYS_ROOT_001",
+        "lastUpdateDateTime": "2026-04-10T06:55:26.092Z",
+        "lastUpdateUser": "SYS_ROOT_001"
+      },
+      "id": "SYM_IELTS_PIPE_446205",
+      "tags": [
+        "IELTS_SCORING_PIPELINE_V0326",
+        "446205"
+      ],
+      "type": "class",
+      "value": "bi bi-journal-richtext"
+    },
+    {
+      "id": "SYM_SYSTEM_077",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T20:00:00.000Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T20:00:00.000Z"
+      },
+      "name": "IELTS_SCORING_PIPELINES",
+      "orgId": "SYSTEM",
+      "tags": [
+        "IELTS_SCORING_PIPELINES",
+        "296981"
+      ],
+      "type": "class",
+      "value": "bi bi-bezier2"
+    },
+    {
+      "id": "SYM_SYSTEM_075",
+      "audit": {
+        "createUser": "ROOT_001",
+        "createDateTime": "2026-03-24T20:00:00.000Z",
+        "lastUpdateUser": "ROOT_001",
+        "lastUpdateDateTime": "2026-03-24T20:00:00.000Z"
+      },
+      "name": "IELTS_WRITING_TASK2_SAMPLES",
+      "orgId": "SYSTEM",
+      "tags": [
+        "IELTS_WRITING_TASK2_SAMPLES",
+        "938720"
+      ],
+      "type": "class",
+      "value": "bi bi-pen-fill"
+    }
+  ],
   "accesses": [],
   "uploadFolders": [
     {
@@ -105,32 +1360,74 @@
     {
       "entityType": "task2Samples",
       "label": "IELTS Task 2 Samples",
-      "source": "data/ielts/task2samples.json"
+      "source": "data/ielts/task2samples.json",
+      "collectionName": "ieltsTask2Samples",
+      "storageType": "json",
+      "storageTarget": "data/ielts/task2samples.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
     },
     {
       "entityType": "microAssessments",
       "label": "IELTS Micro Assessments",
-      "source": "data/ielts/microAssessments.json"
+      "source": "data/ielts/microAssessments.json",
+      "collectionName": "ieltsMicroAssessments",
+      "storageType": "json",
+      "storageTarget": "data/ielts/microAssessments.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
     },
     {
       "entityType": "prompts",
       "label": "IELTS Prompts",
-      "source": "data/ielts/prompts.json"
+      "source": "data/ielts/prompts.json",
+      "collectionName": "ieltsPrompts",
+      "storageType": "json",
+      "storageTarget": "data/ielts/prompts.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
     },
     {
       "entityType": "apiProviders",
       "label": "IELTS API Providers",
-      "source": "data/ielts/apiProviders.json"
+      "source": "data/ielts/apiProviders.json",
+      "collectionName": "ieltsApiProviders",
+      "storageType": "json",
+      "storageTarget": "data/ielts/apiProviders.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
     },
     {
       "entityType": "aiTokenUsages",
       "label": "IELTS AI Token Usages",
-      "source": "data/ielts/aiTokenUsages.json"
+      "source": "data/ielts/aiTokenUsages.json",
+      "collectionName": "ieltsAiTokenUsages",
+      "storageType": "json",
+      "storageTarget": "data/ielts/aiTokenUsages.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
     },
     {
       "entityType": "scoringHistory",
       "label": "IELTS Scoring History",
-      "source": "data/ielts/scoring/sessions"
+      "source": "data/ielts/scoring/sessions",
+      "collectionName": "ieltsScoringHistory",
+      "storageType": "json-directory",
+      "storageTarget": "data/ielts/scoring/sessions",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
     }
   ]
 }
