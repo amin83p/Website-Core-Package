@@ -1,5 +1,5 @@
 const { requireCoreModule } = require('./ieltsCoreModuleResolver');
-const ieltsRepositories = requireCoreModule('MVC/repositories/ielts');
+const ieltsRepositories = require('../../repositories/ielts');
 const { normalizeQueryOptions } = requireCoreModule('MVC/utils/queryOptionsAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');

@@ -25,7 +25,7 @@ test('IELTS package pass7 package services bridge shared core dependencies throu
   const aiServiceSource = read('packages/ielts/MVC/services/ielts/aiService.js');
 
   assert.match(dataServiceSource, /ieltsCoreModuleResolver/);
-  assert.match(dataServiceSource, /requireCoreModule\('MVC\/repositories\/ielts'\)/);
+  assert.match(dataServiceSource, /require\('\.\.\/\.\.\/repositories\/ielts'\)/);
   assert.match(dataServiceSource, /requireCoreModule\('MVC\/utils\/queryOptionsAdapter'\)/);
 
   assert.match(aiServiceSource, /ieltsCoreModuleResolver/);
