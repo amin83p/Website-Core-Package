@@ -81,6 +81,21 @@
       </div>
 
       <div class="row g-3 mt-1">
+        <div class="col-lg-6">
+          <label class="form-label small fw-bold">Manifest Source</label>
+          <select id="builderManifestMode" class="form-select">
+            <option value="static">Static manifest from package folder</option>
+            <option value="live">Live backend manifest (School only)</option>
+          </select>
+          <div class="small text-muted mt-1">Live mode rebuilds School declarations from the active backend while keeping package routes, views, assets, upload folders, and data entities from the template manifest.</div>
+        </div>
+        <div class="col-lg-6">
+          <label class="form-label small fw-bold">Suggested Target Version</label>
+          <div class="small text-muted border rounded px-3 py-2 bg-light" id="builderVersionHint">Select a package to suggest the next version.</div>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
         <div class="col-12">
           <div class="card border-0 bg-light-subtle">
             <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between py-2">
@@ -146,7 +161,15 @@
         <div class="col-12">
           <label class="form-label small fw-bold">Target Version</label>
           <input id="builderVersion" type="text" class="form-control" placeholder="1.0.1">
-          <div class="small text-muted mt-1">Set the package version in this final step before adding any manual refs.</div>
+          <div class="small text-muted mt-1">The builder suggests the next patch version automatically. You can change it, but versions lower than the current package version are rejected.</div>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-12">
+          <label class="form-label small fw-bold">Build Note</label>
+          <textarea id="builderBuildNote" rows="3" class="form-control" placeholder="Describe what changed in this package build..."></textarea>
+          <div class="small text-muted mt-1">Saved into the package as <code>BUILD_NOTE.md</code> and included in builder payload metadata.</div>
         </div>
       </div>
 
@@ -206,7 +229,10 @@
 (() => {
   const actionStateId = document.getElementById('builderActionStateId')?.value || '';
   const packageEl = document.getElementById('builderPackageId');
+  const manifestModeEl = document.getElementById('builderManifestMode');
   const versionEl = document.getElementById('builderVersion');
+  const versionHintEl = document.getElementById('builderVersionHint');
+  const buildNoteEl = document.getElementById('builderBuildNote');
   const originOrgIdEl = document.getElementById('builderOriginOrgId');
   const originOrgNameEl = document.getElementById('builderOriginOrgName');
   const originOrgPickBtn = document.getElementById('builderPickOriginOrgBtn');
@@ -264,6 +290,40 @@
       .split(/\r?\n/)
       .map((row) => row.trim())
       .filter(Boolean);
+  }
+
+  function suggestNextVersion(version) {
+    const token = String(version || '').trim();
+    const match = token.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
+    if (!match) return '1.0.0';
+    const major = Number.parseInt(match[1], 10);
+    const minor = Number.parseInt(match[2], 10);
+    const patch = Number.parseInt(match[3], 10);
+    if (![major, minor, patch].every(Number.isFinite)) return '1.0.0';
+    return `${major}.${minor}.${patch + 1}`;
+  }
+
+  function syncVersionSuggestion(force = false) {
+    const selected = packageEl?.options?.[packageEl.selectedIndex];
+    const currentVersion = String(selected?.getAttribute('data-version') || '').trim();
+    const packageId = String(packageEl?.value || '').trim();
+    const suggested = suggestNextVersion(currentVersion);
+    if (versionHintEl) {
+      versionHintEl.textContent = packageId
+        ? `Current ${currentVersion || 'unknown'} -> suggested ${suggested}`
+        : 'Select a package to suggest the next version.';
+    }
+    if (versionEl && packageId && (force || !versionEl.value.trim())) {
+      versionEl.value = suggested;
+    }
+    if (manifestModeEl) {
+      const isSchool = packageId.toLowerCase() === 'school';
+      Array.from(manifestModeEl.options).forEach((option) => {
+        if (option.value === 'live') option.disabled = !isSchool;
+      });
+      if (!isSchool && manifestModeEl.value === 'live') manifestModeEl.value = 'static';
+      if (isSchool && force) manifestModeEl.value = 'live';
+    }
   }
 
   function setBuilderOriginOrgSelection(orgId, orgName = '') {
@@ -647,6 +707,7 @@
       },
       body: JSON.stringify({
         packageId,
+        manifestMode: manifestModeEl?.value || 'static',
         originOrgId,
         actionStateId,
         selectedDataEntities,
@@ -709,7 +770,9 @@
       },
       body: JSON.stringify({
         packageId,
+        manifestMode: manifestModeEl?.value || 'static',
         version,
+        buildNote: buildNoteEl?.value || '',
         originOrgId,
         actionStateId,
         selectedDataEntities,
@@ -763,6 +826,7 @@
       },
       body: JSON.stringify({
         packageId,
+        manifestMode: manifestModeEl?.value || 'static',
         originOrgId,
         actionStateId,
         selectedDataEntities: [],
@@ -834,10 +898,10 @@
     clearArtifactLinks();
   });
   packageEl?.addEventListener('change', () => {
-    const selected = packageEl.options[packageEl.selectedIndex];
-    if (!selected) return;
-    const version = String(selected.getAttribute('data-version') || '').trim();
-    if (version && !versionEl.value.trim()) versionEl.value = version;
+    syncVersionSuggestion(true);
+    loadEntityCatalog().catch(showError);
+  });
+  manifestModeEl?.addEventListener('change', () => {
     loadEntityCatalog().catch(showError);
   });
   originOrgPickBtn?.addEventListener('click', () => {
@@ -866,7 +930,10 @@
     fileRefsEl.value = '';
   });
   if (packageEl?.value) {
+    syncVersionSuggestion(false);
     loadEntityCatalog().catch(showError);
+  } else {
+    syncVersionSuggestion(false);
   }
 })();
 </script>

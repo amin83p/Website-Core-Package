@@ -1717,6 +1717,7 @@ exports.preflightPackageBuilder = async (req, res) => {
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const report = await systemSettingsPackageBuilderService.preflightBuild({
       packageId: cleanFormText(req.body?.packageId, 120),
+      manifestMode: cleanFormText(req.body?.manifestMode, 40),
       originOrgId: cleanFormText(req.body?.originOrgId, 160),
       selectedDataEntities: Array.isArray(req.body?.selectedDataEntities)
         ? req.body.selectedDataEntities
@@ -1755,7 +1756,9 @@ exports.buildPackageFromBuilder = async (req, res) => {
     const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
     const report = await systemSettingsPackageBuilderService.buildPackage({
       packageId: cleanFormText(req.body?.packageId, 120),
+      manifestMode: cleanFormText(req.body?.manifestMode, 40),
       version: cleanFormText(req.body?.version, 120),
+      buildNote: cleanFormText(req.body?.buildNote, 8000),
       originOrgId: cleanFormText(req.body?.originOrgId, 160),
       selectedDataEntities: Array.isArray(req.body?.selectedDataEntities)
         ? req.body.selectedDataEntities

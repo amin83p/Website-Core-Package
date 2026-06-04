@@ -113,6 +113,33 @@ function formatStamp(now = new Date()) {
   return `${yyyy}${mm}${dd}-${hh}${min}${ss}`;
 }
 
+function formatReadableBuildStamp(now = new Date()) {
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}-${hh}${min}${ss}`;
+}
+
+function suggestNextPackageVersion(currentVersion = '') {
+  const token = cleanText(currentVersion, 120);
+  const match = token.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
+  if (!match) return '1.0.0';
+  const major = Number.parseInt(match[1], 10);
+  const minor = Number.parseInt(match[2], 10);
+  const patch = Number.parseInt(match[3], 10);
+  if (![major, minor, patch].every(Number.isFinite)) return '1.0.0';
+  return `${major}.${minor}.${patch + 1}`;
+}
+
+function createReadableBuildId(packageId = '', version = '', now = new Date()) {
+  const cleanPackage = normalizePackageId(packageId).replace(/[^a-z0-9_-]+/ig, '-') || 'package';
+  const cleanVersion = cleanText(version, 120).replace(/[^a-z0-9._-]+/ig, '-') || '0.0.0';
+  return `${cleanPackage}-${cleanVersion}-${formatReadableBuildStamp(now)}`.replace(/-+/g, '-');
+}
+
 async function pathExists(filePath = '') {
   try {
     await fsp.access(filePath);
@@ -1255,6 +1282,250 @@ function createService(overrides = {}) {
     return base;
   }
 
+  function normalizeManifestMode(value = '', packageId = '') {
+    const mode = cleanText(value, 40).toLowerCase();
+    if (!mode || mode === 'static') return 'static';
+    if (mode === 'live' || mode === 'backend' || mode === 'live-backend') {
+      const normalizedPackageId = normalizePackageId(packageId);
+      if (normalizedPackageId !== 'school') {
+        throw new Error('Live backend manifest generation is currently available for the School package only.');
+      }
+      return 'live';
+    }
+    return 'static';
+  }
+
+  function normalizeDeclarationKey(row = {}) {
+    return cleanText(row?.id || row?.name || row?.key || row?.code || row?.roleId || row?.sectionId || row?.operationId || '', 240);
+  }
+
+  function cloneManifestDeclaration(row = {}) {
+    const cloned = cloneStructured(row || {});
+    const scrub = (node) => {
+      if (Array.isArray(node)) {
+        node.forEach((item) => scrub(item));
+        return node;
+      }
+      if (node && typeof node === 'object') {
+        delete node._id;
+        delete node.__v;
+        Object.values(node).forEach((item) => scrub(item));
+      }
+      return node;
+    };
+    return scrub(cloned);
+  }
+
+  function declarationMentionsSchool(row = {}, type = '') {
+    const key = normalizeDeclarationKey(row);
+    const category = cleanText(row?.category || row?.sectionCategory || row?.group || row?.domain || '', 240).toLowerCase();
+    const packageId = normalizePackageId(row?.packageId || row?.packageName || row?.sourcePackage || '');
+    const tags = sanitizeArray(row?.tags).map((item) => cleanText(item, 120).toLowerCase());
+    const text = [
+      key,
+      row?.name,
+      row?.label,
+      row?.title,
+      row?.profile,
+      row?.profileName,
+      row?.role,
+      row?.roleName
+    ].map((item) => cleanText(item, 240).toLowerCase()).filter(Boolean).join(' ');
+    if (packageId === 'school') return true;
+    if (category === 'school' || category.startsWith('school')) return true;
+    if (tags.includes('school')) return true;
+    if (key.toUpperCase().startsWith('SCHOOL')) return true;
+    if (type === 'section' && text.includes('school')) return true;
+    if (type !== 'operation' && /\bschool\b|^school[_:-]|[_:-]school[_:-]?/i.test(text)) return true;
+    return false;
+  }
+
+  function collectOperationReferencesFromDeclaration(row = {}, out = new Set()) {
+    if (!row || typeof row !== 'object') return out;
+    [
+      row.operation,
+      row.operationId,
+      row.operationName,
+      row.requiredOperation,
+      row.requiredOperationId
+    ].forEach((value) => {
+      const token = cleanText(value, 240);
+      if (token) out.add(token);
+    });
+    ['operations', 'operationIds', 'allowedOperations', 'permissions'].forEach((key) => {
+      sanitizeArray(row[key]).forEach((item) => {
+        if (typeof item === 'string') {
+          const token = cleanText(item, 240);
+          if (token) out.add(token);
+          return;
+        }
+        const token = normalizeDeclarationKey(item);
+        if (token) out.add(token);
+      });
+    });
+    Object.values(row).forEach((value) => {
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (item && typeof item === 'object') collectOperationReferencesFromDeclaration(item, out);
+        });
+      } else if (value && typeof value === 'object') {
+        collectOperationReferencesFromDeclaration(value, out);
+      }
+    });
+    return out;
+  }
+
+  function dedupeDeclarations(rows = []) {
+    const seen = new Set();
+    const out = [];
+    sanitizeArray(rows).forEach((row) => {
+      if (!row || typeof row !== 'object') return;
+      const key = normalizeDeclarationKey(row);
+      if (!key) return;
+      const normalizedKey = key.toLowerCase();
+      if (seen.has(normalizedKey)) return;
+      seen.add(normalizedKey);
+      out.push(cloneManifestDeclaration(row));
+    });
+    out.sort((a, b) => normalizeDeclarationKey(a).localeCompare(normalizeDeclarationKey(b)));
+    return out;
+  }
+
+  function summarizeManifestDeclarations(manifest = {}) {
+    return {
+      operations: sanitizeArray(manifest.operations).length,
+      roles: sanitizeArray(manifest.roles).length,
+      sections: sanitizeArray(manifest.sections).length,
+      symbols: sanitizeArray(manifest.symbols).length,
+      accesses: sanitizeArray(manifest.accesses).length
+    };
+  }
+
+  function diffDeclarationKeys(beforeRows = [], afterRows = []) {
+    const before = new Set(sanitizeArray(beforeRows).map((row) => normalizeDeclarationKey(row).toLowerCase()).filter(Boolean));
+    const after = new Set(sanitizeArray(afterRows).map((row) => normalizeDeclarationKey(row).toLowerCase()).filter(Boolean));
+    return {
+      added: Array.from(after).filter((key) => !before.has(key)).sort(),
+      removed: Array.from(before).filter((key) => !after.has(key)).sort()
+    };
+  }
+
+  async function fetchDeclarationCatalog(entityType = '', options = {}) {
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    return deps.dataService.fetchData(entityType, {}, SYSTEM_CONTEXT, { backendMode }).catch((error) => {
+      sanitizeArray(options.warnings).push(`Live manifest could not read "${entityType}" from ${backendMode}: ${cleanText(error?.message || String(error), 500)}`);
+      return [];
+    });
+  }
+
+  async function generateLivePackageManifest(packageRow = {}, options = {}) {
+    const packageId = normalizePackageId(packageRow?.packageId || packageRow?.manifest?.packageId || '');
+    if (packageId !== 'school') {
+      throw new Error('Live backend manifest generation is currently available for the School package only.');
+    }
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    if (backendMode === 'mongo') {
+      assertMongoConnectedForBuilder('live School manifest generation');
+    }
+    const warnings = [];
+    const template = cloneStructured(packageRow.manifest || {});
+    const generated = cloneStructured(template);
+    generated.packageId = template.packageId || packageId;
+    generated.generatedFromLiveBackend = {
+      packageId,
+      backendMode,
+      generatedAt: new Date().toISOString(),
+      source: 'package-builder'
+    };
+
+    const [sectionRows, symbolRows, roleRows, accessRows, operationRows] = await Promise.all([
+      fetchDeclarationCatalog('sections', { backendMode, warnings }),
+      fetchDeclarationCatalog('symbols', { backendMode, warnings }),
+      fetchDeclarationCatalog('roles', { backendMode, warnings }),
+      fetchDeclarationCatalog('accesses', { backendMode, warnings }),
+      fetchDeclarationCatalog('operations', { backendMode, warnings })
+    ]);
+
+    const sections = dedupeDeclarations(sectionRows.filter((row) => declarationMentionsSchool(row, 'section')));
+    const symbols = dedupeDeclarations(symbolRows.filter((row) => declarationMentionsSchool(row, 'symbol')));
+    const roles = dedupeDeclarations(roleRows.filter((row) => declarationMentionsSchool(row, 'role')));
+    const accesses = dedupeDeclarations(accessRows.filter((row) => declarationMentionsSchool(row, 'access')));
+    const referencedOperations = new Set();
+    sections.forEach((row) => collectOperationReferencesFromDeclaration(row, referencedOperations));
+    accesses.forEach((row) => collectOperationReferencesFromDeclaration(row, referencedOperations));
+    const operationRefLower = new Set(Array.from(referencedOperations).map((row) => cleanText(row, 240).toLowerCase()).filter(Boolean));
+    const operations = dedupeDeclarations(operationRows.filter((row) => {
+      const key = normalizeDeclarationKey(row).toLowerCase();
+      return declarationMentionsSchool(row, 'operation') || (key && operationRefLower.has(key));
+    }));
+
+    const applyLiveRows = (field, rows) => {
+      if (rows.length) {
+        generated[field] = rows;
+      } else {
+        warnings.push(`Live School manifest found zero ${field}; preserved template ${field} to avoid an empty declaration set.`);
+      }
+    };
+    applyLiveRows('sections', sections);
+    applyLiveRows('symbols', symbols);
+    applyLiveRows('roles', roles);
+    applyLiveRows('accesses', accesses);
+    applyLiveRows('operations', operations);
+
+    return {
+      manifest: generated,
+      summary: {
+        mode: 'live',
+        packageId,
+        backendMode,
+        sourceCounts: summarizeManifestDeclarations(template),
+        liveCounts: {
+          operations: operations.length,
+          roles: roles.length,
+          sections: sections.length,
+          symbols: symbols.length,
+          accesses: accesses.length
+        },
+        generatedCounts: summarizeManifestDeclarations(generated)
+      },
+      diff: {
+        operations: diffDeclarationKeys(template.operations, generated.operations),
+        roles: diffDeclarationKeys(template.roles, generated.roles),
+        sections: diffDeclarationKeys(template.sections, generated.sections),
+        symbols: diffDeclarationKeys(template.symbols, generated.symbols),
+        accesses: diffDeclarationKeys(template.accesses, generated.accesses)
+      },
+      warnings
+    };
+  }
+
+  async function resolveBuilderManifestPlan(packageRow = {}, input = {}, options = {}) {
+    const packageId = normalizePackageId(packageRow?.packageId || input.packageId || '');
+    const manifestMode = normalizeManifestMode(input.manifestMode, packageId);
+    if (manifestMode === 'live') {
+      const live = await generateLivePackageManifest(packageRow, options);
+      return {
+        mode: 'live',
+        manifest: live.manifest,
+        summary: live.summary,
+        diff: live.diff,
+        warnings: live.warnings
+      };
+    }
+    return {
+      mode: 'static',
+      manifest: packageRow.manifest || {},
+      summary: {
+        mode: 'static',
+        packageId,
+        backendMode: cleanText(options.backendMode, 40).toLowerCase() || 'json',
+        generatedCounts: summarizeManifestDeclarations(packageRow.manifest || {})
+      },
+      diff: {},
+      warnings: []
+    };
+  }
+
   async function fetchEntityRows(entityType = '', options = {}) {
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
     const normalizedPackageId = normalizePackageId(options.packageId);
@@ -1518,7 +1789,8 @@ function createService(overrides = {}) {
       actor: options.actor || null
     });
     const packageRow = await findPackageById(packageId, options);
-    const availableDataEntities = await resolveDataEntities(packageRow.manifest, packageId, { backendMode });
+    const manifestPlan = await resolveBuilderManifestPlan(packageRow, input, { backendMode });
+    const availableDataEntities = await resolveDataEntities(manifestPlan.manifest, packageId, { backendMode });
     const selectedDataEntityTokens = new Set(
       sanitizeArray(input.selectedDataEntities)
         .map((item) => cleanText(item, 200))
@@ -1526,7 +1798,7 @@ function createService(overrides = {}) {
     );
     const requestedFileFieldSelection = normalizeFileFieldSelection(input.fileFieldSelection || {});
     const detectedUploadUrls = new Set();
-    const symbolCatalog = await resolveSymbolInstallCatalog(packageRow.manifest, {
+    const symbolCatalog = await resolveSymbolInstallCatalog(manifestPlan.manifest, {
       backendMode,
       originOrgId
     });
@@ -1534,7 +1806,7 @@ function createService(overrides = {}) {
     const detectedSymbolUploadUrls = new Set(symbolRefRows.map((row) => row.ref));
     const fileProvenance = [];
     const entityCatalog = [];
-    const warnings = [];
+    const warnings = [...sanitizeArray(manifestPlan.warnings)];
     let selectedRowCount = 0;
     const scopeViolations = {
       blocking: false,
@@ -1776,6 +2048,12 @@ function createService(overrides = {}) {
       },
       backendMode,
       originOrgId,
+      manifestMode: manifestPlan.mode,
+      liveManifest: {
+        summary: manifestPlan.summary,
+        diff: manifestPlan.diff,
+        warnings: sanitizeArray(manifestPlan.warnings)
+      },
       originScopeSummary,
       availableDataEntities,
       entityCatalog,
@@ -2140,6 +2418,10 @@ function createService(overrides = {}) {
     const remapFieldMap = {};
     const remapState = { rewrittenUrlCount: 0, rewrittenFieldCount: 0, rewrittenExactTokenCount: 0 };
     const buildWarnings = sanitizeArray(preflight?.warnings);
+    const manifestPlan = await resolveBuilderManifestPlan(packageRow, input, { backendMode });
+    buildWarnings.push(...sanitizeArray(manifestPlan.warnings));
+    const buildNote = cleanText(input.buildNote, 8000);
+    const buildId = createReadableBuildId(packageId, requestedVersion);
     const originScopeSummary = {
       inspectedRows: 0,
       includedRows: 0,
@@ -2203,9 +2485,27 @@ function createService(overrides = {}) {
       await copyDirectorySafe(packageRow.packageDir, stagedPackageDir);
       const stagedManifestPath = deps.path.join(stagedPackageDir, 'package.manifest.json');
       const stagedManifestSource = readJsonFile(stagedManifestPath);
-      const stagedManifest = applyResolvedSymbolCatalogToManifest(stagedManifestSource, globalSymbolCatalog);
+      const stagedManifestBase = manifestPlan.mode === 'live'
+        ? manifestPlan.manifest
+        : stagedManifestSource;
+      const stagedManifest = applyResolvedSymbolCatalogToManifest(stagedManifestBase, globalSymbolCatalog);
       stagedManifest.version = requestedVersion;
       await deps.fs.writeFile(stagedManifestPath, JSON.stringify(stagedManifest, null, 2));
+      const noteLines = [
+        `# ${packageId} ${requestedVersion}`,
+        '',
+        `Build ID: ${buildId}`,
+        `Created At: ${new Date().toISOString()}`,
+        `Manifest Source: ${manifestPlan.mode}`,
+        `Backend: ${backendMode}`,
+        `Origin Organization: ${originOrgId}`,
+        '',
+        '## Note',
+        '',
+        buildNote || '_No build note was provided._',
+        ''
+      ];
+      await deps.fs.writeFile(deps.path.join(stagedPackageDir, 'BUILD_NOTE.md'), noteLines.join('\n'));
 
       await deps.fs.mkdir(payloadTableArtifactsDir, { recursive: true });
       await deps.fs.mkdir(payloadGlobalArtifactsDir, { recursive: true });
@@ -2252,11 +2552,17 @@ function createService(overrides = {}) {
 
       const payload = {
         schema: 'core.package-builder.payload.v2',
-        buildId: `PKG_BUILD_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        buildId,
         packageId,
         packageName: packageRow.packageName,
         packageVersion: requestedVersion,
         backendMode,
+        manifestMode: manifestPlan.mode,
+        liveManifest: {
+          summary: manifestPlan.summary,
+          diff: manifestPlan.diff
+        },
+        buildNote,
         originOrgId,
         createdAt: new Date().toISOString(),
         orgRemapRequired: remapState.rewrittenFieldCount > 0 || remapState.rewrittenUrlCount > 0,
@@ -2358,6 +2664,12 @@ function createService(overrides = {}) {
           globalArtifactCount: globalArtifacts.length
         },
         symbolCatalog: globalSymbolCatalog,
+        manifestMode: manifestPlan.mode,
+        liveManifest: {
+          summary: manifestPlan.summary,
+          diff: manifestPlan.diff
+        },
+        buildNote,
         remapFieldMap,
         fileFieldSelection,
         remapSummary: payload.remapSummary,
@@ -3270,6 +3582,8 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
   return {
     assertSigningPrivateKeyReady,
     discoverLocalPackages,
+    suggestNextPackageVersion,
+    generateLivePackageManifest,
     preflightBuild,
     buildPackage,
     previewBuilderPayloadDeletionInventory,

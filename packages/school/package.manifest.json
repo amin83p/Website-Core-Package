@@ -127,6 +127,71 @@
       "adoptExisting": true
     },
     {
+      "id": "139382",
+      "name": "SCHOOL_ACADEMIA",
+      "category": "SCHOOL",
+      "description": "This is section holds the academic sections.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "688865"
+        },
+        {
+          "id": "536458"
+        },
+        {
+          "id": "445562"
+        },
+        {
+          "id": "332228"
+        },
+        {
+          "id": "442039"
+        },
+        {
+          "id": "358609"
+        },
+        {
+          "id": "332224"
+        },
+        {
+          "id": "445564"
+        },
+        {
+          "id": "445565"
+        },
+        {
+          "id": "445570"
+        },
+        {
+          "id": "778769"
+        },
+        {
+          "id": "778768"
+        },
+        {
+          "id": "445569"
+        },
+        {
+          "id": "445563"
+        },
+        {
+          "id": "290216"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
       "id": "445563",
       "name": "SCHOOL_ACADEMIC_LEDGER",
       "category": "SCHOOL",
@@ -167,6 +232,44 @@
         }
       ],
       "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "225382",
+      "name": "SCHOOL_ACCOUNTING",
+      "category": "SCHOOL",
+      "description": "This is section holds the accounting sections.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "332225"
+        },
+        {
+          "id": "332226"
+        },
+        {
+          "id": "111874"
+        },
+        {
+          "id": "332227"
+        },
+        {
+          "id": "445567"
+        },
+        {
+          "id": "445568"
+        }
+      ],
       "related": [],
       "adoptExisting": true
     },
@@ -1211,6 +1314,35 @@
         }
       ],
       "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "330563",
+      "name": "SCHOOL_PEOPLE",
+      "category": "SCHOOL",
+      "description": "This is section holds the people registration sections.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        {
+          "id": "332231"
+        },
+        {
+          "id": "332229"
+        },
+        {
+          "id": "332230"
+        }
+      ],
       "related": [],
       "adoptExisting": true
     },
@@ -2839,6 +2971,1148 @@
   ],
   "accesses": [
     {
+      "id": "ACC2003",
+      "name": "SCHOOL_STAFF",
+      "orgId": null,
+      "description": "SCHOOL_STAFF school access profile",
+      "active": true,
+      "fullAdmin": false,
+      "adminCategories": [],
+      "validity": {
+        "startDate": null,
+        "endDate": null
+      },
+      "sections": [
+        {
+          "sectionId": "332225",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445569",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "688865",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "358609",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "442039",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445572",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445573",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "938980",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "778768",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445570",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445561",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445563",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445567",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445571",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "446101",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "446102",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "446103",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445562",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "290216",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "332228",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445564",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445565",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "332231",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "778769",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "332227",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "536458",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "332229",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "332230",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1023",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445568",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "111874",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "332226",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "446001",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "446002",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "446003",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1006",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1024",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1025",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "446004",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445574",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        }
+      ],
+      "adoptExisting": true
+    },
+    {
       "id": "ACC2001",
       "name": "SCHOOL_STUDENT",
       "orgId": null,
@@ -2857,19 +4131,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -2879,19 +4165,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
@@ -2908,19 +4206,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -2930,15 +4240,24 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -2948,19 +4267,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -2970,11 +4301,17 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
@@ -2991,11 +4328,17 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3005,11 +4348,17 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3019,11 +4368,17 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3033,15 +4388,24 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3051,7 +4415,10 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3061,15 +4428,24 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3079,19 +4455,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3101,7 +4489,10 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3111,23 +4502,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3137,23 +4543,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3163,15 +4584,24 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3181,19 +4611,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3203,15 +4645,24 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
@@ -3228,19 +4679,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3250,15 +4713,24 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
@@ -3275,11 +4747,17 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3289,19 +4767,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3311,7 +4801,10 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3321,19 +4814,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3343,19 +4848,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3365,19 +4882,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3387,23 +4916,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1023",
@@ -3420,15 +4964,24 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3438,19 +4991,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3460,19 +5025,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3482,23 +5059,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3508,23 +5100,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3534,27 +5141,45 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1006",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1024",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1025",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3564,15 +5189,24 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3582,27 +5216,43 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         }
-      ]
+      ],
+      "adoptExisting": true
     },
     {
       "id": "ACC2002",
@@ -3623,19 +5273,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3645,19 +5307,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
@@ -3674,19 +5348,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3696,15 +5382,24 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3714,19 +5409,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3736,11 +5443,17 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
@@ -3757,11 +5470,17 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3771,11 +5490,17 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3785,11 +5510,17 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3799,15 +5530,24 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3817,7 +5557,10 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3827,15 +5570,24 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3845,19 +5597,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3867,7 +5631,10 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3877,23 +5644,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3903,23 +5685,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3929,15 +5726,24 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3947,19 +5753,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -3969,15 +5787,24 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
@@ -3994,19 +5821,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4016,15 +5855,24 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
@@ -4041,11 +5889,17 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4055,19 +5909,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4077,7 +5943,10 @@
           "operations": [
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4087,19 +5956,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4109,19 +5990,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4131,19 +6024,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4153,23 +6058,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1023",
@@ -4186,15 +6106,24 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4204,19 +6133,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4226,19 +6167,31 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4248,23 +6201,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4274,23 +6242,38 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4300,27 +6283,45 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1006",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1024",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1025",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4330,15 +6331,24 @@
           "operations": [
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -4348,793 +6358,43 @@
           "operations": [
             {
               "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             },
             {
               "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         }
-      ]
-    },
-    {
-      "id": "ACC2003",
-      "name": "SCHOOL_STAFF",
-      "orgId": null,
-      "description": "SCHOOL_STAFF school access profile",
-      "active": true,
-      "fullAdmin": false,
-      "adminCategories": [],
-      "validity": {
-        "startDate": null,
-        "endDate": null
-      },
-      "sections": [
-        {
-          "sectionId": "332225",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445569",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER",
-              "maxAttemptsPerSession": null,
-              "maxSessionDurationMinutes": null,
-              "maxFetchUploadVolumeKB": null
-            }
-          ]
-        },
-        {
-          "sectionId": "688865",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "358609",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "442039",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445572",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER",
-              "maxAttemptsPerSession": null,
-              "maxSessionDurationMinutes": null,
-              "maxFetchUploadVolumeKB": null
-            }
-          ]
-        },
-        {
-          "sectionId": "445573",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "938980",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "778768",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445570",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445561",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445563",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445567",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445571",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "446101",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "446102",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "446103",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445562",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "290216",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER",
-              "maxAttemptsPerSession": null,
-              "maxSessionDurationMinutes": null,
-              "maxFetchUploadVolumeKB": null
-            }
-          ]
-        },
-        {
-          "sectionId": "332228",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445564",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER",
-              "maxAttemptsPerSession": null,
-              "maxSessionDurationMinutes": null,
-              "maxFetchUploadVolumeKB": null
-            }
-          ]
-        },
-        {
-          "sectionId": "445565",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "332231",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "778769",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "332227",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "536458",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "332229",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "332230",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1023",
-              "scopeId": "SCP_OWNER",
-              "maxAttemptsPerSession": null,
-              "maxSessionDurationMinutes": null,
-              "maxFetchUploadVolumeKB": null
-            }
-          ]
-        },
-        {
-          "sectionId": "445568",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "111874",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "332226",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "446001",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "446002",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "446003",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1006",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1024",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1025",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "446004",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        },
-        {
-          "sectionId": "445574",
-          "adminAccess": false,
-          "operations": [
-            {
-              "operationId": "OP1001",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1002",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1003",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1004",
-              "scopeId": "SCP_OWNER"
-            },
-            {
-              "operationId": "OP1005",
-              "scopeId": "SCP_OWNER"
-            }
-          ]
-        }
-      ]
+      ],
+      "adoptExisting": true
     }
   ],
   "uploadFolders": [
@@ -5194,44 +6454,158 @@
     }
   ],
   "dataEntities": [
-    { "entityType": "accounts", "label": "School Accounts" },
-    { "entityType": "academicLedger", "label": "Academic Ledger" },
-    { "entityType": "academicSnapshots", "label": "Academic Snapshots" },
-    { "entityType": "attendanceMatrixPolicy", "label": "Attendance Matrix Policies" },
-    { "entityType": "classEnrollmentPeriods", "label": "Class Enrollment Periods" },
-    { "entityType": "classes", "label": "Classes" },
-    { "entityType": "departments", "label": "Departments" },
-    { "entityType": "examAllocations", "label": "Exam Allocations" },
-    { "entityType": "examAnswers", "label": "Exam Answers" },
-    { "entityType": "examAssignments", "label": "Exam Assignments" },
-    { "entityType": "examAttempts", "label": "Exam Attempts" },
-    { "entityType": "examQuestions", "label": "Exam Questions" },
-    { "entityType": "examRevisions", "label": "Exam Revisions" },
-    { "entityType": "examTemplates", "label": "Exam Templates" },
-    { "entityType": "feeDefinitions", "label": "Fee Definitions" },
-    { "entityType": "globalTransactionLedger", "label": "Global Transaction Ledger" },
-    { "entityType": "holidays", "label": "Holidays" },
-    { "entityType": "payRates", "label": "Pay Rates" },
-    { "entityType": "programs", "label": "Programs" },
-    { "entityType": "reportAssignments", "label": "Report Assignments" },
-    { "entityType": "reportInstances", "label": "Report Instances" },
-    { "entityType": "reportTemplates", "label": "Report Templates" },
-    { "entityType": "sessionStatuses", "label": "Session Statuses" },
-    { "entityType": "staff", "label": "Staff" },
-    { "entityType": "studentProgramPriorSubjects", "label": "Student Program Prior Subjects" },
-    { "entityType": "studentProgramRegistrations", "label": "Student Program Registrations" },
-    { "entityType": "students", "label": "Students" },
-    { "entityType": "studentTermRegistrations", "label": "Student Term Registrations" },
-    { "entityType": "student_enrollments", "label": "Student Enrollments" },
-    { "entityType": "subjects", "label": "Subjects" },
-    { "entityType": "teachers", "label": "Teachers" },
-    { "entityType": "teacher_schedules", "label": "Teacher Schedules" },
-    { "entityType": "terms", "label": "Terms" },
-    { "entityType": "timesheetPeriods", "label": "Timesheet Periods" },
-    { "entityType": "timesheets", "label": "Timesheets" },
-    { "entityType": "transactionDefinitions", "label": "Transaction Definitions" },
-    { "entityType": "transactionJournals", "label": "Transaction Journals" },
-    { "entityType": "withdrawals", "label": "Withdrawals" }
+    {
+      "entityType": "accounts",
+      "label": "School Accounts"
+    },
+    {
+      "entityType": "academicLedger",
+      "label": "Academic Ledger"
+    },
+    {
+      "entityType": "academicSnapshots",
+      "label": "Academic Snapshots"
+    },
+    {
+      "entityType": "attendanceMatrixPolicy",
+      "label": "Attendance Matrix Policies"
+    },
+    {
+      "entityType": "classEnrollmentPeriods",
+      "label": "Class Enrollment Periods"
+    },
+    {
+      "entityType": "classes",
+      "label": "Classes"
+    },
+    {
+      "entityType": "departments",
+      "label": "Departments"
+    },
+    {
+      "entityType": "examAllocations",
+      "label": "Exam Allocations"
+    },
+    {
+      "entityType": "examAnswers",
+      "label": "Exam Answers"
+    },
+    {
+      "entityType": "examAssignments",
+      "label": "Exam Assignments"
+    },
+    {
+      "entityType": "examAttempts",
+      "label": "Exam Attempts"
+    },
+    {
+      "entityType": "examQuestions",
+      "label": "Exam Questions"
+    },
+    {
+      "entityType": "examRevisions",
+      "label": "Exam Revisions"
+    },
+    {
+      "entityType": "examTemplates",
+      "label": "Exam Templates"
+    },
+    {
+      "entityType": "feeDefinitions",
+      "label": "Fee Definitions"
+    },
+    {
+      "entityType": "globalTransactionLedger",
+      "label": "Global Transaction Ledger"
+    },
+    {
+      "entityType": "holidays",
+      "label": "Holidays"
+    },
+    {
+      "entityType": "payRates",
+      "label": "Pay Rates"
+    },
+    {
+      "entityType": "programs",
+      "label": "Programs"
+    },
+    {
+      "entityType": "reportAssignments",
+      "label": "Report Assignments"
+    },
+    {
+      "entityType": "reportInstances",
+      "label": "Report Instances"
+    },
+    {
+      "entityType": "reportTemplates",
+      "label": "Report Templates"
+    },
+    {
+      "entityType": "sessionStatuses",
+      "label": "Session Statuses"
+    },
+    {
+      "entityType": "staff",
+      "label": "Staff"
+    },
+    {
+      "entityType": "studentProgramPriorSubjects",
+      "label": "Student Program Prior Subjects"
+    },
+    {
+      "entityType": "studentProgramRegistrations",
+      "label": "Student Program Registrations"
+    },
+    {
+      "entityType": "students",
+      "label": "Students"
+    },
+    {
+      "entityType": "studentTermRegistrations",
+      "label": "Student Term Registrations"
+    },
+    {
+      "entityType": "student_enrollments",
+      "label": "Student Enrollments"
+    },
+    {
+      "entityType": "subjects",
+      "label": "Subjects"
+    },
+    {
+      "entityType": "teachers",
+      "label": "Teachers"
+    },
+    {
+      "entityType": "teacher_schedules",
+      "label": "Teacher Schedules"
+    },
+    {
+      "entityType": "terms",
+      "label": "Terms"
+    },
+    {
+      "entityType": "timesheetPeriods",
+      "label": "Timesheet Periods"
+    },
+    {
+      "entityType": "timesheets",
+      "label": "Timesheets"
+    },
+    {
+      "entityType": "transactionDefinitions",
+      "label": "Transaction Definitions"
+    },
+    {
+      "entityType": "transactionJournals",
+      "label": "Transaction Journals"
+    },
+    {
+      "entityType": "withdrawals",
+      "label": "Withdrawals"
+    }
   ],
   "dataSchemas": [],
   "upgradeGuards": [],
