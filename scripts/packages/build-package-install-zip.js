@@ -264,14 +264,17 @@ function resolveOutputDir(projectRoot, options = {}) {
   return outputDir;
 }
 
-function run() {
-  const options = parseArgs(process.argv.slice(2));
+function run(runtimeOptions = {}) {
+  const options = parseArgs(Array.isArray(runtimeOptions.argv) ? runtimeOptions.argv : process.argv.slice(2));
+  const stdout = runtimeOptions.stdout || process.stdout;
   if (options.help) {
     printUsage();
     return;
   }
 
-  const projectRoot = process.cwd();
+  const projectRoot = runtimeOptions.projectRoot
+    ? path.resolve(runtimeOptions.projectRoot)
+    : process.cwd();
   loadLocalEnvFile(projectRoot);
 
   const { packageRoot, manifestPath } = resolvePackageOptions(projectRoot, options);
@@ -358,12 +361,20 @@ function run() {
     }
   };
 
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  return report;
 }
 
-try {
-  run();
-} catch (error) {
-  process.stderr.write(`${error.message || String(error)}\n`);
-  process.exit(1);
+if (require.main === module) {
+  try {
+    run();
+  } catch (error) {
+    process.stderr.write(`${error.message || String(error)}\n`);
+    process.exit(1);
+  }
 }
+
+module.exports = {
+  parseArgs,
+  run
+};

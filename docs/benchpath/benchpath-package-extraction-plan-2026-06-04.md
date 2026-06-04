@@ -122,3 +122,15 @@ The migration is intentionally pass-based. Each pass should be small, test-backe
 - BenchPath package source should not include generated reports or runtime data payloads.
 - Package-local support files can begin as mirrors while root support files remain active.
 - Each pass is committed separately after focused tests pass.
+
+## Completion Evidence
+
+- Runtime reconcile prerequisite committed separately: `0feaee3`.
+- Pass 0/1 plan and guardrails committed: `b9d14ec`.
+- Pass 2 package scaffold committed: `60bc1cc`.
+- Pass 3 route/view mirrors committed: `2f32024`.
+- Pass 4 package-owned domain surface committed: `710990a`.
+- Pass 5 manifest catalog declarations committed: `d7e1f51`.
+- Pass 6 Package Builder/support mirrors committed: `1da45ec`.
+- Pass 7 runtime cutover committed: `a0e136d`.
+- Pass 8 adds BenchPath signed ZIP coverage and this closeout evidence.
