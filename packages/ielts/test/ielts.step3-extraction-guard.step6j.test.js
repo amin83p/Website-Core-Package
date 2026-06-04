@@ -25,7 +25,7 @@ function extractFunctionSource(source, functionName) {
 }
 
 function loadStep3Guard() {
-  const sourcePath = path.join(process.cwd(), 'MVC', 'services', 'ielts', 'aiExtractionService.js');
+  const sourcePath = path.join(process.cwd(), 'packages', 'ielts', 'MVC', 'services', 'ielts', 'aiExtractionService.js');
   const source = fs.readFileSync(sourcePath, 'utf8');
   const snippet = [
     extractFunctionSource(source, 'assertNoBandScoringFields'),

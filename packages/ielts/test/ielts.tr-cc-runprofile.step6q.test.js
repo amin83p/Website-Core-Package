@@ -43,7 +43,7 @@ function extractFunctionSource(source, functionName) {
 }
 
 function loadControllerRunProfileExtractor() {
-  const filePath = path.join(process.cwd(), 'MVC', 'controllers', 'ielts', 'ieltsController.js');
+  const filePath = path.join(process.cwd(), 'packages', 'ielts', 'MVC', 'controllers', 'ielts', 'ieltsController.js');
   const source = fs.readFileSync(filePath, 'utf8');
   const start = source.indexOf('function toPositiveInt');
   const end = source.indexOf('function normalizeUnstableRows');

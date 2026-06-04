@@ -166,3 +166,67 @@ The migration is intentionally pass-based. Each pass should be small, test-backe
 - IELTS install succeeds into a clean host.
 - `/ielts`, `/ielts/scoring`, `/ielts/prompts`, `/ielts/api-providers`, and `/dashboard/section-nav/IELTS` load for an authenticated user.
 
+## Closeout Evidence - 2026-06-04
+
+### Completed Pass Commits
+
+- Pass 0: `d389519 docs(ielts): add package extraction pass plan`
+- Pass 1: `0eb5b11 test(ielts): baseline package ownership guardrails`
+- Pass 2: `f5bf8da feat(ielts): scaffold package shell`
+- Pass 3: `e193289 feat(ielts): add package route surface`
+- Pass 4: `ddf4a1c feat(ielts): mirror package views`
+- Pass 5: `1721787 feat(ielts): add package controllers`
+- Pass 6: `fb892e6 feat(ielts): add package models with core data roots`
+- Pass 7: `d84bbe9 feat(ielts): add package services`
+- Pass 8: `7c6312f feat(ielts): add package repository executors`
+- Pass 9: `8bab1f8 feat(ielts): seed package manifest declarations`
+- Pass 10: `25d1d0f test(ielts): guard global symbol artifacts`
+- Pass 11: `e4e49ef feat(ielts): enable package builder live manifests`
+- Pass 12: `ed425a6 feat(ielts): cut over runtime route loading`
+- Pass 13: `b1a6696 feat(ielts): mirror support files into package`
+- Pass 14: `976c03a feat(ielts): retire root mvc implementations`
+- Pass 15: `48628c3 feat(ielts): add install zip build script`
+
+### Verified Green
+
+- `node --check app.js`
+- `node --check scripts/packages/build-ielts-install-zip.js`
+- `node test/package-loader-service.test.js`
+- `node test/system-settings-package-builder-service.test.js`
+- `node test/system-settings-package-builder-controller-view.test.js`
+- `node test/system-settings-package-manager-service.test.js`
+- `node test/package-ielts-build-install-zip-script.test.js` (ran outside sandbox because the test spawns child Node processes)
+- `node test/ielts-package-ownership-registry-pass1.test.js`
+- `node test/ielts-package-scaffold-pass2.test.js`
+- `node test/ielts-package-route-layer-pass3.test.js`
+- `node test/ielts-package-view-parity-pass4.test.js`
+- `node test/ielts-package-controller-ownership-pass5.test.js`
+- `node test/ielts-package-model-ownership-pass6.test.js`
+- `node test/ielts-package-service-ownership-pass7.test.js`
+- `node test/ielts-package-query-executor-pass8.test.js`
+- `node test/ielts-package-manifest-declarations-pass9.test.js`
+- `node test/ielts-package-symbol-artifacts-pass10.test.js`
+- `node test/ielts-package-runtime-cutover-pass12.test.js`
+- `node test/ielts-package-support-files-pass13.test.js`
+- `node test/ielts-package-root-shim-retirement-pass14.test.js`
+- `node test/school-ielts.step6.test.js`
+- Shim-path behavior tests fixed and passing:
+  - `node test/ielts.tr-cc-runprofile.step6q.test.js`
+  - `node test/ielts.step3-extraction-guard.step6j.test.js`
+
+### Residual Behavior Tests
+
+The package extraction and runtime/package-manager checks are green. A full `test/ielts.*.test.js` sweep still has scoring-calibration failures that are separate from the packaging path changes:
+
+- `test/ielts.high-band-alignment.step6k.test.js`
+- `test/ielts.lr-instability.step6m.test.js`
+- `test/ielts.prompt-echo-stance-regression.step6n.test.js`
+- `test/ielts.step3.paragraph-deterministic-regression.test.js`
+- `test/ielts.step3-language-evidence.step6i.test.js`
+
+These failures involve deterministic IELTS scoring expectations and AI fallback behavior, not package discovery, route loading, support-file mirroring, symbol artifacts, or install ZIP generation.
+
+### Manual Smoke Status
+
+- Automated checks covered package route loading, Package Builder live manifest generation, Package Manager install/ZIP paths, symbol artifact preflight, and build ZIP layout.
+- Browser-authenticated manual smoke for `/ielts`, `/ielts/scoring`, `/ielts/prompts`, `/ielts/api-providers`, and `/dashboard/section-nav/IELTS` remains pending.

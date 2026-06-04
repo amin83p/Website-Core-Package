@@ -397,9 +397,8 @@ test('discoverLocalManifests merges package roots and dedupes duplicate package 
     const snapshot = await service.listPackageSnapshot({ backendMode: 'json' });
 
     const manifestIds = snapshot.localManifests.map((row) => row.packageId).sort();
-    assert.equal(snapshot.localManifests.length, 2);
-    assert.equal(manifestIds[0], 'pte');
-    assert.equal(manifestIds[1], 'school');
+    assert.equal(snapshot.localManifests.length, 3);
+    assert.deepEqual(manifestIds, ['ielts', 'pte', 'school']);
   } finally {
     if (previousRoots === undefined) delete process.env.PACKAGE_STORAGE_ROOTS;
     else process.env.PACKAGE_STORAGE_ROOTS = previousRoots;
