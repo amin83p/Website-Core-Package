@@ -1,10 +1,11 @@
 {
   "packageId": "benchpath",
-  "step": 2,
-  "status": "scaffolded",
+  "step": 6,
+  "status": "support-mirrored",
   "notes": [
     "Targets describe package-local support mirrors for the BenchPath package extraction.",
     "Root BenchPath support files remain active until package-local scripts and tests are intentionally made runnable.",
+    "Package-local copied tests are inventory mirrors until their imports are adjusted for package-local execution.",
     "Runtime data remains app-level under data/benchpath and is not mirrored into packages/benchpath/data."
   ],
   "scripts": [
@@ -14,6 +15,83 @@
       "category": "activation",
       "status": "root-active",
       "targetStatus": "package-active"
+    },
+    {
+      "source": "scripts/benchpath-migration-apply.js",
+      "target": "packages/benchpath/scripts/migration/benchpath-migration-apply.js",
+      "category": "migration",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/benchpath-migration-dry-run.js",
+      "target": "packages/benchpath/scripts/migration/benchpath-migration-dry-run.js",
+      "category": "migration",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/seed-benchpath-sections.js",
+      "target": "packages/benchpath/scripts/seed/seed-benchpath-sections.js",
+      "category": "seed",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/seed-benchpath-symbols.js",
+      "target": "packages/benchpath/scripts/seed/seed-benchpath-symbols.js",
+      "category": "seed",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/benchpath/ensure-benchpath-list-indexes.js",
+      "target": "packages/benchpath/scripts/benchpath/ensure-benchpath-list-indexes.js",
+      "category": "maintenance",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/benchpath/mongo-validate-explain.js",
+      "target": "packages/benchpath/scripts/benchpath/mongo-validate-explain.js",
+      "category": "maintenance",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/benchpath/route-timing-pass.js",
+      "target": "packages/benchpath/scripts/benchpath/route-timing-pass.js",
+      "category": "maintenance",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/benchpath/reference/backfillCanonicalReferenceText.js",
+      "target": "packages/benchpath/scripts/benchpath/reference/backfillCanonicalReferenceText.js",
+      "category": "reference-maintenance",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/benchpath/reference/extractClbBenchmarkFragments.js",
+      "target": "packages/benchpath/scripts/benchpath/reference/extractClbBenchmarkFragments.js",
+      "category": "reference-maintenance",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/benchpath/reference/generateReferenceScaffolds.js",
+      "target": "packages/benchpath/scripts/benchpath/reference/generateReferenceScaffolds.js",
+      "category": "reference-maintenance",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "scripts/benchpath/reference/referenceIntegrityAudit.js",
+      "target": "packages/benchpath/scripts/benchpath/reference/referenceIntegrityAudit.js",
+      "category": "reference-maintenance",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     }
   ],
   "docs": [
@@ -23,7 +101,29 @@
       "category": "migration-plan",
       "status": "root-active",
       "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "docs/benchpath/benchpath-reference-split-plan.md",
+      "target": "packages/benchpath/docs/benchpath-reference-split-plan.md",
+      "category": "reference-plan",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
     }
   ],
-  "tests": []
+  "tests": [
+    {
+      "source": "test/benchpath.payload-contract.step0.test.js",
+      "target": "packages/benchpath/test/benchpath.payload-contract.step0.test.js",
+      "category": "behavior-contract",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    },
+    {
+      "source": "test/benchpath.cross-entity-integrity.step7b.test.js",
+      "target": "packages/benchpath/test/benchpath.cross-entity-integrity.step7b.test.js",
+      "category": "behavior-contract",
+      "status": "root-active",
+      "targetStatus": "package-mirrored"
+    }
+  ]
 }

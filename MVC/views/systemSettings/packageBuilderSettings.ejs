@@ -317,7 +317,7 @@
       versionEl.value = suggested;
     }
     if (manifestModeEl) {
-      const supportsLiveManifest = ['school', 'pte', 'ielts'].includes(packageId.toLowerCase());
+      const supportsLiveManifest = ['school', 'pte', 'ielts', 'benchpath'].includes(packageId.toLowerCase());
       Array.from(manifestModeEl.options).forEach((option) => {
         if (option.value === 'live') option.disabled = !supportsLiveManifest;
       });

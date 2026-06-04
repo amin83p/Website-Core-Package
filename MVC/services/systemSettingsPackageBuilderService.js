@@ -34,7 +34,7 @@ const REMAP_ORG_FIELDS = new Set([
 const ORG_TOKEN_EXACT_REGEX = /^ORG_[A-Za-z0-9_-]+$/i;
 const ORG_UPLOAD_SEGMENT_REGEX = /\/uploads\/(ORG_[^/]+)/ig;
 const UPLOAD_URL_MATCH_REGEX = /\/uploads\/[^"'` ]+/ig;
-const LIVE_MANIFEST_SUPPORTED_PACKAGES = new Set(['school', 'pte', 'ielts']);
+const LIVE_MANIFEST_SUPPORTED_PACKAGES = new Set(['school', 'pte', 'ielts', 'benchpath']);
 let cachedCatalogCollectionMap = null;
 
 function cleanText(value, max = 4000) {
@@ -1289,7 +1289,7 @@ function createService(overrides = {}) {
     if (mode === 'live' || mode === 'backend' || mode === 'live-backend') {
       const normalizedPackageId = normalizePackageId(packageId);
       if (!LIVE_MANIFEST_SUPPORTED_PACKAGES.has(normalizedPackageId)) {
-        throw new Error('Live backend manifest generation is currently available for School, PTE, and IELTS packages only.');
+        throw new Error('Live backend manifest generation is currently available for School, PTE, IELTS, and BenchPath packages only.');
       }
       return 'live';
     }
@@ -1427,7 +1427,7 @@ function createService(overrides = {}) {
   async function generateLivePackageManifest(packageRow = {}, options = {}) {
     const packageId = normalizePackageId(packageRow?.packageId || packageRow?.manifest?.id || packageRow?.manifest?.packageId || '');
     if (!LIVE_MANIFEST_SUPPORTED_PACKAGES.has(packageId)) {
-      throw new Error('Live backend manifest generation is currently available for School, PTE, and IELTS packages only.');
+      throw new Error('Live backend manifest generation is currently available for School, PTE, IELTS, and BenchPath packages only.');
     }
     const packageLabel = cleanText(packageRow?.manifest?.name || packageRow?.packageName || packageId.toUpperCase(), 120) || packageId.toUpperCase();
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';

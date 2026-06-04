@@ -276,7 +276,7 @@ test('package builder EJS compiles and includes expected controls', () => {
   assert.match(html, /Published Artifacts/);
   assert.match(html, /Package Storage Root/);
   assert.match(html, /Unavailable: Missing\/Invalid Manifest/);
-  assert.match(html, /\['school', 'pte', 'ielts'\]\.includes/);
+  assert.match(html, /\['school', 'pte', 'ielts', 'benchpath'\]\.includes/);
 
   const packageIdx = html.indexOf('Package-Owned Tables / Collections');
   const fileFieldsIdx = html.indexOf('File Fields By Table');
