@@ -18,20 +18,12 @@ function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
-test('BenchPath package pass3 mirrors root route files', () => {
+test('BenchPath package pass3 mirrors root route file inventory', () => {
   const rootRoutes = listFiles(ROOT_ROUTES_DIR);
   const packageRoutes = listFiles(PACKAGE_ROUTES_DIR);
 
   assert.equal(rootRoutes.length, 17);
   assert.deepEqual(packageRoutes, rootRoutes);
-
-  rootRoutes.forEach((name) => {
-    assert.equal(
-      read(path.join(PACKAGE_ROUTES_DIR, name)),
-      read(path.join(ROOT_ROUTES_DIR, name)),
-      `${name} should match the root-active BenchPath route`
-    );
-  });
 });
 
 test('BenchPath package pass3 manifest exposes the package route mount', () => {
@@ -40,7 +32,7 @@ test('BenchPath package pass3 manifest exposes the package route mount', () => {
   assert.ok((manifest.routes || []).some((route) => (
     String(route?.method || '').toUpperCase() === 'USE'
     && route.path === '/benchpath'
-    && route.router === 'MVC/routes/benchpathMainRoute.js'
+    && route.router === 'MVC/routes/benchpath/benchpathMainRoute.js'
     && route.metadataOnly === false
   )));
 });
@@ -48,4 +40,17 @@ test('BenchPath package pass3 manifest exposes the package route mount', () => {
 test('BenchPath package pass3 keeps root app mount active before cutover', () => {
   const appSource = read(path.join(ROOT_DIR, 'app.js'));
   assert.match(appSource, /app\.use\('\/benchpath', require\('\.\/MVC\/routes\/benchpath\/benchpathMainRoute'\)\)/);
+});
+
+test('BenchPath package routes bridge shared core dependencies through resolver', () => {
+  const routeFiles = listFiles(PACKAGE_ROUTES_DIR);
+  const packageSources = routeFiles.map((name) => read(path.join(PACKAGE_ROUTES_DIR, name))).join('\n');
+
+  assert.match(packageSources, /benchpathCoreModuleResolver/);
+  assert.match(packageSources, /requireCoreModule\('MVC\/middleware\/authMiddleware'\)/);
+  assert.match(packageSources, /requireCoreModule\('MVC\/middleware\/accessMiddleware'\)/);
+  assert.match(packageSources, /requireCoreModule\('MVC\/middleware\/actionStateMiddleware'\)/);
+  assert.match(packageSources, /requireCoreModule\('config\/accessConstants'\)/);
+  assert.doesNotMatch(packageSources, /require\('\.\.\/\.\.\/middleware\//);
+  assert.doesNotMatch(packageSources, /require\('\.\.\/\.\.\/\.\.\/config\//);
 });

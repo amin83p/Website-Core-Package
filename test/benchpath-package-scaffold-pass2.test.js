@@ -33,7 +33,7 @@ test('BenchPath package pass2 scaffold declares a valid package manifest', () =>
   assert.equal(manifest.assets.metadataOnly, true);
   assert.ok(manifest.routes.some((route) => (
     route.path === '/benchpath'
-    && route.router === 'MVC/routes/benchpathMainRoute.js'
+    && route.router === 'MVC/routes/benchpath/benchpathMainRoute.js'
     && route.metadataOnly === false
   )));
   assert.equal(manifest.queryExecutors.length, 0);

@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('../../middleware/authMiddleware');
-const { requireAccess } = require('../../middleware/accessMiddleware');
-const { trackActionState } = require('../../middleware/actionStateMiddleware');
-const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const { requireCoreModule } = require('../../services/benchpath/benchpathCoreModuleResolver');
+const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
+const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
+const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const ctrl = require('../../controllers/benchpath/clbStageController');
 
 router.use(requireAuth);

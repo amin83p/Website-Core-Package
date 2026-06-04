@@ -1,8 +1,9 @@
 const express = require('express');
-const { requireAuth } = require('../../middleware/authMiddleware');
-const { requireAccess } = require('../../middleware/accessMiddleware');
-const { trackActionState } = require('../../middleware/actionStateMiddleware');
-const { OPERATIONS } = require('../../../config/accessConstants');
+const { requireCoreModule } = require('../../services/benchpath/benchpathCoreModuleResolver');
+const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
+const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
+const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
+const { OPERATIONS } = requireCoreModule('config/accessConstants');
 const { createClbReferenceEntityController } = require('../../controllers/benchpath/clbReferenceController');
 
 function createReferenceCatalogRouter(entityKey, sectionId) {

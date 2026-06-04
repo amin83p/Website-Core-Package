@@ -8,7 +8,7 @@
     {
       "method": "USE",
       "path": "/benchpath",
-      "router": "MVC/routes/benchpathMainRoute.js",
+      "router": "MVC/routes/benchpath/benchpathMainRoute.js",
       "metadataOnly": false,
       "active": true
     }
