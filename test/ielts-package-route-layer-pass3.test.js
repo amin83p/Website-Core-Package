@@ -26,19 +26,19 @@ test('IELTS package pass3 mirrors package route surface', () => {
   )));
 });
 
-test('IELTS package pass3 route copies bridge shared core dependencies through resolver', () => {
+test('IELTS package route copies bridge shared core middleware through resolver', () => {
   const mainSource = read(path.join(ROUTES_DIR, 'ieltsMainRoute.js'));
   const routesSource = read(path.join(ROUTES_DIR, 'ieltsRoutes.js'));
 
   assert.match(mainSource, /ieltsCoreModuleResolver/);
   assert.match(routesSource, /ieltsCoreModuleResolver/);
-  assert.match(routesSource, /requireCoreModule\('MVC\/controllers\/ielts\/ieltsController'\)/);
+  assert.match(routesSource, /require\('\.\.\/controllers\/ielts\/ieltsController'\)/);
   assert.match(routesSource, /requireCoreModule\('MVC\/middleware\/authMiddleware'\)/);
   assert.doesNotMatch(routesSource, /require\('\.\.\/\.\.\/controllers\/ielts\//);
   assert.doesNotMatch(routesSource, /require\('\.\.\/\.\.\/middleware\//);
 });
 
-test('IELTS package pass3 package main route can be required while controllers remain root-active', () => {
+test('IELTS package main route can be required through package route/controller surface', () => {
   const router = require('../packages/ielts/MVC/routes/ieltsMainRoute');
   assert.equal(typeof router, 'function');
 });

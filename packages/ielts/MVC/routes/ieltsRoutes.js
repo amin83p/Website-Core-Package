@@ -2,10 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const { requireCoreModule } = require('../services/ielts/ieltsCoreModuleResolver');
-const ctrl = requireCoreModule('MVC/controllers/ielts/ieltsController');
-const promptCtrl = requireCoreModule('MVC/controllers/ielts/promptController');
-const apiProviderCtrl = requireCoreModule('MVC/controllers/ielts/apiProviderController');
-const aiTokenUsageCtrl = requireCoreModule('MVC/controllers/ielts/aiTokenUsageController');
+const ctrl = require('../controllers/ielts/ieltsController');
+const promptCtrl = require('../controllers/ielts/promptController');
+const apiProviderCtrl = require('../controllers/ielts/apiProviderController');
+const aiTokenUsageCtrl = require('../controllers/ielts/aiTokenUsageController');
 
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
 const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
