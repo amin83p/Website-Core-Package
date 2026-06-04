@@ -1,0 +1,136 @@
+{
+  "id": "ielts",
+  "name": "IELTS",
+  "version": "0.1.0",
+  "mountPath": "/ielts",
+  "enabledByDefault": false,
+  "routes": [
+    {
+      "method": "USE",
+      "path": "/ielts",
+      "router": "MVC/routes/ieltsMainRoute.js",
+      "metadataOnly": false,
+      "active": true
+    }
+  ],
+  "queryExecutors": [
+    {
+      "entity": "ielts.task2samples",
+      "source": "ielts",
+      "repository": "task2Samples",
+      "modulePath": "packages/ielts/MVC/repositories/ielts/index.js"
+    },
+    {
+      "entity": "ielts.microassessments",
+      "source": "ielts",
+      "repository": "microAssessments",
+      "modulePath": "packages/ielts/MVC/repositories/ielts/index.js"
+    },
+    {
+      "entity": "ielts.prompts",
+      "source": "ielts",
+      "repository": "prompts",
+      "modulePath": "packages/ielts/MVC/repositories/ielts/index.js"
+    },
+    {
+      "entity": "ielts.apiproviders",
+      "source": "ielts",
+      "repository": "apiProviders",
+      "modulePath": "packages/ielts/MVC/repositories/ielts/index.js"
+    },
+    {
+      "entity": "ielts.aitokenusages",
+      "source": "ielts",
+      "repository": "aiTokenUsages",
+      "modulePath": "packages/ielts/MVC/repositories/ielts/index.js"
+    },
+    {
+      "entity": "ielts.scoringhistory",
+      "source": "ielts",
+      "repository": "scoringHistory",
+      "modulePath": "packages/ielts/MVC/repositories/ielts/index.js"
+    }
+  ],
+  "views": {
+    "id": "ielts-package-views",
+    "path": "packages/ielts/MVC/views",
+    "namespace": "ielts",
+    "active": true
+  },
+  "assets": {
+    "id": "ielts-package-public-assets",
+    "path": "packages/ielts/public",
+    "publicPath": "/ielts",
+    "metadataOnly": true,
+    "active": true
+  },
+  "operations": [],
+  "roles": [],
+  "sections": [],
+  "symbols": [],
+  "accesses": [],
+  "uploadFolders": [
+    {
+      "key": "core.ielts",
+      "path": "ielts",
+      "label": "IELTS uploads",
+      "active": true,
+      "adoptExisting": true
+    }
+  ],
+  "menuEntries": [
+    {
+      "id": "ielts-dashboard",
+      "label": "IELTS",
+      "href": "/ielts",
+      "icon": "bi-chat-text",
+      "visibility": "authenticated",
+      "target": "_self",
+      "active": true
+    }
+  ],
+  "dashboardEntries": [
+    {
+      "id": "ielts-dashboard",
+      "label": "IELTS Dashboard",
+      "href": "/ielts",
+      "icon": "bi-chat-text",
+      "description": "Open IELTS package area.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "active": true
+    }
+  ],
+  "dataEntities": [
+    {
+      "entityType": "task2Samples",
+      "label": "IELTS Task 2 Samples",
+      "source": "data/ielts/task2samples.json"
+    },
+    {
+      "entityType": "microAssessments",
+      "label": "IELTS Micro Assessments",
+      "source": "data/ielts/microAssessments.json"
+    },
+    {
+      "entityType": "prompts",
+      "label": "IELTS Prompts",
+      "source": "data/ielts/prompts.json"
+    },
+    {
+      "entityType": "apiProviders",
+      "label": "IELTS API Providers",
+      "source": "data/ielts/apiProviders.json"
+    },
+    {
+      "entityType": "aiTokenUsages",
+      "label": "IELTS AI Token Usages",
+      "source": "data/ielts/aiTokenUsages.json"
+    },
+    {
+      "entityType": "scoringHistory",
+      "label": "IELTS Scoring History",
+      "source": "data/ielts/scoring/sessions"
+    }
+  ]
+}

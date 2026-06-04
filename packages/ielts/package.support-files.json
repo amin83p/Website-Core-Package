@@ -1,0 +1,22 @@
+{
+  "packageId": "ielts",
+  "step": 2,
+  "status": "scaffolded",
+  "notes": [
+    "Pass 2 creates the package scaffold only.",
+    "Root IELTS domain files remain active until route, view, controller, model, service, repository, and runtime cutover passes complete.",
+    "Runtime data remains app-level under data/ielts and must not be copied into packages/ielts/data."
+  ],
+  "scripts": [
+    {
+      "source": "scripts/packages/enable-ielts-package.js",
+      "target": "packages/ielts/scripts/maintenance/enable-ielts-package.js",
+      "category": "package-activation",
+      "entrypointMode": "package-safe",
+      "status": "root-active",
+      "targetStatus": "package-owned"
+    }
+  ],
+  "docs": [],
+  "tests": []
+}
