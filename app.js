@@ -52,6 +52,7 @@ const { registerCoreEntityQueryExecutors } = require('./MVC/models/queryExecutor
 const dataBackendRuntimeService = require('./MVC/services/dataBackendRuntimeService');
 const dataBackendRecoveryMiddleware = require('./MVC/middleware/dataBackendRecoveryMiddleware');
 const packageLoaderService = require('./MVC/services/packageLoaderService');
+const packageRegistryService = require('./MVC/services/packageRegistryService');
 const packageRegistryInstallerService = require('./MVC/services/packageRegistryInstallerService');
 const packageNavigationService = require('./MVC/services/packageNavigationService');
 const { getPackageStorageRootAbsolute } = require('./MVC/utils/packageStoragePathUtils');
@@ -66,6 +67,7 @@ const { SESSION_SECRET } = require('./config/security');
 const PORT    = process.env.PORT || 3000;
 const DEFAULT_PACKAGE_STARTUP_RECOVERY_WINDOW_MS = 300000;
 const DEFAULT_PACKAGE_STARTUP_RECOVERY_INTERVAL_MS = 15000;
+const DEFAULT_PACKAGE_RUNTIME_RECONCILE_INTERVAL_MS = 60000;
 
 const app = express();
 const server = http.createServer(app); // Create explicit server
@@ -344,6 +346,7 @@ app.use(packageRuntimeRouter);
 
 let notFoundHandlerRegistered = false;
 let packageStartupRecoveryTimer = null;
+let packageRuntimeReconcileTimer = null;
 function registerNotFoundHandler() {
   if (notFoundHandlerRegistered) return;
   notFoundHandlerRegistered = true;
@@ -450,11 +453,118 @@ function mergePackageLoadSummary(baseSummary = {}, latestSummary = {}) {
   };
 }
 
+function collectLoadedPackageIds(summary = {}) {
+  const loaded = Array.isArray(summary?.loaded) ? summary.loaded : [];
+  return Array.from(new Set(
+    loaded
+      .map((row) => normalizePackageId(row?.packageId || ''))
+      .filter(Boolean)
+  ));
+}
+
+function collectFailedPackageIds(summary = {}) {
+  const failed = Array.isArray(summary?.failed) ? summary.failed : [];
+  return Array.from(new Set(
+    failed
+      .map((row) => normalizePackageId(row?.packageId || ''))
+      .filter(Boolean)
+  ));
+}
+
+async function collectEnabledRegistryPackageIds(backendMode = '') {
+  const rows = await packageRegistryService.listPackageRegistry({ backendMode });
+  return Array.from(new Set(
+    (Array.isArray(rows) ? rows : [])
+      .filter((row) => row && row.enabled === true)
+      .map((row) => normalizePackageId(row?.packageId || row?.id || ''))
+      .filter(Boolean)
+  ));
+}
+
+function resolvePackageRuntimeReconcileSettings(env = process.env) {
+  return {
+    enabled: isTrue(env.PACKAGE_RUNTIME_RECONCILE_ENABLED, true),
+    intervalMs: Math.max(
+      5000,
+      readPositiveInt(env.PACKAGE_RUNTIME_RECONCILE_INTERVAL_MS, DEFAULT_PACKAGE_RUNTIME_RECONCILE_INTERVAL_MS)
+    )
+  };
+}
+
 function stopPackageStartupRecoveryLoop() {
   if (packageStartupRecoveryTimer) {
     clearInterval(packageStartupRecoveryTimer);
     packageStartupRecoveryTimer = null;
   }
+}
+
+function stopPackageRuntimeReconcileLoop() {
+  if (packageRuntimeReconcileTimer) {
+    clearInterval(packageRuntimeReconcileTimer);
+    packageRuntimeReconcileTimer = null;
+  }
+}
+
+function startPackageRuntimeReconcileLoop({
+  backendMode = '',
+  packageRootDir = '',
+  packageLoaderHooks = {},
+  packageRuntimeRouter = null
+} = {}) {
+  stopPackageRuntimeReconcileLoop();
+  const settings = resolvePackageRuntimeReconcileSettings(process.env);
+  if (!settings.enabled) {
+    startupLogger.info('PACKAGE_LOADER', 'RUNTIME_RECONCILE_DISABLED', 'Runtime package reconcile loop is disabled by environment flag.');
+    return;
+  }
+
+  const state = { running: false };
+  const runTick = async () => {
+    if (state.running) return;
+    state.running = true;
+    try {
+      const enabledPackageIds = await collectEnabledRegistryPackageIds(backendMode);
+      const loadedPackageIds = new Set(collectLoadedPackageIds(app.locals.packageLoadSummary || {}));
+      const failedPackageIds = new Set(collectFailedPackageIds(app.locals.packageLoadSummary || {}));
+      const missingPackageIds = enabledPackageIds.filter((packageId) => (
+        !loadedPackageIds.has(packageId)
+        && !failedPackageIds.has(packageId)
+      ));
+      if (!missingPackageIds.length) return;
+
+      startupLogger.warn('PACKAGE_LOADER', 'RUNTIME_RECONCILE_FOUND', 'Enabled packages are missing from the active runtime router; loading them now.', {
+        packageIds: missingPackageIds.join(',')
+      });
+
+      const latestSummary = await packageLoaderService.loadEnabledPackages({
+        app,
+        packageRuntimeRouter,
+        backendMode,
+        packageRootDir,
+        hooks: packageLoaderHooks,
+        packageIds: missingPackageIds,
+        continueOnError: true
+      });
+      app.locals.packageLoadSummary = mergePackageLoadSummary(app.locals.packageLoadSummary || {}, latestSummary);
+
+      if (Array.isArray(latestSummary?.loaded) && latestSummary.loaded.length) {
+        startupLogger.success('PACKAGE_LOADER', 'RUNTIME_RECONCILE_LOADED', 'Runtime package reconcile loaded missing packages.', {
+          loadedPackageIds: latestSummary.loaded.map((row) => normalizePackageId(row?.packageId || '')).filter(Boolean).join(',')
+        });
+      }
+    } catch (error) {
+      startupLogger.warn('PACKAGE_LOADER', 'RUNTIME_RECONCILE_FAIL', 'Runtime package reconcile tick failed.', {
+        error: error?.message || String(error)
+      });
+    } finally {
+      state.running = false;
+    }
+  };
+
+  packageRuntimeReconcileTimer = setInterval(() => {
+    void runTick();
+  }, settings.intervalMs);
+  void runTick();
 }
 
 function startPackageStartupRecoveryLoop({
@@ -566,6 +676,12 @@ async function startServer() {
       app.locals.packageLoadSummary = packageLoadSummary;
       startPackageStartupRecoveryLoop({
         initialSummary: packageLoadSummary,
+        backendMode: dataBackend.mode,
+        packageRootDir,
+        packageLoaderHooks,
+        packageRuntimeRouter
+      });
+      startPackageRuntimeReconcileLoop({
         backendMode: dataBackend.mode,
         packageRootDir,
         packageLoaderHooks,
