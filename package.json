@@ -67,7 +67,7 @@
     "ielts:freeze:check": "node scripts/ielts/scoringBaselineGuardCheck.js",
     "ielts:preflight": "node scripts/ielts/tuningPreflight.js",
     "test:ielts:freeze": "node test/ielts.behavior-freeze.step6t.test.js",
-    "test:ielts:gate": "node test/ielts.behavior-freeze.step6t.test.js && node test/ielts.rule-patch-hardening.step6s.test.js && node test/ielts.stability-accuracy.step6r.test.js && node test/ielts.tr-cc-runprofile.step6q.test.js && node test/ielts.low-band-activation.step6.test.js && node test/ielts.low-band-followup.step6b.test.js && node test/ielts.low-band-polarity-regression.step6d.test.js"
+    "test:ielts:gate": "node scripts/ielts/runIeltsGate.js"
   },
   "keywords": [],
   "author": "",
