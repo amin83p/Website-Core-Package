@@ -1,7 +1,7 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 
 function buildCollapsedParagraphCtx() {
   return {
@@ -7026,3 +7026,4 @@ test('Batch 13D (Phase 12): LR9-1/LR9-2/GRA9-1 require sufficient paragraph-leve
   assert.equal(scoringRules['LR9-2'](sufficientDensityCtx), 'rare_slips');
   assert.equal(scoringRules['GRA9-1'](sufficientDensityCtx), 'Yes');
 });
+

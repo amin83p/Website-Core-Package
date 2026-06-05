@@ -1,12 +1,12 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const step5FeedbackService = require('../MVC/services/ielts/step5FeedbackService');
-const aiService = require('../MVC/services/ielts/aiService');
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const step5FeedbackService = require('../packages/ielts/MVC/services/ielts/step5FeedbackService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 
 function createRestoreStack() {
   const restorers = [];
@@ -659,3 +659,4 @@ test('underlength alone does not auto-trigger TR5-1 partial-coverage fault when 
 
   assert.equal(value, 'No');
 });
+

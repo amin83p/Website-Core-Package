@@ -1,8 +1,8 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 
 function buildGrammarControl(overrides = {}) {
   return {
@@ -140,3 +140,4 @@ test('patched deterministic GRA rows resolve from grammarControl without null fa
   assert.equal(scoringRules['GRA5-6'](weakGrammarCtx), 'some');
   assert.equal(scoringRules['GRA5-6'](strongGrammarCtx), 'none');
 });
+

@@ -1,8 +1,8 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const essayAnalysisService = require('../MVC/services/ielts/essayAnalysisService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const essayAnalysisService = require('../packages/ielts/MVC/services/ielts/essayAnalysisService');
 
 function buildRuntimeConsistencyFixture() {
   return {
@@ -208,3 +208,4 @@ test('Step 4 runtime consistency: recomputes taskEcho when Step-2 payload is mis
     essayAnalysisService.computeTaskEchoSignals = originalCompute;
   }
 });
+

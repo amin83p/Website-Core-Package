@@ -1,9 +1,9 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const aiService = require('../MVC/services/ielts/aiService');
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const calibrationEvaluationService = require('../MVC/services/ielts/calibrationEvaluationService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const calibrationEvaluationService = require('../packages/ielts/MVC/services/ielts/calibrationEvaluationService');
 
 function createRestoreStack() {
   const restorers = [];
@@ -369,3 +369,4 @@ test('benchmark-style session extraction builds comparable records when referenc
   assert.equal(report.metrics.overall.sampleCount, 2);
   assert.equal(report.perEssay.length, 2);
 });
+

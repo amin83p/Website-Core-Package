@@ -1,9 +1,9 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const aiService = require('../MVC/services/ielts/aiService');
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
 
 function createRestoreStack() {
   const restorers = [];
@@ -247,3 +247,4 @@ test('Legacy-only lexical payload remains compatible via existing fallback mappi
     restoreStack.restoreAll();
   }
 });
+

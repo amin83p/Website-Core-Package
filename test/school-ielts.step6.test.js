@@ -1,15 +1,15 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
-const ieltsDataService = require('../MVC/services/ielts/ieltsDataService');
+const ieltsDataService = require('../packages/ielts/MVC/services/ielts/ieltsDataService');
 const schoolRepositories = require('../packages/school/MVC/repositories/school');
-const ieltsRepositories = require('../MVC/repositories/ielts');
+const ieltsRepositories = require('../packages/ielts/MVC/repositories/ielts');
 
 const transactionDefinitionModel = require('../packages/school/MVC/models/school/transactionDefinitionModel');
 const timesheetModel = require('../packages/school/MVC/models/school/timesheetModel');
 const timesheetPeriodModel = require('../packages/school/MVC/models/school/timesheetPeriodModel');
-const microAssessmentModel = require('../MVC/models/ielts/microAssessmentModel');
+const microAssessmentModel = require('../packages/ielts/MVC/models/ielts/microAssessmentModel');
 
 function createRestoreStack() {
   const restorers = [];
@@ -158,9 +158,8 @@ test('ielts repository preserves legacy q search for assessment questions', asyn
   ]));
 
   try {
-    delete require.cache[require.resolve('../MVC/repositories/ielts')];
     delete require.cache[require.resolve('../packages/ielts/MVC/repositories/ielts')];
-    const freshIeltsRepositories = require('../MVC/repositories/ielts');
+    const freshIeltsRepositories = require('../packages/ielts/MVC/repositories/ielts');
     const rows = await freshIeltsRepositories.microAssessments.list({
       query: { q: 'grammar' },
       scope: { canViewAll: true }
@@ -171,3 +170,5 @@ test('ielts repository preserves legacy q search for assessment questions', asyn
     stack.restoreAll();
   }
 });
+
+

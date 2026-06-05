@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * Compare two IELTS scoring export/session JSON files and report score-impact deltas.
  *
@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { evaluateRowPassResult } = require('../../MVC/services/ielts/answerContractUtils');
+const { evaluateRowPassResult } = require('../../packages/ielts/MVC/services/ielts/answerContractUtils');
 
 function parseArgs(argv) {
   const args = { before: '', after: '', out: '', top: 20 };
@@ -480,3 +480,4 @@ module.exports = {
   buildReport,
   parseArgs
 };
+

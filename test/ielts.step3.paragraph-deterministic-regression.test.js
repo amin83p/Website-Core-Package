@@ -1,8 +1,8 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const aiService = require('../MVC/services/ielts/aiService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
 
 function createRestoreStack() {
   const restorers = [];
@@ -280,3 +280,4 @@ test('step3 operationalized_only filtering still works with mixed eligibility', 
     stack.restoreAll();
   }
 });
+

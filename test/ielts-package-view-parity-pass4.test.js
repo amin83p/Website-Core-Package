@@ -3,9 +3,26 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+function findProjectRoot(startDir) {
+  let current = startDir;
+  while (current && current !== path.dirname(current)) {
+    if (fs.existsSync(path.join(current, 'package.json')) && fs.existsSync(path.join(current, 'test/ielts-package-ownership-registry.json'))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  throw new Error(`Unable to locate project root from ${startDir}`);
+}
+
+const ROOT_DIR = findProjectRoot(__dirname);
+const OWNERSHIP_REGISTRY_PATH = path.join(ROOT_DIR, 'test/ielts-package-ownership-registry.json');
 const ROOT_VIEWS_DIR = path.join(ROOT_DIR, 'MVC/views/ielts');
 const PACKAGE_VIEWS_DIR = path.join(ROOT_DIR, 'packages/ielts/MVC/views/ielts');
+const PACKAGE_MANIFEST_PATH = path.join(ROOT_DIR, 'packages/ielts/package.manifest.json');
+
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
 
 function listFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true })
@@ -14,29 +31,22 @@ function listFiles(dir) {
     .sort();
 }
 
-function read(filePath) {
-  return fs.readFileSync(filePath, 'utf8');
-}
+test('IELTS package pass4 keeps package-owned IELTS views in package folder', () => {
+  assert.equal(fs.existsSync(ROOT_VIEWS_DIR), false, 'legacy root views folder should be retired');
+  assert.equal(fs.existsSync(PACKAGE_VIEWS_DIR), true, 'package view folder should exist');
 
-test('IELTS package pass4 mirrors root IELTS views exactly', () => {
-  const rootViews = listFiles(ROOT_VIEWS_DIR);
+  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'packages/ielts/package.manifest.json'), 'utf8'));
+  const ownership = readJson(OWNERSHIP_REGISTRY_PATH);
+  const expectedViews = [...(ownership.views || [])].sort();
   const packageViews = listFiles(PACKAGE_VIEWS_DIR);
 
-  assert.equal(rootViews.length, 30);
-  assert.deepEqual(packageViews, rootViews);
-
-  rootViews.forEach((name) => {
-    assert.equal(
-      read(path.join(PACKAGE_VIEWS_DIR, name)),
-      read(path.join(ROOT_VIEWS_DIR, name)),
-      `${name} should match the root-active IELTS view`
-    );
-  });
+  assert.equal(packageViews.length, 30);
+  assert.equal(packageViews.length, expectedViews.length, 'package view count should match ownership manifest');
+  assert.deepEqual(packageViews, expectedViews);
 });
 
 test('IELTS package pass4 manifest declares package view namespace', () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'packages/ielts/package.manifest.json'), 'utf8'));
-
+  const manifest = JSON.parse(fs.readFileSync(PACKAGE_MANIFEST_PATH, 'utf8'));
   assert.equal(manifest.views.path, 'packages/ielts/MVC/views');
   assert.equal(manifest.views.namespace, 'ielts');
   assert.equal(manifest.views.active, true);

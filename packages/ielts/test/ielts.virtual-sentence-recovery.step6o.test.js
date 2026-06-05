@@ -1,9 +1,9 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const essayPreprocessingService = require('../MVC/services/ielts/essayPreprocessingService');
-const essayAnalysisService = require('../MVC/services/ielts/essayAnalysisService');
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const essayPreprocessingService = require('../packages/ielts/MVC/services/ielts/essayPreprocessingService');
+const essayAnalysisService = require('../packages/ielts/MVC/services/ielts/essayAnalysisService');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 
 const RUN_ON_PROMPT = 'Some people think students should begin formal education very early, while others believe they should start later. Discuss both views and give your opinion.';
 
@@ -181,3 +181,4 @@ test('evidence traceability: recovered sentence spans stay inspectable and map b
     previousEnd = sentence.endChar;
   }
 });
+

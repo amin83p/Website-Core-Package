@@ -1,11 +1,11 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const aiService = require('../MVC/services/ielts/aiService');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
 
 function createRestoreStack() {
   const restorers = [];
@@ -569,3 +569,4 @@ test('scoringV0326 no longer hard-overwrites Step 3/4 run metadata to single_run
   assert.equal(source.includes('SESSION_BUNDLE.steps.step4grade.request.mode = "single_run"'), false);
   assert.equal(source.includes('SESSION_BUNDLE.steps.step4grade.request.runCount = 1'), false);
 });
+

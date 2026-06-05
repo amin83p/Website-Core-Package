@@ -1,10 +1,10 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const microAssessmentModel = require('../MVC/models/ielts/microAssessmentModel');
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const microAssessmentModel = require('../packages/ielts/MVC/models/ielts/microAssessmentModel');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 const { loadRowsForAudit } = require('../scripts/ielts/microAssessmentContractAudit');
 const {
   getActiveDataBackendConfig,
@@ -105,3 +105,4 @@ test('micro-assessment file model blocks file access when mongo backend is activ
     setActiveDataBackendConfig(previousConfig);
   }
 });
+

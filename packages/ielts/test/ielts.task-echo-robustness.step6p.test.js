@@ -1,9 +1,9 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const essayPreprocessingService = require('../MVC/services/ielts/essayPreprocessingService');
-const essayAnalysisService = require('../MVC/services/ielts/essayAnalysisService');
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const essayPreprocessingService = require('../packages/ielts/MVC/services/ielts/essayPreprocessingService');
+const essayAnalysisService = require('../packages/ielts/MVC/services/ielts/essayAnalysisService');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 
 const SCHOOL_START_PROMPT = 'Many people believe that children should start school at a very early age, while others think they should start school later. Discuss both views and give your own opinion.';
 
@@ -173,3 +173,4 @@ test('E) non-regression: stronger essays remain plausible with low task-echo sig
   assert.equal(scoringRules['TR5-1'](ctx), 'No');
   assert.equal(scoringRules['TR6-1'](ctx), 'Yes');
 });
+

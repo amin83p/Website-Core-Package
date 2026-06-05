@@ -1,7 +1,7 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
-const { evaluateRowPassResult } = require('../MVC/services/ielts/answerContractUtils');
+const { evaluateRowPassResult } = require('../packages/ielts/MVC/services/ielts/answerContractUtils');
 
 const {
   STATUS,
@@ -112,3 +112,4 @@ test('step3 and step5 keep explicit-contract-first behavior with legacy fallback
   });
   assert.equal(fallbackStep5Weak, false, 'Legacy fallback should still classify fault-pass as non-weak.');
 });
+

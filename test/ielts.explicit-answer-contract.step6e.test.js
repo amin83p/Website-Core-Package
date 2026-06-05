@@ -1,11 +1,11 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const step5FeedbackService = require('../MVC/services/ielts/step5FeedbackService');
-const aiService = require('../MVC/services/ielts/aiService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const step5FeedbackService = require('../packages/ielts/MVC/services/ielts/step5FeedbackService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
 
 function createRestoreStack() {
   const restorers = [];
@@ -455,3 +455,4 @@ test('legacy rows without explicit answer maps still use polarity fallback', asy
   const rowCheck = gate?.rowChecks?.[0];
   assert.equal(rowCheck?.scoringMode, 'legacy_polarity');
 });
+

@@ -1,4 +1,4 @@
-const { scoringRules } = require('../../MVC/services/ielts/scoringRules');
+﻿const { scoringRules } = require('../../packages/ielts/MVC/services/ielts/scoringRules');
 const { baselineVersion, baselineProfiles } = require('./behaviorFreezeBaseline');
 
 function runBaselineCheck() {
@@ -72,3 +72,4 @@ if (require.main === module) {
 module.exports = {
   runBaselineCheck
 };
+

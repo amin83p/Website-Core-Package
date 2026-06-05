@@ -1,12 +1,12 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const aiService = require('../MVC/services/ielts/aiService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
 const {
   runAiExtraction
-} = require('../MVC/services/ielts/aiExtractionService');
+} = require('../packages/ielts/MVC/services/ielts/aiExtractionService');
 
 function extractFunctionSource(source, functionName) {
   const signature = `function ${functionName}`;
@@ -162,3 +162,4 @@ test('Step 3 extraction guard still rejects direct scoring keys', () => {
     /Forbidden scoring field found: 'overallBand'/
   );
 });
+

@@ -127,9 +127,14 @@ The migration is intentionally pass-based. Each pass should be small, test-backe
 
 ### Pass 14: Root Shim Retirement
 
-- Replace root IELTS MVC files with delegates only where compatibility requires root paths.
-- Remove redundant root IELTS domain files only after package ownership tests prove safe.
-- Keep shared core utilities in root.
+- Remove root IELTS MVC folders after package ownership tests prove package stability.
+- Keep shared core utilities in root and package-only runtime ownership after retirement.
+- Ensure `packages/ielts/MVC` mirrors the full legacy runtime surface.
+
+### Pass 16: Legacy Folder Retirement Verification
+
+- Add pass-specific assertions that the retired root folders are absent and package folders are complete.
+- Re-run package route/loader and behavior smoke checks after physical folder removal.
 
 ### Pass 15: Build And Install Artifacts
 
@@ -186,6 +191,7 @@ The migration is intentionally pass-based. Each pass should be small, test-backe
 - Pass 13: `b1a6696 feat(ielts): mirror support files into package`
 - Pass 14: `976c03a feat(ielts): retire root mvc implementations`
 - Pass 15: `48628c3 feat(ielts): add install zip build script`
+- Pass 14+16 verification updates in this pass: confirm root `MVC/*/ielts` runtime folders removed.
 
 ### Verified Green
 

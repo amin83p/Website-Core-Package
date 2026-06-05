@@ -1,10 +1,10 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const aiService = require('../MVC/services/ielts/aiService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
 
 function createRestoreStack() {
   const restorers = [];
@@ -448,3 +448,4 @@ test('LR band gate with ai_error-style rows is not failed solely by unevaluable 
   assert.equal(gate.status, 'passed');
   assert.equal(result.scores.LR, 4);
 });
+

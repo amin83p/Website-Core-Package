@@ -1,7 +1,7 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 const { baselineVersion, baselineProfiles } = require('../scripts/ielts/behaviorFreezeBaseline');
 const { runBaselineCheck } = require('../scripts/ielts/scoringBaselineGuardCheck');
 
@@ -22,3 +22,4 @@ test('behavior freeze baseline profiles have valid rule references', () => {
     }
   }
 });
+

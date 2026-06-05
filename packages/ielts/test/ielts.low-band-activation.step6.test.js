@@ -1,11 +1,11 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const step5FeedbackService = require('../MVC/services/ielts/step5FeedbackService');
-const aiService = require('../MVC/services/ielts/aiService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const step5FeedbackService = require('../packages/ielts/MVC/services/ielts/step5FeedbackService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
 
 function createRestoreStack() {
   const restorers = [];
@@ -460,3 +460,4 @@ test('low-band activation: backend/client scoring, deterministic+ai routing, agg
     stack.restoreAll();
   }
 });
+

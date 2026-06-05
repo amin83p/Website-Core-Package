@@ -1,10 +1,10 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const essayPreprocessingService = require('../MVC/services/ielts/essayPreprocessingService');
-const essayAnalysisService = require('../MVC/services/ielts/essayAnalysisService');
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const essayPreprocessingService = require('../packages/ielts/MVC/services/ielts/essayPreprocessingService');
+const essayAnalysisService = require('../packages/ielts/MVC/services/ielts/essayAnalysisService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 
 const CAMBRIDGE_LIKE_PROMPT = 'Many people believe that children should start school at a very early age, while others think they should start school later. Discuss both views and give your own opinion.';
 
@@ -235,3 +235,4 @@ test('Non-regression: stable band-5+ deterministic paths stay plausible without 
   assert.equal(scoringRules['TR6-2'](ctx), 'No');
   assert.equal(scoringRules['CC2-1A'](ctx), 'No');
 });
+

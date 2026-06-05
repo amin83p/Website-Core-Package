@@ -1,9 +1,9 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const aiService = require('../MVC/services/ielts/aiService');
-const aiExtractionService = require('../MVC/services/ielts/aiExtractionService');
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
+const aiExtractionService = require('../packages/ielts/MVC/services/ielts/aiExtractionService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
 
 function createRestoreStack() {
   const restorers = [];
@@ -311,3 +311,4 @@ test('Step 4 normalization exposes calibration adjustments for inconsistent load
     restoreStack.restoreAll();
   }
 });
+

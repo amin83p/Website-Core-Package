@@ -14,26 +14,26 @@ function repoPath(...parts) {
   return path.join(ROOT_DIR, ...parts);
 }
 
-function assertRegistryFilesExist(rows = [], rootRelativePath = '', label = '') {
+function assertRegistryFilesExist(rows = [], baseRelativePath = '', label = '') {
   rows.forEach((row) => {
     const normalized = String(row || '').replace(/\\/g, '/');
     assert.ok(normalized, `${label} registry row should not be empty`);
     assert.equal(
-      fs.existsSync(repoPath(rootRelativePath, ...normalized.split('/'))),
+      fs.existsSync(repoPath(baseRelativePath, ...normalized.split('/'))),
       true,
-      `${label} registry path should exist: ${rootRelativePath}/${normalized}`
+      `${label} registry path should exist: ${baseRelativePath}/${normalized}`
     );
   });
 }
 
-test('IELTS package pass1 registry captures current root-owned domain surface', () => {
+test('IELTS package pass1 registry captures package-owned domain surface', () => {
   const registry = readJson(REGISTRY_PATH);
 
-  assertRegistryFilesExist(registry.controllers, 'MVC/controllers/ielts', 'controller');
-  assertRegistryFilesExist(registry.routes, 'MVC/routes/ielts', 'route');
-  assertRegistryFilesExist(registry.models, 'MVC/models/ielts', 'model');
-  assertRegistryFilesExist(registry.services, 'MVC/services/ielts', 'service');
-  assertRegistryFilesExist(registry.views, 'MVC/views/ielts', 'view');
+  assertRegistryFilesExist(registry.controllers, 'packages/ielts/MVC/controllers/ielts', 'controller');
+  assertRegistryFilesExist(registry.routes, 'packages/ielts/MVC/routes/ielts', 'route');
+  assertRegistryFilesExist(registry.models, 'packages/ielts/MVC/models/ielts', 'model');
+  assertRegistryFilesExist(registry.services, 'packages/ielts/MVC/services/ielts', 'service');
+  assertRegistryFilesExist(registry.views, 'packages/ielts/MVC/views/ielts', 'view');
   assertRegistryFilesExist(registry.scripts, 'scripts/ielts', 'script');
   assertRegistryFilesExist(registry.tests, 'test', 'test');
 
@@ -44,6 +44,21 @@ test('IELTS package pass1 registry captures current root-owned domain surface', 
   assert.equal(registry.views.length, 30);
   assert.equal(registry.scripts.length, 8);
   assert.equal(registry.tests.length, 25);
+});
+
+test('IELTS package pass1 keeps legacy root MVC runtime surface retired', () => {
+  const retiredRoots = [
+    'MVC/controllers/ielts',
+    'MVC/routes/ielts',
+    'MVC/models/ielts',
+    'MVC/services/ielts',
+    'MVC/repositories/ielts',
+    'MVC/views/ielts'
+  ];
+
+  retiredRoots.forEach((rootRelativePath) => {
+    assert.equal(fs.existsSync(repoPath(rootRelativePath)), false, `${rootRelativePath} should be removed after package migration`);
+  });
 });
 
 test('IELTS package pass1 keeps runtime data app-level and out of package source', () => {

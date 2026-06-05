@@ -1,11 +1,11 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const step5FeedbackService = require('../MVC/services/ielts/step5FeedbackService');
-const aiService = require('../MVC/services/ielts/aiService');
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const step5FeedbackService = require('../packages/ielts/MVC/services/ielts/step5FeedbackService');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 
 function createRestoreStack() {
   const restorers = [];
@@ -436,3 +436,4 @@ test('step5 strengths do not emit band-9-only praise rows when band-9 gates fail
   assert.ok(strengths.some((s) => s.includes('cohesion well managed overall')));
   assert.ok(!strengths.some((s) => s.includes('cohesion attract no attention')));
 });
+

@@ -1,10 +1,10 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { ExtractionSchema } = require('../MVC/services/ielts/extractionSchema');
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
-const aiService = require('../MVC/services/ielts/aiService');
+const { ExtractionSchema } = require('../packages/ielts/MVC/services/ielts/extractionSchema');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
 
 function createRestoreStack() {
   const restorers = [];
@@ -368,3 +368,4 @@ test('Step 4 preview prompt includes richer LR/GRA evidence snapshot', async () 
   assert.ok(prompt.includes('lexicalControl'));
   assert.ok(prompt.includes('grammarControl'));
 });
+

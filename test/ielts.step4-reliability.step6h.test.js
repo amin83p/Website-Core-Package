@@ -1,9 +1,9 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const aiService = require('../MVC/services/ielts/aiService');
-const step3ScoringService = require('../MVC/services/ielts/step3ScoringService');
-const { scoringRules } = require('../MVC/services/ielts/scoringRules');
+const aiService = require('../packages/ielts/MVC/services/ielts/aiService');
+const step3ScoringService = require('../packages/ielts/MVC/services/ielts/step3ScoringService');
+const { scoringRules } = require('../packages/ielts/MVC/services/ielts/scoringRules');
 
 function createRestoreStack() {
   const restorers = [];
@@ -856,3 +856,4 @@ test('T10: deterministic rule trace instrumentation exposes helper eligibility f
     assert.ok(Number(byBaseKey?.rows || 0) >= 1);
   }
 });
+
