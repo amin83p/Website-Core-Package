@@ -24,17 +24,19 @@ function looksLikeIeltsTarget(request) {
   const noExt = normalized.replace(/\.[a-z0-9]+$/i, '');
 
   for (const entry of FALLBACK_TARGETS) {
-    const candidate = entry.relative.toLowerCase();
+    const candidate = entry.relative;
+    const candidateLower = candidate.toLowerCase();
     const candidateWithoutExt = candidate.replace(/\.[a-z0-9]+$/i, '');
+    const candidateWithoutExtLower = candidateWithoutExt.toLowerCase();
     if (
-      normalized === candidate ||
-      normalized === candidateWithoutExt ||
-      noExt === candidate ||
-      noExt === candidateWithoutExt ||
-      normalized.endsWith(`/${candidate}`) ||
-      normalized.endsWith(`/${candidateWithoutExt}`) ||
-      noExt.endsWith(`/${candidate}`) ||
-      noExt.endsWith(`/${candidateWithoutExt}`)
+      normalized === candidateLower ||
+      normalized === candidateWithoutExtLower ||
+      noExt === candidateLower ||
+      noExt === candidateWithoutExtLower ||
+      normalized.endsWith(`/${candidateLower}`) ||
+      normalized.endsWith(`/${candidateWithoutExtLower}`) ||
+      noExt.endsWith(`/${candidateLower}`) ||
+      noExt.endsWith(`/${candidateWithoutExtLower}`)
     ) {
       return candidate;
     }
