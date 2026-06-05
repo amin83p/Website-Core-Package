@@ -45,7 +45,7 @@ test('BenchPath package pass2 support map uses PTE-style support rows', () => {
   const supportMap = readJson('packages/benchpath/package.support-files.json');
   assert.equal(supportMap.packageId, 'benchpath');
   assert.ok(Number(supportMap.step || 0) >= 2);
-  assert.ok(['scaffolded', 'support-mirrored', 'mapped'].includes(supportMap.status));
+  assert.ok(['scaffolded', 'support-mirrored', 'mapped', 'root-mvc-retired'].includes(supportMap.status));
 
   [...(supportMap.scripts || []), ...(supportMap.docs || []), ...(supportMap.tests || [])].forEach((row) => {
     assert.equal(typeof row.source, 'string');
