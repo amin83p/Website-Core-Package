@@ -28,10 +28,256 @@
     "active": true
   },
   "operations": [],
-  "roles": [],
-  "sections": [],
-  "symbols": [],
-  "accesses": [],
+  "roles": [
+    {
+      "id": "ROL1201",
+      "key": "credit_admin",
+      "label": "Credit Admin",
+      "description": "Credit package admin role.",
+      "domain": "credit",
+      "packageName": "CREDIT",
+      "aliases": [
+        "creditadmin",
+        "credit-admin",
+        "credit-admins",
+        "credit_admins"
+      ],
+      "active": true,
+      "system": true,
+      "adoptExisting": true
+    },
+    {
+      "id": "ROL1202",
+      "key": "credit_user",
+      "label": "Credit User",
+      "description": "Credit package user role.",
+      "domain": "credit",
+      "packageName": "CREDIT",
+      "aliases": [
+        "credituser",
+        "credit-user",
+        "credit-users",
+        "credit_users"
+      ],
+      "active": true,
+      "system": true,
+      "adoptExisting": true
+    }
+  ],
+  "sections": [
+    {
+      "id": "CREDIT_ROOT",
+      "name": "CREDIT",
+      "category": "CREDIT",
+      "description": "Credit package root section.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": true,
+      "navigatorSection": true,
+      "homeURL": "",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [
+        {
+          "id": "CREDIT_CUSTOMERS"
+        }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "CREDIT_CUSTOMERS",
+      "name": "CREDIT_CUSTOMERS",
+      "category": "CREDIT",
+      "description": "Customer directory and credit profile management.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/credit/customers",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    }
+  ],
+  "symbols": [
+    {
+      "id": "SYM_CREDIT_001",
+      "name": "CREDIT",
+      "type": "class",
+      "value": "bi bi-cash-coin",
+      "tags": [
+        "CREDIT",
+        "CREDIT_ROOT"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_CREDIT_CUSTOMERS_001",
+      "name": "CREDIT_CUSTOMERS",
+      "type": "class",
+      "value": "bi bi-person-vcard",
+      "tags": [
+        "CREDIT_CUSTOMERS",
+        "CREDIT_CUSTOMERS_SECTION"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    }
+  ],
+  "accesses": [
+    {
+      "id": "CREDIT_ADMIN",
+      "name": "CREDIT_ADMIN",
+      "orgId": null,
+      "description": "Credit package administrator access profile.",
+      "active": true,
+      "fullAdmin": false,
+      "adminCategories": [],
+      "validity": {
+        "startDate": null,
+        "endDate": null
+      },
+      "sections": [
+        {
+          "sectionId": "CREDIT_ROOT",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "CREDIT_CUSTOMERS",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CREDIT_USER",
+      "name": "CREDIT_USER",
+      "orgId": null,
+      "description": "Credit package read/write helper profile.",
+      "active": true,
+      "fullAdmin": false,
+      "adminCategories": [],
+      "validity": {
+        "startDate": null,
+        "endDate": null
+      },
+      "sections": [
+        {
+          "sectionId": "CREDIT_ROOT",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "CREDIT_CUSTOMERS",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "dataEntities": [
     {
       "entityType": "customers",
@@ -82,4 +328,3 @@
   "migrations": [],
   "dependencies": []
 }
-
