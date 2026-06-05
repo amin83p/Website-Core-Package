@@ -1,4 +1,4 @@
-<%- include('../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -11,7 +11,7 @@
   ]
 }) %>
 
-  <%- include('../partials/tablePages-search', {
+  <%- include('partials/tablePages-search', {
     placeholder: 'Search by Key, Title, or Question...',
     fields: ['question_key', 'title', 'atomic_question', 'criterion', 'prompt_group', 'signal_kind']
   }) %>
@@ -75,15 +75,15 @@
   </table>
 </div>
 
-<%- include('../partials/pagination', { 
+<%- include('partials/pagination', { 
     pagination: pagination, 
     filters: filters, 
     baseUrlPath: newUrl
 }) %>
 
-<%- include('../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
 
-<%- include('../partials/modal') %>
+<%- include('partials/modal') %>
 
 <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">

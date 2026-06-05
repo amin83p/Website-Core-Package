@@ -1,4 +1,4 @@
-<%- include('../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl: 'ielts/scoring/fluctuation/three-run',
   newHref: '/ielts/scoringV0225',
@@ -14,7 +14,7 @@
   ]
 }) %>
 
-<%- include('../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
     placeholder: 'Search three-run sessions...',
     fields: []
 }) %>
@@ -113,13 +113,13 @@
   </table>
 </div>
 
-<%- include('../partials/pagination', {
+<%- include('partials/pagination', {
     pagination: pagination,
     filters: filters,
     baseUrlPath: '/ielts/scoring/fluctuation/three-run'
 }) %>
 
-<%- include('../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
 
 <script>
     function updateCompareState() {

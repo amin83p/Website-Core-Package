@@ -1,4 +1,4 @@
-<%- include('../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -11,7 +11,7 @@
   ]
 }) %>
 
-  <%- include('../partials/tablePages-search', {
+  <%- include('partials/tablePages-search', {
     placeholder: 'Search samples by title or content...',
     fields: []
   }) %>
@@ -131,12 +131,12 @@
   </table>
 </div>
 
-<%- include('../partials/pagination', { 
+<%- include('partials/pagination', { 
     pagination: pagination, 
     filters: filters, 
     baseUrlPath: newUrl
 }) %>
 
-<%- include('../partials/modal_ImageViewer') %>
+<%- include('partials/modal_ImageViewer') %>
 
-<%- include('../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
