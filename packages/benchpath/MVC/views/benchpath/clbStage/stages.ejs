@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -11,7 +11,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', { placeholder: 'Search CLB stages...', fields: [] }) %>
+<%- include('partials/tablePages-search', { placeholder: 'Search CLB stages...', fields: [] }) %>
 
 <div class="table-scroll-wrapper">
   <table class="table-responsive size-md" id="first-table">
@@ -63,6 +63,6 @@
 
 <span id="urlRef" data-id="benchpath/clb-stages" hidden></span>
 
-<%- include('../../partials/pagination', { pagination: pagination, filters: filters, baseUrlPath: newUrl }) %>
+<%- include('partials/pagination', { pagination: pagination, filters: filters, baseUrlPath: newUrl }) %>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>

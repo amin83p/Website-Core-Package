@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl: 'benchpath/tasks',
   newHref: '/benchpath/tasks/new-wizard/1',
@@ -12,7 +12,7 @@
   ]
 }) %>
 
-<%- include('../../partials/tablePages-search', {
+<%- include('partials/tablePages-search', {
   placeholder: 'Search task drafts...',
   fields: searchableFields || []
 }) %>
@@ -82,7 +82,7 @@
 
 <span id="urlRef" data-id="benchpath/tasks" hidden></span>
 
-<%- include('../../partials/pagination', {
+<%- include('partials/pagination', {
   pagination: pagination,
   filters: filters,
   baseUrlPath: 'benchpath/tasks'
@@ -103,4 +103,4 @@
 </script>
 <% } %>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>

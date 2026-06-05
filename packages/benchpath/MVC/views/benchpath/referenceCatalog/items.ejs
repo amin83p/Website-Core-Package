@@ -1,4 +1,4 @@
-<%- include('../../partials/tablePages-start', {
+<%- include('partials/tablePages-start', {
   title,
   newUrl,
   newLabel,
@@ -16,7 +16,7 @@
   const searchPlaceholder = listConfig?.placeholder || `Search ${entity.title}...`;
 %>
 
-<%- include('../../partials/tablePages-search', { placeholder: searchPlaceholder, fields: [] }) %>
+<%- include('partials/tablePages-search', { placeholder: searchPlaceholder, fields: [] }) %>
 
 <div class="table-scroll-wrapper">
   <table class="table-responsive size-md" id="first-table">
@@ -70,6 +70,6 @@
 
 <span id="urlRef" data-id="benchpath/<%= entity.routeBase %>" hidden></span>
 
-<%- include('../../partials/pagination', { pagination: pagination, filters: filters, baseUrlPath: newUrl }) %>
+<%- include('partials/pagination', { pagination: pagination, filters: filters, baseUrlPath: newUrl }) %>
 
-<%- include('../../partials/tablePages-end') %>
+<%- include('partials/tablePages-end') %>
