@@ -1932,6 +1932,54 @@
     "value": "bi bi-bank2"
   },
   {
+    "id": "SYM_CREDIT_001",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-05T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-05T00:00:00.000Z"
+    },
+    "name": "CREDIT_CUSTOMERS",
+    "orgId": "SYSTEM",
+    "tags": [
+      "CREDIT_CUSTOMERS"
+    ],
+    "type": "class",
+    "value": "bi bi-person-vcard"
+  },
+  {
+    "id": "SYM_CREDIT_002",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-05T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-05T00:00:00.000Z"
+    },
+    "name": "CREDIT_REQUESTS",
+    "orgId": "SYSTEM",
+    "tags": [
+      "CREDIT_REQUESTS"
+    ],
+    "type": "class",
+    "value": "bi bi-file-earmark-text"
+  },
+  {
+    "id": "SYM_CREDIT_003",
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-05T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-05T00:00:00.000Z"
+    },
+    "name": "CREDIT_INSTALLMENTS",
+    "orgId": "SYSTEM",
+    "tags": [
+      "CREDIT_INSTALLMENTS"
+    ],
+    "type": "class",
+    "value": "bi bi-receipt-cutoff"
+  },
+  {
     "id": "SYM_SYSTEM_060",
     "audit": {
       "createUser": "ROOT_001",

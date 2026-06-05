@@ -1,7 +1,7 @@
 {
   "id": "credit",
   "name": "Credit",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "mountPath": "/credit",
   "enabledByDefault": false,
   "routes": [
@@ -62,13 +62,30 @@
       "active": true,
       "system": true,
       "adoptExisting": true
+    },
+    {
+      "id": "ROL1203",
+      "key": "credit_customer",
+      "label": "Credit Customer",
+      "description": "Credit package customer role.",
+      "domain": "credit",
+      "packageName": "CREDIT",
+      "aliases": [
+        "creditcustomer",
+        "credit-customer",
+        "credit-customers",
+        "credit_customers"
+      ],
+      "active": true,
+      "system": true,
+      "adoptExisting": true
     }
   ],
   "sections": [
     {
-      "id": "CREDIT_ROOT",
-      "name": "CREDIT",
-      "category": "CREDIT",
+      "id": "774671",
+      "name": "CREDIT_LOANS",
+      "category": "CREDIT_LOANS",
       "description": "Credit package root section.",
       "active": true,
       "trackState": false,
@@ -76,7 +93,7 @@
       "dashboardDisplay": true,
       "mainDashboardDisplay": true,
       "navigatorSection": true,
-      "homeURL": "",
+      "homeURL": "/credit",
       "inactiveMessage": "",
       "message": "",
       "operations": [
@@ -89,16 +106,22 @@
       ],
       "subsections": [
         {
-          "id": "CREDIT_CUSTOMERS"
+          "id": "774672"
+        },
+        {
+          "id": "774673"
+        },
+        {
+          "id": "774674"
         }
       ],
       "related": [],
       "adoptExisting": true
     },
     {
-      "id": "CREDIT_CUSTOMERS",
+      "id": "774672",
       "name": "CREDIT_CUSTOMERS",
-      "category": "CREDIT",
+      "category": "CREDIT_LOANS",
       "description": "Customer directory and credit profile management.",
       "active": true,
       "trackState": true,
@@ -138,17 +161,82 @@
       "subsections": [],
       "related": [],
       "adoptExisting": true
+    },
+    {
+      "id": "774673",
+      "name": "CREDIT_REQUESTS",
+      "category": "CREDIT_LOANS",
+      "description": "Track and review credit/loan application requests.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/credit/requests",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "774674",
+      "name": "CREDIT_INSTALLMENTS",
+      "category": "CREDIT_LOANS",
+      "description": "Manage installment payment workflow and status history.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/credit/installments",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
     }
   ],
   "symbols": [
     {
       "id": "SYM_CREDIT_001",
-      "name": "CREDIT",
+      "name": "CREDIT_LOANS",
       "type": "class",
       "value": "bi bi-cash-coin",
       "tags": [
+        "CREDIT_LOANS",
         "CREDIT",
-        "CREDIT_ROOT"
+        "774671"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -160,7 +248,32 @@
       "value": "bi bi-person-vcard",
       "tags": [
         "CREDIT_CUSTOMERS",
-        "CREDIT_CUSTOMERS_SECTION"
+        "CREDIT_CUSTOMERS_SECTION",
+        "774672"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_CREDIT_REQUESTS_001",
+      "name": "CREDIT_REQUESTS",
+      "type": "class",
+      "value": "bi bi-file-earmark-text",
+      "tags": [
+        "CREDIT_REQUESTS",
+        "774673"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_CREDIT_INSTALLMENTS_001",
+      "name": "CREDIT_INSTALLMENTS",
+      "type": "class",
+      "value": "bi bi-receipt-cutoff",
+      "tags": [
+        "CREDIT_INSTALLMENTS",
+        "774674"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -181,7 +294,7 @@
       },
       "sections": [
         {
-          "sectionId": "CREDIT_ROOT",
+          "sectionId": "774671",
           "adminAccess": false,
           "operations": [
             {
@@ -194,7 +307,7 @@
           ]
         },
         {
-          "sectionId": "CREDIT_CUSTOMERS",
+          "sectionId": "774672",
           "adminAccess": false,
           "operations": [
             {
@@ -213,6 +326,46 @@
             },
             {
               "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+                "maxSessionDurationMinutes": null,
+                "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "774673",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "774674",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
               "scopeId": "SCP_OWNER",
               "maxAttemptsPerSession": null,
               "maxSessionDurationMinutes": null,
@@ -243,7 +396,7 @@
       },
       "sections": [
         {
-          "sectionId": "CREDIT_ROOT",
+          "sectionId": "774671",
           "adminAccess": false,
           "operations": [
             {
@@ -256,7 +409,7 @@
           ]
         },
         {
-          "sectionId": "CREDIT_CUSTOMERS",
+          "sectionId": "774672",
           "adminAccess": false,
           "operations": [
             {
@@ -268,6 +421,46 @@
             },
             {
               "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+                "maxSessionDurationMinutes": null,
+                "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "774673",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "774674",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
               "scopeId": "SCP_OWNER",
               "maxAttemptsPerSession": null,
               "maxSessionDurationMinutes": null,

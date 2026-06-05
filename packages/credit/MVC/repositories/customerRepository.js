@@ -10,7 +10,7 @@ const {
   resolveMongoIdFilter,
   generateUniqueStringId,
   deepMerge
-} = require('./../services/credit/creditCoreContracts');
+} = require('../services/credit/creditCoreContracts');
 
 function stripPaginationFromQuery(query = {}) {
   if (!query || typeof query !== 'object') return {};

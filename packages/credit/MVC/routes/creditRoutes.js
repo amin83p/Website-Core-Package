@@ -6,6 +6,12 @@ const { requireAuth } = require('./creditRouteDependencies');
 router.use(requireAuth);
 
 router.get('/', ctrl.showDashboard);
+router.get('/requests', (req, res) => {
+  res.redirect('/credit/customers');
+});
+router.get('/installments', (req, res) => {
+  res.redirect('/credit/customers');
+});
 
 router.get('/customers', ctrl.listCustomers);
 router.get('/customers/new', ctrl.showForm);

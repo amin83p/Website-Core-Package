@@ -39,7 +39,7 @@
   },
   {
     "packageId": "school",
-    "version": "0.1.0",
+    "version": "0.1.2",
     "enabled": true,
     "installStatus": "enabled",
     "metadata": {
@@ -92,8 +92,8 @@
         "assets": 1,
         "operations": 0,
         "roles": 2,
-        "sections": 2,
-        "symbols": 2,
+        "sections": 4,
+        "symbols": 4,
         "accesses": 2,
         "uploadFolders": 0,
         "menuEntries": 2,

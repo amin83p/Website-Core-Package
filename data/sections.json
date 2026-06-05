@@ -5079,12 +5079,108 @@
     "category": "CREDIT_LOANS",
     "dashboardDisplay": true,
     "description": "This the the dashboard of the Credit and Loans Management.",
-    "homeURL": "/credit/",
+    "homeURL": "/credit",
     "inactiveMessage": "",
     "mainDashboardDisplay": false,
     "message": "",
     "minimumAccessRequirement": 5,
     "name": "CREDIT_LOANS",
+    "navigatorSection": true,
+    "operations": [
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "related": [],
+    "subsections": [
+      {
+        "name": "CREDIT_CUSTOMERS"
+      },
+      {
+        "name": "CREDIT_REQUESTS"
+      },
+      {
+        "name": "CREDIT_INSTALLMENTS"
+      }
+    ],
+    "trackState": true
+  },
+  {
+    "id": "774672",
+    "active": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-05T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-05T00:00:00.000Z"
+    },
+    "category": "CREDIT_LOANS",
+    "dashboardDisplay": true,
+    "description": "Customer directory and credit profile management.",
+    "homeURL": "/credit/customers",
+    "inactiveMessage": "",
+    "mainDashboardDisplay": false,
+    "message": "",
+    "minimumAccessRequirement": 1,
+    "name": "CREDIT_CUSTOMERS",
+    "navigatorSection": false,
+    "operations": [
+      {
+        "id": "OP1001",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "related": [],
+    "subsections": [],
+    "trackState": true
+  },
+  {
+    "id": "774673",
+    "active": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-05T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-05T00:00:00.000Z"
+    },
+    "category": "CREDIT_LOANS",
+    "dashboardDisplay": true,
+    "description": "Track and review credit and loan application requests.",
+    "homeURL": "/credit/requests",
+    "inactiveMessage": "",
+    "mainDashboardDisplay": false,
+    "message": "",
+    "minimumAccessRequirement": 1,
+    "name": "CREDIT_REQUESTS",
     "navigatorSection": false,
     "operations": [
       {
@@ -5095,6 +5191,43 @@
       },
       {
         "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "related": [],
+    "subsections": [],
+    "trackState": true
+  },
+  {
+    "id": "774674",
+    "active": true,
+    "audit": {
+      "createUser": "ROOT_001",
+      "createDateTime": "2026-06-05T00:00:00.000Z",
+      "lastUpdateUser": "ROOT_001",
+      "lastUpdateDateTime": "2026-06-05T00:00:00.000Z"
+    },
+    "category": "CREDIT_LOANS",
+    "dashboardDisplay": true,
+    "description": "Manage installment payment workflow and status history.",
+    "homeURL": "/credit/installments",
+    "inactiveMessage": "",
+    "mainDashboardDisplay": false,
+    "message": "",
+    "minimumAccessRequirement": 1,
+    "name": "CREDIT_INSTALLMENTS",
+    "navigatorSection": false,
+    "operations": [
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1005",
         "sessionAttempts": 5,
         "sessionTime": 15,
         "active": true

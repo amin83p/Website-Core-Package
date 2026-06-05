@@ -11,7 +11,7 @@ const {
   getPrimaryOrgRole
 } = require('../services/credit/creditCoreContracts');
 
-const creditDataService = require('../services/credit/creditDataService');
+const creditDataService = require('../services/creditDataService');
 
 const { getDashboardSection } = dashboardController;
 
@@ -210,28 +210,73 @@ exports.showDashboard = async (req, res) => {
     const modules = [
       {
         title: 'Customer Registration / Directory',
+        name: 'CREDIT_CUSTOMERS',
         description: 'Register persons as credit customers and manage financial profile status.',
-        href: '/credit/customers',
-        buttonLabel: 'Open Customer Directory',
-        icon: 'bi-people-fill',
+        homeURL: '/credit/customers',
+        category: 'CREDIT_LOANS',
+        minimumAccessRequirement: 1,
+        operations: [
+          {
+            id: 'OP1001'
+          },
+          {
+            id: 'OP1002'
+          },
+          {
+            id: 'OP1003'
+          },
+          {
+            id: 'OP1005'
+          }
+        ],
+        customIcon: {
+          type: 'class',
+          value: 'bi bi-person-lines-fill'
+        },
         subtleClass: 'bg-primary-subtle text-primary',
         buttonClass: 'btn btn-primary'
       },
       {
         title: 'Loan & Credit Requests',
+        name: 'CREDIT_REQUESTS',
         description: 'Track loan and credit applications (placeholder for next step).',
-        href: '/credit/customers',
-        buttonLabel: 'Go to Customers',
-        icon: 'bi-cash-coin',
+        homeURL: '/credit/requests',
+        category: 'CREDIT_LOANS',
+        minimumAccessRequirement: 1,
+        operations: [
+          {
+            id: 'OP1002'
+          },
+          {
+            id: 'OP1003'
+          }
+        ],
+        customIcon: {
+          type: 'class',
+          value: 'bi bi-file-earmark-text'
+        },
         subtleClass: 'bg-success-subtle text-success',
         buttonClass: 'btn btn-success'
       },
       {
         title: 'Installment Payments',
+        name: 'CREDIT_INSTALLMENTS',
         description: 'Capture installment payment submissions from customers (coming next).',
-        href: '/credit/customers',
-        buttonLabel: 'Manage Customers',
-        icon: 'bi-receipt',
+        homeURL: '/credit/installments',
+        category: 'CREDIT_LOANS',
+        minimumAccessRequirement: 1,
+        operations: [
+          {
+            id: 'OP1002'
+          },
+          {
+            id: 'OP1005'
+          }
+        ],
+        customIcon: {
+          type: 'class',
+          value: 'bi bi-receipt-cutoff'
+        },
         subtleClass: 'bg-warning-subtle text-warning',
         buttonClass: 'btn btn-warning text-dark'
       }
@@ -244,6 +289,23 @@ exports.showDashboard = async (req, res) => {
       activeOrgName,
       dashboardSections: modules,
       dashboardSection,
+      showDashboardSummary: false,
+      canViewBootstrapShortcut: false,
+      access: {},
+      newUrl: 'credit',
+      stats: {
+        sections: 0,
+        dashboardSections: 0,
+        logCount: 0,
+        logSize: '0 B',
+        logHealth: 'secondary',
+        logMessage: '',
+        actionStateCount: 0,
+        actionStateHealth: 'secondary',
+        actionStateMessage: ''
+      },
+      websitePolicy: req.websitePolicy || {},
+      firstRunBootstrap: null,
       includeModal: true
     });
   } catch (error) {
