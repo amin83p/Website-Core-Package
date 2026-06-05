@@ -28,40 +28,6 @@ const COMPAT_PACKAGE_DEFAULTS = Object.freeze({
       }
     ]
   },
-  ielts: {
-    id: 'ielts',
-    name: 'IELTS',
-    mountPath: '/ielts',
-    menuEntries: [],
-    dashboardEntries: [
-      {
-        id: 'ielts-dashboard',
-        label: 'IELTS Dashboard',
-        href: '/ielts',
-        icon: 'bi-chat-text',
-        description: 'Open IELTS package area.',
-        visibility: 'authenticated',
-        target: '_self'
-      }
-    ]
-  },
-  benchpath: {
-    id: 'benchpath',
-    name: 'BenchPath',
-    mountPath: '/benchpath',
-    menuEntries: [],
-    dashboardEntries: [
-      {
-        id: 'benchpath-dashboard',
-        label: 'BenchPath Dashboard',
-        href: '/benchpath',
-        icon: 'bi-diagram-3',
-        description: 'Open BenchPath package area.',
-        visibility: 'authenticated',
-        target: '_self'
-      }
-    ]
-  },
   credit: {
     id: 'credit',
     name: 'Credit',
