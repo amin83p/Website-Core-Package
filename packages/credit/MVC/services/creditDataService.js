@@ -4,7 +4,8 @@ const {
   dataService,
   toPublicId,
   idsEqual
-} = require('./creditCoreContracts');
+} = require('./credit/creditCoreContracts');
+ 
 
 function getScopedActiveOrgId(requestingUser) {
   return toPublicId(requestingUser?.activeOrgId) || null;
