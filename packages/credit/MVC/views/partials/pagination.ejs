@@ -1,0 +1,136 @@
+<div class="row align-items-center mt-3 bg-white p-3 border rounded shadow-sm g-0">
+  
+  <div class="col-md-3 text-center text-md-start mb-2 mb-md-0">
+    <span class="text-muted small" style="font-weight: 500;">
+      Showing <span class="text-dark"><%= pagination.startItem %>-<%= pagination.endItem %></span> of <span class="text-dark"><%= pagination.totalItems %></span>
+    </span>
+  </div>
+
+  <div class="col-md-6 d-flex justify-content-center mb-2 mb-md-0">
+    <% if (pagination.totalPages > 1) { %>
+      
+      <% 
+         // Helper function using the required variable: baseUrlPath
+         function buildUrl(pageNum) {
+           const params = new URLSearchParams(filters);
+           params.set('page', pageNum);
+           params.set('limit', pagination.limit);
+           // Using baseUrlPath passed by the main view
+           //return `${baseUrlPath}?${params.toString()}`;
+           console.log(`?${params.toString()}`);
+           return `?${params.toString()}`;
+         }
+      %>
+
+      <div class="pagination-custom-container">
+        
+        <a href="<%= pagination.currentPage === 1 ? '#' : buildUrl(1) %>" 
+           class="btn-circle <%= pagination.currentPage === 1 ? 'disabled' : '' %>"
+           title="First">
+          <i class="bi bi-chevron-double-left"></i>
+        </a>
+
+        <a href="<%= pagination.currentPage === 1 ? '#' : buildUrl(pagination.currentPage - 1) %>" 
+           class="btn-circle <%= pagination.currentPage === 1 ? 'disabled' : '' %>"
+           title="Previous">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+
+        <% 
+          let startPage = Math.max(1, pagination.currentPage - 2);
+          let endPage = Math.min(pagination.totalPages, pagination.currentPage + 2);
+
+          if (pagination.totalPages > 5) {
+             if (pagination.currentPage <= 3) { endPage = 5; }
+             if (pagination.currentPage >= pagination.totalPages - 2) { startPage = pagination.totalPages - 4; }
+          }
+        %>
+
+        <% if (startPage > 1) { %>
+          <a href="<%= buildUrl(1) %>" class="btn-circle">1</a>
+          <% if (startPage > 2) { %>
+            <span class="text-muted small px-1">··</span>
+          <% } %>
+        <% } %>
+
+        <% for(let i = startPage; i <= endPage; i++) { %>
+          <a href="<%= buildUrl(i) %>" 
+             class="btn-circle <%= pagination.currentPage === i ? 'active' : '' %>">
+             <%= i %>
+          </a>
+        <% } %>
+
+        <% if (endPage < pagination.totalPages) { %>
+          <% if (endPage < pagination.totalPages - 1) { %>
+            <span class="text-muted small px-1">··</span>
+          <% } %>
+          <a href="<%= buildUrl(pagination.totalPages) %>" class="btn-circle"><%= pagination.totalPages %></a>
+        <% } %>
+
+        <a href="<%= pagination.currentPage === pagination.totalPages ? '#' : buildUrl(pagination.currentPage + 1) %>" 
+           class="btn-circle <%= pagination.currentPage === pagination.totalPages ? 'disabled' : '' %>"
+           title="Next">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+
+        <a href="<%= pagination.currentPage === pagination.totalPages ? '#' : buildUrl(pagination.totalPages) %>" 
+           class="btn-circle <%= pagination.currentPage === pagination.totalPages ? 'disabled' : '' %>"
+           title="Last">
+          <i class="bi bi-chevron-double-right"></i>
+        </a>
+
+      </div>
+    <% } %>
+  </div>
+
+  <div class="col-md-3 d-flex justify-content-center justify-content-md-end align-items-center gap-2">
+    <label class="text-muted small text-nowrap fw-bold" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">Per Page</label>
+    
+    <div class="position-relative">
+      <select class="form-select form-select-sm border-0 bg-light fw-bold text-primary ps-3 pe-4 shadow-sm" 
+              style="border-radius: 20px; appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: none !important; cursor: pointer; font-size: 0.8rem; padding-top: 4px; padding-bottom: 4px;"
+              onchange="changeItemsPerPage(this.value)">
+        
+        <% [5, 10, 20, 30, 50, 80, 100].forEach(val => { %>
+          <option value="<%= val %>" <%= pagination.limit === val ? 'selected' : '' %>><%= val %></option>
+        <% }) %>
+        <option value="1000000" <%= pagination.limit >= 1000000 ? 'selected' : '' %>>All</option>
+      </select>
+      <i class="bi bi-chevron-down position-absolute text-primary" 
+         style="right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.65rem; pointer-events: none;"></i>
+    </div>
+  </div>
+</div>
+
+<script>
+  function changeItemsPerPage(newLimit) {
+    if (typeof showLoading === 'function') showLoading();
+    
+    // Artificial Delay for effect (optional, reusing your constant if defined)
+    const delay = (typeof DELAY_MS !== 'undefined') ? DELAY_MS : 0;
+
+    setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      params.set('limit', newLimit);
+      params.set('page', 1);
+      window.location.href = window.location.pathname + '?' + params.toString();
+    }, delay);
+  }
+
+    const pageLinks = document.querySelectorAll('.pagination-custom-container a');
+    pageLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        // Ignore disabled links or '#' placeholder
+        if (link.classList.contains('disabled') || link.getAttribute('href') === '#') return;
+
+        e.preventDefault(); // Stop immediate navigation
+        showLoading();
+        const delay = (typeof DELAY_MS !== 'undefined') ? DELAY_MS : 0;
+        
+        const targetUrl = link.getAttribute('href');
+        setTimeout(() => {
+          window.location.href = targetUrl; // Go after delay
+        }, delay);
+      });
+    });
+</script>

@@ -1,0 +1,663 @@
+<div class="modal fade" id="genericPickerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: var(--modal-radius, 16px); overflow: hidden;">
+      
+      <div class="modal-header border-bottom bg-light py-3 px-4">
+        <h5 class="modal-title fw-bold text-dark d-flex align-items-center" id="gp-title">
+          <i class="bi bi-search me-2 text-primary"></i> Select Item
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body p-0 d-flex flex-column" style="min-height: 400px; max-height: 65vh;">
+        
+        <div class="p-3 bg-white border-bottom sticky-top z-index-10">
+            
+            <div id="gp-context-section" class="alert alert-light border border-primary-subtle bg-primary-subtle text-primary d-flex align-items-center p-2 mb-3 rounded-3 shadow-sm" style="display:none;">
+                <div class="rounded bg-white text-primary d-flex align-items-center justify-content-center me-3 shadow-sm border border-primary-subtle" 
+                     style="width: 40px; height: 40px; min-width: 40px;">
+                  <i class="bi bi-layers-fill" id="gp-context-icon"></i>
+                </div>
+                <div class="overflow-hidden">
+                  <div class="small text-uppercase fw-bold opacity-75" style="font-size: 0.65rem; letter-spacing: 0.5px;" id="gp-context-label">CONTEXT</div>
+                  <div class="fw-bold text-truncate" id="gp-context-value">Global</div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 align-items-center">
+                <div class="position-relative flex-grow-1">
+                    <i class="bi bi-search position-absolute text-muted" style="left: 14px; top: 50%; transform: translateY(-50%);"></i>
+                    <input type="text" id="gp-search-input" class="form-control ps-5 py-2 bg-light border-0 fw-bold" 
+                           placeholder="Type to search..." autocomplete="off" style="border-radius: 8px;">
+                </div>
+                
+                <div class="form-check form-switch m-0" title="Toggle partial match">
+                    <input class="form-check-input" type="checkbox" id="searchMatchAny" checked>
+                </div>
+            </div>
+        </div>
+
+        <div class="list-group list-group-flush flex-grow-1 overflow-auto bg-light" id="gp-results-list">
+            <div class="text-center text-muted py-5 mt-4">
+                <div class="mb-3">
+                    <div class="rounded-circle bg-white border d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 64px; height: 64px;">
+                        <i class="bi bi-search fs-3 opacity-25"></i>
+                    </div>
+                </div>
+                <h6 class="fw-bold text-dark">Find what you need</h6>
+                <p class="small opacity-75 mb-0">Type in the search box above to start filtering.</p>
+            </div>
+        </div>
+
+      </div>
+      
+      <div class="modal-footer bg-white border-top py-2 px-4 d-flex justify-content-between align-items-center">
+        <small class="text-muted fst-italic" style="font-size: 0.75rem;" id="gp-result-summary">
+            <i class="bi bi-info-circle me-1"></i> Type to search
+        </small>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-primary btn-filled px-3 d-none" id="gp-add-selected-btn">
+            <i class="bi bi-check2-square me-1"></i> Add Selected <span id="gp-selected-count">(0)</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-filled px-3 d-none" id="gp-load-more-btn">
+            <i class="bi bi-plus-circle me-1"></i> Load More
+          </button>
+          <button type="button" class="btn btn-secondary btn-filled btn-sm px-4" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>window.__GENERIC_PICKER_USER__ = <%- JSON.stringify(user || {}).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029').replace(/&/g, '\\u0026') %>;</script>
+<script src="/scripts/genericPickerCore.js"></script>
+<script src="/scripts/genericPickerContexts.js"></script>
+<script src="/scripts/genericPickerPresets.js"></script>
+<script src="/scripts/genericPickerProfiles.js"></script>
+<script src="/scripts/genericPickerSchoolProfiles.js"></script>
+<script>
+/**
+ * Generic Picker Utility
+ */
+window.GenericPicker = (function() {
+    const modalEl = document.getElementById('genericPickerModal');
+    let bsModal = null; 
+
+    const titleEl = document.getElementById('gp-title');
+    const inputEl = document.getElementById('gp-search-input');
+    const listEl = document.getElementById('gp-results-list');
+    const summaryEl = document.getElementById('gp-result-summary');
+    const loadMoreBtn = document.getElementById('gp-load-more-btn');
+    const addSelectedBtn = document.getElementById('gp-add-selected-btn');
+    const selectedCountEl = document.getElementById('gp-selected-count');
+    
+    // Context Elements
+    const contextSection = document.getElementById('gp-context-section');
+    const contextIcon = document.getElementById('gp-context-icon');
+    const contextLabel = document.getElementById('gp-context-label');
+    const contextValue = document.getElementById('gp-context-value');
+
+    let currentConfig = {};
+    let debounceTimer;
+    const SHOW_ALL_KEYWORDS = new Set(['aaa', '---']);
+    const pickerState = {
+      term: '',
+      forceShowAll: false,
+      currentPage: 0,
+      totalPages: 0,
+      totalItems: 0,
+      loadedItems: 0,
+      limit: null,
+      maybeMoreByHeuristic: false,
+      loadedItemsMap: new Map(),
+      selectedItemsMap: new Map(),
+      renderedItemIds: new Set()
+    };
+
+    function getResourceNameFromEndpoint(endpoint) {
+      if (!endpoint || typeof endpoint !== 'string') return '';
+      const withoutOrigin = endpoint.replace(/^[a-z]+:\/\/[^/]+/i, '');
+      const trimmed = withoutOrigin.replace(/^\/+/, '');
+      const parts = trimmed.split(/[/?#]/).filter(Boolean);
+      return String(parts[parts.length - 1] || '').toLowerCase();
+    }
+
+    /* --- RENDERERS --- */
+    const pickerCore = window.GenericPickerCore || null;
+    
+    const sectionRenderer = (item) => {
+      if (pickerCore?.renderResourceCard) return pickerCore.renderResourceCard('sections', item);
+      return `<div class="fw-bold text-dark">${item.name || item.id}</div>`;
+    };
+
+    const operationRenderer= (item) => {
+        if (pickerCore?.renderResourceCard) return pickerCore.renderResourceCard('operations', item);
+        return `<div class="fw-bold text-dark">${item.name || item.id}</div>`;
+    };
+
+    const personRenderer = (item) => {
+      if (pickerCore?.renderResourceCard) return pickerCore.renderResourceCard('persons', item);
+      return `<div class="fw-bold text-dark">${item.id}</div>`;
+    };
+    
+    const userRenderer = (item) => {
+      if (pickerCore?.renderResourceCard) return pickerCore.renderResourceCard('users', item);
+      return `<div class="fw-bold text-dark">${item.name || item.username || item.id}</div>`;
+    };
+
+    const organizationRenderer = (item) => {
+      if (pickerCore?.renderResourceCard) return pickerCore.renderResourceCard('organizations', item);
+      return `<div class="fw-bold text-dark">${item.identity?.displayName || item.name || item.id}</div>`;
+    };
+
+    const accessRenderer = (item) => {
+      if (pickerCore?.renderResourceCard) return pickerCore.renderResourceCard('accesses', item);
+      return `<div class="fw-bold text-dark">${item.name || item.id}</div>`;
+    };
+
+    // Map resource names to renderers
+    const RENDERERS = {
+      section: sectionRenderer, sections: sectionRenderer,
+      operation: operationRenderer, operations: operationRenderer,
+      person: personRenderer, persons: personRenderer,
+      teacher: personRenderer, teachers: personRenderer,
+      student: personRenderer, students: personRenderer,
+      staff: personRenderer,
+      user: userRenderer, users: userRenderer,
+      organization: organizationRenderer, organizations: organizationRenderer,
+      access: accessRenderer, accesses: accessRenderer,
+    };
+
+    const defaultRenderer = (item) => {
+      const endpoint = currentConfig.apiEndpoint;
+      const resource = getResourceNameFromEndpoint(endpoint);
+      
+      let renderer = RENDERERS[resource];
+      if (!renderer) {
+        const key = Object.keys(RENDERERS).find(k => resource.startsWith(k));
+        if (key) renderer = RENDERERS[key];
+      }
+
+      if (renderer) return renderer(item);
+
+      if (pickerCore?.renderResourceCard) {
+        return pickerCore.renderResourceCard(resource, item);
+      }
+
+      return `
+        <div class="d-flex justify-content-between align-items-center w-100">
+          <div>
+             <div class="fw-bold text-dark">${item.name || item.title || item.id}</div>
+             <small class="text-muted">${item.description || item.email || ''}</small>
+          </div>
+          <i class="bi bi-chevron-right text-muted"></i>
+        </div>
+      `;
+    };
+
+    /* --- LOGIC --- */
+
+    function init() {
+        if (!inputEl) return;
+        inputEl.addEventListener('input', (e) => {
+            const term = e.target.value.trim();
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => { fetchData(term); }, 300);
+        });
+        modalEl.addEventListener('shown.bs.modal', () => {
+            inputEl.focus();
+        });
+        if (loadMoreBtn) {
+            loadMoreBtn.addEventListener('click', () => {
+                if (loadMoreBtn.disabled) return;
+                const nextPage = (Number(pickerState.currentPage) || 0) + 1;
+                fetchData(pickerState.term, { append: true, page: nextPage, forceShowAll: pickerState.forceShowAll });
+            });
+        }
+        if (addSelectedBtn) {
+            addSelectedBtn.addEventListener('click', () => {
+                const selected = Array.from(pickerState.selectedItemsMap.values());
+                if (selected.length > 0 && typeof currentConfig.onSelect === 'function') {
+                    currentConfig.onSelect(selected);
+                }
+                if (bsModal) bsModal.hide();
+            });
+        }
+    }
+
+    function normalizePickerTerm(rawTerm) {
+        const trimmed = String(rawTerm || '').trim();
+        if (!trimmed) return { term: '', forceShowAll: false };
+        if (SHOW_ALL_KEYWORDS.has(trimmed.toLowerCase())) {
+            return { term: '', forceShowAll: true };
+        }
+        return { term: trimmed, forceShowAll: false };
+    }
+
+    function resetPickerState() {
+      pickerState.term = '';
+      pickerState.forceShowAll = false;
+      pickerState.currentPage = 0;
+      pickerState.totalPages = 0;
+      pickerState.totalItems = 0;
+      pickerState.loadedItems = 0;
+      pickerState.limit = null;
+      pickerState.maybeMoreByHeuristic = false;
+      pickerState.loadedItemsMap.clear();
+      pickerState.selectedItemsMap.clear();
+      pickerState.renderedItemIds.clear();
+    }
+
+    function resetResultStatePreserveSelection() {
+      pickerState.term = '';
+      pickerState.forceShowAll = false;
+      pickerState.currentPage = 0;
+      pickerState.totalPages = 0;
+      pickerState.totalItems = 0;
+      pickerState.loadedItems = 0;
+      pickerState.limit = null;
+      pickerState.maybeMoreByHeuristic = false;
+      pickerState.loadedItemsMap.clear();
+      pickerState.renderedItemIds.clear();
+    }
+
+    function upsertSelectedItem(item) {
+      const id = String(item?.id || '').trim();
+      if (!id) return;
+      pickerState.selectedItemsMap.set(id, item);
+    }
+
+    function removeSelectedItemById(itemId) {
+      const id = String(itemId || '').trim();
+      if (!id) return;
+      pickerState.selectedItemsMap.delete(id);
+    }
+
+    function isSelectedItem(item) {
+      const id = String(item?.id || '').trim();
+      if (!id) return false;
+      return pickerState.selectedItemsMap.has(id);
+    }
+
+    function setFooterSummary(text, iconClass = 'bi-info-circle') {
+        if (!summaryEl) return;
+        summaryEl.innerHTML = `<i class="bi ${iconClass} me-1"></i> ${text}`;
+    }
+
+    function updateLoadMoreVisibility() {
+        if (!loadMoreBtn) return;
+        const hasMoreByApi = Number(pickerState.currentPage) < Number(pickerState.totalPages);
+        const hasMore = hasMoreByApi || pickerState.maybeMoreByHeuristic === true;
+        loadMoreBtn.classList.toggle('d-none', !hasMore);
+        if (hasMore) {
+            loadMoreBtn.disabled = false;
+            loadMoreBtn.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Load More';
+        }
+    }
+
+    function setLoadMoreBusy(isBusy) {
+        if (!loadMoreBtn) return;
+        if (isBusy) {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Loading';
+            return;
+        }
+        updateLoadMoreVisibility();
+    }
+
+    function getConfiguredLimit() {
+        const raw = Number.parseInt(String(currentConfig?.limit || '').trim(), 10);
+        return Number.isFinite(raw) && raw > 0 ? raw : null;
+    }
+
+    function buildRequestUrl(queryTerm, page) {
+        const params = new URLSearchParams();
+        params.set('q', queryTerm);
+        params.set('page', String(page));
+        const limit = getConfiguredLimit();
+        if (limit) params.set('limit', String(limit));
+
+        if (currentConfig?.type) params.set('type', String(currentConfig.type));
+        if (currentConfig?.searchFields) params.set('searchFields', String(currentConfig.searchFields));
+
+        const separator = String(currentConfig.apiEndpoint || '').includes('?') ? '&' : '?';
+        return `${currentConfig.apiEndpoint}${separator}${params.toString()}`;
+    }
+
+    function updatePickerMeta(itemsCount, pagination, append, requestedPage, uniqueNewItemsCount) {
+        const apiPage = Number(pagination?.currentPage || 1);
+        const page = append
+          ? Math.max(apiPage || 1, Number(requestedPage || 1))
+          : (Number(requestedPage || apiPage || 1) || 1);
+        const totalPages = Number(pagination?.totalPages || 1);
+        const totalItems = Number(pagination?.totalItems || itemsCount || 0);
+        const pageLimit = Number(pagination?.limit || getConfiguredLimit() || itemsCount || 0);
+
+        pickerState.currentPage = page;
+        pickerState.totalPages = totalPages;
+        pickerState.totalItems = totalItems;
+        pickerState.limit = pageLimit || pickerState.limit || null;
+        pickerState.loadedItems = append ? (pickerState.loadedItems + itemsCount) : itemsCount;
+        const hasMoreByApi = Number(pickerState.currentPage) < Number(pickerState.totalPages);
+        const looksPageSized = pageLimit > 0 && itemsCount >= pageLimit;
+        // Heuristic fallback for endpoints that return page-sized data but incorrect pagination metadata.
+        // If no unique new rows are coming in, stop showing Load More to avoid infinite loops.
+        pickerState.maybeMoreByHeuristic = !hasMoreByApi
+          && looksPageSized
+          && Number(uniqueNewItemsCount || 0) > 0;
+
+        if (pickerState.totalItems > 0) {
+            const pageSizeNote = pickerState.limit ? `, page size ${pickerState.limit}` : '';
+            setFooterSummary(`Showing ${pickerState.loadedItems} of ${pickerState.totalItems} (page ${pickerState.currentPage}/${pickerState.totalPages}${pageSizeNote})`);
+        } else {
+            setFooterSummary('No matches found');
+        }
+        updateLoadMoreVisibility();
+    }
+
+    async function fetchData(term, options = {}) {
+        const append = options?.append === true;
+        const requestedPage = Number(options?.page || 1) || 1;
+        const normalized = normalizePickerTerm(term);
+        const queryTerm = normalized.term;
+        const forceShowAll = options?.forceShowAll === true || normalized.forceShowAll;
+        const isMulti = currentConfig.multiselect === true;
+
+        if (queryTerm.length < 2 && !forceShowAll) {
+            const multiHint = currentConfig.multiselect ? ' (type <kbd>---</kbd> to show all)' : '';
+            if (isMulti) {
+                resetResultStatePreserveSelection();
+                renderList([], { append: false });
+                const selectedCount = pickerState.selectedItemsMap.size;
+                if (selectedCount > 0) {
+                    setFooterSummary(`Selected ${selectedCount} item(s). Type at least 2 characters to add more${multiHint}.`, 'bi-check2-square');
+                } else {
+                    listEl.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-keyboard fs-1 opacity-25 mb-2 d-block"></i>Type at least 2 characters to search${multiHint}...</div>`;
+                    setFooterSummary('Type at least 2 characters', 'bi-keyboard');
+                }
+                if (loadMoreBtn) loadMoreBtn.classList.add('d-none');
+                updateAddSelectedUI();
+            } else {
+                listEl.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-keyboard fs-1 opacity-25 mb-2 d-block"></i>Type at least 2 characters to search${multiHint}...</div>`;
+                setFooterSummary('Type at least 2 characters', 'bi-keyboard');
+                if (loadMoreBtn) loadMoreBtn.classList.add('d-none');
+                resetPickerState();
+            }
+            return;
+        }
+
+        pickerState.term = queryTerm;
+        pickerState.forceShowAll = forceShowAll;
+
+        if (!append) {
+            if (!(isMulti && pickerState.selectedItemsMap.size > 0)) {
+                listEl.innerHTML = `<div class="text-center text-primary py-5"><div class="spinner-border mb-2" role="status"></div><div>Searching...</div></div>`;
+            }
+            if (loadMoreBtn) loadMoreBtn.classList.add('d-none');
+            setFooterSummary('Searching...', 'bi-hourglass-split');
+        } else {
+            setLoadMoreBusy(true);
+        }
+        
+        try {
+            const url = buildRequestUrl(queryTerm, requestedPage);
+            const res = await fetch(url, {
+                credentials: 'include',
+                headers: {
+                    'X-AJAX-Request': 'true',
+                    'Accept': 'application/json'
+                }
+            });
+            if (res.redirected && String(res.url || '').includes('/login')) {
+                throw new Error('Session expired. Please log in again.');
+            }
+            const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+            if (!contentType.includes('application/json')) {
+                throw new Error(`Server returned a non-JSON response (HTTP ${res.status}).`);
+            }
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data?.message || `Request failed (HTTP ${res.status}).`);
+            }
+
+            if (data.status === 'success') {
+                const rawItems = Array.isArray(data.results || data.data) ? (data.results || data.data) : [];
+                let items = rawItems;
+                if (typeof currentConfig.itemFilter === 'function') {
+                    items = rawItems.filter((item, index) => {
+                        try {
+                            return currentConfig.itemFilter(item, {
+                                term: queryTerm,
+                                forceShowAll,
+                                page: requestedPage,
+                                append,
+                                index
+                            }) !== false;
+                        } catch (_) {
+                            return true;
+                        }
+                    });
+                }
+                const prevIds = new Set(Array.from(pickerState.loadedItemsMap.keys()));
+                const uniqueNewItemsCount = items.reduce((count, item) => {
+                  const id = String(item?.id || '');
+                  if (!id) return count + 1;
+                  return prevIds.has(id) ? count : count + 1;
+                }, 0);
+                renderList(items, { append });
+                updatePickerMeta(items.length, data.pagination || null, append, requestedPage, uniqueNewItemsCount);
+            } else {
+                throw new Error(data.message || 'API Error');
+            }
+        } catch (err) {
+            console.error(err);
+            const message = String(err?.message || 'Error fetching data.');
+            const safeMessage = message
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
+            if (!append) {
+                listEl.innerHTML = `<div class="text-center text-danger py-5"><i class="bi bi-exclamation-circle fs-1 opacity-25 mb-2 d-block"></i><div class="fw-bold mb-1">Error fetching data.</div><div class="small text-muted">${safeMessage}</div></div>`;
+            }
+            setFooterSummary('Error fetching data', 'bi-exclamation-triangle');
+            if (loadMoreBtn) loadMoreBtn.classList.add('d-none');
+        } finally {
+            if (append) setLoadMoreBusy(false);
+        }
+    }
+
+    function updateAddSelectedUI() {
+        if (!addSelectedBtn || !selectedCountEl) return;
+        const isMulti = currentConfig.multiselect === true;
+        addSelectedBtn.classList.toggle('d-none', !isMulti);
+        if (!isMulti) return;
+        const n = pickerState.selectedItemsMap.size;
+        selectedCountEl.textContent = `(${n})`;
+        addSelectedBtn.disabled = n === 0;
+    }
+
+    function createItemRow(item, isMulti, options = {}) {
+        const isPinnedSelection = options?.isPinnedSelection === true;
+        const id = String(item?.id || '');
+        const btn = document.createElement(isMulti ? 'div' : 'button');
+        if (!isMulti) btn.type = 'button';
+        btn.className = 'list-group-item list-group-item-action px-3 py-3 border-bottom-0 border-top bg-white mb-1 rounded shadow-sm mx-2 my-1 d-flex align-items-center gap-3';
+        btn.style.border = '1px solid #eef2f6';
+        btn.dataset.itemId = id;
+        btn.dataset.gpRow = '1';
+
+        const renderFn = currentConfig.renderer || defaultRenderer;
+        const content = document.createElement('div');
+        content.className = 'flex-grow-1';
+        content.innerHTML = renderFn(item);
+
+        if (isMulti) {
+            const check = document.createElement('input');
+            check.type = 'checkbox';
+            check.className = 'form-check-input gp-item-checkbox flex-shrink-0';
+            check.dataset.itemId = id;
+            check.checked = isSelectedItem(item);
+            check.addEventListener('change', () => {
+                if (check.checked) upsertSelectedItem(item);
+                else {
+                    removeSelectedItemById(id);
+                    if (isPinnedSelection) {
+                        pickerState.renderedItemIds.delete(String(id || '').trim());
+                        btn.remove();
+                    }
+                }
+                updateAddSelectedUI();
+            });
+            btn.insertBefore(check, btn.firstChild);
+
+            if (isPinnedSelection) {
+              const pinnedTag = document.createElement('span');
+              pinnedTag.className = 'badge bg-primary-subtle text-primary border border-primary-subtle ms-2';
+              pinnedTag.textContent = 'Selected';
+              content.appendChild(pinnedTag);
+            }
+
+            btn.appendChild(content);
+            btn.addEventListener('click', (e) => {
+                if (e.target === check) return;
+                check.checked = !check.checked;
+                if (check.checked) upsertSelectedItem(item);
+                else {
+                    removeSelectedItemById(id);
+                    if (isPinnedSelection) {
+                        pickerState.renderedItemIds.delete(String(id || '').trim());
+                        btn.remove();
+                    }
+                }
+                updateAddSelectedUI();
+            });
+        } else {
+            btn.appendChild(content);
+            btn.addEventListener('click', () => {
+                if (typeof currentConfig.onSelect === 'function') {
+                    currentConfig.onSelect(item);
+                }
+                if (bsModal) bsModal.hide();
+            });
+        }
+
+        return btn;
+    }
+
+    function renderList(items, options = {}) {
+        const append = options?.append === true;
+        const isMulti = currentConfig.multiselect === true;
+        if (!append) {
+            listEl.innerHTML = '';
+            pickerState.loadedItemsMap.clear();
+            pickerState.renderedItemIds.clear();
+        }
+
+        if (!append && isMulti && pickerState.selectedItemsMap.size > 0) {
+            Array.from(pickerState.selectedItemsMap.values()).forEach((selectedItem) => {
+                const sid = String(selectedItem?.id || '').trim();
+                if (sid && pickerState.renderedItemIds.has(sid)) return;
+                const selectedRow = createItemRow(selectedItem, true, { isPinnedSelection: true });
+                listEl.appendChild(selectedRow);
+                if (sid) pickerState.renderedItemIds.add(sid);
+            });
+        }
+
+        const incomingItems = Array.isArray(items) ? items : [];
+        if (!incomingItems.length) {
+            if (!append && (!isMulti || pickerState.selectedItemsMap.size === 0)) {
+                listEl.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-box2 fs-1 opacity-25 mb-2 d-block"></i>No matches found.</div>`;
+            }
+            if (isMulti) updateAddSelectedUI();
+            return;
+        }
+
+        incomingItems.forEach((item) => {
+            const id = String(item.id || '');
+            if (id) pickerState.loadedItemsMap.set(id, item);
+            if (id && pickerState.selectedItemsMap.has(id)) {
+                pickerState.selectedItemsMap.set(id, item);
+            }
+            if (id && pickerState.renderedItemIds.has(id)) return;
+
+            const btn = createItemRow(item, isMulti);
+            listEl.appendChild(btn);
+            if (id) pickerState.renderedItemIds.add(id);
+        });
+        if (isMulti) updateAddSelectedUI();
+    }
+
+    init();
+
+    return {
+        open: function(config) {
+            currentConfig = window.GenericPickerPresets?.normalizeConfig
+              ? window.GenericPickerPresets.normalizeConfig(config || {})
+              : (config || {});
+            resetPickerState();
+            
+            if (!bsModal) {
+                bsModal = new bootstrap.Modal(modalEl);
+            }
+            
+            titleEl.innerHTML = `<i class="bi ${currentConfig.icon || 'bi-search'} me-2 text-primary"></i>${currentConfig.title || 'Select Item'}`;
+            inputEl.value = '';
+            inputEl.placeholder = currentConfig.placeholder || 'Type to search...';
+            listEl.innerHTML = `
+                <div class="text-center text-muted py-5 mt-4">
+                    <div class="mb-3">
+                        <div class="rounded-circle bg-white border d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 64px; height: 64px;">
+                            <i class="bi bi-search fs-3 opacity-25"></i>
+                        </div>
+                    </div>
+                    <h6 class="fw-bold text-dark">Find what you need</h6>
+                    <p class="small opacity-75 mb-0">Type in the search box above to start filtering.</p>
+                </div>`;
+            setFooterSummary('Type to search');
+            if (loadMoreBtn) loadMoreBtn.classList.add('d-none');
+            if (addSelectedBtn) {
+                addSelectedBtn.classList.toggle('d-none', currentConfig.multiselect !== true);
+                if (selectedCountEl) selectedCountEl.textContent = '(0)';
+                addSelectedBtn.disabled = true;
+            }
+
+            // Context Setup
+            if (currentConfig.context) {
+              contextSection.style.display = 'flex';
+              contextLabel.textContent = currentConfig.context.label || 'Context';
+              contextValue.textContent = pickerCore?.formatContextValue
+                ? pickerCore.formatContextValue(currentConfig.context, null)
+                : (currentConfig.context.value || 'Global');
+              
+              if(currentConfig.context.icon) {
+                  contextIcon.className = `bi ${currentConfig.context.icon}`;
+              }
+              
+              try {
+                const userDataInfoFromBE = JSON.parse(`<%- JSON.stringify(user || {}) %>`);
+                if (pickerCore?.formatContextValue) {
+                  contextValue.textContent = pickerCore.formatContextValue(currentConfig.context, userDataInfoFromBE);
+                } else if (!currentConfig.context.value || currentConfig.context.value === '') {
+                  let activeOrgName1 = 'System / Global';
+                  if (userDataInfoFromBE && userDataInfoFromBE.activeOrgId && userDataInfoFromBE.allowedOrgs) {
+                    const orgObj = userDataInfoFromBE.allowedOrgs.find(o => String(o.orgId) === String(userDataInfoFromBE.activeOrgId));
+                    if (orgObj) {
+                      activeOrgName1 = orgObj.name || ('Org #' + orgObj.orgId);
+                    }
+                  }
+                  contextValue.textContent = activeOrgName1;
+                }
+              } catch(e) { /* ignore parse error if user undefined */ }
+            } else {
+              contextSection.style.display = 'none';
+            }
+
+            bsModal.show();
+        }
+    };
+})();
+</script>

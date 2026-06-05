@@ -1,0 +1,183 @@
+<div class="modal fade" id="audioPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header border-bottom bg-white py-3 px-4" style="cursor: move;" title="Drag to move">
+        <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2 text-truncate">
+          <span class="rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+            <i class="bi bi-file-earmark-music"></i>
+          </span>
+          <span id="audioPreviewTitle" class="fs-6 text-truncate">Audio Preview</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light p-4">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <div class="small text-muted mb-2">Now Playing</div>
+            <div id="audioPreviewName" class="fw-bold text-dark text-truncate mb-3">Audio</div>
+            <audio id="audioPreviewPlayer" controls preload="metadata" class="w-100">
+              <source id="audioPreviewSource" src="" type="audio/mpeg">
+              Your browser does not support audio playback.
+            </audio>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-white border-top py-2 px-4 d-flex justify-content-between align-items-center">
+        <small class="text-muted" id="audioPreviewMeta">Audio file preview</small>
+        <div class="d-flex align-items-center gap-2">
+          <a href="#" id="audioPreviewOpenNew" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+            <i class="bi bi-box-arrow-up-right me-1"></i>Open
+          </a>
+          <a href="#" id="audioPreviewDownload" download class="btn btn-primary btn-sm">
+            <i class="bi bi-download me-1"></i>Download
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.AudioPreviewModal = (() => {
+  const modalEl = document.getElementById('audioPreviewModal');
+  if (!modalEl) return { open: () => false };
+
+  let bsModal = null;
+  const dialogEl = modalEl.querySelector('.modal-dialog');
+  const headerEl = modalEl.querySelector('.modal-header');
+  const titleEl = document.getElementById('audioPreviewTitle');
+  const nameEl = document.getElementById('audioPreviewName');
+  const playerEl = document.getElementById('audioPreviewPlayer');
+  const sourceEl = document.getElementById('audioPreviewSource');
+  const openNewEl = document.getElementById('audioPreviewOpenNew');
+  const downloadEl = document.getElementById('audioPreviewDownload');
+  const metaEl = document.getElementById('audioPreviewMeta');
+  const INTERACTIVE_DRAG_BLOCK_SELECTOR = 'button, a, input, select, textarea, label, .btn, [data-bs-dismiss]';
+
+  let dragActive = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  function clamp(value, min, max) {
+    if (!Number.isFinite(value)) return min;
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  }
+
+  function resetDialogPosition() {
+    if (!dialogEl) return;
+    dialogEl.style.position = '';
+    dialogEl.style.left = '';
+    dialogEl.style.top = '';
+    dialogEl.style.margin = '';
+    dialogEl.style.transform = '';
+    dialogEl.style.width = '';
+    dialogEl.style.maxWidth = '';
+    dialogEl.style.willChange = '';
+  }
+
+  function applyDialogFixedPosition(left, top) {
+    if (!dialogEl) return;
+    const rect = dialogEl.getBoundingClientRect();
+    if (!dialogEl.style.width) {
+      dialogEl.style.width = `${Math.round(rect.width)}px`;
+    }
+    dialogEl.style.position = 'fixed';
+    dialogEl.style.margin = '0';
+    dialogEl.style.transform = 'none';
+    dialogEl.style.maxWidth = '95vw';
+    dialogEl.style.willChange = 'left, top';
+    const maxLeft = Math.max(12, window.innerWidth - rect.width - 12);
+    const maxTop = Math.max(12, window.innerHeight - Math.max(80, rect.height * 0.35));
+    const clampedLeft = clamp(left, 12, maxLeft);
+    const clampedTop = clamp(top, 12, maxTop);
+    dialogEl.style.left = `${Math.round(clampedLeft)}px`;
+    dialogEl.style.top = `${Math.round(clampedTop)}px`;
+  }
+
+  function stopDrag() {
+    if (!dragActive) return;
+    dragActive = false;
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', stopDrag);
+  }
+
+  function onDragMove(event) {
+    if (!dragActive || !dialogEl) return;
+    const nextLeft = event.clientX - dragOffsetX;
+    const nextTop = event.clientY - dragOffsetY;
+    applyDialogFixedPosition(nextLeft, nextTop);
+  }
+
+  function onDragStart(event) {
+    if (!dialogEl || !headerEl) return;
+    if (event.button !== 0) return;
+    if (event.target && event.target.closest(INTERACTIVE_DRAG_BLOCK_SELECTOR)) return;
+
+    const rect = dialogEl.getBoundingClientRect();
+    dragOffsetX = event.clientX - rect.left;
+    dragOffsetY = event.clientY - rect.top;
+    applyDialogFixedPosition(rect.left, rect.top);
+    dragActive = true;
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', stopDrag);
+    event.preventDefault();
+  }
+
+  if (headerEl && dialogEl) {
+    headerEl.addEventListener('mousedown', onDragStart);
+  }
+
+  modalEl.addEventListener('hidden.bs.modal', () => {
+    stopDrag();
+    resetDialogPosition();
+    try {
+      if (playerEl) {
+        playerEl.pause();
+        playerEl.currentTime = 0;
+      }
+    } catch (_) {}
+  });
+
+  function open(url, filename = 'Audio', mimeType = '') {
+    const token = String(url || '').trim();
+    if (!token) return false;
+    if (!bsModal && window.bootstrap && window.bootstrap.Modal) {
+      bsModal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+    }
+    if (!bsModal) return false;
+
+    const safeName = String(filename || 'Audio').trim() || 'Audio';
+    const safeMime = String(mimeType || '').trim();
+    if (titleEl) titleEl.textContent = safeName;
+    if (nameEl) nameEl.textContent = safeName;
+    if (metaEl) {
+      metaEl.textContent = safeMime
+        ? `MIME: ${safeMime}`
+        : 'Audio file preview';
+    }
+    if (sourceEl) {
+      sourceEl.src = token;
+      if (safeMime) sourceEl.type = safeMime;
+    }
+    if (playerEl) {
+      playerEl.src = token;
+      try {
+        playerEl.load();
+      } catch (_) {}
+    }
+    if (openNewEl) openNewEl.href = token;
+    if (downloadEl) {
+      downloadEl.href = token;
+      downloadEl.download = safeName;
+    }
+
+    resetDialogPosition();
+    bsModal.show();
+    return true;
+  }
+
+  return { open };
+})();
+</script>

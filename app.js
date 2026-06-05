@@ -329,7 +329,6 @@ app.use('/docs', docsRoutes);
 app.use('/email-management', emailManagementRoutes);
 app.use('/activity-quota', activityQuotaRoutes);
 
-app.use('/credit', require('./MVC/routes/credit/creditRoutes'));
 
 app.use('/internal/file-gateway', fileGatewayRoutes);
 

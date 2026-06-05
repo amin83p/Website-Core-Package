@@ -76,6 +76,45 @@
     }
   },
   {
+    "packageId": "credit",
+    "version": "0.1.0",
+    "enabled": true,
+    "installStatus": "enabled",
+    "metadata": {
+      "packageName": "Credit",
+      "mountPath": "/credit",
+      "manifestPath": "packages/credit/package.manifest.json",
+      "activatedBy": "manual-local-fix",
+      "activationMode": "manual",
+      "declarationCounts": {
+        "routes": 1,
+        "views": 1,
+        "assets": 1,
+        "operations": 0,
+        "roles": 0,
+        "sections": 0,
+        "symbols": 0,
+        "accesses": 0,
+        "uploadFolders": 0,
+        "menuEntries": 2,
+        "dashboardEntries": 1,
+        "queryExecutors": 0,
+        "dataEntities": 1
+      }
+    },
+    "id": "credit",
+    "installedAt": "2026-06-04T00:00:00.000Z",
+    "updatedAt": "2026-06-04T00:00:00.000Z",
+    "lastError": "",
+    "lastWarning": "",
+    "audit": {
+      "createUser": "SYSTEM",
+      "createDateTime": "2026-06-04T00:00:00.000Z",
+      "lastUpdateUser": "SYSTEM",
+      "lastUpdateDateTime": "2026-06-04T00:00:00.000Z"
+    }
+  },
+  {
     "packageId": "ielts",
     "version": "0.1.0",
     "enabled": true,

@@ -1,0 +1,85 @@
+{
+  "id": "credit",
+  "name": "Credit",
+  "version": "0.1.0",
+  "mountPath": "/credit",
+  "enabledByDefault": false,
+  "routes": [
+    {
+      "method": "USE",
+      "path": "/credit",
+      "router": "MVC/routes/creditMainRoute.js",
+      "metadataOnly": false,
+      "active": true
+    }
+  ],
+  "queryExecutors": [],
+  "views": {
+    "id": "credit-package-views",
+    "path": "packages/credit/MVC/views",
+    "namespace": "credit",
+    "active": true
+  },
+  "assets": {
+    "id": "credit-package-public-scripts",
+    "path": "packages/credit/public/scripts",
+    "publicPath": "/scripts",
+    "metadataOnly": true,
+    "active": true
+  },
+  "operations": [],
+  "roles": [],
+  "sections": [],
+  "symbols": [],
+  "accesses": [],
+  "dataEntities": [
+    {
+      "entityType": "customers",
+      "label": "Credit Customers"
+    }
+  ],
+  "dataSchemas": [],
+  "upgradeGuards": [],
+  "quotaDefinitions": [],
+  "settings": [],
+  "menuEntries": [
+    {
+      "id": "credit-menu-root",
+      "label": "Credit",
+      "href": "/credit",
+      "icon": "bi bi-cash-coin",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "Credit",
+      "active": true
+    },
+    {
+      "id": "credit-menu-customers",
+      "label": "Credit Customers",
+      "href": "/credit/customers",
+      "icon": "bi bi-person-vcard",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "Credit",
+      "active": true
+    }
+  ],
+  "dashboardEntries": [
+    {
+      "id": "credit-dashboard-home",
+      "label": "Credit",
+      "href": "/credit",
+      "icon": "bi bi-cash-coin",
+      "description": "Open Credit package dashboard",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "Credit",
+      "active": true
+    }
+  ],
+  "uploadFolders": [],
+  "seeders": [],
+  "migrations": [],
+  "dependencies": []
+}
+

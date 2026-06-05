@@ -1,0 +1,212 @@
+<div class="modal fade" id="mediaManagerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden; height: 90vh;">
+      <div class="modal-header border-bottom-0 pb-2 bg-white">
+        <div class="d-flex flex-column flex-md-row align-items-md-center gap-2 w-100 me-2">
+          <h5 class="modal-title fw-bold mb-0 text-dark d-flex align-items-center">
+            <i class="bi bi-images me-2 text-primary"></i>
+            <span id="mediaManagerTitle">Media Manager</span>
+          </h5>
+          <span id="mediaManagerContextBadge" class="badge bg-light text-dark border text-uppercase">Attach</span>
+          <span id="mediaManagerMediaKindBadge" class="badge bg-info-subtle text-info border text-uppercase">Any</span>
+        </div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body bg-light pt-0">
+        <div id="mediaManagerAlert" class="alert alert-light border py-2 small d-none mt-2 mb-2"></div>
+
+        <ul class="nav nav-tabs mt-2 border-0" id="mediaManagerTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-bold" id="mediaManagerLibraryTabBtn" data-bs-toggle="tab" data-bs-target="#mediaManagerLibraryTab" type="button" role="tab">
+              <i class="bi bi-collection me-1"></i>Library
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold" id="mediaManagerUploadTabBtn" data-bs-toggle="tab" data-bs-target="#mediaManagerUploadTab" type="button" role="tab">
+              <i class="bi bi-cloud-upload me-1"></i>Upload
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content h-100">
+          <div class="tab-pane fade show active h-100 pt-3" id="mediaManagerLibraryTab" role="tabpanel" aria-labelledby="mediaManagerLibraryTabBtn">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <div class="btn-group btn-group-sm shadow-sm" role="group" aria-label="View Mode">
+                <button type="button" class="btn btn-outline-secondary active" data-media-view="tile" title="Tile View">
+                  <i class="bi bi-grid-3x3-gap"></i> Tile
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-media-view="thumbs" title="Thumbnails View">
+                  <i class="bi bi-card-image"></i> Thumbs
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-media-view="list" title="List View">
+                  <i class="bi bi-list-ul"></i> List
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-media-view="detail" title="Detail View">
+                  <i class="bi bi-layout-text-window-reverse"></i> Detail
+                </button>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" id="mediaManagerRefreshBtn">
+                <i class="bi bi-arrow-repeat me-1"></i>Refresh
+              </button>
+            </div>
+            <div class="row g-2 align-items-center mb-2">
+              <div class="col-12 col-lg-8">
+                <div class="input-group input-group-sm shadow-sm">
+                  <span class="input-group-text bg-white border-end-0 text-muted">
+                    <i class="bi bi-search"></i>
+                  </span>
+                  <input type="search" class="form-control border-start-0" id="mediaManagerSearchInput" placeholder="Search files in this folder...">
+                  <button type="button" class="btn btn-outline-secondary" id="mediaManagerSearchClearBtn" title="Clear Search">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="col-12 col-lg-4 text-lg-end">
+                <span class="small text-muted" id="mediaManagerPaginationSummary">Showing 0 of 0</span>
+              </div>
+            </div>
+            <div class="row g-2 align-items-center mb-2">
+              <div class="col-12">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="mediaManagerFolderUpBtn" title="Go to parent folder">
+                    <i class="bi bi-arrow-up-left me-1"></i>Up
+                  </button>
+                  <span id="mediaManagerBaseFolderBadge" class="badge bg-primary text-white fw-bold d-none"></span>
+                  <label for="mediaManagerFolderSelect" class="small text-muted fw-semibold mb-0">Folder</label>
+                  <select class="form-select form-select-sm" id="mediaManagerFolderSelect" style="min-width: 260px; max-width: 460px;">
+                    <option value="">/</option>
+                  </select>
+                  <span class="small text-muted text-break" id="mediaManagerCurrentFolderLabel">/</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="small text-muted mb-2" id="mediaManagerScopeHint">Double-click an item to preview.</div>
+            <div id="mediaManagerLibraryContent" class="media-manager-library-wrap rounded border bg-white p-2"></div>
+            <div id="mediaManagerLibraryEmpty" class="d-none flex-column align-items-center justify-content-center text-muted rounded border bg-white p-5 mt-2">
+              <i class="bi bi-images fs-1 opacity-25 mb-2"></i>
+              <div class="fw-semibold">No media found.</div>
+              <div class="small">Upload files or refresh library.</div>
+            </div>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 p-2 border rounded bg-white">
+              <div class="d-flex align-items-center gap-2">
+                <label for="mediaManagerPageSizeSelect" class="small text-muted fw-semibold mb-0">Per page</label>
+                <select class="form-select form-select-sm" id="mediaManagerPageSizeSelect" style="width: auto;">
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="30">30</option>
+                  <option value="50">50</option>
+                  <option value="80">80</option>
+                  <option value="100">100</option>
+                </select>
+                <div class="form-check form-switch ms-1 mb-0">
+                  <input class="form-check-input" type="checkbox" id="mediaManagerViewAllToggle">
+                  <label class="form-check-label small" for="mediaManagerViewAllToggle">View all</label>
+                </div>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="mediaManagerPrevPageBtn">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+                <span class="small text-muted" id="mediaManagerPageIndicator">Page 1 of 1</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="mediaManagerNextPageBtn">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade h-100 pt-3" id="mediaManagerUploadTab" role="tabpanel" aria-labelledby="mediaManagerUploadTabBtn">
+            <div class="d-flex flex-column align-items-center justify-content-center h-100 border rounded-3 bg-white p-5">
+              <div id="mediaManagerUploadSpinner" class="d-none text-center">
+                <div class="spinner-border text-primary" role="status" style="width: 2.8rem; height: 2.8rem;"></div>
+                <h5 class="mt-3 mb-0">Uploading...</h5>
+              </div>
+
+              <div id="mediaManagerUploadZone" class="text-center">
+                <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 4rem;"></i>
+                <h4 class="fw-bold mt-3">Upload Files</h4>
+                <p class="text-muted mb-4">Upload and reuse media without leaving this form.</p>
+                <input type="file" id="mediaManagerUploadInput" class="d-none" multiple accept="image/*,video/*,audio/*,application/pdf">
+                <button type="button" class="btn btn-primary btn-filled btn-lg px-5" id="mediaManagerUploadSelectBtn">
+                  Select Files
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer bg-white d-flex justify-content-between align-items-center">
+        <div class="small text-muted" id="mediaManagerSelectionStatus">Select file(s) to continue.</div>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-secondary btn-filled btn-sm px-4" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary btn-filled btn-sm px-4" id="mediaManagerApplyBtn" disabled>
+            <i class="bi bi-check2-square me-1"></i>Use Selected
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .media-manager-library-wrap {
+    min-height: 420px;
+    max-height: 60vh;
+    overflow: auto;
+  }
+  .media-manager-card {
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+  }
+  .media-manager-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.3rem 0.9rem rgba(17, 24, 39, 0.15);
+  }
+  .media-manager-card.selected {
+    border-color: #0d6efd !important;
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.2);
+  }
+  .media-manager-folder-card {
+    background: #fffdf7;
+  }
+  .media-manager-folder-row {
+    cursor: pointer;
+  }
+  .media-manager-folder-row:hover {
+    background: rgba(255, 193, 7, 0.08);
+  }
+  #mediaManagerBaseFolderBadge {
+    letter-spacing: 0;
+  }
+  .media-manager-thumb-box {
+    width: 100%;
+    background: #f8fafc;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .media-manager-thumb-box.tile {
+    aspect-ratio: 1 / 1;
+  }
+  .media-manager-thumb-box.thumbs {
+    height: 96px;
+  }
+  .media-manager-thumb-box.detail {
+    width: 160px;
+    min-width: 160px;
+    height: 100px;
+  }
+  .media-manager-thumb-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+</style>
+
+<script src="/scripts/mediaManagerModal.js?v=20260520b"></script>

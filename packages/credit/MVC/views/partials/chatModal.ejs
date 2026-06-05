@@ -1,0 +1,956 @@
+<%
+  const modalChatAccess = (typeof chatAccess !== 'undefined' && chatAccess && typeof chatAccess === 'object') ? chatAccess : {};
+  const canChatCreate = !!modalChatAccess.canCreate;
+  const canChatUpdate = !!modalChatAccess.canUpdate;
+  const canChatDelete = !!(modalChatAccess.canDelete || modalChatAccess.canDeleteAll);
+%>
+<div class="modal fade" id="chatInterfaceModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 90vw; width: 900px;"> 
+    <div class="modal-content overflow-hidden shadow-lg" id="chatModalContent" style="height: 600px; min-height: 400px; min-width: 350px; position: relative; resize: both; overflow: hidden;">
+      
+      <div class="modal-body p-0 d-flex h-100 position-relative">
+          
+          <div class="chat-sidebar bg-light border-end d-flex flex-column" id="chatSidebar" style="width: 280px; min-width: 0px; max-width: 65%;">
+              
+              <div class="p-2 bg-white border-bottom d-flex justify-content-between align-items-center">
+                  <div class="d-flex align-items-center gap-2">
+                      <h6 class="fw-bold m-0 text-secondary ps-2" id="sidebarTitle">Messages</h6>
+                  </div>
+                  <div class="d-flex align-items-center gap-1">
+                      <% if (canChatCreate) { %>
+                          <button class="btn btn-sm btn-light text-primary rounded-circle" title="New Chat" onclick="startNewChatWizard()">
+                              <i class="bi bi-pencil-square"></i>
+                          </button>
+                      <% } %>
+                      <button type="button" class="btn-close small ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+              </div>
+
+              <div class="p-2 border-bottom">
+                  <input type="text" class="form-control form-control-sm bg-white" placeholder="Search..." id="chatSearchInput" onkeyup="handleSearch(this.value)">
+              </div>
+
+              <div class="flex-grow-1 overflow-auto custom-scrollbar" id="conversationList">
+                   <div class="text-center text-muted mt-5 small">Loading...</div>
+              </div>
+          </div>
+
+          <div id="sidebarResizer" class="bg-light border-end border-start d-flex align-items-center justify-content-center" 
+               style="width: 8px; cursor: col-resize; flex-shrink: 0; user-select: none;">
+               <i class="bi bi-three-dots-vertical text-muted opacity-25" style="font-size: 0.7rem;"></i>
+          </div>
+
+          <div class="chat-main d-flex flex-column flex-grow-1 bg-white position-relative" id="chatMainArea" style="min-width: 200px;">
+              
+              <div id="chatEmptyState" class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+                  <div class="bg-light p-3 rounded-circle mb-3">
+                      <i class="bi bi-chat-dots fs-1 opacity-50"></i>
+                  </div>
+                  <h5>Select a chat</h5>
+              </div>
+
+              <div id="chatActiveView" class="d-flex flex-column h-100 d-none">
+                  
+                  <div class="p-2 px-3 border-bottom d-flex justify-content-between align-items-center bg-white shadow-sm" style="z-index: 10;">
+                      <div class="d-flex align-items-center overflow-hidden">
+                           <button id="toggleSidebarBtn" class="btn btn-sm btn-light border me-2 text-secondary" onclick="toggleSidebar()" title="Toggle Sidebar">
+                                <i class="bi bi-layout-sidebar"></i>
+                           </button>
+
+                           <% if (canChatDelete) { %>
+                               <button class="btn btn-sm btn-light border me-3 text-danger" onclick="deleteCurrentChat()" title="Delete Conversation">
+                                    <i class="bi bi-trash"></i>
+                               </button>
+                           <% } %>
+
+                           <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2 fw-bold flex-shrink-0" 
+                               style="width: 32px; height: 32px; font-size: 0.85rem;" id="chatHeaderAvatar">U</div>
+                           <div class="overflow-hidden">
+                               <div class="fw-bold text-dark small text-truncate" id="chatHeaderName">User</div>
+                           </div>
+                      </div>
+                      <button type="button" class="btn-close small ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+
+                  <div class="flex-grow-1 overflow-auto p-3 bg-light custom-scrollbar" id="chatMessageContainer" 
+                       style="background-image: radial-gradient(#e9ecef 1px, transparent 1px); background-size: 15px 15px;">
+                  </div>
+
+                  <div id="attachmentPreviewArea" class="d-none"></div>
+
+                  <div class="p-2 border-top bg-white">
+                      <% if (!canChatUpdate) { %>
+                          <div class="small text-muted px-2 py-1">
+                              You can read this conversation, but your access profile does not allow sending messages.
+                          </div>
+                      <% } %>
+                      <form id="chatForm" class="d-flex align-items-end gap-2 <%= canChatUpdate ? '' : 'd-none' %>">
+                           <button type="button" class="btn btn-light text-secondary rounded-circle" onclick="document.getElementById('chatFileInput').click()">
+                              <i class="bi bi-paperclip"></i>
+                          </button>
+              
+                          <input type="file" id="chatFileInput" class="d-none" multiple onchange="handleFileSelection(this)">
+                          
+                          <textarea class="form-control bg-light border-0" id="chatInput" rows="1" 
+                                    placeholder="Message..." 
+                                    style="resize:none; min-height: 38px; max-height: 160px; overflow-y: auto; line-height: 1.5;"></textarea>
+                          
+                          <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                              <i class="bi bi-send-fill" style="font-size: 0.9rem; margin-left: 2px;"></i>
+                          </button>
+                      </form>
+                  </div>
+              </div>
+          </div>
+      </div>
+       
+      <div id="modalResizer" style="position: absolute; bottom: 0; right: 0; width: 15px; height: 15px; cursor: nwse-resize; z-index: 20;">
+          <svg viewBox="0 0 10 10" width="100%" height="100%" fill="#adb5bd">
+            <path d="M10 10 L10 2 L2 10 Z" />
+          </svg>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<style>
+    /* Compact Styling */
+    .chat-item { cursor: pointer; border-bottom: 1px solid #f8f9fa; padding: 10px; }
+    .chat-item:hover, .chat-item.active { background-color: #f1f5f9; }
+    .msg-bubble { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9rem; margin-bottom: 2px; }
+    .msg-sent { background-color: #d1e7dd; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .msg-received { background-color: #fff; border: 1px solid #eee; align-self: flex-start; border-bottom-left-radius: 2px; }
+    .msg-time { font-size: 0.65rem; color: #adb5bd; margin-bottom: 8px; text-align: right; margin-right: 4px; }
+    
+    /* Scrollbar */
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Status Icons */
+    .msg-status { font-size: 0.75rem; margin-left: 4px; vertical-align: middle; }
+    .status-sending { color: #adb5bd; }
+    .status-sent { color: #adb5bd; }
+    .status-delivered { color: #adb5bd; }
+    .status-read { color: #0d6efd; }
+
+    /* Images */
+    .msg-bubble img { max-width: 200px; height: auto; border-radius: 8px; display: block; object-fit: cover; }
+    .msg-bubble img:after { content: "⚠️ Image Error"; display: block; font-size: 12px; color: #dc3545; } 
+
+    /* Attachment Preview */
+    #attachmentPreviewArea { display: flex; gap: 10px; padding: 10px; background: #f8f9fa; border-top: 1px solid #dee2e6; overflow-x: auto; }
+    .att-preview-card { position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6; flex-shrink: 0; background: #fff; display: flex; align-items: center; justify-content: center; }
+    .att-preview-card img { width: 100%; height: 100%; object-fit: cover; }
+    .att-preview-remove { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .att-preview-file { font-size: 2rem; color: #6c757d; }   
+
+    /* Sidebar Item Styling */
+    .chat-item {
+        cursor: pointer;
+        padding: 12px 15px;
+        border-bottom: 1px solid #f1f1f1;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+    .chat-item:hover {
+        background-color: #f8f9fa;
+    }
+    .chat-item.active {
+        background-color: #e7f1ff; /* Light blue active state */
+        border-left: 4px solid #0d6efd;
+    }
+    
+    /* Unread Styling */
+    .chat-item.unread {
+        background-color: #fff; /* Differentiate unread background? */
+    }
+    .chat-item.unread .chat-name {
+        font-weight: 700 !important;
+        color: #000;
+    }
+    .chat-item.unread .chat-msg {
+        font-weight: 600 !important;
+        color: #333;
+    }
+
+    /* Avatar Badge */
+    .avatar-wrapper { position: relative; }
+    .status-dot {
+        position: absolute; bottom: 0; right: 0;
+        width: 10px; height: 10px;
+        border-radius: 50%; border: 2px solid #fff;
+        background-color: #ccc; /* Offline/Default */
+    }
+    .status-dot.online { background-color: #28a745; }
+
+    /* Unread Counter Badge */
+    .unread-badge {
+        background-color: #dc3545;
+        color: white;
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-weight: bold;
+        min-width: 18px;
+        text-align: center;
+    }
+
+    #sidebarResizer,
+    #modalResizer {
+        touch-action: none;
+    }
+</style>
+
+<script>
+// --- GLOBAL VARIABLES ---
+let socket;
+let currentConvId = null;
+let currentUser = { id: '<%= user.id %>' };
+const chatAccess = <%- JSON.stringify({
+    canRead: !!(modalChatAccess.canRead || modalChatAccess.canReadAll),
+    canCreate: canChatCreate,
+    canUpdate: canChatUpdate,
+    canDelete: canChatDelete
+}) %>;
+let isSidebarVisible = true;
+let previousSidebarWidth = 280;
+let pendingAttachments = [];
+
+function safeText(value) {
+    return String(value || '').replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
+}
+
+function safeAttr(value) {
+    return safeText(value);
+}
+
+function buildAvatarHtml(name, avatarUrl, size = 40, bgClass = 'bg-secondary', textClass = 'text-white') {
+    const displayName = String(name || 'U');
+    const initial = displayName.charAt(0).toUpperCase() || 'U';
+    const safeName = safeText(displayName);
+    const safeAvatarUrl = String(avatarUrl || '').trim();
+    if (safeAvatarUrl) {
+        return `<img src="${safeAttr(safeAvatarUrl)}" alt="${safeName}" class="rounded-circle" style="width: ${size}px; height: ${size}px; object-fit: cover;" onerror="this.remove();">`;
+    }
+    return `<div class="rounded-circle ${bgClass} ${textClass} d-flex align-items-center justify-content-center fw-bold" style="width: ${size}px; height: ${size}px; font-size: 1rem;">${safeText(initial)}</div>`;
+}
+
+// --- CUSTOM MODAL HELPER ---
+async function safeShowAlert(msg, type = 'info') {
+    if (typeof window.showMessageModal === 'function') {
+        const btn_class = (type === 'info' ? 'btn-primary' : type === 'error' ? 'btn-danger' : type === 'success' ? 'btn-success' : 'btn-warning');
+        await window.showMessageModal({
+            title: type.charAt(0).toUpperCase() + type.slice(1),
+            icon: type, 
+            message: msg,
+            size: 'sm',
+            buttons: [{ text: 'OK', class: btn_class }]
+        });
+    } else {
+        alert(msg);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Move Modal to Body
+    const modalEl = document.getElementById('chatInterfaceModal');
+    if(modalEl) document.body.appendChild(modalEl);
+    if(!modalEl) return;
+    
+    // 2. Init Logic
+    initChatSystem();
+    initResizers();
+
+    // 3. Reset UI on Open
+    modalEl.addEventListener('show.bs.modal', () => {
+        showInbox(); 
+        updateUnreadCount(0, true); 
+
+        // ✅ FIX #2: Refresh active chat if it exists
+        const sidebar = document.getElementById('chatSidebar');
+        if (sidebar && sidebar.classList.contains('d-none')) {
+            toggleSidebar(); // Ensure sidebar is visible initially if needed
+        }
+
+        // If we were in a chat, reload it silently to get new messages
+        if (currentConvId) {
+             // We use a small timeout to let the socket reconnect first
+             setTimeout(() => {
+                 // We re-use openChat but passing existing Name/Target stored in global vars
+                 // Note: You need to store Name/Target when opening a chat to use them here.
+                 // See updated openChat function below.
+                 if(typeof currentChatName !== 'undefined') {
+                     openChat(currentConvId, currentChatName, currentChatTarget, currentChatAvatar);
+                 }
+             }, 100);
+        }
+    });
+});
+
+function initChatSystem() {
+    if (!chatAccess.canRead) return;
+    if(typeof io === 'undefined') return;
+    socket = io();
+
+    socket.on('connect_error', (error) => {
+        console.warn('Chat connection rejected:', error && error.message ? error.message : error);
+    });
+
+    socket.on('chat_error', (payload) => {
+        const message = payload && payload.message ? payload.message : 'Chat action was not allowed.';
+        safeShowAlert(message, 'warning');
+    });
+    
+    // ✅ FIXED: Consolidated Connect Logic & Badge Fetch
+    socket.on('connect', () => {
+        socket.emit('identify', currentUser.id);
+
+        // Fetch unread count on initial load
+        setTimeout(async () => {
+            try {
+                const resp = await fetch('/chat/conversations');
+                const res = await resp.json();
+                if(res.status === 'success' && res.data) {
+                    let totalUnread = 0;
+                    res.data.forEach(c => {
+                        // If I am NOT the sender of the last message, and I haven't read it
+                        if (c.lastMessage && String(c.lastMessage.senderId) !== String(currentUser.id)) {
+                             // Fallback logic if unreadCount isn't on backend yet
+                             if(c.unreadCount) totalUnread += c.unreadCount;
+                             // Or simplified: Just count 1 if last msg is new (timestamp check needed for strictness)
+                        }
+                    });
+                    if(totalUnread > 0) updateUnreadCount(totalUnread);
+                }
+            } catch(e) {}
+        }, 1000);
+    });
+
+    // A. Sending Ack
+    socket.on('message_sent_ack', (data) => {
+        const tempRow = document.getElementById(`msg-row-${data.tempId}`);
+        if (tempRow) {
+            tempRow.id = `msg-row-${data.realMsg.id}`;
+            const statusContainer = tempRow.querySelector('.status-container');
+            if (statusContainer) {
+                statusContainer.id = `status-${data.realMsg.id}`;
+                statusContainer.innerHTML = '<i class="bi bi-check status-sent msg-status"></i>';
+            }
+        }
+    });
+
+    // B. New Message Received
+    socket.on('new_message', (data) => {
+        // Ignore self (handled locally)
+        if (String(data.message.senderId) === String(currentUser.id)) return;
+
+        const modalEl = document.getElementById('chatInterfaceModal');
+        const isModalOpen = modalEl.classList.contains('show');
+
+        // Logic: Show message if I'm looking at it; otherwise Badge it.
+        if (isModalOpen && currentConvId === data.convId) {
+            appendMessage(data.message);
+            scrollToBottom();
+            if (socket && socket.connected) socket.emit('mark_read', { convId: data.convId, messageId: data.message.id });
+        } else {
+            // Background notification
+            if (socket && socket.connected) socket.emit('mark_delivered', { convId: data.convId, messageId: data.message.id });
+            updateUnreadCount(1); // ✅ This adds the red number
+            if(isModalOpen) refreshInbox(); // Refresh sidebar list if modal is open (looking at other chat)
+        }
+    });
+
+    // C. Status Updates
+    socket.on('status_update', (data) => {
+        const statusContainer = document.getElementById(`status-${data.messageId}`);
+        if (statusContainer) {
+            if (data.status === 'delivered') statusContainer.innerHTML = '<i class="bi bi-check-all status-delivered msg-status"></i>';
+            else if (data.status === 'read') statusContainer.innerHTML = '<i class="bi bi-check-all status-read msg-status"></i>';
+        }
+    });
+
+    // D. Conversation Deleted (Real-time)
+    socket.on('on_conversation_deleted', (data) => {
+        refreshInbox(); // Remove from list
+        
+        // If I am currently looking at this deleted chat, kick me out
+        if (currentConvId === data.convId) {
+            currentConvId = null;
+            document.getElementById('chatActiveView').classList.add('d-none');
+            document.getElementById('chatEmptyState').classList.remove('d-none');
+            safeShowAlert("The other user has deleted this conversation.", "warning");
+        }
+    });
+
+    // E. Submit Handler
+    const form = document.getElementById('chatForm');
+    if(form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!chatAccess.canUpdate) {
+                safeShowAlert('Your access profile does not allow sending chat messages.', 'warning');
+                return;
+            }
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if(!text && pendingAttachments.length === 0) return;
+
+            if (pendingAttachments.length > 0) {
+                await uploadPendingFiles();
+            }
+
+            if (text) {
+                const tempId = 'temp_' + Date.now();
+                appendMessage({
+                    id: tempId, content: text, senderId: currentUser.id, type: 'text', status: 'sending'
+                }, true);
+                scrollToBottom();
+                if (!socket || !socket.connected) {
+                    safeShowAlert('Chat connection is not available yet. Please try again.', 'warning');
+                    return;
+                }
+                socket.emit('send_message', {
+                    tempId: tempId, convId: currentConvId, content: text, type: 'text', senderId: currentUser.id
+                });
+                input.value = '';
+                input.style.height = '38px';
+            }
+        });
+    }
+}
+
+// Uploads files and renders them LOCALLY immediately
+async function uploadPendingFiles() {
+    if (!currentConvId) return;
+    if (!chatAccess.canUpdate) {
+        safeShowAlert('Your access profile does not allow uploading chat attachments.', 'warning');
+        return;
+    }
+    if (!socket || !socket.connected) {
+        safeShowAlert('Chat connection is not available yet. Please try again.', 'warning');
+        return;
+    }
+
+    // 1. Show Loading
+    const loadingId = 'temp_load_' + Date.now();
+    appendMessage({
+        id: loadingId, content: '<div class="spinner-border spinner-border-sm"></div> Sending files...', 
+        senderId: currentUser.id, type: 'text', status: 'sending'
+    }, true);
+    scrollToBottom();
+
+    const formData = new FormData();
+    formData.append('convId', currentConvId);
+    pendingAttachments.forEach(file => formData.append('files', file));
+
+    try {
+        const resp = await fetch('/chat/upload', { method: 'POST', body: formData });
+        const res = await resp.json();
+
+        // Remove loading bubble
+        const tempRow = document.getElementById(`msg-row-${loadingId}`);
+        if(tempRow) tempRow.remove();
+
+        if (res.status === 'success') {
+            pendingAttachments = [];
+            renderPreviews();
+
+            // 2. Process uploaded files
+            res.files.forEach(f => {
+                // A. Emit to Server (for Recipient)
+                if (socket && socket.connected) socket.emit('send_message', {
+                    convId: currentConvId,
+                    content: f.type === 'image' ? 'Image' : 'File',
+                    type: f.type,
+                    fileUrl: f.url,
+                    senderId: currentUser.id
+                });
+
+                // B. RENDER LOCALLY (Fixes "I don't see my image")
+                appendMessage({
+                    id: 'temp_img_sent_' + Date.now() + Math.random(),
+                    content: f.type === 'image' ? 'Image' : 'File',
+                    type: f.type,
+                    fileUrl: f.url,
+                    senderId: currentUser.id,
+                    timestamp: new Date(),
+                    status: 'sent'
+                });
+            });
+        } else {
+            safeShowAlert("Upload failed: " + res.message, "error");
+        }
+    } catch (e) {
+        console.error(e);
+        const tempRow = document.getElementById(`msg-row-${loadingId}`);
+        if(tempRow) tempRow.remove();
+        safeShowAlert("Connection error during upload.", "error");
+    }
+}
+
+async function deleteCurrentChat() {
+    if (!currentConvId) return;
+    if (!chatAccess.canDelete) {
+        safeShowAlert('Your access profile does not allow deleting conversations.', 'warning');
+        return;
+    }
+    let isConfirmed = false;
+    if (typeof window.showMessageModal === 'function') {
+        const btnResult = await window.showMessageModal({
+            title: 'Confirm Delete',
+            icon: 'warning',
+            message: 'Are you sure? This will delete the chat for BOTH users.',
+            size: 'md',
+            buttons: [
+                { text: 'Cancel', class: 'btn-secondary btn-md' },
+                { text: 'Delete', class: 'btn-danger btn-md' }
+            ]
+        });
+        if (btnResult === 'Delete') isConfirmed = true;
+    } else {
+        isConfirmed = confirm("Are you sure? This will permanently delete the conversation.");
+    }
+
+    if (!isConfirmed) return;
+
+    try {
+        const resp = await fetch(`/chat/delete/${currentConvId}`, { method: 'DELETE' });
+        const res = await resp.json();
+        if (res.status === 'success') {
+            // Notify other user via Socket
+            if (socket && socket.connected) socket.emit('conversation_deleted', { convId: currentConvId });
+
+            currentConvId = null;
+            document.getElementById('chatActiveView').classList.add('d-none');
+            document.getElementById('chatEmptyState').classList.remove('d-none');
+            refreshInbox();
+            safeShowAlert("Conversation deleted successfully.", "success");
+        } else {
+            safeShowAlert(res.message || "Failed to delete chat.", "error");
+        }
+    } catch (e) {
+        console.error(e);
+        safeShowAlert("Error connecting to server.", "error");
+    }
+}
+
+function updateUnreadCount(num, reset = false) {
+    const badge = document.getElementById('chatGlobalBadge');
+    if(!badge) return;
+    
+    let current = parseInt(badge.innerText) || 0;
+    if (reset) current = 0; else current += num;
+    
+    badge.innerText = current;
+    if (current > 0) {
+        badge.classList.remove('d-none');
+    } else {
+        badge.classList.add('d-none');
+    }
+}
+
+function appendMessage(msg, isTemp = false) {
+    const container = document.getElementById('chatMessageContainer');
+    const isMine = String(msg.senderId) === String(currentUser.id);
+    const typeClass = isMine ? 'msg-sent' : 'msg-received';
+    const alignClass = isMine ? 'align-self-end' : 'align-self-start';
+
+    let statusIcon = '';
+    if (isMine) {
+        if (isTemp) {
+            statusIcon = '<i class="bi bi-clock status-sending msg-status" title="Sending..."></i>';
+        } else {
+            switch(msg.status) {
+                case 'read': statusIcon = '<i class="bi bi-check-all status-read msg-status"></i>'; break;
+                case 'delivered': statusIcon = '<i class="bi bi-check-all status-delivered msg-status"></i>'; break;
+                default: statusIcon = '<i class="bi bi-check status-sent msg-status"></i>'; break;
+            }
+        }
+    }
+
+    let contentHtml = msg.content;
+    if(msg.type === 'image') {
+        const safeUrl = encodeURI(msg.fileUrl).replace(/%25/g, '%'); 
+        contentHtml = `<a href="${safeUrl}" target="_blank"><img src="${safeUrl}" class="img-fluid rounded mb-1" style="max-width: 200px; min-height: 50px; background: #f0f0f0;"></a>`;
+    } else if (msg.type === 'file') {
+        contentHtml = `<a href="${msg.fileUrl}" target="_blank" class="text-decoration-none d-flex align-items-center p-2 border rounded bg-white"><i class="bi bi-file-earmark-arrow-down fs-4 me-2 text-primary"></i><div><div class="small fw-bold text-dark">Attachment</div><div class="x-small text-muted">Download</div></div></a>`;
+    }
+
+    const html = `
+    <div class="d-flex flex-column ${alignClass}" style="max-width: 85%;" id="msg-row-${msg.id || 'temp'}">
+        <div class="msg-bubble ${typeClass}">
+            ${contentHtml}
+            <div class="d-flex align-items-center justify-content-end mt-1">
+                <span class="msg-time small text-muted" style="font-size:0.65rem;">
+                    ${isTemp ? 'Now' : new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                </span>
+                <span class="status-container" id="status-${msg.id}">${statusIcon}</span>
+            </div>
+        </div>
+    </div>`;
+    
+    container.insertAdjacentHTML('beforeend', html);
+    scrollToBottom();
+    
+    if (!isMine && !isTemp && msg.status !== 'read') {
+        if (socket && socket.connected) socket.emit('mark_delivered', { convId: currentConvId, messageId: msg.id });
+        if (document.visibilityState === 'visible') {
+             if (socket && socket.connected) socket.emit('mark_read', { convId: currentConvId, messageId: msg.id });
+        }
+    }
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('chatMessageContainer');
+    if(container) container.scrollTop = container.scrollHeight;
+}
+
+function handleFileSelection(input) {
+    if (!chatAccess.canUpdate) {
+        safeShowAlert('Your access profile does not allow uploading chat attachments.', 'warning');
+        input.value = '';
+        return;
+    }
+    if (!input.files || input.files.length === 0) return;
+    const MAX_SIZE = 5 * 1024 * 1024; 
+    Array.from(input.files).forEach(file => {
+        if (pendingAttachments.length >= 3) { safeShowAlert("Maximum 3 files allowed.", "warning"); return; }
+        if (file.size > MAX_SIZE) { safeShowAlert("File too large (Max 5MB).", "error"); return; }
+        pendingAttachments.push(file);
+    });
+    renderPreviews();
+    input.value = ''; 
+}
+
+function renderPreviews() {
+    const area = document.getElementById('attachmentPreviewArea');
+    area.innerHTML = '';
+    if (pendingAttachments.length === 0) { area.classList.add('d-none'); return; }
+    area.classList.remove('d-none');
+    pendingAttachments.forEach((file, index) => {
+        const isImage = file.type.startsWith('image/');
+        let innerHTML = isImage ? `<img src="${URL.createObjectURL(file)}">` : `<i class="bi bi-file-earmark-text att-preview-file"></i>`;
+        const card = document.createElement('div');
+        card.className = 'att-preview-card';
+        card.innerHTML = `${innerHTML}<div class="att-preview-remove" onclick="removeAttachment(${index})">&times;</div>`;
+        area.appendChild(card);
+    });
+}
+
+function removeAttachment(index) {
+    pendingAttachments.splice(index, 1);
+    renderPreviews();
+}
+
+function initResizers() {
+    const tx = document.getElementById('chatInput');
+    if (tx) {
+        tx.addEventListener("input", function() {
+            this.style.height = 0;
+            this.style.height = this.scrollHeight + "px";
+            this.style.overflowY = this.scrollHeight > 160 ? "scroll" : "hidden";
+        }, false);
+    }
+
+    const sidebar = document.getElementById('chatSidebar');
+    const sidebarResizer = document.getElementById('sidebarResizer');
+    const modalBody = document.querySelector('#chatInterfaceModal .modal-body');
+    const modalContent = document.getElementById('chatModalContent');
+    const modalResizer = document.getElementById('modalResizer');
+
+    if (sidebar && sidebarResizer && modalBody) {
+        let draggingSidebar = false;
+
+        const onSidebarMove = (clientX) => {
+            if (!draggingSidebar) return;
+            const bodyRect = modalBody.getBoundingClientRect();
+            const minW = 180;
+            const maxW = Math.max(minW, Math.floor(bodyRect.width * 0.65));
+            const newW = Math.max(minW, Math.min(maxW, clientX - bodyRect.left));
+            sidebar.style.width = `${newW}px`;
+            previousSidebarWidth = newW;
+        };
+
+        const stopSidebarDrag = () => {
+            draggingSidebar = false;
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+            window.removeEventListener('mousemove', mouseSidebarMove);
+            window.removeEventListener('mouseup', stopSidebarDrag);
+            window.removeEventListener('touchmove', touchSidebarMove);
+            window.removeEventListener('touchend', stopSidebarDrag);
+        };
+
+        const mouseSidebarMove = (e) => onSidebarMove(e.clientX);
+        const touchSidebarMove = (e) => {
+            if (!e.touches || !e.touches.length) return;
+            onSidebarMove(e.touches[0].clientX);
+        };
+
+        sidebarResizer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            draggingSidebar = true;
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'col-resize';
+            window.addEventListener('mousemove', mouseSidebarMove);
+            window.addEventListener('mouseup', stopSidebarDrag);
+        });
+
+        sidebarResizer.addEventListener('touchstart', (e) => {
+            draggingSidebar = true;
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'col-resize';
+            window.addEventListener('touchmove', touchSidebarMove, { passive: true });
+            window.addEventListener('touchend', stopSidebarDrag);
+        }, { passive: true });
+    }
+
+    if (modalContent && modalResizer) {
+        let draggingModal = false;
+        let startX = 0;
+        let startY = 0;
+        let startW = 0;
+        let startH = 0;
+
+        const onModalMove = (clientX, clientY) => {
+            if (!draggingModal) return;
+            const deltaX = clientX - startX;
+            const deltaY = clientY - startY;
+            const minW = 350;
+            const minH = 400;
+            const maxW = Math.max(minW, window.innerWidth - 24);
+            const maxH = Math.max(minH, window.innerHeight - 24);
+            const newW = Math.max(minW, Math.min(maxW, startW + deltaX));
+            const newH = Math.max(minH, Math.min(maxH, startH + deltaY));
+            modalContent.style.width = `${newW}px`;
+            modalContent.style.height = `${newH}px`;
+        };
+
+        const stopModalDrag = () => {
+            draggingModal = false;
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+            window.removeEventListener('mousemove', mouseModalMove);
+            window.removeEventListener('mouseup', stopModalDrag);
+            window.removeEventListener('touchmove', touchModalMove);
+            window.removeEventListener('touchend', stopModalDrag);
+        };
+
+        const mouseModalMove = (e) => onModalMove(e.clientX, e.clientY);
+        const touchModalMove = (e) => {
+            if (!e.touches || !e.touches.length) return;
+            onModalMove(e.touches[0].clientX, e.touches[0].clientY);
+        };
+
+        modalResizer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            draggingModal = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            startW = modalContent.offsetWidth;
+            startH = modalContent.offsetHeight;
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'nwse-resize';
+            window.addEventListener('mousemove', mouseModalMove);
+            window.addEventListener('mouseup', stopModalDrag);
+        });
+
+        modalResizer.addEventListener('touchstart', (e) => {
+            if (!e.touches || !e.touches.length) return;
+            draggingModal = true;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            startW = modalContent.offsetWidth;
+            startH = modalContent.offsetHeight;
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'nwse-resize';
+            window.addEventListener('touchmove', touchModalMove, { passive: true });
+            window.addEventListener('touchend', stopModalDrag);
+        }, { passive: true });
+    }
+}
+
+function showInbox() { const t=document.getElementById('sidebarTitle'); if(t)t.innerText='Messages'; refreshInbox(); }
+
+async function refreshInbox() {
+    const listEl = document.getElementById('conversationList');
+    try {
+        const resp = await fetch('/chat/conversations');
+        const res = await resp.json();
+        if(res.status === 'success') {
+            listEl.innerHTML = '';
+            
+            if(!res.data || res.data.length === 0) {
+                 listEl.innerHTML = '<div class="text-center text-muted mt-5 small">No messages yet.</div>';
+                 updateUnreadCount(0, true);
+                 return;
+            }
+
+            let totalGlobalUnread = 0;
+
+            res.data.forEach(c => {
+                const isActive = (c.id === currentConvId) ? 'active' : '';
+                const unreadNum = c.unreadCount || 0; // ✅ USE REAL NUMBER
+                const isUnreadClass = unreadNum > 0 ? 'unread' : '';
+                const lastMsg = c.lastMessage ? c.lastMessage.content : 'New Chat';
+                
+                let displayMsg = lastMsg.length > 25 ? lastMsg.substring(0,25)+'...' : lastMsg;
+                if(c.lastMessage && String(c.lastMessage.senderId) === String(currentUser.id)) {
+                    displayMsg = 'You: ' + displayMsg;
+                }
+
+                totalGlobalUnread += unreadNum;
+
+                // ✅ BADGE: Show Number
+                const badgeHtml = unreadNum > 0 ? 
+                    `<div class="unread-badge ms-2">${unreadNum}</div>` : ''; 
+
+                const timeStr = c.lastMessage ? new Date(c.lastMessage.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+                
+                // Safety check for display name
+                const displayName = (c.display && c.display.name) ? c.display.name : 'Unknown';
+                const targetId = (c.display && c.display.targetUserId) ? c.display.targetUserId : '';
+                const avatarUrl = (c.display && c.display.avatar) ? String(c.display.avatar) : '';
+                const avatarHtml = buildAvatarHtml(displayName, avatarUrl, 40);
+
+                const html = `
+                <div class="chat-item d-flex align-items-center ${isActive} ${isUnreadClass}" onclick='openChat(${JSON.stringify(String(c.id || ""))}, ${JSON.stringify(displayName)}, ${JSON.stringify(String(targetId || ""))}, ${JSON.stringify(String(avatarUrl || ""))})'>
+                    <div class="avatar-wrapper me-3">
+                        ${avatarHtml}
+                    </div>
+                    
+                    <div class="overflow-hidden flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="chat-name small text-dark text-truncate">${displayName}</span>
+                            <span class="x-small text-muted">${timeStr}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="chat-msg x-small text-muted text-truncate" style="max-width: 140px;">${displayMsg}</div>
+                            ${badgeHtml}
+                        </div>
+                    </div>
+                </div>`;
+                listEl.insertAdjacentHTML('beforeend', html);
+            });
+
+            updateUnreadCount(totalGlobalUnread, true); 
+        }
+    } catch(e) { 
+        console.error(e);
+        listEl.innerHTML = '<div class="text-center text-muted mt-5 small">Failed to load.</div>';
+    }
+}
+
+function startNewChatWizard(){
+    if (!chatAccess.canCreate) {
+        safeShowAlert('Your access profile does not allow starting new chats.', 'warning');
+        return;
+    }
+    document.getElementById('sidebarTitle').innerText='New Chat';
+    fetchUsers('');
+}
+
+async function fetchUsers(query) {
+    if (!chatAccess.canCreate) return;
+    const listEl = document.getElementById('conversationList');
+    listEl.innerHTML = '<div class="text-center mt-4"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
+    try {
+        const resp = await fetch(`/chat/users/search?q=${encodeURIComponent(query)}`);
+        const res = await resp.json();
+        if (res.status === 'success') {
+            listEl.innerHTML = '';
+            if (res.data.length === 0) { listEl.innerHTML = '<div class="text-center text-muted mt-4 small">No users found.</div>'; return; }
+            res.data.forEach(u => {
+                const avatarHtml = buildAvatarHtml(u.name, u.avatar, 35, 'bg-primary-subtle', 'text-primary');
+                const html = `
+                <div class="chat-item d-flex align-items-center p-2" onclick='createNewChat(${JSON.stringify(String(u.id || ""))})'>
+                    <div class="me-2 flex-shrink-0">${avatarHtml}</div>
+                    <div class="flex-grow-1"><div class="fw-bold small text-dark">${u.name}</div><div class="x-small text-muted">${u.org}</div></div>
+                </div>`;
+                listEl.insertAdjacentHTML('beforeend', html);
+            });
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function createNewChat(uid){
+    if (!chatAccess.canCreate) {
+        safeShowAlert('Your access profile does not allow starting new chats.', 'warning');
+        return;
+    }
+    fetch('/chat/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetUserId:uid})}).then(r=>r.json()).then(res=>{if(res.status==='success'){showInbox();}else if(res.message){safeShowAlert(res.message, 'error');}});
+}
+
+function handleSearch(v){if(document.getElementById('sidebarTitle').innerText==='New Chat')fetchUsers(v);}
+
+async function openChat(convId, name, targetUserId, avatarUrl = '') {
+    currentConvId = convId;
+    
+    // Store these for the "Reopen" logic
+    window.currentChatName = name; 
+    window.currentChatTarget = targetUserId;
+    window.currentChatAvatar = avatarUrl || '';
+
+    document.getElementById('chatEmptyState').classList.add('d-none');
+    document.getElementById('chatActiveView').classList.remove('d-none');
+    document.getElementById('chatHeaderName').innerText = name;
+    const headerAvatar = document.getElementById('chatHeaderAvatar');
+    if (avatarUrl) {
+        headerAvatar.className = 'rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold flex-shrink-0 overflow-hidden';
+        headerAvatar.innerHTML = `<img src="${safeAttr(avatarUrl)}" alt="${safeText(name)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.remove();">`;
+    } else {
+        headerAvatar.className = 'rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2 fw-bold flex-shrink-0';
+        headerAvatar.innerText = name.charAt(0).toUpperCase();
+    }
+
+    // 1. Refresh Inbox to clear badge for this item
+    // (Wait slightly so the server has processed the "mark read" request)
+    // Actually, calling refreshInbox() here might cause a visual jump.
+    // Better to just manually remove the badge class from the active item if you want instant feedback.
+    // But for now, we just rely on the next refresh or the socket event.
+    
+    const container = document.getElementById('chatMessageContainer');
+    
+    // Only show loader if empty (to avoid flashing on refresh)
+    if(container.innerHTML.trim() === '') {
+        container.innerHTML = '<div class="text-center py-5"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
+    }
+    
+    try {
+        const resp = await fetch(`/chat/messages/${convId}`);
+        const res = await resp.json();
+        
+        container.innerHTML = '';
+        if(res.status === 'success') {
+            res.data.forEach(msg => appendMessage(msg));
+            scrollToBottom();
+        }
+        if (socket && socket.connected) socket.emit('join_room', convId);
+        
+        // Refresh sidebar to update read counts (remove badge)
+        refreshInbox();
+        
+    } catch(e) { 
+        container.innerHTML = '<div class="text-danger text-center p-4">Error loading history.</div>';
+    }
+}
+// ✅ ADD THIS: Missing Sidebar Toggle
+function toggleSidebar(){
+    const s = document.getElementById('chatSidebar'); 
+    const r = document.getElementById('sidebarResizer');
+    
+    if(s.classList.contains('d-none')){ 
+        if (previousSidebarWidth) s.style.width = `${previousSidebarWidth}px`;
+        s.classList.remove('d-none'); s.classList.add('d-flex'); 
+        r.classList.remove('d-none'); r.classList.add('d-flex'); 
+    } else { 
+        s.classList.remove('d-flex'); s.classList.add('d-none'); 
+        r.classList.remove('d-flex'); r.classList.add('d-none'); 
+    }
+}
+</script>

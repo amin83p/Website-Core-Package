@@ -1,0 +1,35 @@
+<%
+  const status = (typeof backendStatus !== 'undefined' && backendStatus && typeof backendStatus === 'object')
+    ? backendStatus
+    : {};
+  const fallback = status.fallback || {};
+  const runtime = status.runtime || {};
+  const reason = String(fallback.reason || 'mongo_unavailable').replace(/_/g, ' ');
+  const lastError = runtime.lastMongoError && runtime.lastMongoError.message
+    ? String(runtime.lastMongoError.message)
+    : '';
+%>
+
+<div class="container mt-3">
+  <div class="alert alert-warning border-warning-subtle shadow-sm mb-0" role="alert">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2">
+      <div>
+        <div class="fw-bold">
+          <i class="bi bi-database-exclamation me-2"></i>
+          Mongo unavailable. Running in JSON recovery mode.
+        </div>
+        <div class="small mb-0">
+          Requested: <code><%= runtime.requestedMode || status.requested || 'mongo' %></code>,
+          active: <code><%= status.mode || runtime.activeMode || 'json' %></code>,
+          reason: <span class="text-capitalize"><%= reason %></span>.
+          <% if (lastError) { %>
+            <span class="d-block d-lg-inline text-muted">Last error: <%= lastError %></span>
+          <% } %>
+        </div>
+      </div>
+      <a href="/systemSettings/data-backend" class="btn btn-sm btn-outline-dark fw-semibold">
+        View Backend Status
+      </a>
+    </div>
+  </div>
+</div>
