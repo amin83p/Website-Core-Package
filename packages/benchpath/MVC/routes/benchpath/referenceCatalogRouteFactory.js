@@ -3,7 +3,7 @@ const { requireCoreModule } = require('../../services/benchpath/benchpathCoreMod
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
 const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
-const { OPERATIONS } = requireCoreModule('config/accessConstants');
+const { OPERATIONS } = require('../../../config/accessConstants');
 const { createClbReferenceEntityController } = require('../../controllers/benchpath/clbReferenceController');
 
 function createReferenceCatalogRouter(entityKey, sectionId) {

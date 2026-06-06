@@ -4,7 +4,7 @@ const { requireCoreModule } = require('../../services/benchpath/benchpathCoreMod
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
 const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
-const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const ctrl = require('../../controllers/benchpath/clbFrameworkController');
 
 router.use(requireAuth);

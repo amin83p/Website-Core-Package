@@ -397,6 +397,11 @@ router.post('/package-builder/preflight',
             { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true, keepActive: true }
           ),
           ctrl.preflightPackageBuilder);
+router.get('/package-builder/catalog',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_BUILDER, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_BUILDER, OPERATIONS.UPDATE, { keepActive: true }),
+          ctrl.listPackageBuilderCatalog);
 router.post('/package-builder/build',
           requireAuth,
           requireAccess(SECTIONS.SYSTEM_PACKAGE_BUILDER, OPERATIONS.UPDATE),

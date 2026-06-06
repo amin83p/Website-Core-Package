@@ -15,11 +15,85 @@
   })();
 %>
 
+<style>
+  .package-builder-page .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scrollbar-width: none;
+  }
+  .package-builder-page .wizard-step-rail::-webkit-scrollbar { display: none; }
+  .package-builder-page .wizard-step-pill {
+    flex: 0 0 auto;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    border-radius: 999px;
+    padding: 0.4rem 0.8rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .package-builder-page .wizard-step-pill.active {
+    background: #17324d;
+    border-color: #17324d;
+    color: #fff;
+  }
+  .package-builder-page .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  .package-builder-page .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .package-builder-page .wizard-progress-bar {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    transition: width 0.25s ease;
+  }
+  .package-builder-page .builder-step-panel { display: none; }
+  .package-builder-page .builder-step-panel.active { display: block; }
+  .package-builder-page .builder-scroll-box {
+    min-height: 220px;
+    max-height: 420px;
+    overflow: auto;
+  }
+  .package-builder-page .builder-item-card {
+    border: 1px solid #e5ebf1;
+    border-radius: 0.55rem;
+    background: #fff;
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 0.55rem;
+  }
+  .package-builder-page .builder-item-card.removed {
+    opacity: 0.62;
+    background: #fff7f7;
+    border-color: #f2c6c6;
+  }
+  .package-builder-page .builder-file-tree ul {
+    list-style: none;
+    padding-left: 1.2rem;
+    margin-bottom: 0;
+  }
+  .package-builder-page .builder-file-node {
+    padding: 0.2rem 0;
+  }
+  .package-builder-page .builder-output {
+    max-height: 360px;
+    overflow: auto;
+  }
+</style>
+
 <div class="sections-page package-builder-page">
   <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
     <div>
       <h1 class="page-heading size-md text-start m-0">Package Builder</h1>
-      <p class="text-muted mb-0 mt-1">Create signed install packages from existing package modules.</p>
+      <p class="text-muted mb-0 mt-1">Create signed install packages with staged manifest review.</p>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
       <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">PACKAGE BUILD</span>
@@ -33,196 +107,215 @@
   <% if (packageRoot) { %>
     <div class="alert alert-info border-0 shadow-sm py-2 px-3 mb-3 small">
       <strong>Package Storage Root:</strong> <code><%= packageRoot %></code>
-      <div class="mt-1 text-muted">Discovery also checks default <code>./packages</code> and installed registry metadata to surface missing-package diagnostics.</div>
+      <div class="mt-1 text-muted">Discovery checks configured package storage, default <code>./packages</code>, and installed registry metadata.</div>
     </div>
   <% } %>
-
-  <div class="card border-0 shadow-sm mb-3">
-    <div class="card-header bg-white fw-bold small">Build Package</div>
-    <div class="card-body p-3">
-      <div class="row g-3">
-        <div class="col-lg-6">
-          <label class="form-label small fw-bold">Package</label>
-          <select id="builderPackageId" class="form-select">
-            <option value="">Select package</option>
-            <% packageRows.forEach((row) => { %>
-              <% const isAvailable = row && row.valid === true && row.manifestResolved === true; %>
-              <% const sourceLabel = row?.source ? String(row.source).replace(/_/g, ' ') : 'configured root'; %>
-              <option
-                value="<%= row.packageId %>"
-                data-version="<%= row.version %>"
-                <%= isAvailable ? '' : 'disabled' %>>
-                <%= row.packageId %> - <%= row.version || '-' %>
-                (<%= row.storedManifestPath || row.manifestPath || sourceLabel %>)
-                <%= isAvailable ? '' : ' [Unavailable: Missing/Invalid Manifest]' %>
-              </option>
-            <% }) %>
-          </select>
-        </div>
-        <div class="col-lg-6">
-          <label class="form-label small fw-bold">Origin Organization</label>
-          <div class="input-group">
-            <input type="hidden" id="builderOriginOrgId" value="<%= activeOrgIdValue %>">
-            <input
-              type="text"
-              id="builderOriginOrgName"
-              class="form-control size-md bg-white border-primary fw-bold"
-              value="<%= activeOrgName %>"
-              placeholder="Select organization..."
-              readonly>
-            <button type="button" class="btn btn-outline-primary" id="builderPickOriginOrgBtn">
-              <i class="bi bi-search"></i>
-            </button>
-            <button type="button" class="btn btn-outline-secondary" id="builderClearOriginOrgBtn" title="Clear selected organization">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="row g-3 mt-1">
-        <div class="col-lg-6">
-          <label class="form-label small fw-bold">Manifest Source</label>
-          <select id="builderManifestMode" class="form-select">
-            <option value="static">Static manifest from package folder</option>
-            <option value="live">Live backend manifest</option>
-          </select>
-          <div class="small text-muted mt-1">Live mode rebuilds supported package declarations from the active backend while keeping package routes, views, assets, upload folders, and data entities from the template manifest.</div>
-        </div>
-        <div class="col-lg-6">
-          <label class="form-label small fw-bold">Suggested Target Version</label>
-          <div class="small text-muted border rounded px-3 py-2 bg-light" id="builderVersionHint">Select a package to suggest the next version.</div>
-        </div>
-      </div>
-
-      <div class="row g-3 mt-1">
-        <div class="col-12">
-          <div class="card border-0 bg-light-subtle">
-            <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between py-2">
-              <button
-                type="button"
-                class="btn btn-link text-decoration-none text-dark fw-bold small p-0 d-inline-flex align-items-center gap-2"
-                data-bs-toggle="collapse"
-                data-bs-target="#builderEntitiesCollapse"
-                aria-expanded="true"
-                aria-controls="builderEntitiesCollapse">
-                <i class="bi bi-chevron-down small"></i>
-                <span>Package-Owned Tables / Collections</span>
-              </button>
-              <div class="d-flex gap-2">
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllEntitiesBtn">Select All</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearEntitiesBtn">Clear</button>
-              </div>
-            </div>
-            <div class="collapse show" id="builderEntitiesCollapse">
-              <div class="card-body pt-0">
-                <div class="border rounded p-2" style="min-height: 300px; max-height: 360px; overflow:auto;" id="builderEntityList">
-                  <div class="small text-muted">Select a package to load entity list.</div>
-                </div>
-                <div class="small text-muted mt-1">Select origin org first, then tables are discovered and scoped to that org (unscoped rows are included).</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="row g-3 mt-1">
-        <div class="col-12">
-          <div class="card border-0 bg-light-subtle">
-            <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between py-2">
-              <button
-                type="button"
-                class="btn btn-link text-decoration-none text-dark fw-bold small p-0 d-inline-flex align-items-center gap-2"
-                data-bs-toggle="collapse"
-                data-bs-target="#builderFileFieldsCollapse"
-                aria-expanded="true"
-                aria-controls="builderFileFieldsCollapse">
-                <i class="bi bi-chevron-down small"></i>
-                <span>File Fields By Table</span>
-              </button>
-              <div class="d-flex gap-2">
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderAddAllFileFieldsBtn">Add All Detected</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearSelectedFileFieldsBtn">Clear Selected</button>
-              </div>
-            </div>
-            <div class="collapse show" id="builderFileFieldsCollapse">
-              <div class="card-body pt-0">
-                <div class="border rounded p-2" style="min-height: 300px; max-height: 360px; overflow:auto;" id="builderFileFieldList">
-                  <div class="small text-muted">File field candidates load after entity preflight.</div>
-                </div>
-                <div class="small text-muted mt-1">Only selected fields are scanned for upload refs during preflight/build.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="row g-3 mt-1">
-        <div class="col-12">
-          <label class="form-label small fw-bold">Target Version</label>
-          <input id="builderVersion" type="text" class="form-control" placeholder="1.0.1">
-          <div class="small text-muted mt-1">The builder suggests the next patch version automatically. You can change it, but versions lower than the current package version are rejected.</div>
-        </div>
-      </div>
-
-      <div class="row g-3 mt-1">
-        <div class="col-12">
-          <label class="form-label small fw-bold">Build Note</label>
-          <textarea id="builderBuildNote" rows="3" class="form-control" placeholder="Describe what changed in this package build..."></textarea>
-          <div class="small text-muted mt-1">Saved into the package as <code>BUILD_NOTE.md</code> and included in builder payload metadata.</div>
-        </div>
-      </div>
-
-      <div class="row g-3 mt-1">
-        <div class="col-12">
-          <label class="form-label small fw-bold">Manual File/Folder Refs (one per line)</label>
-          <textarea id="builderSelectedFileRefs" rows="4" class="form-control font-monospace small" placeholder="/uploads/ORG_900000/symbols/logo.png"></textarea>
-          <div class="small text-muted mt-1">Auto-detected upload refs from selected data are included automatically.</div>
-        </div>
-      </div>
-
-      <div class="d-flex align-items-center gap-2 flex-wrap mt-3">
-        <button type="button" class="btn btn-outline-secondary" id="builderPreflightBtn">
-          <i class="bi bi-search me-1"></i>Preflight
-        </button>
-        <button type="button" class="btn btn-primary btn-filled" id="builderBuildBtn">
-          <i class="bi bi-box-arrow-down-right me-1"></i>Build Signed Package
-        </button>
-      </div>
-    </div>
-  </div>
 
   <% if (packageWarningsRows.length) { %>
     <div class="alert alert-warning border-0 shadow-sm py-2 px-3 mb-3 small">
       <div class="fw-semibold mb-1">Some packages are unavailable for build:</div>
       <ul class="mb-0 ps-3">
         <% packageWarningsRows.slice(0, 8).forEach((row) => { %>
-          <li>
-            <code><%= row.packageId || row.storedManifestPath || row.manifestPath %></code>
-            - <%= row.warning || row.error || 'Missing or invalid manifest' %>
-          </li>
+          <li><code><%= row.packageId || row.storedManifestPath || row.manifestPath %></code> - <%= row.warning || row.error || 'Missing or invalid manifest' %></li>
         <% }) %>
       </ul>
     </div>
   <% } %>
 
-  <div class="card border-0 shadow-sm mt-3">
-    <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between">
-      <span>Builder Output</span>
-      <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearOutputBtn">Clear</button>
-    </div>
+  <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
-      <pre id="builderOutput" class="small bg-dark text-success p-3 rounded mb-0" style="max-height: 360px; overflow:auto;">Ready.</pre>
-      <div id="builderArtifactLinks" class="mt-3 d-none">
-        <div class="small fw-semibold mb-1">Published Artifacts</div>
-        <div id="builderArtifactHealthAlert" class="alert alert-warning py-2 px-3 small mb-2 d-none"></div>
-        <div id="builderArtifactLinksList"></div>
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+        <div>
+          <div class="fw-bold text-primary">Package Build Wizard</div>
+          <div class="text-muted">Review declarations, data, storage, and files before creating the signed package.</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-light text-dark border" id="builderStepBadge">Step 1 of 8</span>
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="builderProgressPct">0%</span>
+        </div>
+      </div>
+      <div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="builderProgressBar"></div></div>
+      <div class="wizard-step-rail mb-3" id="builderStepRail"></div>
+
+      <div class="builder-step-panel active" data-builder-step="setup">
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <label class="form-label small fw-bold">Package</label>
+            <select id="builderPackageId" class="form-select">
+              <option value="">Select package</option>
+              <% packageRows.forEach((row) => { %>
+                <% const isAvailable = row && row.valid === true && row.manifestResolved === true; %>
+                <% const sourceLabel = row?.source ? String(row.source).replace(/_/g, ' ') : 'configured root'; %>
+                <option value="<%= row.packageId %>" data-version="<%= row.version %>" <%= isAvailable ? '' : 'disabled' %>>
+                  <%= row.packageId %> - <%= row.version || '-' %>
+                  (<%= row.storedManifestPath || row.manifestPath || sourceLabel %>)
+                  <%= isAvailable ? '' : ' [Unavailable: Missing/Invalid Manifest]' %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-lg-6">
+            <label class="form-label small fw-bold">Origin Organization</label>
+            <div class="input-group">
+              <input type="hidden" id="builderOriginOrgId" value="<%= activeOrgIdValue %>">
+              <input type="text" id="builderOriginOrgName" class="form-control size-md bg-white border-primary fw-bold" value="<%= activeOrgName %>" placeholder="Select organization..." readonly>
+              <button type="button" class="btn btn-outline-primary" id="builderPickOriginOrgBtn"><i class="bi bi-search"></i></button>
+              <button type="button" class="btn btn-outline-secondary" id="builderClearOriginOrgBtn" title="Clear selected organization"><i class="bi bi-x-lg"></i></button>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <label class="form-label small fw-bold">Manifest Source</label>
+            <select id="builderManifestMode" class="form-select">
+              <option value="static">Static manifest from package folder</option>
+              <option value="live">Live backend manifest</option>
+            </select>
+            <div class="small text-muted mt-1">Live mode refreshes supported business declarations while preserving package runtime wiring.</div>
+          </div>
+          <div class="col-lg-6">
+            <label class="form-label small fw-bold">Suggested Target Version</label>
+            <div class="small text-muted border rounded px-3 py-2 bg-light" id="builderVersionHint">Select a package to suggest the next version.</div>
+          </div>
+          <div class="col-lg-6">
+            <label class="form-label small fw-bold">Target Version</label>
+            <input id="builderVersion" type="text" class="form-control" placeholder="1.0.1">
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-bold">Build Note</label>
+            <textarea id="builderBuildNote" rows="3" class="form-control" placeholder="Describe what changed in this package build..."></textarea>
+            <div class="small text-muted mt-1">Saved into the package as <code>BUILD_NOTE.md</code>.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="builder-step-panel" data-builder-step="sections">
+        <%- renderDeclarationStep('sections', 'Sections', 'bi-collection', 'Add Section') %>
+      </div>
+
+      <div class="builder-step-panel" data-builder-step="operations">
+        <%- renderDeclarationStep('operations', 'Operations', 'bi-gear', 'Add Operation') %>
+      </div>
+
+      <div class="builder-step-panel" data-builder-step="roles-symbols">
+        <div class="row g-3">
+          <div class="col-xl-6"><%- renderDeclarationBlock('roles', 'Roles', 'bi-person-badge', 'Add Role') %></div>
+          <div class="col-xl-6"><%- renderDeclarationBlock('symbols', 'Symbols', 'bi-stars', 'Add Symbol') %></div>
+        </div>
+      </div>
+
+      <div class="builder-step-panel" data-builder-step="navigation-quota">
+        <div class="row g-3">
+          <div class="col-xl-4"><%- renderDeclarationBlock('menuEntries', 'Menu Entries', 'bi-list', 'Add Menu') %></div>
+          <div class="col-xl-4"><%- renderDeclarationBlock('dashboardEntries', 'Dashboard Entries', 'bi-speedometer2', 'Add Dashboard') %></div>
+          <div class="col-xl-4"><%- renderDeclarationBlock('quotaDefinitions', 'Quota Definitions', 'bi-activity', 'Add Quota') %></div>
+        </div>
+      </div>
+
+      <div class="builder-step-panel" data-builder-step="data-storage">
+        <div class="row g-3">
+          <div class="col-xl-7">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+              <div>
+                <div class="fw-bold">Package-Owned Tables / Collections</div>
+                <div class="small text-muted">Rows are scoped to the selected origin organization during preflight/build.</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllEntitiesBtn">Select All</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearEntitiesBtn">Clear</button>
+              </div>
+            </div>
+            <div class="border rounded p-2 builder-scroll-box" id="builderEntityList">
+              <div class="small text-muted">Select package and origin organization, then run preflight.</div>
+            </div>
+          </div>
+          <div class="col-xl-5">
+            <%- renderDeclarationBlock('uploadFolders', 'Upload Folders', 'bi-folder2-open', 'Add Upload Folder') %>
+            <%- renderDeclarationBlock('mongoIndexes', 'Mongo Indexes', 'bi-database-gear', 'Add Index') %>
+            <%- renderDeclarationBlock('dataSchemas', 'Data Schemas', 'bi-diagram-3', 'Add Schema') %>
+            <%- renderDeclarationBlock('seeders', 'Seeders', 'bi-database-add', 'Add Seeder') %>
+            <%- renderDeclarationBlock('migrations', 'Migrations', 'bi-arrow-left-right', 'Add Migration') %>
+            <%- renderDeclarationBlock('upgradeGuards', 'Upgrade Guards', 'bi-shield-check', 'Add Guard') %>
+            <%- renderDeclarationBlock('dependencies', 'Dependencies', 'bi-boxes', 'Add Dependency') %>
+          </div>
+        </div>
+      </div>
+
+      <div class="builder-step-panel" data-builder-step="files">
+        <div class="row g-3">
+          <div class="col-xl-6">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+              <div>
+                <div class="fw-bold">File Tree</div>
+                <div class="small text-muted">Detected upload and symbol files are grouped by folder. Uncheck files to exclude them from this build.</div>
+              </div>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllFilesBtn">Select All Files</button>
+            </div>
+            <div class="border rounded p-2 builder-scroll-box builder-file-tree" id="builderFileTree">
+              <div class="small text-muted">File tree loads after preflight.</div>
+            </div>
+          </div>
+          <div class="col-xl-6">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Manual File/Folder Refs (one per line)</label>
+              <textarea id="builderSelectedFileRefs" rows="4" class="form-control font-monospace small" placeholder="/uploads/ORG_900000/symbols/logo.png"></textarea>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+              <div>
+                <div class="fw-bold">File Fields By Table</div>
+                <div class="small text-muted">Selected fields are scanned for upload refs during preflight/build.</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderAddAllFileFieldsBtn">Add All Detected</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearSelectedFileFieldsBtn">Clear Selected</button>
+              </div>
+            </div>
+            <div class="border rounded p-2 builder-scroll-box" id="builderFileFieldList">
+              <div class="small text-muted">File field candidates load after entity preflight.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="builder-step-panel" data-builder-step="review">
+        <div class="row g-3">
+          <div class="col-xl-5">
+            <div class="border rounded p-3 bg-light" id="builderReviewSummary">Run preflight to prepare review summary.</div>
+            <div class="d-flex align-items-center gap-2 flex-wrap mt-3">
+              <button type="button" class="btn btn-outline-secondary" id="builderPreflightBtn"><i class="bi bi-search me-1"></i>Preflight</button>
+              <button type="button" class="btn btn-primary btn-filled" id="builderBuildBtn"><i class="bi bi-box-arrow-down-right me-1"></i>Build Signed Package</button>
+            </div>
+          </div>
+          <div class="col-xl-7">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between">
+                <span>Builder Output</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearOutputBtn">Clear</button>
+              </div>
+              <div class="card-body">
+                <pre id="builderOutput" class="small bg-dark text-success p-3 rounded mb-0 builder-output">Ready.</pre>
+                <div id="builderArtifactLinks" class="mt-3 d-none">
+                  <div class="small fw-semibold mb-1">Published Artifacts</div>
+                  <div id="builderArtifactHealthAlert" class="alert alert-warning py-2 px-3 small mb-2 d-none"></div>
+                  <div id="builderArtifactLinksList"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 pt-3 border-top">
+        <button type="button" class="btn btn-outline-secondary" id="builderPrevStepBtn"><i class="bi bi-arrow-left me-1"></i>Previous</button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-primary" id="builderRefreshPreflightBtn"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Preflight</button>
+          <button type="button" class="btn btn-primary" id="builderNextStepBtn">Next<i class="bi bi-arrow-right ms-1"></i></button>
+        </div>
       </div>
     </div>
   </div>
 
   <input type="hidden" id="builderActionStateId" value="<%= actionStateValue %>">
 </div>
+
 <%- include('../partials/modal_GenericPicker', { user }) %>
 
 <script>
@@ -235,17 +328,60 @@
   const buildNoteEl = document.getElementById('builderBuildNote');
   const originOrgIdEl = document.getElementById('builderOriginOrgId');
   const originOrgNameEl = document.getElementById('builderOriginOrgName');
-  const originOrgPickBtn = document.getElementById('builderPickOriginOrgBtn');
-  const originOrgClearBtn = document.getElementById('builderClearOriginOrgBtn');
-  const entityListEl = document.getElementById('builderEntityList');
-  const fileFieldListEl = document.getElementById('builderFileFieldList');
-  const fileRefsEl = document.getElementById('builderSelectedFileRefs');
   const outputEl = document.getElementById('builderOutput');
   const artifactLinksWrapEl = document.getElementById('builderArtifactLinks');
   const artifactHealthAlertEl = document.getElementById('builderArtifactHealthAlert');
   const artifactLinksListEl = document.getElementById('builderArtifactLinksList');
-  let entityCatalog = [];
-  let selectedFileFieldsByEntity = {};
+  const entityListEl = document.getElementById('builderEntityList');
+  const fileFieldListEl = document.getElementById('builderFileFieldList');
+  const fileTreeEl = document.getElementById('builderFileTree');
+  const fileRefsEl = document.getElementById('builderSelectedFileRefs');
+  const stepRailEl = document.getElementById('builderStepRail');
+  const stepBadgeEl = document.getElementById('builderStepBadge');
+  const progressPctEl = document.getElementById('builderProgressPct');
+  const progressBarEl = document.getElementById('builderProgressBar');
+  const reviewSummaryEl = document.getElementById('builderReviewSummary');
+
+  const steps = [
+    { id: 'setup', title: 'Setup' },
+    { id: 'sections', title: 'Sections' },
+    { id: 'operations', title: 'Operations' },
+    { id: 'roles-symbols', title: 'Roles And Symbols' },
+    { id: 'navigation-quota', title: 'Navigation And Quota' },
+    { id: 'data-storage', title: 'Data And Storage' },
+    { id: 'files', title: 'Files' },
+    { id: 'review', title: 'Review And Build' }
+  ];
+  const manifestFields = [
+    'sections',
+    'operations',
+    'roles',
+    'symbols',
+    'menuEntries',
+    'dashboardEntries',
+    'quotaDefinitions',
+    'uploadFolders',
+    'mongoIndexes',
+    'dataSchemas',
+    'seeders',
+    'migrations',
+    'upgradeGuards',
+    'dependencies'
+  ];
+
+  const state = {
+    currentStep: 0,
+    entityCatalog: [],
+    selectedFileFieldsByEntity: {},
+    manifestSelection: {},
+    fileSelection: { excludedRefs: [], selectedRefs: [] },
+    entitySelectionTouched: false,
+    lastReport: null
+  };
+
+  manifestFields.forEach((field) => {
+    state.manifestSelection[field] = { excludedIds: [], selectedIds: [], addedRows: [] };
+  });
 
   function escapeHtml(value = '') {
     return String(value || '')
@@ -256,19 +392,12 @@
       .replace(/'/g, '&#39;');
   }
 
-  function formatBytes(value = 0) {
-    const size = Number(value || 0);
-    if (!Number.isFinite(size) || size <= 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const power = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
-    const scaled = size / (1024 ** power);
-    const rounded = power === 0 ? scaled.toFixed(0) : scaled.toFixed(2);
-    return `${rounded} ${units[power]}`;
+  function parseLines(value) {
+    return String(value || '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
   }
 
   function setOutput(title, payload) {
-    const stamp = new Date().toISOString();
-    outputEl.textContent = `[${stamp}] ${title}\n${JSON.stringify(payload, null, 2)}`;
+    outputEl.textContent = `[${new Date().toISOString()}] ${title}\n${JSON.stringify(payload, null, 2)}`;
   }
 
   async function fetchJson(url, options = {}) {
@@ -276,384 +405,12 @@
     let payload = {};
     try { payload = await response.json(); } catch (_) {}
     if (!response.ok || payload.status === 'error') {
-      const message = payload.message || `Request failed (${response.status}).`;
-      const error = new Error(message);
-      if (payload?.code) error.code = payload.code;
+      const error = new Error(payload.message || `Request failed (${response.status}).`);
+      error.code = payload.code || '';
       error.payload = payload;
       throw error;
     }
     return payload;
-  }
-
-  function parseLines(value) {
-    return String(value || '')
-      .split(/\r?\n/)
-      .map((row) => row.trim())
-      .filter(Boolean);
-  }
-
-  function suggestNextVersion(version) {
-    const token = String(version || '').trim();
-    const match = token.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
-    if (!match) return '1.0.0';
-    const major = Number.parseInt(match[1], 10);
-    const minor = Number.parseInt(match[2], 10);
-    const patch = Number.parseInt(match[3], 10);
-    if (![major, minor, patch].every(Number.isFinite)) return '1.0.0';
-    return `${major}.${minor}.${patch + 1}`;
-  }
-
-  function syncVersionSuggestion(force = false) {
-    const selected = packageEl?.options?.[packageEl.selectedIndex];
-    const currentVersion = String(selected?.getAttribute('data-version') || '').trim();
-    const packageId = String(packageEl?.value || '').trim();
-    const suggested = suggestNextVersion(currentVersion);
-    if (versionHintEl) {
-      versionHintEl.textContent = packageId
-        ? `Current ${currentVersion || 'unknown'} -> suggested ${suggested}`
-        : 'Select a package to suggest the next version.';
-    }
-    if (versionEl && packageId && (force || !versionEl.value.trim())) {
-      versionEl.value = suggested;
-    }
-    if (manifestModeEl) {
-      const supportsLiveManifest = ['school', 'pte', 'ielts', 'benchpath'].includes(packageId.toLowerCase());
-      Array.from(manifestModeEl.options).forEach((option) => {
-        if (option.value === 'live') option.disabled = !supportsLiveManifest;
-      });
-      if (!supportsLiveManifest && manifestModeEl.value === 'live') manifestModeEl.value = 'static';
-      if (supportsLiveManifest && force) manifestModeEl.value = 'live';
-    }
-  }
-
-  function setBuilderOriginOrgSelection(orgId, orgName = '') {
-    const normalizedOrgId = String(orgId || '').trim();
-    if (originOrgIdEl) originOrgIdEl.value = normalizedOrgId;
-    if (originOrgNameEl) {
-      const fallbackName = normalizedOrgId ? `Organization #${normalizedOrgId}` : 'Select organization...';
-      originOrgNameEl.value = String(orgName || fallbackName).trim();
-    }
-  }
-
-  function getSelectedEntities() {
-    return Array.from(document.querySelectorAll('.builder-entity-checkbox:checked'))
-      .map((node) => String(node.value || '').trim())
-      .filter(Boolean);
-  }
-
-  function setAllEntitiesChecked(checked) {
-    document.querySelectorAll('.builder-entity-checkbox').forEach((node) => {
-      node.checked = checked;
-    });
-    renderFileFieldList(entityCatalog);
-  }
-
-  function renderEntityList(rows = []) {
-    entityCatalog = Array.isArray(rows) ? rows : [];
-    if (!entityListEl) return;
-    if (!entityCatalog.length) {
-      entityListEl.innerHTML = '<div class="small text-muted">No package-owned tables found.</div>';
-      return;
-    }
-    entityListEl.innerHTML = entityCatalog.map((row) => {
-      const entityType = String(row?.entityType || row?.id || '').trim();
-      const rowCount = Number(row?.rowCount || 0);
-      const uploadCount = Number(row?.detectedUploadRefCount || 0);
-      const remap = row?.remapCandidates || {};
-      const remapFieldMap = row?.remapFieldMap || {};
-      const orgFieldPaths = Array.isArray(remapFieldMap.orgFieldPaths) ? remapFieldMap.orgFieldPaths : [];
-      const uploadUrlFieldPaths = Array.isArray(remapFieldMap.uploadUrlFieldPaths) ? remapFieldMap.uploadUrlFieldPaths : [];
-      const remapOrgPathCount = orgFieldPaths.length;
-      const remapUploadPathCount = uploadUrlFieldPaths.length;
-      const orgFieldPathPreview = orgFieldPaths.slice(0, 3).join(', ');
-      const uploadFieldPathPreview = uploadUrlFieldPaths.slice(0, 3).join(', ');
-      const selected = row?.selected !== false;
-      return `
-        <label class="d-flex align-items-start gap-2 py-1 border-bottom">
-          <input type="checkbox" class="form-check-input mt-1 builder-entity-checkbox" value="${entityType.replace(/"/g, '&quot;')}" ${selected ? 'checked' : ''}>
-          <span class="small">
-            <span class="fw-semibold">${entityType}</span>
-            <span class="text-muted ms-1">(${rowCount} row${rowCount === 1 ? '' : 's'})</span>
-            <div class="text-muted">
-              Upload refs: ${uploadCount} | Remap fields: ${Number(remap.orgFieldCount || 0)} | Upload URLs: ${Number(remap.uploadUrlCount || 0)} | ORG tokens: ${Number(remap.exactOrgTokenCount || 0)}
-            </div>
-            <div class="text-muted">
-              Remap path map: org fields ${remapOrgPathCount} | upload URL fields ${remapUploadPathCount}
-            </div>
-            ${orgFieldPathPreview ? `<div class="text-muted"><span class="fw-semibold">Org paths:</span> ${orgFieldPathPreview.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
-            ${uploadFieldPathPreview ? `<div class="text-muted"><span class="fw-semibold">Upload URL paths:</span> ${uploadFieldPathPreview.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
-          </span>
-        </label>
-      `;
-    }).join('');
-  }
-
-  function getCurrentSelectedEntitySet() {
-    const values = Array.from(document.querySelectorAll('.builder-entity-checkbox:checked'))
-      .map((node) => String(node.value || '').trim())
-      .filter(Boolean);
-    return new Set(values);
-  }
-
-  function getEntityCandidates(entityType) {
-    const row = entityCatalog.find((item) => String(item?.entityType || item?.id || '').trim() === entityType);
-    return Array.isArray(row?.fileFieldCandidates) ? row.fileFieldCandidates.map((token) => String(token || '').trim()).filter(Boolean) : [];
-  }
-
-  function normalizeSelectedFileFields(entityType, fields) {
-    const candidates = new Set(getEntityCandidates(entityType));
-    return Array.from(new Set((Array.isArray(fields) ? fields : [])
-      .map((token) => String(token || '').trim())
-      .filter((token) => token && candidates.has(token))));
-  }
-
-  function seedSelectedFileFieldState(rows = []) {
-    const next = {};
-    const selectedEntities = getCurrentSelectedEntitySet();
-    (Array.isArray(rows) ? rows : []).forEach((row) => {
-      const entityType = String(row?.entityType || row?.id || '').trim();
-      if (!entityType || !selectedEntities.has(entityType)) return;
-      const current = Array.isArray(selectedFileFieldsByEntity[entityType]) ? selectedFileFieldsByEntity[entityType] : [];
-      const fallback = Array.isArray(row?.fileFieldSelected) ? row.fileFieldSelected : [];
-      next[entityType] = normalizeSelectedFileFields(entityType, current.length ? current : fallback);
-    });
-    selectedFileFieldsByEntity = next;
-  }
-
-  function addSelectedFileField(entityType, fieldPath) {
-    const token = String(fieldPath || '').trim();
-    if (!entityType || !token) return;
-    const next = normalizeSelectedFileFields(entityType, [
-      ...(Array.isArray(selectedFileFieldsByEntity[entityType]) ? selectedFileFieldsByEntity[entityType] : []),
-      token
-    ]);
-    selectedFileFieldsByEntity[entityType] = next;
-  }
-
-  function removeSelectedFileField(entityType, fieldPath) {
-    const token = String(fieldPath || '').trim();
-    if (!entityType || !token) return;
-    const rows = Array.isArray(selectedFileFieldsByEntity[entityType]) ? selectedFileFieldsByEntity[entityType] : [];
-    selectedFileFieldsByEntity[entityType] = rows.filter((row) => row !== token);
-  }
-
-  function clearSelectedFileFields(entityType) {
-    if (!entityType) return;
-    selectedFileFieldsByEntity[entityType] = [];
-  }
-
-  function addAllDetectedFileFields() {
-    const selectedEntities = getCurrentSelectedEntitySet();
-    selectedEntities.forEach((entityType) => {
-      selectedFileFieldsByEntity[entityType] = normalizeSelectedFileFields(entityType, getEntityCandidates(entityType));
-    });
-    renderFileFieldList(entityCatalog);
-  }
-
-  function clearAllSelectedFileFields() {
-    const selectedEntities = getCurrentSelectedEntitySet();
-    selectedEntities.forEach((entityType) => {
-      selectedFileFieldsByEntity[entityType] = [];
-    });
-    renderFileFieldList(entityCatalog);
-  }
-
-  function renderFileFieldList(rows = []) {
-    if (!fileFieldListEl) return;
-    const catalog = Array.isArray(rows) ? rows : [];
-    seedSelectedFileFieldState(catalog);
-    const selectedEntities = getCurrentSelectedEntitySet();
-    const selectedRows = catalog.filter((row) => {
-      const entityType = String(row?.entityType || row?.id || '').trim();
-      return entityType && selectedEntities.has(entityType);
-    });
-    if (!selectedRows.length) {
-      fileFieldListEl.innerHTML = '<div class="small text-muted">Select at least one table above to configure file field extraction.</div>';
-      return;
-    }
-    const selectableRows = selectedRows.filter((row) => {
-      const entityType = String(row?.entityType || row?.id || '').trim();
-      return entityType && getEntityCandidates(entityType).length > 0;
-    });
-    if (!selectableRows.length) {
-      fileFieldListEl.innerHTML = '<div class="small text-muted">No upload-address fields detected in selected tables. Use Manual File/Folder Refs if needed.</div>';
-      return;
-    }
-
-    const cards = selectableRows.map((row) => {
-      const entityType = String(row?.entityType || row?.id || '').trim();
-      const rowCount = Number(row?.rowCount || 0);
-      const candidates = getEntityCandidates(entityType);
-      const selected = Array.isArray(selectedFileFieldsByEntity[entityType]) ? selectedFileFieldsByEntity[entityType] : [];
-      const hasCandidates = candidates.length > 0;
-      const selectedMarkup = selected.length
-        ? selected.map((fieldPath) => `
-          <span class="badge bg-light text-dark border d-inline-flex align-items-center gap-2">
-            <code>${fieldPath.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>
-            <button
-              type="button"
-              class="btn btn-sm p-0 text-danger builder-file-field-remove-btn"
-              data-entity-type="${entityType.replace(/"/g, '&quot;')}"
-              data-field-path="${fieldPath.replace(/"/g, '&quot;')}"
-              title="Remove field">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </span>
-        `).join('')
-        : '<span class="small text-muted">No selected file fields.</span>';
-
-      return `
-        <div class="border rounded p-2 mb-2" data-file-field-card="${entityType.replace(/"/g, '&quot;')}">
-          <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-            <div>
-              <div class="small fw-semibold">${entityType}</div>
-              <div class="small text-muted">${rowCount} row${rowCount === 1 ? '' : 's'} | ${candidates.length} upload field candidate${candidates.length === 1 ? '' : 's'}</div>
-            </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <select class="form-select form-select-sm builder-file-field-picker" data-entity-type="${entityType.replace(/"/g, '&quot;')}" style="min-width: 320px;" ${hasCandidates ? '' : 'disabled'}>
-                ${hasCandidates
-                  ? (`<option value="">Select upload field</option>${candidates.map((fieldPath) => `<option value="${fieldPath.replace(/"/g, '&quot;')}">${fieldPath.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`).join('')}`)
-                  : '<option value="">No upload fields detected</option>'}
-              </select>
-              <button type="button" class="btn btn-outline-secondary btn-sm builder-file-field-add-btn" data-entity-type="${entityType.replace(/"/g, '&quot;')}" ${hasCandidates ? '' : 'disabled'}>Add</button>
-              <button type="button" class="btn btn-outline-secondary btn-sm builder-file-field-clear-btn" data-entity-type="${entityType.replace(/"/g, '&quot;')}">Clear</button>
-            </div>
-          </div>
-          <div class="d-flex flex-wrap gap-2 mt-2">${selectedMarkup}</div>
-        </div>
-      `;
-    });
-    fileFieldListEl.innerHTML = cards.join('');
-  }
-
-  function getFileFieldSelection() {
-    const map = {};
-    const selectedEntities = getCurrentSelectedEntitySet();
-    selectedEntities.forEach((entityType) => {
-      const rows = normalizeSelectedFileFields(entityType, selectedFileFieldsByEntity[entityType] || []);
-      map[entityType] = rows;
-    });
-    return map;
-  }
-
-  function clearArtifactLinks() {
-    if (!artifactLinksWrapEl || !artifactLinksListEl) return;
-    artifactLinksListEl.innerHTML = '';
-    if (artifactHealthAlertEl) {
-      artifactHealthAlertEl.classList.add('d-none');
-      artifactHealthAlertEl.textContent = '';
-    }
-    artifactLinksWrapEl.classList.add('d-none');
-  }
-
-  function renderArtifactLinks(report = {}) {
-    if (!artifactLinksWrapEl || !artifactLinksListEl) return;
-    const rows = Array.isArray(report?.publishedArtifacts?.files) ? report.publishedArtifacts.files : [];
-    const links = rows
-      .map((row) => ({
-        fileName: String(row?.fileName || '').trim(),
-        url: String(row?.uploadsUrl || '').trim(),
-        size: Number(row?.size || 0),
-        sha256: String(row?.sha256 || '').trim()
-      }))
-      .filter((row) => row.fileName && row.url);
-    if (!links.length) {
-      clearArtifactLinks();
-      return;
-    }
-    artifactLinksListEl.innerHTML = `
-      <div class="list-group">
-        ${links.map((row) => `
-          <div class="list-group-item d-flex align-items-center justify-content-between gap-2 flex-wrap">
-            <div class="small">
-              <div class="fw-semibold">${escapeHtml(row.fileName)}</div>
-              <div class="text-muted">Size: ${escapeHtml(formatBytes(row.size))}${row.sha256 ? ` | SHA-256: <code>${escapeHtml(row.sha256)}</code>` : ''}</div>
-            </div>
-            <a class="btn btn-outline-primary btn-sm" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">
-              <i class="bi bi-download me-1"></i>Download
-            </a>
-          </div>
-        `).join('')}
-      </div>
-    `;
-    const selectedRefCount = Number(report?.fileSummary?.selectedRefCount || 0);
-    const copiedCount = Number(report?.fileSummary?.copiedCount || 0);
-    if (artifactHealthAlertEl) {
-      if (selectedRefCount > 0 && copiedCount === 0) {
-        artifactHealthAlertEl.className = 'alert alert-warning py-2 px-3 small mb-2';
-        artifactHealthAlertEl.textContent = 'No referenced upload files were copied into the package payload. Check upload paths or gateway availability, then rebuild.';
-        artifactHealthAlertEl.classList.remove('d-none');
-      } else if (selectedRefCount > copiedCount) {
-        artifactHealthAlertEl.className = 'alert alert-info py-2 px-3 small mb-2';
-        artifactHealthAlertEl.textContent = `Only ${copiedCount} of ${selectedRefCount} referenced upload file(s) were copied. Review warnings before install.`;
-        artifactHealthAlertEl.classList.remove('d-none');
-      } else {
-        artifactHealthAlertEl.classList.add('d-none');
-        artifactHealthAlertEl.textContent = '';
-      }
-    }
-    artifactLinksWrapEl.classList.remove('d-none');
-  }
-
-  async function runWithWaiting(label, action, options = {}) {
-    const config = options && typeof options === 'object' ? options : {};
-    const initialProgress = Number.isFinite(Number(config.initialProgress))
-      ? Math.max(0, Math.min(100, Number(config.initialProgress)))
-      : 8;
-    const maxProgress = Number.isFinite(Number(config.maxProgress))
-      ? Math.max(initialProgress, Math.min(99, Number(config.maxProgress)))
-      : 88;
-    const progressStep = Number.isFinite(Number(config.progressStep))
-      ? Math.max(1, Math.min(20, Number(config.progressStep)))
-      : 3;
-    const tickMs = Number.isFinite(Number(config.tickMs))
-      ? Math.max(200, Number(config.tickMs))
-      : 700;
-
-    let loadingToken = null;
-    let progressTimer = null;
-    let currentProgress = initialProgress;
-    if (typeof showLoading === 'function') {
-      loadingToken = showLoading({
-        title: label || 'Please wait...',
-        note: config.initialNote || 'Preparing request...',
-        operation: config.operation || 'Package Builder',
-        progress: currentProgress
-      });
-      progressTimer = window.setInterval(() => {
-        currentProgress = Math.min(maxProgress, currentProgress + progressStep);
-        if (typeof updateLoading === 'function') {
-          updateLoading({
-            note: config.runningNote || 'Processing package request...',
-            progress: currentProgress
-          });
-        } else if (typeof setLoadingProgress === 'function') {
-          setLoadingProgress(currentProgress);
-        }
-      }, tickMs);
-    }
-    try {
-      if (typeof updateLoading === 'function') {
-        updateLoading({
-          note: config.startNote || 'Sending request...',
-          progress: Math.min(maxProgress, initialProgress + progressStep)
-        });
-      }
-      return await action();
-    } finally {
-      if (progressTimer) window.clearInterval(progressTimer);
-      if (typeof updateLoading === 'function') {
-        updateLoading({
-          note: config.finishNote || 'Finalizing response...',
-          progress: 100
-        });
-      } else if (typeof setLoadingProgress === 'function') {
-        setLoadingProgress(100);
-      }
-      if (typeof hideLoading === 'function') {
-        window.setTimeout(() => hideLoading(loadingToken || undefined), 180);
-      }
-    }
   }
 
   function showError(error) {
@@ -671,240 +428,561 @@
         icon: 'error',
         buttons: [{ text: 'Close', class: 'btn-danger' }]
       });
-      return;
+    } else {
+      alert(message);
     }
-    alert(message);
   }
 
-  async function requireAdminVerification() {
-    if (typeof window.requestProtectedAction !== 'function') {
-      throw new Error('Admin verification modal is unavailable. Refresh and try again.');
-    }
-    await window.requestProtectedAction();
+  function suggestNextVersion(version) {
+    const token = String(version || '').trim();
+    const match = token.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
+    if (!match) return '1.0.0';
+    return `${Number(match[1])}.${Number(match[2])}.${Number(match[3]) + 1}`;
   }
 
-  async function preflightBuild() {
+  function syncVersionSuggestion(force = false) {
+    const selected = packageEl?.options?.[packageEl.selectedIndex];
+    const currentVersion = String(selected?.getAttribute('data-version') || '').trim();
     const packageId = String(packageEl?.value || '').trim();
-    const originOrgId = String(originOrgIdEl?.value || '').trim();
-    if (!packageId) {
-      showError(new Error('Select a package first.'));
-      return;
+    const suggested = suggestNextVersion(currentVersion);
+    if (versionHintEl) {
+      versionHintEl.textContent = packageId
+        ? `Current ${currentVersion || 'unknown'} -> suggested ${suggested}`
+        : 'Select a package to suggest the next version.';
     }
-    if (!originOrgId) {
-      showError(new Error('Select origin organization first.'));
-      return;
-    }
-    const selectedDataEntities = getSelectedEntities();
-    if (!selectedDataEntities.length) {
-      showError(new Error('Select at least one table/collection to package.'));
-      return;
-    }
-    const payload = await runWithWaiting('Running package preflight...', async () => fetchJson('/systemSettings/package-builder/preflight', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-ajax-request': 'yes'
-      },
-      body: JSON.stringify({
-        packageId,
-        manifestMode: manifestModeEl?.value || 'static',
-        originOrgId,
-        actionStateId,
-        selectedDataEntities,
-        selectedFileRefs: parseLines(fileRefsEl?.value || ''),
-        fileFieldSelection: getFileFieldSelection()
-      })
-    }), {
-      initialNote: 'Preparing preflight payload...',
-      runningNote: 'Evaluating selected tables and upload references...',
-      finishNote: 'Preparing preflight report...',
-      initialProgress: 10,
-      maxProgress: 86
-    });
-    if (Array.isArray(payload?.report?.entityCatalog)) {
-      renderEntityList(payload.report.entityCatalog);
-      renderFileFieldList(payload.report.entityCatalog);
-    }
-    clearArtifactLinks();
-    setOutput('Preflight Result', payload);
-    if (typeof showMessageModal === 'function') {
-      const blocking = payload?.report?.scopeValidation?.blocking === true;
-      showMessageModal({
-        title: blocking ? 'Preflight Blocked' : 'Preflight Complete',
-        message: blocking
-          ? 'Blocking scope violations were found. Review Builder Output and fix violations before build.'
-          : (payload.message || 'Preflight completed successfully.'),
-        icon: blocking ? 'warning' : 'success',
-        buttons: [{ text: 'OK', class: blocking ? 'btn-warning' : 'btn-success' }]
+    if (versionEl && packageId && (force || !versionEl.value.trim())) versionEl.value = suggested;
+    if (manifestModeEl) {
+      const supportsLiveManifest = ['school', 'pte', 'ielts', 'benchpath'].includes(packageId.toLowerCase());
+      Array.from(manifestModeEl.options).forEach((option) => {
+        if (option.value === 'live') option.disabled = !supportsLiveManifest;
       });
+      if (!supportsLiveManifest && manifestModeEl.value === 'live') manifestModeEl.value = 'static';
+      if (supportsLiveManifest && force) manifestModeEl.value = 'live';
     }
+  }
+
+  function setBuilderOriginOrgSelection(orgId, orgName = '') {
+    const normalizedOrgId = String(orgId || '').trim();
+    if (originOrgIdEl) originOrgIdEl.value = normalizedOrgId;
+    if (originOrgNameEl) originOrgNameEl.value = orgName || (normalizedOrgId ? `Organization #${normalizedOrgId}` : '');
+  }
+
+  function updateWizard() {
+    const progress = ((state.currentStep + 1) / steps.length) * 100;
+    stepBadgeEl.textContent = `Step ${state.currentStep + 1} of ${steps.length}`;
+    progressPctEl.textContent = `${Math.round(progress)}%`;
+    progressBarEl.style.width = `${progress}%`;
+    stepRailEl.innerHTML = steps.map((step, index) => {
+      const cls = index === state.currentStep ? 'active' : (index < state.currentStep ? 'completed' : '');
+      return `<button type="button" class="wizard-step-pill ${cls}" data-step-index="${index}">${index + 1}. ${escapeHtml(step.title)}</button>`;
+    }).join('');
+    document.querySelectorAll('.builder-step-panel').forEach((panel) => {
+      panel.classList.toggle('active', panel.getAttribute('data-builder-step') === steps[state.currentStep].id);
+    });
+    document.getElementById('builderPrevStepBtn').disabled = state.currentStep <= 0;
+    document.getElementById('builderNextStepBtn').innerHTML = state.currentStep >= steps.length - 1
+      ? 'Stay On Review<i class="bi bi-check2-circle ms-1"></i>'
+      : 'Next<i class="bi bi-arrow-right ms-1"></i>';
+  }
+
+  function getSelectedEntities() {
+    return Array.from(document.querySelectorAll('.builder-entity-checkbox:checked'))
+      .map((node) => String(node.value || '').trim())
+      .filter(Boolean);
+  }
+
+  function getSelectedEntitiesForPayload() {
+    const selected = getSelectedEntities();
+    if (state.entitySelectionTouched && selected.length === 0) return ['__none__'];
+    return selected;
+  }
+
+  function getCurrentSelectedEntitySet() {
+    return new Set(getSelectedEntities());
+  }
+
+  function normalizeFieldSelection(field, values = []) {
+    const current = state.manifestSelection[field] || { excludedIds: [], selectedIds: [], addedRows: [] };
+    current.excludedIds = Array.from(new Set(values.map((item) => String(item || '').trim()).filter(Boolean)));
+    state.manifestSelection[field] = current;
+  }
+
+  function rowKey(row = {}, field = '') {
+    if (typeof row === 'string') return row;
+    if (field === 'quotaDefinitions') {
+      if (row.key || row.middlewareKey || row.id) return String(row.key || row.middlewareKey || row.id);
+      if (row.sectionId && row.operationId) return `${row.sectionId}::${row.operationId}`;
+    }
+    if (field === 'dataEntities' || field === 'dataSchemas') return String(row.entityType || row.table || row.id || row.name || '');
+    if (field === 'dependencies') return String(row.id || row.packageId || row.name || '');
+    return String(row.id || row.name || row.key || row.code || row.roleId || row.sectionId || row.operationId || row.href || '');
+  }
+
+  function getFieldSelection(field) {
+    if (!state.manifestSelection[field]) {
+      state.manifestSelection[field] = { excludedIds: [], selectedIds: [], addedRows: [] };
+    }
+    return state.manifestSelection[field];
+  }
+
+  function addManifestRow(field, row) {
+    const selection = getFieldSelection(field);
+    const key = rowKey(row?.row || row, field);
+    if (!key) return;
+    const exists = selection.addedRows.some((item) => rowKey(item, field) === key);
+    if (!exists) selection.addedRows.push(row?.row || row);
+    selection.excludedIds = selection.excludedIds.filter((item) => item !== key);
+    runPreflight({ silent: true }).catch(showError);
+  }
+
+  function removeManifestRow(field, key, manuallyAdded) {
+    const selection = getFieldSelection(field);
+    if (manuallyAdded) {
+      selection.addedRows = selection.addedRows.filter((row) => rowKey(row, field) !== key);
+    } else if (!selection.excludedIds.includes(key)) {
+      selection.excludedIds.push(key);
+    }
+    runPreflight({ silent: true }).catch(showError);
+  }
+
+  function restoreManifestRow(field, key) {
+    const selection = getFieldSelection(field);
+    selection.excludedIds = selection.excludedIds.filter((item) => item !== key);
+    runPreflight({ silent: true }).catch(showError);
+  }
+
+  function renderManifestField(field) {
+    const container = document.querySelector(`[data-manifest-list="${field}"]`);
+    if (!container) return;
+    const preview = state.lastReport?.manifestPreview?.[field];
+    const rows = Array.isArray(preview?.rows) ? preview.rows : [];
+    if (!rows.length) {
+      container.innerHTML = '<div class="small text-muted">Run preflight to load this catalog.</div>';
+      return;
+    }
+    container.innerHTML = rows.map((item) => {
+      const key = String(item.key || item.id || '').trim();
+      const removed = item.removed === true || item.selected === false;
+      const source = item.manuallyAdded ? 'manual' : (item.source || 'auto');
+      return `
+        <div class="builder-item-card ${removed ? 'removed' : ''}">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="small">
+              <div class="fw-bold">${escapeHtml(item.label || key)}</div>
+              <div class="text-muted"><code>${escapeHtml(key)}</code> | ${escapeHtml(source)}${removed ? ' | excluded from build' : ''}</div>
+            </div>
+            <div class="d-flex gap-2">
+              ${removed
+                ? `<button type="button" class="btn btn-outline-success btn-sm builder-restore-manifest-btn" data-field="${field}" data-key="${escapeHtml(key)}">Restore</button>`
+                : `<button type="button" class="btn btn-outline-danger btn-sm builder-remove-manifest-btn" data-field="${field}" data-key="${escapeHtml(key)}" data-manual="${item.manuallyAdded === true ? '1' : '0'}">Remove</button>`}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderEntityList(rows = []) {
+    state.entityCatalog = Array.isArray(rows) ? rows : [];
+    if (!entityListEl) return;
+    if (!state.entityCatalog.length) {
+      entityListEl.innerHTML = '<div class="small text-muted">No package-owned tables found.</div>';
+      return;
+    }
+    entityListEl.innerHTML = state.entityCatalog.map((row) => {
+      const entityType = String(row?.entityType || row?.id || '').trim();
+      const rowCount = Number(row?.rowCount || 0);
+      const uploadCount = Number(row?.detectedUploadRefCount || 0);
+      const selected = row?.selected !== false;
+      return `
+        <label class="d-flex align-items-start gap-2 py-2 border-bottom">
+          <input type="checkbox" class="form-check-input mt-1 builder-entity-checkbox" value="${escapeHtml(entityType)}" ${selected ? 'checked' : ''}>
+          <span class="small">
+            <span class="fw-semibold">${escapeHtml(entityType)}</span>
+            <span class="text-muted ms-1">(${rowCount} row${rowCount === 1 ? '' : 's'})</span>
+            <div class="text-muted">Upload refs: ${uploadCount} | File fields: ${Array.isArray(row.fileFieldCandidates) ? row.fileFieldCandidates.length : 0}</div>
+          </span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  function getEntityCandidates(entityType) {
+    const row = state.entityCatalog.find((item) => String(item?.entityType || item?.id || '') === entityType);
+    return Array.isArray(row?.fileFieldCandidates) ? row.fileFieldCandidates : [];
+  }
+
+  function normalizeSelectedFileFields(entityType, fields = []) {
+    const candidates = new Set(getEntityCandidates(entityType));
+    return Array.from(new Set((fields || []).filter((field) => candidates.has(field))));
+  }
+
+  function renderFileFieldList() {
+    const selectedEntities = getCurrentSelectedEntitySet();
+    const rows = state.entityCatalog.filter((row) => selectedEntities.has(String(row?.entityType || row?.id || '')));
+    const selectableRows = rows.filter((row) => getEntityCandidates(String(row?.entityType || row?.id || '')).length > 0);
+    if (!selectableRows.length) {
+      fileFieldListEl.innerHTML = '<div class="small text-muted">No upload-address fields detected in selected tables.</div>';
+      return;
+    }
+    fileFieldListEl.innerHTML = selectableRows.map((row) => {
+      const entityType = String(row?.entityType || row?.id || '').trim();
+      const candidates = getEntityCandidates(entityType);
+      const selected = normalizeSelectedFileFields(entityType, state.selectedFileFieldsByEntity[entityType] || row.fileFieldSelected || []);
+      state.selectedFileFieldsByEntity[entityType] = selected;
+      return `
+        <div class="border rounded p-2 mb-2">
+          <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+            <div>
+              <div class="small fw-semibold">${escapeHtml(entityType)}</div>
+              <div class="small text-muted">${candidates.length} upload field candidate${candidates.length === 1 ? '' : 's'}</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <select class="form-select form-select-sm builder-file-field-picker" data-entity-type="${escapeHtml(entityType)}" style="min-width: 260px;">
+                <option value="">Select upload field</option>
+                ${candidates.map((field) => `<option value="${escapeHtml(field)}">${escapeHtml(field)}</option>`).join('')}
+              </select>
+              <button type="button" class="btn btn-outline-secondary btn-sm builder-file-field-add-btn" data-entity-type="${escapeHtml(entityType)}">Add</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm builder-file-field-clear-btn" data-entity-type="${escapeHtml(entityType)}">Clear</button>
+            </div>
+          </div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            ${selected.length ? selected.map((field) => `
+              <span class="badge bg-light text-dark border">
+                <code>${escapeHtml(field)}</code>
+                <button type="button" class="btn btn-sm p-0 text-danger ms-1 builder-file-field-remove-btn" data-entity-type="${escapeHtml(entityType)}" data-field-path="${escapeHtml(field)}"><i class="bi bi-x-lg"></i></button>
+              </span>
+            `).join('') : '<span class="small text-muted">No selected file fields.</span>'}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderFileTreeNode(node) {
+    if (!node) return '';
+    if (node.type === 'file') {
+      const checked = node.selected !== false ? 'checked' : '';
+      const missing = node.exists === false ? '<span class="badge bg-danger-subtle text-danger border ms-1">missing</span>' : '';
+      return `
+        <li class="builder-file-node">
+          <label class="small d-flex align-items-center gap-2">
+            <input type="checkbox" class="form-check-input builder-file-checkbox" data-ref="${escapeHtml(node.ref || '')}" ${checked}>
+            <span><i class="bi bi-file-earmark me-1"></i>${escapeHtml(node.name || '')}${missing}</span>
+          </label>
+        </li>
+      `;
+    }
+    const children = Array.isArray(node.children) ? node.children : [];
+    return `
+      <li class="builder-file-node">
+        <details open>
+          <summary class="small fw-semibold"><i class="bi bi-folder2-open me-1"></i>${escapeHtml(node.name || 'folder')} <span class="text-muted">(${Number(node.fileCount || 0)} files)</span></summary>
+          <ul>${children.map(renderFileTreeNode).join('')}</ul>
+        </details>
+      </li>
+    `;
+  }
+
+  function renderFileTree() {
+    const tree = state.lastReport?.filePlan?.fileTree;
+    if (!tree || !Array.isArray(tree.children) || !tree.children.length) {
+      fileTreeEl.innerHTML = '<div class="small text-muted">No package file refs detected yet.</div>';
+      return;
+    }
+    fileTreeEl.innerHTML = `<ul>${tree.children.map(renderFileTreeNode).join('')}</ul>`;
+  }
+
+  function renderReviewSummary() {
+    if (!state.lastReport) {
+      reviewSummaryEl.innerHTML = 'Run preflight to prepare review summary.';
+      return;
+    }
+    const report = state.lastReport;
+    const selectedDeclarations = Object.values(report.manifestPreview || {}).reduce((sum, group) => sum + Number(group?.selectedCount || 0), 0);
+    const removedDeclarations = Object.values(report.manifestPreview || {}).reduce((sum, group) => sum + Number(group?.removedCount || 0), 0);
+    const warnings = Array.isArray(report.warnings) ? report.warnings : [];
+    reviewSummaryEl.innerHTML = `
+      <div class="fw-bold mb-2">${escapeHtml(report.package?.packageId || '')} build review</div>
+      <div class="small">Manifest source: <strong>${escapeHtml(report.manifestMode || '')}</strong></div>
+      <div class="small">Selected declarations: <strong>${selectedDeclarations}</strong></div>
+      <div class="small">Excluded declarations: <strong>${removedDeclarations}</strong></div>
+      <div class="small">Selected tables: <strong>${Number(report.selectedDataEntities?.length || 0)}</strong></div>
+      <div class="small">Selected rows: <strong>${Number(report.selectedRowCount || 0)}</strong></div>
+      <div class="small">Selected files: <strong>${Number(report.filePlan?.selectedRefs?.length || 0)}</strong></div>
+      <div class="small">Warnings: <strong>${warnings.length}</strong></div>
+      ${warnings.length ? `<hr><div class="small text-warning fw-semibold mb-1">Warnings</div><ul class="small mb-0 ps-3">${warnings.slice(0, 8).map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>` : ''}
+    `;
+  }
+
+  function renderArtifactLinks(report = {}) {
+    const rows = Array.isArray(report?.publishedArtifacts?.files) ? report.publishedArtifacts.files : [];
+    const links = rows.filter((row) => row?.fileName && row?.uploadsUrl);
+    if (!links.length) {
+      artifactLinksWrapEl.classList.add('d-none');
+      artifactLinksListEl.innerHTML = '';
+      return;
+    }
+    artifactLinksListEl.innerHTML = `<div class="list-group">${links.map((row) => `
+      <div class="list-group-item d-flex justify-content-between align-items-center gap-2 flex-wrap">
+        <div class="small"><div class="fw-semibold">${escapeHtml(row.fileName)}</div><div class="text-muted">${Number(row.size || 0)} bytes</div></div>
+        <a class="btn btn-outline-primary btn-sm" href="${escapeHtml(row.uploadsUrl)}" target="_blank" rel="noopener"><i class="bi bi-download me-1"></i>Download</a>
+      </div>
+    `).join('')}</div>`;
+    const selectedRefCount = Number(report?.fileSummary?.selectedRefCount || 0);
+    const copiedCount = Number(report?.fileSummary?.copiedCount || 0);
+    if (selectedRefCount > 0 && copiedCount === 0) {
+      artifactHealthAlertEl.className = 'alert alert-warning py-2 px-3 small mb-2';
+      artifactHealthAlertEl.textContent = 'No referenced upload files were copied into the package payload. Review warnings before install.';
+      artifactHealthAlertEl.classList.remove('d-none');
+    } else {
+      artifactHealthAlertEl.classList.add('d-none');
+      artifactHealthAlertEl.textContent = '';
+    }
+    artifactLinksWrapEl.classList.remove('d-none');
+  }
+
+  function renderAll() {
+    manifestFields.forEach(renderManifestField);
+    renderEntityList(state.entityCatalog);
+    renderFileFieldList();
+    renderFileTree();
+    renderReviewSummary();
+  }
+
+  function getFileFieldSelection() {
+    const map = {};
+    getCurrentSelectedEntitySet().forEach((entityType) => {
+      map[entityType] = normalizeSelectedFileFields(entityType, state.selectedFileFieldsByEntity[entityType] || []);
+    });
+    return map;
+  }
+
+  function buildRequestPayload() {
+    return {
+      packageId: String(packageEl?.value || '').trim(),
+      manifestMode: manifestModeEl?.value || 'static',
+      version: versionEl?.value || '',
+      buildNote: buildNoteEl?.value || '',
+      originOrgId: String(originOrgIdEl?.value || '').trim(),
+      actionStateId,
+      selectedDataEntities: getSelectedEntitiesForPayload(),
+      selectedFileRefs: parseLines(fileRefsEl?.value || ''),
+      fileFieldSelection: getFileFieldSelection(),
+      manifestSelection: state.manifestSelection,
+      fileSelection: state.fileSelection
+    };
+  }
+
+  async function runWithWaiting(label, action) {
+    let loadingToken = null;
+    if (typeof showLoading === 'function') {
+      loadingToken = showLoading({ title: label, note: 'Preparing request...', operation: 'Package Builder', progress: 10 });
+    }
+    try {
+      return await action();
+    } finally {
+      if (typeof hideLoading === 'function') window.setTimeout(() => hideLoading(loadingToken || undefined), 180);
+    }
+  }
+
+  async function runPreflight(options = {}) {
+    const payload = buildRequestPayload();
+    if (!payload.packageId) throw new Error('Select a package first.');
+    if (!payload.originOrgId) throw new Error('Select origin organization first.');
+    const response = await runWithWaiting('Running package preflight...', () => fetchJson('/systemSettings/package-builder/preflight', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ajax-request': 'yes' },
+      body: JSON.stringify(payload)
+    }));
+    state.lastReport = response.report || null;
+    state.entityCatalog = Array.isArray(response?.report?.entityCatalog) ? response.report.entityCatalog : [];
+    state.fileSelection.excludedRefs = Array.isArray(response?.report?.filePlan?.excludedRefs) ? response.report.filePlan.excludedRefs : state.fileSelection.excludedRefs;
+    renderAll();
+    if (!options.silent) setOutput('Preflight Result', response);
+    return response;
   }
 
   async function buildPackage() {
-    const packageId = String(packageEl?.value || '').trim();
-    const version = String(versionEl?.value || '').trim();
-    const originOrgId = String(originOrgIdEl?.value || '').trim();
-    if (!packageId) {
-      showError(new Error('Select a package first.'));
-      return;
-    }
-    if (!originOrgId) {
-      showError(new Error('Select origin organization first.'));
-      return;
-    }
-    if (!version) {
-      showError(new Error('Enter target version.'));
-      return;
-    }
-    const selectedDataEntities = getSelectedEntities();
-    if (!selectedDataEntities.length) {
-      showError(new Error('Select at least one table/collection to package.'));
-      return;
-    }
-    await requireAdminVerification();
-    const payload = await runWithWaiting('Building signed package...', async () => fetchJson('/systemSettings/package-builder/build', {
+    const payload = buildRequestPayload();
+    if (!payload.packageId) throw new Error('Select a package first.');
+    if (!payload.originOrgId) throw new Error('Select origin organization first.');
+    if (!payload.version) throw new Error('Enter target version.');
+    if (!getSelectedEntities().length) throw new Error('Select at least one table/collection to package.');
+    if (typeof window.requestProtectedAction !== 'function') throw new Error('Admin verification modal is unavailable. Refresh and try again.');
+    await window.requestProtectedAction();
+    const response = await runWithWaiting('Building signed package...', () => fetchJson('/systemSettings/package-builder/build', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-ajax-request': 'yes'
-      },
-      body: JSON.stringify({
-        packageId,
-        manifestMode: manifestModeEl?.value || 'static',
-        version,
-        buildNote: buildNoteEl?.value || '',
-        originOrgId,
-        actionStateId,
-        selectedDataEntities,
-        selectedFileRefs: parseLines(fileRefsEl?.value || ''),
-        fileFieldSelection: getFileFieldSelection()
-      })
-    }), {
-      initialNote: 'Preparing package build request...',
-      runningNote: 'Building package payload and publishing artifacts...',
-      finishNote: 'Completing build response...',
-      initialProgress: 12,
-      maxProgress: 92,
-      progressStep: 2,
-      tickMs: 800
-    });
-    setOutput('Build Result', payload);
-    renderArtifactLinks(payload?.report || {});
+      headers: { 'content-type': 'application/json', 'x-ajax-request': 'yes' },
+      body: JSON.stringify(payload)
+    }));
+    setOutput('Build Result', response);
+    renderArtifactLinks(response.report || {});
     if (typeof showMessageModal === 'function') {
       showMessageModal({
         title: 'Build Completed',
-        message: payload.message || 'Package build completed successfully.',
+        message: response.message || 'Package build completed successfully.',
         icon: 'success',
         buttons: [{ text: 'OK', class: 'btn-success' }]
       });
     }
   }
 
-  async function loadEntityCatalog() {
+  function openManifestPicker(field) {
     const packageId = String(packageEl?.value || '').trim();
-    const originOrgId = String(originOrgIdEl?.value || '').trim();
-    if (!packageId) {
-      selectedFileFieldsByEntity = {};
-      renderEntityList([]);
-      renderFileFieldList([]);
-      return;
-    }
-    if (!originOrgId) {
-      selectedFileFieldsByEntity = {};
-      renderEntityList([]);
-      renderFileFieldList([]);
-      if (entityListEl) {
-        entityListEl.innerHTML = '<div class="small text-muted">Select origin org to load package tables.</div>';
+    if (!packageId) return showError(new Error('Select a package first.'));
+    if (!window.GenericPicker) return showError(new Error('Generic picker is not ready yet.'));
+    const common = {
+      title: `Add ${field}`,
+      multiselect: true,
+      onSelect: (items) => {
+        (Array.isArray(items) ? items : [items]).forEach((item) => addManifestRow(field, item?.row || item));
       }
+    };
+    if (field === 'sections' && window.GenericPickerPresets?.section) {
+      window.GenericPicker.open(window.GenericPickerPresets.section({ ...common, title: 'Add Sections', context: window.GenericPickerContexts?.allOrganizations?.() }));
       return;
     }
-    const payload = await runWithWaiting('Loading package tables...', async () => fetchJson('/systemSettings/package-builder/preflight', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-ajax-request': 'yes'
-      },
-      body: JSON.stringify({
-        packageId,
-        manifestMode: manifestModeEl?.value || 'static',
-        originOrgId,
-        actionStateId,
-        selectedDataEntities: [],
-        selectedFileRefs: parseLines(fileRefsEl?.value || ''),
-        fileFieldSelection: getFileFieldSelection()
-      })
-    }), {
-      initialNote: 'Loading table catalog...',
-      runningNote: 'Reading package-owned entities...',
-      finishNote: 'Finalizing table list...',
-      initialProgress: 10,
-      maxProgress: 84
+    if (field === 'operations' && window.GenericPickerPresets?.operation) {
+      window.GenericPicker.open(window.GenericPickerPresets.operation({ ...common, title: 'Add Operations', context: window.GenericPickerContexts?.allOrganizations?.() }));
+      return;
+    }
+    const params = new URLSearchParams({
+      packageId,
+      manifestMode: manifestModeEl?.value || 'static',
+      type: field
     });
-    const catalog = (Array.isArray(payload?.report?.entityCatalog) && payload.report.entityCatalog.length)
-      ? payload.report.entityCatalog
-      : (Array.isArray(payload?.report?.availableDataEntities) ? payload.report.availableDataEntities : []);
-    renderEntityList(catalog);
-    renderFileFieldList(catalog);
-    clearArtifactLinks();
-    setOutput('Entity Catalog Loaded', payload);
+    window.GenericPicker.open({
+      ...common,
+      title: `Add ${field.replace(/([A-Z])/g, ' $1')}`,
+      icon: 'bi-plus-circle',
+      apiEndpoint: `/systemSettings/package-builder/catalog?${params.toString()}`,
+      placeholder: 'Search catalog...',
+      renderer: (item) => {
+        const key = item?.key || item?.id || '';
+        return `<div class="fw-bold text-dark">${escapeHtml(item?.label || item?.name || key)}</div><small class="text-muted"><code>${escapeHtml(key)}</code> | ${escapeHtml(item?.source || 'catalog')}</small>`;
+      }
+    });
   }
 
-  document.getElementById('builderPreflightBtn')?.addEventListener('click', () => {
-    preflightBuild().catch(showError);
-  });
-  document.getElementById('builderBuildBtn')?.addEventListener('click', () => {
-    buildPackage().catch(showError);
-  });
-  document.getElementById('builderSelectAllEntitiesBtn')?.addEventListener('click', () => setAllEntitiesChecked(true));
-  document.getElementById('builderClearEntitiesBtn')?.addEventListener('click', () => setAllEntitiesChecked(false));
-  document.getElementById('builderAddAllFileFieldsBtn')?.addEventListener('click', () => addAllDetectedFileFields());
-  document.getElementById('builderClearSelectedFileFieldsBtn')?.addEventListener('click', () => clearAllSelectedFileFields());
-  entityListEl?.addEventListener('change', (event) => {
-    if (!event.target?.classList?.contains('builder-entity-checkbox')) return;
-    renderFileFieldList(entityCatalog);
-  });
-  fileFieldListEl?.addEventListener('click', (event) => {
-    const addBtn = event.target.closest('.builder-file-field-add-btn');
-    if (addBtn) {
-      const entityType = String(addBtn.getAttribute('data-entity-type') || '').trim();
-      if (!entityType) return;
-      const card = addBtn.closest('[data-file-field-card]');
-      const selectNode = card?.querySelector('.builder-file-field-picker');
-      const fieldPath = String(selectNode?.value || '').trim();
-      if (!fieldPath) return;
-      addSelectedFileField(entityType, fieldPath);
-      renderFileFieldList(entityCatalog);
+  function clearArtifactLinks() {
+    artifactLinksListEl.innerHTML = '';
+    artifactLinksWrapEl.classList.add('d-none');
+  }
+
+  document.addEventListener('click', (event) => {
+    const stepBtn = event.target.closest('[data-step-index]');
+    if (stepBtn) {
+      state.currentStep = Number(stepBtn.getAttribute('data-step-index') || 0);
+      updateWizard();
       return;
     }
-
-    const removeBtn = event.target.closest('.builder-file-field-remove-btn');
-    if (removeBtn) {
-      const entityType = String(removeBtn.getAttribute('data-entity-type') || '').trim();
-      const fieldPath = String(removeBtn.getAttribute('data-field-path') || '').trim();
-      removeSelectedFileField(entityType, fieldPath);
-      renderFileFieldList(entityCatalog);
+    const addManifestBtn = event.target.closest('[data-manifest-add]');
+    if (addManifestBtn) {
+      openManifestPicker(addManifestBtn.getAttribute('data-manifest-add'));
       return;
     }
-
-    const clearBtn = event.target.closest('.builder-file-field-clear-btn');
-    if (clearBtn) {
-      const entityType = String(clearBtn.getAttribute('data-entity-type') || '').trim();
-      clearSelectedFileFields(entityType);
-      renderFileFieldList(entityCatalog);
+    const removeManifestBtn = event.target.closest('.builder-remove-manifest-btn');
+    if (removeManifestBtn) {
+      removeManifestRow(removeManifestBtn.getAttribute('data-field'), removeManifestBtn.getAttribute('data-key'), removeManifestBtn.getAttribute('data-manual') === '1');
+      return;
+    }
+    const restoreManifestBtn = event.target.closest('.builder-restore-manifest-btn');
+    if (restoreManifestBtn) {
+      restoreManifestRow(restoreManifestBtn.getAttribute('data-field'), restoreManifestBtn.getAttribute('data-key'));
+      return;
+    }
+    const addFieldBtn = event.target.closest('.builder-file-field-add-btn');
+    if (addFieldBtn) {
+      const entityType = addFieldBtn.getAttribute('data-entity-type');
+      const select = addFieldBtn.parentElement?.querySelector('.builder-file-field-picker');
+      const field = String(select?.value || '').trim();
+      if (!field) return;
+      state.selectedFileFieldsByEntity[entityType] = Array.from(new Set([...(state.selectedFileFieldsByEntity[entityType] || []), field]));
+      renderFileFieldList();
+      return;
+    }
+    const removeFieldBtn = event.target.closest('.builder-file-field-remove-btn');
+    if (removeFieldBtn) {
+      const entityType = removeFieldBtn.getAttribute('data-entity-type');
+      const field = removeFieldBtn.getAttribute('data-field-path');
+      state.selectedFileFieldsByEntity[entityType] = (state.selectedFileFieldsByEntity[entityType] || []).filter((item) => item !== field);
+      renderFileFieldList();
+      return;
+    }
+    const clearFieldBtn = event.target.closest('.builder-file-field-clear-btn');
+    if (clearFieldBtn) {
+      state.selectedFileFieldsByEntity[clearFieldBtn.getAttribute('data-entity-type')] = [];
+      renderFileFieldList();
     }
   });
+
+  document.addEventListener('change', (event) => {
+    if (event.target?.classList?.contains('builder-entity-checkbox')) {
+      state.entitySelectionTouched = true;
+      renderFileFieldList();
+    }
+    if (event.target?.classList?.contains('builder-file-checkbox')) {
+      const ref = String(event.target.getAttribute('data-ref') || '').trim();
+      if (!ref) return;
+      const excluded = new Set(state.fileSelection.excludedRefs || []);
+      if (event.target.checked) excluded.delete(ref);
+      else excluded.add(ref);
+      state.fileSelection.excludedRefs = Array.from(excluded);
+    }
+  });
+
+  document.getElementById('builderPrevStepBtn')?.addEventListener('click', () => {
+    state.currentStep = Math.max(0, state.currentStep - 1);
+    updateWizard();
+  });
+  document.getElementById('builderNextStepBtn')?.addEventListener('click', () => {
+    state.currentStep = Math.min(steps.length - 1, state.currentStep + 1);
+    updateWizard();
+  });
+  document.getElementById('builderRefreshPreflightBtn')?.addEventListener('click', () => runPreflight().catch(showError));
+  document.getElementById('builderPreflightBtn')?.addEventListener('click', () => runPreflight().catch(showError));
+  document.getElementById('builderBuildBtn')?.addEventListener('click', () => buildPackage().catch(showError));
   document.getElementById('builderClearOutputBtn')?.addEventListener('click', () => {
     outputEl.textContent = 'Ready.';
     clearArtifactLinks();
   });
+  document.getElementById('builderSelectAllEntitiesBtn')?.addEventListener('click', () => {
+    state.entitySelectionTouched = true;
+    document.querySelectorAll('.builder-entity-checkbox').forEach((node) => { node.checked = true; });
+    renderFileFieldList();
+  });
+  document.getElementById('builderClearEntitiesBtn')?.addEventListener('click', () => {
+    state.entitySelectionTouched = true;
+    document.querySelectorAll('.builder-entity-checkbox').forEach((node) => { node.checked = false; });
+    renderFileFieldList();
+  });
+  document.getElementById('builderAddAllFileFieldsBtn')?.addEventListener('click', () => {
+    getCurrentSelectedEntitySet().forEach((entityType) => {
+      state.selectedFileFieldsByEntity[entityType] = getEntityCandidates(entityType);
+    });
+    renderFileFieldList();
+  });
+  document.getElementById('builderClearSelectedFileFieldsBtn')?.addEventListener('click', () => {
+    state.selectedFileFieldsByEntity = {};
+    renderFileFieldList();
+  });
+  document.getElementById('builderSelectAllFilesBtn')?.addEventListener('click', () => {
+    state.fileSelection.excludedRefs = [];
+    renderFileTree();
+  });
   packageEl?.addEventListener('change', () => {
+    state.lastReport = null;
+    state.entityCatalog = [];
+    state.fileSelection.excludedRefs = [];
     syncVersionSuggestion(true);
-    loadEntityCatalog().catch(showError);
+    renderAll();
+    if (packageEl.value && originOrgIdEl.value) runPreflight({ silent: true }).catch(showError);
   });
   manifestModeEl?.addEventListener('change', () => {
-    loadEntityCatalog().catch(showError);
+    if (packageEl.value && originOrgIdEl.value) runPreflight({ silent: true }).catch(showError);
   });
-  originOrgPickBtn?.addEventListener('click', () => {
+  document.getElementById('builderPickOriginOrgBtn')?.addEventListener('click', () => {
     if (!window.GenericPicker || !window.GenericPickerPresets || !window.GenericPickerContexts) {
       showError(new Error('Generic organization picker is not ready yet.'));
       return;
@@ -913,27 +991,51 @@
       title: 'Select Origin Organization',
       context: window.GenericPickerContexts.allOrganizations(),
       onSelect: (item) => {
-        setBuilderOriginOrgSelection(
-          item?.id,
-          item?.identity?.displayName || item?.name || `Organization #${item?.id}`
-        );
-        if (packageEl?.value) loadEntityCatalog().catch(showError);
+        setBuilderOriginOrgSelection(item?.id, item?.identity?.displayName || item?.name || `Organization #${item?.id}`);
+        if (packageEl?.value) runPreflight({ silent: true }).catch(showError);
       }
     }));
   });
-  originOrgClearBtn?.addEventListener('click', () => {
+  document.getElementById('builderClearOriginOrgBtn')?.addEventListener('click', () => {
     setBuilderOriginOrgSelection('', '');
-    entityCatalog = [];
-    selectedFileFieldsByEntity = {};
-    renderEntityList([]);
-    renderFileFieldList([]);
-    fileRefsEl.value = '';
+    state.lastReport = null;
+    state.entityCatalog = [];
+    state.fileSelection.excludedRefs = [];
+    renderAll();
   });
-  if (packageEl?.value) {
-    syncVersionSuggestion(false);
-    loadEntityCatalog().catch(showError);
-  } else {
-    syncVersionSuggestion(false);
-  }
+
+  updateWizard();
+  syncVersionSuggestion(false);
 })();
 </script>
+
+<% function renderDeclarationStep(field, title, icon, addLabel) {
+  return `
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+      <div>
+        <div class="fw-bold"><i class="bi ${icon} me-1"></i>${title}</div>
+        <div class="small text-muted">Auto-included items can be removed for this build. Added items are included only in this package artifact.</div>
+      </div>
+      <button type="button" class="btn btn-outline-primary btn-sm" data-manifest-add="${field}"><i class="bi bi-plus-lg me-1"></i>${addLabel}</button>
+    </div>
+    <div class="border rounded p-2 builder-scroll-box" data-manifest-list="${field}">
+      <div class="small text-muted">Run preflight to load ${String(title).toLowerCase()}.</div>
+    </div>
+  `;
+} %>
+
+<% function renderDeclarationBlock(field, title, icon, addLabel) {
+  return `
+    <div class="mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <div>
+          <div class="fw-bold small"><i class="bi ${icon} me-1"></i>${title}</div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-manifest-add="${field}"><i class="bi bi-plus-lg me-1"></i>${addLabel}</button>
+      </div>
+      <div class="border rounded p-2 builder-scroll-box" data-manifest-list="${field}" style="max-height: 260px;">
+        <div class="small text-muted">Run preflight to load ${String(title).toLowerCase()}.</div>
+      </div>
+    </div>
+  `;
+} %>

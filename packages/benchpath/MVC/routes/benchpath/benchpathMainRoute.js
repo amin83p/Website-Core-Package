@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
 
+router.use((req, res, next) => {
+  res.locals.packageId = res.locals.packageId || 'benchpath';
+  res.locals.packageName = res.locals.packageName || 'BenchPath';
+  res.locals.packageMountPath = res.locals.packageMountPath || '/benchpath';
+  next();
+});
+
 router.use('/sources', require('./sourceRoutes'));
 router.use('/source-fragments', require('./sourceFragmentRoutes'));
 router.use('/clb-framework', require('./clbFrameworkRoutes'));
@@ -16,5 +23,9 @@ router.use('/clb-sample-task-labels', require('./clbSampleTaskLabelRoutes'));
 router.use('/tasks', require('./taskRoutes'));
 router.use('/tools', require('./benchpathToolsRoutes'));
 router.use('/', require('./benchpathRoutes'));
+
+router.packageId = 'benchpath';
+router.packageName = 'BenchPath';
+router.mountPath = '/benchpath';
 
 module.exports = router;

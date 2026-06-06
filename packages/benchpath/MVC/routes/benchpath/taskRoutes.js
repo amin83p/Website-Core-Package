@@ -6,7 +6,7 @@ const ctrl = require('../../controllers/benchpath/taskController');
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
 const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
-const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 router.use(requireAuth);
 

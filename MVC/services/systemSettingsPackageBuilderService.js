@@ -35,6 +35,62 @@ const ORG_TOKEN_EXACT_REGEX = /^ORG_[A-Za-z0-9_-]+$/i;
 const ORG_UPLOAD_SEGMENT_REGEX = /\/uploads\/(ORG_[^/]+)/ig;
 const UPLOAD_URL_MATCH_REGEX = /\/uploads\/[^"'` ]+/ig;
 const LIVE_MANIFEST_SUPPORTED_PACKAGES = new Set(['school', 'pte', 'ielts', 'benchpath']);
+const LIVE_MANIFEST_PACKAGE_MATCH_PROFILES = Object.freeze({
+  school: {
+    terms: ['school'],
+    prefixes: ['SCHOOL'],
+    categories: ['school'],
+    tags: ['school'],
+    textTerms: ['school']
+  },
+  pte: {
+    terms: ['pte'],
+    prefixes: ['PTE'],
+    categories: ['pte'],
+    tags: ['pte'],
+    textTerms: ['pte']
+  },
+  ielts: {
+    terms: ['ielts'],
+    prefixes: ['IELTS'],
+    categories: ['ielts'],
+    tags: ['ielts'],
+    textTerms: ['ielts']
+  },
+  benchpath: {
+    terms: ['benchpath', 'bench path', 'bench_path', 'clbpath', 'pblapath'],
+    prefixes: ['BENCHPATH', 'CLBPATH', 'PBLAPATH'],
+    categories: ['benchpath'],
+    tags: ['benchpath', 'clbpath', 'pblapath'],
+    textTerms: ['benchpath', 'bench path', 'clbpath', 'pblapath']
+  }
+});
+const MANIFEST_SELECTION_FIELDS = Object.freeze([
+  'sections',
+  'operations',
+  'roles',
+  'symbols',
+  'menuEntries',
+  'dashboardEntries',
+  'quotaDefinitions',
+  'dataEntities',
+  'uploadFolders',
+  'mongoIndexes',
+  'dataSchemas',
+  'seeders',
+  'migrations',
+  'upgradeGuards',
+  'dependencies'
+]);
+const MANIFEST_TEMPLATE_WIRING_FIELDS = Object.freeze([
+  'uploadFolders',
+  'mongoIndexes',
+  'dataSchemas',
+  'seeders',
+  'migrations',
+  'upgradeGuards',
+  'dependencies'
+]);
 let cachedCatalogCollectionMap = null;
 
 function cleanText(value, max = 4000) {
@@ -1317,10 +1373,77 @@ function createService(overrides = {}) {
     return scrub(cloned);
   }
 
+  function uniqueCleanTokens(values = [], options = {}) {
+    const caseMode = cleanText(options.caseMode, 20).toLowerCase();
+    const max = Number.isFinite(Number(options.max)) ? Number(options.max) : 240;
+    return Array.from(new Set(sanitizeArray(values)
+      .map((value) => {
+        const token = cleanText(value, max);
+        if (!token) return '';
+        if (caseMode === 'upper') return token.toUpperCase();
+        if (caseMode === 'lower') return token.toLowerCase();
+        return token;
+      })
+      .filter(Boolean)));
+  }
+
+  function getLiveManifestPackageMatchProfile(packageIdRaw = '') {
+    const packageId = normalizePackageId(packageIdRaw);
+    const configured = LIVE_MANIFEST_PACKAGE_MATCH_PROFILES[packageId] || {};
+    const baseUpper = packageId.toUpperCase();
+    return {
+      terms: uniqueCleanTokens([packageId].concat(configured.terms || []), { caseMode: 'lower' }),
+      prefixes: uniqueCleanTokens([baseUpper].concat(configured.prefixes || []), { caseMode: 'upper' }),
+      categories: uniqueCleanTokens([packageId].concat(configured.categories || []), { caseMode: 'lower' }),
+      tags: uniqueCleanTokens([packageId].concat(configured.tags || []), { caseMode: 'lower' }),
+      textTerms: uniqueCleanTokens([packageId].concat(configured.textTerms || []), { caseMode: 'lower' })
+    };
+  }
+
+  function escapeRegExpToken(value = '') {
+    return cleanText(value, 240).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function textMentionsPackageTerm(text = '', termRaw = '') {
+    const term = cleanText(termRaw, 240).toLowerCase();
+    if (!term) return false;
+    if (term.length <= 3) {
+      const pattern = new RegExp(`(?:^|[^a-z0-9])${escapeRegExpToken(term)}(?:$|[^a-z0-9])`, 'i');
+      return pattern.test(text);
+    }
+    return text.includes(term);
+  }
+
+  function valueMatchesPackagePrefix(value = '', prefixes = []) {
+    const upper = cleanText(value, 240).toUpperCase();
+    if (!upper) return false;
+    return sanitizeArray(prefixes).some((prefixRaw) => {
+      const prefix = cleanText(prefixRaw, 120).toUpperCase();
+      if (!prefix) return false;
+      return upper === prefix
+        || upper.startsWith(`${prefix}_`)
+        || upper.startsWith(`${prefix}-`)
+        || upper.startsWith(`${prefix}:`);
+    });
+  }
+
+  function valueMatchesPackageCategory(value = '', categories = []) {
+    const lower = cleanText(value, 240).toLowerCase();
+    if (!lower) return false;
+    return sanitizeArray(categories).some((categoryRaw) => {
+      const category = cleanText(categoryRaw, 120).toLowerCase();
+      if (!category) return false;
+      return lower === category
+        || lower.startsWith(`${category}_`)
+        || lower.startsWith(`${category}-`)
+        || lower.startsWith(`${category}:`);
+    });
+  }
+
   function declarationMentionsPackage(row = {}, packageIdRaw = '', type = '') {
     const targetPackageId = normalizePackageId(packageIdRaw);
     if (!LIVE_MANIFEST_SUPPORTED_PACKAGES.has(targetPackageId)) return false;
-    const targetUpper = targetPackageId.toUpperCase();
+    const profile = getLiveManifestPackageMatchProfile(targetPackageId);
     const key = normalizeDeclarationKey(row);
     const category = cleanText(row?.category || row?.sectionCategory || row?.group || row?.domain || '', 240).toLowerCase();
     const rowPackageId = normalizePackageId(row?.packageId || row?.packageName || row?.sourcePackage || '');
@@ -1335,14 +1458,12 @@ function createService(overrides = {}) {
       row?.role,
       row?.roleName
     ].map((item) => cleanText(item, 240).toLowerCase()).filter(Boolean).join(' ');
-    const textPattern = new RegExp(`\\b${targetPackageId}\\b|^${targetPackageId}[_:-]|[_:-]${targetPackageId}[_:-]?`, 'i');
-    if (rowPackageId === targetPackageId) return true;
-    if (category === targetPackageId || category.startsWith(targetPackageId)) return true;
-    if (tags.includes(targetPackageId)) return true;
-    if (tags.some((tag) => tag.toUpperCase().startsWith(targetUpper))) return true;
-    if (key.toUpperCase().startsWith(targetUpper)) return true;
-    if (type === 'section' && text.includes(targetPackageId)) return true;
-    if (type !== 'operation' && textPattern.test(text)) return true;
+    if (rowPackageId === targetPackageId || profile.terms.includes(rowPackageId)) return true;
+    if (valueMatchesPackageCategory(category, profile.categories)) return true;
+    if (tags.some((tag) => profile.tags.includes(tag) || valueMatchesPackagePrefix(tag, profile.prefixes))) return true;
+    if (valueMatchesPackagePrefix(key, profile.prefixes)) return true;
+    if (type === 'section' && profile.textTerms.some((term) => textMentionsPackageTerm(text, term))) return true;
+    if (type !== 'operation' && profile.textTerms.some((term) => textMentionsPackageTerm(text, term))) return true;
     return false;
   }
 
@@ -1416,6 +1537,283 @@ function createService(overrides = {}) {
     };
   }
 
+  function normalizeManifestSelectionKey(row = {}, field = '') {
+    if (typeof row === 'string') return cleanText(row, 240);
+    const source = sanitizeObject(row);
+    if (field === 'quotaDefinitions') {
+      const explicit = cleanText(source.key || source.middlewareKey || source.id || '', 260);
+      if (explicit) return explicit;
+      const section = cleanText(source.sectionId || source.section || '', 120);
+      const operation = cleanText(source.operationId || source.operation || '', 120);
+      if (section && operation) return `${section}::${operation}`;
+    }
+    if (field === 'uploadFolders') {
+      const key = cleanText(source.key || source.id || source.name || '', 240);
+      if (key) return key;
+    }
+    if (field === 'menuEntries' || field === 'dashboardEntries') {
+      const key = cleanText(source.id || source.href || source.label || source.name || '', 240);
+      if (key) return key;
+    }
+    if (field === 'dataEntities' || field === 'dataSchemas') {
+      const key = cleanText(source.entityType || source.table || source.id || source.name || '', 240);
+      if (key) return key;
+    }
+    if (field === 'dependencies') {
+      const key = cleanText(source.id || source.packageId || source.name || '', 240);
+      if (key) return key;
+    }
+    return normalizeDeclarationKey(source);
+  }
+
+  function normalizeManifestSelection(input = {}) {
+    const source = sanitizeObject(input);
+    const out = {};
+    MANIFEST_SELECTION_FIELDS.forEach((field) => {
+      const row = source[field];
+      const item = sanitizeObject(row);
+      const normalizeIds = (value = []) => Array.from(new Set(sanitizeArray(value)
+        .map((entry) => cleanText(entry, 240))
+        .filter(Boolean)));
+      out[field] = {
+        selectedIds: normalizeIds(item.selectedIds),
+        excludedIds: normalizeIds(item.excludedIds),
+        addedRows: sanitizeArray(item.addedRows)
+          .map((entry) => cloneManifestDeclaration(entry))
+          .filter((entry) => normalizeManifestSelectionKey(entry, field))
+      };
+    });
+    return out;
+  }
+
+  function createManifestPreviewRow(row = {}, field = '', options = {}) {
+    const key = normalizeManifestSelectionKey(row, field);
+    const label = (() => {
+      if (typeof row === 'string') return row;
+      const source = sanitizeObject(row);
+      return cleanText(
+        source.label
+        || source.name
+        || source.title
+        || source.entityType
+        || source.sectionId
+        || source.operationId
+        || source.href
+        || key,
+        300
+      ) || key;
+    })();
+    return {
+      id: key,
+      key,
+      label,
+      field,
+      source: cleanText(options.source, 80) || 'manifest',
+      autoIncluded: options.autoIncluded !== false,
+      manuallyAdded: options.manuallyAdded === true,
+      removed: options.removed === true,
+      selected: options.selected !== false,
+      protected: options.protected === true,
+      row: cloneManifestDeclaration(row)
+    };
+  }
+
+  function applyManifestSelectionToManifest(manifest = {}, selectionInput = {}, options = {}) {
+    const selection = normalizeManifestSelection(selectionInput);
+    const selectedDataEntityTokens = new Set(sanitizeArray(options.selectedDataEntities)
+      .map((item) => cleanText(item, 240))
+      .filter(Boolean));
+    const out = cloneStructured(manifest || {});
+    const preview = {};
+    const warnings = [];
+    const manifestMode = cleanText(options.manifestMode, 40).toLowerCase();
+
+    MANIFEST_SELECTION_FIELDS.forEach((field) => {
+      const fieldSelection = selection[field] || {};
+      const selectedIds = new Set(sanitizeArray(fieldSelection.selectedIds));
+      const excludedIds = new Set(sanitizeArray(fieldSelection.excludedIds));
+      const explicitSelected = selectedIds.size > 0;
+      const originalRows = sanitizeArray(out[field]);
+      const rowsByKey = new Map();
+      const previewRows = [];
+
+      originalRows.forEach((row) => {
+        const key = normalizeManifestSelectionKey(row, field);
+        if (!key || rowsByKey.has(key.toLowerCase())) return;
+        let selected = explicitSelected ? selectedIds.has(key) : !excludedIds.has(key);
+        if (field === 'dataEntities' && selectedDataEntityTokens.size > 0) {
+          selected = selectedDataEntityTokens.has(key) || selectedDataEntityTokens.has(String(key).toLowerCase());
+        }
+        const previewRow = createManifestPreviewRow(row, field, {
+          source: manifestMode === 'live' ? 'live-or-template' : 'template',
+          autoIncluded: true,
+          selected,
+          removed: !selected,
+          protected: false
+        });
+        rowsByKey.set(key.toLowerCase(), previewRow);
+        previewRows.push(previewRow);
+      });
+
+      sanitizeArray(fieldSelection.addedRows).forEach((row) => {
+        const key = normalizeManifestSelectionKey(row, field);
+        if (!key) return;
+        const selected = explicitSelected ? selectedIds.has(key) : !excludedIds.has(key);
+        const previewRow = createManifestPreviewRow(row, field, {
+          source: 'manual',
+          autoIncluded: false,
+          manuallyAdded: true,
+          selected,
+          removed: !selected,
+          protected: false
+        });
+        const existingIndex = previewRows.findIndex((item) => String(item.key || '').toLowerCase() === key.toLowerCase());
+        if (existingIndex >= 0) {
+          previewRows[existingIndex] = {
+            ...previewRows[existingIndex],
+            manuallyAdded: true,
+            selected,
+            removed: !selected
+          };
+        } else {
+          previewRows.push(previewRow);
+        }
+        rowsByKey.set(key.toLowerCase(), previewRow);
+      });
+
+      const selectedRows = previewRows
+        .filter((row) => row.selected !== false)
+        .map((row) => cloneManifestDeclaration(row.row));
+      out[field] = selectedRows;
+      preview[field] = {
+        field,
+        totalCount: previewRows.length,
+        selectedCount: selectedRows.length,
+        removedCount: previewRows.filter((row) => row.removed === true).length,
+        rows: previewRows
+      };
+
+      if (MANIFEST_TEMPLATE_WIRING_FIELDS.includes(field) && originalRows.length > 0 && selectedRows.length < originalRows.length) {
+        warnings.push(`Manifest ${field} has ${originalRows.length - selectedRows.length} excluded item(s). Confirm this package capability is intentionally removed for this build.`);
+      }
+    });
+
+    if (manifestMode === 'live' && sanitizeArray(out.accesses).length > 0) {
+      preview.accesses = {
+        field: 'accesses',
+        totalCount: sanitizeArray(out.accesses).length,
+        selectedCount: 0,
+        removedCount: sanitizeArray(out.accesses).length,
+        rows: sanitizeArray(out.accesses).map((row) => createManifestPreviewRow(row, 'accesses', {
+          source: 'live',
+          selected: false,
+          removed: true
+        }))
+      };
+      out.accesses = [];
+      warnings.push('Access profiles were excluded from the live build by default. Add app-specific profiles after install or add explicit package access templates later.');
+    }
+
+    return { manifest: out, preview, warnings };
+  }
+
+  function normalizeFileSelection(input = {}) {
+    const source = sanitizeObject(input);
+    const normalizeRefs = (value = []) => Array.from(new Set(sanitizeArray(value)
+      .map((item) => normalizeManualFileRef(item))
+      .filter(Boolean)));
+    return {
+      selectedRefs: normalizeRefs(source.selectedRefs),
+      excludedRefs: normalizeRefs(source.excludedRefs)
+    };
+  }
+
+  function applyFileSelection(normalizedRefs = [], input = {}) {
+    const selection = normalizeFileSelection(input);
+    const selectedSet = new Set(selection.selectedRefs);
+    const excludedSet = new Set(selection.excludedRefs);
+    const explicitSelected = selectedSet.size > 0;
+    return sanitizeArray(normalizedRefs).map((row) => {
+      const ref = normalizeManualFileRef(row?.ref || '');
+      const selected = explicitSelected ? selectedSet.has(ref) : !excludedSet.has(ref);
+      return {
+        ...row,
+        ref,
+        selected,
+        removed: !selected
+      };
+    }).filter((row) => row.ref);
+  }
+
+  function createFileTreeNode(name = '', type = 'folder') {
+    return {
+      name,
+      type,
+      path: '',
+      selected: true,
+      fileCount: 0,
+      missingCount: 0,
+      sourceGroups: [],
+      children: []
+    };
+  }
+
+  function buildFileTree(normalizedRefs = []) {
+    const root = createFileTreeNode('package-files', 'folder');
+    const sourceGroupsByNode = new WeakMap();
+    const addSource = (node, group = '') => {
+      const token = cleanText(group, 80) || 'package-source';
+      const set = sourceGroupsByNode.get(node) || new Set();
+      set.add(token);
+      sourceGroupsByNode.set(node, set);
+      node.sourceGroups = Array.from(set).sort();
+    };
+    const getChild = (parent, name, type) => {
+      const existing = parent.children.find((child) => child.name === name && child.type === type);
+      if (existing) return existing;
+      const child = createFileTreeNode(name, type);
+      child.path = parent.path ? `${parent.path}/${name}` : name;
+      parent.children.push(child);
+      parent.children.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : (a.type === 'folder' ? -1 : 1)));
+      return child;
+    };
+
+    sanitizeArray(normalizedRefs).forEach((row) => {
+      const ref = normalizeManualFileRef(row?.ref || '');
+      if (!ref) return;
+      const uploadPath = cleanText(row?.uploadRelativePath, 2000);
+      const pathToken = (uploadPath || ref)
+        .replace(/^\/+/, '')
+        .replace(/^uploads\//i, '')
+        .replace(/[?#].*$/, '');
+      const parts = pathToken.split('/').map((part) => cleanText(part, 240)).filter(Boolean);
+      const safeParts = parts.length ? parts : [ref.replace(/[\\/:*?"<>|]+/g, '_')];
+      let cursor = root;
+      root.fileCount += 1;
+      if (row?.exists === false) root.missingCount += 1;
+      addSource(root, row?.artifactGroup);
+      safeParts.forEach((part, index) => {
+        const isFile = index === safeParts.length - 1;
+        cursor = getChild(cursor, part, isFile ? 'file' : 'folder');
+        cursor.fileCount += 1;
+        if (row?.exists === false) cursor.missingCount += 1;
+        cursor.selected = cursor.selected && row?.selected !== false;
+        addSource(cursor, row?.artifactGroup);
+        if (isFile) {
+          cursor.ref = ref;
+          cursor.exists = row?.exists !== false;
+          cursor.selected = row?.selected !== false;
+          cursor.removed = row?.removed === true;
+          cursor.artifactGroup = cleanText(row?.artifactGroup, 80);
+          cursor.inTableGroup = row?.inTableGroup === true;
+          cursor.inGlobalGroup = row?.inGlobalGroup === true;
+          cursor.symbolNames = sanitizeArray(row?.symbolNames);
+        }
+      });
+    });
+    return root;
+  }
+
   async function fetchDeclarationCatalog(entityType = '', options = {}) {
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
     return deps.dataService.fetchData(entityType, {}, SYSTEM_CONTEXT, { backendMode }).catch((error) => {
@@ -1454,6 +1852,7 @@ function createService(overrides = {}) {
     const accesses = dedupeDeclarations(accessRows.filter((row) => declarationMentionsPackage(row, packageId, 'access')));
     const referencedOperations = new Set();
     sections.forEach((row) => collectOperationReferencesFromDeclaration(row, referencedOperations));
+    roles.forEach((row) => collectOperationReferencesFromDeclaration(row, referencedOperations));
     accesses.forEach((row) => collectOperationReferencesFromDeclaration(row, referencedOperations));
     const operationRefLower = new Set(Array.from(referencedOperations).map((row) => cleanText(row, 240).toLowerCase()).filter(Boolean));
     const operations = dedupeDeclarations(operationRows.filter((row) => {
@@ -1525,6 +1924,144 @@ function createService(overrides = {}) {
       },
       diff: {},
       warnings: []
+    };
+  }
+
+  function normalizeCatalogType(value = '') {
+    const token = cleanText(value, 80).replace(/[-_\s]+/g, '').toLowerCase();
+    const map = {
+      section: 'sections',
+      sections: 'sections',
+      operation: 'operations',
+      operations: 'operations',
+      role: 'roles',
+      roles: 'roles',
+      symbol: 'symbols',
+      symbols: 'symbols',
+      menuentry: 'menuEntries',
+      menuentries: 'menuEntries',
+      dashboardentry: 'dashboardEntries',
+      dashboardentries: 'dashboardEntries',
+      quotadefinition: 'quotaDefinitions',
+      quotadefinitions: 'quotaDefinitions',
+      dataentity: 'dataEntities',
+      dataentities: 'dataEntities',
+      uploadfolder: 'uploadFolders',
+      uploadfolders: 'uploadFolders',
+      mongoindex: 'mongoIndexes',
+      mongoindexes: 'mongoIndexes',
+      dataschema: 'dataSchemas',
+      dataschemas: 'dataSchemas',
+      seeder: 'seeders',
+      seeders: 'seeders',
+      migration: 'migrations',
+      migrations: 'migrations',
+      upgradeguard: 'upgradeGuards',
+      upgradeguards: 'upgradeGuards',
+      dependency: 'dependencies',
+      dependencies: 'dependencies'
+    };
+    return map[token] || '';
+  }
+
+  function normalizeCatalogRow(row = {}, field = '', source = 'manifest') {
+    const key = normalizeManifestSelectionKey(row, field);
+    if (!key) return null;
+    const item = typeof row === 'string' ? row : cloneManifestDeclaration(row);
+    const label = (() => {
+      if (typeof row === 'string') return row;
+      const sourceRow = sanitizeObject(row);
+      return cleanText(
+        sourceRow.label
+        || sourceRow.name
+        || sourceRow.title
+        || sourceRow.entityType
+        || sourceRow.sectionId
+        || sourceRow.operationId
+        || sourceRow.href
+        || key,
+        300
+      ) || key;
+    })();
+    return {
+      id: key,
+      key,
+      name: label,
+      label,
+      type: field,
+      source,
+      row: item,
+      ...((typeof row === 'object' && row) ? cloneManifestDeclaration(row) : {})
+    };
+  }
+
+  function filterCatalogRows(rows = [], query = '') {
+    const q = cleanText(query, 200).toLowerCase();
+    const list = sanitizeArray(rows).filter(Boolean);
+    if (!q) return list;
+    return list.filter((row) => JSON.stringify(row).toLowerCase().includes(q));
+  }
+
+  async function listManifestCatalog(input = {}, options = {}) {
+    const packageId = normalizePackageId(input.packageId);
+    if (!packageId) throw new Error('packageId is required.');
+    const type = normalizeCatalogType(input.type || input.catalogType || '');
+    if (!type) throw new Error('catalog type is required.');
+    const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
+    if (backendMode === 'mongo') {
+      assertMongoConnectedForBuilder('package builder catalog');
+    }
+    const packageRow = await findPackageById(packageId, options);
+    const manifestPlan = await resolveBuilderManifestPlan(packageRow, input, { backendMode });
+    const rows = [];
+    const pushRows = (sourceRows = [], source = 'manifest') => {
+      sanitizeArray(sourceRows).forEach((row) => {
+        const normalized = normalizeCatalogRow(row, type, source);
+        if (normalized) rows.push(normalized);
+      });
+    };
+
+    if (type === 'dataEntities') {
+      const entities = await resolveDataEntities(manifestPlan.manifest, packageId, { backendMode });
+      pushRows(entities, 'data-entities');
+    } else if (['sections', 'operations', 'roles', 'symbols'].includes(type)) {
+      const backendType = type;
+      const liveRows = await fetchDeclarationCatalog(backendType, {
+        backendMode,
+        warnings: []
+      });
+      pushRows(liveRows, 'backend');
+      pushRows(sanitizeArray(manifestPlan.manifest?.[type]), manifestPlan.mode === 'live' ? 'live-manifest' : 'template');
+    } else {
+      pushRows(sanitizeArray(manifestPlan.manifest?.[type]), manifestPlan.mode === 'live' ? 'live-or-template' : 'template');
+    }
+
+    const seen = new Set();
+    const deduped = [];
+    rows.forEach((row) => {
+      const key = cleanText(row?.key || row?.id, 240).toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      deduped.push(row);
+    });
+
+    const page = Math.max(1, Number.parseInt(String(input.page || 1), 10) || 1);
+    const limit = Math.max(1, Math.min(100, Number.parseInt(String(input.limit || 25), 10) || 25));
+    const filtered = filterCatalogRows(deduped, input.q || input.query || '');
+    const totalItems = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+    const start = (page - 1) * limit;
+    return {
+      packageId,
+      type,
+      backendMode,
+      results: filtered.slice(start, start + limit),
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems,
+        limit
+      }
     };
   }
 
@@ -1792,6 +2329,15 @@ function createService(overrides = {}) {
     });
     const packageRow = await findPackageById(packageId, options);
     const manifestPlan = await resolveBuilderManifestPlan(packageRow, input, { backendMode });
+    const manifestSelectionResult = applyManifestSelectionToManifest(
+      manifestPlan.manifest,
+      input.manifestSelection || {},
+      {
+        manifestMode: manifestPlan.mode,
+        selectedDataEntities: input.selectedDataEntities || []
+      }
+    );
+    const effectiveManifest = manifestSelectionResult.manifest;
     const availableDataEntities = await resolveDataEntities(manifestPlan.manifest, packageId, { backendMode });
     const selectedDataEntityTokens = new Set(
       sanitizeArray(input.selectedDataEntities)
@@ -1800,7 +2346,7 @@ function createService(overrides = {}) {
     );
     const requestedFileFieldSelection = normalizeFileFieldSelection(input.fileFieldSelection || {});
     const detectedUploadUrls = new Set();
-    const symbolCatalog = await resolveSymbolInstallCatalog(manifestPlan.manifest, {
+    const symbolCatalog = await resolveSymbolInstallCatalog(effectiveManifest, {
       backendMode,
       originOrgId
     });
@@ -1808,7 +2354,10 @@ function createService(overrides = {}) {
     const detectedSymbolUploadUrls = new Set(symbolRefRows.map((row) => row.ref));
     const fileProvenance = [];
     const entityCatalog = [];
-    const warnings = [...sanitizeArray(manifestPlan.warnings)];
+    const warnings = [
+      ...sanitizeArray(manifestPlan.warnings),
+      ...sanitizeArray(manifestSelectionResult.warnings)
+    ];
     let selectedRowCount = 0;
     const scopeViolations = {
       blocking: false,
@@ -2015,7 +2564,7 @@ function createService(overrides = {}) {
       ...Array.from(tableArtifactRefSet),
       ...Array.from(globalArtifactRefSet)
     ]));
-    const normalizedFileRefs = combinedFileRefs.map((item) => {
+    const normalizedFileRefsRaw = combinedFileRefs.map((item) => {
       const symbolRows = symbolRefRows.filter((row) => row.ref === item);
       const symbolNames = Array.from(new Set(symbolRows.map((row) => row.symbolName).filter(Boolean)));
       const uploadRelative = uploadPathUtils.extractRelativeUploadPath(item);
@@ -2039,6 +2588,8 @@ function createService(overrides = {}) {
         detectedOrgTokens: extractOrgTokensFromUploadRef(item)
       };
     });
+    const normalizedFileRefs = applyFileSelection(normalizedFileRefsRaw, input.fileSelection || {});
+    const selectedNormalizedFileRefs = normalizedFileRefs.filter((row) => row.selected !== false);
 
     return {
       package: {
@@ -2056,6 +2607,8 @@ function createService(overrides = {}) {
         diff: manifestPlan.diff,
         warnings: sanitizeArray(manifestPlan.warnings)
       },
+      manifestPreview: manifestSelectionResult.preview,
+      manifestSelection: normalizeManifestSelection(input.manifestSelection || {}),
       originScopeSummary,
       availableDataEntities,
       entityCatalog,
@@ -2077,7 +2630,10 @@ function createService(overrides = {}) {
         requiredSymbolAssetCount: symbolRefRows.length,
         provenance: fileProvenance,
         manualRefs: manualFileRefs,
-        normalizedRefs: normalizedFileRefs
+        normalizedRefs: normalizedFileRefs,
+        selectedRefs: selectedNormalizedFileRefs.map((row) => row.ref),
+        excludedRefs: normalizedFileRefs.filter((row) => row.selected === false).map((row) => row.ref),
+        fileTree: buildFileTree(normalizedFileRefs)
       },
       warnings
     };
@@ -2421,7 +2977,15 @@ function createService(overrides = {}) {
     const remapState = { rewrittenUrlCount: 0, rewrittenFieldCount: 0, rewrittenExactTokenCount: 0 };
     const buildWarnings = sanitizeArray(preflight?.warnings);
     const manifestPlan = await resolveBuilderManifestPlan(packageRow, input, { backendMode });
-    buildWarnings.push(...sanitizeArray(manifestPlan.warnings));
+    const manifestSelectionResult = applyManifestSelectionToManifest(
+      manifestPlan.manifest,
+      input.manifestSelection || {},
+      {
+        manifestMode: manifestPlan.mode,
+        selectedDataEntities: selectedEntityRows.map((row) => row?.entityType || row?.id || '').filter(Boolean)
+      }
+    );
+    buildWarnings.push(...sanitizeArray(manifestPlan.warnings), ...sanitizeArray(manifestSelectionResult.warnings));
     const buildNote = cleanText(input.buildNote, 8000);
     const buildId = createReadableBuildId(packageId, requestedVersion);
     const originScopeSummary = {
@@ -2458,7 +3022,7 @@ function createService(overrides = {}) {
       }));
     }
 
-    const fileRefs = sanitizeArray(preflight.filePlan?.normalizedRefs).map((row) => ({
+    const fileRefs = sanitizeArray(preflight.filePlan?.normalizedRefs).filter((row) => row?.selected !== false).map((row) => ({
       ref: cleanText(row.ref, 2000),
       type: cleanText(row.type, 40),
       artifactGroup: cleanText(row.artifactGroup, 40).toLowerCase() || 'global',
@@ -2486,10 +3050,7 @@ function createService(overrides = {}) {
     try {
       await copyDirectorySafe(packageRow.packageDir, stagedPackageDir);
       const stagedManifestPath = deps.path.join(stagedPackageDir, 'package.manifest.json');
-      const stagedManifestSource = readJsonFile(stagedManifestPath);
-      const stagedManifestBase = manifestPlan.mode === 'live'
-        ? manifestPlan.manifest
-        : stagedManifestSource;
+      const stagedManifestBase = manifestSelectionResult.manifest;
       const stagedManifest = applyResolvedSymbolCatalogToManifest(stagedManifestBase, globalSymbolCatalog);
       stagedManifest.version = requestedVersion;
       const validatedStagedManifest = deps.packageManifestService.validatePackageManifest(stagedManifest, { knownIds: [] });
@@ -2570,6 +3131,8 @@ function createService(overrides = {}) {
           summary: manifestPlan.summary,
           diff: manifestPlan.diff
         },
+        manifestSelection: normalizeManifestSelection(input.manifestSelection || {}),
+        manifestPreview: manifestSelectionResult.preview,
         buildNote,
         originOrgId,
         createdAt: new Date().toISOString(),
@@ -2677,6 +3240,8 @@ function createService(overrides = {}) {
           summary: manifestPlan.summary,
           diff: manifestPlan.diff
         },
+        manifestSelection: normalizeManifestSelection(input.manifestSelection || {}),
+        manifestPreview: manifestSelectionResult.preview,
         buildNote,
         remapFieldMap,
         fileFieldSelection,
@@ -3841,6 +4406,7 @@ function summarizeRequiredSymbolAssets(manifest = {}) {
     discoverLocalPackages,
     suggestNextPackageVersion,
     generateLivePackageManifest,
+    listManifestCatalog,
     preflightBuild,
     buildPackage,
     previewBuilderPayloadDeletionInventory,

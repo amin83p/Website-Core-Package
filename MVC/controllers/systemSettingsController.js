@@ -1725,7 +1725,9 @@ exports.preflightPackageBuilder = async (req, res) => {
       selectedFileRefs: Array.isArray(req.body?.selectedFileRefs)
         ? req.body.selectedFileRefs
         : (req.body?.selectedFileRefs ? [req.body.selectedFileRefs] : []),
-      fileFieldSelection: parseFileFieldSelectionInput(req.body?.fileFieldSelection)
+      fileFieldSelection: parseFileFieldSelectionInput(req.body?.fileFieldSelection),
+      manifestSelection: parseFileFieldSelectionInput(req.body?.manifestSelection),
+      fileSelection: parseFileFieldSelectionInput(req.body?.fileSelection)
     }, {
       backendMode: runtimeBackend?.mode || '',
       packageRootDir: getPackageStorageRootAbsolute(),
@@ -1750,6 +1752,43 @@ exports.preflightPackageBuilder = async (req, res) => {
   }
 };
 
+exports.listPackageBuilderCatalog = async (req, res) => {
+  try {
+    assertPackageBuilderSigningKeyReady();
+    const runtimeBackend = dataBackendRuntimeService.getPublicBackendStatus();
+    const report = await systemSettingsPackageBuilderService.listManifestCatalog({
+      packageId: cleanFormText(req.query?.packageId || req.body?.packageId, 120),
+      manifestMode: cleanFormText(req.query?.manifestMode || req.body?.manifestMode, 40),
+      type: cleanFormText(req.query?.type || req.body?.type || req.query?.catalogType || req.body?.catalogType, 80),
+      q: cleanFormText(req.query?.q || req.body?.q || req.query?.query || req.body?.query, 240),
+      page: cleanFormText(req.query?.page || req.body?.page, 40),
+      limit: cleanFormText(req.query?.limit || req.body?.limit, 40)
+    }, {
+      backendMode: runtimeBackend?.mode || '',
+      packageRootDir: getPackageStorageRootAbsolute(),
+      actor: req.user || null
+    });
+
+    return res.json({
+      status: 'success',
+      results: report.results || [],
+      data: report.results || [],
+      pagination: report.pagination || null,
+      report
+    });
+  } catch (error) {
+    if (String(error?.code || '').trim().toUpperCase() === 'PACKAGE_BUILDER_SIGNING_KEY_REQUIRED') {
+      return sendPackageManagerError(res, error, 'Package builder catalog failed.');
+    }
+    return res.status(400).json({
+      status: 'error',
+      message: error?.message || 'Package builder catalog failed.',
+      code: cleanFormText(error?.code || '', 120),
+      details: error?.details || null
+    });
+  }
+};
+
 exports.buildPackageFromBuilder = async (req, res) => {
   try {
     assertPackageBuilderSigningKeyReady();
@@ -1766,7 +1805,9 @@ exports.buildPackageFromBuilder = async (req, res) => {
       selectedFileRefs: Array.isArray(req.body?.selectedFileRefs)
         ? req.body.selectedFileRefs
         : (req.body?.selectedFileRefs ? [req.body.selectedFileRefs] : []),
-      fileFieldSelection: parseFileFieldSelectionInput(req.body?.fileFieldSelection)
+      fileFieldSelection: parseFileFieldSelectionInput(req.body?.fileFieldSelection),
+      manifestSelection: parseFileFieldSelectionInput(req.body?.manifestSelection),
+      fileSelection: parseFileFieldSelectionInput(req.body?.fileSelection)
     }, {
       backendMode: runtimeBackend?.mode || '',
       packageRootDir: getPackageStorageRootAbsolute(),

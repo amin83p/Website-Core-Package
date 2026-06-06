@@ -1413,8 +1413,12 @@
   "uploadFolders": [
     {
       "key": "generated.benchpathReports",
-      "relativePath": "benchpath/reports",
-      "description": "Generated BenchPath migration and validation reports."
+      "packageName": "BenchPath",
+      "group": "BenchPath Uploads",
+      "label": "BenchPath Generated Reports",
+      "defaultTemplate": "benchpath/reports",
+      "placeholders": [],
+      "applyDefault": true
     }
   ],
   "menuEntries": [],
