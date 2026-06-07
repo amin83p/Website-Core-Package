@@ -21,9 +21,9 @@
     "active": true
   },
   "assets": {
-    "id": "credit-package-public-scripts",
-    "path": "packages/credit/public/scripts",
-    "publicPath": "/scripts",
+    "id": "credit-package-public-assets",
+    "path": "packages/credit/public",
+    "publicPath": "/credit",
     "metadataOnly": true,
     "active": true
   },
@@ -147,6 +147,12 @@
         },
         {
           "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
           "sessionAttempts": 5,
           "sessionTime": 15,
           "active": true
@@ -332,6 +338,13 @@
               "maxFetchUploadVolumeKB": null
             },
             {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
               "operationId": "OP1005",
               "scopeId": "SCP_OWNER",
               "maxAttemptsPerSession": null,
@@ -425,6 +438,13 @@
               "maxAttemptsPerSession": null,
                 "maxSessionDurationMinutes": null,
                 "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
             }
           ]
         },
@@ -474,7 +494,16 @@
   "dataEntities": [
     {
       "entityType": "customers",
-      "label": "Credit Customers"
+      "label": "Credit Customers",
+      "source": "data/credit/customers.json",
+      "collectionName": "creditCustomers",
+      "repository": "customers",
+      "storageType": "json",
+      "storageTarget": "data/credit/customers.json",
+      "backendModes": [
+        "json",
+        "mongo"
+      ]
     }
   ],
   "dataSchemas": [],

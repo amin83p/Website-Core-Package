@@ -1,7 +1,8 @@
-const dataService = require('./dataService');
 const dataBackendRuntimeService = require('./dataBackendRuntimeService');
 const { SECTIONS } = require('../../config/accessConstants');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
+
+const DATA_SERVICE_PATH = './dataService';
 
 const CACHE_TTL_MS = 15 * 1000;
 
@@ -71,8 +72,14 @@ function resolveRequestedMode() {
   return requestedMode;
 }
 
+function getDataService() {
+  return require(DATA_SERVICE_PATH);
+}
+
 async function countRows(entityName) {
   try {
+    const dataService = getDataService();
+    if (!dataService || typeof dataService.fetchData !== 'function') return 0;
     const rows = await dataService.fetchData(entityName, {}, SYSTEM_CONTEXT);
     if (!Array.isArray(rows)) return 0;
     return rows.length;

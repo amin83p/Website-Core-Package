@@ -87,6 +87,16 @@
     max-height: 360px;
     overflow: auto;
   }
+  .package-builder-page .builder-data-storage-upload-panel .builder-declaration-block {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .package-builder-page .builder-data-storage-upload-panel .builder-declaration-list {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 </style>
 
 <div class="sections-page package-builder-page">
@@ -130,7 +140,7 @@
           <div class="text-muted">Review declarations, data, storage, and files before creating the signed package.</div>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-light text-dark border" id="builderStepBadge">Step 1 of 8</span>
+          <span class="badge bg-light text-dark border" id="builderStepBadge">Step 1 of 9</span>
           <span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="builderProgressPct">0%</span>
         </div>
       </div>
@@ -171,19 +181,6 @@
             </select>
             <div class="small text-muted mt-1">Live mode refreshes supported business declarations while preserving package runtime wiring.</div>
           </div>
-          <div class="col-lg-6">
-            <label class="form-label small fw-bold">Suggested Target Version</label>
-            <div class="small text-muted border rounded px-3 py-2 bg-light" id="builderVersionHint">Select a package to suggest the next version.</div>
-          </div>
-          <div class="col-lg-6">
-            <label class="form-label small fw-bold">Target Version</label>
-            <input id="builderVersion" type="text" class="form-control" placeholder="1.0.1">
-          </div>
-          <div class="col-12">
-            <label class="form-label small fw-bold">Build Note</label>
-            <textarea id="builderBuildNote" rows="3" class="form-control" placeholder="Describe what changed in this package build..."></textarea>
-            <div class="small text-muted mt-1">Saved into the package as <code>BUILD_NOTE.md</code>.</div>
-          </div>
         </div>
       </div>
 
@@ -195,53 +192,67 @@
         <%- renderDeclarationStep('operations', 'Operations', 'bi-gear', 'Add Operation') %>
       </div>
 
-      <div class="builder-step-panel" data-builder-step="roles-symbols">
-        <div class="row g-3">
-          <div class="col-xl-6"><%- renderDeclarationBlock('roles', 'Roles', 'bi-person-badge', 'Add Role') %></div>
-          <div class="col-xl-6"><%- renderDeclarationBlock('symbols', 'Symbols', 'bi-stars', 'Add Symbol') %></div>
-        </div>
+      <div class="builder-step-panel" data-builder-step="roles">
+        <%- renderDeclarationStep('roles', 'Roles', 'bi-person-badge', 'Add Role') %>
       </div>
 
-      <div class="builder-step-panel" data-builder-step="navigation-quota">
+      <div class="builder-step-panel" data-builder-step="navigation">
         <div class="row g-3">
-          <div class="col-xl-4"><%- renderDeclarationBlock('menuEntries', 'Menu Entries', 'bi-list', 'Add Menu') %></div>
-          <div class="col-xl-4"><%- renderDeclarationBlock('dashboardEntries', 'Dashboard Entries', 'bi-speedometer2', 'Add Dashboard') %></div>
-          <div class="col-xl-4"><%- renderDeclarationBlock('quotaDefinitions', 'Quota Definitions', 'bi-activity', 'Add Quota') %></div>
+          <div class="col-xl-6"><%- renderDeclarationBlock('menuEntries', 'Menu Entries', 'bi-list', 'Add Menu') %></div>
+          <div class="col-xl-6"><%- renderDeclarationBlock('dashboardEntries', 'Dashboard Entries', 'bi-speedometer2', 'Add Dashboard') %></div>
         </div>
       </div>
 
       <div class="builder-step-panel" data-builder-step="data-storage">
-        <div class="row g-3">
-          <div class="col-xl-7">
-            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-              <div>
-                <div class="fw-bold">Package-Owned Tables / Collections</div>
-                <div class="small text-muted">Rows are scoped to the selected origin organization during preflight/build.</div>
+        <div class="row g-3 align-items-stretch">
+          <div class="col-xl-6 d-flex">
+            <div class="border rounded p-3 bg-white w-100 h-100 d-flex flex-column">
+              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <div>
+                  <div class="fw-bold">Package-Owned Tables / Collections</div>
+                  <div class="small text-muted">Rows are scoped to the selected origin organization during preflight/build.</div>
+                </div>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllEntitiesBtn">Select All</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearEntitiesBtn">Clear</button>
+                </div>
               </div>
-              <div class="d-flex gap-2">
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderSelectAllEntitiesBtn">Select All</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearEntitiesBtn">Clear</button>
+              <div class="border rounded p-2 builder-scroll-box flex-grow-1" id="builderEntityList">
+                <div class="small text-muted">Select package and origin organization, then run preflight.</div>
               </div>
-            </div>
-            <div class="border rounded p-2 builder-scroll-box" id="builderEntityList">
-              <div class="small text-muted">Select package and origin organization, then run preflight.</div>
             </div>
           </div>
-          <div class="col-xl-5">
-            <%- renderDeclarationBlock('uploadFolders', 'Upload Folders', 'bi-folder2-open', 'Add Upload Folder') %>
-            <%- renderDeclarationBlock('mongoIndexes', 'Mongo Indexes', 'bi-database-gear', 'Add Index') %>
-            <%- renderDeclarationBlock('dataSchemas', 'Data Schemas', 'bi-diagram-3', 'Add Schema') %>
-            <%- renderDeclarationBlock('seeders', 'Seeders', 'bi-database-add', 'Add Seeder') %>
-            <%- renderDeclarationBlock('migrations', 'Migrations', 'bi-arrow-left-right', 'Add Migration') %>
-            <%- renderDeclarationBlock('upgradeGuards', 'Upgrade Guards', 'bi-shield-check', 'Add Guard') %>
-            <%- renderDeclarationBlock('dependencies', 'Dependencies', 'bi-boxes', 'Add Dependency') %>
+          <div class="col-xl-6 d-flex">
+            <div class="border rounded p-3 bg-white w-100 h-100 d-flex flex-column builder-data-storage-upload-panel">
+              <%- renderDeclarationBlock('uploadFolders', 'Upload Folders', 'bi-folder2-open', 'Add Upload Folder') %>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="builder-step-panel" data-builder-step="files">
+      <div class="builder-step-panel" data-builder-step="advanced-manifest">
         <div class="row g-3">
-          <div class="col-xl-6">
+          <div class="col-xl-6"><%- renderDeclarationBlock('quotaDefinitions', 'Quota Definitions', 'bi-activity', 'Add Quota') %></div>
+          <div class="col-xl-6"><%- renderDeclarationBlock('mongoIndexes', 'Mongo Indexes', 'bi-database-gear', 'Add Index') %></div>
+          <div class="col-xl-6"><%- renderDeclarationBlock('dataSchemas', 'Data Schemas', 'bi-diagram-3', 'Add Schema') %></div>
+          <div class="col-xl-6"><%- renderDeclarationBlock('seeders', 'Seeders', 'bi-database-add', 'Add Seeder') %></div>
+          <div class="col-xl-6"><%- renderDeclarationBlock('migrations', 'Migrations', 'bi-arrow-left-right', 'Add Migration') %></div>
+          <div class="col-xl-6"><%- renderDeclarationBlock('upgradeGuards', 'Upgrade Guards', 'bi-shield-check', 'Add Guard') %></div>
+          <div class="col-12"><%- renderDeclarationBlock('dependencies', 'Dependencies', 'bi-boxes', 'Add Dependency') %></div>
+        </div>
+      </div>
+
+      <div class="builder-step-panel" data-builder-step="files">
+        <details class="border rounded p-3 bg-white mb-3" open>
+          <summary class="fw-bold"><i class="bi bi-stars me-1"></i> Symbols</summary>
+          <div class="mt-3">
+            <%- renderDeclarationBlock('symbols', 'Symbols', 'bi-stars', 'Add Symbol') %>
+          </div>
+        </details>
+
+        <details class="border rounded p-3 bg-white mb-3" open>
+          <summary class="fw-bold"><i class="bi bi-folder2-open me-1"></i> File Tree</summary>
+          <div class="mt-3">
             <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
               <div>
                 <div class="fw-bold">File Tree</div>
@@ -253,11 +264,11 @@
               <div class="small text-muted">File tree loads after preflight.</div>
             </div>
           </div>
-          <div class="col-xl-6">
-            <div class="mb-3">
-              <label class="form-label small fw-bold">Manual File/Folder Refs (one per line)</label>
-              <textarea id="builderSelectedFileRefs" rows="4" class="form-control font-monospace small" placeholder="/uploads/ORG_900000/symbols/logo.png"></textarea>
-            </div>
+        </details>
+
+        <details class="border rounded p-3 bg-white mb-3" open>
+          <summary class="fw-bold"><i class="bi bi-table me-1"></i> File Fields By Table</summary>
+          <div class="mt-3">
             <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
               <div>
                 <div class="fw-bold">File Fields By Table</div>
@@ -272,31 +283,56 @@
               <div class="small text-muted">File field candidates load after entity preflight.</div>
             </div>
           </div>
-        </div>
+        </details>
+
+        <details class="border rounded p-3 bg-white">
+          <summary class="fw-bold"><i class="bi bi-pencil-square me-1"></i> Manual File/Folder Refs (one per line)</summary>
+          <div class="mt-3">
+            <label class="form-label small fw-bold">Manual File/Folder Refs (one per line)</label>
+            <textarea id="builderSelectedFileRefs" rows="6" class="form-control font-monospace small" placeholder="/uploads/ORG_900000/symbols/logo.png"></textarea>
+          </div>
+        </details>
       </div>
 
       <div class="builder-step-panel" data-builder-step="review">
-        <div class="row g-3">
-          <div class="col-xl-5">
-            <div class="border rounded p-3 bg-light" id="builderReviewSummary">Run preflight to prepare review summary.</div>
-            <div class="d-flex align-items-center gap-2 flex-wrap mt-3">
-              <button type="button" class="btn btn-outline-secondary" id="builderPreflightBtn"><i class="bi bi-search me-1"></i>Preflight</button>
-              <button type="button" class="btn btn-primary btn-filled" id="builderBuildBtn"><i class="bi bi-box-arrow-down-right me-1"></i>Build Signed Package</button>
+        <div class="d-flex flex-column gap-3">
+          <div class="border rounded p-3 bg-light" id="builderReviewSummary">Run preflight to prepare review summary.</div>
+          <div class="border rounded p-3">
+            <div class="fw-bold mb-2">Build Version And Note</div>
+            <div class="row g-3">
+              <div class="col-xl-6">
+                <label class="form-label small fw-bold">Suggested Target Version</label>
+                <div class="small text-muted border rounded px-3 py-2 bg-light" id="builderVersionHint">Select a package to suggest the next version.</div>
+              </div>
+              <div class="col-xl-6">
+                <label class="form-label small fw-bold">Target Version</label>
+                <input id="builderVersion" type="text" class="form-control" placeholder="1.0.1">
+              </div>
+              <div class="col-12">
+                <label class="form-label small fw-bold">Build Note</label>
+                <textarea id="builderBuildNote" rows="4" class="form-control" placeholder="Describe what changed in this package build..."></textarea>
+                <div class="small text-muted mt-1">Saved into the package as <code>BUILD_NOTE.md</code>.</div>
+              </div>
             </div>
           </div>
-          <div class="col-xl-7">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between">
-                <span>Builder Output</span>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" class="btn btn-outline-secondary" id="builderPreflightBtn"><i class="bi bi-search me-1"></i>Preflight</button>
+            <button type="button" class="btn btn-primary btn-filled" id="builderBuildBtn"><i class="bi bi-box-arrow-down-right me-1"></i>Build Signed Package</button>
+          </div>
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-bold small d-flex align-items-center justify-content-between">
+              <span>Builder Output</span>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="builderCopyOutputBtn"><i class="bi bi-clipboard me-1"></i>Copy</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="builderClearOutputBtn">Clear</button>
               </div>
-              <div class="card-body">
-                <pre id="builderOutput" class="small bg-dark text-success p-3 rounded mb-0 builder-output">Ready.</pre>
-                <div id="builderArtifactLinks" class="mt-3 d-none">
-                  <div class="small fw-semibold mb-1">Published Artifacts</div>
-                  <div id="builderArtifactHealthAlert" class="alert alert-warning py-2 px-3 small mb-2 d-none"></div>
-                  <div id="builderArtifactLinksList"></div>
-                </div>
+            </div>
+            <div class="card-body">
+              <pre id="builderOutput" class="small bg-dark text-success p-3 rounded mb-0 builder-output">Ready.</pre>
+              <div id="builderArtifactLinks" class="mt-3 d-none">
+                <div class="small fw-semibold mb-1">Published Artifacts</div>
+                <div id="builderArtifactHealthAlert" class="alert alert-warning py-2 px-3 small mb-2 d-none"></div>
+                <div id="builderArtifactLinksList"></div>
               </div>
             </div>
           </div>
@@ -346,9 +382,10 @@
     { id: 'setup', title: 'Setup' },
     { id: 'sections', title: 'Sections' },
     { id: 'operations', title: 'Operations' },
-    { id: 'roles-symbols', title: 'Roles And Symbols' },
-    { id: 'navigation-quota', title: 'Navigation And Quota' },
+    { id: 'roles', title: 'Roles' },
+    { id: 'navigation', title: 'Navigation' },
     { id: 'data-storage', title: 'Data And Storage' },
+    { id: 'advanced-manifest', title: 'Advanced Manifest' },
     { id: 'files', title: 'Files' },
     { id: 'review', title: 'Review And Build' }
   ];
@@ -452,7 +489,7 @@
     }
     if (versionEl && packageId && (force || !versionEl.value.trim())) versionEl.value = suggested;
     if (manifestModeEl) {
-      const supportsLiveManifest = ['school', 'pte', 'ielts', 'benchpath'].includes(packageId.toLowerCase());
+      const supportsLiveManifest = ['school', 'pte', 'ielts', 'benchpath', 'credit'].includes(packageId.toLowerCase());
       Array.from(manifestModeEl.options).forEach((option) => {
         if (option.value === 'live') option.disabled = !supportsLiveManifest;
       });
@@ -643,6 +680,7 @@
                 ${candidates.map((field) => `<option value="${escapeHtml(field)}">${escapeHtml(field)}</option>`).join('')}
               </select>
               <button type="button" class="btn btn-outline-secondary btn-sm builder-file-field-add-btn" data-entity-type="${escapeHtml(entityType)}">Add</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm builder-file-field-add-all-btn" data-entity-type="${escapeHtml(entityType)}">Add All</button>
               <button type="button" class="btn btn-outline-secondary btn-sm builder-file-field-clear-btn" data-entity-type="${escapeHtml(entityType)}">Clear</button>
             </div>
           </div>
@@ -902,6 +940,13 @@
       renderFileFieldList();
       return;
     }
+    const addAllFieldBtn = event.target.closest('.builder-file-field-add-all-btn');
+    if (addAllFieldBtn) {
+      const entityType = addAllFieldBtn.getAttribute('data-entity-type');
+      state.selectedFileFieldsByEntity[entityType] = getEntityCandidates(entityType);
+      renderFileFieldList();
+      return;
+    }
     const removeFieldBtn = event.target.closest('.builder-file-field-remove-btn');
     if (removeFieldBtn) {
       const entityType = removeFieldBtn.getAttribute('data-entity-type');
@@ -946,6 +991,30 @@
   document.getElementById('builderClearOutputBtn')?.addEventListener('click', () => {
     outputEl.textContent = 'Ready.';
     clearArtifactLinks();
+  });
+  document.getElementById('builderCopyOutputBtn')?.addEventListener('click', async () => {
+    const text = String(outputEl?.textContent || '');
+    if (!text) return;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', 'readonly');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      if (typeof showToast === 'function') {
+        showToast('Builder output copied to clipboard.', 'success');
+      }
+    } catch (error) {
+      showError(new Error(`Failed to copy builder output: ${error?.message || error}`));
+    }
   });
   document.getElementById('builderSelectAllEntitiesBtn')?.addEventListener('click', () => {
     state.entitySelectionTouched = true;

@@ -1684,16 +1684,69 @@ exports.showPackageBuilderPage = async (req, res) => {
     const organizations = await dataService.fetchData('organizations', {}, req.user, {
       backendMode: runtimeBackend?.mode || ''
     }).catch(() => []);
+    const organizationRows = Array.isArray(organizations) ? organizations : [];
+    const normalizeOrgCandidate = (value = '') => cleanFormText(value, 120);
+    const isSystemOrgCandidate = (value = '') => {
+      const token = normalizeOrgCandidate(value).toUpperCase();
+      return !token || token === 'SYSTEM' || token === 'GLOBAL' || token === 'ORG_SYSTEM' || token === 'ORG_GLOBAL';
+    };
+    const orgRowMatches = (row = {}, value = '') => {
+      const token = normalizeOrgCandidate(value);
+      if (!token) return false;
+      const normalizedToken = token.replace(/^ORG_/i, '');
+      const rowTokens = [
+        row?.id,
+        row?.orgId,
+        row?.organizationId,
+        row?.code,
+        row?.orgCode
+      ].map((item) => normalizeOrgCandidate(item)).filter(Boolean);
+      return rowTokens.some((rowToken) => (
+        rowToken === token
+        || rowToken.replace(/^ORG_/i, '') === normalizedToken
+        || `ORG_${rowToken.replace(/^ORG_/i, '')}` === token
+      ));
+    };
+    const userOrgCandidates = []
+      .concat(req.user?.activeOrgId || [])
+      .concat(req.user?.primaryOrgId || [])
+      .concat(req.user?.orgId || [])
+      .concat(req.user?.organizationId || [])
+      .concat(req.user?.activeOrganization?.orgId || req.user?.activeOrganization?.id || [])
+      .concat(req.user?.organization?.orgId || req.user?.organization?.id || [])
+      .concat((Array.isArray(req.user?.organizations) ? req.user.organizations : []).flatMap((row) => [
+        row?.orgId,
+        row?.id,
+        row?.organizationId
+      ]))
+      .map((item) => normalizeOrgCandidate(item))
+      .filter(Boolean);
+    const matchedActiveOrg = userOrgCandidates
+      .map((candidate) => organizationRows.find((row) => orgRowMatches(row, candidate)))
+      .find(Boolean);
+    const firstRealOrg = organizationRows.find((row) => (
+      !isSystemOrgCandidate(row?.orgId)
+      && !isSystemOrgCandidate(row?.id)
+    ));
+    const resolvedActiveOrgId = normalizeOrgCandidate(
+      matchedActiveOrg?.orgId
+      || matchedActiveOrg?.id
+      || firstRealOrg?.orgId
+      || firstRealOrg?.id
+      || (!isSystemOrgCandidate(req.user?.activeOrgId) ? req.user?.activeOrgId : '')
+      || (!isSystemOrgCandidate(req.user?.primaryOrgId) ? req.user?.primaryOrgId : '')
+      || ''
+    );
 
     return res.render('systemSettings/packageBuilderSettings', {
       title: 'Package Builder',
       settings,
       runtimeBackend,
-      activeOrgId: cleanFormText(req.user?.activeOrgId || req.user?.primaryOrgId || '', 120),
+      activeOrgId: resolvedActiveOrgId,
       packageStorageRoot,
       packages: discovered,
       packageWarnings: discovered.filter((row) => row.valid !== true || row.manifestResolved !== true),
-      organizations: Array.isArray(organizations) ? organizations : [],
+      organizations: organizationRows,
       packageBuilderSigningKeySource: cleanFormText(signingKeyState?.source, 300),
       includeModal: true,
       user: req.user,

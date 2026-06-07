@@ -34,7 +34,8 @@ const REMAP_ORG_FIELDS = new Set([
 const ORG_TOKEN_EXACT_REGEX = /^ORG_[A-Za-z0-9_-]+$/i;
 const ORG_UPLOAD_SEGMENT_REGEX = /\/uploads\/(ORG_[^/]+)/ig;
 const UPLOAD_URL_MATCH_REGEX = /\/uploads\/[^"'` ]+/ig;
-const LIVE_MANIFEST_SUPPORTED_PACKAGES = new Set(['school', 'pte', 'ielts', 'benchpath']);
+const FILE_FIELD_KEY_REGEX = /^(url|urls|path|paths|filepath|filepaths|fileurl|fileurls|file_url|file_urls|storagepath|storagepaths|storage_path|storage_paths|attachment|attachments|media|image|images|photo|photos|avatar|logo|document|documents|audio|video|thumbnail|icon)$/i;
+const LIVE_MANIFEST_SUPPORTED_PACKAGES = new Set(['school', 'pte', 'ielts', 'benchpath', 'credit']);
 const LIVE_MANIFEST_PACKAGE_MATCH_PROFILES = Object.freeze({
   school: {
     terms: ['school'],
@@ -63,6 +64,13 @@ const LIVE_MANIFEST_PACKAGE_MATCH_PROFILES = Object.freeze({
     categories: ['benchpath'],
     tags: ['benchpath', 'clbpath', 'pblapath'],
     textTerms: ['benchpath', 'bench path', 'clbpath', 'pblapath']
+  },
+  credit: {
+    terms: ['credit', 'credit loans', 'credit_loans'],
+    prefixes: ['CREDIT'],
+    categories: ['credit', 'credit_loans'],
+    tags: ['credit', 'credit_loans'],
+    textTerms: ['credit', 'credit loans']
   }
 });
 const MANIFEST_SELECTION_FIELDS = Object.freeze([
@@ -379,14 +387,66 @@ function collectStringLeafRows(node, pathParts = [], out = []) {
   return out;
 }
 
-function collectFileFieldCandidates(rows = []) {
+function collectPrimitiveLeafRows(node, pathParts = [], out = []) {
+  if (Array.isArray(node)) {
+    if (!node.length) {
+      out.push({
+        fieldPath: formatFieldPath([...pathParts, '[]']),
+        value: ''
+      });
+      return out;
+    }
+    node.forEach((item) => collectPrimitiveLeafRows(item, [...pathParts, '[]'], out));
+    return out;
+  }
+  if (node && typeof node === 'object') {
+    Object.entries(node).forEach(([key, value]) => {
+      collectPrimitiveLeafRows(value, [...pathParts, cleanText(key, 160)], out);
+    });
+    return out;
+  }
+  out.push({
+    fieldPath: formatFieldPath(pathParts),
+    value: node === undefined || node === null ? '' : String(node)
+  });
+  return out;
+}
+
+function normalizeDeclaredFileFieldCandidates(entity = {}) {
+  const source = sanitizeObject(entity);
+  const raw = []
+    .concat(source.fileFieldCandidates || [])
+    .concat(source.fileFields || [])
+    .concat(source.uploadUrlFieldPaths || [])
+    .concat(source.uploadFields || []);
+  return Array.from(new Set(sanitizeArray(raw)
+    .map((item) => {
+      if (typeof item === 'string') return normalizeFieldPathToken(item);
+      return normalizeFieldPathToken(item?.fieldPath || item?.path || item?.name || item?.key || '');
+    })
+    .filter(Boolean)));
+}
+
+function isLikelyFileFieldPath(fieldPath = '') {
+  const terminal = cleanText(resolveTerminalFieldKey(fieldPath), 200);
+  if (!terminal) return false;
+  const normalized = terminal.replace(/[\s-]+/g, '_');
+  if (FILE_FIELD_KEY_REGEX.test(normalized)) return true;
+  return /(file|upload|storage|attachment|media|image|photo|avatar|logo|document|audio|video|thumbnail|icon)/i.test(normalized)
+    && /(url|path|ref|key|name|id|file|upload|storage|attachment|media|image|photo|avatar|logo|document|audio|video|thumbnail|icon)$/i.test(normalized);
+}
+
+function collectFileFieldCandidates(rows = [], entity = {}) {
   const fromUpload = new Set();
+  normalizeDeclaredFileFieldCandidates(entity).forEach((fieldPath) => fromUpload.add(fieldPath));
   sanitizeArray(rows).forEach((row) => {
-    const leafRows = collectStringLeafRows(row, [], []);
+    const leafRows = collectPrimitiveLeafRows(row, [], []);
     leafRows.forEach((leaf) => {
       const fieldPath = normalizeFieldPathToken(leaf?.fieldPath || '');
       if (!fieldPath) return;
-      if (listUploadRefsInText(leaf.value).length) fromUpload.add(fieldPath);
+      if (listUploadRefsInText(leaf.value).length || isLikelyFileFieldPath(fieldPath)) {
+        fromUpload.add(fieldPath);
+      }
     });
   });
   return Array.from(fromUpload);
@@ -1345,7 +1405,7 @@ function createService(overrides = {}) {
     if (mode === 'live' || mode === 'backend' || mode === 'live-backend') {
       const normalizedPackageId = normalizePackageId(packageId);
       if (!LIVE_MANIFEST_SUPPORTED_PACKAGES.has(normalizedPackageId)) {
-        throw new Error('Live backend manifest generation is currently available for School, PTE, IELTS, and BenchPath packages only.');
+        throw new Error('Live backend manifest generation is currently available for School, PTE, IELTS, BenchPath, and Credit packages only.');
       }
       return 'live';
     }
@@ -1825,7 +1885,7 @@ function createService(overrides = {}) {
   async function generateLivePackageManifest(packageRow = {}, options = {}) {
     const packageId = normalizePackageId(packageRow?.packageId || packageRow?.manifest?.id || packageRow?.manifest?.packageId || '');
     if (!LIVE_MANIFEST_SUPPORTED_PACKAGES.has(packageId)) {
-      throw new Error('Live backend manifest generation is currently available for School, PTE, IELTS, and BenchPath packages only.');
+      throw new Error('Live backend manifest generation is currently available for School, PTE, IELTS, BenchPath, and Credit packages only.');
     }
     const packageLabel = cleanText(packageRow?.manifest?.name || packageRow?.packageName || packageId.toUpperCase(), 120) || packageId.toUpperCase();
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
@@ -2390,7 +2450,7 @@ function createService(overrides = {}) {
         });
         const scoped = filterRowsByOriginScope(rowsRaw, originOrgId);
         const rows = scoped.rows;
-        const fileFieldCandidates = collectFileFieldCandidates(rowsRaw);
+        const fileFieldCandidates = collectFileFieldCandidates(rowsRaw, entity);
         const selectedFields = resolveSelectedFileFields(
           entity.entityType,
           requestedFileFieldSelection,
