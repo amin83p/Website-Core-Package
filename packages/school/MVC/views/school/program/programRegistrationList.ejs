@@ -1,7 +1,10 @@
 <%- include('partials/tablePages-start', {
   title, newUrl, newLabel: 'Register Students', newHref: '/school/programs/register-students', user, tableName, btn_export: true, print,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-backpack2 me-1"></i> School Academia</a>'
+  ],
   manageBtns: [
-    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
     `<a href="/school/programs/register-students-wizard" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-signpost-split me-1"></i> Wizard</a>`,
     '<a href="/school/programs/prior-subject-credits" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-mortarboard me-1"></i> Prior subject credits</a>'
   ]
@@ -64,27 +67,41 @@
           </td>
           <td class="small"><%= item.note || '-' %></td>
           <td class="table-actions text-end pe-4" data-col="actions">
-            <a href="/school/programs/registrations/<%= encodeURIComponent(item.id) %>" class="btn btn-sm btn-outline-secondary"><%= String(item.status || '').toLowerCase() === 'draft' ? 'Review Draft' : 'Details' %></a>
-            <% if (canManageRegistrations && item.canApprove) { %>
+            <div class="row-actions-wrap">
               <button
                 type="button"
-                class="btn btn-sm btn-outline-success approve-btn"
-                data-id="<%= item.id %>"
-                data-name="<%= item.studentName || item.studentId %>">
-                Approve & Post
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Program Registration Actions">
+                <i class="bi bi-three-dots-vertical"></i>
               </button>
-            <% } %>
-            <% if (canManageRegistrations && item.canRollback) { %>
-              <button
-                type="button"
-                class="btn btn-sm btn-filled btn-delete rollback-btn"
-                data-id="<%= item.id %>"
-                data-name="<%= item.studentName || item.studentId %>">
-                <%= String(item.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Move Back to Draft' %>
-              </button>
-            <% } else if (canManageRegistrations && item.termRegistrationsCount) { %>
-              <span class="text-muted small ms-2">Move back to draft is blocked (term registrations exist)</span>
-            <% } %>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/programs/registrations/<%= encodeURIComponent(item.id) %>" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-eye me-2"></i><%= String(item.status || '').toLowerCase() === 'draft' ? 'Review Draft' : 'Details' %>
+                </a>
+                <% if (canManageRegistrations && item.canApprove) { %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-success btn-sm approve-btn"
+                    data-id="<%= item.id %>"
+                    data-name="<%= item.studentName || item.studentId %>">
+                    <i class="bi bi-check2-circle me-2"></i>Approve & Post
+                  </button>
+                <% } %>
+                <% if (canManageRegistrations && item.canRollback) { %>
+                  <button
+                    type="button"
+                    class="btn btn-danger btn-sm rollback-btn"
+                    data-id="<%= item.id %>"
+                    data-name="<%= item.studentName || item.studentId %>">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>
+                    <%= String(item.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Move Back to Draft' %>
+                  </button>
+                <% } else if (canManageRegistrations && item.termRegistrationsCount) { %>
+                  <span class="text-muted small d-block ps-1">Move back to draft is blocked (term registrations exist)</span>
+                <% } %>
+              </div>
+            </div>
           </td>
         </tr>
       <% }) %>

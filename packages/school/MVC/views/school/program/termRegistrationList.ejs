@@ -1,7 +1,10 @@
 <%- include('partials/tablePages-start', {
   title, newUrl, newLabel, newHref: '/school/programs/register-terms', user, tableName, btn_export: true, print,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-backpack2 me-1"></i> School Academia</a>'
+  ],
   manageBtns: [
-    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
     `<a href="/school/programs/register-terms-wizard" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-signpost-split me-1"></i> Wizard</a>`,
     `<a href="/school/programs/register-terms-batch-wizard" class="btn btn-filled btn-primary btn-md mb-2"><i class="bi bi-diagram-3 me-1"></i> Batch Wizard</a>`,
   ]
@@ -79,15 +82,30 @@
             <div>Voided: <span class="fw-bold"><%= item.academic.voided %></span></div>
           </td>
           <td class="table-actions text-end pe-4">
-            <a href="/school/programs/term-registrations/<%= encodeURIComponent(item.id) %>" class="btn btn-sm btn-outline-secondary"><%= String(item.status || '').toLowerCase() === 'draft' ? 'Review Draft' : 'Details' %></a>
-            <% if (canManageRegistrations && item.canApprove) { %>
-              <button type="button" class="btn btn-sm btn-outline-success approve-btn" data-id="<%= item.id %>" data-name="<%= item.studentName || item.studentId %>">
-                Approve & Post
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Term Registration Actions">
+                <i class="bi bi-three-dots-vertical"></i>
               </button>
-            <% } %>
-            <% if (canManageRegistrations && item.canRollback) { %>
-              <button type="button" class="btn btn-sm btn-filled btn-delete rollback-btn" data-id="<%= item.id %>" data-name="<%= item.studentName || item.studentId %>" data-status="<%= String(item.status || '').toLowerCase() %>"><%= String(item.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Move Back to Draft' %></button>
-            <% } %>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/programs/term-registrations/<%= encodeURIComponent(item.id) %>" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-eye me-2"></i><%= String(item.status || '').toLowerCase() === 'draft' ? 'Review Draft' : 'Details' %>
+                </a>
+                <% if (canManageRegistrations && item.canApprove) { %>
+                  <button type="button" class="btn btn-outline-success btn-sm approve-btn" data-id="<%= item.id %>" data-name="<%= item.studentName || item.studentId %>">
+                    <i class="bi bi-check2-circle me-2"></i>Approve & Post
+                  </button>
+                <% } %>
+                <% if (canManageRegistrations && item.canRollback) { %>
+                  <button type="button" class="btn btn-danger btn-sm rollback-btn" data-id="<%= item.id %>" data-name="<%= item.studentName || item.studentId %>" data-status="<%= String(item.status || '').toLowerCase() %>">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i><%= String(item.status || '').toLowerCase() === 'draft' ? 'Cancel Draft' : 'Move Back to Draft' %>
+                  </button>
+                <% } %>
+              </div>
+            </div>
           </td>
         </tr>
       <% }) %>

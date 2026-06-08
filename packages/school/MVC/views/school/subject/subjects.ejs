@@ -6,9 +6,12 @@
   tableName,
   btn_export: true,
   print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-backpack2 me-1"></i> School Academia</a>'
+  ],
   manageBtns: [
-    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
-  `
+    `
       <a href="/school/subjects/new-wizard" class="btn btn-filled btn-primary btn-md mb-2">
         <i class="bi bi-signpost-split me-1"></i> Wizard
       </a>
@@ -76,10 +79,27 @@
              <span class="badge <%= badge %>"><%= (item.status || 'unknown').toUpperCase() %></span>
           </td>
 
-          <td class="table-actions">
-             <a href="/school/subjects/edit-wizard/<%= item.id %>" class="btn btn-sm btn-outline-info me-1">Wizard</a>
-             <a href="/school/subjects/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
-             <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Subject Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/subjects/edit-wizard/<%= item.id %>" class="btn btn-outline-info btn-sm">
+                  <i class="bi bi-magic me-2"></i>Wizard
+                </a>
+                <a href="/school/subjects/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>">
+                  <i class="bi bi-archive me-2"></i>Delete
+                </button>
+              </div>
+            </div>
           </td>
         </tr>
       <% }) %>

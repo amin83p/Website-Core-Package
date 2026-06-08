@@ -6,8 +6,11 @@
   tableName: 'Holidays_List',
   btn_export: true,
   print: true,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-backpack2 me-1"></i> School Academia</a>'
+  ],
   manageBtns: [
-    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>'
   ]
 }) %>
 
@@ -63,13 +66,24 @@
                     </td>
                     <td class="text-muted small text-truncate" style="max-width: 250px;"><%= item.notes || '-' %></td>
                     <td class="table-actions text-end pe-4">
-                        <button class="btn btn-sm btn-filled btn-edit me-1" 
-                            onclick="openHolidayModal('<%= item.id %>', '<%= item.date %>', '<%= item.title.replace(/'/g, "\\'") %>', '<%= item.type %>', '<%= (item.notes||'').replace(/'/g, "\\'") %>')">
-                            Edit
-                        </button>
-                        <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">
-                            Delete
-                        </button>
+                        <div class="row-actions-wrap">
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                            data-row-actions-id="<%= item.id %>"
+                            title="Holiday Actions">
+                            <i class="bi bi-three-dots-vertical"></i>
+                          </button>
+                          <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                            <button class="btn btn-outline-info btn-sm" 
+                                onclick="openHolidayModal('<%= item.id %>', '<%= item.date %>', '<%= item.title.replace(/'/g, "\\'") %>', '<%= item.type %>', '<%= (item.notes||'').replace(/'/g, "\\'") %>')">
+                                <i class="bi bi-pencil-square me-2"></i>Edit
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>">
+                                <i class="bi bi-trash me-2"></i>Delete
+                            </button>
+                          </div>
+                        </div>
                     </td>
                 </tr>
                 <% }) %>
