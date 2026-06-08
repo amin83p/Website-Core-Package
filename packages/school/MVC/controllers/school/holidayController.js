@@ -62,13 +62,19 @@ async function listHolidays(req, res) {
         const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
         if(query.q === searchDefaultKeyword) query.q='';
 
+        // Extract the UI year filter for post-load filtering.
+        // Keep repository queries backend-safe by not sending year as a direct DB filter.
+        const requestedYear = String(query.year || '').trim();
+        const targetYear = /^\d{4}$/.test(requestedYear) ? requestedYear : new Date().getFullYear().toString();
+        const dataQuery = { ...query };
+        if (Object.prototype.hasOwnProperty.call(dataQuery, 'year')) delete dataQuery.year;
+
         // Fetch using the Data Service
-        const allHolidays = await schoolDataService.fetchData('holidays', query, req.user);
+        const allHolidays = await schoolDataService.fetchData('holidays', dataQuery, req.user);
         
         const searchableFields = await inferSearchableFields(allHolidays, { exclude: ['audit', 'attachments'] });
         
         // Filter by year if requested, default to current year
-        const targetYear = query.year || new Date().getFullYear().toString();
         const filteredHolidays = allHolidays.filter(h => h.date && h.date.startsWith(targetYear));
 
         const { data, pagination } = paginate(filteredHolidays, query.page, query.limit);

@@ -23,7 +23,11 @@ router.get('/api/range',
 
 router.post('/save',
   requireAccess(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.saveHoliday);
 
 router.get('/delete/:id',
@@ -33,7 +37,11 @@ router.get('/delete/:id',
 
 router.delete('/delete/:id',
   requireAccess(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.DELETE),
-  trackActionState(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.DELETE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.DELETE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.deleteHoliday);
 
 module.exports = router;
