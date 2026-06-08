@@ -1,8 +1,10 @@
 <%- include('partials/tablePages-start', {
   title, newUrl, newLabel, user, tableName, btn_export: true, print,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_PEOPLE" class="school-navigator-dashboard btn btn-filled btn-secondary mb-2 btn-md"><i class="bi bi-people me-1"></i> People Dashboard</a>'
+  ],
   manageBtns: [
-    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>',
-    '<a href="/dashboard/section-nav/SCHOOL_PEOPLE" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-people me-1"></i> People Dashboard</a>',
     `<a href="/school/staff/archived" class="btn btn-outline-warning btn-md mb-2"><i class="bi bi-arrow-counterclockwise me-1"></i> Recover Archived</a>`
   ]
 }) %>
@@ -15,7 +17,7 @@
   ]
 }) %>
 
-<div class="table-scroll-wrapper">
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
   <table class="table-responsive size-md" id="first-table">
     <thead>
       <tr>
@@ -55,8 +57,20 @@
             <span class="badge <%= badge %>"><%= String(item.status || 'Unknown').toUpperCase() %></span>
           </td>
           <td class="table-actions text-end pe-4">
-            <a href="/school/staff/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
-            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Archive</button>
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Staff Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/staff/edit/<%= item.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <button class="btn btn-outline-secondary btn-sm archive-btn" data-id="<%= item.id %>"><i class="bi bi-archive me-2"></i>Archive</button>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>"><i class="bi bi-trash me-2"></i>Delete</button>
+              </div>
+            </div>
           </td>
         </tr>
       <% }) %>

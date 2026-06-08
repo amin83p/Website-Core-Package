@@ -12,6 +12,24 @@ function isNavigatorSection(section) {
   return section?.navigatorSection === true;
 }
 
+const MAIN_DASHBOARD_SORT_PRIORITY = [
+  { name: 'SCHOOL', category: 'SCHOOL', sectionId: '122740', rank: 1 },
+  { name: 'PTE', category: 'PTE', sectionId: '910001', rank: 2 }
+];
+
+function getMainDashboardRank(section) {
+  const name = String(section?.name || '').trim().toUpperCase();
+  const category = String(section?.category || '').trim().toUpperCase();
+  const sectionId = String(section?.id || '').trim();
+
+  const match = MAIN_DASHBOARD_SORT_PRIORITY.find((entry) => (
+    entry.rank > 0 &&
+    (entry.name === name || entry.category === category || entry.sectionId === sectionId)
+  ));
+
+  return match ? match.rank : Number.MAX_SAFE_INTEGER;
+}
+
 function getSubsectionRefs(section) {
   return (section?.subsections || [])
     .map((s) => ({ id: s?.id || s, name: s?.name }))
@@ -273,6 +291,19 @@ async function getAllAccessibleSections(req, res) {
   }
 }
 
+function sortMainDashboardSectionsForDisplay(rows = []) {
+  const list = Array.isArray(rows) ? rows.slice() : [];
+  return list.sort((a, b) => {
+    const accessDelta = (a.minimumAccessRequirement ?? 0) - (b.minimumAccessRequirement ?? 0);
+    if (accessDelta !== 0) return accessDelta;
+
+    const rankDelta = getMainDashboardRank(a) - getMainDashboardRank(b);
+    if (rankDelta !== 0) return rankDelta;
+
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  });
+}
+
 /* ============================================================
    VIEW: Show Main Dashboard
 ============================================================ */
@@ -293,11 +324,7 @@ async function showDashboard(req, res) {
     accessibleSections = mapSymbolsToSections(accessibleSections, contextSymbols, req.user);
 
     // 4. Sort
-    const dashboardSections = accessibleSections.sort((a, b) => {
-        const al = (a.minimumAccessRequirement ?? 0) - (b.minimumAccessRequirement ?? 0);
-        if (al !== 0) return al;
-        return String(a.name || '').localeCompare(String(b.name || ''));
-    });
+    const dashboardSections = sortMainDashboardSectionsForDisplay(accessibleSections);
 
     const canViewSystemStat = async (sectionId, operationId) => {
       if (adminCheckersService.isAdmin(req.user)) return true;
@@ -385,11 +412,7 @@ async function getQuickMenu(req, res) {
     let accessibleSections = await filterAccessibleSections(req.user, allSections);
     accessibleSections = mapSymbolsToSections(accessibleSections, contextSymbols, req.user);
 
-    const dashboardSections = accessibleSections.sort((a, b) => {
-        const al = (a.minimumAccessRequirement ?? 0) - (b.minimumAccessRequirement ?? 0);
-        if (al !== 0) return al;
-        return String(a.name || '').localeCompare(String(b.name || ''));
-    });
+    const dashboardSections = sortMainDashboardSectionsForDisplay(accessibleSections);
 
     res.json({ status: 'success', sections: dashboardSections });
 

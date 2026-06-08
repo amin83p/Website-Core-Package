@@ -29,6 +29,16 @@ router.post('/recover/:id',
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.recoverStudent);
 
+router.get('/archive/:id',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE),
+  ctrl.archiveStudent);
+
+router.post('/archive/:id',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DELETE, { requireToken: true }),
+  ctrl.archiveStudent);
+
 router.get('/:id/attachments/:attId/download',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DOWNLOAD_FILE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.DOWNLOAD_FILE),

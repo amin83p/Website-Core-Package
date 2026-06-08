@@ -14,6 +14,7 @@ const {
     normalizeOrgRoles,
     getPrimaryOrgRole
 } = requireCoreModule('MVC/utils/orgContextUtils');
+const { normalizeOrgRoleTokens } = require('../../utils/schoolRoleTokenUtils');
 const { resolveCanonicalOrganizationName } = requireCoreModule('MVC/utils/organizationDisplay');
 
 // File handling helpers (centralized)
@@ -28,6 +29,18 @@ const idempotencyGuardService = require('../../services/school/idempotencyGuardS
 const { ACADEMIC_STATUSES } = require('../../models/school/studentModel');
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
+const STUDENT_DELETE_FOOTPRINT_RULES = Object.freeze([
+  { entityType: 'studentProgramRegistrations', field: 'studentId', label: 'Student Program Registrations' },
+  { entityType: 'studentTermRegistrations', field: 'studentId', label: 'Student Term Registrations' },
+  { entityType: 'classEnrollmentPeriods', field: 'studentId', label: 'Class Enrollment Periods' },
+  { entityType: 'academicLedger', field: 'studentId', label: 'Academic Ledger' },
+  { entityType: 'globalTransactions', field: 'party.studentId', label: 'Global Transactions' },
+  { entityType: 'reportInstances', field: 'studentId', label: 'Report Instances' },
+  { entityType: 'examAssignments', field: 'studentId', label: 'Exam Assignments' },
+  { entityType: 'examAttempts', field: 'studentId', label: 'Exam Attempts' },
+  { entityType: 'examAnswers', field: 'studentId', label: 'Exam Answers' }
+]);
+const STUDENT_DELETE_MAX_FOOTPRINT_SAMPLE = 5;
 
 function getActiveOrgIdOrThrow(reqUser) {
     return getActiveOrgIdOrThrowShared(reqUser);
@@ -49,6 +62,111 @@ function parseJsonSafe(value, fallback) {
 
 function toBoolean(v) {
     return v === true || v === 'true' || v === 'on' || v === 1 || v === '1';
+}
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getRecordIdentity(record) {
+    return toPublicId(record?.id)
+        || toPublicId(record?.code)
+        || toPublicId(record?.partyId)
+        || toPublicId(record?.orgId)
+        || toPublicId(record?._id)
+        || '';
+}
+
+function buildFootprintBlockedMessage(studentDisplayName, footprint) {
+    const safeName = escapeHtml(studentDisplayName);
+    if (!Array.isArray(footprint) || !footprint.length) {
+        return `Cannot delete ${safeName} because it has related history.`;
+    }
+
+    const items = footprint.map((entry) => {
+        const sampleText = Array.isArray(entry.samples) && entry.samples.length > 0
+            ? `<span class="font-monospace">(${entry.samples.join(', ')})</span>`
+            : '';
+        return `<li><strong>${escapeHtml(entry.label || '')}</strong>: ${Number(entry.count || 0)} record(s) found ${sampleText}</li>`;
+    });
+
+    return `Cannot delete ${safeName} because related history exists. Please remove these references first:<ul>${items.join('')}</ul>`;
+}
+
+async function collectStudentFootprint(studentId, activeOrgId, reqUser) {
+    const targetStudentId = toPublicId(studentId);
+    if (!targetStudentId) return [];
+
+    const rows = [];
+    for (const rule of STUDENT_DELETE_FOOTPRINT_RULES) {
+        const field = String(rule?.field || '').trim();
+        if (!field) continue;
+
+        const query = {
+            page: 1,
+            [`${field}__eq`]: targetStudentId
+        };
+        if (activeOrgId) query.orgId__eq = String(activeOrgId);
+
+        const items = await dataService.fetchData(rule.entityType, query, reqUser);
+        if (!Array.isArray(items) || items.length === 0) continue;
+
+        const samples = (items || [])
+            .slice(0, STUDENT_DELETE_MAX_FOOTPRINT_SAMPLE)
+            .map(getRecordIdentity)
+            .filter(Boolean);
+
+        rows.push({
+            entityType: String(rule.entityType || '').trim(),
+            label: String(rule.label || '').trim() || String(rule.entityType || '').trim(),
+            count: items.length,
+            samples
+        });
+    }
+
+    return rows;
+}
+
+async function removePersonSchoolRole(personId, orgId, role, reqUser, options = {}) {
+    const person = await dataServiceGlobal.getDataById('persons', personId, reqUser, PERSON_QUERY_OPTIONS);
+    if (!person) return { changed: false, skipped: true, reason: 'person_not_found' };
+
+    const targetRole = String(role || '').trim().toLowerCase();
+    if (!targetRole) return { changed: false, skipped: true, reason: 'role_not_defined' };
+
+    const list = Array.isArray(person.organizations) ? person.organizations.slice() : [];
+    const idx = list.findIndex((org) => idsEqual(org?.orgId || '', orgId || ''));
+    if (idx < 0) return { changed: false, personId: toPublicId(person.id), reason: 'organization_link_not_found' };
+
+  const orgEntry = { ...list[idx] };
+  const roles = normalizeOrgRoleTokens(orgEntry);
+  if (!roles.includes(targetRole)) return { changed: false, personId: toPublicId(person.id), reason: 'school_student_role_not_attached' };
+
+  const nextRoles = roles.filter((candidate) => candidate !== targetRole);
+  const nextOrg = { ...orgEntry, roles: Array.isArray(nextRoles) && nextRoles.length > 0 ? nextRoles : ['member'] };
+  nextOrg.role = Array.isArray(nextOrg.roles) && nextOrg.roles.length > 0 ? nextOrg.roles[0] : 'member';
+  if (!nextOrg.memberStatus) nextOrg.memberStatus = 'active';
+  if (!nextOrg.joinedAt) nextOrg.joinedAt = new Date().toISOString();
+    list[idx] = nextOrg;
+
+    const beforeOrganizations = Array.isArray(person.organizations) ? JSON.parse(JSON.stringify(person.organizations)) : [];
+    await dataServiceGlobal.updateData('persons', person.id, { ...person, organizations: list }, reqUser, options);
+
+    return {
+        changed: true,
+        personId: toPublicId(person.id),
+        beforeOrganizations
+    };
+}
+
+function formatStudentDisplayName(student, person) {
+    const personLabel = `${String(person?.name?.first || '').trim()} ${String(person?.name?.last || '').trim()}`.trim();
+    return personLabel || toPublicId(student?.id || '') || 'Student';
 }
 
 function normalizeToken(value) {
@@ -471,6 +589,52 @@ async function recoverLinkedStudentAccount(student, reqUser) {
         { ...account, status: 'active', allowPost: true },
         reqUser
     );
+}
+
+async function purgeLinkedStudentAccount(student, reqUser, txContext, outcome, warnings) {
+    const linkedAccountId = String(student?.studentAccountId || '').trim();
+    if (!linkedAccountId) {
+        warnings.push('Student has no linked school account id.');
+        return { removed: false, accountId: '' };
+    }
+
+    const accountSnapshot = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser);
+    if (!accountSnapshot) {
+        warnings.push(`Linked school account ${linkedAccountId} not found.`);
+        return { removed: false, accountId: linkedAccountId };
+    }
+
+    const accountSnapshotClone = JSON.parse(JSON.stringify(accountSnapshot));
+    await dataService.purgeData('schoolAccounts', linkedAccountId, reqUser, { transactionContext: txContext });
+
+    if (txContext) {
+        txContext.addCompensation(async () => {
+            await dataService.addData('schoolAccounts', accountSnapshotClone, reqUser, { transactionContext: txContext });
+        }, { type: 'restore_student_school_account', entityType: 'schoolAccounts', id: toPublicId(linkedAccountId) });
+    }
+
+    outcome.removedSchoolAccount = true;
+    outcome.schoolAccountId = toPublicId(linkedAccountId);
+    return { removed: true, accountId: toPublicId(linkedAccountId), snapshot: accountSnapshotClone };
+}
+
+function logStudentDeleteAuditEvent(level, payload) {
+    const parts = [
+        '[STUDENT_DELETE]',
+        `level=${String(level || '').trim() || 'unknown'}`,
+        `actor=${String(payload?.actor || '').trim() || 'unknown'}`,
+        `studentId=${String(payload?.studentId || '').trim() || 'unknown'}`,
+        `orgId=${String(payload?.orgId || '').trim() || 'unknown'}`,
+        `outcome=${String(payload?.outcome || '').trim() || 'unknown'}`
+    ];
+
+    const footer = [
+        `removedRole=${Boolean(payload?.removedRole) ? 'yes' : 'no'}`,
+        `removedSchoolAccount=${Boolean(payload?.removedSchoolAccount) ? 'yes' : 'no'}`,
+        `footprint=${Number(payload?.footprintCount || 0)}`
+    ];
+
+    console.info(`${parts.join(' ')} ${footer.join(' ')}`);
 }
 
 exports.listStudents = async (req, res) => {
@@ -1057,6 +1221,161 @@ exports.deleteAttachment = async (req, res) => {
 
 exports.deleteStudent = async (req, res) => {
     let guardKey = '';
+    let txContext = null;
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        guardKey = idempotencyGuardService.createGuardKey([
+            'student_delete',
+            String(activeOrgId || '').trim(),
+            String(req.params.id || '').trim()
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({
+            key: guardKey,
+            runningTtlMs: 90000,
+            replayTtlMs: 12000
+        });
+        if (sendGuardedResponse(req, res, guardResult, 'Student delete is already in progress. Please wait.')) return;
+
+        const student = await dataService.getDataById('students', req.params.id, req.user);
+        if (!student) throw new Error('Student not found.');
+        assertStudentOrgAccess(student, activeOrgId, req.user);
+
+        const footprint = await collectStudentFootprint(student?.id, activeOrgId, req.user);
+        const person = student?.personId
+            ? await dataServiceGlobal.getDataById('persons', student.personId, req.user, PERSON_QUERY_OPTIONS)
+            : null;
+        const studentDisplayName = formatStudentDisplayName(student, person);
+        if (footprint.length > 0) {
+            idempotencyGuardService.failGuard(guardKey);
+            const detailPayload = {
+                studentId: toPublicId(student?.id),
+                personId: toPublicId(student?.personId),
+                footprint
+            };
+            const payloadOut = {
+                status: 'error',
+                code: 'STUDENT_DELETE_BLOCKED',
+                message: buildFootprintBlockedMessage(studentDisplayName, footprint),
+                details: detailPayload,
+                data: detailPayload
+            };
+            if (isAjax(req)) return res.status(409).json(payloadOut);
+            return res.status(409).render('error', {
+                title: 'Delete blocked',
+                statusCode: 409,
+                code: payloadOut.code,
+                error: new Error(payloadOut.message),
+                message: payloadOut.message,
+                details: payloadOut.details,
+                user: req.user
+            });
+        }
+
+        txContext = createTransactionContext({
+            name: 'student_delete',
+            metadata: {
+                studentId: toPublicId(student?.id),
+                personId: toPublicId(student?.personId),
+                activeOrgId: toPublicId(activeOrgId),
+                requestUserId: toPublicId(req.user?.id) || String(req.user?.username || 'system')
+            }
+        });
+
+        const studentSnapshot = JSON.parse(JSON.stringify(student || {}));
+        const removed = {
+            removedRole: false,
+            removedSchoolAccount: false,
+            removedStudent: false,
+            studentAccountId: '',
+            personId: toPublicId(student?.personId),
+            warnings: []
+        };
+
+        const roleResult = await removePersonSchoolRole(student.personId, activeOrgId, 'school_student', req.user, { transactionContext: txContext });
+        if (roleResult?.changed && roleResult?.personId) {
+            removed.removedRole = true;
+            txContext.addCompensation(async () => {
+                const personRecord = await dataServiceGlobal.getDataById('persons', roleResult.personId, req.user, PERSON_QUERY_OPTIONS);
+                if (!personRecord) return;
+                await dataServiceGlobal.updateData(
+                    'persons',
+                    roleResult.personId,
+                    { ...personRecord, organizations: roleResult.beforeOrganizations || [] },
+                    req.user,
+                    { transactionContext: txContext }
+                );
+            }, { type: 'restore_person_org_roles', personId: roleResult.personId });
+        } else if (roleResult?.reason) {
+        if (roleResult.reason === 'person_not_found') {
+            removed.warnings.push('Person record was not found for role cleanup.');
+        } else if (roleResult.reason === 'school_student_role_not_attached') {
+            removed.warnings.push('Student role was not attached to the person membership. Legacy role token cleanup may still be needed.');
+        } else if (roleResult.reason !== 'organization_link_not_found') {
+            removed.warnings.push(`Role cleanup skipped: ${roleResult.reason}`);
+        }
+        }
+
+        await purgeLinkedStudentAccount(student, req.user, txContext, removed, removed.warnings);
+
+        await dataService.purgeData('students', student.id, req.user, { transactionContext: txContext });
+        if (txContext) {
+            txContext.addCompensation(async () => {
+                await dataService.addData('students', studentSnapshot, req.user, { transactionContext: txContext });
+            }, { type: 'restore_student_record', entityType: 'students', id: toPublicId(student?.id) });
+        }
+        removed.removedStudent = true;
+
+        await txContext.commit({ flow: 'student_delete', studentId: toPublicId(student?.id) });
+        logStudentDeleteAuditEvent('success', {
+            actor: toPublicId(req.user?.id) || String(req.user?.username || 'system'),
+            studentId: toPublicId(student?.id),
+            orgId: toPublicId(activeOrgId),
+            outcome: 'deleted',
+            removedRole: removed.removedRole,
+            removedSchoolAccount: removed.removedSchoolAccount,
+            footprintCount: footprint.length
+        });
+
+        const payloadOut = {
+            status: 'success',
+            message: `Student ${escapeHtml(studentDisplayName)} deleted safely.`,
+            note: `${removed.warnings.length > 0
+                ? `${removed.warnings.join(' ')} `
+                : ''}Person and user accounts are retained. If needed, remove those records from People/Users manually.`,
+            data: {
+                deletedStudentId: toPublicId(student?.id),
+                removedRole: removed.removedRole,
+                removedSchoolAccount: removed.removedSchoolAccount,
+                personId: toPublicId(student?.personId),
+                schoolAccountId: removed.schoolAccountId,
+                warnings: removed.warnings
+            },
+            redirectTo: '/school/students'
+        };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        if (isAjax(req)) return res.json(payloadOut);
+        res.redirect('/school/students');
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        if (txContext) {
+            await txContext.rollback({ flow: 'student_delete', reason: error.message || 'Student delete failed' });
+            logStudentDeleteAuditEvent('error', {
+                actor: toPublicId(req.user?.id) || String(req.user?.username || 'system'),
+                studentId: toPublicId(req.params?.id),
+                orgId: toPublicId(req?.user?.activeOrgId),
+                outcome: `rollback_initiated:${error.message || 'unknown'}`,
+                removedRole: false,
+                removedSchoolAccount: false,
+                footprintCount: 0
+            });
+        }
+        if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
+        res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    }
+};
+
+exports.archiveStudent = async (req, res) => {
+    let guardKey = '';
     try {
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
         guardKey = idempotencyGuardService.createGuardKey([
@@ -1066,8 +1385,8 @@ exports.deleteStudent = async (req, res) => {
         ]);
         const guardResult = idempotencyGuardService.beginGuard({
             key: guardKey,
-            runningTtlMs: 90000,
-            replayTtlMs: 12000
+            runningTtlMs: 60000,
+            replayTtlMs: 8000
         });
         if (sendGuardedResponse(req, res, guardResult, 'Student archive is already in progress. Please wait.')) return;
 
@@ -1075,9 +1394,34 @@ exports.deleteStudent = async (req, res) => {
         if (!student) throw new Error('Student not found.');
         assertStudentOrgAccess(student, activeOrgId, req.user);
 
-        await archiveLinkedStudentAccount(student, req.user);
-        await dataService.deleteData('students', req.params.id, req.user);
-        const payloadOut = { status: 'success', message: 'Student archived successfully.', redirectTo: '/school/students' };
+        if (String(student.academicStatus || '').trim().toLowerCase() === 'archived') {
+            const payloadOut = {
+                status: 'success',
+                message: 'Student is already archived.',
+                data: { studentId: toPublicId(student.id) },
+                redirectTo: '/school/students'
+            };
+            idempotencyGuardService.completeGuard(guardKey, payloadOut);
+            if (isAjax(req)) return res.json(payloadOut);
+            return res.redirect('/school/students');
+        }
+
+        const archivedStudent = await dataService.updateData(
+            'students',
+            student.id,
+            { ...student, academicStatus: 'Archived' },
+            req.user
+        );
+        if (archivedStudent?.studentAccountId) {
+            await archiveLinkedStudentAccount(archivedStudent, req.user);
+        }
+
+        const payloadOut = {
+            status: 'success',
+            message: 'Student archived successfully.',
+            data: { archivedStudentId: toPublicId(student.id) },
+            redirectTo: '/school/students'
+        };
         idempotencyGuardService.completeGuard(guardKey, payloadOut);
         if (isAjax(req)) return res.json(payloadOut);
         res.redirect('/school/students');

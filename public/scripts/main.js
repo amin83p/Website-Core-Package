@@ -1036,10 +1036,16 @@ function initGlobalActions() {
         const target = e.target.closest('button, a');
         if (!target) return;
 
+        // A. ARCHIVE
+        if (target.classList.contains('archive-btn')) {
+            await handleArchiveAction(e, target);
+            return;
+        }
+
         // A. DELETE
         if (target.classList.contains('delete-btn')) {
             await handleDeleteAction(e, target);
-        } 
+        }
         // B. CANCEL
         else if (target.id === 'btnCancelAction' || target.closest('#btnCancelAction')) {
             const btn = target.closest('#btnCancelAction') || target;
@@ -1233,10 +1239,13 @@ async function handleDeleteAction(eventOrButton, maybeButton = null) {
             }
 
             if (typeof showMessageModal === 'function') {
+                const successMessage = result?.note
+                    ? `${result?.message || 'Item deleted successfully.'}<div class="mt-1 text-muted">${result.note}</div>`
+                    : result?.message || 'Item deleted successfully.';
                 showMessageModal({
                     title: 'Deleted',
                     icon: 'success',
-                    message: 'Item deleted successfully.',
+                    message: successMessage,
                     size: 'md',
                     buttons: [{ text: 'OK', class: 'btn-success btn-sm' }]
                 });
@@ -1261,6 +1270,145 @@ async function handleDeleteAction(eventOrButton, maybeButton = null) {
     } finally {
         closeLoading();
         window.__appDeleteActionInProgress = false;
+    }
+}
+
+async function handleArchiveAction(eventOrButton, maybeButton = null) {
+    const e = maybeButton ? eventOrButton : null;
+    const btn = maybeButton || eventOrButton;
+    if (e && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    if (!btn || btn.dataset.archiveBusy === '1' || window.__appArchiveActionInProgress === true) return;
+
+    const urlRefEl = document.getElementById('urlRef');
+    if (!urlRefEl) {
+        console.warn('Archive button clicked, but #urlRef hidden input is missing.');
+        return;
+    }
+
+    const urlRef = urlRefEl.dataset.id;
+    const id = btn.dataset.id;
+    let archiveUrl = btn.dataset.archiveUrl || `/${urlRef}/archive/${encodeURIComponent(id)}`;
+
+    const btnResult = await showMessageModal({
+        title: 'Confirm Archive',
+        icon: 'warning',
+        message: `Are you sure you want to archive this item?`,
+        size: 'md',
+        buttons: [
+            { text: 'Cancel', class: 'btn-secondary btn-md' },
+            { text: 'Archive', class: 'btn-primary btn-md' }
+        ]
+    });
+    if (btnResult !== 'Archive') return;
+
+    const originalHtml = btn.innerHTML;
+    const originalDisabled = btn.disabled === true;
+    const originalAriaBusy = btn.getAttribute('aria-busy');
+    window.__appArchiveActionInProgress = true;
+    btn.dataset.archiveBusy = '1';
+    btn.disabled = true;
+    btn.classList.add('disabled');
+    btn.setAttribute('aria-busy', 'true');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Archiving...';
+    let loadingToken = null;
+
+    const closeLoading = () => {
+        if (loadingToken && typeof window.hideLoading === 'function') {
+            window.hideLoading(loadingToken);
+            loadingToken = null;
+        }
+    };
+    const restoreButton = () => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = originalDisabled;
+        btn.classList.remove('disabled');
+        if (originalAriaBusy === null) btn.removeAttribute('aria-busy');
+        else btn.setAttribute('aria-busy', originalAriaBusy);
+        delete btn.dataset.archiveBusy;
+    };
+
+    if (typeof window.showLoading === 'function') {
+        loadingToken = window.showLoading({
+            title: 'Archiving Record',
+            note: 'Please wait while the selected item is moved to archived status.',
+            operation: 'Archive'
+        });
+    }
+
+    try {
+        const response = await fetch(archiveUrl, {
+            method: 'GET',
+            headers: { 'X-AJAX-Request': 'true', 'Accept': 'application/json' }
+        });
+        const responseText = await response.text();
+        let result = {};
+        try {
+            result = responseText ? JSON.parse(responseText) : {};
+        } catch (_) {
+            result = { status: response.ok ? 'success' : 'error', message: responseText };
+        }
+
+        if (!response.ok && result.status !== 'success') {
+            throw new Error(result.message || `Archive failed with status ${response.status}.`);
+        }
+
+        if (typeof window.handleGuardedApiPayload === 'function' && result?.idempotency?.state) {
+            const guardResult = await window.handleGuardedApiPayload(result, {
+                busyTitle: 'Archive In Progress',
+                replayTitle: 'Archive Already Completed'
+            });
+            if (guardResult?.handled && guardResult.state === 'busy') {
+                closeLoading();
+                restoreButton();
+                return;
+            }
+        }
+
+        if (result.status === 'success' || result?.idempotency?.state === 'replayed') {
+            closeLoading();
+            const row = btn.closest('tr');
+            if (row) {
+                row.style.transition = 'all 0.3s ease';
+                row.style.opacity = '0';
+                row.style.backgroundColor = '#e9ecef';
+                setTimeout(() => row.remove(), 300);
+            }
+
+            if (typeof showMessageModal === 'function') {
+                const successMessage = result?.note
+                    ? `${result?.message || 'Item archived successfully.'}<div class=\"mt-1 text-muted\">${result.note}</div>`
+                    : result?.message || 'Item archived successfully.';
+                showMessageModal({
+                    title: 'Archived',
+                    icon: 'success',
+                    message: successMessage,
+                    size: 'md',
+                    buttons: [{ text: 'OK', class: 'btn-success btn-sm' }]
+                });
+            }
+        } else {
+            throw new Error(result.message || 'Failed to archive item.');
+        }
+    } catch (error) {
+        console.error('Archive Error:', error);
+        closeLoading();
+        if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+                title: 'Error',
+                icon: 'error',
+                message: error.message,
+                buttons: [{ text: 'OK', class: 'btn-danger btn-sm' }]
+            });
+        } else {
+            alert(error.message);
+        }
+        restoreButton();
+    } finally {
+        closeLoading();
+        window.__appArchiveActionInProgress = false;
     }
 }
 

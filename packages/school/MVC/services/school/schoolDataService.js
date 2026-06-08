@@ -196,6 +196,27 @@ const schoolDataService = {
     return result;
   },
 
+  purgeData: async (entityType, id, requestingUser, options = {}) => {
+    const normalizedType = String(entityType || '');
+    const config = resolveEntityConfig(entityType);
+    if (!config) throw new Error(`Unknown school entity type for purge: ${entityType}`);
+    if (!toPublicId(id)) throw new Error('Purge requires a valid id.');
+
+    const purgeFn = config.repository?.purgeById;
+    if (typeof purgeFn === 'function') {
+      const result = await purgeFn(id, options);
+      recordTransactionOperation(options, {
+        type: 'purge',
+        entityType: String(entityType || ''),
+        id: toPublicId(id),
+        size: 1
+      });
+      return result;
+    }
+
+    throw new Error(`Hard delete is not supported for ${normalizedType}.`);
+  },
+
   /* ----------------------------------------------------------------
     DIRECT FILE DELEGATES (Ensuring Controller has 0 fs logic)
   ---------------------------------------------------------------- */

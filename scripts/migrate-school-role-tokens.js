@@ -4,6 +4,13 @@ const fsSync = require('fs');
 const path = require('path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
+let schoolRoleTokenUtils = null;
+
+try {
+  schoolRoleTokenUtils = require('../packages/school/MVC/utils/schoolRoleTokenUtils');
+} catch (_) {
+  schoolRoleTokenUtils = null;
+}
 
 const ROLE_TOKEN_MAP = Object.freeze({
   student: 'school_student',
@@ -42,16 +49,20 @@ function loadLocalEnvFile() {
 }
 
 function normalizeRoleToken(value) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+}
+
+function normalizeRoleTokenFromLegacy(value) {
+  return normalizeRoleToken(value);
 }
 
 function isOldGenericSchoolRole(value) {
-  return Object.prototype.hasOwnProperty.call(ROLE_TOKEN_MAP, normalizeRoleToken(value));
+  return Object.prototype.hasOwnProperty.call(ROLE_TOKEN_MAP, normalizeRoleTokenFromLegacy(value));
 }
 
 function mapSchoolRoleToken(value) {
   const trimmed = String(value || '').trim();
-  const normalized = normalizeRoleToken(trimmed);
+  const normalized = normalizeRoleTokenFromLegacy(trimmed);
   return ROLE_TOKEN_MAP[normalized] || trimmed;
 }
 
@@ -69,8 +80,32 @@ function dedupePreserveOrder(values = []) {
   return output;
 }
 
+function normalizeRoleArrayForCompare(values = []) {
+  return dedupePreserveOrder((Array.isArray(values) ? values : []).map((value) => normalizeRoleTokenFromLegacy(value)));
+}
+
+function isSameRoleArray(valuesA = [], valuesB = []) {
+  const left = normalizeRoleArrayForCompare(valuesA);
+  const right = normalizeRoleArrayForCompare(valuesB);
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => String(value || '').trim() === String(right[index] || '').trim());
+}
+
 function migrateRoleTokenArray(values = []) {
   const original = Array.isArray(values) ? values : [];
+
+  if (schoolRoleTokenUtils && typeof schoolRoleTokenUtils.normalizeRoleTokenValues === 'function') {
+    const result = schoolRoleTokenUtils.normalizeRoleTokenValues(original);
+    const mapped = Array.isArray(result?.value) ? result.value : [];
+    const mappedCount = Number(result?.mappedCount || 0);
+    const changed = Boolean(result?.changed) || mapped.length !== dedupePreserveOrder(original).length;
+    return {
+      value: mapped,
+      changed,
+      mappedCount
+    };
+  }
+
   const mapped = dedupePreserveOrder(original.map((value) => mapSchoolRoleToken(value)));
   const changed = mapped.length !== original.length || mapped.some((value, index) => value !== original[index]);
   const mappedCount = original.filter((value) => isOldGenericSchoolRole(value)).length;
@@ -83,24 +118,70 @@ function migrateMembershipRow(row = {}) {
   let changed = false;
   let mappedCount = 0;
   const next = { ...row };
+  const mergedRoles = [];
 
   if (Array.isArray(row.roles)) {
     const result = migrateRoleTokenArray(row.roles);
     if (result.changed) {
-      next.roles = result.value;
       changed = true;
     }
     mappedCount += result.mappedCount;
+    for (const token of (Array.isArray(result.value) ? result.value : [])) {
+      const normalized = normalizeRoleTokenFromLegacy(token);
+      if (normalized && !mergedRoles.includes(normalized)) {
+        mergedRoles.push(normalized);
+      }
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(row, 'role')) {
-    const originalRole = String(row.role || '').trim();
-    const mappedRole = mapSchoolRoleToken(originalRole);
-    if (mappedRole !== originalRole) {
-      next.role = mappedRole;
+    const legacyRoleInput = row.role;
+    const roleResult = schoolRoleTokenUtils && typeof schoolRoleTokenUtils.normalizeRoleTokenValues === 'function'
+      ? schoolRoleTokenUtils.normalizeRoleTokenValues([legacyRoleInput])
+      : { value: [mapSchoolRoleToken(legacyRoleInput)], changed: false };
+    const normalizedRoleTokens = Array.isArray(roleResult.value) ? roleResult.value : [];
+    const normalizedLegacyRole = normalizeRoleTokenFromLegacy(legacyRoleInput);
+
+    const explicitMappedCount = Number(roleResult?.mappedCount || 0);
+    if (roleResult.changed) {
+      changed = true;
+      if (explicitMappedCount > 0) {
+        mappedCount += explicitMappedCount;
+      } else {
+        mappedCount += 1;
+      }
+    } else if (normalizedRoleTokens.join(',') !== normalizedLegacyRole) {
       changed = true;
       mappedCount += 1;
     }
+
+    for (const token of normalizedRoleTokens) {
+      const normalized = normalizeRoleTokenFromLegacy(token);
+      if (normalized && !mergedRoles.includes(normalized)) {
+        mergedRoles.push(normalized);
+      }
+    }
+  }
+
+  const canonicalRoles = dedupePreserveOrder(mergedRoles);
+  if (canonicalRoles.length === 0) {
+    return { value: next, changed, mappedCount };
+  }
+
+  if (!isSameRoleArray(row.roles, canonicalRoles)) {
+    next.roles = canonicalRoles;
+    changed = true;
+  } else if (!Array.isArray(next.roles)) {
+    next.roles = canonicalRoles;
+  }
+
+  const targetPrimaryRole = String(canonicalRoles[0] || '').trim().toLowerCase() || 'member';
+  if (!Object.prototype.hasOwnProperty.call(row, 'role')
+    || normalizeRoleTokenFromLegacy(row.role || '') !== targetPrimaryRole
+    || !row.role
+  ) {
+    next.role = targetPrimaryRole;
+    changed = true;
   }
 
   return { value: next, changed, mappedCount };

@@ -16,9 +16,18 @@ const {
   normalizeOrgRoles,
   getPrimaryOrgRole
 } = requireCoreModule('MVC/utils/orgContextUtils');
+const { normalizeOrgRoleTokens } = require('../../utils/schoolRoleTokenUtils');
 const { resolveCanonicalOrganizationName } = requireCoreModule('MVC/utils/organizationDisplay');
 const { TEACHER_STATUSES, EMPLOYMENT_TYPES, INSTRUCTIONAL_MODES, COMPENSATION_METHODS } = require('../../models/school/teacherModel');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
+const TEACHER_DELETE_FOOTPRINT_RULES = Object.freeze([
+  { entityType: 'reportAssignments', field: 'teacherIds', label: 'Report Assignments', mode: 'array' },
+  { entityType: 'reportInstances', field: 'teacherId', label: 'Report Instances' },
+  { entityType: 'timesheets', field: 'teacherId', label: 'Timesheets' },
+  { entityType: 'globalTransactions', field: 'party.teacherId', label: 'Global Transactions' },
+  { entityType: 'payRates', field: 'personId', label: 'Pay Rates', personRole: 'teacher' }
+]);
+const TEACHER_DELETE_MAX_FOOTPRINT_SAMPLE = 5;
 
 function getActiveOrgIdOrThrow(reqUser) {
   return getActiveOrgIdOrThrowShared(reqUser);
@@ -34,6 +43,178 @@ function assertTeacherOrgAccess(teacher, activeOrgId, reqUser) {
 
 function toBoolean(v) {
   return v === true || v === 'true' || v === 'on' || v === 1 || v === '1';
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getRecordIdentity(record) {
+  return toPublicId(record?.id)
+    || toPublicId(record?.code)
+    || toPublicId(record?.partyId)
+    || toPublicId(record?.orgId)
+    || toPublicId(record?._id)
+    || '';
+}
+
+function buildFootprintBlockedMessage(displayName, footprint) {
+  const safeName = escapeHtml(displayName);
+  if (!Array.isArray(footprint) || !footprint.length) {
+    return `Cannot delete ${safeName} because it has related history.`;
+  }
+
+  const items = footprint.map((entry) => {
+    const sampleText = Array.isArray(entry.samples) && entry.samples.length > 0
+      ? `<span class="font-monospace">(${entry.samples.join(', ')})</span>`
+      : '';
+    return `<li><strong>${escapeHtml(entry.label || '')}</strong>: ${Number(entry.count || 0)} record(s) found ${sampleText}</li>`;
+  });
+
+  return `Cannot delete ${safeName} because related history exists. Please remove these references first:<ul>${items.join('')}</ul>`;
+}
+
+function buildTeacherDisplayName(teacher, person) {
+  const personLabel = `${String(person?.name?.first || '').trim()} ${String(person?.name?.last || '').trim()}`.trim();
+  return personLabel || toPublicId(teacher?.id) || toPublicId(teacher?.personId) || 'Teacher';
+}
+
+async function collectTeacherFootprint(teacher, personId, activeOrgId, reqUser) {
+  const targetTeacherId = toPublicId(teacher?.id);
+  if (!targetTeacherId) return [];
+
+  const rows = [];
+  const safeActiveOrgId = String(activeOrgId || '').trim();
+  const targetPersonId = String(personId || '').trim();
+
+  for (const rule of TEACHER_DELETE_FOOTPRINT_RULES) {
+    if (!rule?.entityType || !rule?.field) continue;
+
+    if (String(rule.mode || '').trim().toLowerCase() === 'array') {
+      const query = { page: 1 };
+      if (safeActiveOrgId) query.orgId__eq = safeActiveOrgId;
+      const assignments = await dataService.fetchData(rule.entityType, query, reqUser);
+      const relatedRows = Array.isArray(assignments)
+        ? assignments.filter((item) => Array.isArray(item?.teacherIds) && item.teacherIds.some((candidateId) => idsEqual(candidateId, targetTeacherId)))
+        : [];
+      if (!relatedRows.length) continue;
+      const samples = relatedRows.slice(0, TEACHER_DELETE_MAX_FOOTPRINT_SAMPLE).map(getRecordIdentity).filter(Boolean);
+      rows.push({
+        entityType: String(rule.entityType || '').trim(),
+        label: String(rule.label || '').trim() || String(rule.entityType || '').trim(),
+        count: relatedRows.length,
+        samples
+      });
+      continue;
+    }
+
+    const query = { page: 1 };
+    if (rule.entityType === 'payRates' && targetPersonId) {
+      query.personId__eq = targetPersonId;
+      if (rule.personRole) query.personRole__eq = String(rule.personRole || '').trim();
+    } else {
+      query[`${rule.field}__eq`] = targetTeacherId;
+    }
+    if (safeActiveOrgId) query.orgId__eq = safeActiveOrgId;
+
+    const relatedRows = await dataService.fetchData(rule.entityType, query, reqUser);
+    if (!Array.isArray(relatedRows) || relatedRows.length === 0) continue;
+    const samples = relatedRows.slice(0, TEACHER_DELETE_MAX_FOOTPRINT_SAMPLE).map(getRecordIdentity).filter(Boolean);
+    rows.push({
+      entityType: String(rule.entityType || '').trim(),
+      label: String(rule.label || '').trim() || String(rule.entityType || '').trim(),
+      count: relatedRows.length,
+      samples
+    });
+  }
+
+  return rows;
+}
+
+function logTeacherDeleteAuditEvent(level, payload) {
+  const parts = [
+    '[TEACHER_DELETE]',
+    `level=${String(level || '').trim() || 'unknown'}`,
+    `actor=${String(payload?.actor || '').trim() || 'unknown'}`,
+    `teacherId=${String(payload?.teacherId || '').trim() || 'unknown'}`,
+    `orgId=${String(payload?.orgId || '').trim() || 'unknown'}`,
+    `outcome=${String(payload?.outcome || '').trim() || 'unknown'}`
+  ];
+  const footer = [
+    `removedRole=${Boolean(payload?.removedRole) ? 'yes' : 'no'}`,
+    `removedSchoolAccount=${Boolean(payload?.removedSchoolAccount) ? 'yes' : 'no'}`,
+    `removedTeacher=${Boolean(payload?.removedTeacher) ? 'yes' : 'no'}`,
+    `footprint=${Number(payload?.footprintCount || 0)}`
+  ];
+  console.info(`${parts.join(' ')} ${footer.join(' ')}`);
+}
+
+function formatTeacherDisplayNameForLog(teacher, person) {
+  return buildTeacherDisplayName(teacher, person);
+}
+
+async function removePersonSchoolRole(personId, orgId, role, reqUser, options = {}) {
+  const person = await dataServiceGlobal.getDataById('persons', personId, reqUser, PERSON_QUERY_OPTIONS);
+  if (!person) return { changed: false, skipped: true, reason: 'person_not_found' };
+
+  const targetRole = String(role || '').trim().toLowerCase();
+  if (!targetRole) return { changed: false, skipped: true, reason: 'role_not_defined' };
+
+  const list = Array.isArray(person.organizations) ? person.organizations.slice() : [];
+  const idx = list.findIndex((org) => idsEqual(org?.orgId || '', orgId || ''));
+  if (idx < 0) return { changed: false, personId: toPublicId(person.id), reason: 'organization_link_not_found' };
+
+  const orgEntry = { ...list[idx] };
+  const roles = normalizeOrgRoleTokens(orgEntry);
+  if (!roles.includes(targetRole)) return { changed: false, personId: toPublicId(person.id), reason: `${targetRole}_role_not_attached` };
+
+  const nextRoles = roles.filter((candidate) => candidate !== targetRole);
+  const nextOrg = { ...orgEntry, roles: Array.isArray(nextRoles) && nextRoles.length > 0 ? nextRoles : ['member'] };
+  nextOrg.role = Array.isArray(nextOrg.roles) && nextOrg.roles.length > 0 ? nextOrg.roles[0] : 'member';
+  if (!nextOrg.memberStatus) nextOrg.memberStatus = 'active';
+  if (!nextOrg.joinedAt) nextOrg.joinedAt = new Date().toISOString();
+  list[idx] = nextOrg;
+
+  const beforeOrganizations = Array.isArray(person.organizations) ? JSON.parse(JSON.stringify(person.organizations)) : [];
+  await dataServiceGlobal.updateData('persons', person.id, { ...person, organizations: list }, reqUser, options);
+
+  return {
+    changed: true,
+    personId: toPublicId(person.id),
+    beforeOrganizations
+  };
+}
+
+async function purgeLinkedTeacherAccount(teacher, reqUser, txContext, outcome, warnings) {
+  const linkedAccountId = String(teacher?.teacherAccountId || '').trim();
+  if (!linkedAccountId) {
+    warnings.push('Teacher has no linked school account id.');
+    return { removed: false, accountId: '' };
+  }
+
+  const accountSnapshot = await dataService.getDataById('schoolAccounts', linkedAccountId, reqUser);
+  if (!accountSnapshot) {
+    warnings.push(`Linked school account ${linkedAccountId} not found.`);
+    return { removed: false, accountId: linkedAccountId };
+  }
+
+  const accountSnapshotClone = JSON.parse(JSON.stringify(accountSnapshot));
+  await dataService.purgeData('schoolAccounts', linkedAccountId, reqUser, { transactionContext: txContext });
+
+  if (txContext) {
+    txContext.addCompensation(async () => {
+      await dataService.addData('schoolAccounts', accountSnapshotClone, reqUser, { transactionContext: txContext });
+    }, { type: 'restore_teacher_school_account', entityType: 'schoolAccounts', id: toPublicId(linkedAccountId) });
+  }
+
+  outcome.removedSchoolAccount = true;
+  outcome.teacherAccountId = toPublicId(linkedAccountId);
+  return { removed: true, accountId: toPublicId(linkedAccountId), snapshot: accountSnapshotClone };
 }
 
 function parseJsonSafe(value, fallback) {
@@ -760,6 +941,163 @@ exports.saveTeacher = async (req, res) => {
 
 exports.deleteTeacher = async (req, res) => {
   let guardKey = '';
+  let txContext = null;
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    guardKey = idempotencyGuardService.createGuardKey([
+      'teacher_delete',
+      String(activeOrgId || '').trim(),
+      String(req.params.id || '').trim()
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 90000,
+      replayTtlMs: 12000
+    });
+    if (sendGuardedResponse(req, res, guardResult, 'Teacher delete is already in progress. Please wait.')) return;
+
+    const teacher = await dataService.getDataById('teachers', req.params.id, req.user);
+    if (!teacher) throw new Error('Teacher not found.');
+    assertTeacherOrgAccess(teacher, activeOrgId, req.user);
+
+    const footprint = await collectTeacherFootprint(teacher, teacher?.personId, activeOrgId, req.user);
+    const person = teacher?.personId
+      ? await dataServiceGlobal.getDataById('persons', teacher.personId, req.user, PERSON_QUERY_OPTIONS)
+      : null;
+    const teacherDisplayName = buildTeacherDisplayName(teacher, person);
+    if (footprint.length > 0) {
+      idempotencyGuardService.failGuard(guardKey);
+      const detailPayload = {
+        teacherId: toPublicId(teacher?.id),
+        personId: toPublicId(teacher?.personId),
+        footprint
+      };
+      const payloadOut = {
+        status: 'error',
+        code: 'TEACHER_DELETE_BLOCKED',
+        message: buildFootprintBlockedMessage(teacherDisplayName, footprint),
+        details: detailPayload,
+        data: detailPayload
+      };
+      if (isAjax(req)) return res.status(409).json(payloadOut);
+      return res.status(409).render('error', {
+        title: 'Delete blocked',
+        statusCode: 409,
+        code: payloadOut.code,
+        error: new Error(payloadOut.message),
+        message: payloadOut.message,
+        details: payloadOut.details,
+        user: req.user
+      });
+    }
+
+    txContext = createTransactionContext({
+      name: 'teacher_delete',
+      metadata: {
+        teacherId: toPublicId(teacher?.id),
+        personId: toPublicId(teacher?.personId),
+        activeOrgId: toPublicId(activeOrgId),
+        requestUserId: toPublicId(req.user?.id) || String(req.user?.username || 'system')
+      }
+    });
+
+    const teacherSnapshot = JSON.parse(JSON.stringify(teacher || {}));
+    const removed = {
+      removedRole: false,
+      removedSchoolAccount: false,
+      removedTeacher: false,
+      teacherAccountId: '',
+      personId: toPublicId(teacher?.personId),
+      warnings: []
+    };
+
+    const roleResult = await removePersonSchoolRole(
+      teacher.personId,
+      activeOrgId,
+      'school_teacher',
+      req.user,
+      { transactionContext: txContext }
+    );
+    if (roleResult?.changed && roleResult?.personId) {
+      removed.removedRole = true;
+      txContext.addCompensation(async () => {
+        const personRecord = await dataServiceGlobal.getDataById('persons', roleResult.personId, req.user, PERSON_QUERY_OPTIONS);
+        if (!personRecord) return;
+        await dataServiceGlobal.updateData(
+          'persons',
+          roleResult.personId,
+          { ...personRecord, organizations: roleResult.beforeOrganizations || [] },
+          req.user,
+          { transactionContext: txContext }
+        );
+      }, { type: 'restore_person_org_roles', personId: roleResult.personId });
+    } else if (roleResult?.reason) {
+    if (roleResult.reason === 'person_not_found') {
+        removed.warnings.push('Person record was not found for role cleanup.');
+    } else if (roleResult.reason === 'school_teacher_role_not_attached') {
+        removed.warnings.push('Teacher role was not attached to the person membership. Legacy role token cleanup may still be needed.');
+    } else if (roleResult.reason !== 'school_teacher_role_not_attached' && roleResult.reason !== 'organization_link_not_found') {
+        removed.warnings.push(`Role cleanup skipped: ${roleResult.reason}`);
+    }
+    }
+
+    await purgeLinkedTeacherAccount(teacher, req.user, txContext, removed, removed.warnings);
+    await dataService.purgeData('teachers', teacher.id, req.user, { transactionContext: txContext });
+    if (txContext) {
+      txContext.addCompensation(async () => {
+        await dataService.addData('teachers', teacherSnapshot, req.user, { transactionContext: txContext });
+      }, { type: 'restore_teacher_record', entityType: 'teachers', id: toPublicId(teacher?.id) });
+    }
+    removed.removedTeacher = true;
+    await txContext.commit({ flow: 'teacher_delete', teacherId: toPublicId(teacher?.id) });
+    logTeacherDeleteAuditEvent('success', {
+      actor: toPublicId(req.user?.id) || String(req.user?.username || 'system'),
+      teacherId: toPublicId(teacher?.id),
+      orgId: toPublicId(activeOrgId),
+      outcome: 'deleted',
+      removedRole: removed.removedRole,
+      removedSchoolAccount: removed.removedSchoolAccount,
+      footprintCount: footprint.length
+    });
+
+    const payloadOut = {
+      status: 'success',
+      message: `Teacher ${escapeHtml(teacherDisplayName)} deleted safely.`,
+      note: `${removed.warnings.length > 0 ? `${removed.warnings.join(' ')} ` : ''}Person and user accounts are retained. If needed, remove those records from People/Users manually.`,
+      data: {
+        deletedTeacherId: toPublicId(teacher?.id),
+        removedRole: removed.removedRole,
+        removedSchoolAccount: removed.removedSchoolAccount,
+        personId: toPublicId(teacher?.personId),
+        warnings: removed.warnings
+      },
+      redirectTo: '/school/teachers'
+    };
+    idempotencyGuardService.completeGuard(guardKey, payloadOut);
+    if (isAjax(req)) return res.json(payloadOut);
+    res.redirect('/school/teachers');
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    if (txContext) {
+      await txContext.rollback({ flow: 'teacher_delete', reason: error.message || 'Teacher delete failed' });
+      logTeacherDeleteAuditEvent('error', {
+        actor: toPublicId(req.user?.id) || String(req.user?.username || 'system'),
+        teacherId: toPublicId(req.params?.id),
+        orgId: toPublicId(req?.user?.activeOrgId),
+        outcome: `rollback_initiated:${error.message || 'unknown'}`,
+        removedRole: false,
+        removedSchoolAccount: false,
+        removedTeacher: false,
+        footprintCount: 0
+      });
+    }
+    if (isAjax(req)) return res.status(400).json({ status: 'error', error, message: error.message });
+    res.status(400).render('error', { title: 'Error', error, message: error.message, user: req.user });
+    }
+};
+
+exports.archiveTeacher = async (req, res) => {
+  let guardKey = '';
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     guardKey = idempotencyGuardService.createGuardKey([
@@ -769,8 +1107,8 @@ exports.deleteTeacher = async (req, res) => {
     ]);
     const guardResult = idempotencyGuardService.beginGuard({
       key: guardKey,
-      runningTtlMs: 90000,
-      replayTtlMs: 12000
+      runningTtlMs: 60000,
+      replayTtlMs: 8000
     });
     if (sendGuardedResponse(req, res, guardResult, 'Teacher archive is already in progress. Please wait.')) return;
 
@@ -778,9 +1116,34 @@ exports.deleteTeacher = async (req, res) => {
     if (!teacher) throw new Error('Teacher not found.');
     assertTeacherOrgAccess(teacher, activeOrgId, req.user);
 
-    await archiveLinkedTeacherAccount(teacher, req.user);
-    await dataService.deleteData('teachers', req.params.id, req.user);
-    const payloadOut = { status: 'success', message: 'Teacher archived successfully.', redirectTo: '/school/teachers' };
+    if (String(teacher.status || '').trim().toLowerCase() === 'archived') {
+      const payloadOut = {
+        status: 'success',
+        message: 'Teacher is already archived.',
+        data: { teacherId: toPublicId(teacher.id) },
+        redirectTo: '/school/teachers'
+      };
+      idempotencyGuardService.completeGuard(guardKey, payloadOut);
+      if (isAjax(req)) return res.json(payloadOut);
+      return res.redirect('/school/teachers');
+    }
+
+    const archivedTeacher = await dataService.updateData(
+      'teachers',
+      teacher.id,
+      { ...teacher, status: 'Archived' },
+      req.user
+    );
+    if (archivedTeacher?.teacherAccountId) {
+      await archiveLinkedTeacherAccount(archivedTeacher, req.user);
+    }
+
+    const payloadOut = {
+      status: 'success',
+      message: 'Teacher archived successfully.',
+      data: { archivedTeacherId: toPublicId(teacher.id) },
+      redirectTo: '/school/teachers'
+    };
     idempotencyGuardService.completeGuard(guardKey, payloadOut);
     if (isAjax(req)) return res.json(payloadOut);
     res.redirect('/school/teachers');
