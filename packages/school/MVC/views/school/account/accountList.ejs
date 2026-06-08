@@ -26,7 +26,7 @@
   ]
 }) %>
 
-<div class="table-scroll-wrapper">
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
   <table class="table-responsive size-md" id="first-table">
     <thead>
       <tr>
@@ -82,9 +82,26 @@
             <span class="badge <%= badge %>"><%= (item.status || 'unknown').toUpperCase() %></span>
           </td>
           <td class="table-actions text-end pe-4">
-            <a href="/school/accounts/edit-wizard/<%= item.id %>" class="btn btn-sm btn-outline-info me-1">Wizard</a>
-            <a href="/school/accounts/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
-            <button class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Archive</button>
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.id %>"
+                title="Account Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/accounts/edit-wizard/<%= item.id %>" class="btn btn-outline-info btn-sm">
+                  <i class="bi bi-magic me-2"></i>Wizard
+                </a>
+                <a href="/school/accounts/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>">
+                  <i class="bi bi-archive me-2"></i>Archive
+                </button>
+              </div>
+            </div>
           </td>
         </tr>
       <% }) %>

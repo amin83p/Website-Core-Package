@@ -16,7 +16,7 @@
   fields: []
 }) %>
 
-<div class="table-scroll-wrapper">
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
   <table class="table-responsive size-md" id="first-table">
     <thead>
       <tr>
@@ -40,8 +40,21 @@
           <td><span class="badge bg-primary-subtle text-primary border"><%= Number(item.compensationCount || 0) %></span></td>
           <td class="small text-primary fw-bold"><%= item.departments || '-' %></td>
           <td><span class="badge bg-light text-dark border"><%= item.status || '-' %></span></td>
-          <td class="table-actions">
-            <a href="/<%= newUrl %>/edit/<%= item.ownerId %>?ownerType=<%= encodeURIComponent(item.ownerType || '') %>" class="btn btn-sm btn-filled btn-edit">Manage Rates</a>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= item.ownerId %>"
+                title="Pay Rate Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.ownerId %>">
+                <a href="/<%= newUrl %>/edit/<%= item.ownerId %>?ownerType=<%= encodeURIComponent(item.ownerType || '') %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-gear me-2"></i>Manage Rates
+                </a>
+              </div>
+            </div>
           </td>
         </tr>
       <% }) %>
