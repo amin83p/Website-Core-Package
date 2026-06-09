@@ -38,6 +38,10 @@ function getActorId(user) {
   return toPublicId(user?.id || user?._id || user?.userId || user?.username || '');
 }
 
+function getActorPersonId(user) {
+  return toPublicId(personDisplayNameService.getUserPersonId(user));
+}
+
 function getActorName(user) {
   const direct = cleanString(user?.displayName || user?.fullName, 160);
   if (direct) return direct;
@@ -55,6 +59,32 @@ async function resolveActorName(user) {
 
 function isAdminViewer(user) {
   return Boolean(adminChekersService.isSuperAdmin(user) || adminChekersService.isOrgAdmin(user));
+}
+
+function isAssignedToActor(notification, user) {
+  return idsEqual(notification?.assignedPersonId || '', getActorPersonId(user));
+}
+
+function isTaskAssignedToActor(task, user) {
+  return idsEqual(task?.assignedPersonId || '', getActorPersonId(user));
+}
+
+function assertNotificationOwnership(user, notification, action = 'update this notification') {
+  if (isAdminViewer(user)) return;
+  if (!notification || !isAssignedToActor(notification, user)) {
+    const error = new Error(`You are not authorized to ${action}.`);
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
+function assertTaskOwnership(user, task, action = 'update this task') {
+  if (isAdminViewer(user)) return;
+  if (!task || !isTaskAssignedToActor(task, user)) {
+    const error = new Error(`You are not authorized to ${action}.`);
+    error.statusCode = 403;
+    throw error;
+  }
 }
 
 function normalizeQueryScope(reqUser, query = {}) {
@@ -143,6 +173,67 @@ async function enrichNotificationForDisplay(row) {
     });
   }
   return next;
+}
+
+function normalizeTaskWithTiming({
+  actor,
+  task = {},
+  assignedPersonId = '',
+  assignedRole = '',
+  assignedPersonName = '',
+  status = 'open',
+  now = new Date().toISOString()
+} = {}) {
+  const previousStatus = normalizeTaskStatus(task.status, 'open');
+  const nextStatus = normalizeTaskStatus(status, previousStatus);
+  const hadAssignee = !!toPublicId(task.assignedPersonId || '');
+  const assignedChanged = assignedPersonId && (!hadAssignee || !idsEqual(task.assignedPersonId, assignedPersonId));
+  const reassigned = hadAssignee && task.assignedPersonId && !idsEqual(task.assignedPersonId, assignedPersonId);
+  const unassigned = !assignedPersonId;
+
+  let nextStartedAt = cleanString(task.startedAt, 40);
+  let nextAssignedAt = cleanString(task.assignedAt, 40);
+  let nextReassignedAt = cleanString(task.reassignedAt, 40);
+  let nextStatusValue = nextStatus;
+
+  if (actor && assignedPersonId && nextStatusValue !== 'done' && nextStatusValue !== 'cancelled') {
+    if (!hadAssignee && !nextAssignedAt) {
+      nextAssignedAt = now;
+    }
+    if (!nextStartedAt && nextStatusValue === 'open') {
+      nextStatusValue = 'in_progress';
+      nextStartedAt = now;
+    }
+    if (assignedChanged || reassigned) {
+      nextReassignedAt = now;
+      if (!nextAssignedAt) {
+        nextAssignedAt = now;
+      }
+    }
+  }
+
+  if (!assignedPersonId) {
+    nextReassignedAt = '';
+  }
+
+  if (unassigned) {
+    nextAssignedAt = '';
+  }
+
+  if ((nextStatusValue === 'done' || nextStatusValue === 'cancelled') && !task.completedAt) {
+    nextStartedAt = nextStartedAt || now;
+  }
+
+  return {
+    status: nextStatusValue,
+    assignedRole,
+    assignedPersonId,
+    assignedPersonName,
+    assignedAt: nextAssignedAt,
+    startedAt: nextStartedAt,
+    reassignedAt: nextReassignedAt,
+    note: cleanString(task.note, 1000)
+  };
 }
 
 async function resolveAssignmentInput(input = {}, fallback = {}) {
@@ -251,13 +342,26 @@ async function findBySource({ orgId, sourceType, sourceId } = {}) {
 
 async function buildDefaultReviewTask(input = {}) {
   const assignment = await resolveAssignmentInput(input);
+  const now = new Date().toISOString();
+  const startedTiming = normalizeTaskWithTiming({
+    actor: true,
+    task: {},
+    assignedPersonId: assignment.assignedPersonId,
+    assignedRole: assignment.assignedRole,
+    assignedPersonName: assignment.assignedPersonName,
+    status: 'open',
+    now
+  });
   return {
     title: cleanString(input.taskTitle, 220) || 'Review notification',
     description: cleanString(input.taskDescription || input.message, 2000),
-    status: 'open',
+    status: startedTiming.status,
     assignedRole: assignment.assignedRole,
     assignedPersonId: assignment.assignedPersonId,
     assignedPersonName: assignment.assignedPersonName,
+    assignedAt: startedTiming.assignedAt,
+    startedAt: startedTiming.startedAt,
+    reassignedAt: '',
     dueDate: cleanDate(input.dueDate),
     note: ''
   };
@@ -422,6 +526,7 @@ async function resolveLeaveRequestNotification(leaveRequest = {}, actorUser = nu
 async function updateNotificationStatus(reqUser, id, input = {}) {
   const existing = await getNotificationById(id, reqUser);
   if (!existing) throw new Error('Notification was not found.');
+  assertNotificationOwnership(reqUser, existing, 'change this notification status');
   const nextStatus = normalizeStatus(input.status, existing.status || 'open');
   const now = new Date().toISOString();
   const next = {
@@ -453,12 +558,33 @@ async function updateNotificationStatus(reqUser, id, input = {}) {
 async function reassignNotification(reqUser, id, input = {}) {
   const existing = await getNotificationById(id, reqUser);
   if (!existing) throw new Error('Notification was not found.');
+  assertNotificationOwnership(reqUser, existing, 'reassign this notification');
   const assignment = await resolveAssignmentInput(input);
+  const now = new Date().toISOString();
+  const nextAssignedPersonId = assignment.assignedPersonId;
+  const previousAssignedPersonId = toPublicId(existing.assignedPersonId || '');
+  const shouldAutoStart = !!nextAssignedPersonId && !idsEqual(nextAssignedPersonId, previousAssignedPersonId);
+  const tasks = notificationModel.sanitizeTasks(Array.isArray(existing.tasks) ? existing.tasks : [], { existingTasks: existing.tasks || [] }).map((task) => {
+    if (task.assignedPersonId === nextAssignedPersonId) return task;
+    const nextStatus = shouldAutoStart && ['open', ''].includes(String(task.status || '').toLowerCase())
+      ? 'in_progress'
+      : String(task.status || 'open').toLowerCase();
+
+    if (!shouldAutoStart) return task;
+    return {
+      ...task,
+      status: normalizeTaskStatus(nextStatus, task.status),
+      reassignedAt: now,
+      startedAt: task.startedAt || now,
+      assignedAt: task.assignedAt || now
+    };
+  });
   const next = {
     ...existing,
     assignedRole: assignment.assignedRole,
     assignedPersonId: assignment.assignedPersonId,
     assignedPersonName: assignment.assignedPersonName,
+    tasks,
     revisionNo: Math.max(1, Number(existing.revisionNo || 1) + 1),
     audit: {
       ...(existing.audit || {}),
@@ -487,18 +613,33 @@ async function reassignNotification(reqUser, id, input = {}) {
 async function addNotificationTask(reqUser, id, input = {}) {
   const existing = await getNotificationById(id, reqUser);
   if (!existing) throw new Error('Notification was not found.');
+  assertNotificationOwnership(reqUser, existing, 'add tasks to this notification');
   const assignment = await resolveAssignmentInput(input);
+  const now = new Date().toISOString();
+  const taskTiming = normalizeTaskWithTiming({
+    actor: true,
+    task: {},
+    assignedPersonId: assignment.assignedPersonId,
+    assignedRole: assignment.assignedRole,
+    assignedPersonName: assignment.assignedPersonName,
+    status: cleanString(input.status, 40) || 'open',
+    now
+  });
   const tasks = notificationModel.sanitizeTasks([
     ...(Array.isArray(existing.tasks) ? existing.tasks : []),
     {
       title: input.title,
       description: input.description,
-      status: 'open',
+      status: taskTiming.status,
       assignedRole: assignment.assignedRole,
       assignedPersonId: assignment.assignedPersonId,
       assignedPersonName: assignment.assignedPersonName,
       dueDate: input.dueDate,
-      note: input.note
+      note: input.note,
+      assignedAt: taskTiming.assignedAt,
+      startedAt: taskTiming.startedAt,
+      reassignedAt: taskTiming.reassignedAt,
+      completedAt: ''
     }
   ], { existingTasks: existing.tasks || [] });
   const next = {
@@ -528,6 +669,7 @@ async function addNotificationTask(reqUser, id, input = {}) {
 async function updateNotificationTask(reqUser, id, taskId, input = {}) {
   const existing = await getNotificationById(id, reqUser);
   if (!existing) throw new Error('Notification was not found.');
+  assertNotificationOwnership(reqUser, existing, 'update tasks for this notification');
   const targetTaskId = toPublicId(taskId);
   const now = new Date().toISOString();
   let found = false;
@@ -538,22 +680,44 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
       continue;
     }
     found = true;
-    const nextStatus = normalizeTaskStatus(input.status, task.status || 'open');
-    const assignment = await resolveAssignmentInput(input, task);
-    tasks.push({
+    const taskCopy = {
       ...task,
+      status: normalizeTaskStatus(task?.status, 'open')
+    };
+    assertTaskOwnership(reqUser, taskCopy, 'update this task');
+    const nextStatus = normalizeTaskStatus(input.status, task.status || 'open');
+    const assignment = await resolveAssignmentInput(input, taskCopy);
+    const nextTaskTiming = normalizeTaskWithTiming({
+      actor: true,
+      task: taskCopy,
+      assignedPersonId: assignment.assignedPersonId,
+      assignedRole: assignment.assignedRole,
+      assignedPersonName: assignment.assignedPersonName,
+      status: nextStatus,
+      now
+    });
+    const normalizedNote = cleanString(input.note ?? task.note, 1000);
+    const previousStatus = normalizeTaskStatus(task?.status, 'open');
+    const completedAt = nextTaskTiming.status === 'done'
+      ? (task.completedAt || cleanString(taskCopy.completedAt, 40) || now)
+      : (nextTaskTiming.status === 'cancelled'
+        ? (task.completedAt || cleanString(task.completedAt, 40) || now)
+        : (nextStatus === 'open' && previousStatus !== 'open' ? '' : cleanString(task.completedAt, 40)));
+    const updated = {
+      ...taskCopy,
       title: cleanString(input.title || task.title, 220),
       description: cleanString(input.description ?? task.description, 2000),
-      status: nextStatus,
-      assignedRole: assignment.assignedRole,
-      assignedPersonId: assignment.assignedPersonId,
-      assignedPersonName: assignment.assignedPersonName,
-      dueDate: cleanDate(input.dueDate ?? task.dueDate),
-      note: cleanString(input.note ?? task.note, 1000),
+      ...nextTaskTiming,
+      note: normalizedNote,
       updatedAt: now,
-      completedAt: nextStatus === 'done' ? (task.completedAt || now) : (nextStatus === 'cancelled' ? (task.completedAt || now) : '')
-    });
-  }
+      completedAt
+    };
+    updated.assignedRole = nextTaskTiming.assignedRole;
+    updated.assignedPersonId = nextTaskTiming.assignedPersonId;
+    updated.assignedPersonName = nextTaskTiming.assignedPersonName;
+    updated.dueDate = cleanDate(input.dueDate ?? task.dueDate);
+    tasks.push(updated);
+    }
   if (!found) throw new Error('Notification task was not found.');
 
   const hasOpenTask = tasks.some((task) => ['open', 'in_progress'].includes(normalizeTaskStatus(task?.status, 'open')));

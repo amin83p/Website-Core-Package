@@ -3,6 +3,10 @@
 <% const severity = String(row.severity || 'info').toLowerCase(); %>
 <% const tasks = Array.isArray(row.tasks) ? row.tasks : []; %>
 <% const lifecycleEvents = Array.isArray(row.lifecycle) ? row.lifecycle.slice().reverse() : []; %>
+<% const normalizedPersonId = String(currentPersonId || '').trim(); %>
+<% const canManageAllNotifications = !!canManageAll; %>
+<% const canManageNotificationStatus = canManageAllNotifications || (normalizedPersonId && String(row.assignedPersonId || '').trim() === normalizedPersonId); %>
+<% const visibleTasks = canManageAllNotifications ? tasks : tasks.filter((task) => String(task?.assignedPersonId || '').trim() === normalizedPersonId); %>
 <%
   const lifecycleMeta = {
     source_notification_created: { icon: 'bi-bell-fill', tone: 'primary', label: 'Created' },
@@ -25,6 +29,12 @@
   function statusLabel(value) {
     const token = String(value || '').trim();
     return token ? token.replace(/_/g, ' ').toUpperCase() : 'NONE';
+  }
+  function taskStatusClass(value) {
+    const statusValue = String(value || 'open').toLowerCase();
+    if (statusValue === 'done') return 'notification-task-card-success';
+    if (statusValue === 'in_progress') return 'notification-task-card-progress';
+    return 'notification-task-card-open';
   }
 %>
 
@@ -74,8 +84,20 @@
   .notification-task-card {
     border: 1px solid rgba(33, 37, 41, .08);
     border-radius: 10px;
-    background: #fff;
+    background: #fff8e1;
     padding: .9rem 1rem;
+  }
+  .notification-task-card-open {
+    background: #fff8e1;
+  }
+  .notification-task-card-progress {
+    background: #e3f2fd;
+  }
+  .notification-task-card-success {
+    background: #e2f5ea;
+  }
+  .notification-task-meta {
+    font-size: 0.84rem;
   }
   @media (max-width: 575.98px) {
     .notification-lifecycle-item {
@@ -143,14 +165,16 @@
           </dl>
         </div>
         <div class="card-footer bg-white d-flex flex-wrap justify-content-end gap-2">
-          <button class="btn btn-outline-primary" type="button" id="btnReassignNotification"><i class="bi bi-person-check me-1"></i> Reassign</button>
-          <% if (status === 'open') { %>
+          <% if (canManageNotificationStatus) { %>
+            <button class="btn btn-outline-primary" type="button" id="btnReassignNotification"><i class="bi bi-person-check me-1"></i> Reassign</button>
+          <% } %>
+          <% if (canManageNotificationStatus && status === 'open') { %>
             <button class="btn btn-primary notification-status-action" data-status="in_progress" data-id="<%= row.id %>"><i class="bi bi-play-circle me-1"></i> Start</button>
           <% } %>
-          <% if (status === 'open' || status === 'in_progress') { %>
+          <% if (canManageNotificationStatus && (status === 'open' || status === 'in_progress')) { %>
             <button class="btn btn-success notification-status-action" data-status="resolved" data-id="<%= row.id %>"><i class="bi bi-check2-circle me-1"></i> Resolve</button>
             <button class="btn btn-outline-secondary notification-status-action" data-status="dismissed" data-id="<%= row.id %>"><i class="bi bi-archive me-1"></i> Dismiss</button>
-          <% } else { %>
+          <% } else if (canManageNotificationStatus) { %>
             <button class="btn btn-warning notification-status-action" data-status="open" data-id="<%= row.id %>"><i class="bi bi-arrow-counterclockwise me-1"></i> Reopen</button>
           <% } %>
         </div>
@@ -161,13 +185,15 @@
           <h2 class="h5 mb-0">Tasks</h2>
         </div>
         <div class="card-body">
-          <% if (!tasks.length) { %>
-            <div class="text-muted mb-3">No tasks are attached to this notification.</div>
+          <% if (!visibleTasks.length) { %>
+            <div class="text-muted mb-3">No tasks are assigned to you in this notification.</div>
           <% } %>
           <div class="d-grid gap-3 mb-4">
-            <% tasks.forEach((task) => { %>
+            <% visibleTasks.forEach((task) => { %>
               <% const taskStatus = String(task.status || 'open').toLowerCase(); %>
-              <div class="notification-task-card">
+              <% const taskIsAssignedToMe = normalizedPersonId && String(task.assignedPersonId || '').trim() === normalizedPersonId; %>
+              <% const canManageTask = canManageAllNotifications || taskIsAssignedToMe; %>
+              <div class="notification-task-card <%= taskStatusClass(taskStatus) %>">
                 <div class="d-flex flex-wrap justify-content-between gap-2">
                   <div>
                     <div class="fw-bold"><%= task.title || task.id %></div>
@@ -177,30 +203,41 @@
                   </div>
                   <span class="badge align-self-start <%= taskStatus === 'done' ? 'bg-success' : (taskStatus === 'in_progress' ? 'bg-primary' : (taskStatus === 'cancelled' ? 'bg-secondary' : 'bg-warning text-dark')) %>"><%= statusLabel(taskStatus) %></span>
                 </div>
-                <% if (task.note) { %><div class="small text-muted mt-2"><%= task.note %></div><% } %>
-                <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
-                  <button class="btn btn-outline-primary btn-sm notification-task-reassign-action"
-                    data-task-id="<%= task.id %>"
-                    data-status="<%= taskStatus %>"
-                    data-assigned-person-id="<%= task.assignedPersonId || '' %>"
-                    data-assigned-person-name="<%= task.assignedPersonName || '' %>"
-                    data-assigned-role="<%= task.assignedRole || '' %>">
-                    <i class="bi bi-person-check me-1"></i> Reassign
-                  </button>
-                  <% if (taskStatus === 'open') { %>
-                    <button class="btn btn-outline-primary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="in_progress"><i class="bi bi-play-circle me-1"></i> Start</button>
-                  <% } %>
-                  <% if (taskStatus === 'open' || taskStatus === 'in_progress') { %>
-                    <button class="btn btn-outline-success btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="done"><i class="bi bi-check2 me-1"></i> Complete</button>
-                    <button class="btn btn-outline-secondary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="cancelled"><i class="bi bi-slash-circle me-1"></i> Cancel</button>
-                  <% } else { %>
-                    <button class="btn btn-outline-warning btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="open"><i class="bi bi-arrow-counterclockwise me-1"></i> Reopen</button>
-                  <% } %>
+                <div class="small text-muted notification-task-meta mt-2">
+                  <div>Assigned at: <%= task.assignedAt || '-' %></div>
+                  <div>Started at: <%= task.startedAt || '-' %></div>
+                  <div>Reassigned at: <%= task.reassignedAt || '-' %></div>
+                  <div>Completed at: <%= task.completedAt || '-' %></div>
                 </div>
+                <% if (task.note) { %><div class="small text-muted mt-2"><%= task.note %></div><% } %>
+                <% if (canManageTask) { %>
+                  <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
+                    <% if (canManageAllNotifications) { %>
+                      <button class="btn btn-outline-primary btn-sm notification-task-reassign-action"
+                        data-task-id="<%= task.id %>"
+                        data-status="<%= taskStatus %>"
+                        data-assigned-person-id="<%= task.assignedPersonId || '' %>"
+                        data-assigned-person-name="<%= task.assignedPersonName || '' %>"
+                        data-assigned-role="<%= task.assignedRole || '' %>">
+                        <i class="bi bi-person-check me-1"></i> Reassign
+                      </button>
+                    <% } %>
+                    <% if (taskStatus === 'open') { %>
+                      <button class="btn btn-outline-primary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="in_progress"><i class="bi bi-play-circle me-1"></i> Start</button>
+                    <% } %>
+                    <% if (taskStatus === 'open' || taskStatus === 'in_progress') { %>
+                      <button class="btn btn-outline-success btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="done" data-status-confirm="true"><i class="bi bi-check2 me-1"></i> Complete</button>
+                      <button class="btn btn-outline-secondary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="cancelled"><i class="bi bi-slash-circle me-1"></i> Cancel</button>
+                    <% } else { %>
+                      <button class="btn btn-outline-warning btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="open"><i class="bi bi-arrow-counterclockwise me-1"></i> Reopen</button>
+                    <% } %>
+                  </div>
+                <% } %>
               </div>
             <% }) %>
           </div>
 
+          <% if (canManageAllNotifications) { %>
           <form id="notificationTaskForm" class="border rounded p-3 bg-light">
             <h3 class="h6 mb-3">Add Task</h3>
             <div class="row g-2">
@@ -232,6 +269,7 @@
               </div>
             </div>
           </form>
+          <% } %>
         </div>
       </div>
 
@@ -278,10 +316,10 @@
           <h2 class="h5 mb-0">Task Summary</h2>
         </div>
         <div class="card-body small">
-          <div class="d-flex justify-content-between mb-2"><span>Open</span><strong><%= tasks.filter((task) => String(task.status || '').toLowerCase() === 'open').length %></strong></div>
-          <div class="d-flex justify-content-between mb-2"><span>In Progress</span><strong><%= tasks.filter((task) => String(task.status || '').toLowerCase() === 'in_progress').length %></strong></div>
-          <div class="d-flex justify-content-between mb-2"><span>Done</span><strong><%= tasks.filter((task) => String(task.status || '').toLowerCase() === 'done').length %></strong></div>
-          <div class="d-flex justify-content-between"><span>Cancelled</span><strong><%= tasks.filter((task) => String(task.status || '').toLowerCase() === 'cancelled').length %></strong></div>
+          <div class="d-flex justify-content-between mb-2"><span>Open</span><strong><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'open').length %></strong></div>
+          <div class="d-flex justify-content-between mb-2"><span>In Progress</span><strong><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'in_progress').length %></strong></div>
+          <div class="d-flex justify-content-between mb-2"><span>Done</span><strong><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'done').length %></strong></div>
+          <div class="d-flex justify-content-between"><span>Cancelled</span><strong><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'cancelled').length %></strong></div>
         </div>
       </div>
     </div>
@@ -364,13 +402,18 @@
       GenericPicker.open(config);
     }
 
-    async function requestNote({ status, titlePrefix = 'Update' }) {
+    async function requestNote({ status, titlePrefix = 'Update', isTask = false }) {
       const noteId = `notificationNote_${Date.now()}`;
+      const isCompleteAction = String(status || '').toLowerCase() === 'done';
+      const confirmPrompt = isTask && isCompleteAction
+        ? '<p>Are you sure you want to mark this task as <b>completed</b>?</p>'
+        : '';
       const result = await showNotificationMessage({
         title: `${titlePrefix} Notification`,
         icon: status === 'resolved' || status === 'done' ? 'success' : 'warning',
         size: 'lg',
         message: `
+          ${confirmPrompt}
           <label class="form-label" for="${noteId}">Optional note</label>
           <textarea class="form-control" id="${noteId}" rows="4" maxlength="1000"></textarea>
         `,
@@ -453,7 +496,8 @@
         const status = button.dataset.status || '';
         if (!taskId || !status) return;
         const label = status === 'done' ? 'Complete' : (status === 'cancelled' ? 'Cancel' : 'Update');
-        const note = await requestNote({ status, titlePrefix: label });
+        const isTask = true;
+        const note = await requestNote({ status, titlePrefix: label, isTask });
         if (note === null) return;
         await postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/tasks/${encodeURIComponent(taskId)}`, { status, note });
       });

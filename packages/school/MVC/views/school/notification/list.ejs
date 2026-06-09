@@ -1,4 +1,5 @@
 <%
+  const currentPersonId = String(currentPersonId || '').trim();
   const headerButtons = [
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary mb-2 btn-md"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
@@ -129,15 +130,19 @@
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <% const rowIsAssignedToCurrent = currentPersonId && currentPersonId === String(row.assignedPersonId || '').trim(); %>
+                <% const canManageRow = canManageAll || rowIsAssignedToCurrent; %>
                 <a href="/school/notifications/detail/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-eye me-2"></i>Details</a>
-                <% if (status === 'open') { %>
-                  <button class="btn btn-outline-primary btn-sm notification-status-action" data-status="in_progress" data-id="<%= row.id %>"><i class="bi bi-play-circle me-2"></i>Start</button>
-                <% } %>
-                <% if (status === 'open' || status === 'in_progress') { %>
-                  <button class="btn btn-outline-success btn-sm notification-status-action" data-status="resolved" data-id="<%= row.id %>"><i class="bi bi-check2-circle me-2"></i>Resolve</button>
-                  <button class="btn btn-outline-secondary btn-sm notification-status-action" data-status="dismissed" data-id="<%= row.id %>"><i class="bi bi-archive me-2"></i>Dismiss</button>
-                <% } else { %>
-                  <button class="btn btn-outline-warning btn-sm notification-status-action" data-status="open" data-id="<%= row.id %>"><i class="bi bi-arrow-counterclockwise me-2"></i>Reopen</button>
+                <% if (canManageRow) { %>
+                  <% if (status === 'open') { %>
+                    <button class="btn btn-outline-primary btn-sm notification-status-action" data-status="in_progress" data-id="<%= row.id %>"><i class="bi bi-play-circle me-2"></i>Start</button>
+                  <% } %>
+                  <% if (status === 'open' || status === 'in_progress') { %>
+                    <button class="btn btn-outline-success btn-sm notification-status-action" data-status="resolved" data-id="<%= row.id %>"><i class="bi bi-check2-circle me-2"></i>Resolve</button>
+                    <button class="btn btn-outline-secondary btn-sm notification-status-action" data-status="dismissed" data-id="<%= row.id %>"><i class="bi bi-archive me-2"></i>Dismiss</button>
+                  <% } else { %>
+                    <button class="btn btn-outline-warning btn-sm notification-status-action" data-status="open" data-id="<%= row.id %>"><i class="bi bi-arrow-counterclockwise me-2"></i>Reopen</button>
+                  <% } %>
                 <% } %>
               </div>
             </div>

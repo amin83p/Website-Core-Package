@@ -113,6 +113,9 @@ function sanitizeTasks(tasks, { existingTasks = [] } = {}) {
         note: cleanString(task?.note, { max: 1000, allowEmpty: true }),
         createdAt: cleanString(task?.createdAt, { max: 40, allowEmpty: true }) || new Date().toISOString(),
         updatedAt: cleanString(task?.updatedAt, { max: 40, allowEmpty: true }),
+        assignedAt: cleanString(task?.assignedAt, { max: 40, allowEmpty: true }),
+        startedAt: cleanString(task?.startedAt, { max: 40, allowEmpty: true }),
+        reassignedAt: cleanString(task?.reassignedAt, { max: 40, allowEmpty: true }),
         completedAt: cleanString(task?.completedAt, { max: 40, allowEmpty: true })
       };
     });

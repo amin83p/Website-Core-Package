@@ -2,6 +2,7 @@ const notificationService = require('../../services/school/notificationService')
 const notificationRoutingRuleService = require('../../services/school/notificationRoutingRuleService');
 const notificationModel = require('../../models/school/notificationModel');
 const routingRuleModel = require('../../models/school/notificationRoutingRuleModel');
+const personDisplayNameService = require('../../services/school/personDisplayNameService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
@@ -62,10 +63,27 @@ function baseViewModel(req, res, extra = {}) {
     sourceTypes: notificationModel.NOTIFICATION_SOURCE_TYPES,
     taskStatuses: notificationModel.NOTIFICATION_TASK_STATUSES,
     assignmentFilters: ['all', 'mine', 'unassigned'],
-    canManageAll: true,
+    canManageAll: notificationService.isAdminViewer(req.user),
+    currentPersonId: String(personDisplayNameService.getUserPersonId(req.user) || '').trim(),
     canManageRouting: notificationRoutingRuleService.isAdminViewer(req.user),
     schoolSectionDashboardHref: resLocalSchoolDashboard(res),
     ...extra
+  };
+}
+
+function filterTasksForViewer(reqUser, notification) {
+  const canManageAll = notificationService.isAdminViewer(reqUser);
+  if (canManageAll) return notification;
+  const currentPersonId = String(personDisplayNameService.getUserPersonId(reqUser) || '').trim();
+  if (!currentPersonId) {
+    return {
+      ...notification,
+      tasks: []
+    };
+  }
+  return {
+    ...notification,
+    tasks: (Array.isArray(notification?.tasks) ? notification.tasks : []).filter((task) => String(task?.assignedPersonId || '').trim() === currentPersonId)
   };
 }
 
@@ -124,7 +142,7 @@ async function showList(req, res) {
 
 async function showDetail(req, res) {
   try {
-    const notification = await notificationService.getNotificationById(req.params.id, req.user);
+    const notification = filterTasksForViewer(req.user, await notificationService.getNotificationById(req.params.id, req.user));
     return res.render('school/notification/detail', baseViewModel(req, res, {
       title: 'School Notification Detail',
       notification

@@ -107,6 +107,84 @@ test('School notification package route, repository, data service, and views are
   assert.doesNotMatch(routingView, /window\.alert|window\.confirm|window\.prompt/);
 });
 
+test('School notification ownership limits non-admin users to their assigned notifications and tasks', async (t) => {
+  const notificationDataPath = path.join(ROOT, 'data/school/notifications.json');
+  const originalNotifications = fs.existsSync(notificationDataPath) ? fs.readFileSync(notificationDataPath, 'utf8') : '[]';
+  t.after(() => fs.writeFileSync(notificationDataPath, originalNotifications));
+  fs.writeFileSync(notificationDataPath, '[]');
+
+  const service = require('../packages/school/MVC/services/school/notificationService');
+
+  const admin = {
+    id: 'NOTIFICATION-ADMIN',
+    personId: 'PERSON-ADMIN',
+    activeOrgId: 'ORG-NOTIFICATION-OWNERSHIP',
+    isSuperAdmin: true
+  };
+  const user = {
+    id: 'NOTIFICATION-USER',
+    personId: 'PERSON-USER',
+    activeOrgId: 'ORG-NOTIFICATION-OWNERSHIP'
+  };
+  const outsider = {
+    id: 'NOTIFICATION-OUTSIDER',
+    personId: 'PERSON-OUTSIDER',
+    activeOrgId: 'ORG-NOTIFICATION-OWNERSHIP'
+  };
+
+  const assignedRow = await service.upsertSourceNotification({
+    orgId: 'ORG-NOTIFICATION-OWNERSHIP',
+    sourceType: 'manual',
+    sourceId: 'NR-ASSIGNED',
+    title: 'Assigned notification',
+    message: 'Only the assigned user may change this.',
+    severity: 'warning',
+    assignedPersonId: 'PERSON-USER',
+    assignedPersonName: 'Person User'
+  }, admin);
+  const otherRow = await service.upsertSourceNotification({
+    orgId: 'ORG-NOTIFICATION-OWNERSHIP',
+    sourceType: 'manual',
+    sourceId: 'NR-OTHER',
+    title: 'Notification for another user',
+    message: 'This should be blocked from other users.',
+    severity: 'warning',
+    assignedPersonId: 'PERSON-OUTSIDER',
+    assignedPersonName: 'Person Outsider'
+  }, admin);
+
+  const updated = await service.updateNotificationStatus(user, assignedRow.id, { status: 'in_progress' });
+  assert.equal(updated.status, 'in_progress');
+
+  await assert.rejects(
+    async () => service.updateNotificationStatus(user, otherRow.id, { status: 'resolved' }),
+    /not authorized/i
+  );
+
+  const withTask = await service.addNotificationTask(admin, assignedRow.id, {
+    title: 'Assigned task',
+    description: 'Task should auto-start once assigned',
+    assignedPersonId: 'PERSON-USER',
+    assignedPersonName: 'Person User',
+    dueDate: '2026-06-12'
+  });
+  const assignedTask = withTask.tasks.find((task) => task.title === 'Assigned task');
+  assert.ok(assignedTask);
+  assert.equal(assignedTask.status, 'in_progress');
+  assert.ok(assignedTask.assignedAt);
+  assert.ok(assignedTask.startedAt);
+
+  await assert.rejects(
+    async () => service.updateNotificationTask(outsider, assignedRow.id, assignedTask.id, { status: 'done' }),
+    /not authorized/i
+  );
+
+  const completed = await service.updateNotificationTask(user, assignedRow.id, assignedTask.id, { status: 'done' });
+  const completedTask = completed.tasks.find((task) => task.id === assignedTask.id);
+  assert.equal(completedTask.status, 'done');
+  assert.ok(completedTask.completedAt);
+});
+
 test('School notification service routes leave requests, falls back to unassigned, and tracks embedded tasks', async (t) => {
   const notificationDataPath = path.join(ROOT, 'data/school/notifications.json');
   const routingDataPath = path.join(ROOT, 'data/school/notificationRoutingRules.json');
@@ -157,7 +235,7 @@ test('School notification service routes leave requests, falls back to unassigne
   assert.equal(opened.assignedPersonId, '144922');
   assert.equal(opened.assignedPersonName, expectedAssigneeName);
   assert.equal(opened.tasks.length, 1);
-  assert.equal(opened.tasks[0].status, 'open');
+  assert.equal(opened.tasks[0].status, 'in_progress');
   assert.equal(opened.tasks[0].assignedPersonId, '144922');
   assert.equal(opened.tasks[0].assignedPersonName, expectedAssigneeName);
   assert.equal(opened.lifecycle.at(-1).action, 'source_notification_created');
