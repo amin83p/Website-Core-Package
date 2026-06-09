@@ -42,6 +42,7 @@ router.use('/holidays', require('./holidayRoutes'));
 router.use('/sessions', require('./sessionRoutes'));
 router.use('/reports', require('./reportRoutes'));
 router.use('/exams', require('./examRoutes'));
+router.use('/leave-requests', require('./leaveRequestRoutes'));
 router.use('/withdrawal', require('./withdrawalRoutes'));
 router.use('/', require('./schoolRoutes'));
 

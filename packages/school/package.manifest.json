@@ -173,6 +173,9 @@
           "id": "445570"
         },
         {
+          "id": "445575"
+        },
+        {
           "id": "778769"
         },
         {
@@ -2591,6 +2594,74 @@
       "subsections": [],
       "related": [],
       "adoptExisting": true
+    },
+    {
+      "id": "445575",
+      "name": "SCHOOL_LEAVE_REQUESTS",
+      "category": "SCHOOL",
+      "description": "Submit, review, and approve student, teacher, and staff leave requests with schedule blocking after approval.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/leave-requests",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
     }
   ],
   "symbols": [
@@ -2967,6 +3038,18 @@
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_059",
+      "name": "SCHOOL_LEAVE_REQUESTS",
+      "type": "class",
+      "value": "bi bi-calendar-x",
+      "tags": [
+        "SCHOOL_LEAVE_REQUESTS",
+        "445575"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
     }
   ],
   "accesses": [
@@ -3260,6 +3343,40 @@
             },
             {
               "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445575",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
               "scopeId": "SCP_OWNER",
               "maxAttemptsPerSession": null,
               "maxSessionDurationMinutes": null,
@@ -4410,6 +4527,40 @@
           ]
         },
         {
+          "sectionId": "445575",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
           "sectionId": "445561",
           "adminAccess": false,
           "operations": [
@@ -5552,6 +5703,40 @@
           ]
         },
         {
+          "sectionId": "445575",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
           "sectionId": "445561",
           "adminAccess": false,
           "operations": [
@@ -6605,6 +6790,11 @@
     {
       "entityType": "withdrawals",
       "label": "Withdrawals"
+    },
+    {
+      "entityType": "leaveRequests",
+      "label": "Leave Requests",
+      "collectionName": "schoolLeaveRequests"
     }
   ],
   "dataSchemas": [],
@@ -6688,6 +6878,16 @@
       "label": "Withdrawals",
       "href": "/school/withdrawal",
       "icon": "bi bi-box-arrow-right",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
+      "id": "school-menu-leave-requests",
+      "label": "Leave Requests",
+      "href": "/school/leave-requests",
+      "icon": "bi bi-calendar-x",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",
@@ -6787,6 +6987,17 @@
       "href": "/school/staff",
       "icon": "bi bi-people-fill",
       "description": "Manage staff records and administration settings.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
+      "id": "school-dashboard-leave-requests",
+      "label": "Leave Requests",
+      "href": "/school/leave-requests",
+      "icon": "bi bi-calendar-x",
+      "description": "Submit and review leave requests with approval lifecycle and schedule blocking.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",

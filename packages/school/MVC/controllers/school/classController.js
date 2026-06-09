@@ -34,6 +34,7 @@ const classEnrollmentReadService = require('../../services/school/classEnrollmen
 const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
+const leaveRequestService = require('../../services/school/leaveRequestService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { isRollingClassWorkflowEnabledForClass } = require('../../services/school/phase2FeatureFlagService');
 const {
@@ -1308,6 +1309,104 @@ async function detectSessionConflicts({ classId = '', sessions = [], activeOrgId
         _rowIndex: index,
         resolvedPersonId: resolveSessionTeacherId(session, fallbackTeacherId)
     }));
+
+    const leaveConflictWindows = normalizedSessions
+        .filter((ses) => !sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {
+            status: ses?.status,
+            notes: ses?.notes
+        }))
+        .filter((ses) => ses.resolvedPersonId && ses.date && ses.startTime && ses.endTime)
+        .map((ses) => ({
+            sessionIndex: ses._rowIndex,
+            personId: ses.resolvedPersonId,
+            personName: ses?.delivery?.deliveredByName || ses.resolvedPersonId,
+            date: ses.date,
+            startTime: ses.startTime,
+            endTime: ses.endTime
+        }));
+
+    const leaveConflicts = await leaveRequestService.findApprovedLeaveConflicts({
+        orgId: activeOrgId,
+        windows: leaveConflictWindows,
+        reqUser
+    });
+    leaveConflicts.forEach((conflict) => {
+        conflicts.push({
+            sessionIndex: conflict.sessionIndex,
+            date: conflict.date,
+            teacherName: conflict.personName || conflict.personId,
+            conflictClass: 'Approved leave request',
+            existTime: conflict.leaveLabel || `${conflict.startTime || ''}${conflict.endTime ? ` - ${conflict.endTime}` : ''}`,
+            conflictType: 'approved_leave',
+            leaveRequestId: conflict.leaveRequestId
+        });
+    });
+
+    if (classId) {
+        const targetClassRow = scopedClasses.find((row) => idsEqual(row?.id, classId)) || null;
+        const sessionDates = normalizedSessions.map((ses) => ses.date).filter(Boolean);
+        const activeRosterResult = await classEnrollmentReadService.listActiveStudentIdsForClass({
+            classId,
+            classItem: targetClassRow,
+            reqUser,
+            activeOrgId,
+            sessionDates
+        });
+        const activeStudentIds = activeRosterResult?.studentIds instanceof Set
+            ? [...activeRosterResult.studentIds]
+            : [];
+        if (activeStudentIds.length) {
+            const allStudents = await schoolDataService.fetchData('students', {}, reqUser);
+            const studentPersonMap = new Map(
+                (Array.isArray(allStudents) ? allStudents : [])
+                    .map((student) => [
+                        toPublicId(student?.id),
+                        {
+                            personId: toPublicId(student?.personId),
+                            name: [student?.firstName, student?.lastName].map((part) => String(part || '').trim()).filter(Boolean).join(' ') || toPublicId(student?.id)
+                        }
+                    ])
+                    .filter(([studentId, info]) => Boolean(studentId && info.personId))
+            );
+            const studentLeaveWindows = [];
+            normalizedSessions
+                .filter((ses) => !sessionStatusPolicyService.shouldExcludeFromStudentIndexByMap(statusMap, {
+                    status: ses?.status,
+                    notes: ses?.notes
+                }))
+                .filter((ses) => ses.date && ses.startTime && ses.endTime)
+                .forEach((ses) => {
+                    activeStudentIds.forEach((studentId) => {
+                        const info = studentPersonMap.get(toPublicId(studentId));
+                        if (!info?.personId) return;
+                        studentLeaveWindows.push({
+                            sessionIndex: ses._rowIndex,
+                            personId: info.personId,
+                            personName: info.name,
+                            date: ses.date,
+                            startTime: ses.startTime,
+                            endTime: ses.endTime
+                        });
+                    });
+                });
+            const studentLeaveConflicts = await leaveRequestService.findApprovedLeaveConflicts({
+                orgId: activeOrgId,
+                windows: studentLeaveWindows,
+                reqUser
+            });
+            studentLeaveConflicts.forEach((conflict) => {
+                conflicts.push({
+                    sessionIndex: conflict.sessionIndex,
+                    date: conflict.date,
+                    teacherName: conflict.personName || conflict.personId,
+                    conflictClass: 'Student approved leave request',
+                    existTime: conflict.leaveLabel || `${conflict.startTime || ''}${conflict.endTime ? ` - ${conflict.endTime}` : ''}`,
+                    conflictType: 'student_approved_leave',
+                    leaveRequestId: conflict.leaveRequestId
+                });
+            });
+        }
+    }
 
     normalizedSessions.forEach((ses, index) => {
         if (sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {

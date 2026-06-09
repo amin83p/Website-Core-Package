@@ -31,6 +31,7 @@ const studentProgramRegistrationModel = require('../../models/school/studentProg
 const studentProgramPriorSubjectModel = require('../../models/school/studentProgramPriorSubjectModel');
 const studentTermRegistrationModel = require('../../models/school/studentTermRegistrationModel');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
+const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -794,6 +795,26 @@ const schoolRepositories = {
       'reasonStart',
       'reasonEnd'
     ]
+  }),
+  leaveRequests: createSchoolRepository({
+    entityName: 'leaveRequests',
+    collectionName: 'schoolLeaveRequests',
+    getAll: leaveRequestModel.getAllLeaveRequests,
+    getById: leaveRequestModel.getLeaveRequestById,
+    create: leaveRequestModel.addLeaveRequest,
+    update: leaveRequestModel.updateLeaveRequest,
+    remove: leaveRequestModel.deleteLeaveRequest,
+    defaultSearchFields: [
+      'id',
+      'orgId',
+      'requesterPersonId',
+      'requesterName',
+      'requesterRole',
+      'status',
+      'reason',
+      'details'
+    ],
+    dateFields: ['requestDate', 'startDate', 'endDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
   })
 };
 
@@ -1057,6 +1078,22 @@ schoolRepositories.classEnrollmentPeriods.clearByOrg = async (orgId, options = {
       };
     }
   }, 'school.classEnrollmentPeriods.clearByOrg');
+};
+
+schoolRepositories.leaveRequests.clearByOrg = async (orgId, options = {}) => {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('orgId is required to clear leave requests.');
+  return runByRepositoryBackend(options, {
+    json: async () => leaveRequestModel.clearLeaveRequestsByOrg(targetOrgId),
+    mongo: async () => {
+      const collection = getMongoCollection('schoolLeaveRequests');
+      const result = await collection.deleteMany({ orgId: targetOrgId });
+      return {
+        removed: Number(result?.deletedCount || 0),
+        remaining: await collection.countDocuments({})
+      };
+    }
+  }, 'school.leaveRequests.clearByOrg');
 };
 
 schoolRepositories.reportInstances.clearByOrg = async (orgId, options = {}) => {
@@ -1609,6 +1646,7 @@ assertQueryableCrudRepository('schoolRepositories.timesheets', schoolRepositorie
 assertQueryableCrudRepository('schoolRepositories.studentProgramRegistrations', schoolRepositories.studentProgramRegistrations);
 assertQueryableCrudRepository('schoolRepositories.studentTermRegistrations', schoolRepositories.studentTermRegistrations);
 assertQueryableCrudRepository('schoolRepositories.classEnrollmentPeriods', schoolRepositories.classEnrollmentPeriods);
+assertQueryableCrudRepository('schoolRepositories.leaveRequests', schoolRepositories.leaveRequests);
 
 module.exports = schoolRepositories;
 

@@ -7,6 +7,7 @@ const schoolRepositories = require('../../repositories/school');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
+const leaveRequestService = require('../../services/school/leaveRequestService');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
@@ -748,6 +749,15 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
         reqUser,
         isStudentActiveOnDate
     });
+
+    const approvedLeaveEvents = await leaveRequestService.getApprovedLeaveEventsForPerson({
+        orgId: activeOrgId,
+        personId: normalizedPersonId,
+        startDate,
+        endDate,
+        reqUser
+    });
+    events.push(...approvedLeaveEvents);
 
     sortEventsChronologically(events);
     markOverlappingEvents(events);

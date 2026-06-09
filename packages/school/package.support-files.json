@@ -79,6 +79,13 @@
             "target": "packages/school/scripts/maintenance/insert-school-gradebook.mongosh.js",
             "category": "maintenance",
             "status": "root-active"
+        },
+        {
+            "source": "scripts/mongo-railway/insert-school-leave-request-section.mongosh.js",
+            "target": "packages/school/scripts/maintenance/insert-school-leave-request-section.mongosh.js",
+            "category": "maintenance",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
         }
     ],
     "docs": [

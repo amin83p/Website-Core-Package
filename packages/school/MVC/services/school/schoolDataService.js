@@ -47,7 +47,8 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   studentProgramRegistrations: { repository: schoolRepositories.studentProgramRegistrations },
   studentProgramPriorSubjects: { repository: schoolRepositories.studentProgramPriorSubjects },
   studentTermRegistrations: { repository: schoolRepositories.studentTermRegistrations },
-  classEnrollmentPeriods: { repository: schoolRepositories.classEnrollmentPeriods }
+  classEnrollmentPeriods: { repository: schoolRepositories.classEnrollmentPeriods },
+  leaveRequests: { repository: schoolRepositories.leaveRequests }
 });
 
 const SCHOOL_INDEX_DOCS = Object.freeze({

@@ -1,0 +1,356 @@
+<% const row = request || {}; %>
+<% const isEdit = mode === 'edit' && row && row.id; %>
+<% const isApproved = isEdit && String(row.status || '').toLowerCase() === 'approved'; %>
+<% const asid = actionStateId || ''; %>
+<% const roleOptions = Array.isArray(requesterRoleOptions) && requesterRoleOptions.length ? requesterRoleOptions : (requesterRoles || []); %>
+<% const self = selfRequester || {}; %>
+<% const selectedRequesterRole = row.requesterRole || self.requesterRole || roleOptions[0] || 'staff'; %>
+<% const selfRequesterName = row.requesterName || self.requesterName || ''; %>
+<% const selfRequesterPersonId = row.requesterPersonId || self.requesterPersonId || ''; %>
+
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1"><%= title %></h1>
+      <div class="text-muted">Submit and track leave that affects school schedules.</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="<%= schoolSectionDashboardHref %>" class="btn btn-filled btn-secondary"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>
+      <a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="btn btn-filled btn-secondary"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>
+      <a href="/school/leave-requests" class="btn btn-outline-secondary"><i class="bi bi-list-ul me-1"></i> Leave Requests</a>
+    </div>
+  </div>
+
+  <% if (isApproved) { %>
+    <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
+      <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+      <div>
+        This request is already approved. Saving schedule-related changes will move it to pending reapproval while the last approved snapshot remains active for schedule blocking.
+      </div>
+    </div>
+  <% } %>
+
+  <form id="leaveRequestForm" method="post" action="<%= formAction %>" data-approved-request="<%= isApproved ? 'true' : 'false' %>">
+    <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
+    <input type="hidden" name="confirmReapproval" id="hid_confirmReapproval" value="false">
+
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white">
+            <h2 class="h5 mb-0">Leave Window</h2>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <% if (canManageAll) { %>
+                <div class="col-md-4">
+                  <label class="form-label" for="requesterRole">Requester Role</label>
+                  <select class="form-select" id="requesterRole" name="requesterRole">
+                    <% roleOptions.forEach((role) => { %>
+                      <option value="<%= role %>" <%= selectedRequesterRole === role ? 'selected' : '' %>><%= role.charAt(0).toUpperCase() + role.slice(1) %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label" for="requesterPickerLabel">Requester Person</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                    <input class="form-control" id="requesterPickerLabel" value="<%= row.requesterName || row.requesterPersonId || '' %>" placeholder="Pick requester by role" readonly>
+                    <button class="btn btn-outline-primary" type="button" id="btnPickRequester"><i class="bi bi-search me-1"></i> Pick</button>
+                  </div>
+                  <input type="hidden" id="requesterPersonId" name="requesterPersonId" value="<%= row.requesterPersonId || '' %>">
+                  <input type="hidden" id="requesterRecordId" name="requesterRecordId" value="<%= row.requesterRecordId || '' %>">
+                  <input type="hidden" id="requesterName" name="requesterName" value="<%= row.requesterName || '' %>">
+                </div>
+              <% } else { %>
+                <div class="col-md-4">
+                  <label class="form-label" for="requesterRole">Requester Role</label>
+                  <% if (roleOptions.length > 1) { %>
+                    <select class="form-select" id="requesterRole" name="requesterRole">
+                      <% roleOptions.forEach((role) => { %>
+                        <option value="<%= role %>" <%= selectedRequesterRole === role ? 'selected' : '' %>><%= role.charAt(0).toUpperCase() + role.slice(1) %></option>
+                      <% }) %>
+                    </select>
+                  <% } else { %>
+                    <input type="hidden" id="requesterRole" name="requesterRole" value="<%= selectedRequesterRole %>">
+                    <input class="form-control" value="<%= selectedRequesterRole.charAt(0).toUpperCase() + selectedRequesterRole.slice(1) %>" readonly>
+                  <% } %>
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label" for="requesterPickerLabel">Requester Person</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                    <input class="form-control" id="requesterPickerLabel" value="<%= selfRequesterName || selfRequesterPersonId || '' %>" readonly>
+                  </div>
+                  <input type="hidden" id="requesterPersonId" name="requesterPersonId" value="<%= selfRequesterPersonId %>">
+                  <input type="hidden" id="requesterRecordId" name="requesterRecordId" value="">
+                  <input type="hidden" id="requesterName" name="requesterName" value="<%= selfRequesterName %>">
+                </div>
+              <% } %>
+
+              <div class="col-md-6">
+                <label class="form-label" for="startDate">Start Date</label>
+                <input class="form-control" type="date" id="startDate" name="startDate" value="<%= row.startDate || '' %>" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="endDate">End Date</label>
+                <input class="form-control" type="date" id="endDate" name="endDate" value="<%= row.endDate || row.startDate || '' %>" required>
+              </div>
+              <div class="col-12">
+                <input type="hidden" id="allDay" name="allDay" value="<%= row.allDay === false ? 'false' : 'true' %>">
+                <label class="form-label d-block">Leave Duration</label>
+                <div class="btn-group" role="group" aria-label="Leave duration">
+                  <input type="radio" class="btn-check" name="leaveDurationMode" id="leaveDurationDays" value="days" autocomplete="off" <%= row.allDay === false ? '' : 'checked' %>>
+                  <label class="btn btn-outline-secondary" for="leaveDurationDays"><i class="bi bi-calendar-day me-1"></i> Full Day(s)</label>
+                  <input type="radio" class="btn-check" name="leaveDurationMode" id="leaveDurationHours" value="hours" autocomplete="off" <%= row.allDay === false ? 'checked' : '' %>>
+                  <label class="btn btn-outline-secondary" for="leaveDurationHours"><i class="bi bi-clock me-1"></i> Hours</label>
+                </div>
+              </div>
+              <div class="col-md-6 leave-time-field">
+                <label class="form-label" for="startTime">Start Time</label>
+                <input class="form-control" type="time" id="startTime" name="startTime" value="<%= row.startTime || '' %>">
+              </div>
+              <div class="col-md-6 leave-time-field">
+                <label class="form-label" for="endTime">End Time</label>
+                <input class="form-control" type="time" id="endTime" name="endTime" value="<%= row.endTime || '' %>">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="reason">Reason</label>
+                <select class="form-select" id="reason" name="reason">
+                  <% Object.entries(reasons || {}).forEach(([value, label]) => { %>
+                    <option value="<%= value %>" <%= row.reason === value ? 'selected' : '' %>><%= label %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="details">Details</label>
+                <textarea class="form-control" id="details" name="details" rows="5" maxlength="5000"><%= row.details || '' %></textarea>
+              </div>
+              <% if (canManageAll) { %>
+                <div class="col-12">
+                  <label class="form-label" for="adminNote">Admin Note</label>
+                  <textarea class="form-control" id="adminNote" name="adminNote" rows="3" maxlength="5000"><%= row.adminNote || '' %></textarea>
+                </div>
+              <% } %>
+              <% if (isEdit) { %>
+                <div class="col-12">
+                  <label class="form-label" for="changeNote">Change Note</label>
+                  <input class="form-control" id="changeNote" name="changeNote" value="" placeholder="Optional note for this revision">
+                </div>
+              <% } %>
+            </div>
+          </div>
+          <div class="card-footer bg-white d-flex justify-content-end gap-2">
+            <a href="<%= isEdit ? '/school/leave-requests/detail/' + encodeURIComponent(row.id) : '/school/leave-requests' %>" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Save Request</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white">
+            <h2 class="h5 mb-0">Status</h2>
+          </div>
+          <div class="card-body">
+            <div class="mb-2">
+              <span class="text-muted small d-block">Current status</span>
+              <span class="badge bg-secondary"><%= String(row.status || 'new').replace(/_/g, ' ').toUpperCase() %></span>
+            </div>
+            <div class="small text-muted">
+              Approved requests block overlapping teacher or staff assignment. If an approved request is changed, the approved snapshot keeps blocking until the revision is reviewed.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<% if (canManageAll) { %>
+  <%- include('partials/modal_GenericPicker', { user }) %>
+<% } %>
+
+<script>
+  (function () {
+    const form = document.getElementById('leaveRequestForm');
+    const allDay = document.getElementById('allDay');
+    const durationDays = document.getElementById('leaveDurationDays');
+    const durationHours = document.getElementById('leaveDurationHours');
+    const timeFields = Array.from(document.querySelectorAll('.leave-time-field'));
+    const confirmInput = document.getElementById('hid_confirmReapproval');
+    const requesterRole = document.getElementById('requesterRole');
+    const requesterPersonId = document.getElementById('requesterPersonId');
+    const requesterRecordId = document.getElementById('requesterRecordId');
+    const requesterName = document.getElementById('requesterName');
+    const requesterPickerLabel = document.getElementById('requesterPickerLabel');
+    const btnPickRequester = document.getElementById('btnPickRequester');
+    const wasApproved = form?.dataset?.approvedRequest === 'true';
+    const initial = form ? new FormData(form) : null;
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
+    async function showLeaveRequestMessage({ title, message, icon = 'info', buttons } = {}) {
+      if (typeof window.showMessageModal === 'function') {
+        return window.showMessageModal({
+          title: title || 'Leave Request',
+          icon,
+          message: message || '',
+          buttons: buttons && buttons.length ? buttons : [{ text: 'OK', class: 'btn-primary' }]
+        });
+      }
+      console.warn(`${title || 'Leave Request'}: ${message || ''}`);
+      return buttons?.[0]?.text || 'OK';
+    }
+
+    async function confirmLeaveRequestMessage({ title, message, confirmText = 'Continue', confirmClass = 'btn-primary' } = {}) {
+      const result = await showLeaveRequestMessage({
+        title,
+        message,
+        icon: 'warning',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: confirmText, class: confirmClass }
+        ]
+      });
+      return result === confirmText;
+    }
+
+    function toggleTimeFields() {
+      const isHourly = durationHours?.checked === true;
+      if (allDay) allDay.value = isHourly ? 'false' : 'true';
+      const hidden = !isHourly;
+      timeFields.forEach((field) => field.classList.toggle('d-none', hidden));
+      document.getElementById('startTime')?.toggleAttribute('required', !hidden);
+      document.getElementById('endTime')?.toggleAttribute('required', !hidden);
+    }
+
+    function displayNameForPickerItem(item, role) {
+      const firstName = String(item?.firstName || item?.name?.first || '').trim();
+      const lastName = String(item?.lastName || item?.name?.last || '').trim();
+      const directName = typeof item?.name === 'string' ? String(item.name).trim() : '';
+      const name = [firstName, lastName].filter(Boolean).join(' ').trim()
+        || directName
+        || String(item?.displayName || item?.fullName || '').trim();
+      const code = String(item?.studentNumber || item?.studentCode || item?.teacherCode || item?.staffCode || item?.employeeNo || '').trim();
+      const id = String(item?.id || '').trim();
+      const roleLabel = String(role || '').trim();
+      const suffix = code || id;
+      return suffix ? `${name || suffix} (${suffix}${roleLabel ? ', ' + roleLabel : ''})` : (name || 'Selected requester');
+    }
+
+    function resolvePickerPersonId(item, role) {
+      if (role === 'person' || role === 'admin') return String(item?.id || item?.personId || '').trim();
+      return String(item?.personId || item?.id || '').trim();
+    }
+
+    async function pickRequester() {
+      if (!window.GenericPicker || !window.GenericPickerPresets) {
+        await showLeaveRequestMessage({
+          title: 'Requester Picker',
+          icon: 'warning',
+          message: 'The requester picker is not available on this page. Please refresh and try again.'
+        });
+        return;
+      }
+      const role = String(requesterRole?.value || 'staff').trim().toLowerCase();
+      const context = (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined;
+      const presetFactory = {
+        student: () => GenericPickerPresets.student({
+          title: 'Select Student',
+          searchFields: 'id,firstName,lastName,name.first,name.last,studentNumber,studentCode,personId',
+          context
+        }),
+        teacher: () => GenericPickerPresets.teacher({
+          title: 'Select Teacher',
+          searchFields: 'id,firstName,lastName,name.first,name.last,teacherCode,email,personId',
+          context
+        }),
+        staff: () => GenericPickerPresets.staff({
+          title: 'Select Staff',
+          searchFields: 'id,firstName,lastName,name.first,name.last,staffCode,email,personId',
+          context
+        }),
+        admin: () => GenericPickerPresets.person({
+          title: 'Select Person',
+          searchFields: 'id,firstName,lastName,name.first,name.last,email,personId',
+          context
+        })
+      };
+      const config = (presetFactory[role] || presetFactory.staff)();
+      config.multiselect = false;
+      config.onSelect = (selected) => {
+        const item = Array.isArray(selected) ? selected[0] : selected;
+        if (!item) return;
+        const personId = resolvePickerPersonId(item, role);
+        const recordId = String(item?.id || '').trim();
+        const label = displayNameForPickerItem(item, role);
+        if (requesterPersonId) requesterPersonId.value = personId;
+        if (requesterRecordId) requesterRecordId.value = recordId;
+        if (requesterName) requesterName.value = label;
+        if (requesterPickerLabel) requesterPickerLabel.value = label;
+      };
+      GenericPicker.open(config);
+    }
+
+    function clearRequesterPick() {
+      if (requesterPersonId) requesterPersonId.value = '';
+      if (requesterRecordId) requesterRecordId.value = '';
+      if (requesterName) requesterName.value = '';
+      if (requesterPickerLabel) requesterPickerLabel.value = '';
+    }
+
+    function isDirty() {
+      if (!form || !initial) return false;
+      const current = new FormData(form);
+      return ['startDate', 'endDate', 'allDay', 'startTime', 'endTime', 'reason', 'details'].some((key) => {
+        return String(initial.get(key) || '') !== String(current.get(key) || '');
+      });
+    }
+
+    durationDays?.addEventListener('change', toggleTimeFields);
+    durationHours?.addEventListener('change', toggleTimeFields);
+    if (btnPickRequester) requesterRole?.addEventListener('change', clearRequesterPick);
+    btnPickRequester?.addEventListener('click', pickRequester);
+    toggleTimeFields();
+
+    form?.addEventListener('submit', async (event) => {
+      if (requesterRole && !requesterPersonId?.value) {
+        event.preventDefault();
+        await showLeaveRequestMessage({
+          title: 'Requester Required',
+          icon: 'warning',
+          message: escapeHtml('Pick a requester before saving the leave request.')
+        });
+        return;
+      }
+      if (!wasApproved || confirmInput.value === 'true' || !isDirty()) return;
+      event.preventDefault();
+      const ok = await confirmLeaveRequestMessage({
+        title: 'Approval Required Again',
+        message: 'Changing an approved leave request requires approval again. The last approved snapshot will remain active until this change is reviewed.',
+        confirmText: 'Continue',
+        confirmClass: 'btn-warning'
+      });
+      if (!ok) {
+        return;
+      }
+      confirmInput.value = 'true';
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+    });
+  })();
+</script>

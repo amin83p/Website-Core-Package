@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '../../..');
 const SCHOOL_RUNTIME_ROOT = path.join(ROOT_DIR, 'packages/school/MVC');
 const SCHOOL_CONFIG_ACCESS_CONSTANTS_PATH = path.resolve(ROOT_DIR, 'packages/school/config/accessConstants.js');
 const DEEP_CORE_REQUIRE_PATTERN = /require\(\s*['"](?:\.\.\/){5}(?:MVC|config)\//g;

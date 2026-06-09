@@ -4,6 +4,7 @@ const postingPolicyService = require('./postingPolicyService');
 const academicSnapshotService = require('./academicSnapshotService');
 const indexService = require('./schoolIndexService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
+const leaveRequestService = require('./leaveRequestService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { recordTransactionOperation } = requireCoreModule('MVC/services/transactionContextService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -22,6 +23,37 @@ function isApprovedProgramRegistrationStatus(status) {
 
 function isActiveTermStatus(status) {
   return normalizeStatus(status) === 'active';
+}
+
+async function assertStudentLeaveDoesNotOverlapClass({ classItem, student, reqUser } = {}) {
+  const personId = toPublicId(student?.personId);
+  const classId = toPublicId(classItem?.id);
+  if (!personId || !classId) return;
+
+  const sessions = await schoolDataService.getClassSessions(classId, reqUser);
+  const windows = (Array.isArray(sessions) ? sessions : [])
+    .map((session, index) => ({
+      sessionIndex: index,
+      personId,
+      personName: [student?.firstName, student?.lastName].map((part) => String(part || '').trim()).filter(Boolean).join(' ') || personId,
+      date: String(session?.date || '').trim(),
+      startTime: String(session?.startTime || '').trim(),
+      endTime: String(session?.endTime || '').trim()
+    }))
+    .filter((window) => window.date && window.startTime && window.endTime);
+  if (!windows.length) return;
+
+  const conflicts = await leaveRequestService.findApprovedLeaveConflicts({
+    orgId: classItem?.orgId,
+    windows,
+    reqUser
+  });
+  if (!conflicts.length) return;
+
+  const first = conflicts[0];
+  throw new Error(
+    `Student has approved leave overlapping class ${classId} on ${first.date} (${first.leaveLabel || 'approved leave'}).`
+  );
 }
 
 function resolveProgramTermRow(program, termId) {
@@ -747,6 +779,8 @@ const registrationIntegrityService = {
       const existingRow = activeExistingResult.row || {};
       return { classId, enrollmentId: String(existingRow?.enrollmentId || existingRow?.id || ''), reused: true };
     }
+
+    await assertStudentLeaveDoesNotOverlapClass({ classItem, student, reqUser });
 
     const pricingSnapshot = {
       currency: String(classPreview?.pricing?.currency || 'CAD'),

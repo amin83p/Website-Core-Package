@@ -1,0 +1,209 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: 'school/leave-requests',
+  newLabel: 'New Leave Request',
+  newHref: '/school/leave-requests/new',
+  user,
+  tableName: 'school_leave_requests',
+  btn_export: true,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary mb-2 btn-md"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
+  ]
+}) %>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search leave requests...',
+  fields: [
+    { name: 'status', label: 'Status', type: 'select', options: statuses || [] },
+    { name: 'reason', label: 'Reason', type: 'select', options: Object.keys(reasons || {}) }
+  ]
+}) %>
+
+<input type="hidden" id="leaveRequestActionStateId" value="<%= actionStateId || '' %>">
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Request</th>
+        <th>Person</th>
+        <th>Window</th>
+        <th>Reason</th>
+        <th>Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!leaveRequests || leaveRequests.length === 0) { %>
+        <tr><td colspan="6" class="text-center py-4 text-muted">No leave requests found.</td></tr>
+      <% } %>
+      <% (leaveRequests || []).forEach((row) => { %>
+        <% const status = String(row.status || '').toLowerCase(); %>
+        <% const reasonLabel = (reasons || {})[row.reason] || row.reason || '-'; %>
+        <% let badge = 'bg-secondary'; %>
+        <% if (status === 'approved') badge = 'bg-success'; %>
+        <% if (status === 'submitted' || status === 'pending_reapproval') badge = 'bg-warning text-dark'; %>
+        <% if (status === 'rejected' || status === 'cancelled') badge = 'bg-danger'; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-primary"><a href="/school/leave-requests/detail/<%= row.id %>"><%= row.id %></a></div>
+            <div class="small text-muted">Requested: <%= row.requestDate || '-' %></div>
+            <div class="x-small text-muted">Revision: <%= row.revisionNo || 1 %></div>
+          </td>
+          <td>
+            <div class="fw-bold"><%= row.requesterName || row.requesterPersonId || '-' %></div>
+            <div class="small text-muted"><%= row.requesterRole || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= row.requesterPersonId || '-' %></div>
+          </td>
+          <td class="small">
+            <div><%= row.startDate || '-' %><%= row.endDate && row.endDate !== row.startDate ? ' to ' + row.endDate : '' %></div>
+            <% if (row.allDay === false) { %>
+              <div class="text-muted"><%= row.startTime || '--:--' %> - <%= row.endTime || '--:--' %></div>
+            <% } else { %>
+              <div class="text-muted">All day</div>
+            <% } %>
+          </td>
+          <td class="small"><%= reasonLabel %></td>
+          <td><span class="badge <%= badge %>"><%= status.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN' %></span></td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= row.id %>" title="Leave Request Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <a href="/school/leave-requests/detail/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-eye me-2"></i>Details</a>
+                <% if (!['rejected', 'cancelled'].includes(status)) { %>
+                  <a href="/school/leave-requests/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <% } %>
+                <% if (canManageAll && ['submitted', 'pending_reapproval'].includes(status)) { %>
+                  <button class="btn btn-outline-success btn-sm leave-request-action" data-action="approve" data-id="<%= row.id %>"><i class="bi bi-check2-circle me-2"></i>Approve</button>
+                  <button class="btn btn-outline-danger btn-sm leave-request-action" data-action="reject" data-id="<%= row.id %>"><i class="bi bi-x-circle me-2"></i>Reject</button>
+                <% } %>
+                <% if (!['rejected', 'cancelled'].includes(status)) { %>
+                  <button class="btn btn-outline-danger btn-sm leave-request-action" data-action="cancel" data-id="<%= row.id %>"><i class="bi bi-slash-circle me-2"></i>Cancel</button>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<div class="row align-items-center mt-3 bg-white p-3 border rounded shadow-sm g-0">
+  <div class="col-md-12 text-center text-md-start">
+    <span class="text-muted small" style="font-weight: 500;">
+      Showing <span class="text-dark"><%= (leaveRequests || []).length %></span> request(s)
+    </span>
+  </div>
+</div>
+
+<span id="urlRef" data-id="school/leave-requests" hidden></span>
+<%- include('partials/tablePages-end') %>
+
+<script>
+  (function () {
+    const token = document.getElementById('leaveRequestActionStateId')?.value || '';
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
+    async function showLeaveRequestMessage({ title, message, icon = 'info', buttons, size = 'md' } = {}) {
+      if (typeof window.showMessageModal === 'function') {
+        return window.showMessageModal({
+          title: title || 'Leave Request',
+          icon,
+          message: message || '',
+          size,
+          buttons: buttons && buttons.length ? buttons : [{ text: 'OK', class: 'btn-primary' }]
+        });
+      }
+      console.warn(`${title || 'Leave Request'}: ${message || ''}`);
+      return buttons?.[0]?.text || 'OK';
+    }
+
+    async function requestReviewNote(action) {
+      const isApprove = action === 'approve';
+      const confirmText = isApprove ? 'Approve' : 'Reject';
+      const noteId = `leaveReviewNote_${Date.now()}`;
+      const result = await showLeaveRequestMessage({
+        title: `${confirmText} Leave Request`,
+        icon: isApprove ? 'success' : 'warning',
+        size: 'lg',
+        message: `
+          <label class="form-label" for="${noteId}">Optional review note</label>
+          <textarea class="form-control" id="${noteId}" rows="4" maxlength="2000" placeholder="Add a note for the request lifecycle"></textarea>
+        `,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: confirmText, class: isApprove ? 'btn-success' : 'btn-danger' }
+        ]
+      });
+      if (result !== confirmText) return null;
+      return document.getElementById(noteId)?.value || '';
+    }
+
+    async function confirmCancel() {
+      const result = await showLeaveRequestMessage({
+        title: 'Cancel Leave Request',
+        icon: 'warning',
+        message: 'Cancel this leave request?',
+        buttons: [
+          { text: 'Keep Request', class: 'btn-secondary' },
+          { text: 'Cancel Request', class: 'btn-danger' }
+        ]
+      });
+      return result === 'Cancel Request';
+    }
+
+    async function postAction(action, id, note = '') {
+      const response = await fetch(`/school/leave-requests/api/${encodeURIComponent(id)}/${encodeURIComponent(action)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Ajax-Request': 'true',
+          'X-Action-State-Id': token
+        },
+        body: JSON.stringify({ actionStateId: token, note })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status === 'error') {
+        await showLeaveRequestMessage({
+          title: 'Leave Request',
+          icon: 'error',
+          message: escapeHtml(payload.message || 'The leave request could not be updated.'),
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+        return;
+      }
+      window.location.reload();
+    }
+
+    document.querySelectorAll('.leave-request-action').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const action = button.dataset.action || '';
+        const id = button.dataset.id || '';
+        if (!action || !id) return;
+        if (action === 'cancel') {
+          const confirmed = await confirmCancel();
+          if (!confirmed) return;
+          await postAction(action, id);
+          return;
+        }
+        const note = ['approve', 'reject'].includes(action) ? await requestReviewNote(action) : '';
+        if (note === null) return;
+        await postAction(action, id, note);
+      });
+    });
+  })();
+</script>

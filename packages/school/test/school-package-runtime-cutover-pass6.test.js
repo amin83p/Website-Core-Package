@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(__dirname, '../../..');
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');

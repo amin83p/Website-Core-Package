@@ -26,6 +26,7 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/sessions(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SESSIONS },
     { pattern: /^\/school\/attendances(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_ATTENDANCES },
     { pattern: /^\/school\/grades-matrix(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_GRADEBOOK },
+    { pattern: /^\/school\/leave-requests(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_LEAVE_REQUESTS },
     { pattern: /^\/school\/holidays(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_HOLIDAYS },
     { pattern: /^\/school\/payRates(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_PAY_RATES },
     { pattern: /^\/school\/session-statuses(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SESSION_STATUSES },
@@ -329,6 +330,16 @@ async function showDashboard(req, res) {
                 href: '/school/holidays',
                 buttonLabel: 'Manage Holidays',
                 icon: 'bi-calendar-x-fill',
+                subtleClass: 'bg-danger-subtle text-danger',
+                buttonClass: 'btn btn-danger'
+            },
+            {
+                priority: 185,
+                title: 'Leave Requests',
+                description: 'Submit and review student, teacher, and staff leave requests with schedule blocking after approval.',
+                href: '/school/leave-requests',
+                buttonLabel: 'Open Leave Requests',
+                icon: 'bi-calendar-x',
                 subtleClass: 'bg-danger-subtle text-danger',
                 buttonClass: 'btn btn-danger'
             },
