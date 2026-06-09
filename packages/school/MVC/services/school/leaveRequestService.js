@@ -36,6 +36,24 @@ function getActiveOrgId(user) {
   return toPublicId(user?.activeOrgId || user?.activeOrganization?.id || user?.primaryOrgId || '');
 }
 
+function isSystemOrgId(value) {
+  const normalized = String(value || '').trim().toUpperCase().replace(/^ORG_/, '');
+  return normalized === 'SYSTEM';
+}
+
+function canCreateRequest(reqUser) {
+  return !isSystemOrgId(getActiveOrgId(reqUser));
+}
+
+function assertCreateAllowed(reqUser) {
+  if (!canCreateRequest(reqUser)) {
+    const error = new Error('Leave requests cannot be created in the System organization.');
+    error.code = 'LEAVE_REQUESTS_SYSTEM_ORG_BLOCKED';
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
 function getActorId(user) {
   return toPublicId(user?.id || user?._id || user?.userId || user?.username || '');
 }
@@ -273,6 +291,7 @@ async function listVisibleRequests(reqUser, filters = {}) {
 }
 
 function buildCreatePayload(reqUser, input = {}) {
+  assertCreateAllowed(reqUser);
   const admin = isAdminViewer(reqUser);
   const ownPersonId = getRequesterPersonId(reqUser);
   const requesterRoleOptions = getRequesterRoleOptions(reqUser);
@@ -660,6 +679,8 @@ async function getApprovedLeaveEventsForPerson({ orgId, personId, startDate, end
 module.exports = {
   ACTIVE_REVIEW_STATUSES,
   getActiveOrgId,
+  canCreateRequest,
+  assertCreateAllowed,
   isAdminViewer,
   getRequesterRoleOptions,
   getSelfRequesterContext,

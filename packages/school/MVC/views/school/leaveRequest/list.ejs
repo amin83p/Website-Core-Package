@@ -1,7 +1,7 @@
 <%- include('partials/tablePages-start', {
   title,
   newUrl: 'school/leave-requests',
-  newLabel: 'New Leave Request',
+  newLabel: canCreateRequest ? 'New Leave Request' : null,
   newHref: '/school/leave-requests/new',
   user,
   tableName: 'school_leave_requests',

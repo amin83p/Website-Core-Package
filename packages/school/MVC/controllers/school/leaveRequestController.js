@@ -61,6 +61,7 @@ function baseViewModel(req, res, extra = {}) {
     requesterRoleOptions,
     selfRequester: leaveRequestService.getSelfRequesterContext(req.user),
     canManageAll: leaveRequestService.isAdminViewer(req.user),
+    canCreateRequest: leaveRequestService.canCreateRequest(req.user),
     schoolSectionDashboardHref: resLocalSchoolDashboard(res),
     ...extra
   };
@@ -85,6 +86,7 @@ async function showList(req, res) {
 
 async function showNewForm(req, res) {
   try {
+    leaveRequestService.assertCreateAllowed(req.user);
     return res.render('school/leaveRequest/form', baseViewModel(req, res, {
       title: 'New Leave Request',
       mode: 'create',
