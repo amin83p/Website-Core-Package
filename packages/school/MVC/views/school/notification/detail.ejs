@@ -177,6 +177,9 @@
           <% } else if (canManageNotificationStatus) { %>
             <button class="btn btn-warning notification-status-action" data-status="open" data-id="<%= row.id %>"><i class="bi bi-arrow-counterclockwise me-1"></i> Reopen</button>
           <% } %>
+          <% if (canManageAllNotifications) { %>
+            <button class="btn btn-outline-danger notification-delete-action" data-id="<%= row.id %>"><i class="bi bi-trash3 me-1"></i> Delete</button>
+          <% } %>
         </div>
       </div>
 
@@ -426,6 +429,19 @@
       return document.getElementById(noteId)?.value || '';
     }
 
+    async function confirmDelete() {
+      const result = await showNotificationMessage({
+        title: 'Delete Notification',
+        icon: 'warning',
+        message: 'Delete this notification permanently?',
+        buttons: [
+          { text: 'Keep Notification', class: 'btn-secondary' },
+          { text: 'Delete Notification', class: 'btn-danger' }
+        ]
+      });
+      return result === 'Delete Notification';
+    }
+
     async function postJson(url, body) {
       const response = await fetch(url, {
         method: 'POST',
@@ -447,6 +463,30 @@
       }
       window.location.reload();
       return true;
+    }
+
+    async function deleteNotification() {
+      const confirmed = await confirmDelete();
+      if (!confirmed) return;
+      const response = await fetch(`/school/notifications/api/${encodeURIComponent(notificationId)}/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Ajax-Request': 'true'
+        },
+        body: JSON.stringify({})
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status === 'error') {
+        await showNotificationMessage({
+          title: 'School Notifications',
+          icon: 'error',
+          message: escapeHtml(payload.message || 'The notification could not be deleted.'),
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+        return;
+      }
+      window.location.href = '/school/notifications';
     }
 
     async function reassignNotification(personId, personName) {
@@ -536,6 +576,10 @@
           });
         });
       });
+    });
+
+    document.querySelector('.notification-delete-action')?.addEventListener('click', async () => {
+      await deleteNotification();
     });
 
     document.getElementById('btnPickTaskAssignee')?.addEventListener('click', async () => {

@@ -624,6 +624,35 @@ async function cancelRequest(reqUser, id, note = '') {
   return updated;
 }
 
+async function deleteRequest(reqUser, id) {
+  assertAdmin(reqUser);
+  const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser));
+  if (!existing) {
+    const error = new Error('Leave request was not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+  try {
+    await notificationService.deleteSourceNotification({
+      orgId: existing.orgId,
+      sourceType: 'leave_request',
+      sourceId: existing.id
+    }, reqUser);
+  } catch (error) {
+    console.warn(`School notification sync skipped for delete leave request ${existing.id || ''}: ${error.message}`);
+  }
+  const removed = await schoolRepositories.leaveRequests.remove(existing.id, normalizeQueryScope(reqUser));
+  if (removed === false) {
+    const error = new Error('Leave request could not be deleted.');
+    error.statusCode = 404;
+    throw error;
+  }
+  return {
+    id: existing.id,
+    removed: removed !== false
+  };
+}
+
 async function syncLeaveRequestNotification(action, row, reqUser, options = {}) {
   try {
     if (action === 'resolve') {
@@ -815,6 +844,7 @@ module.exports = {
   approveRequest,
   rejectRequest,
   cancelRequest,
+  deleteRequest,
   getActiveApprovedSnapshot,
   findApprovedLeaveConflicts,
   getApprovedLeaveEventsForPerson,

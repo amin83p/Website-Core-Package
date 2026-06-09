@@ -84,6 +84,9 @@
                 <% if (!['rejected', 'cancelled'].includes(status)) { %>
                   <button class="btn btn-outline-danger btn-sm leave-request-action" data-action="cancel" data-id="<%= row.id %>"><i class="bi bi-slash-circle me-2"></i>Cancel</button>
                 <% } %>
+                <% if (canManageAll) { %>
+                  <button class="btn btn-outline-danger btn-sm leave-request-action" data-action="delete" data-id="<%= row.id %>"><i class="bi bi-trash3 me-2"></i>Delete</button>
+                <% } %>
               </div>
             </div>
           </td>
@@ -154,7 +157,24 @@
       return result === 'Cancel Request';
     }
 
+    async function confirmDelete() {
+      const result = await showLeaveRequestMessage({
+        title: 'Delete Leave Request',
+        icon: 'warning',
+        message: 'Delete this leave request permanently? Related notifications will also be removed.',
+        buttons: [
+          { text: 'Keep Request', class: 'btn-secondary' },
+          { text: 'Delete Request', class: 'btn-danger' }
+        ]
+      });
+      return result === 'Delete Request';
+    }
+
     async function postAction(action, id, note = '') {
+      if (action === 'delete') {
+        const confirmed = await confirmDelete();
+        if (!confirmed) return;
+      }
       const response = await fetch(`/school/leave-requests/api/${encodeURIComponent(id)}/${encodeURIComponent(action)}`, {
         method: 'POST',
         headers: {

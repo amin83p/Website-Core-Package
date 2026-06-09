@@ -61,6 +61,13 @@ function isAdminViewer(user) {
   return Boolean(adminChekersService.isSuperAdmin(user) || adminChekersService.isOrgAdmin(user));
 }
 
+function assertAdminViewer(user, action = 'delete this item') {
+  if (isAdminViewer(user)) return;
+  const error = new Error(`You are not authorized to ${action}.`);
+  error.statusCode = 403;
+  throw error;
+}
+
 function isAssignedToActor(notification, user) {
   return idsEqual(notification?.assignedPersonId || '', getActorPersonId(user));
 }
@@ -282,6 +289,45 @@ async function getNotificationById(id, reqUser, options = {}) {
   if (!row) return null;
   assertSameOrg(row, reqUser);
   return enrichNotificationForDisplay(row);
+}
+
+async function deleteSourceNotification(input = {}, reqUser = null) {
+  const orgId = toPublicId(input.orgId || getActiveOrgId(reqUser));
+  const sourceType = cleanString(input.sourceType, 80).toLowerCase();
+  const sourceId = toPublicId(input.sourceId || '');
+  if (!reqUser) {
+    const error = new Error('Request user is required to delete source notifications.');
+    error.statusCode = 403;
+    throw error;
+  }
+  assertAdminViewer(reqUser, 'remove source notification');
+  if (!orgId || !sourceType || !sourceId) return false;
+  const existing = await findBySource({ orgId, sourceType, sourceId });
+  if (!existing) return false;
+  const row = await getNotificationById(existing.id, reqUser);
+  if (!row) return false;
+  const removed = await schoolRepositories.notifications.remove(existing.id, normalizeQueryScope(reqUser));
+  return removed !== false;
+}
+
+async function deleteNotification(reqUser, id) {
+  assertAdminViewer(reqUser, 'delete this notification');
+  const existing = await getNotificationById(id, reqUser);
+  if (!existing) {
+    const error = new Error('Notification was not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+  const removed = await schoolRepositories.notifications.remove(existing.id, normalizeQueryScope(reqUser));
+  if (removed === false) {
+    const error = new Error('Notification could not be deleted.');
+    error.statusCode = 404;
+    throw error;
+  }
+  return {
+    id: toPublicId(existing.id),
+    removed: removed !== false
+  };
 }
 
 async function listVisibleNotifications(reqUser, filters = {}) {
@@ -759,6 +805,8 @@ module.exports = {
   resolveSourceNotification,
   upsertLeaveRequestNotification,
   resolveLeaveRequestNotification,
+  deleteSourceNotification,
+  deleteNotification,
   updateNotificationStatus,
   reassignNotification,
   addNotificationTask,

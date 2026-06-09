@@ -269,6 +269,15 @@ async function updateTask(req, res) {
   }
 }
 
+async function deleteNotification(req, res) {
+  try {
+    const row = await notificationService.deleteNotification(req.user, req.params.id);
+    return res.json({ status: 'success', message: 'Notification deleted.', notification: row });
+  } catch (error) {
+    return sendError(req, res, error, 400);
+  }
+}
+
 module.exports = {
   showList,
   showDetail,
@@ -278,5 +287,6 @@ module.exports = {
   reassignNotification,
   saveRoutingRule,
   addTask,
-  updateTask
+  updateTask,
+  deleteNotification
 };

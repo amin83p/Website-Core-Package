@@ -81,4 +81,11 @@ router.post('/api/:id/cancel',
   leaveRequestController.cancelRequest
 );
 
+router.post('/api/:id/delete',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.DELETE),
+  trackActionState(SECTION, OPERATIONS.DELETE, { requireToken: false, keepActive: true }),
+  leaveRequestController.deleteRequest
+);
+
 module.exports = router;

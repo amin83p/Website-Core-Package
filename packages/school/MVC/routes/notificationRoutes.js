@@ -60,6 +60,13 @@ router.post('/api/:id/assign',
   notificationController.reassignNotification
 );
 
+router.post('/api/:id/delete',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.DELETE),
+  trackActionState(SECTION, OPERATIONS.DELETE, { requireToken: false, keepActive: true }),
+  notificationController.deleteNotification
+);
+
 router.post('/api/routing',
   requireAuth,
   requireAccess(SECTION, OPERATIONS.UPDATE),

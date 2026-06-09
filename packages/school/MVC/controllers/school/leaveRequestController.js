@@ -175,6 +175,15 @@ async function cancelRequest(req, res) {
   }
 }
 
+async function deleteRequest(req, res) {
+  try {
+    const row = await leaveRequestService.deleteRequest(req.user, req.params.id);
+    return res.json({ status: 'success', message: 'Leave request deleted.', request: row });
+  } catch (error) {
+    return sendError(req, res, error, 400);
+  }
+}
+
 module.exports = {
   showList,
   showNewForm,
@@ -184,5 +193,6 @@ module.exports = {
   showDetail,
   approveRequest,
   rejectRequest,
-  cancelRequest
+  cancelRequest,
+  deleteRequest
 };

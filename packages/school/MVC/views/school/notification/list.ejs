@@ -1,5 +1,5 @@
 <%
-  const currentPersonId = String(currentPersonId || '').trim();
+  const currentPersonIdValue = String(currentPersonId || '').trim();
   const headerButtons = [
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary mb-2 btn-md"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
@@ -130,7 +130,7 @@
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
-                <% const rowIsAssignedToCurrent = currentPersonId && currentPersonId === String(row.assignedPersonId || '').trim(); %>
+                <% const rowIsAssignedToCurrent = currentPersonIdValue && currentPersonIdValue === String(row.assignedPersonId || '').trim(); %>
                 <% const canManageRow = canManageAll || rowIsAssignedToCurrent; %>
                 <a href="/school/notifications/detail/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-eye me-2"></i>Details</a>
                 <% if (canManageRow) { %>
@@ -142,6 +142,9 @@
                     <button class="btn btn-outline-secondary btn-sm notification-status-action" data-status="dismissed" data-id="<%= row.id %>"><i class="bi bi-archive me-2"></i>Dismiss</button>
                   <% } else { %>
                     <button class="btn btn-outline-warning btn-sm notification-status-action" data-status="open" data-id="<%= row.id %>"><i class="bi bi-arrow-counterclockwise me-2"></i>Reopen</button>
+                  <% } %>
+                  <% if (canManageAll) { %>
+                    <button class="btn btn-outline-danger btn-sm notification-delete-action" data-id="<%= row.id %>"><i class="bi bi-trash3 me-2"></i>Delete</button>
                   <% } %>
                 <% } %>
               </div>
@@ -234,6 +237,43 @@
       window.location.reload();
     }
 
+    async function confirmDelete() {
+      const result = await showNotificationMessage({
+        title: 'Delete Notification',
+        icon: 'warning',
+        message: 'Delete this notification permanently?',
+        buttons: [
+          { text: 'Keep Notification', class: 'btn-secondary' },
+          { text: 'Delete Notification', class: 'btn-danger' }
+        ]
+      });
+      return result === 'Delete Notification';
+    }
+
+    async function postDelete(id) {
+      const confirmed = await confirmDelete();
+      if (!confirmed) return;
+      const response = await fetch(`/school/notifications/api/${encodeURIComponent(id)}/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Ajax-Request': 'true'
+        },
+        body: JSON.stringify({})
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status === 'error') {
+        await showNotificationMessage({
+          title: 'School Notifications',
+          icon: 'error',
+          message: payload.message || 'The notification could not be deleted.',
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+        return;
+      }
+      window.location.reload();
+    }
+
     document.querySelectorAll('.notification-status-action').forEach((button) => {
       button.addEventListener('click', async () => {
         const id = button.dataset.id || '';
@@ -242,6 +282,14 @@
         const note = await requestNote(status);
         if (note === null) return;
         await postStatus(id, status, note);
+      });
+    });
+
+    document.querySelectorAll('.notification-delete-action').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const id = button.dataset.id || '';
+        if (!id) return;
+        await postDelete(id);
       });
     });
   })();
