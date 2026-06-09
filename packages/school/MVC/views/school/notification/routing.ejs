@@ -209,6 +209,7 @@
         : undefined;
       const config = GenericPickerPresets.person({
         title: 'Select Primary Assignee',
+        apiEndpoint: '/school/notifications/api/eligible-persons',
         searchFields: 'id,firstName,lastName,name.first,name.last,name.preferred,preferredName,email,personId',
         context
       });

@@ -2,10 +2,29 @@ const notificationService = require('../../services/school/notificationService')
 const notificationRoutingRuleService = require('../../services/school/notificationRoutingRuleService');
 const notificationModel = require('../../models/school/notificationModel');
 const routingRuleModel = require('../../models/school/notificationRoutingRuleModel');
+const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
+const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
+const paginate = requireCoreModule('MVC/utils/paginationHelper');
+const { buildDataServiceQuery, normalizeSearchKeyword } = requireCoreModule('MVC/utils/generalTools');
+
+const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function getStatusCode(error, fallback = 500) {
   const status = Number(error?.statusCode || error?.status || fallback);
   return Number.isFinite(status) && status >= 400 && status < 600 ? status : fallback;
+}
+
+function getActiveOrgIdOrThrow(reqUser) {
+  const activeOrgId = String(reqUser?.activeOrgId || '').trim();
+  if (!activeOrgId) {
+    throw new Error('No active organization selected.');
+  }
+  return activeOrgId;
+}
+
+function resolvePersonMembershipOrgIds(person = null) {
+  const list = Array.isArray(person?.organizations) ? person.organizations : [];
+  return list.map((entry) => String(entry?.orgId || '').trim()).filter(Boolean);
 }
 
 function wantsJson(req) {
@@ -129,6 +148,59 @@ async function showRouting(req, res) {
   }
 }
 
+async function listEligiblePersons(req, res) {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const query = await buildDataServiceQuery(req.query);
+    const searchDefaultKeyword = normalizeSearchKeyword(query.q || '');
+    if (query.q === searchDefaultKeyword) query.q = '';
+
+    const persons = await dataServiceGlobal.fetchData('persons', {
+      q: query.q || '',
+      type: query.type || 'contains',
+      searchFields: query.searchFields || 'id,name.first,name.last,name.preferred,preferredName,contact.email'
+    }, req.user, PERSON_QUERY_OPTIONS);
+
+    const mapped = (Array.isArray(persons) ? persons : []).filter((person) => {
+      const orgIds = resolvePersonMembershipOrgIds(person);
+      return orgIds.length === 0 || orgIds.includes(activeOrgId);
+    }).map((person) => {
+      const firstName = String(person?.name?.first || person?.firstName || '').trim();
+      const lastName = String(person?.name?.last || person?.lastName || '').trim();
+      const preferredName = String(person?.name?.preferred || person?.preferredName || '').trim();
+      const personId = String(person?.id || '').trim();
+      const emails = Array.isArray(person?.contact?.emails) ? person.contact.emails : [];
+      const contactEmail = String(person?.contact?.email || person?.email || emails[0]?.email || '').trim();
+      const displayName = preferredName || `${firstName} ${lastName}`.trim() || String(person?.name || person?.displayName || person?.fullName || '').trim() || personId;
+
+      return {
+        id: personId,
+        personId,
+        firstName,
+        lastName,
+        preferredName,
+        email: contactEmail,
+        name: {
+          first: firstName,
+          last: lastName,
+          preferred: preferredName
+        },
+        displayName,
+        organizations: person?.organizations || []
+      };
+    });
+
+    const { data, pagination } = paginate(mapped, query);
+    return res.json({
+      status: 'success',
+      results: data,
+      pagination
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function updateStatus(req, res) {
   try {
     const row = await notificationService.updateNotificationStatus(req.user, req.params.id, buildStatusPayload(req.body || {}));
@@ -183,6 +255,7 @@ module.exports = {
   showList,
   showDetail,
   showRouting,
+  listEligiblePersons,
   updateStatus,
   reassignNotification,
   saveRoutingRule,

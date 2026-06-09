@@ -39,6 +39,13 @@ router.get('/detail/:id',
   notificationController.showDetail
 );
 
+router.get('/api/eligible-persons',
+  requireAuth,
+  requireAccess(SECTION, OPERATIONS.READ_ALL),
+  trackActionState(SECTION, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  notificationController.listEligiblePersons
+);
+
 router.post('/api/:id/status',
   requireAuth,
   requireAccess(SECTION, OPERATIONS.UPDATE),

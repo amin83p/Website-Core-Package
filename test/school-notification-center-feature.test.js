@@ -62,9 +62,12 @@ test('School notification package route, repository, data service, and views are
   assert.match(schoolRoute, /router\.use\('\/notifications', require\('\.\/notificationRoutes'\)\)/);
 
   const notificationRoute = readText('packages/school/MVC/routes/notificationRoutes.js');
+  const notificationController = readText('packages/school/MVC/controllers/school/notificationController.js');
   assert.match(notificationRoute, /SECTIONS\.SCHOOL_NOTIFICATIONS/);
   assert.match(notificationRoute, /requireAccess\(SECTION, OPERATIONS\.READ/);
   assert.match(notificationRoute, /requireAccess\(SECTION, OPERATIONS\.UPDATE/);
+  assert.match(notificationRoute, /router\.get\('\/api\/eligible-persons'/);
+  assert.match(notificationController, /listEligiblePersons/);
   assert.match(notificationRoute, /router\.get\('\/routing'/);
   assert.match(notificationRoute, /router\.post\('\/api\/routing'/);
   assert.match(notificationRoute, /router\.post\('\/api\/:id\/assign'/);
@@ -93,9 +96,11 @@ test('School notification package route, repository, data service, and views are
   assert.match(detailView, /btnReassignNotification/);
   assert.match(detailView, /taskAssignedPersonId/);
   assert.match(detailView, /GenericPickerPresets\.person/);
+  assert.match(detailView, /\/school\/notifications\/api\/eligible-persons/);
   assert.match(detailView, /showMessageModal/);
   assert.match(routingView, /notificationRoutingForm/);
   assert.match(routingView, /GenericPickerPresets\.person/);
+  assert.match(routingView, /\/school\/notifications\/api\/eligible-persons/);
   assert.match(routingView, /showMessageModal/);
   assert.doesNotMatch(listView, /window\.alert|window\.confirm|window\.prompt/);
   assert.doesNotMatch(detailView, /window\.alert|window\.confirm|window\.prompt/);
