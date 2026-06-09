@@ -1009,9 +1009,13 @@ function assertClassOrgAccess(classData, activeOrgId, reqUser) {
     assertOrgAccess(classData, activeOrgId, reqUser, { orgField: 'orgId', allowSystemBypass: true });
 }
 
-async function getClassByIdWithOrgCheck(classId, reqUser) {
+function buildRouteAccessContext(req) {
+    return { scopeId: req?.accessScope || '' };
+}
+
+async function getClassByIdWithOrgCheck(classId, reqUser, accessContext = {}) {
     const activeOrgId = getActiveOrgIdOrThrow(reqUser);
-    const classData = await schoolDataService.getDataById('classes', classId, reqUser);
+    const classData = await schoolDataService.getDataById('classes', classId, reqUser, accessContext);
     if (!classData) throw new Error('Class not found');
     assertClassOrgAccess(classData, activeOrgId, reqUser);
     return { classData, activeOrgId };
@@ -1738,7 +1742,7 @@ async function listClasses(req, res) {
     if(query.q===searchDefaultKeyword) query={};
     const canCreateClasses = await canCreateOrgScopedItem(req.user, { scopeLabel: 'classes' });
 
-    const classes = await schoolDataService.fetchData('classes', query, req.user);
+    const classes = await schoolDataService.fetchData('classes', query, req.user, buildRouteAccessContext(req));
     const orgs = await dataService.fetchData('organizations', {}, req.user);
     const classIds = (Array.isArray(classes) ? classes : []).map((row) => toPublicId(row?.id)).filter(Boolean);
     const periodMetricsMap = await buildClassEnrollmentPeriodMetrics(req.user, classIds);
@@ -1848,7 +1852,7 @@ async function showAddWizardForm(req, res) {
 
 async function showEditForm(req, res) {
   try {
-    const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user);
     const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
     const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
@@ -1904,7 +1908,7 @@ async function showEditForm(req, res) {
 
 async function showEditWizardForm(req, res) {
   try {
-    const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user, buildRouteAccessContext(req));
     const lifecycleContext = await buildClassLifecycleContext(classData, req.user);
     const sessionStatusMeta = await getSessionStatusMetaForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
     const subjects = await schoolDataService.fetchData('subjects', {}, req.user);
@@ -1962,7 +1966,7 @@ async function getClassTemplate(req, res) {
     const sourceClassId = String(req.params.id || '').trim();
     if (!sourceClassId) throw new Error('Class id is required.');
 
-    const { classData } = await getClassByIdWithOrgCheck(sourceClassId, req.user);
+    const { classData } = await getClassByIdWithOrgCheck(sourceClassId, req.user, buildRouteAccessContext(req));
 
     const template = {
       id: String(classData.id || ''),

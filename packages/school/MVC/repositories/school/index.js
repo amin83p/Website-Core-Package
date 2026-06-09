@@ -68,6 +68,99 @@ function readRecordOrgId(record, orgField) {
   return toPublicId(record?.[orgField]);
 }
 
+function readOwnerUserIds(record = {}) {
+  return [
+    record?.ownerUserId,
+    record?.createdBy,
+    record?.createdByUserId,
+    record?.creator?.userId,
+    record?.audit?.createUser
+  ].map((value) => toPublicId(value)).filter(Boolean);
+}
+
+function isRecordOwnedByScopeUser(record = {}, scope = {}) {
+  if (scope?.ownerScoped !== true && !scope?.userId) return true;
+  const scopedUserId = toPublicId(scope?.userId);
+  if (!scopedUserId) return false;
+  return readOwnerUserIds(record).some((ownerId) => idsEqual(ownerId, scopedUserId));
+}
+
+function buildOwnerScopeFilter(scope = {}) {
+  if (scope?.ownerScoped !== true && !scope?.userId) return null;
+  const scopedUserId = toPublicId(scope?.userId);
+  if (!scopedUserId) return { id: '__NO_MATCH__' };
+  return {
+    $or: [
+      { ownerUserId: scopedUserId },
+      { createdBy: scopedUserId },
+      { createdByUserId: scopedUserId },
+      { 'creator.userId': scopedUserId },
+      { 'audit.createUser': scopedUserId }
+    ]
+  };
+}
+
+function getRequestingUserIdFromOptions(options = {}) {
+  return toPublicId(options?.requestingUser?.id || options?.requestingUser?.userId || options?.requestingUser?._id);
+}
+
+function stampCreateOwnershipPayload(raw, options = {}) {
+  if (Array.isArray(raw)) return raw.map((row) => stampCreateOwnershipPayload(row, options));
+  if (!raw || typeof raw !== 'object') return raw;
+  const userId = getRequestingUserIdFromOptions(options);
+  if (!userId) return raw;
+  const nowIso = new Date().toISOString();
+  const payload = { ...raw };
+  const audit = (payload.audit && typeof payload.audit === 'object' && !Array.isArray(payload.audit))
+    ? { ...payload.audit }
+    : {};
+  if (!toPublicId(audit.createUser)) audit.createUser = userId;
+  if (!audit.createDateTime) audit.createDateTime = nowIso;
+  if (!toPublicId(audit.lastUpdateUser)) audit.lastUpdateUser = userId;
+  if (!audit.lastUpdateDateTime) audit.lastUpdateDateTime = nowIso;
+  payload.audit = audit;
+  if (!toPublicId(payload.ownerUserId)) payload.ownerUserId = userId;
+  const creator = (payload.creator && typeof payload.creator === 'object' && !Array.isArray(payload.creator))
+    ? { ...payload.creator }
+    : {};
+  if (!toPublicId(creator.userId)) creator.userId = userId;
+  payload.creator = creator;
+  return payload;
+}
+
+function stampUpdateAuditPayload(raw, options = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const userId = getRequestingUserIdFromOptions(options);
+  if (!userId) return raw;
+  const audit = (raw.audit && typeof raw.audit === 'object' && !Array.isArray(raw.audit))
+    ? { ...raw.audit }
+    : {};
+  return {
+    ...raw,
+    audit: {
+      ...audit,
+      lastUpdateUser: userId,
+      lastUpdateDateTime: new Date().toISOString()
+    }
+  };
+}
+
+function preserveExistingOwnershipFields(merged = {}, existing = {}) {
+  const output = { ...merged };
+  if (toPublicId(existing?.ownerUserId)) output.ownerUserId = existing.ownerUserId;
+  if (toPublicId(existing?.createdBy)) output.createdBy = existing.createdBy;
+  if (toPublicId(existing?.createdByUserId)) output.createdByUserId = existing.createdByUserId;
+  if (existing?.creator && typeof existing.creator === 'object' && toPublicId(existing.creator.userId)) {
+    output.creator = { ...(output.creator || {}), userId: existing.creator.userId };
+  }
+  if (existing?.audit && typeof existing.audit === 'object') {
+    output.audit = { ...(output.audit || {}) };
+    if (toPublicId(existing.audit.createUser)) output.audit.createUser = existing.audit.createUser;
+    if (existing.audit.createDateTime) output.audit.createDateTime = existing.audit.createDateTime;
+  }
+  return output;
+}
+
 function applyOrgScope(rows, scope = {}, options = {}) {
   const list = normalizeRows(rows);
   if (scope?.canViewAll === true) return list;
@@ -82,11 +175,13 @@ function applyOrgScope(rows, scope = {}, options = {}) {
     ? options.resolveOrgId
     : (record) => readRecordOrgId(record, orgField);
 
-  return list.filter((record) => {
+  const orgScopedRows = list.filter((record) => {
     const recordOrgId = toPublicId(resolveOrgId(record));
     if (allowSystemFallback && recordOrgId === 'SYSTEM') return true;
     return idsEqual(recordOrgId, activeOrgId);
   });
+
+  return orgScopedRows.filter((record) => isRecordOwnedByScopeUser(record, scope));
 }
 
 function buildSchoolScopeFilter(scope = {}, options = {}) {
@@ -97,10 +192,17 @@ function buildSchoolScopeFilter(scope = {}, options = {}) {
   if (!activeOrgId) return { id: '__NO_MATCH__' };
 
   const orgField = String(options?.orgField || 'orgId').trim() || 'orgId';
+  const clauses = [];
   if (options?.allowSystemFallback === true) {
-    return { $or: [{ [orgField]: activeOrgId }, { [orgField]: 'SYSTEM' }] };
+    clauses.push({ $or: [{ [orgField]: activeOrgId }, { [orgField]: 'SYSTEM' }] });
+  } else {
+    clauses.push({ [orgField]: activeOrgId });
   }
-  return { [orgField]: activeOrgId };
+  const ownerFilter = buildOwnerScopeFilter(scope);
+  if (ownerFilter) clauses.push(ownerFilter);
+  if (!clauses.length) return {};
+  if (clauses.length === 1) return clauses[0];
+  return { $and: clauses };
 }
 
 function normalizeClassRegistrationModeValue(value) {
@@ -304,14 +406,15 @@ function createSchoolRepository(config) {
       return runByRepositoryBackend(options, {
         json: async () => {
           if (typeof create !== 'function') throw new Error('Create operation is not supported.');
-          return create(data, options);
+          return create(stampCreateOwnershipPayload(data, options), options);
         },
         mongo: async () => {
           if (typeof create !== 'function') throw new Error('Create operation is not supported.');
           const collection = getMongoCollection(collectionName);
+          const stampedData = stampCreateOwnershipPayload(data, options);
           if (Array.isArray(data)) {
             const payloads = [];
-            for (const raw of data) {
+            for (const raw of stampedData) {
               const payload = { ...(raw || {}) };
               // eslint-disable-next-line no-await-in-loop
               payload.id = await generateUniqueStringId(collection, payload.id);
@@ -320,7 +423,7 @@ function createSchoolRepository(config) {
             if (payloads.length) await collection.insertMany(payloads);
             return payloads.map((row) => normalizeMongoDocument(row)).filter(Boolean);
           }
-          const payload = { ...(data || {}) };
+          const payload = { ...(stampedData || {}) };
           payload.id = await generateUniqueStringId(collection, payload.id);
           await collection.insertOne(payload);
           return normalizeMongoDocument(payload);
@@ -332,14 +435,15 @@ function createSchoolRepository(config) {
       return runByRepositoryBackend(options, {
         json: async () => {
           if (typeof update !== 'function') throw new Error('Update operation is not supported.');
-          return update(id, data, options);
+          return update(id, stampUpdateAuditPayload(data, options), options);
         },
         mongo: async () => {
           if (typeof update !== 'function') throw new Error('Update operation is not supported.');
           const collection = getMongoCollection(collectionName);
           const existing = await collection.findOne(resolveMongoIdFilter(id));
           if (!existing) throw new Error('Record not found');
-          const merged = deepMerge(existing, data || {});
+          const incoming = stampUpdateAuditPayload(data, options);
+          const merged = preserveExistingOwnershipFields(deepMerge(existing, incoming || {}), existing);
           merged.id = toPublicId(existing?.id || existing?._id);
           const { _id, ...toSet } = merged;
           await collection.updateOne({ _id: existing._id }, { $set: toSet });

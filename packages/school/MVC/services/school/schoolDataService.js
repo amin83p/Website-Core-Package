@@ -109,26 +109,26 @@ function allowsSystemFallbackEntity(entityType) {
     .includes(String(entityType || ''));
 }
 
-function buildEntityScope(entityType, requestingUser) {
+function buildEntityScope(entityType, requestingUser, accessContext = {}) {
   const allowSystemFallback = allowsSystemFallbackEntity(entityType);
-  return buildSchoolListScope(requestingUser, { allowSystemFallback });
+  return buildSchoolListScope(requestingUser, { allowSystemFallback, accessContext });
 }
 
 const schoolDataService = {
-  fetchData: async (entityType, query, requestingUser) => {
+  fetchData: async (entityType, query, requestingUser, accessContext = {}) => {
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type: ${entityType}`);
 
     return await config.repository.list({
       query: normalizeQueryOptions(query),
-      scope: buildEntityScope(entityType, requestingUser)
+      scope: buildEntityScope(entityType, requestingUser, accessContext)
     });
   },
 
   addData: async (entityType, data, requestingUser, options = {}) => {
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type for add: ${entityType}`);
-    const result = await config.repository.create(data, options);
+    const result = await config.repository.create(data, { ...options, requestingUser });
     recordTransactionOperation(options, {
       type: 'create',
       entityType: String(entityType || ''),
@@ -140,7 +140,7 @@ const schoolDataService = {
   updateData: async (entityType, id, data, requestingUser, options = {}) => {
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type for update: ${entityType}`);
-    const result = await config.repository.update(id, data, options);
+    const result = await config.repository.update(id, data, { ...options, requestingUser });
     recordTransactionOperation(options, {
       type: 'update',
       entityType: String(entityType || ''),
@@ -149,7 +149,7 @@ const schoolDataService = {
     return result;
   },
 
-  getDataById: async (entityType, id, requestingUser) => {
+  getDataById: async (entityType, id, requestingUser, accessContext = {}) => {
     const config = resolveEntityConfig(entityType);
     if (!config) throw new Error(`Unknown school entity type for ID: ${entityType}`);
 
@@ -162,7 +162,7 @@ const schoolDataService = {
         page: 1,
         limit: 1
       }),
-      scope: buildEntityScope(entityType, requestingUser)
+      scope: buildEntityScope(entityType, requestingUser, accessContext)
     });
 
     return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
