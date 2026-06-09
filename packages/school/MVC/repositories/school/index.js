@@ -32,6 +32,8 @@ const studentProgramPriorSubjectModel = require('../../models/school/studentProg
 const studentTermRegistrationModel = require('../../models/school/studentTermRegistrationModel');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
+const notificationModel = require('../../models/school/notificationModel');
+const notificationRoutingRuleModel = require('../../models/school/notificationRoutingRuleModel');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -919,6 +921,48 @@ const schoolRepositories = {
       'details'
     ],
     dateFields: ['requestDate', 'startDate', 'endDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
+  }),
+  notifications: createSchoolRepository({
+    entityName: 'notifications',
+    collectionName: 'schoolNotifications',
+    getAll: notificationModel.getAllNotifications,
+    getById: notificationModel.getNotificationById,
+    create: notificationModel.addNotification,
+    update: notificationModel.updateNotification,
+    remove: notificationModel.deleteNotification,
+    defaultSearchFields: [
+      'id',
+      'orgId',
+      'sourceType',
+      'sourceId',
+      'title',
+      'message',
+      'severity',
+      'status',
+      'assignedRole',
+      'assignedPersonId',
+      'assignedPersonName'
+    ],
+    dateFields: ['dueDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
+  }),
+  notificationRoutingRules: createSchoolRepository({
+    entityName: 'notificationRoutingRules',
+    collectionName: 'schoolNotificationRoutingRules',
+    getAll: notificationRoutingRuleModel.getAllNotificationRoutingRules,
+    getById: notificationRoutingRuleModel.getNotificationRoutingRuleById,
+    create: notificationRoutingRuleModel.addNotificationRoutingRule,
+    update: notificationRoutingRuleModel.updateNotificationRoutingRule,
+    remove: notificationRoutingRuleModel.deleteNotificationRoutingRule,
+    defaultSearchFields: [
+      'id',
+      'orgId',
+      'sourceType',
+      'assigneePersonId',
+      'assigneePersonName',
+      'label',
+      'notes'
+    ],
+    dateFields: ['audit.createDateTime', 'audit.lastUpdateDateTime']
   })
 };
 
@@ -1198,6 +1242,38 @@ schoolRepositories.leaveRequests.clearByOrg = async (orgId, options = {}) => {
       };
     }
   }, 'school.leaveRequests.clearByOrg');
+};
+
+schoolRepositories.notifications.clearByOrg = async (orgId, options = {}) => {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('orgId is required to clear notifications.');
+  return runByRepositoryBackend(options, {
+    json: async () => notificationModel.clearNotificationsByOrg(targetOrgId),
+    mongo: async () => {
+      const collection = getMongoCollection('schoolNotifications');
+      const result = await collection.deleteMany({ orgId: targetOrgId });
+      return {
+        removed: Number(result?.deletedCount || 0),
+        remaining: await collection.countDocuments({})
+      };
+    }
+  }, 'school.notifications.clearByOrg');
+};
+
+schoolRepositories.notificationRoutingRules.clearByOrg = async (orgId, options = {}) => {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('orgId is required to clear notification routing rules.');
+  return runByRepositoryBackend(options, {
+    json: async () => notificationRoutingRuleModel.clearNotificationRoutingRulesByOrg(targetOrgId),
+    mongo: async () => {
+      const collection = getMongoCollection('schoolNotificationRoutingRules');
+      const result = await collection.deleteMany({ orgId: targetOrgId });
+      return {
+        removed: Number(result?.deletedCount || 0),
+        remaining: await collection.countDocuments({})
+      };
+    }
+  }, 'school.notificationRoutingRules.clearByOrg');
 };
 
 schoolRepositories.reportInstances.clearByOrg = async (orgId, options = {}) => {
@@ -1751,6 +1827,8 @@ assertQueryableCrudRepository('schoolRepositories.studentProgramRegistrations', 
 assertQueryableCrudRepository('schoolRepositories.studentTermRegistrations', schoolRepositories.studentTermRegistrations);
 assertQueryableCrudRepository('schoolRepositories.classEnrollmentPeriods', schoolRepositories.classEnrollmentPeriods);
 assertQueryableCrudRepository('schoolRepositories.leaveRequests', schoolRepositories.leaveRequests);
+assertQueryableCrudRepository('schoolRepositories.notifications', schoolRepositories.notifications);
+assertQueryableCrudRepository('schoolRepositories.notificationRoutingRules', schoolRepositories.notificationRoutingRules);
 
 module.exports = schoolRepositories;
 

@@ -149,12 +149,12 @@ test('School leave request form uses role-aware requester picker and hourly leav
   assert.doesNotMatch(detail, /window\.alert|window\.confirm|window\.prompt/);
 });
 
-test('School leave request requester role helpers scope normal users to their own roles', () => {
+test('School leave request requester role helpers scope normal users to their own roles', async () => {
   const service = require('../packages/school/MVC/services/school/leaveRequestService');
   const requester = {
     id: 'U-1',
-    personId: 'P-1',
-    displayName: 'Alex Requester',
+    personId: '144922',
+    displayName: '900000_student_1772254486524_1@sample.school.local',
     role: 'member',
     roles: ['school_teacher'],
     activeOrgId: '900000',
@@ -165,9 +165,9 @@ test('School leave request requester role helpers scope normal users to their ow
   };
 
   assert.deepEqual(service.getRequesterRoleOptions(requester), ['teacher', 'staff']);
-  assert.deepEqual(service.getSelfRequesterContext(requester), {
-    requesterPersonId: 'P-1',
-    requesterName: 'Alex Requester',
+  assert.deepEqual(await service.getSelfRequesterContext(requester), {
+    requesterPersonId: '144922',
+    requesterName: 'Hossein Norouzi',
     requesterRole: 'teacher',
     requesterRoles: ['teacher', 'staff']
   });

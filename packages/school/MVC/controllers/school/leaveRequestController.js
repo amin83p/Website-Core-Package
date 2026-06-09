@@ -49,7 +49,7 @@ function buildFormPayload(body = {}) {
   return payload;
 }
 
-function baseViewModel(req, res, extra = {}) {
+async function baseViewModel(req, res, extra = {}) {
   const requesterRoleOptions = leaveRequestService.getRequesterRoleOptions(req.user);
   return {
     user: req.user,
@@ -59,7 +59,7 @@ function baseViewModel(req, res, extra = {}) {
     reasons: leaveRequestModel.LEAVE_REQUEST_REASON_LABELS,
     requesterRoles: leaveRequestModel.REQUESTER_ROLES,
     requesterRoleOptions,
-    selfRequester: leaveRequestService.getSelfRequesterContext(req.user),
+    selfRequester: await leaveRequestService.getSelfRequesterContext(req.user),
     canManageAll: leaveRequestService.isAdminViewer(req.user),
     canCreateRequest: leaveRequestService.canCreateRequest(req.user),
     schoolSectionDashboardHref: resLocalSchoolDashboard(res),
@@ -74,7 +74,7 @@ function resLocalSchoolDashboard(res) {
 async function showList(req, res) {
   try {
     const leaveRequests = await leaveRequestService.listVisibleRequests(req.user, req.query);
-    return res.render('school/leaveRequest/list', baseViewModel(req, res, {
+    return res.render('school/leaveRequest/list', await baseViewModel(req, res, {
       title: 'Leave Requests',
       leaveRequests,
       filters: req.query || {}
@@ -87,7 +87,7 @@ async function showList(req, res) {
 async function showNewForm(req, res) {
   try {
     leaveRequestService.assertCreateAllowed(req.user);
-    return res.render('school/leaveRequest/form', baseViewModel(req, res, {
+    return res.render('school/leaveRequest/form', await baseViewModel(req, res, {
       title: 'New Leave Request',
       mode: 'create',
       request: null,
@@ -110,7 +110,7 @@ async function createRequest(req, res) {
 async function showEditForm(req, res) {
   try {
     const request = await leaveRequestService.getRequestById(req.params.id, req.user);
-    return res.render('school/leaveRequest/form', baseViewModel(req, res, {
+    return res.render('school/leaveRequest/form', await baseViewModel(req, res, {
       title: 'Edit Leave Request',
       mode: 'edit',
       request,
@@ -138,7 +138,7 @@ async function updateRequest(req, res) {
 async function showDetail(req, res) {
   try {
     const request = await leaveRequestService.getRequestById(req.params.id, req.user);
-    return res.render('school/leaveRequest/detail', baseViewModel(req, res, {
+    return res.render('school/leaveRequest/detail', await baseViewModel(req, res, {
       title: 'Leave Request Detail',
       request,
       canApprove: leaveRequestService.isAdminViewer(req.user)

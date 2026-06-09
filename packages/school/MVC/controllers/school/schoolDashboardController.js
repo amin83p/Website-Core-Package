@@ -27,6 +27,7 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/attendances(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_ATTENDANCES },
     { pattern: /^\/school\/grades-matrix(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_GRADEBOOK },
     { pattern: /^\/school\/leave-requests(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_LEAVE_REQUESTS },
+    { pattern: /^\/school\/notifications(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_NOTIFICATIONS },
     { pattern: /^\/school\/holidays(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_HOLIDAYS },
     { pattern: /^\/school\/payRates(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_PAY_RATES },
     { pattern: /^\/school\/session-statuses(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SESSION_STATUSES },
@@ -342,6 +343,16 @@ async function showDashboard(req, res) {
                 icon: 'bi-calendar-x',
                 subtleClass: 'bg-danger-subtle text-danger',
                 buttonClass: 'btn btn-danger'
+            },
+            {
+                priority: 187,
+                title: 'Notification Center',
+                description: 'Review school notifications and manage embedded follow-up tasks.',
+                href: '/school/notifications',
+                buttonLabel: 'Open Notifications',
+                icon: 'bi-bell-fill',
+                subtleClass: 'bg-warning-subtle text-warning',
+                buttonClass: 'btn btn-warning'
             },
             // Payroll / Faculty Admin
             {

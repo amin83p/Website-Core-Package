@@ -1,5 +1,7 @@
 const schoolRepositories = require('../../repositories/school');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
+const notificationService = require('./notificationService');
+const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
@@ -59,12 +61,18 @@ function getActorId(user) {
 }
 
 function getActorName(user) {
-  const direct = cleanString(user?.displayName || user?.fullName || user?.username || user?.email, 160);
+  const direct = cleanString(user?.displayName || user?.fullName, 160);
   if (direct) return direct;
   if (user?.name && typeof user.name === 'object') {
     return cleanString(`${user.name.first || ''} ${user.name.last || ''}`, 160);
   }
   return getActorId(user) || 'System';
+}
+
+async function resolveActorName(user) {
+  return personDisplayNameService.resolveUserDisplayName(user, {
+    fallback: getActorId(user) || 'System'
+  });
 }
 
 function isAdminViewer(user) {
@@ -172,11 +180,14 @@ function getRequesterRoleOptions(user) {
   return roles.length ? roles : ['staff'];
 }
 
-function getSelfRequesterContext(user) {
+async function getSelfRequesterContext(user) {
   const requesterRoles = getRequesterRoleOptions(user);
+  const requesterPersonId = getRequesterPersonId(user);
   return {
-    requesterPersonId: getRequesterPersonId(user),
-    requesterName: getActorName(user),
+    requesterPersonId,
+    requesterName: await personDisplayNameService.resolvePersonDisplayName(requesterPersonId, {
+      fallback: requesterPersonId
+    }),
     requesterRole: requesterRoles[0] || 'staff',
     requesterRoles
   };
@@ -205,12 +216,12 @@ function normalizeQueryScope(reqUser, query = {}) {
   };
 }
 
-function buildLifecycleEvent({ action, actorUser, oldStatus = '', newStatus = '', note = '', snapshot = {} }) {
+async function buildLifecycleEvent({ action, actorUser, oldStatus = '', newStatus = '', note = '', snapshot = {} }) {
   return {
     at: new Date().toISOString(),
     action: cleanString(action, 60),
     actorId: getActorId(actorUser),
-    actorName: getActorName(actorUser),
+    actorName: await resolveActorName(actorUser),
     oldStatus: cleanString(oldStatus, 40),
     newStatus: cleanString(newStatus, 40),
     note: cleanString(note, 1000),
@@ -265,11 +276,65 @@ function assertAdmin(reqUser) {
   throw error;
 }
 
+async function enrichLifecycleForDisplay(lifecycle = []) {
+  const events = Array.isArray(lifecycle) ? lifecycle : [];
+  return Promise.all(events.map(async (event) => {
+    const actorName = await personDisplayNameService.resolveUserIdDisplayName(event?.actorId, {
+      fallback: cleanString(event?.actorName || event?.actorId || 'System', 160)
+    });
+    return { ...event, actorName };
+  }));
+}
+
+async function enrichApprovalForDisplay(approval = null) {
+  if (!approval || typeof approval !== 'object') return approval;
+  const next = { ...approval };
+  if (next.approvedBy) {
+    next.approvedByName = await personDisplayNameService.resolveUserIdDisplayName(next.approvedBy, {
+      fallback: cleanString(next.approvedByName || next.approvedBy, 160)
+    });
+  }
+  if (next.rejectedBy) {
+    next.rejectedByName = await personDisplayNameService.resolveUserIdDisplayName(next.rejectedBy, {
+      fallback: cleanString(next.rejectedByName || next.rejectedBy, 160)
+    });
+  }
+  if (next.cancelledBy) {
+    next.cancelledByName = await personDisplayNameService.resolveUserIdDisplayName(next.cancelledBy, {
+      fallback: cleanString(next.cancelledByName || next.cancelledBy, 160)
+    });
+  }
+  return next;
+}
+
+async function enrichLeaveRequestForDisplay(row, reqUser = null) {
+  if (!row || typeof row !== 'object') return row;
+  const requesterPersonId = toPublicId(row.requesterPersonId);
+  const requesterName = await personDisplayNameService.resolvePersonDisplayName(requesterPersonId, {
+    fallback: requesterPersonId || row.requesterName || ''
+  });
+  const next = {
+    ...row,
+    requesterName: requesterName || cleanString(row.requesterName || requesterPersonId, 160),
+    lifecycle: await enrichLifecycleForDisplay(row.lifecycle),
+    approval: await enrichApprovalForDisplay(row.approval)
+  };
+  if (next.lastApprovedSnapshot && typeof next.lastApprovedSnapshot === 'object') {
+    next.lastApprovedSnapshot = {
+      ...next.lastApprovedSnapshot,
+      requesterName: await personDisplayNameService.resolvePersonDisplayName(next.lastApprovedSnapshot.requesterPersonId || requesterPersonId, {
+        fallback: next.lastApprovedSnapshot.requesterName || requesterName || requesterPersonId
+      })
+    };
+  }
+  return next;
+}
+
 async function getRequestById(id, reqUser, options = {}) {
   const row = await schoolRepositories.leaveRequests.getById(id, options);
   if (!row) return null;
   assertCanView(row, reqUser);
-  return row;
+  return enrichLeaveRequestForDisplay(row, reqUser);
 }
 
 async function listVisibleRequests(reqUser, filters = {}) {
@@ -285,12 +350,13 @@ async function listVisibleRequests(reqUser, filters = {}) {
   if (requesterPersonId) query.requesterPersonId = requesterPersonId;
 
   const rows = await schoolRepositories.leaveRequests.list(normalizeQueryScope(reqUser, query));
-  return (Array.isArray(rows) ? rows : [])
+  const sorted = (Array.isArray(rows) ? rows : [])
     .filter((row) => !orgId || idsEqual(row?.orgId, orgId))
     .sort((a, b) => String(b?.audit?.createDateTime || b?.requestDate || '').localeCompare(String(a?.audit?.createDateTime || a?.requestDate || '')));
+  return Promise.all(sorted.map((row) => enrichLeaveRequestForDisplay(row, reqUser)));
 }
 
-function buildCreatePayload(reqUser, input = {}) {
+async function buildCreatePayload(reqUser, input = {}) {
   assertCreateAllowed(reqUser);
   const admin = isAdminViewer(reqUser);
   const ownPersonId = getRequesterPersonId(reqUser);
@@ -301,13 +367,16 @@ function buildCreatePayload(reqUser, input = {}) {
   if (!requesterPersonId) {
     throw new Error('Your user account is not linked to a person record.');
   }
+  const requesterName = await personDisplayNameService.resolvePersonDisplayName(requesterPersonId, {
+    fallback: admin ? cleanString(input.requesterName || requesterPersonId, 160) : requesterPersonId
+  });
 
   return {
     ...input,
     orgId: getActiveOrgId(reqUser),
     requesterPersonId,
     requesterRecordId: admin ? cleanString(input.requesterRecordId, 100) : '',
-    requesterName: admin ? cleanString(input.requesterName || getActorName(reqUser), 160) : getActorName(reqUser),
+    requesterName,
     requesterRole: inferRequesterRole(reqUser, input.requesterRole, { allowedRoles: requesterRoleOptions }),
     status: 'submitted',
     requestDate: cleanDate(input.requestDate) || new Date().toISOString().slice(0, 10),
@@ -316,7 +385,7 @@ function buildCreatePayload(reqUser, input = {}) {
       updatedBy: getActorId(reqUser)
     },
     lifecycle: [
-      buildLifecycleEvent({
+      await buildLifecycleEvent({
         action: 'submitted',
         actorUser: reqUser,
         oldStatus: '',
@@ -328,8 +397,11 @@ function buildCreatePayload(reqUser, input = {}) {
 }
 
 async function createRequest(reqUser, input = {}) {
-  const payload = buildCreatePayload(reqUser, input);
+  const payload = await buildCreatePayload(reqUser, input);
   const created = await schoolRepositories.leaveRequests.create(payload, normalizeQueryScope(reqUser));
+  await syncLeaveRequestNotification('upsert', created, reqUser, {
+    note: 'Leave request submitted.'
+  });
   return created;
 }
 
@@ -345,22 +417,24 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
 
   const wasApproved = String(existing.status || '').toLowerCase() === 'approved';
   const confirmReapproval = normalizeBool(options.confirmReapproval ?? input.confirmReapproval, false);
+  const nextRequesterPersonId = isAdminViewer(reqUser)
+    ? toPublicId(input.requesterPersonId || existing.requesterPersonId)
+    : existing.requesterPersonId;
+  const nextRequesterName = await personDisplayNameService.resolvePersonDisplayName(nextRequesterPersonId, {
+    fallback: cleanString(input.requesterName || existing.requesterName || nextRequesterPersonId, 160)
+  });
   const next = {
     ...existing,
     ...input,
     orgId: existing.orgId,
-    requesterPersonId: isAdminViewer(reqUser)
-      ? toPublicId(input.requesterPersonId || existing.requesterPersonId)
-      : existing.requesterPersonId,
+    requesterPersonId: nextRequesterPersonId,
     requesterRecordId: isAdminViewer(reqUser)
       ? toPublicId(input.requesterRecordId || existing.requesterRecordId)
       : existing.requesterRecordId,
     requesterRole: isAdminViewer(reqUser)
       ? inferRequesterRole(reqUser, input.requesterRole || existing.requesterRole)
       : inferRequesterRole(reqUser, input.requesterRole || existing.requesterRole, { allowedRoles: getRequesterRoleOptions(reqUser) }),
-    requesterName: isAdminViewer(reqUser)
-      ? cleanString(input.requesterName || existing.requesterName, 160)
-      : (existing.requesterName || getActorName(reqUser)),
+    requesterName: nextRequesterName,
     audit: {
       ...(existing.audit || {}),
       updatedBy: getActorId(reqUser)
@@ -383,7 +457,7 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
   next.revisionNo = Math.max(1, Number(existing.revisionNo || 1) + 1);
   next.lifecycle = [
     ...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []),
-    buildLifecycleEvent({
+    await buildLifecycleEvent({
       action: wasApproved && next.status === 'pending_reapproval' ? 'approved_request_modified' : 'request_modified',
       actorUser: reqUser,
       oldStatus: existing.status,
@@ -393,7 +467,18 @@ async function updateRequest(reqUser, id, input = {}, options = {}) {
     })
   ];
 
-  return schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  if (String(updated?.status || '').toLowerCase() === 'pending_reapproval') {
+    await syncLeaveRequestNotification('upsert', updated, reqUser, {
+      severity: 'warning',
+      note: 'Approved leave request was modified and needs reapproval.'
+    });
+  } else if (String(updated?.status || '').toLowerCase() === 'submitted') {
+    await syncLeaveRequestNotification('upsert', updated, reqUser, {
+      note: 'Leave request was modified.'
+    });
+  }
+  return updated;
 }
 
 async function approveRequest(reqUser, id, note = '') {
@@ -402,14 +487,20 @@ async function approveRequest(reqUser, id, note = '') {
   if (!existing) throw new Error('Leave request was not found.');
 
   const now = new Date().toISOString();
+  const actorName = await resolveActorName(reqUser);
+  const requesterPersonId = toPublicId(existing.requesterPersonId);
+  const requesterName = await personDisplayNameService.resolvePersonDisplayName(requesterPersonId, {
+    fallback: existing.requesterName || requesterPersonId
+  });
   const next = {
     ...existing,
+    requesterName,
     status: 'approved',
     adminNote: cleanString(note || existing.adminNote, 5000),
     approval: {
       ...(existing.approval || {}),
       approvedBy: getActorId(reqUser),
-      approvedByName: getActorName(reqUser),
+      approvedByName: actorName,
       approvedAt: now,
       note: cleanString(note, 2000)
     },
@@ -421,7 +512,7 @@ async function approveRequest(reqUser, id, note = '') {
   next.lastApprovedSnapshot = leaveRequestModel.buildLeaveWindowSnapshot(next);
   next.lifecycle = [
     ...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []),
-    buildLifecycleEvent({
+    await buildLifecycleEvent({
       action: 'approved',
       actorUser: reqUser,
       oldStatus: existing.status,
@@ -431,13 +522,19 @@ async function approveRequest(reqUser, id, note = '') {
     })
   ];
 
-  return schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  await syncLeaveRequestNotification('resolve', updated, reqUser, {
+    action: 'leave_request_approved',
+    note: cleanString(note || 'Leave request approved.', 1000)
+  });
+  return updated;
 }
 
 async function rejectRequest(reqUser, id, note = '') {
   assertAdmin(reqUser);
   const existing = await schoolRepositories.leaveRequests.getById(id, normalizeQueryScope(reqUser));
   if (!existing) throw new Error('Leave request was not found.');
+  const actorName = await resolveActorName(reqUser);
 
   const snapshot = existing.lastApprovedSnapshot
     ? { ...existing.lastApprovedSnapshot, active: false }
@@ -450,7 +547,7 @@ async function rejectRequest(reqUser, id, note = '') {
     approval: {
       ...(existing.approval || {}),
       rejectedBy: getActorId(reqUser),
-      rejectedByName: getActorName(reqUser),
+      rejectedByName: actorName,
       rejectedAt: new Date().toISOString(),
       note: cleanString(note, 2000)
     },
@@ -460,7 +557,7 @@ async function rejectRequest(reqUser, id, note = '') {
     },
     lifecycle: [
       ...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []),
-      buildLifecycleEvent({
+      await buildLifecycleEvent({
         action: 'rejected',
         actorUser: reqUser,
         oldStatus: existing.status,
@@ -471,7 +568,12 @@ async function rejectRequest(reqUser, id, note = '') {
     ]
   };
 
-  return schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  await syncLeaveRequestNotification('resolve', updated, reqUser, {
+    action: 'leave_request_rejected',
+    note: cleanString(note || 'Leave request rejected.', 1000)
+  });
+  return updated;
 }
 
 async function cancelRequest(reqUser, id, note = '') {
@@ -481,6 +583,7 @@ async function cancelRequest(reqUser, id, note = '') {
   if (!isAdminViewer(reqUser) && !isOwner(existing, reqUser)) {
     throw new Error('You can only cancel your own leave requests.');
   }
+  const actorName = await resolveActorName(reqUser);
 
   const snapshot = existing.lastApprovedSnapshot
     ? { ...existing.lastApprovedSnapshot, active: false }
@@ -493,7 +596,7 @@ async function cancelRequest(reqUser, id, note = '') {
     approval: {
       ...(existing.approval || {}),
       cancelledBy: getActorId(reqUser),
-      cancelledByName: getActorName(reqUser),
+      cancelledByName: actorName,
       cancelledAt: new Date().toISOString()
     },
     audit: {
@@ -502,7 +605,7 @@ async function cancelRequest(reqUser, id, note = '') {
     },
     lifecycle: [
       ...(Array.isArray(existing.lifecycle) ? existing.lifecycle : []),
-      buildLifecycleEvent({
+      await buildLifecycleEvent({
         action: 'cancelled',
         actorUser: reqUser,
         oldStatus: existing.status,
@@ -513,7 +616,24 @@ async function cancelRequest(reqUser, id, note = '') {
     ]
   };
 
-  return schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  const updated = await schoolRepositories.leaveRequests.update(id, next, normalizeQueryScope(reqUser));
+  await syncLeaveRequestNotification('resolve', updated, reqUser, {
+    action: 'leave_request_cancelled',
+    note: cleanString(note || 'Leave request cancelled.', 1000)
+  });
+  return updated;
+}
+
+async function syncLeaveRequestNotification(action, row, reqUser, options = {}) {
+  try {
+    if (action === 'resolve') {
+      await notificationService.resolveLeaveRequestNotification(row, reqUser, options);
+      return;
+    }
+    await notificationService.upsertLeaveRequestNotification(row, reqUser, options);
+  } catch (error) {
+    console.warn(`School notification sync skipped for leave request ${row?.id || ''}: ${error.message}`);
+  }
 }
 
 function getActiveApprovedSnapshot(row) {

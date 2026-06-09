@@ -263,7 +263,7 @@ async function getAllLeaveRequests() {
 
 async function saveAll(rows) {
   const payload = JSON.stringify(Array.isArray(rows) ? rows : [], null, 2);
-  await queueWrite(dataPath, payload);
+  await queueWrite(async () => fs.writeFile(dataPath, payload));
 }
 
 async function getLeaveRequestById(id) {

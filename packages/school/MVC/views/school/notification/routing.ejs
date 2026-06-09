@@ -1,0 +1,310 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: 'school_notification_routing',
+  btn_export: false,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary mb-2 btn-md"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>',
+    '<a href="/school/notifications" class="school-navigator-dashboard btn btn-outline-secondary mb-2 btn-md"><i class="bi bi-bell me-1"></i> Notifications</a>'
+  ]
+}) %>
+
+<div class="card-container size-md mb-3">
+  <form id="notificationRoutingForm">
+    <input type="hidden" name="id" id="routingRuleId" value="">
+    <input type="hidden" name="assigneePersonId" id="routingAssigneePersonId" value="">
+    <input type="hidden" name="assigneePersonName" id="routingAssigneePersonName" value="">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label" for="routingSourceType">Source Type</label>
+        <select class="form-select" id="routingSourceType" name="sourceType" required>
+          <% (routingSourceTypes || []).forEach((value) => { %>
+            <option value="<%= value %>"><%= String(value).replace(/_/g, ' ') %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="routingAssigneeLabel">Primary Assignee</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-person-check"></i></span>
+          <input class="form-control" id="routingAssigneeLabel" value="" placeholder="Pick a person" readonly>
+          <button class="btn btn-outline-primary" type="button" id="btnPickRoutingAssignee"><i class="bi bi-search me-1"></i> Pick</button>
+          <button class="btn btn-outline-secondary" type="button" id="btnClearRoutingAssignee"><i class="bi bi-x-lg"></i></button>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="routingLabel">Display Label</label>
+        <input class="form-control" id="routingLabel" name="label" maxlength="160" placeholder="Leave Request Reviewer">
+      </div>
+      <div class="col-md-2">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch" id="routingActive" name="active" value="true" checked>
+          <label class="form-check-label" for="routingActive">Active</label>
+        </div>
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="routingNotes">Notes</label>
+        <textarea class="form-control" id="routingNotes" name="notes" rows="3" maxlength="2000"></textarea>
+      </div>
+      <div class="col-12 d-flex justify-content-end gap-2">
+        <button class="btn btn-outline-secondary" type="button" id="btnResetRoutingForm"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i> Save Routing Rule</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Source Type</th>
+        <th>Primary Assignee</th>
+        <th>Label</th>
+        <th>Status</th>
+        <th>Updated</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!rules || rules.length === 0) { %>
+        <tr><td colspan="6" class="text-center py-4 text-muted">No notification routing rules are configured.</td></tr>
+      <% } %>
+      <% (rules || []).forEach((rule) => { %>
+        <tr>
+          <td class="ps-4 text-capitalize"><%= String(rule.sourceType || '').replace(/_/g, ' ') %></td>
+          <td>
+            <div><%= rule.assigneePersonName || rule.assigneePersonId || 'Unassigned' %></div>
+            <% if (rule.assigneePersonId) { %><div class="small text-muted font-monospace"><%= rule.assigneePersonId %></div><% } %>
+          </td>
+          <td><%= rule.label || '-' %></td>
+          <td><span class="badge <%= rule.active === false ? 'bg-secondary' : 'bg-success' %>"><%= rule.active === false ? 'INACTIVE' : 'ACTIVE' %></span></td>
+          <td class="small text-muted"><%= rule.audit?.lastUpdateDateTime || rule.audit?.createDateTime || '-' %></td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= rule.id %>" title="Routing Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= rule.id %>">
+                <button class="btn btn-outline-primary btn-sm routing-edit-action"
+                  data-id="<%= rule.id %>"
+                  data-source-type="<%= rule.sourceType || '' %>"
+                  data-assignee-person-id="<%= rule.assigneePersonId || '' %>"
+                  data-assignee-person-name="<%= rule.assigneePersonName || '' %>"
+                  data-label="<%= rule.label || '' %>"
+                  data-notes="<%= rule.notes || '' %>"
+                  data-active="<%= rule.active === false ? 'false' : 'true' %>">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </button>
+                <button class="btn btn-outline-secondary btn-sm routing-toggle-action"
+                  data-id="<%= rule.id %>"
+                  data-source-type="<%= rule.sourceType || '' %>"
+                  data-assignee-person-id="<%= rule.assigneePersonId || '' %>"
+                  data-assignee-person-name="<%= rule.assigneePersonName || '' %>"
+                  data-label="<%= rule.label || '' %>"
+                  data-notes="<%= rule.notes || '' %>"
+                  data-active="<%= rule.active === false ? 'true' : 'false' %>">
+                  <i class="bi bi-power me-2"></i><%= rule.active === false ? 'Activate' : 'Deactivate' %>
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="school/notifications/routing" hidden></span>
+<%- include('partials/modal_GenericPicker', { user }) %>
+<%- include('partials/tablePages-end') %>
+
+<script>
+  (function () {
+    const form = document.getElementById('notificationRoutingForm');
+    const ruleId = document.getElementById('routingRuleId');
+    const sourceType = document.getElementById('routingSourceType');
+    const assigneeId = document.getElementById('routingAssigneePersonId');
+    const assigneeName = document.getElementById('routingAssigneePersonName');
+    const assigneeLabel = document.getElementById('routingAssigneeLabel');
+    const routingLabel = document.getElementById('routingLabel');
+    const routingNotes = document.getElementById('routingNotes');
+    const routingActive = document.getElementById('routingActive');
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
+    async function showRoutingMessage({ title, message, icon = 'info', buttons, size = 'md' } = {}) {
+      if (typeof window.showMessageModal === 'function') {
+        return window.showMessageModal({
+          title: title || 'Notification Routing',
+          icon,
+          message: message || '',
+          size,
+          buttons: buttons && buttons.length ? buttons : [{ text: 'OK', class: 'btn-primary' }]
+        });
+      }
+      console.warn(`${title || 'Notification Routing'}: ${message || ''}`);
+      return buttons?.[0]?.text || 'OK';
+    }
+
+    function displayNameForPickerItem(item) {
+      const preferredName = String(item?.preferredName || item?.name?.preferred || '').trim();
+      const firstName = String(item?.firstName || item?.name?.first || '').trim();
+      const lastName = String(item?.lastName || item?.name?.last || '').trim();
+      const directName = typeof item?.name === 'string' ? String(item.name).trim() : '';
+      const name = preferredName
+        || [firstName, lastName].filter(Boolean).join(' ').trim()
+        || directName
+        || String(item?.displayName || item?.fullName || '').trim();
+      const id = String(item?.personId || item?.id || '').trim();
+      return id ? `${name || id} (${id})` : (name || 'Selected person');
+    }
+
+    function resetForm() {
+      if (ruleId) ruleId.value = '';
+      if (sourceType) sourceType.value = 'leave_request';
+      if (assigneeId) assigneeId.value = '';
+      if (assigneeName) assigneeName.value = '';
+      if (assigneeLabel) assigneeLabel.value = '';
+      if (routingLabel) routingLabel.value = '';
+      if (routingNotes) routingNotes.value = '';
+      if (routingActive) routingActive.checked = true;
+    }
+
+    function setFormFromDataset(dataset = {}) {
+      if (ruleId) ruleId.value = dataset.id || '';
+      if (sourceType) sourceType.value = dataset.sourceType || 'leave_request';
+      if (assigneeId) assigneeId.value = dataset.assigneePersonId || '';
+      if (assigneeName) assigneeName.value = dataset.assigneePersonName || '';
+      if (assigneeLabel) assigneeLabel.value = dataset.assigneePersonName || dataset.assigneePersonId || '';
+      if (routingLabel) routingLabel.value = dataset.label || '';
+      if (routingNotes) routingNotes.value = dataset.notes || '';
+      if (routingActive) routingActive.checked = dataset.active !== 'false';
+      form?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function pickPerson() {
+      if (!window.GenericPicker || !window.GenericPickerPresets) {
+        await showRoutingMessage({
+          title: 'Person Picker',
+          icon: 'warning',
+          message: 'The person picker is not available on this page. Please refresh and try again.'
+        });
+        return;
+      }
+      const context = (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined;
+      const config = GenericPickerPresets.person({
+        title: 'Select Primary Assignee',
+        searchFields: 'id,firstName,lastName,name.first,name.last,name.preferred,preferredName,email,personId',
+        context
+      });
+      config.multiselect = false;
+      config.onSelect = (selected) => {
+        const item = Array.isArray(selected) ? selected[0] : selected;
+        if (!item) return;
+        const personId = String(item?.personId || item?.id || '').trim();
+        const label = displayNameForPickerItem(item);
+        if (assigneeId) assigneeId.value = personId;
+        if (assigneeName) assigneeName.value = label;
+        if (assigneeLabel) assigneeLabel.value = label;
+      };
+      GenericPicker.open(config);
+    }
+
+    async function postRule(payload) {
+      const response = await fetch('/school/notifications/api/routing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Ajax-Request': 'true'
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.status === 'error') {
+        await showRoutingMessage({
+          title: 'Notification Routing',
+          icon: 'error',
+          message: escapeHtml(data.message || 'The routing rule could not be saved.'),
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+        return false;
+      }
+      window.location.reload();
+      return true;
+    }
+
+    document.getElementById('btnPickRoutingAssignee')?.addEventListener('click', pickPerson);
+    document.getElementById('btnClearRoutingAssignee')?.addEventListener('click', () => {
+      if (assigneeId) assigneeId.value = '';
+      if (assigneeName) assigneeName.value = '';
+      if (assigneeLabel) assigneeLabel.value = '';
+    });
+    document.getElementById('btnResetRoutingForm')?.addEventListener('click', resetForm);
+
+    document.querySelectorAll('.routing-edit-action').forEach((button) => {
+      button.addEventListener('click', () => setFormFromDataset(button.dataset));
+    });
+
+    document.querySelectorAll('.routing-toggle-action').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const action = button.dataset.active === 'false' ? 'Deactivate' : 'Activate';
+        const result = await showRoutingMessage({
+          title: `${action} Routing Rule`,
+          icon: 'warning',
+          message: `${action} this notification routing rule?`,
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: action, class: button.dataset.active === 'false' ? 'btn-warning' : 'btn-primary' }
+          ]
+        });
+        if (result !== action) return;
+        await postRule({
+          id: button.dataset.id || '',
+          sourceType: button.dataset.sourceType || 'leave_request',
+          active: button.dataset.active !== 'false',
+          assigneePersonId: button.dataset.assigneePersonId || '',
+          assigneePersonName: button.dataset.assigneePersonName || '',
+          label: button.dataset.label || '',
+          notes: button.dataset.notes || ''
+        });
+      });
+    });
+
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const active = routingActive?.checked === true;
+      if (active && !String(assigneeId?.value || '').trim()) {
+        await showRoutingMessage({
+          title: 'Assignee Required',
+          icon: 'warning',
+          message: 'Pick a primary assignee before activating this routing rule.'
+        });
+        return;
+      }
+      await postRule({
+        id: ruleId?.value || '',
+        sourceType: sourceType?.value || 'leave_request',
+        active,
+        assigneePersonId: assigneeId?.value || '',
+        assigneePersonName: assigneeName?.value || '',
+        label: routingLabel?.value || '',
+        notes: routingNotes?.value || ''
+      });
+    });
+  })();
+</script>

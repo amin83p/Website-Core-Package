@@ -1,0 +1,532 @@
+<% const row = notification || {}; %>
+<% const status = String(row.status || '').toLowerCase(); %>
+<% const severity = String(row.severity || 'info').toLowerCase(); %>
+<% const tasks = Array.isArray(row.tasks) ? row.tasks : []; %>
+<% const lifecycleEvents = Array.isArray(row.lifecycle) ? row.lifecycle.slice().reverse() : []; %>
+<%
+  const lifecycleMeta = {
+    source_notification_created: { icon: 'bi-bell-fill', tone: 'primary', label: 'Created' },
+    source_notification_reopened: { icon: 'bi-arrow-counterclockwise', tone: 'warning', label: 'Reopened' },
+    source_notification_resolved: { icon: 'bi-check2-circle', tone: 'success', label: 'Resolved' },
+    leave_request_resolved: { icon: 'bi-calendar-check', tone: 'success', label: 'Leave Resolved' },
+    notification_open: { icon: 'bi-envelope-open', tone: 'warning', label: 'Opened' },
+    notification_in_progress: { icon: 'bi-play-circle', tone: 'primary', label: 'In Progress' },
+    notification_resolved: { icon: 'bi-check2-circle', tone: 'success', label: 'Resolved' },
+    notification_dismissed: { icon: 'bi-archive', tone: 'secondary', label: 'Dismissed' },
+    notification_reassigned: { icon: 'bi-person-check', tone: 'primary', label: 'Reassigned' },
+    task_added: { icon: 'bi-plus-circle', tone: 'info', label: 'Task Added' },
+    task_updated: { icon: 'bi-check2-square', tone: 'info', label: 'Task Updated' }
+  };
+  function formatAction(action) {
+    const token = String(action || '').trim();
+    if (!token) return 'Update';
+    return token.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+  }
+  function statusLabel(value) {
+    const token = String(value || '').trim();
+    return token ? token.replace(/_/g, ' ').toUpperCase() : 'NONE';
+  }
+%>
+
+<style>
+  .notification-lifecycle-timeline {
+    position: relative;
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    padding: .25rem 0;
+  }
+  .notification-lifecycle-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: .85rem;
+  }
+  .notification-lifecycle-item:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 23px;
+    top: 48px;
+    bottom: -1rem;
+    width: 2px;
+    background: linear-gradient(180deg, rgba(13, 110, 253, .22), rgba(108, 117, 125, .08));
+  }
+  .notification-lifecycle-marker {
+    position: relative;
+    z-index: 1;
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgba(33, 37, 41, .1);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, .08);
+  }
+  .notification-lifecycle-card {
+    min-width: 0;
+    border: 1px solid rgba(33, 37, 41, .08);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #fff, #fbfcfe);
+    padding: .9rem 1rem;
+  }
+  .notification-task-card {
+    border: 1px solid rgba(33, 37, 41, .08);
+    border-radius: 10px;
+    background: #fff;
+    padding: .9rem 1rem;
+  }
+  @media (max-width: 575.98px) {
+    .notification-lifecycle-item {
+      grid-template-columns: 40px minmax(0, 1fr);
+    }
+    .notification-lifecycle-marker {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+    }
+    .notification-lifecycle-item:not(:last-child)::before {
+      left: 19px;
+      top: 40px;
+    }
+  }
+</style>
+
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Notification <span class="text-muted"><%= row.id %></span></h1>
+      <div class="text-muted"><%= row.title || '-' %></div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="<%= schoolSectionDashboardHref %>" class="btn btn-filled btn-secondary"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>
+      <a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="btn btn-filled btn-secondary"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>
+      <a href="/school/notifications" class="btn btn-outline-secondary"><i class="bi bi-list-ul me-1"></i> Notifications</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+          <h2 class="h5 mb-0">Notification Details</h2>
+          <div class="d-flex flex-wrap gap-2">
+            <span class="badge <%= status === 'resolved' ? 'bg-success' : (status === 'in_progress' ? 'bg-primary' : (status === 'open' ? 'bg-warning text-dark' : 'bg-secondary')) %>"><%= statusLabel(status) %></span>
+            <span class="badge <%= severity === 'urgent' || severity === 'error' ? 'bg-danger' : (severity === 'warning' ? 'bg-warning text-dark' : 'bg-info text-dark') %>"><%= severity.toUpperCase() %></span>
+          </div>
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-4">Message</dt>
+            <dd class="col-sm-8"><%= row.message || '-' %></dd>
+            <dt class="col-sm-4">Source</dt>
+            <dd class="col-sm-8">
+              <div><%= String(row.sourceType || 'manual').replace(/_/g, ' ') %></div>
+              <% if (row.sourceUrl) { %>
+                <a href="<%= row.sourceUrl %>"><%= row.sourceId || 'Open source record' %></a>
+              <% } else { %>
+                <span class="text-muted"><%= row.sourceId || '-' %></span>
+              <% } %>
+            </dd>
+            <dt class="col-sm-4">Assigned</dt>
+            <dd class="col-sm-8">
+              <div><%= row.assignedPersonName || row.assignedPersonId || 'Unassigned' %></div>
+              <% if (row.assignedRole) { %><div class="small text-muted"><%= row.assignedRole %></div><% } %>
+            </dd>
+            <dt class="col-sm-4">Due Date</dt>
+            <dd class="col-sm-8"><%= row.dueDate || '-' %></dd>
+            <% if (row.resolvedAt) { %>
+              <dt class="col-sm-4">Resolved</dt>
+              <dd class="col-sm-8"><%= row.resolvedAt %> by <%= row.resolvedByName || row.resolvedBy || 'System' %></dd>
+            <% } %>
+          </dl>
+        </div>
+        <div class="card-footer bg-white d-flex flex-wrap justify-content-end gap-2">
+          <button class="btn btn-outline-primary" type="button" id="btnReassignNotification"><i class="bi bi-person-check me-1"></i> Reassign</button>
+          <% if (status === 'open') { %>
+            <button class="btn btn-primary notification-status-action" data-status="in_progress" data-id="<%= row.id %>"><i class="bi bi-play-circle me-1"></i> Start</button>
+          <% } %>
+          <% if (status === 'open' || status === 'in_progress') { %>
+            <button class="btn btn-success notification-status-action" data-status="resolved" data-id="<%= row.id %>"><i class="bi bi-check2-circle me-1"></i> Resolve</button>
+            <button class="btn btn-outline-secondary notification-status-action" data-status="dismissed" data-id="<%= row.id %>"><i class="bi bi-archive me-1"></i> Dismiss</button>
+          <% } else { %>
+            <button class="btn btn-warning notification-status-action" data-status="open" data-id="<%= row.id %>"><i class="bi bi-arrow-counterclockwise me-1"></i> Reopen</button>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-white">
+          <h2 class="h5 mb-0">Tasks</h2>
+        </div>
+        <div class="card-body">
+          <% if (!tasks.length) { %>
+            <div class="text-muted mb-3">No tasks are attached to this notification.</div>
+          <% } %>
+          <div class="d-grid gap-3 mb-4">
+            <% tasks.forEach((task) => { %>
+              <% const taskStatus = String(task.status || 'open').toLowerCase(); %>
+              <div class="notification-task-card">
+                <div class="d-flex flex-wrap justify-content-between gap-2">
+                  <div>
+                    <div class="fw-bold"><%= task.title || task.id %></div>
+                    <div class="small text-muted"><%= task.description || '' %></div>
+                    <div class="small mt-1">Assigned: <%= task.assignedPersonName || task.assignedPersonId || 'Unassigned' %></div>
+                    <% if (task.assignedRole) { %><div class="small text-muted"><%= task.assignedRole %></div><% } %>
+                  </div>
+                  <span class="badge align-self-start <%= taskStatus === 'done' ? 'bg-success' : (taskStatus === 'in_progress' ? 'bg-primary' : (taskStatus === 'cancelled' ? 'bg-secondary' : 'bg-warning text-dark')) %>"><%= statusLabel(taskStatus) %></span>
+                </div>
+                <% if (task.note) { %><div class="small text-muted mt-2"><%= task.note %></div><% } %>
+                <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
+                  <button class="btn btn-outline-primary btn-sm notification-task-reassign-action"
+                    data-task-id="<%= task.id %>"
+                    data-status="<%= taskStatus %>"
+                    data-assigned-person-id="<%= task.assignedPersonId || '' %>"
+                    data-assigned-person-name="<%= task.assignedPersonName || '' %>"
+                    data-assigned-role="<%= task.assignedRole || '' %>">
+                    <i class="bi bi-person-check me-1"></i> Reassign
+                  </button>
+                  <% if (taskStatus === 'open') { %>
+                    <button class="btn btn-outline-primary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="in_progress"><i class="bi bi-play-circle me-1"></i> Start</button>
+                  <% } %>
+                  <% if (taskStatus === 'open' || taskStatus === 'in_progress') { %>
+                    <button class="btn btn-outline-success btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="done"><i class="bi bi-check2 me-1"></i> Complete</button>
+                    <button class="btn btn-outline-secondary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="cancelled"><i class="bi bi-slash-circle me-1"></i> Cancel</button>
+                  <% } else { %>
+                    <button class="btn btn-outline-warning btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="open"><i class="bi bi-arrow-counterclockwise me-1"></i> Reopen</button>
+                  <% } %>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+
+          <form id="notificationTaskForm" class="border rounded p-3 bg-light">
+            <h3 class="h6 mb-3">Add Task</h3>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label" for="taskTitle">Task Title</label>
+                <input class="form-control" id="taskTitle" name="title" maxlength="220" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="taskAssigneeLabel">Assignee</label>
+                <div class="input-group">
+                  <input class="form-control" id="taskAssigneeLabel" placeholder="Unassigned" readonly>
+                  <button class="btn btn-outline-primary" type="button" id="btnPickTaskAssignee"><i class="bi bi-search"></i></button>
+                  <button class="btn btn-outline-secondary" type="button" id="btnClearTaskAssignee"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <input type="hidden" id="taskAssignedPersonId" name="assignedPersonId" value="">
+                <input type="hidden" id="taskAssignedPersonName" name="assignedPersonName" value="">
+                <input type="hidden" id="taskAssignedRole" name="assignedRole" value="">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="taskDueDate">Due Date</label>
+                <input class="form-control" type="date" id="taskDueDate" name="dueDate">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="taskDescription">Description</label>
+                <textarea class="form-control" id="taskDescription" name="description" rows="3" maxlength="2000"></textarea>
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-plus-circle me-1"></i> Add Task</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white">
+          <h2 class="h5 mb-0">Lifecycle</h2>
+        </div>
+        <div class="card-body">
+          <% if (!lifecycleEvents.length) { %>
+            <div class="text-muted">No lifecycle entries recorded.</div>
+          <% } %>
+          <div class="notification-lifecycle-timeline">
+            <% lifecycleEvents.forEach((event) => { %>
+              <% const meta = lifecycleMeta[event.action] || { icon: 'bi-clock-history', tone: 'secondary', label: formatAction(event.action) }; %>
+              <div class="notification-lifecycle-item">
+                <div class="notification-lifecycle-marker text-<%= meta.tone %>">
+                  <i class="bi <%= meta.icon %> fs-5"></i>
+                </div>
+                <div class="notification-lifecycle-card">
+                  <div class="d-flex justify-content-between gap-2">
+                    <div>
+                      <div class="fw-bold"><%= meta.label || formatAction(event.action) %></div>
+                      <div class="small text-muted"><%= event.actorName || event.actorId || 'System' %></div>
+                    </div>
+                    <div class="text-end small text-muted">
+                      <div><%= event.at || '-' %></div>
+                      <div><%= statusLabel(event.oldStatus) %> -> <%= statusLabel(event.newStatus) %></div>
+                    </div>
+                  </div>
+                  <% if (event.note) { %>
+                    <div class="small mt-2 text-muted"><%= event.note %></div>
+                  <% } %>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white">
+          <h2 class="h5 mb-0">Task Summary</h2>
+        </div>
+        <div class="card-body small">
+          <div class="d-flex justify-content-between mb-2"><span>Open</span><strong><%= tasks.filter((task) => String(task.status || '').toLowerCase() === 'open').length %></strong></div>
+          <div class="d-flex justify-content-between mb-2"><span>In Progress</span><strong><%= tasks.filter((task) => String(task.status || '').toLowerCase() === 'in_progress').length %></strong></div>
+          <div class="d-flex justify-content-between mb-2"><span>Done</span><strong><%= tasks.filter((task) => String(task.status || '').toLowerCase() === 'done').length %></strong></div>
+          <div class="d-flex justify-content-between"><span>Cancelled</span><strong><%= tasks.filter((task) => String(task.status || '').toLowerCase() === 'cancelled').length %></strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/modal_GenericPicker', { user }) %>
+
+<script>
+  (function () {
+    const notificationId = '<%= row.id %>';
+    const taskForm = document.getElementById('notificationTaskForm');
+    const taskAssigneeId = document.getElementById('taskAssignedPersonId');
+    const taskAssigneeName = document.getElementById('taskAssignedPersonName');
+    const taskAssigneeLabel = document.getElementById('taskAssigneeLabel');
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
+    async function showNotificationMessage({ title, message, icon = 'info', buttons, size = 'md' } = {}) {
+      if (typeof window.showMessageModal === 'function') {
+        return window.showMessageModal({
+          title: title || 'School Notifications',
+          icon,
+          message: message || '',
+          size,
+          buttons: buttons && buttons.length ? buttons : [{ text: 'OK', class: 'btn-primary' }]
+        });
+      }
+      console.warn(`${title || 'School Notifications'}: ${message || ''}`);
+      return buttons?.[0]?.text || 'OK';
+    }
+
+    function displayNameForPickerItem(item) {
+      const preferredName = String(item?.preferredName || item?.name?.preferred || '').trim();
+      const firstName = String(item?.firstName || item?.name?.first || '').trim();
+      const lastName = String(item?.lastName || item?.name?.last || '').trim();
+      const directName = typeof item?.name === 'string' ? String(item.name).trim() : '';
+      const name = preferredName
+        || [firstName, lastName].filter(Boolean).join(' ').trim()
+        || directName
+        || String(item?.displayName || item?.fullName || '').trim();
+      const id = String(item?.personId || item?.id || '').trim();
+      return id ? `${name || id} (${id})` : (name || 'Selected person');
+    }
+
+    async function pickPerson(title, onSelect) {
+      if (!window.GenericPicker || !window.GenericPickerPresets) {
+        await showNotificationMessage({
+          title: 'Person Picker',
+          icon: 'warning',
+          message: 'The person picker is not available on this page. Please refresh and try again.'
+        });
+        return;
+      }
+      const context = (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined;
+      const config = GenericPickerPresets.person({
+        title: title || 'Select Person',
+        searchFields: 'id,firstName,lastName,name.first,name.last,name.preferred,preferredName,email,personId',
+        context
+      });
+      config.multiselect = false;
+      config.onSelect = (selected) => {
+        const item = Array.isArray(selected) ? selected[0] : selected;
+        if (!item) return;
+        const personId = String(item?.personId || item?.id || '').trim();
+        const label = displayNameForPickerItem(item);
+        onSelect({ personId, label });
+      };
+      GenericPicker.open(config);
+    }
+
+    async function requestNote({ status, titlePrefix = 'Update' }) {
+      const noteId = `notificationNote_${Date.now()}`;
+      const result = await showNotificationMessage({
+        title: `${titlePrefix} Notification`,
+        icon: status === 'resolved' || status === 'done' ? 'success' : 'warning',
+        size: 'lg',
+        message: `
+          <label class="form-label" for="${noteId}">Optional note</label>
+          <textarea class="form-control" id="${noteId}" rows="4" maxlength="1000"></textarea>
+        `,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: titlePrefix, class: status === 'resolved' || status === 'done' ? 'btn-success' : 'btn-warning' }
+        ]
+      });
+      if (result !== titlePrefix) return null;
+      return document.getElementById(noteId)?.value || '';
+    }
+
+    async function postJson(url, body) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Ajax-Request': 'true'
+        },
+        body: JSON.stringify(body || {})
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status === 'error') {
+        await showNotificationMessage({
+          title: 'School Notifications',
+          icon: 'error',
+          message: escapeHtml(payload.message || 'The notification could not be updated.'),
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+        return false;
+      }
+      window.location.reload();
+      return true;
+    }
+
+    async function reassignNotification(personId, personName) {
+      return postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/assign`, {
+        assignedPersonId: personId || '',
+        assignedPersonName: personName || '',
+        assignedRole: ''
+      });
+    }
+
+    document.getElementById('btnReassignNotification')?.addEventListener('click', async () => {
+      const result = await showNotificationMessage({
+        title: 'Reassign Notification',
+        icon: 'info',
+        message: 'Pick a person to make them the primary assignee, or clear the assignee.',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary' },
+          { text: 'Clear Assignee', class: 'btn-outline-secondary' },
+          { text: 'Pick Person', class: 'btn-primary' }
+        ]
+      });
+      if (result === 'Clear Assignee') {
+        await reassignNotification('', '');
+        return;
+      }
+      if (result !== 'Pick Person') return;
+      await pickPerson('Select Notification Assignee', async ({ personId, label }) => {
+        await reassignNotification(personId, label);
+      });
+    });
+
+    document.querySelectorAll('.notification-status-action').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const status = button.dataset.status || '';
+        const id = button.dataset.id || notificationId;
+        if (!status || !id) return;
+        const label = status === 'resolved' ? 'Resolve' : (status === 'dismissed' ? 'Dismiss' : 'Update');
+        const note = await requestNote({ status, titlePrefix: label });
+        if (note === null) return;
+        await postJson(`/school/notifications/api/${encodeURIComponent(id)}/status`, { status, note });
+      });
+    });
+
+    document.querySelectorAll('.notification-task-action').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const taskId = button.dataset.taskId || '';
+        const status = button.dataset.status || '';
+        if (!taskId || !status) return;
+        const label = status === 'done' ? 'Complete' : (status === 'cancelled' ? 'Cancel' : 'Update');
+        const note = await requestNote({ status, titlePrefix: label });
+        if (note === null) return;
+        await postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/tasks/${encodeURIComponent(taskId)}`, { status, note });
+      });
+    });
+
+    document.querySelectorAll('.notification-task-reassign-action').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const taskId = button.dataset.taskId || '';
+        if (!taskId) return;
+        const result = await showNotificationMessage({
+          title: 'Reassign Task',
+          icon: 'info',
+          message: 'Pick a person for this task, or clear the assignee.',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Clear Assignee', class: 'btn-outline-secondary' },
+            { text: 'Pick Person', class: 'btn-primary' }
+          ]
+        });
+        if (result === 'Clear Assignee') {
+          await postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/tasks/${encodeURIComponent(taskId)}`, {
+            status: button.dataset.status || '',
+            assignedPersonId: '',
+            assignedPersonName: '',
+            assignedRole: ''
+          });
+          return;
+        }
+        if (result !== 'Pick Person') return;
+        await pickPerson('Select Task Assignee', async ({ personId, label }) => {
+          await postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/tasks/${encodeURIComponent(taskId)}`, {
+            status: button.dataset.status || '',
+            assignedPersonId: personId,
+            assignedPersonName: label,
+            assignedRole: ''
+          });
+        });
+      });
+    });
+
+    document.getElementById('btnPickTaskAssignee')?.addEventListener('click', async () => {
+      await pickPerson('Select Task Assignee', ({ personId, label }) => {
+        if (taskAssigneeId) taskAssigneeId.value = personId;
+        if (taskAssigneeName) taskAssigneeName.value = label;
+        if (taskAssigneeLabel) taskAssigneeLabel.value = label;
+      });
+    });
+
+    document.getElementById('btnClearTaskAssignee')?.addEventListener('click', () => {
+      if (taskAssigneeId) taskAssigneeId.value = '';
+      if (taskAssigneeName) taskAssigneeName.value = '';
+      if (taskAssigneeLabel) taskAssigneeLabel.value = '';
+    });
+
+    taskForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = new FormData(taskForm);
+      const title = String(data.get('title') || '').trim();
+      if (!title) {
+        await showNotificationMessage({
+          title: 'Task Required',
+          icon: 'warning',
+          message: 'Enter a task title before adding the task.'
+        });
+        return;
+      }
+      await postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/tasks`, {
+        title,
+        assignedRole: '',
+        assignedPersonId: String(data.get('assignedPersonId') || '').trim(),
+        assignedPersonName: String(data.get('assignedPersonName') || '').trim(),
+        dueDate: String(data.get('dueDate') || '').trim(),
+        description: String(data.get('description') || '').trim()
+      });
+    });
+  })();
+</script>

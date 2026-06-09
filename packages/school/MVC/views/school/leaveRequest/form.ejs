@@ -234,10 +234,12 @@
     }
 
     function displayNameForPickerItem(item, role) {
+      const preferredName = String(item?.preferredName || item?.name?.preferred || '').trim();
       const firstName = String(item?.firstName || item?.name?.first || '').trim();
       const lastName = String(item?.lastName || item?.name?.last || '').trim();
       const directName = typeof item?.name === 'string' ? String(item.name).trim() : '';
-      const name = [firstName, lastName].filter(Boolean).join(' ').trim()
+      const name = preferredName
+        || [firstName, lastName].filter(Boolean).join(' ').trim()
         || directName
         || String(item?.displayName || item?.fullName || '').trim();
       const code = String(item?.studentNumber || item?.studentCode || item?.teacherCode || item?.staffCode || item?.employeeNo || '').trim();
