@@ -63,21 +63,21 @@ router.post('/edit/:id',
 router.post('/api/:id/approve',
   requireAuth,
   requireAccess(SECTION, OPERATIONS.UPDATE),
-  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   leaveRequestController.approveRequest
 );
 
 router.post('/api/:id/reject',
   requireAuth,
   requireAccess(SECTION, OPERATIONS.UPDATE),
-  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   leaveRequestController.rejectRequest
 );
 
 router.post('/api/:id/cancel',
   requireAuth,
   requireAccess(SECTION, OPERATIONS.UPDATE),
-  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   leaveRequestController.cancelRequest
 );
 

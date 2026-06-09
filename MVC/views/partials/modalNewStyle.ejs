@@ -123,6 +123,10 @@ window.showMessageModal = function({ title = "", icon = null, message = "", size
 
       const keydownHandler = (event) => {
         if (!actionButtons.length) return;
+        const eventTarget = event.target;
+        if (eventTarget && eventTarget.closest && eventTarget.closest('input, textarea, select, [contenteditable="true"]')) {
+          return;
+        }
         const key = String(event.key || '');
         if (key === 'ArrowRight' || key === 'ArrowDown') {
           event.preventDefault();

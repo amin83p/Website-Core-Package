@@ -15,7 +15,6 @@ const resendEmailService = require('../services/resendEmailService');
 const smsProviderService = require('../services/sms/smsProviderService');
 const settingService = require('../services/settingService');
 const appBrandingService = require('../services/appBrandingService');
-const packageNavigationService = require('../services/packageNavigationService');
 const userRepository = require('../repositories/userRepository');
 const microsoftAuthService = require('../services/microsoftAuthService');
 const adminCheckersService = require('../services/adminChekersService');
@@ -397,9 +396,7 @@ function resolvePendingMicrosoftSessionLimit(req) {
 }
 
 function resolveUserDashboardRedirectUrl(user) {
-  return packageNavigationService.getPrimaryDashboardHref(user, {
-    fallback: USER_DASHBOARD_FALLBACK_URL
-  }) || USER_DASHBOARD_FALLBACK_URL;
+  return USER_DASHBOARD_FALLBACK_URL;
 }
 
 function resolvePostLoginRedirectUrl(user) {

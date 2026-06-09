@@ -106,18 +106,6 @@
 
 <script>
   (function () {
-    const token = document.getElementById('leaveRequestActionStateId')?.value || '';
-
-    function escapeHtml(value) {
-      return String(value || '').replace(/[&<>"']/g, (ch) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-      }[ch]));
-    }
-
     async function showLeaveRequestMessage({ title, message, icon = 'info', buttons, size = 'md' } = {}) {
       if (typeof window.showMessageModal === 'function') {
         return window.showMessageModal({
@@ -171,17 +159,16 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Ajax-Request': 'true',
-          'X-Action-State-Id': token
+          'X-Ajax-Request': 'true'
         },
-        body: JSON.stringify({ actionStateId: token, note })
+        body: JSON.stringify({ note })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.status === 'error') {
         await showLeaveRequestMessage({
           title: 'Leave Request',
           icon: 'error',
-          message: escapeHtml(payload.message || 'The leave request could not be updated.'),
+          message: payload.message || 'The leave request could not be updated.',
           buttons: [{ text: 'OK', class: 'btn-danger' }]
         });
         return;

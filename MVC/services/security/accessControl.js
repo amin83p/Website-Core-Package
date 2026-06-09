@@ -1,7 +1,7 @@
 // MVC/services/accessControlService.js
 const { SYSTEM_CONTEXT } = require('../../../config/constants');
 const { SECTIONS } = require('../../../config/accessConstants');
-const dataService = require('../dataService');
+const websitePolicyRepository = require('../../repositories/websitePolicyRepository');
 const { resolveEntity } = require('../../utils/entityResolver');
 const { idsEqual } = require('../../utils/idAdapter');
 const adminAuthorityService = require('../adminAuthorityService');
@@ -61,8 +61,8 @@ async function evaluateAccess({ user, sectionId, operationId, ipAddress }) {
     if (sectionOpConfig) sysOp = { ...sysOp, ...sectionOpConfig };
   }
 
-  // 2.5. WEBSITE GOVERNANCE CHECK (Via DataService)
-  const websitePolicy = await dataService.getWebsitePolicy();
+  // 2.5. WEBSITE GOVERNANCE CHECK
+  const websitePolicy = await websitePolicyRepository.getPolicy();
   let webSectionConfig = null;
   let webOpConfig = null;
 
