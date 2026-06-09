@@ -645,6 +645,7 @@ async function getApprovedLeaveEventsForPerson({ orgId, personId, startDate, end
   }
 
   snapshots.forEach(({ row, snapshot }) => {
+    const requesterRole = cleanString(snapshot.requesterRole || row?.requesterRole, 40);
     let day = snapshot.startDate < rangeStart ? rangeStart : snapshot.startDate;
     const lastDay = snapshot.endDate > rangeEnd ? rangeEnd : snapshot.endDate;
     while (day && day <= lastDay) {
@@ -661,7 +662,9 @@ async function getApprovedLeaveEventsForPerson({ orgId, personId, startDate, end
         duration: snapshot.allDay === false ? computeDurationHours(snapshot.startTime, snapshot.endTime) : 8,
         status: row?.status === 'approved' ? 'approved_leave' : 'approved_leave_snapshot',
         locked: true,
-        roles: ['Leave'],
+        roles: requesterRole ? [requesterRole, 'Leave'] : ['Leave'],
+        requesterRole,
+        schoolRole: requesterRole,
         roleLabel: 'Leave',
         hasOverlap: false,
         eventType: 'leave_request',

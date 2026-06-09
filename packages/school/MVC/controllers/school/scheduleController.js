@@ -171,6 +171,314 @@ function hasInstructorMatch(classRow, personId) {
     return instructors.some((inst) => idsEqual(inst?.personId, normalizedPersonId));
 }
 
+const SCHEDULE_ROLE_META = Object.freeze({
+    student: Object.freeze({ key: 'student', label: 'Student', dataKey: 'students', roleToken: 'school_student' }),
+    teacher: Object.freeze({ key: 'teacher', label: 'Teacher', dataKey: 'teachers', roleToken: 'school_teacher' }),
+    staff: Object.freeze({ key: 'staff', label: 'Staff', dataKey: 'staff', roleToken: 'school_staff' }),
+});
+
+function normalizeScheduleRole(value) {
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    if (!normalized) return '';
+    if (normalized === 'school_student' || normalized === 'student' || normalized === 'students' || normalized.endsWith('school_student') || normalized.includes('school_student')) return 'student';
+    if (normalized === 'school_teacher' || normalized === 'teacher' || normalized === 'teachers' || normalized.endsWith('school_teacher') || normalized.includes('school_teacher')) return 'teacher';
+    if (normalized === 'school_staff' || normalized === 'staff' || normalized === 'staffs' || normalized.endsWith('school_staff') || normalized.includes('school_staff')) return 'staff';
+    return normalized;
+}
+
+function isApprovedLeaveScheduleEvent(event) {
+    return [
+        event?.eventType,
+        event?.targetType,
+        event?.status,
+        event?.role,
+        event?.roleLabel,
+    ].some((value) => {
+        const normalized = String(value || '').trim().toLowerCase();
+        return normalized === 'leave_request'
+            || normalized === 'approved_leave'
+            || normalized === 'approved_leave_snapshot'
+            || normalized === 'leave';
+    });
+}
+
+function scheduleEventMatchesRole(event, requestedRole) {
+    const role = normalizeScheduleRole(requestedRole);
+    if (!role) return true;
+    const candidates = [
+        event?.role,
+        event?.roleLabel,
+        event?.targetRole,
+        event?.schoolRole,
+        event?.requesterRole,
+        ...(Array.isArray(event?.roles) ? event.roles : []),
+    ].map(normalizeScheduleRole).filter(Boolean);
+    return candidates.includes(role);
+}
+
+function filterScheduleEventsForRole(events, requestedRole) {
+    const role = normalizeScheduleRole(requestedRole);
+    if (!role) return Array.isArray(events) ? events : [];
+    return (Array.isArray(events) ? events : []).filter((event) => scheduleEventMatchesRole(event, role));
+}
+
+function getActiveScheduleOrgId(reqUser = {}) {
+    return normalizeId(
+        reqUser.activeOrgId
+        || reqUser.activeOrganizationId
+        || reqUser.currentOrgId
+        || reqUser.currentOrganizationId
+        || reqUser.selectedOrgId
+        || reqUser.orgId
+        || reqUser.organizationId
+        || reqUser.activeOrg?.id
+        || reqUser.organization?.id
+    );
+}
+
+function getUserPersonId(reqUser = {}) {
+    return normalizeId(
+        reqUser.personId
+        || reqUser.person?.id
+        || reqUser.person?._id
+        || reqUser.profile?.personId
+        || reqUser.account?.personId
+    );
+}
+
+function rowBelongsToActiveOrg(row = {}, activeOrgId = '') {
+    const orgId = normalizeId(activeOrgId);
+    if (!orgId) return true;
+    const rowOrgIds = [
+        row.orgId,
+        row.organizationId,
+        row.organizationID,
+        row.orgID,
+        row.schoolOrgId,
+        row.activeOrgId,
+    ].map(normalizeId).filter(Boolean);
+    if (!rowOrgIds.length) return true;
+    return rowOrgIds.some((rowOrgId) => idsEqual(rowOrgId, orgId));
+}
+
+function isActiveSchoolIdentityRow(row = {}) {
+    const status = String(row.status || row.state || '').trim().toLowerCase();
+    return !['archived', 'deleted', 'inactive', 'disabled', 'removed'].includes(status);
+}
+
+function addScheduleRoleOption(roleMap, roleKey, source = 'backend') {
+    const normalized = normalizeScheduleRole(roleKey);
+    const meta = SCHEDULE_ROLE_META[normalized];
+    if (!meta || roleMap.has(normalized)) return;
+    roleMap.set(normalized, { key: meta.key, label: meta.label, source });
+}
+
+function getScheduleViewerName({ person, reqUser, personId }) {
+    return (person ? buildPersonDisplayName(person) : '')
+        || String(reqUser?.displayName || reqUser?.name || reqUser?.fullName || reqUser?.username || '').trim()
+        || personId
+        || '';
+}
+
+async function buildScheduleViewerAccess(reqUser = {}) {
+    const canSelectAnyPerson = Boolean(
+        adminChekersService.isOrgAdmin(reqUser)
+        || (typeof adminChekersService.isAdmin === 'function' && adminChekersService.isAdmin(reqUser))
+        || (typeof adminChekersService.isSuperAdmin === 'function' && adminChekersService.isSuperAdmin(reqUser))
+    );
+    const activeOrgId = getActiveScheduleOrgId(reqUser);
+
+    if (canSelectAnyPerson) {
+        return {
+            canSelectAnyPerson: true,
+            activeOrgId,
+            lockedPersonId: '',
+            lockedPersonName: '',
+            availableRoles: [],
+            selectedRole: '',
+        };
+    }
+
+    const personId = getUserPersonId(reqUser);
+    const roleMap = new Map();
+    let person = null;
+
+    if (personId) {
+        try {
+            const [students, teachers, staffRows] = await Promise.all([
+                schoolDataService.fetchData('students', {}, reqUser),
+                schoolDataService.fetchData('teachers', {}, reqUser),
+                schoolDataService.fetchData('staff', {}, reqUser),
+            ]);
+
+            let persons = [];
+            try {
+                persons = await dataService.fetchData('persons', {}, reqUser);
+            } catch (lookupError) {
+                persons = [];
+            }
+
+            person = (Array.isArray(persons) ? persons : []).find((row) => idsEqual(row?.id, personId) || idsEqual(row?._id, personId)) || null;
+
+            [
+                { key: 'student', rows: students },
+                { key: 'teacher', rows: teachers },
+                { key: 'staff', rows: staffRows },
+            ].forEach(({ key, rows }) => {
+                const hasLinkedRow = (Array.isArray(rows) ? rows : []).some((row) => (
+                    idsEqual(row?.personId, personId)
+                    && rowBelongsToActiveOrg(row, activeOrgId)
+                    && isActiveSchoolIdentityRow(row)
+                ));
+                if (hasLinkedRow) addScheduleRoleOption(roleMap, key, 'school-record');
+            });
+
+            const orgRoles = extractPersonRolesInOrg(person || reqUser.person || reqUser, activeOrgId);
+            (Array.isArray(orgRoles) ? orgRoles : []).forEach((roleToken) => {
+                const role = normalizeScheduleRole(roleToken);
+                if (SCHEDULE_ROLE_META[role]) addScheduleRoleOption(roleMap, role, 'person-role');
+            });
+        } catch (error) {
+            const orgRoles = extractPersonRolesInOrg(reqUser.person || reqUser, activeOrgId);
+            (Array.isArray(orgRoles) ? orgRoles : []).forEach((roleToken) => {
+                const role = normalizeScheduleRole(roleToken);
+                if (SCHEDULE_ROLE_META[role]) addScheduleRoleOption(roleMap, role, 'person-role');
+            });
+        }
+    }
+
+    const availableRoles = Array.from(roleMap.values());
+    return {
+        canSelectAnyPerson: false,
+        activeOrgId,
+        lockedPersonId: personId,
+        lockedPersonName: getScheduleViewerName({ person, reqUser, personId }),
+        availableRoles,
+        selectedRole: availableRoles.length === 1 ? availableRoles[0].key : '',
+    };
+}
+
+async function buildScheduleRoleOptionsForPerson({ personId, activeOrgId, reqUser }) {
+    const normalizedPersonId = normalizeId(personId);
+    const roleMap = new Map();
+    if (!normalizedPersonId) return [];
+
+    try {
+        const [students, teachers, staffRows] = await Promise.all([
+            schoolDataService.fetchData('students', {}, reqUser),
+            schoolDataService.fetchData('teachers', {}, reqUser),
+            schoolDataService.fetchData('staff', {}, reqUser),
+        ]);
+
+        [
+            { key: 'student', rows: students },
+            { key: 'teacher', rows: teachers },
+            { key: 'staff', rows: staffRows },
+        ].forEach(({ key, rows }) => {
+            const hasLinkedRow = (Array.isArray(rows) ? rows : []).some((row) => (
+                idsEqual(row?.personId, normalizedPersonId)
+                && rowBelongsToActiveOrg(row, activeOrgId)
+                && isActiveSchoolIdentityRow(row)
+            ));
+            if (hasLinkedRow) addScheduleRoleOption(roleMap, key, 'school-record');
+        });
+    } catch (error) {
+        // Role discovery should improve the admin filter, not block schedule viewing.
+    }
+
+    try {
+        const persons = await dataService.fetchData('persons', {}, reqUser);
+        const person = (Array.isArray(persons) ? persons : []).find((row) => idsEqual(row?.id, normalizedPersonId) || idsEqual(row?._id, normalizedPersonId)) || null;
+        const orgRoles = person ? extractPersonRolesInOrg(person, activeOrgId) : [];
+        (Array.isArray(orgRoles) ? orgRoles : []).forEach((roleToken) => {
+            const role = normalizeScheduleRole(roleToken);
+            if (SCHEDULE_ROLE_META[role]) addScheduleRoleOption(roleMap, role, 'person-role');
+        });
+    } catch (error) {
+        // Ignore display/profile role lookup failures; school-owned rows above are authoritative enough.
+    }
+
+    return Array.from(roleMap.values());
+}
+
+function getPersonSearchText(person, roleOptions = []) {
+    return [
+        person?.id,
+        person?._id,
+        person?.displayName,
+        person?.fullName,
+        person?.name?.first,
+        person?.name?.middle,
+        person?.name?.last,
+        person?.contact?.email,
+        person?.contact?.primaryEmail,
+        ...(Array.isArray(roleOptions) ? roleOptions.map((role) => role?.label || role?.key) : []),
+    ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean).join(' ');
+}
+
+async function buildSchoolSchedulePersonPickerRows({ activeOrgId, reqUser }) {
+    const [students, teachers, staffRows, persons] = await Promise.all([
+        schoolDataService.fetchData('students', {}, reqUser),
+        schoolDataService.fetchData('teachers', {}, reqUser),
+        schoolDataService.fetchData('staff', {}, reqUser),
+        dataService.fetchData('persons', {}, reqUser, PERSON_QUERY_OPTIONS),
+    ]);
+
+    const roleMapByPersonId = new Map();
+    const addRole = (personId, roleKey, source) => {
+        const normalizedPersonId = normalizeId(personId);
+        if (!normalizedPersonId) return;
+        if (!roleMapByPersonId.has(normalizedPersonId)) roleMapByPersonId.set(normalizedPersonId, new Map());
+        addScheduleRoleOption(roleMapByPersonId.get(normalizedPersonId), roleKey, source);
+    };
+
+    [
+        { key: 'student', rows: students },
+        { key: 'teacher', rows: teachers },
+        { key: 'staff', rows: staffRows },
+    ].forEach(({ key, rows }) => {
+        (Array.isArray(rows) ? rows : []).forEach((row) => {
+            if (!rowBelongsToActiveOrg(row, activeOrgId) || !isActiveSchoolIdentityRow(row)) return;
+            addRole(row?.personId, key, 'school-record');
+        });
+    });
+
+    (Array.isArray(persons) ? persons : []).forEach((person) => {
+        const personId = normalizeId(person?.id || person?._id);
+        if (!personId) return;
+        extractPersonRolesInOrg(person, activeOrgId).forEach((roleToken) => {
+            const role = normalizeScheduleRole(roleToken);
+            if (SCHEDULE_ROLE_META[role]) addRole(personId, role, 'person-role');
+        });
+    });
+
+    const personMap = new Map((Array.isArray(persons) ? persons : []).map((person) => [normalizeId(person?.id || person?._id), person]));
+
+    return Array.from(roleMapByPersonId.entries()).map(([personId, rolesForPerson]) => {
+        const person = personMap.get(personId) || { id: personId };
+        const availableRoles = Array.from(rolesForPerson.values());
+        const displayName = buildPersonDisplayName(person, personId);
+        return {
+            id: personId,
+            personId,
+            firstName: person?.name?.first || '',
+            middleName: person?.name?.middle || '',
+            lastName: person?.name?.last || '',
+            displayName,
+            name: displayName,
+            email: person?.contact?.email || person?.contact?.primaryEmail || '',
+            availableRoles,
+            roles: availableRoles.map((role) => role.key),
+            roleLabels: availableRoles.map((role) => role.label),
+            searchText: getPersonSearchText(person, availableRoles),
+        };
+    }).sort((a, b) => String(a.displayName || a.id).localeCompare(String(b.displayName || b.id)));
+}
+
 function buildTeacherPersonMap(teachers = []) {
     const map = new Map();
     (Array.isArray(teachers) ? teachers : []).forEach((teacher) => {
@@ -890,17 +1198,21 @@ async function showSchedulePage(req, res) {
     try {
         // Intercept Deep Link parameters from the URL
         const { personId, personName, date } = req.query;
+        const viewerScheduleAccess = await buildScheduleViewerAccess(req.user);
+        const safePersonId = viewerScheduleAccess.canSelectAnyPerson ? (personId || '') : (viewerScheduleAccess.lockedPersonId || '');
+        const safePersonName = viewerScheduleAccess.canSelectAnyPerson ? (personName || '') : (viewerScheduleAccess.lockedPersonName || '');
 
         res.render('school/schedule/personSchedule', {
             // Dynamically set the page title if a name is provided
-            title: personName ? `Schedule: ${personName}` : 'Master Schedule Viewer',
+            title: safePersonName ? `Schedule: ${safePersonName}` : 'Master Schedule Viewer',
             includeModal: true,
             user: req.user,
             
             // Pass the variables to the view (fallback to empty strings if null)
-            prefillId: personId || '',
-            prefillName: personName || '',
+            prefillId: safePersonId,
+            prefillName: safePersonName,
             prefillDate: date || '',
+            viewerScheduleAccess,
             //
         });
     } catch (error) {
@@ -910,16 +1222,44 @@ async function showSchedulePage(req, res) {
 
 async function getPersonSchedule(req, res) {
     try {
-        const { personId, startDate, endDate } = req.query;
-        if (!personId || !startDate || !endDate) {
+        const { personId, startDate, endDate, role } = req.query;
+        const viewerScheduleAccess = await buildScheduleViewerAccess(req.user);
+        let effectivePersonId = normalizeId(personId);
+        let effectiveRole = normalizeScheduleRole(role);
+
+        if (!viewerScheduleAccess.canSelectAnyPerson) {
+            if (!viewerScheduleAccess.lockedPersonId) {
+                throw new Error('Your user account is not linked to a school student, staff, or teacher profile.');
+            }
+            if (effectivePersonId && !idsEqual(effectivePersonId, viewerScheduleAccess.lockedPersonId)) {
+                throw new Error('You can only view your own school schedule.');
+            }
+            effectivePersonId = viewerScheduleAccess.lockedPersonId;
+
+            const allowedRoles = (Array.isArray(viewerScheduleAccess.availableRoles) ? viewerScheduleAccess.availableRoles : [])
+                .map((item) => normalizeScheduleRole(item?.key))
+                .filter(Boolean);
+            if (!allowedRoles.length) {
+                throw new Error('Your user account is not linked to a school student, staff, or teacher profile.');
+            }
+            if (!effectiveRole && allowedRoles.length === 1) effectiveRole = allowedRoles[0];
+            if (!effectiveRole && allowedRoles.length > 1) {
+                throw new Error('Select one of your school roles to view this schedule.');
+            }
+            if (effectiveRole && allowedRoles.length && !allowedRoles.includes(effectiveRole)) {
+                throw new Error('You can only view schedule roles attached to your school profile.');
+            }
+        }
+
+        if (!effectivePersonId || !startDate || !endDate) {
             throw new Error('Person ID, Start Date, and End Date are required.');
         }
 
-        const activeOrgId = normalizeId(req.user?.activeOrgId);
+        const activeOrgId = getActiveScheduleOrgId(req.user);
         const statusMeta = await sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(statusMeta);
         const personResult = await buildEventsForPersonAndRange({
-            personId: String(personId || '').trim(),
+            personId: String(effectivePersonId || '').trim(),
             startDate: String(startDate || '').trim(),
             endDate: String(endDate || '').trim(),
             reqUser: req.user,
@@ -927,17 +1267,50 @@ async function getPersonSchedule(req, res) {
             statusMap
         });
 
-        const events = (Array.isArray(personResult?.events) ? personResult.events : []).map((event) => ({
-            ...event,
-            role: event?.roles?.[0] || event?.role || 'Participant',
-            detailsUrl: String(event?.detailsUrl || '').trim() || (
-                event.sessionId
-                    ? `/school/classes/${encodeURIComponent(event.classId)}/sessions/${encodeURIComponent(event.sessionId)}`
-                    : ''
-            )
-        }));
+        const availableRoles = viewerScheduleAccess.canSelectAnyPerson
+            ? await buildScheduleRoleOptionsForPerson({ personId: effectivePersonId, activeOrgId, reqUser: req.user })
+            : (Array.isArray(viewerScheduleAccess.availableRoles) ? viewerScheduleAccess.availableRoles : []);
 
-        res.json({ status: 'success', events, statusMeta });
+        const events = filterScheduleEventsForRole(personResult?.events, effectiveRole).map((event) => {
+            const isLeaveEvent = isApprovedLeaveScheduleEvent(event);
+            return {
+                ...event,
+                role: isLeaveEvent ? 'Leave' : (event?.roles?.[0] || event?.role || 'Participant'),
+                detailsUrl: String(event?.detailsUrl || '').trim() || (
+                    event.sessionId
+                        ? `/school/classes/${encodeURIComponent(event.classId)}/sessions/${encodeURIComponent(event.sessionId)}`
+                        : ''
+                )
+            };
+        });
+
+        res.json({ status: 'success', events, statusMeta, viewerScheduleAccess, availableRoles, selectedRole: effectiveRole });
+    } catch (error) {
+        res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function pickerSchoolSchedulePersons(req, res) {
+    try {
+        const activeOrgId = getActiveScheduleOrgId(req.user);
+        const q = String(req.query.q || req.query.search || '').trim().toLowerCase();
+        const page = Math.max(1, Number(req.query.page || 1) || 1);
+        const pageSize = Math.max(1, Math.min(100, Number(req.query.pageSize || req.query.limit || 25) || 25));
+        const rows = await buildSchoolSchedulePersonPickerRows({ activeOrgId, reqUser: req.user });
+        const filtered = q
+            ? rows.filter((row) => String(row.searchText || '').includes(q))
+            : rows;
+        const start = (page - 1) * pageSize;
+        const items = filtered.slice(start, start + pageSize).map(({ searchText, ...row }) => row);
+        res.json({
+            status: 'success',
+            items,
+            data: items,
+            total: filtered.length,
+            page,
+            pageSize,
+            totalPages: Math.max(1, Math.ceil(filtered.length / pageSize)),
+        });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
     }
@@ -1017,6 +1390,7 @@ module.exports = {
     showMySchedulePage,
     getMyScheduleData,
     getPersonSchedule,
+    pickerSchoolSchedulePersons,
     showGlobalSchedulePage,
     getGlobalSchedule
 };

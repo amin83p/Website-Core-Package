@@ -2,6 +2,121 @@
 <% const status = String(row.status || '').toLowerCase(); %>
 <% const reasonLabel = (reasons || {})[row.reason] || row.reason || '-'; %>
 <% const asid = actionStateId || ''; %>
+<%
+  const lifecycleEvents = Array.isArray(row.lifecycle) ? row.lifecycle.slice().reverse() : [];
+  const lifecycleMeta = {
+    submitted: { icon: 'bi-send-check', tone: 'primary', label: 'Submitted' },
+    request_modified: { icon: 'bi-pencil-square', tone: 'info', label: 'Modified' },
+    approved_request_modified: { icon: 'bi-arrow-repeat', tone: 'warning', label: 'Reapproval Needed' },
+    approved: { icon: 'bi-check2-circle', tone: 'success', label: 'Approved' },
+    rejected: { icon: 'bi-x-circle', tone: 'danger', label: 'Rejected' },
+    cancelled: { icon: 'bi-slash-circle', tone: 'secondary', label: 'Cancelled' }
+  };
+  function formatLifecycleAction(action) {
+    const token = String(action || '').trim();
+    if (!token) return 'Update';
+    return token.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+  }
+  function lifecycleStatusLabel(value) {
+    const token = String(value || '').trim();
+    return token ? token.replace(/_/g, ' ').toUpperCase() : 'NONE';
+  }
+%>
+
+<style>
+  .leave-lifecycle-timeline {
+    position: relative;
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    padding: .25rem 0 .25rem 0;
+  }
+  .leave-lifecycle-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: .85rem;
+  }
+  .leave-lifecycle-item:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 23px;
+    top: 48px;
+    bottom: -1rem;
+    width: 2px;
+    background: linear-gradient(180deg, rgba(13, 110, 253, .22), rgba(108, 117, 125, .08));
+  }
+  .leave-lifecycle-marker {
+    position: relative;
+    z-index: 1;
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgba(33, 37, 41, .1);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, .08);
+  }
+  .leave-lifecycle-card {
+    min-width: 0;
+    border: 1px solid rgba(33, 37, 41, .08);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #fff, #fbfcfe);
+    padding: .9rem 1rem;
+  }
+  .leave-lifecycle-card header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+  }
+  .leave-lifecycle-note {
+    margin-top: .65rem;
+    padding: .65rem .75rem;
+    border-radius: 8px;
+    background: rgba(248, 249, 250, .95);
+    border: 1px solid rgba(33, 37, 41, .06);
+    color: #495057;
+  }
+  .leave-lifecycle-status-chain {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin-top: .55rem;
+    font-size: .78rem;
+  }
+  .leave-lifecycle-status-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: .2rem .55rem;
+    background: #f8f9fa;
+    border: 1px solid rgba(33, 37, 41, .08);
+    color: #495057;
+    font-weight: 600;
+  }
+  @media (max-width: 575.98px) {
+    .leave-lifecycle-item {
+      grid-template-columns: 40px minmax(0, 1fr);
+      gap: .7rem;
+    }
+    .leave-lifecycle-marker {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+    }
+    .leave-lifecycle-item:not(:last-child)::before {
+      left: 19px;
+      top: 40px;
+    }
+    .leave-lifecycle-card header {
+      display: block;
+    }
+  }
+</style>
 
 <div class="container-fluid py-3">
   <input type="hidden" id="leaveRequestActionStateId" value="<%= asid %>">
@@ -68,28 +183,55 @@
       </div>
 
       <div class="card shadow-sm border-0">
-        <div class="card-header bg-white">
-          <h2 class="h5 mb-0">Lifecycle</h2>
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <h2 class="h5 mb-0">Action Timeline</h2>
+            <div class="small text-muted">Most recent activity appears first.</div>
+          </div>
+          <span class="badge bg-light text-dark border"><%= lifecycleEvents.length %> event<%= lifecycleEvents.length === 1 ? '' : 's' %></span>
         </div>
         <div class="card-body">
-          <% if (!row.lifecycle || row.lifecycle.length === 0) { %>
+          <% if (lifecycleEvents.length === 0) { %>
             <div class="text-muted">No lifecycle entries recorded.</div>
           <% } %>
-          <div class="list-group list-group-flush">
-            <% (row.lifecycle || []).slice().reverse().forEach((event) => { %>
-              <div class="list-group-item px-0">
-                <div class="d-flex justify-content-between gap-2">
-                  <div>
-                    <div class="fw-bold"><%= String(event.action || '').replace(/_/g, ' ') || 'Update' %></div>
-                    <div class="small text-muted"><%= event.actorName || event.actorId || 'System' %></div>
-                    <% if (event.note) { %><div class="small"><%= event.note %></div><% } %>
-                  </div>
-                  <div class="text-end small text-muted">
-                    <div><%= event.at || '-' %></div>
-                    <div><%= event.oldStatus || '-' %> -> <%= event.newStatus || '-' %></div>
-                  </div>
+          <div class="leave-lifecycle-timeline">
+            <% lifecycleEvents.forEach((event, index) => { %>
+              <%
+                const actionKey = String(event.action || '').trim().toLowerCase();
+                const meta = lifecycleMeta[actionKey] || { icon: 'bi-clock-history', tone: 'secondary', label: formatLifecycleAction(event.action) };
+              %>
+              <article class="leave-lifecycle-item">
+                <div class="leave-lifecycle-marker text-<%= meta.tone %>">
+                  <i class="bi <%= meta.icon %> fs-5"></i>
                 </div>
-              </div>
+                <div class="leave-lifecycle-card">
+                  <header>
+                    <div>
+                      <div class="d-flex align-items-center flex-wrap gap-2">
+                        <span class="badge bg-<%= meta.tone %><%= meta.tone === 'warning' ? ' text-dark' : '' %>"><%= meta.label %></span>
+                        <% if (index === 0) { %><span class="badge bg-light text-dark border">Latest</span><% } %>
+                      </div>
+                      <div class="fw-bold mt-2"><%= formatLifecycleAction(event.action) %></div>
+                      <div class="small text-muted">
+                        <i class="bi bi-person-circle me-1"></i><%= event.actorName || event.actorId || 'System' %>
+                      </div>
+                    </div>
+                    <div class="text-lg-end small text-muted mt-2 mt-lg-0">
+                      <i class="bi bi-calendar3 me-1"></i><%= event.at || '-' %>
+                    </div>
+                  </header>
+                  <div class="leave-lifecycle-status-chain">
+                    <span class="leave-lifecycle-status-pill"><%= lifecycleStatusLabel(event.oldStatus) %></span>
+                    <i class="bi bi-arrow-right text-muted"></i>
+                    <span class="leave-lifecycle-status-pill"><%= lifecycleStatusLabel(event.newStatus) %></span>
+                  </div>
+                  <% if (event.note) { %>
+                    <div class="leave-lifecycle-note small">
+                      <i class="bi bi-chat-left-text me-1"></i><%= event.note %>
+                    </div>
+                  <% } %>
+                </div>
+              </article>
             <% }) %>
           </div>
         </div>
@@ -121,18 +263,6 @@
 
 <script>
   (function () {
-    const token = document.getElementById('leaveRequestActionStateId')?.value || '';
-
-    function escapeHtml(value) {
-      return String(value || '').replace(/[&<>"']/g, (ch) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-      }[ch]));
-    }
-
     async function showLeaveRequestMessage({ title, message, icon = 'info', buttons, size = 'md' } = {}) {
       if (typeof window.showMessageModal === 'function') {
         return window.showMessageModal({
@@ -186,17 +316,16 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Ajax-Request': 'true',
-          'X-Action-State-Id': token
+          'X-Ajax-Request': 'true'
         },
-        body: JSON.stringify({ actionStateId: token, note })
+        body: JSON.stringify({ note })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.status === 'error') {
         await showLeaveRequestMessage({
           title: 'Leave Request',
           icon: 'error',
-          message: escapeHtml(payload.message || 'The leave request could not be updated.'),
+          message: payload.message || 'The leave request could not be updated.',
           buttons: [{ text: 'OK', class: 'btn-danger' }]
         });
         return;

@@ -181,9 +181,13 @@ const trackActionState = (sectionIdOrName, operationIdOrName, options = {}) => {
                 req.body?.actionStateId ||
                 req.query?.actionStateId ||
                 req.headers['x-action-state-id'];
-            // Only bind to a client-provided token on mutating requests.
-            // For normal GET navigation, stale URL/query tokens should not block page access.
-            const clientProvidedId = isMutatingRequest ? inboundActionStateId : null;
+            const shouldBindClientProvidedToken =
+                isMutatingRequest &&
+                (requiresToken || options.acceptOptionalToken === true || options.acceptClientToken === true);
+            // Only bind to a client-provided token when the route asks for token validation.
+            // Runtime endpoints with requireToken:false create a fresh state, so stale incidental
+            // headers/body fields from shared page plumbing do not block the action.
+            const clientProvidedId = shouldBindClientProvidedToken ? inboundActionStateId : null;
 
             // If multiple IDs are provided, they must agree with the canonical target.
             if (routeId && bodyId && String(routeId) !== String(bodyId)) {

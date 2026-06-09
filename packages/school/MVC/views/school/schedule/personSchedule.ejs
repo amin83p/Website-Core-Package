@@ -17,6 +17,54 @@
     .status-tag-default { background: #e2e3e5; color: #41464b; border-color: #c6c8ca; }
     .role-teacher { background-color: #0dcaf0; color: #000; }
     .role-student { background-color: #0d6efd; color: #fff; }
+    .event-leave {
+        background: linear-gradient(135deg, #fff3bf 0%, #ffd43b 100%);
+        color: #4d3200;
+        border-left-color: #f08c00;
+        border: 1px solid #fcc419;
+        box-shadow: 0 3px 10px rgba(240, 140, 0, 0.22);
+    }
+    .event-leave .session-status-tag {
+        background: rgba(255,255,255,0.75) !important;
+        color: #7a4d00 !important;
+        border-color: rgba(122,77,0,0.2) !important;
+    }
+    .schedule-hours-summary {
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        background: #fff;
+        padding: 0.85rem;
+        margin-top: 0.85rem;
+    }
+    .schedule-hours-summary-title {
+        font-size: 0.75rem;
+        font-weight: 800;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.5rem;
+    }
+    .schedule-hours-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        border-radius: 999px;
+        padding: 0.4rem 0.7rem;
+        font-weight: 800;
+        border: 1px solid transparent;
+        box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
+    }
+    .schedule-hours-dot {
+        width: 0.65rem;
+        height: 0.65rem;
+        border-radius: 999px;
+        background: currentColor;
+    }
+    .hours-category-teacher { background: #cff4fc; color: #055160; border-color: #9eeaf9; }
+    .hours-category-student { background: #cfe2ff; color: #084298; border-color: #9ec5fe; }
+    .hours-category-staff { background: #e2e3e5; color: #41464b; border-color: #c6c8ca; }
+    .hours-category-leave { background: #fff3cd; color: #7a4d00; border-color: #ffda6a; }
+    .hours-category-default { background: #f8f9fa; color: #495057; border-color: #dee2e6; }
     .conflict-zone { position: absolute; top: 0; bottom: 0; background-color: rgba(220, 53, 69, 0.3); border-left: 2px dashed #dc3545; border-right: 2px dashed #dc3545; z-index: 5; pointer-events: none; animation: pulseConflict 2s infinite; }
     
     /* --- CALENDAR CSS (Monthly/Yearly View) --- */
@@ -27,6 +75,8 @@
     .cal-day.active:hover { background-color: #cfe2ff; transform: translateY(-2px); }
     .cal-day.conflict { background-color: #f8d7da; border-color: #f5c2c7; color: #842029; font-weight: bold; cursor: pointer; animation: pulseCal 2s infinite; }
     .cal-day.conflict:hover { background-color: #f1b0b7; transform: translateY(-2px); }
+    .cal-day.leave { background-color: #fff3cd; border-color: #ffc107; color: #664d03; font-weight: bold; cursor: pointer; }
+    .cal-day.leave:hover { background-color: #ffe69c; transform: translateY(-2px); }
     .cal-badge { position: absolute; bottom: 2px; right: 2px; font-size: 0.6rem; padding: 1px 5px; border-radius: 10px; color: white; }
 
     .single-day-list .day-card {
@@ -63,6 +113,10 @@
     }
     .single-day-list .event-row.overlap {
         background: #fff5f5;
+    }
+    .single-day-list .event-row.leave-event {
+        background: linear-gradient(90deg, #fff9db 0%, #ffffff 72%);
+        border-left: 5px solid #f08c00;
     }
     .single-day-list .event-time {
         font-weight: 700;
@@ -105,6 +159,14 @@
 </style>
 
 <div class="sections-page">
+  <%
+    const scheduleAccess = (typeof viewerScheduleAccess !== 'undefined' && viewerScheduleAccess) ? viewerScheduleAccess : {};
+    const canSelectAnyPerson = scheduleAccess.canSelectAnyPerson === true;
+    const scheduleRoles = Array.isArray(scheduleAccess.availableRoles) ? scheduleAccess.availableRoles : [];
+    const defaultRole = scheduleAccess.selectedRole || (scheduleRoles.length >= 1 ? scheduleRoles[0].key : '');
+    const lockedPersonId = scheduleAccess.lockedPersonId || (typeof prefillId !== 'undefined' ? prefillId : '') || '';
+    const lockedPersonName = scheduleAccess.lockedPersonName || (typeof prefillName !== 'undefined' ? prefillName : '') || '';
+  %>
   <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
         <h1 class="page-heading size-md m-0 text-start"><i class="bi bi-calendar-week me-2"></i> Master Schedule Viewer</h1>
@@ -114,24 +176,40 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body bg-light rounded">
             <div class="row align-items-end g-3 mb-3">
-                <div class="col-md-5">
-                    <label class="form-label fw-bold">Select Teacher</label>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold"><%= canSelectAnyPerson ? 'Select Person' : 'Your Schedule Identity' %></label>
                     <div class="input-group">
-                        <input type="hidden" id="sch_personId">
-                        <input type="text" id="sch_personName" class="form-control bg-white" placeholder="Search Teacher..." readonly>
-                        <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker"><i class="bi bi-search"></i></button>
+                        <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
+                        <input type="text" id="sch_personName" class="form-control bg-white" placeholder="<%= canSelectAnyPerson ? 'Search Person...' : 'No linked school profile found' %>" value="<%= lockedPersonName %>" readonly>
+                        <% if (canSelectAnyPerson) { %>
+                            <button type="button" class="btn btn-outline-primary" id="btn_openPersonPicker"><i class="bi bi-search"></i></button>
+                        <% } %>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Role</label>
+                    <select id="sch_role" class="form-select" <%= !canSelectAnyPerson && scheduleRoles.length <= 1 ? 'disabled' : '' %>>
+                        <% if (canSelectAnyPerson) { %>
+                            <option value="">All Roles</option>
+                        <% } %>
+                        <% if (!canSelectAnyPerson && !scheduleRoles.length) { %>
+                            <option value="">No school role found</option>
+                        <% } %>
+                        <% scheduleRoles.forEach((role) => { %>
+                            <option value="<%= role.key %>" <%= role.key === defaultRole ? 'selected' : '' %>><%= role.label %></option>
+                        <% }); %>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label fw-bold">Start Date</label>
                     <input type="date" id="sch_startDate" class="form-control">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label fw-bold">End Date</label>
                     <input type="date" id="sch_endDate" class="form-control">
                 </div>
-                <div class="col-md-1">
-                    <button type="button" id="btn_loadSchedule" class="btn btn-primary w-100 fw-bold">Load</button>
+                <div class="col-md-2">
+                    <button type="button" id="btn_loadSchedule" class="btn btn-primary w-100 fw-bold text-nowrap px-3">Load</button>
                 </div>
             </div>
 
@@ -139,11 +217,17 @@
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="day">Today</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="week">This Week</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="first15">First 15 Days</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="second15">Second 15 Days</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="month">This Month</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="season">Next 3 Months</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary btn-range" data-range="year">This Year</button>
                 </div>
                 <span class="badge bg-white text-muted border" id="viewModeIndicator">Ready</span>
+            </div>
+            <div id="scheduleHoursSummary" class="schedule-hours-summary d-none">
+                <div class="schedule-hours-summary-title">Total Hours By Category</div>
+                <div id="lbl_totalHours" class="d-flex flex-wrap gap-2"></div>
             </div>
         </div>
     </div>
@@ -152,7 +236,6 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div class="d-flex align-items-center gap-3">
                 <h5 class="fw-bold m-0 text-primary" id="scheduleTitle">Schedule</h5>
-                <span id="lbl_totalHours" class="badge bg-info text-dark border fs-6 d-none">Total Hours: 0</span>
             </div>
             <div class="d-flex gap-3 align-items-center small" id="legendContainer">
                 </div>
@@ -175,14 +258,19 @@ document.addEventListener('DOMContentLoaded', () => {
         return sessionStatusMetaMap.get(normalized) || null;
     }
     function getStatusTagStyle(status) {
+        const normalized = normalizeSessionStatus(status);
+        if (normalized === 'approved_leave' || normalized === 'approved_leave_snapshot') {
+            return 'background:#fff3cd;color:#7a4d00;border-color:#f59f00;';
+        }
         const meta = getStatusMeta(status);
         if (!meta) return 'background:#e2e3e5;color:#41464b;border-color:#c6c8ca;';
         return `background:${meta.colorBg || '#e2e3e5'};color:${meta.colorText || '#41464b'};border-color:${meta.colorBorder || '#c6c8ca'};`;
     }
     function formatStatusLabel(status) {
+        const normalized = normalizeSessionStatus(status);
+        if (normalized === 'approved_leave' || normalized === 'approved_leave_snapshot') return 'Approved Leave';
         const meta = getStatusMeta(status);
         if (meta?.label) return meta.label;
-        const normalized = normalizeSessionStatus(status);
         if (normalized === 'holiday') return 'Holiday';
         return normalized.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     }
@@ -193,6 +281,101 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+    const canSelectAnyPerson = <%- JSON.stringify(canSelectAnyPerson) %>;
+    function isLeaveEvent(event) {
+        const candidates = [
+            event?.eventType,
+            event?.targetType,
+            event?.status,
+            event?.role,
+            event?.roleLabel
+        ].map((value) => String(value || '').trim().toLowerCase());
+        return candidates.some((value) => value === 'leave_request' || value === 'approved_leave' || value === 'approved_leave_snapshot' || value === 'leave');
+    }
+    function getEventTitle(event) {
+        return String(event?.className || event?.title || event?.label || event?.classId || 'Schedule Item').trim();
+    }
+    function getEventCategoryLabels(event) {
+        if (isLeaveEvent(event)) return ['Approved Leave'];
+        const labels = [];
+        if (Array.isArray(event?.roles)) {
+            event.roles.forEach((role) => {
+                const label = String(role || '').trim();
+                if (label && !labels.includes(label)) labels.push(label);
+            });
+        }
+        [event?.roleLabel, event?.role].forEach((role) => {
+            String(role || '')
+                .split('/')
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .forEach((label) => {
+                    if (!labels.includes(label)) labels.push(label);
+                });
+        });
+        return labels.length ? labels : ['Schedule'];
+    }
+    function renderCategoryHourTotals(events) {
+        const totals = new Map();
+        (Array.isArray(events) ? events : []).forEach((event) => {
+            const duration = Number(event?.duration || 0);
+            if (!Number.isFinite(duration) || duration <= 0) return;
+            getEventCategoryLabels(event).forEach((label) => {
+                totals.set(label, (totals.get(label) || 0) + duration);
+            });
+        });
+        if (!totals.size) return '';
+        const getCategoryClass = (label) => {
+            const normalized = String(label || '').trim().toLowerCase();
+            if (normalized.includes('leave')) return 'hours-category-leave';
+            if (normalized.includes('teacher')) return 'hours-category-teacher';
+            if (normalized.includes('student')) return 'hours-category-student';
+            if (normalized.includes('staff')) return 'hours-category-staff';
+            return 'hours-category-default';
+        };
+        return Array.from(totals.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([label, hours]) => `
+                <span class="schedule-hours-chip ${getCategoryClass(label)}">
+                    <span class="schedule-hours-dot"></span>
+                    <span>${escapeHtml(label)}: ${hours.toFixed(2)} h</span>
+                </span>
+            `)
+            .join(' ');
+    }
+    function resolvePersonPickerName(item) {
+        const nameValue = item?.displayName || item?.fullName || item?.label || item?.name || '';
+        if (nameValue && typeof nameValue === 'object') {
+            const objectName = `${nameValue.first || ''} ${nameValue.middle || ''} ${nameValue.last || ''}`.replace(/\s+/g, ' ').trim();
+            if (objectName) return objectName;
+        }
+        const direct = String(nameValue || '').trim();
+        if (direct && direct !== '[object Object]') return direct;
+        const fromParts = `${item?.firstName || ''} ${item?.middleName || ''} ${item?.lastName || ''}`.replace(/\s+/g, ' ').trim();
+        return fromParts || String(item?.personId || item?.id || '').trim();
+    }
+    function updateAdminRoleOptions(availableRoles, selectedRole) {
+        if (!canSelectAnyPerson) return;
+        const roleEl = document.getElementById('sch_role');
+        if (!roleEl) return;
+        const currentValue = String(selectedRole || roleEl.value || '').trim();
+        const roles = Array.isArray(availableRoles) ? availableRoles : [];
+        roleEl.innerHTML = '<option value="">All Roles</option>';
+        roles.forEach((role) => {
+            const key = String(role?.key || '').trim();
+            if (!key) return;
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = role?.label || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+            roleEl.appendChild(option);
+        });
+        if (currentValue && Array.from(roleEl.options).some((option) => option.value === currentValue)) {
+            roleEl.value = currentValue;
+        } else {
+            roleEl.value = '';
+        }
+        roleEl.disabled = false;
     }
 
     function buildLifecycleInline(event) {
@@ -251,6 +434,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const day = today.getDay() || 7; 
                 if (day !== 1) start.setHours(-24 * (day - 1)); 
                 end.setTime(start.getTime() + (6 * 24 * 60 * 60 * 1000));
+            } else if (range === 'first15') {
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                end = new Date(today.getFullYear(), today.getMonth(), 15);
+            } else if (range === 'second15') {
+                start = new Date(today.getFullYear(), today.getMonth(), 16);
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
             } else if (range === 'month') {
                 start = new Date(today.getFullYear(), today.getMonth(), 1);
                 end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -271,18 +460,53 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPicker = document.getElementById('btn_openPersonPicker');
     if (btnPicker) {
         btnPicker.addEventListener('click', () => {
-            GenericPicker.open(GenericPickerPresets.teacher({
-                title: 'Select Teacher',
-                placeholder: 'Search teachers...',
+            GenericPicker.open(GenericPickerPresets.normalizeConfig({
+                title: 'Select School Person',
+                icon: 'bi-person-badge',
+                apiEndpoint: '/school/schedules/api/school-person-picker',
+                placeholder: 'Search school people...',
                 context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
+                renderer: (item) => {
+                    const displayName = escapeHtml(resolvePersonPickerName(item) || 'School Person');
+                    const personId = escapeHtml(item?.personId || item?.id || '');
+                    const email = escapeHtml(item?.email || '');
+                    const roleBadges = (Array.isArray(item?.availableRoles) ? item.availableRoles : [])
+                        .map((role) => `<span class="badge bg-primary-subtle text-primary border">${escapeHtml(role?.label || role?.key || '')}</span>`)
+                        .join(' ');
+                    return `
+                        <div class="d-flex justify-content-between align-items-center w-100 gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm fw-bold" style="width:40px;height:40px;">
+                                    ${displayName.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark">${displayName}</div>
+                                    <div class="text-muted small">${email || 'School-linked person'}</div>
+                                    <div class="mt-1 d-flex flex-wrap gap-1">${roleBadges || '<span class="badge bg-light text-muted border">School Role</span>'}</div>
+                                </div>
+                            </div>
+                            <span class="badge bg-light text-secondary border font-monospace">${personId}</span>
+                        </div>
+                    `;
+                },
                 onSelect: (item) => {
-                    const teacherId = item.personId || item.id || '';
-                    const name = `${item.firstName || ''} ${item.lastName || ''}`.trim() || item.name || teacherId;
-                    document.getElementById('sch_personId').value = teacherId;
+                    const selectedPersonId = item.personId || item.id || '';
+                    const name = resolvePersonPickerName(item) || selectedPersonId;
+                    document.getElementById('sch_personId').value = selectedPersonId;
                     document.getElementById('sch_personName').value = name;
                     document.getElementById('scheduleTitle').innerText = `Schedule: ${name}`;
+                    updateAdminRoleOptions(item.availableRoles, '');
                 }
             }));
+        });
+    }
+
+    const roleSelect = document.getElementById('sch_role');
+    if (roleSelect) {
+        roleSelect.addEventListener('change', () => {
+            if (document.getElementById('sch_personId').value && document.getElementById('sch_startDate').value && document.getElementById('sch_endDate').value) {
+                document.getElementById('btn_loadSchedule').click();
+            }
         });
     }
 
@@ -291,6 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const personId = document.getElementById('sch_personId').value;
         const startStr = document.getElementById('sch_startDate').value;
         const endStr = document.getElementById('sch_endDate').value;
+        const role = document.getElementById('sch_role')?.value || '';
 
         if (!personId) { await uiAlert('Please select a person first.'); return; }
 
@@ -299,8 +524,9 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading schedule...</div></div>`;
 
         try {
-            //console.log(`/school/schedules/api/person-schedule?personId=${personId}&startDate=${startStr}&endDate=${endStr}`);
-            const res = await fetch(`/school/schedules/api/person-schedule?personId=${personId}&startDate=${startStr}&endDate=${endStr}`, {
+            const params = new URLSearchParams({ personId, startDate: startStr, endDate: endStr });
+            if (role) params.set('role', role);
+            const res = await fetch(`/school/schedules/api/person-schedule?${params.toString()}`, {
                 headers: { 'X-AJAX-Request': 'true' }
             });
             const result = await res.json();
@@ -309,6 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 : { stop: false };
             if (guarded.stop) return;
             if (result.status !== 'success') throw new Error(result.message);
+            updateAdminRoleOptions(result.availableRoles, result.selectedRole);
             sessionStatusMetaMap = new Map(
                 (Array.isArray(result.statusMeta) ? result.statusMeta : [])
                     .map((row) => [normalizeSessionStatus(row?.code), row])
@@ -319,18 +546,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const lblHours = document.getElementById('lbl_totalHours');
             
             if (events.length === 0) {
-                if (lblHours) lblHours.classList.add('d-none');
+                if (lblHours) lblHours.innerHTML = '';
+                document.getElementById('scheduleHoursSummary')?.classList.add('d-none');
                 container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
                 document.getElementById('viewModeIndicator').innerText = "Empty";
                 return;
             }
 
-            // Calculate and Show Total Hours
-            let totalHrs = 0;
-            events.forEach(ev => totalHrs += parseFloat(ev.duration || 0));
+            // Calculate and show category totals for the currently displayed events.
             if (lblHours) {
-                lblHours.innerText = `Total Hours: ${totalHrs.toFixed(2)}`;
-                lblHours.classList.remove('d-none');
+                lblHours.innerHTML = renderCategoryHourTotals(events);
+                document.getElementById('scheduleHoursSummary')?.classList.remove('d-none');
             }
 
             const eventsByDate = {};
@@ -354,6 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('legendContainer').innerHTML = `
                     <div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher</div>
                     <div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div>
+                    <div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div>
                     <div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div>
                 `;
                 renderTimelineView(eventsByDate, container);
@@ -427,6 +654,8 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
 
             dayEvents.forEach((ev) => {
+                const leaveEvent = isLeaveEvent(ev);
+                const eventTitle = getEventTitle(ev);
                 const statusLabel = formatStatusLabel(ev?.status);
                 const statusStyle = getStatusTagStyle(ev?.status);
                 const detailsUrl = String(ev?.detailsUrl || '').trim();
@@ -434,16 +663,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
                     : `<span class="text-muted small">No details</span>`;
                 html += `
-                    <div class="event-row ${ev?.hasOverlap ? 'overlap' : ''}">
+                    <div class="event-row ${ev?.hasOverlap ? 'overlap' : ''} ${leaveEvent ? 'leave-event' : ''}">
                         <div class="event-time">${escapeHtml(ev?.start || '-')} - ${escapeHtml(ev?.end || '-')}</div>
                         <div>
-                            <div class="event-main-title">${escapeHtml(ev?.className || ev?.classId || '-')}</div>
+                            <div class="event-main-title">${escapeHtml(eventTitle)}</div>
                             <div class="event-meta-line">
-                                <span class="badge ${String(ev?.role || '').toLowerCase() === 'student' ? 'bg-primary-subtle text-primary border' : 'bg-info-subtle text-info-emphasis border'}">${escapeHtml(ev?.role || '-')}</span>
+                                <span class="badge ${leaveEvent ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : (String(ev?.role || '').toLowerCase() === 'student' ? 'bg-primary-subtle text-primary border' : 'bg-info-subtle text-info-emphasis border')}">${escapeHtml(leaveEvent ? 'Approved Leave' : (ev?.role || '-'))}</span>
                                 <span class="session-status-tag" style="${statusStyle}">${escapeHtml(statusLabel)}</span>
                                 <span class="text-muted">${Number(ev?.duration || 0).toFixed(2)} h</span>
                             </div>
-                            <div class="event-meta-line">${buildLifecycleInline(ev)}</div>
+                            <div class="event-meta-line">${leaveEvent ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Leave request approved and reserved on schedule</span>' : buildLifecycleInline(ev)}</div>
                         </div>
                         <div class="event-actions">${openButton}</div>
                     </div>
@@ -494,8 +723,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             dayEvents.forEach(ev => {
                 const topPos = (ev.trackIndex * 54) + 5;
+                const leaveEvent = isLeaveEvent(ev);
+                const eventTitle = getEventTitle(ev);
                 const roleText = String(ev.role || '').toLowerCase();
-                const cssClass = (roleText === 'teacher' || roleText === 'staff') ? 'role-teacher' : 'role-student';
+                const cssClass = leaveEvent ? 'event-leave' : ((roleText === 'teacher' || roleText === 'staff') ? 'role-teacher' : 'role-student');
                 const statusLabel = formatStatusLabel(ev.status);
                 const statusStyle = getStatusTagStyle(ev.status);
                 const detailsUrl = String(ev.detailsUrl || '').trim();
@@ -508,12 +739,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += `
                         <div class="event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}" 
                              style="left: ${ev.pos.left}%; width: ${ev.pos.width}%; top: ${topPos}px;"
-                             title="${openHint}: ${ev.className} | ${ev.start} - ${ev.end} | ${statusLabel}${String(ev?.classLifecycle?.registrationMode || '').trim().toLowerCase() === 'rolling' ? ' | Rolling' : ''}"
+                             title="${escapeHtml(openHint)}: ${escapeHtml(eventTitle)} | ${escapeHtml(ev.start)} - ${escapeHtml(ev.end)} | ${escapeHtml(statusLabel)}${String(ev?.classLifecycle?.registrationMode || '').trim().toLowerCase() === 'rolling' ? ' | Rolling' : ''}"
                              ${clickHandler}>
-                             <div class="fw-bold text-truncate">${ev.className}</div>
+                             <div class="fw-bold text-truncate">${escapeHtml(eventTitle)}</div>
                              <div class="event-meta x-small">
-                                    <span class="text-truncate">${ev.start} - ${ev.end}</span>
-                            <span class="session-status-tag" style="${statusStyle}">${statusLabel}</span>
+                                    <span class="text-truncate">${escapeHtml(ev.start)} - ${escapeHtml(ev.end)}</span>
+                            <span class="session-status-tag" style="${statusStyle}">${escapeHtml(statusLabel)}</span>
                          </div>
                     </div>
                 `;
@@ -559,6 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                 const dayEvents = eventsByDate[dateStr] || [];
                 const hasConflict = dayEvents.some(e => e.hasOverlap);
+                const hasLeave = dayEvents.some(e => isLeaveEvent(e));
                 const count = dayEvents.length;
                 let classes = 'cal-day ';
                 let badges = '';
@@ -566,6 +798,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (hasConflict) {
                     classes += 'conflict';
                     badges = `<div class="cal-badge bg-danger">${count}</div>`;
+                } else if (hasLeave) {
+                    classes += 'leave';
+                    badges = `<div class="cal-badge bg-warning text-dark">${count}</div>`;
                 } else if (count > 0) {
                     classes += 'active';
                     badges = `<div class="cal-badge bg-primary">${count}</div>`;
@@ -590,7 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('visualDisplayArea').addEventListener('click', (e) => {
         if (e.target.closest('.event-block')) return; 
 
-        const dayEl = e.target.closest('.cal-day.active, .cal-day.conflict');
+        const dayEl = e.target.closest('.cal-day.active, .cal-day.conflict, .cal-day.leave');
         if (dayEl) {
             const dateStr = dayEl.getAttribute('data-date');
             if (dateStr) {
@@ -604,8 +839,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 3. Deep Link Auto-Loader (Moved to BOTTOM) ---
     // Pure Javascript URL parsing avoids EJS syntax breaks!
     const urlParams = new URLSearchParams(window.location.search);
-    const prefillId = urlParams.get('personId');
-    const prefillName = urlParams.get('personName');
+    const prefillId = canSelectAnyPerson ? urlParams.get('personId') : document.getElementById('sch_personId').value;
+    const prefillName = canSelectAnyPerson ? urlParams.get('personName') : document.getElementById('sch_personName').value;
     const prefillDate = urlParams.get('date');
 
     if (prefillId) {
@@ -645,6 +880,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const end = new Date(start);
         end.setDate(start.getDate() + 6);
         setDateRange(start, end);
+        if (!canSelectAnyPerson && document.getElementById('sch_personId').value) {
+            document.getElementById('btn_loadSchedule').click();
+        }
     }
 
 });
