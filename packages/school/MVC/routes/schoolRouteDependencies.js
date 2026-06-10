@@ -1,6 +1,7 @@
 const {
   requireAuth,
   requireAccess,
+  requireAccessAny,
   trackActionState,
   SECTIONS,
   OPERATIONS
@@ -9,6 +10,7 @@ const {
 module.exports = {
   requireAuth,
   requireAccess,
+  requireAccessAny,
   trackActionState,
   SECTIONS,
   OPERATIONS

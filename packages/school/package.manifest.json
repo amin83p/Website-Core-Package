@@ -121,6 +121,9 @@
         },
         {
           "id": "445574"
+        },
+        {
+          "id": "445577"
         }
       ],
       "related": [],
@@ -2733,6 +2736,38 @@
       "subsections": [],
       "related": [],
       "adoptExisting": true
+    },
+    {
+      "id": "445577",
+      "name": "SCHOOL_MASTER_HUB",
+      "category": "SCHOOL",
+      "description": "Full-width School Master Hub for reviewing student, teacher, and staff directories from one workspace.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/master-hub",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
     }
   ],
   "symbols": [
@@ -3124,12 +3159,14 @@
     },
     {
       "id": "SYM_SYSTEM_060",
-      "name": "SCHOOL_NOTIFICATIONS",
+      "name": "SCHOOL_MASTER_HUB",
       "type": "class",
-      "value": "bi bi-bell-fill",
+      "value": "bi bi-grid-1x2-fill",
       "tags": [
-        "SCHOOL_NOTIFICATIONS",
-        "445576"
+        "SCHOOL_MASTER_HUB",
+        "SCHOOL_MASTER_HUB",
+        "SCHOOL_PEOPLE",
+        "445577"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -7117,6 +7154,16 @@
       "target": "_self",
       "category": "School",
       "active": true
+    },
+    {
+      "id": "school-menu-master-hub",
+      "label": "Master Hub",
+      "href": "/school/master-hub",
+      "icon": "bi bi-grid-1x2-fill",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
     }
   ],
   "dashboardEntries": [
@@ -7214,6 +7261,17 @@
       "href": "/school/notifications",
       "icon": "bi bi-bell-fill",
       "description": "Review school notifications and manage embedded follow-up tasks.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
+      "id": "school-dashboard-master-hub",
+      "label": "Master Hub",
+      "href": "/school/master-hub",
+      "icon": "bi bi-grid-1x2-fill",
+      "description": "Open the School Master Hub for students, teachers, and staff.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",

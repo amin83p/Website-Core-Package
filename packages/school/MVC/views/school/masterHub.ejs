@@ -1,0 +1,640 @@
+<%
+  const safeModules = Array.isArray(modules) ? modules : [];
+  const initialType = String(defaultType || safeModules[0]?.type || '').trim();
+%>
+
+<style>
+  .school-master-hub {
+    --hub-left-safe: clamp(3.75rem, 5vw, 5.5rem);
+    width: 100vw;
+    max-width: none;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .school-master-hub .hub-shell {
+    display: grid;
+    grid-template-columns: minmax(390px, 540px) minmax(0, 1fr);
+    gap: 0;
+    min-height: calc(100vh - 92px);
+    padding-left: var(--hub-left-safe);
+    transition: grid-template-columns 180ms ease;
+  }
+
+  .school-master-hub .hub-page-header {
+    padding-left: var(--hub-left-safe);
+    padding-right: 1rem;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-shell {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .school-master-hub .hub-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    min-height: calc(100vh - 92px);
+    border-right: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 0;
+    background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.14), transparent 36%),
+      linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 12px 0 35px rgba(15, 23, 42, 0.07);
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-sidebar-inner {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 92px);
+  }
+
+  .school-master-hub .hub-sidebar-header {
+    padding: 1.2rem 1.2rem 0.85rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-collapse-toggle {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+  }
+
+  .school-master-hub .hub-tab {
+    width: 100%;
+    border: 0;
+    border-right: 1px solid rgba(15, 23, 42, 0.07);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+    background: transparent;
+    padding: 0.75rem 0.7rem;
+    text-align: center;
+    transition: background 160ms ease, transform 160ms ease;
+  }
+
+  .school-master-hub .hub-tab:hover,
+  .school-master-hub .hub-tab.active {
+    background: rgba(2, 132, 199, 0.09);
+  }
+
+  .school-master-hub .hub-tab.active {
+    box-shadow: inset 0 -4px 0 #0284c7;
+  }
+
+  .school-master-hub .hub-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .school-master-hub .hub-refresh {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    display: none;
+  }
+.school-master-hub .hub-tab.active .hub-refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .school-master-hub .hub-tab.hub-tab-loading {
+    animation: schoolHubBeat 850ms ease-in-out infinite;
+  }
+
+  @keyframes schoolHubBeat {
+    0%, 100% {
+      transform: scale(1);
+      background: rgba(2, 132, 199, 0.09);
+    }
+    50% {
+      transform: scale(1.025);
+      background: rgba(2, 132, 199, 0.18);
+    }
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-sidebar-header-text,
+  .school-master-hub.hub-sidebar-collapsed .hub-tab-label,
+  .school-master-hub.hub-sidebar-collapsed .hub-count,
+  .school-master-hub.hub-sidebar-collapsed .hub-sidebar-content {
+    display: none !important;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-sidebar-header {
+    padding: 1rem 0.65rem;
+    display: flex;
+    justify-content: center;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-tab {
+    justify-content: center !important;
+    padding: 1rem 0.65rem;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-tabs {
+    display: block;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-tab-main {
+    justify-content: center;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-refresh {
+    position: absolute;
+    right: 0.35rem;
+    top: 0.35rem;
+    width: 1.65rem;
+    height: 1.65rem;
+    padding: 0;
+  }
+
+  .school-master-hub .hub-main {
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-stage-empty {
+    min-height: calc(100vh - 92px);
+    display: grid;
+    place-items: center;
+    color: #94a3b8;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(14, 165, 233, 0.08), transparent 28%),
+      radial-gradient(circle at 80% 30%, rgba(34, 197, 94, 0.08), transparent 30%),
+      #ffffff;
+  }
+
+  .school-master-hub .hub-hero {
+    padding: 1.25rem;
+    background:
+      linear-gradient(135deg, rgba(2, 132, 199, 0.11), rgba(34, 197, 94, 0.09)),
+      #f8fafc;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-content {
+    padding: 1rem 1.25rem 1.25rem;
+  }
+
+  .school-master-hub .hub-sidebar-content {
+    flex: 1;
+    min-height: 0;
+    padding: 1rem;
+    overflow: auto;
+  }
+
+  .school-master-hub .hub-table-wrap {
+    overflow: auto;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1rem;
+  }
+
+  .school-master-hub .hub-table {
+    min-width: 980px;
+    margin-bottom: 0;
+  }
+
+  .school-master-hub .hub-person-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .school-master-hub .hub-person-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+    padding: 0.9rem;
+  }
+
+  .school-master-hub .hub-person-card:hover {
+    border-color: rgba(2, 132, 199, 0.28);
+  }
+
+  .school-master-hub .hub-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .school-master-hub .hub-card-actions .btn {
+    white-space: nowrap;
+  }
+
+  .school-master-hub .hub-row-actions {
+    min-width: 158px;
+  }
+
+  .school-master-hub .hub-action-menu {
+    min-width: 12rem;
+  }
+
+  .school-master-hub .hub-empty {
+    min-height: 220px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    color: #64748b;
+  }
+
+  @media (max-width: 991.98px) {
+    .school-master-hub .hub-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .school-master-hub .hub-sidebar {
+      position: static;
+      min-height: auto;
+    }
+
+    .school-master-hub .hub-sidebar-inner {
+      min-height: auto;
+    }
+  }
+</style>
+
+<div class="container-fluid school-master-hub py-3"
+     data-master-hub
+     data-modules='<%- JSON.stringify(safeModules) %>'
+     data-default-type="<%= initialType %>">
+  <div class="hub-page-header d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+    <div>
+      <div class="text-uppercase text-muted small fw-bold">School Package</div>
+      <h1 class="h3 mb-1">School Master Hub</h1>
+      <p class="text-muted mb-0">Review school people records from one full-width workspace.</p>
+    </div>
+    <a href="<%= schoolSectionDashboardHref || '/school' %>" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-speedometer2 me-1"></i> School Dashboard
+    </a>
+  </div>
+
+  <% if (!safeModules.length) { %>
+    <div class="hub-main">
+      <div class="hub-empty">
+        <div>
+          <i class="bi bi-shield-lock display-5 d-block mb-3"></i>
+          <h2 class="h5">No people directory access</h2>
+          <p class="mb-0">You need access to Students, Teachers, or Staff to use the School Master Hub.</p>
+        </div>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="hub-shell">
+      <aside class="hub-sidebar">
+        <div class="hub-sidebar-inner">
+          <div class="hub-sidebar-header d-flex align-items-center justify-content-between gap-2">
+            <div class="hub-sidebar-header-text">
+              <div class="text-uppercase text-muted small fw-bold">People Lists</div>
+              <div class="fw-semibold">Choose a directory</div>
+            </div>
+            <button type="button"
+                    class="btn btn-outline-secondary btn-sm hub-collapse-toggle"
+                    id="schoolMasterHubCollapseSidebar"
+                    title="Collapse sidebar">
+              <i class="bi bi-layout-sidebar-inset"></i>
+            </button>
+          </div>
+          <div class="hub-tabs" id="schoolMasterHubTabs">
+            <% safeModules.forEach((item) => { %>
+              <button type="button"
+                      class="hub-tab position-relative"
+                      data-hub-tab="<%= item.type %>">
+                <span class="hub-tab-main d-flex align-items-center justify-content-center gap-2">
+                  <i class="<%= item.icon %> <%= item.color || '' %>"></i>
+                  <span class="hub-tab-label">
+                    <span class="fw-semibold d-block"><%= item.label %></span>
+                  </span>
+                </span>
+                <span class="d-flex align-items-center justify-content-center gap-2 mt-2">
+                  <span class="badge text-bg-light border hub-count" data-hub-count="<%= item.type %>">-</span>
+                  <span class="btn btn-sm btn-outline-secondary hub-refresh"
+                        title="Refresh <%= item.label %>"
+                        data-hub-refresh="<%= item.type %>">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </span>
+                </span>
+              </button>
+            <% }); %>
+          </div>
+
+          <div class="hub-sidebar-content">
+            <div class="mb-3">
+              <label for="schoolMasterHubSearch" class="form-label fw-semibold">Search selected list</label>
+              <input type="search"
+                     id="schoolMasterHubSearch"
+                     class="form-control"
+                     placeholder="Search name, email, phone, ID, status, or department">
+            </div>
+            <div class="mb-3">
+              <label for="schoolMasterHubLimit" class="form-label fw-semibold">Rows per page</label>
+              <select id="schoolMasterHubLimit" class="form-select">
+                <option value="25">25 rows</option>
+                <option value="50">50 rows</option>
+                <option value="100">100 rows</option>
+              </select>
+            </div>
+            <div id="schoolMasterHubStatus" class="alert alert-info d-none" role="status"></div>
+            <div id="schoolMasterHubList"></div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="hub-main">
+        <section class="hub-hero d-none">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+              <div class="text-uppercase text-muted small fw-bold" id="schoolMasterHubEyebrow">Directory</div>
+              <h2 class="h4 mb-1" id="schoolMasterHubTitle">Loading...</h2>
+              <p class="text-muted mb-0" id="schoolMasterHubMeta">Preparing the workspace.</p>
+            </div>
+            <div class="d-flex gap-2">
+              <a href="#" class="btn btn-outline-primary btn-sm disabled" id="schoolMasterHubOpenDirectory">
+                <i class="bi bi-box-arrow-up-right me-1"></i> Open Directory
+              </a>
+              <button type="button" class="btn btn-primary btn-sm" id="schoolMasterHubRefreshCurrent">
+                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="hub-stage-empty">
+          <div class="text-center px-4">
+            <i class="bi bi-grid-1x2-fill display-5 d-block mb-3"></i>
+            <h2 class="h5 text-slate-600">Master Hub canvas</h2>
+            <p class="mb-0">Select a person on the left. This area is reserved for the next detail view pass.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+  <% } %>
+</div>
+<script>
+(function () {
+  const root = document.querySelector('[data-master-hub]');
+  if (!root) return;
+
+  let modules = [];
+  try {
+    modules = JSON.parse(root.getAttribute('data-modules') || '[]');
+  } catch (error) {
+    modules = [];
+  }
+
+  const state = {
+    currentType: root.getAttribute('data-default-type') || (modules[0] && modules[0].type) || '',
+    page: 1,
+    loading: false,
+    lastSearch: ''
+  };
+
+  const els = {
+    tabs: root.querySelectorAll('[data-hub-tab]'),
+    counts: root.querySelectorAll('[data-hub-count]'),
+    title: document.getElementById('schoolMasterHubTitle'),
+    eyebrow: document.getElementById('schoolMasterHubEyebrow'),
+    meta: document.getElementById('schoolMasterHubMeta'),
+    list: document.getElementById('schoolMasterHubList'),
+    status: document.getElementById('schoolMasterHubStatus'),
+    search: document.getElementById('schoolMasterHubSearch'),
+    limit: document.getElementById('schoolMasterHubLimit'),
+    refreshCurrent: document.getElementById('schoolMasterHubRefreshCurrent'),
+    openDirectory: document.getElementById('schoolMasterHubOpenDirectory'),
+    collapseSidebar: document.getElementById('schoolMasterHubCollapseSidebar')
+  };
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function findModule(type) {
+    return modules.find((item) => item.type === type) || null;
+  }
+
+  function setStatus(message, tone) {
+    if (!els.status) return;
+    const text = String(message || '').trim();
+    els.status.className = 'alert alert-' + (tone || 'info') + ' ' + (text ? '' : 'd-none');
+    els.status.textContent = text;
+  }
+
+  function setTabLoading(type, loading) {
+    root.querySelectorAll('[data-hub-tab]').forEach(function (tab) {
+      if (tab.getAttribute('data-hub-tab') === type) tab.classList.toggle('hub-tab-loading', loading === true);
+    });
+  }
+
+  function setLoading(isLoading, type) {
+    state.loading = isLoading;
+    root.querySelectorAll('[data-hub-refresh]').forEach(function (btn) {
+      btn.classList.toggle('disabled', isLoading);
+    });
+    if (type) setTabLoading(type, isLoading);
+  }
+
+  function syncActiveTab() {
+    els.tabs.forEach(function (tab) {
+      tab.classList.toggle('active', tab.getAttribute('data-hub-tab') === state.currentType);
+    });
+    const module = findModule(state.currentType);
+    if (els.openDirectory) {
+      if (module && module.directoryUrl) {
+        els.openDirectory.href = module.directoryUrl;
+        els.openDirectory.classList.remove('disabled');
+      } else {
+        els.openDirectory.href = '#';
+        els.openDirectory.classList.add('disabled');
+      }
+    }
+  }
+
+  function updateCount(type, total) {
+    els.counts.forEach(function (badge) {
+      if (badge.getAttribute('data-hub-count') === type) {
+        badge.textContent = Number.isFinite(Number(total)) ? String(total) : '-';
+      }
+    });
+  }
+
+  function renderEmpty(message, icon) {
+    if (!els.list) return;
+    els.list.innerHTML = [
+      '<div class="hub-empty">',
+      '<div>',
+      '<i class="bi ' + escapeHtml(icon || 'bi-search') + ' display-6 d-block mb-3"></i>',
+      '<div class="fw-semibold">' + escapeHtml(message || 'Start searching to find records.') + '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderSearchPrompt() {
+    const module = findModule(state.currentType);
+    const label = module ? module.label : 'records';
+    renderEmpty('Type at least 2 characters to search ' + label + '.', 'bi-search');
+  }
+
+  function renderRows(rows) {
+    if (!els.list) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      renderEmpty('No matching active records were found.');
+      return;
+    }
+
+    const body = rows.map(function (row) {
+      const actions = Array.isArray(row.actions) ? row.actions : [];
+      const actionLinks = actions.map(function (action) {
+        return [
+          '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener">',
+          '<i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open'),
+          '</a>'
+        ].join('');
+      }).join('');
+
+      return [
+        '<article class="hub-person-card">',
+        '<div class="d-flex justify-content-between align-items-start gap-2">',
+        '<div class="min-w-0">',
+        '<div class="fw-semibold text-truncate">' + escapeHtml(row.name || '-') + '</div>',
+        '<div class="text-muted small font-monospace">' + escapeHtml(row.id || '') + '</div>',
+        '</div>',
+        '<span class="badge text-bg-light border flex-shrink-0">' + escapeHtml(row.status || 'Active') + '</span>',
+        '</div>',
+        '<div class="mt-2 small text-muted">',
+        '<div><i class="bi bi-person-badge me-1"></i>' + escapeHtml(row.personId || '-') + '</div>',
+        '<div><i class="bi bi-envelope me-1"></i>' + escapeHtml(row.email || '-') + '</div>',
+        '<div><i class="bi bi-telephone me-1"></i>' + escapeHtml(row.phone || '-') + '</div>',
+        '</div>',
+        '<div class="d-flex justify-content-between align-items-center gap-2 mt-2">',
+        '<span class="small text-muted">' + escapeHtml(row.detailLabel || 'Detail') + '</span>',
+        '<span class="small text-end">' + escapeHtml(row.detail || '-') + '</span>',
+        '</div>',
+        '<div class="hub-card-actions mt-3">',
+        actionLinks || '<span class="text-muted small">No actions</span>',
+        '</div>',
+        '</article>'
+      ].join('');
+    }).join('');
+
+    els.list.innerHTML = '<div class="hub-person-list">' + body + '</div>';
+  }
+
+  function updateHeader(result) {
+    const module = result && result.module ? result.module : findModule(state.currentType);
+    if (els.eyebrow) els.eyebrow.textContent = module ? module.sectionId : 'Directory';
+    if (els.title) els.title.textContent = module ? module.label : 'School Master Hub';
+    if (els.meta) {
+      const refreshed = result && result.refreshedAt ? new Date(result.refreshedAt).toLocaleString() : 'not loaded yet';
+      els.meta.textContent = String(result && result.total != null ? result.total : 0) + ' matching records. Last refreshed: ' + refreshed + '.';
+    }
+  }
+
+  async function searchCurrent() {
+    if (!state.currentType || state.loading) return;
+    const term = String((els.search && els.search.value) || '').trim();
+    state.lastSearch = term;
+    syncActiveTab();
+
+    if (term.length < 2) {
+      updateCount(state.currentType, '-');
+      setStatus('', 'info');
+      renderSearchPrompt();
+      return;
+    }
+
+    const type = state.currentType;
+    const query = new URLSearchParams({
+      type: type,
+      page: String(state.page || 1),
+      limit: String((els.limit && els.limit.value) || '25'),
+      q: term
+    });
+
+    setLoading(true, type);
+    setStatus('Searching ' + (findModule(type)?.label || 'records') + '...', 'info');
+
+    try {
+      const response = await fetch('/school/master-hub/api/list?' + query.toString(), {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const contentType = response.headers.get('content-type') || '';
+      const payload = contentType.includes('application/json') ? await response.json() : { status: 'error', message: await response.text() };
+      if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Unable to search list.');
+      updateHeader(payload);
+      updateCount(type, payload.total);
+      renderRows(payload.rows || []);
+      setStatus('', 'info');
+    } catch (error) {
+      renderEmpty(error.message || 'Unable to search list.', 'bi-exclamation-triangle');
+      setStatus(error.message || 'Unable to search list.', 'danger');
+    } finally {
+      setLoading(false, type);
+    }
+  }
+
+  let searchTimer = null;
+  if (els.search) {
+    els.search.addEventListener('input', function () {
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(searchCurrent, 280);
+    });
+  }
+
+  if (els.limit) {
+    els.limit.addEventListener('change', searchCurrent);
+  }
+
+  if (els.refreshCurrent) {
+    els.refreshCurrent.addEventListener('click', searchCurrent);
+  }
+
+  if (els.collapseSidebar) {
+    els.collapseSidebar.addEventListener('click', function () {
+      root.classList.toggle('hub-sidebar-collapsed');
+      const collapsed = root.classList.contains('hub-sidebar-collapsed');
+      els.collapseSidebar.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+      els.collapseSidebar.innerHTML = collapsed
+        ? '<i class="bi bi-layout-sidebar-inset-reverse"></i>'
+        : '<i class="bi bi-layout-sidebar-inset"></i>';
+    });
+  }
+
+  root.querySelectorAll('[data-hub-tab]').forEach(function (tab) {
+    tab.addEventListener('click', function (event) {
+      if (event.target && event.target.closest('[data-hub-refresh]')) return;
+      state.currentType = tab.getAttribute('data-hub-tab') || state.currentType;
+      state.page = 1;
+      if (els.search) els.search.value = '';
+      updateCount(state.currentType, '-');
+      syncActiveTab();
+      renderSearchPrompt();
+      setStatus('', 'info');
+    });
+  });
+
+  root.querySelectorAll('[data-hub-refresh]').forEach(function (btn) {
+    btn.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      state.currentType = btn.getAttribute('data-hub-refresh') || state.currentType;
+      searchCurrent();
+    });
+  });
+
+  if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+  syncActiveTab();
+  renderSearchPrompt();
+}());
+</script>
