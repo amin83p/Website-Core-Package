@@ -34,3 +34,30 @@ exports.listPeoplePanel = async (req, res) => {
     });
   }
 };
+
+exports.getNotificationCount = async (req, res) => {
+  try {
+    const result = await masterHubService.getNotificationSummary(req);
+    res.json({ status: 'success', ...result });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      status: 'error',
+      message: error.message || 'Unable to load notification count.'
+    });
+  }
+};
+
+exports.getWorkspaceSection = async (req, res) => {
+  try {
+    const sectionKey = String(req.params.sectionKey || '').trim().toLowerCase();
+    const result = await masterHubService.getWorkspaceSection(sectionKey, req.query, req);
+    res.json({ status: 'success', ...result });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      status: 'error',
+      message: error.message || 'Unable to load this Master Hub section.'
+    });
+  }
+};

@@ -5,8 +5,10 @@
 <% const lifecycleEvents = Array.isArray(row.lifecycle) ? row.lifecycle.slice().reverse() : []; %>
 <% const normalizedPersonId = String(currentPersonId || '').trim(); %>
 <% const canManageAllNotifications = !!canManageAll; %>
-<% const canManageNotificationStatus = canManageAllNotifications || (normalizedPersonId && String(row.assignedPersonId || '').trim() === normalizedPersonId); %>
-<% const visibleTasks = canManageAllNotifications ? tasks : tasks.filter((task) => String(task?.assignedPersonId || '').trim() === normalizedPersonId); %>
+<% const canManageTaskWorkflowFlag = !!canManageTaskWorkflow; %>
+<% const canAssignTasksFlag = !!canAssignTasks; %>
+<% const canManageNotificationStatus = canManageTaskWorkflowFlag; %>
+<% const visibleTasks = tasks; %>
 <%
   const lifecycleMeta = {
     source_notification_created: { icon: 'bi-bell-fill', tone: 'primary', label: 'Created' },
@@ -189,13 +191,14 @@
         </div>
         <div class="card-body">
           <% if (!visibleTasks.length) { %>
-            <div class="text-muted mb-3">No tasks are assigned to you in this notification.</div>
+            <div class="text-muted mb-3"><%= canManageTaskWorkflowFlag ? 'No tasks have been assigned for this notification.' : 'No tasks are assigned to you in this notification.' %></div>
           <% } %>
           <div class="d-grid gap-3 mb-4">
             <% visibleTasks.forEach((task) => { %>
               <% const taskStatus = String(task.status || 'open').toLowerCase(); %>
+              <% const taskAssignmentHistory = Array.isArray(task.assignmentHistory) ? task.assignmentHistory : []; %>
               <% const taskIsAssignedToMe = normalizedPersonId && String(task.assignedPersonId || '').trim() === normalizedPersonId; %>
-              <% const canManageTask = canManageAllNotifications || taskIsAssignedToMe; %>
+              <% const canManageTask = canManageTaskWorkflowFlag || taskIsAssignedToMe; %>
               <div class="notification-task-card <%= taskStatusClass(taskStatus) %>">
                 <div class="d-flex flex-wrap justify-content-between gap-2">
                   <div>
@@ -212,10 +215,36 @@
                   <div>Reassigned at: <%= task.reassignedAt || '-' %></div>
                   <div>Completed at: <%= task.completedAt || '-' %></div>
                 </div>
+                <% if (taskAssignmentHistory.length) { %>
+                  <div class="d-grid gap-2 mt-3">
+                    <% taskAssignmentHistory.forEach((assignment) => { %>
+                      <div class="border rounded bg-white p-2">
+                        <div class="d-flex flex-wrap justify-content-between gap-2">
+                          <div>
+                            <div class="fw-semibold">
+                              <i class="bi bi-person-check me-1"></i>
+                              Previous assignment: <%= assignment.assignedPersonName || assignment.assignedPersonId || 'Previous assignee' %>
+                            </div>
+                            <% if (assignment.assignedRole) { %><div class="small text-muted"><%= assignment.assignedRole %></div><% } %>
+                          </div>
+                          <span class="badge bg-success align-self-start">Completed</span>
+                        </div>
+                        <div class="small text-muted notification-task-meta mt-2">
+                          <div>Assigned at: <%= assignment.assignedAt || '-' %></div>
+                          <div>Started: <%= assignment.startedAt ? `Yes (${assignment.startedAt})` : 'No' %></div>
+                          <div>Assigned to another at: <%= assignment.reassignedAt || assignment.completedAt || '-' %></div>
+                        </div>
+                        <div class="small text-muted mt-2">
+                          This previous assignment cannot be reopened because the task is now assigned to another person.
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                <% } %>
                 <% if (task.note) { %><div class="small text-muted mt-2"><%= task.note %></div><% } %>
                 <% if (canManageTask) { %>
                   <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
-                    <% if (canManageAllNotifications) { %>
+                    <% if (canManageTaskWorkflowFlag) { %>
                       <button class="btn btn-outline-primary btn-sm notification-task-reassign-action"
                         data-task-id="<%= task.id %>"
                         data-status="<%= taskStatus %>"
@@ -225,13 +254,15 @@
                         <i class="bi bi-person-check me-1"></i> Reassign
                       </button>
                     <% } %>
-                    <% if (taskStatus === 'open') { %>
+                    <% if (canManageTaskWorkflowFlag && taskStatus === 'open') { %>
                       <button class="btn btn-outline-primary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="in_progress"><i class="bi bi-play-circle me-1"></i> Start</button>
                     <% } %>
                     <% if (taskStatus === 'open' || taskStatus === 'in_progress') { %>
                       <button class="btn btn-outline-success btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="done" data-status-confirm="true"><i class="bi bi-check2 me-1"></i> Complete</button>
-                      <button class="btn btn-outline-secondary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="cancelled"><i class="bi bi-slash-circle me-1"></i> Cancel</button>
-                    <% } else { %>
+                      <% if (canManageTaskWorkflowFlag) { %>
+                        <button class="btn btn-outline-secondary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="cancelled"><i class="bi bi-slash-circle me-1"></i> Cancel</button>
+                      <% } %>
+                    <% } else if (canManageTaskWorkflowFlag) { %>
                       <button class="btn btn-outline-warning btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="open"><i class="bi bi-arrow-counterclockwise me-1"></i> Reopen</button>
                     <% } %>
                   </div>
@@ -240,20 +271,19 @@
             <% }) %>
           </div>
 
-          <% if (canManageAllNotifications) { %>
+          <% if (canAssignTasksFlag) { %>
           <form id="notificationTaskForm" class="border rounded p-3 bg-light">
-            <h3 class="h6 mb-3">Add Task</h3>
+            <h3 class="h6 mb-3">Assign Task</h3>
             <div class="row g-2">
               <div class="col-md-6">
                 <label class="form-label" for="taskTitle">Task Title</label>
                 <input class="form-control" id="taskTitle" name="title" maxlength="220" required>
               </div>
               <div class="col-md-3">
-                <label class="form-label" for="taskAssigneeLabel">Assignee</label>
+                <label class="form-label" for="taskAssigneeLabel">Assignee <span class="text-danger">*</span></label>
                 <div class="input-group">
-                  <input class="form-control" id="taskAssigneeLabel" placeholder="Unassigned" readonly>
+                  <input class="form-control" id="taskAssigneeLabel" placeholder="Select another person" readonly required>
                   <button class="btn btn-outline-primary" type="button" id="btnPickTaskAssignee"><i class="bi bi-search"></i></button>
-                  <button class="btn btn-outline-secondary" type="button" id="btnClearTaskAssignee"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <input type="hidden" id="taskAssignedPersonId" name="assignedPersonId" value="">
                 <input type="hidden" id="taskAssignedPersonName" name="assignedPersonName" value="">
@@ -268,7 +298,7 @@
                 <textarea class="form-control" id="taskDescription" name="description" rows="3" maxlength="2000"></textarea>
               </div>
               <div class="col-12 d-flex justify-content-end">
-                <button class="btn btn-primary" type="submit"><i class="bi bi-plus-circle me-1"></i> Add Task</button>
+                <button class="btn btn-primary" type="submit"><i class="bi bi-person-plus me-1"></i> Assign Task</button>
               </div>
             </div>
           </form>
@@ -334,6 +364,7 @@
 <script>
   (function () {
     const notificationId = '<%= row.id %>';
+    const currentPersonId = '<%= normalizedPersonId %>';
     const taskForm = document.getElementById('notificationTaskForm');
     const taskAssigneeId = document.getElementById('taskAssignedPersonId');
     const taskAssigneeName = document.getElementById('taskAssignedPersonName');
@@ -376,7 +407,7 @@
       return id ? `${name || id} (${id})` : (name || 'Selected person');
     }
 
-    async function pickPerson(title, onSelect) {
+    async function pickPerson(title, onSelect, options = {}) {
       if (!window.GenericPicker || !window.GenericPickerPresets) {
         await showNotificationMessage({
           title: 'Person Picker',
@@ -399,6 +430,14 @@
         const item = Array.isArray(selected) ? selected[0] : selected;
         if (!item) return;
         const personId = String(item?.personId || item?.id || '').trim();
+        if (options.excludeCurrentPerson && currentPersonId && personId && personId === currentPersonId) {
+          showNotificationMessage({
+            title: 'Choose Another Person',
+            icon: 'warning',
+            message: 'Assign this task to another person, not yourself.'
+          });
+          return;
+        }
         const label = displayNameForPickerItem(item);
         onSelect({ personId, label });
       };
@@ -550,22 +589,12 @@
         const result = await showNotificationMessage({
           title: 'Reassign Task',
           icon: 'info',
-          message: 'Pick a person for this task, or clear the assignee.',
+          message: 'Pick another person for this task.',
           buttons: [
             { text: 'Cancel', class: 'btn-secondary' },
-            { text: 'Clear Assignee', class: 'btn-outline-secondary' },
             { text: 'Pick Person', class: 'btn-primary' }
           ]
         });
-        if (result === 'Clear Assignee') {
-          await postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/tasks/${encodeURIComponent(taskId)}`, {
-            status: button.dataset.status || '',
-            assignedPersonId: '',
-            assignedPersonName: '',
-            assignedRole: ''
-          });
-          return;
-        }
         if (result !== 'Pick Person') return;
         await pickPerson('Select Task Assignee', async ({ personId, label }) => {
           await postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/tasks/${encodeURIComponent(taskId)}`, {
@@ -574,7 +603,7 @@
             assignedPersonName: label,
             assignedRole: ''
           });
-        });
+        }, { excludeCurrentPerson: true });
       });
     });
 
@@ -587,13 +616,7 @@
         if (taskAssigneeId) taskAssigneeId.value = personId;
         if (taskAssigneeName) taskAssigneeName.value = label;
         if (taskAssigneeLabel) taskAssigneeLabel.value = label;
-      });
-    });
-
-    document.getElementById('btnClearTaskAssignee')?.addEventListener('click', () => {
-      if (taskAssigneeId) taskAssigneeId.value = '';
-      if (taskAssigneeName) taskAssigneeName.value = '';
-      if (taskAssigneeLabel) taskAssigneeLabel.value = '';
+      }, { excludeCurrentPerson: true });
     });
 
     taskForm?.addEventListener('submit', async (event) => {
@@ -604,14 +627,31 @@
         await showNotificationMessage({
           title: 'Task Required',
           icon: 'warning',
-          message: 'Enter a task title before adding the task.'
+          message: 'Enter a task title before assigning the task.'
+        });
+        return;
+      }
+      const assignedPersonId = String(data.get('assignedPersonId') || '').trim();
+      if (!assignedPersonId) {
+        await showNotificationMessage({
+          title: 'Assignee Required',
+          icon: 'warning',
+          message: 'Select another person before assigning this task.'
+        });
+        return;
+      }
+      if (currentPersonId && assignedPersonId === currentPersonId) {
+        await showNotificationMessage({
+          title: 'Choose Another Person',
+          icon: 'warning',
+          message: 'Assign this task to another person, not yourself.'
         });
         return;
       }
       await postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/tasks`, {
         title,
         assignedRole: '',
-        assignedPersonId: String(data.get('assignedPersonId') || '').trim(),
+        assignedPersonId,
         assignedPersonName: String(data.get('assignedPersonName') || '').trim(),
         dueDate: String(data.get('dueDate') || '').trim(),
         description: String(data.get('description') || '').trim()

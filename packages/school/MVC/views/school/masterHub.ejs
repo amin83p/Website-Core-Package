@@ -28,6 +28,118 @@
     padding-right: 1rem;
   }
 
+  .school-master-hub .hub-section-panel {
+    margin-left: var(--hub-left-safe);
+    margin-right: 1rem;
+    margin-bottom: 1rem;
+    padding: 0;
+    border: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 1rem;
+    background:
+      linear-gradient(135deg, rgba(2, 132, 199, 0.08), rgba(34, 197, 94, 0.06)),
+      #ffffff;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-section-panel-inner {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    direction: rtl;
+  }
+
+  .school-master-hub .hub-section-segment {
+    appearance: none;
+    position: relative;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-left: 1px solid rgba(15, 23, 42, 0.09);
+    background: rgba(255, 255, 255, 0.68);
+    color: #475569;
+    padding: 1rem 1.1rem;
+    min-height: 4.25rem;
+    text-align: center;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  }
+
+  .school-master-hub .hub-section-segment:first-child {
+    border-left: 0;
+  }
+
+  .school-master-hub .hub-section-segment:hover,
+  .school-master-hub .hub-section-segment.is-active {
+    background: #0284c7;
+    color: #ffffff;
+    transform: translateY(-1px);
+  }
+
+  .school-master-hub .hub-section-main-link {
+    appearance: none;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-decoration: none;
+    font: inherit;
+  }
+
+  .school-master-hub .hub-section-segment > span,
+  .school-master-hub .hub-section-main-link > span {
+    direction: ltr;
+  }
+
+  .school-master-hub .hub-notification-count {
+    position: absolute;
+    top: 0.42rem;
+    left: 0.42rem;
+    z-index: 3;
+    min-width: 1.65rem;
+    height: 1.65rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.72rem;
+    line-height: 1;
+    box-shadow: 0 8px 18px rgba(239, 68, 68, 0.24);
+  }
+
+  .school-master-hub .hub-notification-count.is-muted {
+    background: #94a3b8;
+    box-shadow: none;
+  }
+
+  .school-master-hub .hub-notification-gear {
+    position: absolute;
+    top: 0.42rem;
+    right: 0.42rem;
+    z-index: 4;
+    width: 1.8rem;
+    height: 1.8rem;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #0f172a;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 160ms ease, background 160ms ease;
+  }
+
+  .school-master-hub .hub-notification-gear:hover {
+    transform: rotate(32deg);
+    background: #ffffff;
+  }
+
   .school-master-hub.hub-sidebar-collapsed .hub-shell {
     grid-template-columns: 88px minmax(0, 1fr);
   }
@@ -87,20 +199,7 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-
-  .school-master-hub .hub-refresh {
-    width: 2rem;
-    height: 2rem;
-    border-radius: 999px;
-    display: none;
-  }
-.school-master-hub .hub-tab.active .hub-refresh {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .school-master-hub .hub-tab.hub-tab-loading {
+.school-master-hub .hub-tab.hub-tab-loading {
     animation: schoolHubBeat 850ms ease-in-out infinite;
   }
 
@@ -117,7 +216,6 @@
 
   .school-master-hub.hub-sidebar-collapsed .hub-sidebar-header-text,
   .school-master-hub.hub-sidebar-collapsed .hub-tab-label,
-  .school-master-hub.hub-sidebar-collapsed .hub-count,
   .school-master-hub.hub-sidebar-collapsed .hub-sidebar-content {
     display: none !important;
   }
@@ -140,17 +238,7 @@
   .school-master-hub.hub-sidebar-collapsed .hub-tab-main {
     justify-content: center;
   }
-
-  .school-master-hub.hub-sidebar-collapsed .hub-refresh {
-    position: absolute;
-    right: 0.35rem;
-    top: 0.35rem;
-    width: 1.65rem;
-    height: 1.65rem;
-    padding: 0;
-  }
-
-  .school-master-hub .hub-main {
+.school-master-hub .hub-main {
     min-width: 0;
     border: 0;
     border-radius: 0;
@@ -168,6 +256,41 @@
       radial-gradient(circle at 20% 20%, rgba(14, 165, 233, 0.08), transparent 28%),
       radial-gradient(circle at 80% 30%, rgba(34, 197, 94, 0.08), transparent 30%),
       #ffffff;
+  }
+
+  .school-master-hub .hub-workspace {
+    min-height: calc(100vh - 92px);
+    padding: 1.25rem;
+    background:
+      radial-gradient(circle at 15% 15%, rgba(14, 165, 233, 0.08), transparent 28%),
+      radial-gradient(circle at 85% 20%, rgba(34, 197, 94, 0.08), transparent 30%),
+      #ffffff;
+  }
+
+  .school-master-hub .hub-workspace-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1.2rem;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-workspace-header {
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.08), rgba(34, 197, 94, 0.07));
+  }
+
+  .school-master-hub .hub-workspace-table {
+    min-width: 860px;
+    margin-bottom: 0;
+  }
+
+  .school-master-hub .hub-workspace-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
   }
 
   .school-master-hub .hub-hero {
@@ -223,8 +346,31 @@
     gap: 0.35rem;
   }
 
+  .school-master-hub .hub-card-details {
+    display: none;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-person-card.is-expanded .hub-card-details {
+    display: block;
+  }
+
+  .school-master-hub .hub-card-toggle {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+  }
+
   .school-master-hub .hub-card-actions .btn {
     white-space: nowrap;
+  }
+
+  .school-master-hub .hub-load-more-wrap {
+    display: grid;
+    place-items: center;
+    padding: 0.25rem 0 1rem;
   }
 
   .school-master-hub .hub-row-actions {
@@ -244,6 +390,14 @@
   }
 
   @media (max-width: 991.98px) {
+    .school-master-hub .hub-section-panel {
+      margin-left: 1rem;
+    }
+
+    .school-master-hub .hub-section-panel-inner {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .school-master-hub .hub-shell {
       grid-template-columns: 1fr;
     }
@@ -259,7 +413,7 @@
   }
 </style>
 
-<div class="container-fluid school-master-hub py-3"
+<div class="container-fluid school-master-hub hub-sidebar-collapsed py-3"
      data-master-hub
      data-modules='<%- JSON.stringify(safeModules) %>'
      data-default-type="<%= initialType %>">
@@ -272,6 +426,35 @@
     <a href="<%= schoolSectionDashboardHref || '/school' %>" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-speedometer2 me-1"></i> School Dashboard
     </a>
+  </div>
+
+  <div class="hub-section-panel" aria-label="School Master Hub sections">
+    <div class="hub-section-panel-inner">
+      <a class="hub-section-segment" href="/school/classes">
+        <span><i class="bi bi-easel-fill me-1"></i> Class</span>
+      </a>
+      <a class="hub-section-segment" href="/school/sessions">
+        <span><i class="bi bi-calendar2-week-fill me-1"></i> Sessions</span>
+      </a>
+      <a class="hub-section-segment" href="/school/schedules">
+        <span><i class="bi bi-calendar-check-fill me-1"></i> Schedule</span>
+      </a>
+      <a class="hub-section-segment" href="/school/attendances">
+        <span><i class="bi bi-clipboard-check-fill me-1"></i> Attendance</span>
+      </a>
+      <a class="hub-section-segment" href="/school/grades-matrix">
+        <span><i class="bi bi-journal-check me-1"></i> Gradebook</span>
+      </a>
+      <div class="hub-section-segment hub-notification-segment">
+        <span class="hub-notification-count is-muted" id="schoolMasterHubNotificationCount">-</span>
+        <button type="button" class="hub-section-main-link" data-hub-workspace-section="notifications">
+          <span><i class="bi bi-bell-fill me-1"></i> Notification</span>
+        </button>
+        <button type="button" class="hub-notification-gear" id="schoolMasterHubNotificationSettings" aria-label="Notification refresh settings">
+          <i class="bi bi-gear-fill"></i>
+        </button>
+      </div>
+    </div>
   </div>
 
   <% if (!safeModules.length) { %>
@@ -311,14 +494,6 @@
                     <span class="fw-semibold d-block"><%= item.label %></span>
                   </span>
                 </span>
-                <span class="d-flex align-items-center justify-content-center gap-2 mt-2">
-                  <span class="badge text-bg-light border hub-count" data-hub-count="<%= item.type %>">-</span>
-                  <span class="btn btn-sm btn-outline-secondary hub-refresh"
-                        title="Refresh <%= item.label %>"
-                        data-hub-refresh="<%= item.type %>">
-                    <i class="bi bi-arrow-clockwise"></i>
-                  </span>
-                </span>
               </button>
             <% }); %>
           </div>
@@ -330,14 +505,6 @@
                      id="schoolMasterHubSearch"
                      class="form-control"
                      placeholder="Search name, email, phone, ID, status, or department">
-            </div>
-            <div class="mb-3">
-              <label for="schoolMasterHubLimit" class="form-label fw-semibold">Rows per page</label>
-              <select id="schoolMasterHubLimit" class="form-select">
-                <option value="25">25 rows</option>
-                <option value="50">50 rows</option>
-                <option value="100">100 rows</option>
-              </select>
             </div>
             <div id="schoolMasterHubStatus" class="alert alert-info d-none" role="status"></div>
             <div id="schoolMasterHubList"></div>
@@ -364,17 +531,20 @@
           </div>
         </section>
 
-        <section class="hub-stage-empty">
-          <div class="text-center px-4">
-            <i class="bi bi-grid-1x2-fill display-5 d-block mb-3"></i>
-            <h2 class="h5 text-slate-600">Master Hub canvas</h2>
-            <p class="mb-0">Select a person on the left. This area is reserved for the next detail view pass.</p>
+        <section class="hub-workspace" id="schoolMasterHubWorkspace" data-hub-workspace>
+          <div class="hub-stage-empty">
+            <div class="text-center px-4">
+              <i class="bi bi-grid-1x2-fill display-5 d-block mb-3"></i>
+              <h2 class="h5 text-slate-600">Master Hub canvas</h2>
+              <p class="mb-0">Select a section button above to work inside the hub, or select a person on the left.</p>
+            </div>
           </div>
         </section>
       </main>
     </div>
   <% } %>
 </div>
+
 <script>
 (function () {
   const root = document.querySelector('[data-master-hub]');
@@ -391,7 +561,9 @@
     currentType: root.getAttribute('data-default-type') || (modules[0] && modules[0].type) || '',
     page: 1,
     loading: false,
-    lastSearch: ''
+    lastSearch: '',
+    loadedRows: [],
+    pagination: null
   };
 
   const els = {
@@ -403,10 +575,13 @@
     list: document.getElementById('schoolMasterHubList'),
     status: document.getElementById('schoolMasterHubStatus'),
     search: document.getElementById('schoolMasterHubSearch'),
-    limit: document.getElementById('schoolMasterHubLimit'),
     refreshCurrent: document.getElementById('schoolMasterHubRefreshCurrent'),
     openDirectory: document.getElementById('schoolMasterHubOpenDirectory'),
-    collapseSidebar: document.getElementById('schoolMasterHubCollapseSidebar')
+    collapseSidebar: document.getElementById('schoolMasterHubCollapseSidebar'),
+    notificationCount: document.getElementById('schoolMasterHubNotificationCount'),
+    notificationSettings: document.getElementById('schoolMasterHubNotificationSettings'),
+    workspace: document.getElementById('schoolMasterHubWorkspace'),
+    workspaceButtons: root.querySelectorAll('[data-hub-workspace-section]')
   };
 
   function escapeHtml(value) {
@@ -416,6 +591,292 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  async function showHubMessage(options) {
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal(options || {});
+    }
+    renderWorkspaceStatus(String(options?.message || options?.title || 'Message modal is not available.'), 'bi-exclamation-triangle', 'danger');
+    return null;
+  }
+
+  async function confirmHubReload({ title = 'Reload Master Hub', message = 'Reload this Master Hub view?' } = {}) {
+    const selected = await showHubMessage({
+      title,
+      icon: 'warning',
+      message,
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Reload', class: 'btn-primary' }
+      ]
+    });
+    return selected === 'Reload';
+  }
+
+  async function showCloseLimitationMessage() {
+    return showHubMessage({
+      title: 'Close Master Hub',
+      icon: 'info',
+      message: 'Browser tab close is controlled by the browser, so the app cannot replace it with this message modal. Use in-page navigation when you want a modal-confirmed exit.',
+      buttons: [
+        { text: 'OK', class: 'btn-primary' }
+      ]
+    });
+  }
+
+  const notificationState = {
+    intervalSeconds: 60,
+    timer: null,
+    loading: false
+  };
+
+  function setNotificationCount(value, muted) {
+    if (!els.notificationCount) return;
+    els.notificationCount.textContent = String(value == null ? '-' : value);
+    els.notificationCount.classList.toggle('is-muted', Boolean(muted));
+  }
+
+  async function refreshNotificationCount() {
+    if (notificationState.loading || !els.notificationCount) return;
+    notificationState.loading = true;
+
+    try {
+      const response = await fetch('/school/master-hub/api/notification-count', {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to read notification count.' };
+      });
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Unable to read notification count.');
+      }
+      setNotificationCount(payload.unresolvedCount || 0, false);
+    } catch (error) {
+      setNotificationCount('-', true);
+    } finally {
+      notificationState.loading = false;
+    }
+  }
+
+  function restartNotificationTimer() {
+    if (notificationState.timer) {
+      window.clearInterval(notificationState.timer);
+      notificationState.timer = null;
+    }
+
+    refreshNotificationCount();
+    notificationState.timer = window.setInterval(refreshNotificationCount, Math.max(10, notificationState.intervalSeconds) * 1000);
+  }
+
+  function applyNotificationInterval(value) {
+    const parsed = Number(value);
+    notificationState.intervalSeconds = Number.isFinite(parsed) && parsed >= 10 ? parsed : 60;
+    restartNotificationTimer();
+  }
+
+  async function openNotificationSettings() {
+    if (typeof window.showMessageModal !== 'function') {
+      renderWorkspaceStatus('Message modal is not available on this page.', 'bi-exclamation-triangle', 'danger');
+      return;
+    }
+
+    const inputId = 'schoolMasterHubNotificationIntervalInput';
+    const selected = await window.showMessageModal({
+      title: 'Notification refresh timer',
+      icon: 'info',
+      size: 'md',
+      message: [
+        '<p class="mb-3">Set how often Master Hub checks unresolved or incomplete notifications while this page remains open.</p>',
+        '<label class="form-label fw-semibold" for="' + inputId + '">Interval timer, in seconds</label>',
+        '<div class="input-group">',
+        '<input type="number" class="form-control" id="' + inputId + '" min="10" step="5" value="' + escapeHtml(notificationState.intervalSeconds || 60) + '">',
+        '<span class="input-group-text">seconds</span>',
+        '</div>',
+        '<div class="form-text">Default is 60 seconds. Minimum allowed value is 10 seconds.</div>'
+      ].join(''),
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Save Timer', class: 'btn-primary' }
+      ]
+    });
+
+    if (selected === 'Save Timer') {
+      const input = document.getElementById(inputId);
+      applyNotificationInterval(input ? input.value : 60);
+    }
+  }
+
+  const workspaceState = {
+    currentSection: '',
+    loading: false
+  };
+
+  const workspaceSections = {
+    notifications: {
+      label: 'Notifications',
+      endpoint: '/school/master-hub/api/workspace/notifications',
+      sourceUrl: '/school/notifications',
+      icon: 'bi bi-bell-fill'
+    }
+  };
+
+  function setWorkspaceButtons(activeKey) {
+    els.workspaceButtons.forEach(function (button) {
+      const key = button.getAttribute('data-hub-workspace-section') || '';
+      const segment = button.closest('.hub-section-segment');
+      if (segment) {
+        segment.classList.toggle('is-active', key === activeKey);
+      }
+    });
+  }
+
+  function renderWorkspaceStatus(message, icon, tone) {
+    if (!els.workspace) return;
+    els.workspace.innerHTML = [
+      '<div class="hub-stage-empty text-' + escapeHtml(tone || 'muted') + '">',
+      '<div class="text-center px-4">',
+      '<i class="bi ' + escapeHtml(icon || 'bi-grid-1x2-fill') + ' display-5 d-block mb-3"></i>',
+      '<h2 class="h5">' + escapeHtml(message || 'Select a section to begin.') + '</h2>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function statusBadgeClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (value === 'resolved') return 'text-bg-success';
+    if (value === 'in_progress') return 'text-bg-primary';
+    if (value === 'dismissed') return 'text-bg-secondary';
+    return 'text-bg-warning';
+  }
+
+  function severityBadgeClass(severity) {
+    const value = String(severity || '').toLowerCase();
+    if (value === 'critical' || value === 'high') return 'text-bg-danger';
+    if (value === 'warning' || value === 'medium') return 'text-bg-warning';
+    if (value === 'success' || value === 'low') return 'text-bg-success';
+    return 'text-bg-info';
+  }
+
+  function renderNotificationWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : workspaceSections.notifications;
+    const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const body = rows.length
+      ? rows.map(function (row) {
+        const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+          return [
+            '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener">',
+            '<i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open'),
+            '</a>'
+          ].join('');
+        }).join('');
+        return [
+          '<tr>',
+          '<td class="ps-4">',
+          '<div class="fw-semibold">' + escapeHtml(row.title || row.id || 'Notification') + '</div>',
+          '<div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div>',
+          '</td>',
+          '<td><span class="badge ' + statusBadgeClass(row.status) + '">' + escapeHtml(String(row.status || 'open').replace(/_/g, ' ')) + '</span></td>',
+          '<td><span class="badge ' + severityBadgeClass(row.severity) + '">' + escapeHtml(row.severity || 'info') + '</span></td>',
+          '<td>' + escapeHtml(row.sourceType || '-') + '<div class="small text-muted">' + escapeHtml(row.sourceId || '') + '</div></td>',
+          '<td>' + escapeHtml(row.assignedPersonName || row.assignedRole || '-') + '</td>',
+          '<td class="text-nowrap">' + escapeHtml(row.dueDate || '-') + '</td>',
+          '<td class="text-nowrap">' + escapeHtml(row.incompleteTaskCount || 0) + ' / ' + escapeHtml(row.taskCount || 0) + '</td>',
+          '<td class="pe-4"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
+          '</tr>'
+        ].join('');
+      }).join('')
+      : '<tr><td colspan="8" class="text-center text-muted py-5">No notifications assigned to you.</td></tr>';
+
+    els.workspace.innerHTML = [
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-bell-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Notifications') + '</h2>',
+      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' notification(s) related to you. Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
+      '</div>',
+      '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="notifications"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>',
+      '<a href="' + escapeHtml(section.sourceUrl || '/school/notifications') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      '<div class="table-responsive">',
+      '<table class="table align-middle hub-workspace-table">',
+      '<thead class="table-light">',
+      '<tr>',
+      '<th class="ps-4">Notification</th>',
+      '<th>Status</th>',
+      '<th>Severity</th>',
+      '<th>Source</th>',
+      '<th>Assigned</th>',
+      '<th>Due</th>',
+      '<th>Tasks</th>',
+      '<th class="pe-4 text-end">Actions</th>',
+      '</tr>',
+      '</thead>',
+      '<tbody>',
+      body,
+      '</tbody>',
+      '</table>',
+      '</div>',
+      '</div>'
+    ].join('');
+
+    const reload = els.workspace.querySelector('[data-hub-workspace-reload]');
+    if (reload) {
+      reload.addEventListener('click', async function () {
+        const shouldReload = await confirmHubReload({
+          title: 'Reload Notifications',
+          message: 'Reload the notifications list inside Master Hub?'
+        });
+        if (shouldReload) {
+          loadWorkspaceSection(reload.getAttribute('data-hub-workspace-reload') || 'notifications');
+        }
+      });
+    }
+  }
+
+  async function loadWorkspaceSection(sectionKey) {
+    const key = String(sectionKey || '').trim().toLowerCase();
+    const config = workspaceSections[key];
+    if (!config || workspaceState.loading) return;
+
+    workspaceState.currentSection = key;
+    workspaceState.loading = true;
+    setWorkspaceButtons(key);
+    renderWorkspaceStatus('Loading ' + config.label + '...', 'bi-arrow-repeat', 'muted');
+    if (typeof window.showLoading === 'function') {
+      window.showLoading('Loading ' + config.label + '...');
+    }
+
+    try {
+      const response = await fetch(config.endpoint, {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to load this section.' };
+      });
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Unable to load this section.');
+      }
+
+      if (key === 'notifications') {
+        renderNotificationWorkspace(payload);
+        setNotificationCount(payload.unresolvedCount || 0, false);
+      }
+    } catch (error) {
+      renderWorkspaceStatus(error.message || 'Unable to load this section.', 'bi-exclamation-triangle', 'danger');
+    } finally {
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+      workspaceState.loading = false;
+    }
   }
 
   function findModule(type) {
@@ -492,7 +953,7 @@
       return;
     }
 
-    const body = rows.map(function (row) {
+    const body = rows.map(function (row, idx) {
       const actions = Array.isArray(row.actions) ? row.actions : [];
       const actionLinks = actions.map(function (action) {
         return [
@@ -501,17 +962,24 @@
           '</a>'
         ].join('');
       }).join('');
+      const cardId = 'schoolHubCardDetails_' + escapeHtml(row.id || idx);
 
       return [
-        '<article class="hub-person-card">',
+        '<article class="hub-person-card" data-hub-card>',
         '<div class="d-flex justify-content-between align-items-start gap-2">',
         '<div class="min-w-0">',
         '<div class="fw-semibold text-truncate">' + escapeHtml(row.name || '-') + '</div>',
         '<div class="text-muted small font-monospace">' + escapeHtml(row.id || '') + '</div>',
         '</div>',
-        '<span class="badge text-bg-light border flex-shrink-0">' + escapeHtml(row.status || 'Active') + '</span>',
+        '<div class="d-flex align-items-center gap-2 flex-shrink-0">',
+        '<span class="badge text-bg-light border">' + escapeHtml(row.status || 'Active') + '</span>',
+        '<button type="button" class="btn btn-outline-secondary btn-sm hub-card-toggle" data-hub-card-toggle aria-expanded="false" aria-controls="' + cardId + '">',
+        '<i class="bi bi-chevron-down"></i>',
+        '</button>',
         '</div>',
-        '<div class="mt-2 small text-muted">',
+        '</div>',
+        '<div class="hub-card-details" id="' + cardId + '">',
+        '<div class="small text-muted">',
         '<div><i class="bi bi-person-badge me-1"></i>' + escapeHtml(row.personId || '-') + '</div>',
         '<div><i class="bi bi-envelope me-1"></i>' + escapeHtml(row.email || '-') + '</div>',
         '<div><i class="bi bi-telephone me-1"></i>' + escapeHtml(row.phone || '-') + '</div>',
@@ -523,11 +991,42 @@
         '<div class="hub-card-actions mt-3">',
         actionLinks || '<span class="text-muted small">No actions</span>',
         '</div>',
+        '</div>',
         '</article>'
       ].join('');
     }).join('');
 
-    els.list.innerHTML = '<div class="hub-person-list">' + body + '</div>';
+    const pagination = state.pagination || {};
+    const hasMore = Number(pagination.currentPage || 1) < Number(pagination.totalPages || 1);
+    const totalItems = Number(pagination.totalItems || rows.length || 0);
+    const footer = hasMore
+      ? [
+        '<div class="hub-load-more-wrap">',
+        '<button type="button" class="btn btn-outline-primary btn-sm" id="schoolMasterHubLoadMore">',
+        '<i class="bi bi-plus-circle me-1"></i> Load More',
+        '</button>',
+        '<div class="text-muted small mt-2">Showing ' + escapeHtml(rows.length) + ' of ' + escapeHtml(totalItems) + '</div>',
+        '</div>'
+      ].join('')
+      : '<div class="text-muted small text-center py-2">Showing ' + escapeHtml(rows.length) + ' of ' + escapeHtml(totalItems) + '</div>';
+
+    els.list.innerHTML = '<div class="hub-person-list">' + body + footer + '</div>';
+    const loadMoreBtn = document.getElementById('schoolMasterHubLoadMore');
+    if (loadMoreBtn) {
+      loadMoreBtn.addEventListener('click', function () {
+        searchCurrent({ append: true });
+      });
+    }
+    els.list.querySelectorAll('[data-hub-card-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const card = btn.closest('[data-hub-card]');
+        if (!card) return;
+        const expanded = !card.classList.contains('is-expanded');
+        card.classList.toggle('is-expanded', expanded);
+        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        btn.innerHTML = expanded ? '<i class="bi bi-chevron-up"></i>' : '<i class="bi bi-chevron-down"></i>';
+      });
+    });
   }
 
   function updateHeader(result) {
@@ -540,29 +1039,36 @@
     }
   }
 
-  async function searchCurrent() {
+  async function searchCurrent(options) {
     if (!state.currentType || state.loading) return;
+    const opts = options || {};
     const term = String((els.search && els.search.value) || '').trim();
     state.lastSearch = term;
     syncActiveTab();
 
     if (term.length < 2) {
       updateCount(state.currentType, '-');
+      state.page = 1;
+      state.loadedRows = [];
+      state.pagination = null;
       setStatus('', 'info');
       renderSearchPrompt();
       return;
     }
 
     const type = state.currentType;
+    state.page = opts.append === true ? Number(state.page || 1) + 1 : 1;
     const query = new URLSearchParams({
       type: type,
       page: String(state.page || 1),
-      limit: String((els.limit && els.limit.value) || '25'),
       q: term
     });
 
     setLoading(true, type);
     setStatus('Searching ' + (findModule(type)?.label || 'records') + '...', 'info');
+    if (typeof window.showLoading === 'function') {
+      window.showLoading('Searching ' + (findModule(type)?.label || 'records') + '...');
+    }
 
     try {
       const response = await fetch('/school/master-hub/api/list?' + query.toString(), {
@@ -574,12 +1080,19 @@
       if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Unable to search list.');
       updateHeader(payload);
       updateCount(type, payload.total);
-      renderRows(payload.rows || []);
+      state.pagination = payload.pagination || null;
+      state.loadedRows = opts.append === true
+        ? state.loadedRows.concat(payload.rows || [])
+        : (payload.rows || []);
+      renderRows(state.loadedRows);
       setStatus('', 'info');
     } catch (error) {
       renderEmpty(error.message || 'Unable to search list.', 'bi-exclamation-triangle');
       setStatus(error.message || 'Unable to search list.', 'danger');
     } finally {
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
       setLoading(false, type);
     }
   }
@@ -592,22 +1105,39 @@
     });
   }
 
-  if (els.limit) {
-    els.limit.addEventListener('change', searchCurrent);
-  }
-
   if (els.refreshCurrent) {
     els.refreshCurrent.addEventListener('click', searchCurrent);
+  }
+
+  if (els.notificationSettings) {
+    els.notificationSettings.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      openNotificationSettings();
+    });
+  }
+
+  els.workspaceButtons.forEach(function (button) {
+    button.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      loadWorkspaceSection(button.getAttribute('data-hub-workspace-section') || '');
+    });
+  });
+
+  function syncSidebarToggle() {
+    if (!els.collapseSidebar) return;
+    const collapsed = root.classList.contains('hub-sidebar-collapsed');
+    els.collapseSidebar.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+    els.collapseSidebar.innerHTML = collapsed
+      ? '<i class="bi bi-layout-sidebar-inset-reverse"></i>'
+      : '<i class="bi bi-layout-sidebar-inset"></i>';
   }
 
   if (els.collapseSidebar) {
     els.collapseSidebar.addEventListener('click', function () {
       root.classList.toggle('hub-sidebar-collapsed');
-      const collapsed = root.classList.contains('hub-sidebar-collapsed');
-      els.collapseSidebar.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
-      els.collapseSidebar.innerHTML = collapsed
-        ? '<i class="bi bi-layout-sidebar-inset-reverse"></i>'
-        : '<i class="bi bi-layout-sidebar-inset"></i>';
+      syncSidebarToggle();
     });
   }
 
@@ -616,6 +1146,8 @@
       if (event.target && event.target.closest('[data-hub-refresh]')) return;
       state.currentType = tab.getAttribute('data-hub-tab') || state.currentType;
       state.page = 1;
+      state.loadedRows = [];
+      state.pagination = null;
       if (els.search) els.search.value = '';
       updateCount(state.currentType, '-');
       syncActiveTab();
@@ -633,7 +1165,44 @@
     });
   });
 
+  document.addEventListener('keydown', async function (event) {
+    const key = String(event.key || '').toLowerCase();
+    const isReloadShortcut = event.key === 'F5' || ((event.ctrlKey || event.metaKey) && key === 'r');
+    const isCloseShortcut = (event.ctrlKey || event.metaKey) && key === 'w';
+
+    if (isReloadShortcut) {
+      event.preventDefault();
+      event.stopPropagation();
+      const shouldReload = await confirmHubReload({
+        title: 'Reload Master Hub',
+        message: 'Reloading will clear the current in-page Master Hub view. Continue?'
+      });
+      if (shouldReload) {
+        window.location.reload();
+      }
+      return;
+    }
+
+    if (isCloseShortcut) {
+      event.preventDefault();
+      event.stopPropagation();
+      await showCloseLimitationMessage();
+    }
+  });
+
+  function confirmMasterHubUnload(event) {
+    const message = 'Leave School Master Hub? Your current in-page workspace state may be cleared.';
+    event.preventDefault();
+    event.returnValue = message;
+    return message;
+  }
+
+  window.addEventListener('beforeunload', confirmMasterHubUnload);
+  window.onbeforeunload = confirmMasterHubUnload;
+
   if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+  restartNotificationTimer();
+  syncSidebarToggle();
   syncActiveTab();
   renderSearchPrompt();
 }());

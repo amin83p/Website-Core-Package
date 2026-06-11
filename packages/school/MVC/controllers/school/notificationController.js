@@ -72,8 +72,8 @@ function baseViewModel(req, res, extra = {}) {
 }
 
 function filterTasksForViewer(reqUser, notification) {
-  const canManageAll = notificationService.isAdminViewer(reqUser);
-  if (canManageAll) return notification;
+  const canManageTaskWorkflow = notificationService.canManageNotificationWorkflow(reqUser, notification);
+  if (canManageTaskWorkflow) return notification;
   const currentPersonId = String(personDisplayNameService.getUserPersonId(reqUser) || '').trim();
   if (!currentPersonId) {
     return {
@@ -83,7 +83,11 @@ function filterTasksForViewer(reqUser, notification) {
   }
   return {
     ...notification,
-    tasks: (Array.isArray(notification?.tasks) ? notification.tasks : []).filter((task) => String(task?.assignedPersonId || '').trim() === currentPersonId)
+    tasks: (Array.isArray(notification?.tasks) ? notification.tasks : []).filter((task) => {
+      if (String(task?.assignedPersonId || '').trim() === currentPersonId) return true;
+      return (Array.isArray(task?.assignmentHistory) ? task.assignmentHistory : [])
+        .some((entry) => String(entry?.assignedPersonId || '').trim() === currentPersonId);
+    })
   };
 }
 
@@ -142,10 +146,14 @@ async function showList(req, res) {
 
 async function showDetail(req, res) {
   try {
-    const notification = filterTasksForViewer(req.user, await notificationService.getNotificationById(req.params.id, req.user));
+    const rawNotification = await notificationService.getNotificationById(req.params.id, req.user);
+    const canManageTaskWorkflow = notificationService.canManageNotificationWorkflow(req.user, rawNotification);
+    const notification = filterTasksForViewer(req.user, rawNotification);
     return res.render('school/notification/detail', baseViewModel(req, res, {
       title: 'School Notification Detail',
-      notification
+      notification,
+      canManageTaskWorkflow,
+      canAssignTasks: canManageTaskWorkflow
     }));
   } catch (error) {
     return sendError(req, res, error);

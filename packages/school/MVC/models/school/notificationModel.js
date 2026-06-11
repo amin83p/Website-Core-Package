@@ -95,6 +95,23 @@ function sanitizeLifecycleEvents(events) {
     .filter((event) => event.action || event.oldStatus || event.newStatus);
 }
 
+function sanitizeTaskAssignmentHistory(history) {
+  return (Array.isArray(history) ? history : [])
+    .map((entry) => ({
+      id: cleanId(entry?.id, { max: 120, allowEmpty: true }) || `SNTA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      assignedRole: cleanString(entry?.assignedRole, { max: 120, allowEmpty: true }),
+      assignedPersonId: cleanId(entry?.assignedPersonId, { max: 120, allowEmpty: true }) || '',
+      assignedPersonName: cleanString(entry?.assignedPersonName, { max: 160, allowEmpty: true }),
+      assignedAt: cleanString(entry?.assignedAt, { max: 40, allowEmpty: true }),
+      startedAt: cleanString(entry?.startedAt, { max: 40, allowEmpty: true }),
+      reassignedAt: cleanString(entry?.reassignedAt, { max: 40, allowEmpty: true }),
+      completedAt: cleanString(entry?.completedAt, { max: 40, allowEmpty: true }),
+      status: cleanString(entry?.status, { max: 40, allowEmpty: true }) || 'completed',
+      note: cleanString(entry?.note, { max: 1000, allowEmpty: true })
+    }))
+    .filter((entry) => entry.assignedPersonId || entry.assignedPersonName || entry.assignedAt);
+}
+
 function sanitizeTasks(tasks, { existingTasks = [] } = {}) {
   const existingIds = new Set((existingTasks || []).map((task) => cleanString(task?.id, { max: 120, allowEmpty: true })).filter(Boolean));
   return (Array.isArray(tasks) ? tasks : [])
@@ -116,7 +133,8 @@ function sanitizeTasks(tasks, { existingTasks = [] } = {}) {
         assignedAt: cleanString(task?.assignedAt, { max: 40, allowEmpty: true }),
         startedAt: cleanString(task?.startedAt, { max: 40, allowEmpty: true }),
         reassignedAt: cleanString(task?.reassignedAt, { max: 40, allowEmpty: true }),
-        completedAt: cleanString(task?.completedAt, { max: 40, allowEmpty: true })
+        completedAt: cleanString(task?.completedAt, { max: 40, allowEmpty: true }),
+        assignmentHistory: sanitizeTaskAssignmentHistory(task?.assignmentHistory)
       };
     });
 }

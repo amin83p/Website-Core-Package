@@ -1,4 +1,6 @@
 const dataService = require('./schoolDataService');
+const notificationService = require('./notificationService');
+const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
@@ -208,6 +210,7 @@ async function getPeoplePanelRows(type, queryInput, req) {
   const query = await buildDataServiceQuery(queryInput || {});
   const searchTerm = lower(query.q);
   if (searchTerm.length < 2) {
+    const empty = paginate([], query);
     return {
       module: {
         type: moduleConfig.type,
@@ -218,7 +221,7 @@ async function getPeoplePanelRows(type, queryInput, req) {
         directoryUrl: moduleConfig.directoryUrl
       },
       rows: [],
-      pagination: { page: 1, limit: Number(query.limit || 25), total: 0, totalPages: 0 },
+      pagination: empty.pagination,
       total: 0,
       refreshedAt: new Date().toISOString(),
       minimumSearchLength: 2
@@ -228,6 +231,8 @@ async function getPeoplePanelRows(type, queryInput, req) {
   delete fetchQuery.q;
   delete fetchQuery.type;
   delete fetchQuery.searchFields;
+  delete fetchQuery.page;
+  delete fetchQuery.limit;
 
   const [peopleRows, persons, departments] = await Promise.all([
     dataService.fetchData(moduleConfig.entityType, fetchQuery, req.user, { scopeId: access.scopeId }),
@@ -262,7 +267,151 @@ async function getPeoplePanelRows(type, queryInput, req) {
   };
 }
 
+const COMPLETE_NOTIFICATION_STATUSES = new Set(['resolved', 'dismissed']);
+const COMPLETE_TASK_STATUSES = new Set(['done', 'cancelled']);
+
+function hasIncompleteNotificationWork(notification) {
+  if (!notification || typeof notification !== 'object') {
+    return false;
+  }
+
+  if (!COMPLETE_NOTIFICATION_STATUSES.has(lower(notification.status || 'open'))) {
+    return true;
+  }
+
+  const tasks = Array.isArray(notification.tasks) ? notification.tasks : [];
+  return tasks.some((task) => !COMPLETE_TASK_STATUSES.has(lower(task?.status || 'open')));
+}
+
+function buildNotificationActionLinks(row) {
+  const id = normalizeText(row?.id);
+  const detailUrl = `/school/notifications/detail/${encodeURIComponent(id)}`;
+  const status = lower(row?.status || 'open');
+  const actions = [
+    { label: 'Details', href: detailUrl, icon: 'bi bi-eye', tone: 'secondary' },
+    { label: 'Tasks', href: detailUrl, icon: 'bi bi-list-task', tone: 'primary' }
+  ];
+
+  if (status === 'open') {
+    actions.push({ label: 'Start', href: detailUrl, icon: 'bi bi-play-circle', tone: 'primary' });
+  } else if (status === 'in_progress') {
+    actions.push({ label: 'Resolve', href: detailUrl, icon: 'bi bi-check2-circle', tone: 'success' });
+  } else {
+    actions.push({ label: 'Reopen', href: detailUrl, icon: 'bi bi-arrow-counterclockwise', tone: 'warning' });
+  }
+
+  return actions;
+}
+
+function normalizeNotificationRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: normalizeText(row?.id),
+    title: normalizeText(row?.title || row?.id || 'Notification'),
+    status: normalizeText(row?.status || 'open'),
+    severity: normalizeText(row?.severity || 'info'),
+    sourceType: normalizeText(row?.sourceType || ''),
+    sourceId: normalizeText(row?.sourceId || ''),
+    assignedRole: normalizeText(row?.assignedRole || ''),
+    assignedPersonName: normalizeText(row?.assignedPersonName || row?.assignedPersonId || ''),
+    dueDate: normalizeText(row?.dueDate || ''),
+    taskCount: Array.isArray(row?.tasks) ? row.tasks.length : 0,
+    incompleteTaskCount: (Array.isArray(row?.tasks) ? row.tasks : [])
+      .filter((task) => !COMPLETE_TASK_STATUSES.has(lower(task?.status || 'open'))).length,
+    actions: buildNotificationActionLinks(row)
+  }));
+}
+
+function addRoleTokens(target, value) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => addRoleTokens(target, item));
+    return;
+  }
+  const token = lower(value);
+  if (!token) return;
+  target.add(token);
+  if (token.startsWith('member') && token.length > 'member'.length) {
+    target.add(token.slice('member'.length));
+  }
+}
+
+function getActiveUserRoleTokens(user) {
+  const tokens = new Set();
+  addRoleTokens(tokens, user?.roles);
+  addRoleTokens(tokens, user?.role);
+
+  const activeOrgId = normalizeText(user?.activeOrgId || user?.activeOrganization?.id || user?.primaryOrgId);
+  const memberships = Array.isArray(user?.organizations) ? user.organizations : [];
+  memberships.forEach((membership) => {
+    const membershipOrgId = normalizeText(membership?.orgId || membership?.organizationId || membership?.id);
+    if (activeOrgId && membershipOrgId && !idsEqual(activeOrgId, membershipOrgId)) return;
+    addRoleTokens(tokens, membership?.roles);
+    addRoleTokens(tokens, membership?.role);
+  });
+
+  return tokens;
+}
+
+function isNotificationRelatedToActiveUser(row, user) {
+  const personId = normalizeText(personDisplayNameService.getUserPersonId(user));
+  const assignedPersonId = normalizeText(row?.assignedPersonId);
+  if (personId && assignedPersonId && idsEqual(personId, assignedPersonId)) {
+    return true;
+  }
+
+  const assignedRole = lower(row?.assignedRole);
+  if (assignedRole && getActiveUserRoleTokens(user).has(assignedRole)) {
+    return true;
+  }
+
+  return false;
+}
+
+async function getActiveUserNotifications(req, filters = {}) {
+  const query = { ...(filters || {}) };
+  delete query.assignment;
+  const visibleNotifications = await notificationService.listVisibleNotifications(req.user, query);
+  return (Array.isArray(visibleNotifications) ? visibleNotifications : [])
+    .filter((row) => isNotificationRelatedToActiveUser(row, req.user));
+}
+
+async function getNotificationSummary(req) {
+  const rows = await getActiveUserNotifications(req, { limit: 5000 });
+
+  return {
+    totalCount: rows.length,
+    unresolvedCount: rows.filter(hasIncompleteNotificationWork).length,
+    checkedAt: new Date().toISOString()
+  };
+}
+
+async function getWorkspaceSection(sectionKey, queryInput, req) {
+  const key = lower(sectionKey);
+
+  if (key !== 'notifications') {
+    const error = new Error('This Master Hub section is not available on-page yet.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const rows = await getActiveUserNotifications(req, queryInput || {});
+
+  return {
+    section: {
+      key: 'notifications',
+      label: 'Notifications',
+      icon: 'bi bi-bell-fill',
+      sourceUrl: '/school/notifications'
+    },
+    rows: normalizeNotificationRows(rows),
+    total: rows.length,
+    unresolvedCount: rows.filter(hasIncompleteNotificationWork).length,
+    refreshedAt: new Date().toISOString()
+  };
+}
+
 module.exports = {
   resolveAccessibleModules,
-  getPeoplePanelRows
+  getPeoplePanelRows,
+  getNotificationSummary,
+  getWorkspaceSection
 };

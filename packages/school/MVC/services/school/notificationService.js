@@ -42,6 +42,38 @@ function getActorPersonId(user) {
   return toPublicId(personDisplayNameService.getUserPersonId(user));
 }
 
+function addRoleTokens(target, value) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => addRoleTokens(target, item));
+    return;
+  }
+  const raw = cleanString(value, 240).toLowerCase();
+  if (!raw) return;
+  raw.split(/[\s,;|]+/).map((token) => token.trim()).filter(Boolean).forEach((token) => {
+    target.add(token);
+    if (token.startsWith('member') && token.length > 'member'.length) {
+      target.add(token.slice('member'.length));
+    }
+  });
+}
+
+function getActorOrgRoleTokens(user) {
+  const tokens = new Set();
+  addRoleTokens(tokens, user?.roles);
+  addRoleTokens(tokens, user?.role);
+
+  const activeOrgId = getActiveOrgId(user);
+  const memberships = Array.isArray(user?.organizations) ? user.organizations : [];
+  memberships.forEach((membership) => {
+    const membershipOrgId = toPublicId(membership?.orgId || membership?.organizationId || membership?.id || '');
+    if (activeOrgId && membershipOrgId && !idsEqual(activeOrgId, membershipOrgId)) return;
+    addRoleTokens(tokens, membership?.roles);
+    addRoleTokens(tokens, membership?.role);
+  });
+
+  return tokens;
+}
+
 function getActorName(user) {
   const direct = cleanString(user?.displayName || user?.fullName, 160);
   if (direct) return direct;
@@ -59,6 +91,35 @@ async function resolveActorName(user) {
 
 function isAdminViewer(user) {
   return Boolean(adminChekersService.isSuperAdmin(user) || adminChekersService.isOrgAdmin(user));
+}
+
+function canManageNotificationWorkflow(user, notification) {
+  if (isAdminViewer(user)) return true;
+  if (isAssignedToActor(notification, user)) return true;
+  const assignedRole = cleanString(notification?.assignedRole, 120).toLowerCase();
+  return Boolean(assignedRole && getActorOrgRoleTokens(user).has(assignedRole));
+}
+
+function assertNotificationWorkflowOwner(user, notification, action = 'manage this notification workflow') {
+  if (canManageNotificationWorkflow(user, notification)) return;
+  const error = new Error(`You are not authorized to ${action}.`);
+  error.statusCode = 403;
+  throw error;
+}
+
+function assertTaskAssigneeIsOtherPerson(user, assignment) {
+  const assignedPersonId = toPublicId(assignment?.assignedPersonId || '');
+  if (!assignedPersonId) {
+    const error = new Error('Select a person assignee before assigning this task.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const actorPersonId = getActorPersonId(user);
+  if (actorPersonId && idsEqual(actorPersonId, assignedPersonId)) {
+    const error = new Error('Assign this task to another person, not yourself.');
+    error.statusCode = 400;
+    throw error;
+  }
 }
 
 function assertAdminViewer(user, action = 'delete this item') {
@@ -207,15 +268,13 @@ function normalizeTaskWithTiming({
     if (!hadAssignee && !nextAssignedAt) {
       nextAssignedAt = now;
     }
-    if (!nextStartedAt && nextStatusValue === 'open') {
-      nextStatusValue = 'in_progress';
-      nextStartedAt = now;
-    }
     if (assignedChanged || reassigned) {
       nextReassignedAt = now;
-      if (!nextAssignedAt) {
-        nextAssignedAt = now;
-      }
+      nextAssignedAt = now;
+      nextStartedAt = '';
+    }
+    if (!nextStartedAt && nextStatusValue === 'in_progress') {
+      nextStartedAt = now;
     }
   }
 
@@ -240,6 +299,25 @@ function normalizeTaskWithTiming({
     startedAt: nextStartedAt,
     reassignedAt: nextReassignedAt,
     note: cleanString(task.note, 1000)
+  };
+}
+
+function buildCompletedAssignmentHistoryEntry(task = {}, reassignedAt = new Date().toISOString(), nextAssignment = {}) {
+  const previousPersonId = toPublicId(task.assignedPersonId || '');
+  if (!previousPersonId) return null;
+  return {
+    id: `SNTA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+    assignedRole: cleanString(task.assignedRole, 120),
+    assignedPersonId: previousPersonId,
+    assignedPersonName: cleanString(task.assignedPersonName || previousPersonId, 160),
+    assignedAt: cleanString(task.assignedAt, 40),
+    startedAt: cleanString(task.startedAt, 40),
+    reassignedAt,
+    completedAt: reassignedAt,
+    status: 'completed',
+    note: nextAssignment?.assignedPersonId
+      ? `Task was assigned to ${cleanString(nextAssignment.assignedPersonName || nextAssignment.assignedPersonId, 160)}.`
+      : 'Task assignment ended.'
   };
 }
 
@@ -659,8 +737,9 @@ async function reassignNotification(reqUser, id, input = {}) {
 async function addNotificationTask(reqUser, id, input = {}) {
   const existing = await getNotificationById(id, reqUser);
   if (!existing) throw new Error('Notification was not found.');
-  assertNotificationOwnership(reqUser, existing, 'add tasks to this notification');
+  assertNotificationWorkflowOwner(reqUser, existing, 'assign tasks for this notification');
   const assignment = await resolveAssignmentInput(input);
+  assertTaskAssigneeIsOtherPerson(reqUser, assignment);
   const now = new Date().toISOString();
   const taskTiming = normalizeTaskWithTiming({
     actor: true,
@@ -668,7 +747,7 @@ async function addNotificationTask(reqUser, id, input = {}) {
     assignedPersonId: assignment.assignedPersonId,
     assignedRole: assignment.assignedRole,
     assignedPersonName: assignment.assignedPersonName,
-    status: cleanString(input.status, 40) || 'open',
+    status: 'open',
     now
   });
   const tasks = notificationModel.sanitizeTasks([
@@ -715,7 +794,7 @@ async function addNotificationTask(reqUser, id, input = {}) {
 async function updateNotificationTask(reqUser, id, taskId, input = {}) {
   const existing = await getNotificationById(id, reqUser);
   if (!existing) throw new Error('Notification was not found.');
-  assertNotificationOwnership(reqUser, existing, 'update tasks for this notification');
+  const canManageWorkflow = canManageNotificationWorkflow(reqUser, existing);
   const targetTaskId = toPublicId(taskId);
   const now = new Date().toISOString();
   let found = false;
@@ -730,9 +809,43 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
       ...task,
       status: normalizeTaskStatus(task?.status, 'open')
     };
-    assertTaskOwnership(reqUser, taskCopy, 'update this task');
-    const nextStatus = normalizeTaskStatus(input.status, task.status || 'open');
-    const assignment = await resolveAssignmentInput(input, taskCopy);
+    const requestedStatus = normalizeTaskStatus(input.status, task.status || 'open');
+    const assignmentProvided = Object.prototype.hasOwnProperty.call(input, 'assignedPersonId')
+      || Object.prototype.hasOwnProperty.call(input, 'assignedPersonName')
+      || Object.prototype.hasOwnProperty.call(input, 'assignedRole');
+    const detailProvided = Object.prototype.hasOwnProperty.call(input, 'title')
+      || Object.prototype.hasOwnProperty.call(input, 'description')
+      || Object.prototype.hasOwnProperty.call(input, 'dueDate');
+
+    if (!canManageWorkflow) {
+      assertTaskOwnership(reqUser, taskCopy, 'complete this task');
+      if (requestedStatus !== 'done') {
+        const error = new Error('You can only mark your assigned task as completed.');
+        error.statusCode = 403;
+        throw error;
+      }
+      if (assignmentProvided || detailProvided) {
+        const error = new Error('You cannot edit or reassign this task.');
+        error.statusCode = 403;
+        throw error;
+      }
+    }
+    const assignment = canManageWorkflow
+      ? await resolveAssignmentInput(input, taskCopy)
+      : await resolveAssignmentInput({}, taskCopy);
+    if (canManageWorkflow && assignmentProvided) {
+      assertTaskAssigneeIsOtherPerson(reqUser, assignment);
+    }
+    const previousAssignedPersonId = toPublicId(taskCopy.assignedPersonId || '');
+    const nextAssignedPersonId = toPublicId(assignment.assignedPersonId || '');
+    const shouldClosePreviousAssignment = Boolean(
+      canManageWorkflow
+      && assignmentProvided
+      && previousAssignedPersonId
+      && nextAssignedPersonId
+      && !idsEqual(previousAssignedPersonId, nextAssignedPersonId)
+    );
+    const nextStatus = shouldClosePreviousAssignment ? 'open' : requestedStatus;
     const nextTaskTiming = normalizeTaskWithTiming({
       actor: true,
       task: taskCopy,
@@ -749,6 +862,10 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
       : (nextTaskTiming.status === 'cancelled'
         ? (task.completedAt || cleanString(task.completedAt, 40) || now)
         : (nextStatus === 'open' && previousStatus !== 'open' ? '' : cleanString(task.completedAt, 40)));
+    const previousAssignmentHistory = Array.isArray(taskCopy.assignmentHistory) ? taskCopy.assignmentHistory : [];
+    const closedAssignmentEntry = shouldClosePreviousAssignment
+      ? buildCompletedAssignmentHistoryEntry(taskCopy, nextTaskTiming.reassignedAt || now, assignment)
+      : null;
     const updated = {
       ...taskCopy,
       title: cleanString(input.title || task.title, 220),
@@ -756,7 +873,10 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
       ...nextTaskTiming,
       note: normalizedNote,
       updatedAt: now,
-      completedAt
+      completedAt,
+      assignmentHistory: closedAssignmentEntry
+        ? previousAssignmentHistory.concat(closedAssignmentEntry)
+        : previousAssignmentHistory
     };
     updated.assignedRole = nextTaskTiming.assignedRole;
     updated.assignedPersonId = nextTaskTiming.assignedPersonId;
@@ -799,6 +919,7 @@ module.exports = {
   getActorId,
   getActorName,
   isAdminViewer,
+  canManageNotificationWorkflow,
   listVisibleNotifications,
   getNotificationById,
   upsertSourceNotification,
