@@ -126,7 +126,9 @@ async function listAccesses(req, res) {
         const pagination = pagedAccesses?.pagination || null;
     
         if (req.headers['x-ajax-request']) {
-          if(String(req.query?.q || '').trim() === SEARCH_DEFAULT_KEYWORD) data = await dataService.getAccessibleAccesses(req.user);
+          const isDefaultPickerSearch = String(req.query?.q || '').trim() === SEARCH_DEFAULT_KEYWORD;
+          const hasTargetOrgFilter = String(req.query?.orgId || '').trim() !== '';
+          if(isDefaultPickerSearch && !hasTargetOrgFilter) data = await dataService.getAccessibleAccesses(req.user);
           return res.json({ status: 'success', results: data, pagination });
         }
     

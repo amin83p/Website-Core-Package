@@ -4,6 +4,13 @@ const { runByRepositoryBackend } = require('./backend/repositoryBackendSelector'
 const { getMongoCollection } = require('../infrastructure/mongo/mongoConnection');
 const { toPublicId } = require('../utils/idAdapter');
 const {
+  normalizeAccessProfileScope,
+  choosePreferredAccessProfile,
+  dedupeAccessProfilesById,
+  buildMongoAccessOrgFilter,
+  buildMongoGlobalAccessOrgFilter
+} = require('../utils/accessProfileScopeUtils');
+const {
   buildMongoFilterFromQuery,
   buildMongoSortFromQuery,
   resolveMongoPagination,
@@ -13,6 +20,8 @@ const {
   generateUniqueStringId,
   deepMerge
 } = require('./backend/mongoRepositoryUtils');
+
+const ACCESS_MONGO_SEARCH_FIELDS = ['id', 'name', 'description', 'orgId', 'adminCategories', 'profileName', 'scope'];
 
 function stripPaginationFromQuery(query = {}) {
   if (!query || typeof query !== 'object') return {};
@@ -27,32 +36,79 @@ function buildAccessScopeFilter(scope = {}) {
   const includeGlobal = scope?.includeGlobal !== false;
   const orgId = toPublicId(scope?.orgId);
   const clauses = [];
-  if (includeGlobal) clauses.push({ $or: [{ orgId: { $exists: false } }, { orgId: null }, { orgId: '' }] });
-  if (orgId) clauses.push({ orgId });
+  if (includeGlobal) clauses.push(buildMongoGlobalAccessOrgFilter());
+  if (orgId) clauses.push(buildMongoAccessOrgFilter(orgId));
   if (!clauses.length) return { id: '__NO_MATCH__' };
   if (clauses.length === 1) return clauses[0];
   return { $or: clauses };
 }
 
-async function listMongoAccesses(options = {}) {
+function splitOrgIdQueryFilter(query = {}) {
+  const cleanQuery = { ...(query || {}) };
+  const orgId = toPublicId(cleanQuery.orgId);
+  delete cleanQuery.orgId;
+  return {
+    query: cleanQuery,
+    orgFilter: orgId ? buildMongoAccessOrgFilter(orgId) : {}
+  };
+}
+
+function getNestedValue(item, path) {
+  if (!item || !path) return undefined;
+  return String(path).split('.').reduce((current, key) => {
+    if (!current || typeof current !== 'object') return undefined;
+    return current[key];
+  }, item);
+}
+
+function compareUnknownValues(left, right) {
+  if (left === right) return 0;
+  if (left === undefined || left === null || left === '') return 1;
+  if (right === undefined || right === null || right === '') return -1;
+  const leftDate = Date.parse(String(left));
+  const rightDate = Date.parse(String(right));
+  if (Number.isFinite(leftDate) && Number.isFinite(rightDate)) return leftDate - rightDate;
+  if (typeof left === 'number' && typeof right === 'number') return left - right;
+  return String(left).localeCompare(String(right), undefined, { sensitivity: 'base', numeric: true });
+}
+
+function applySortAndPagination(rows = [], query = {}, explicitSort = null) {
+  const output = [...(Array.isArray(rows) ? rows : [])];
+  const sort = buildMongoSortFromQuery(query, explicitSort);
+  const sortEntries = Object.entries(sort || {});
+  if (sortEntries.length > 0) {
+    output.sort((left, right) => {
+      for (const [field, direction] of sortEntries) {
+        const comparison = compareUnknownValues(getNestedValue(left, field), getNestedValue(right, field));
+        if (comparison !== 0) return Number(direction) < 0 ? -comparison : comparison;
+      }
+      return 0;
+    });
+  }
+
+  const { skip, limit } = resolveMongoPagination(query, null);
+  if (limit > 0) return output.slice(Math.max(0, skip), Math.max(0, skip) + limit);
+  return output;
+}
+
+async function listMongoAccessesRaw(options = {}) {
   const collection = getMongoCollection('accesses');
   const query = options?.query || {};
+  const splitQuery = splitOrgIdQueryFilter(query);
   const scopeFilter = buildAccessScopeFilter(options?.scope || {});
-  const queryFilter = buildMongoFilterFromQuery(query, {
-    defaultSearchFields: ['id', 'userId', 'orgId', 'profileName', 'scope'],
+  const queryFilter = buildMongoFilterFromQuery(splitQuery.query, {
+    defaultSearchFields: ACCESS_MONGO_SEARCH_FIELDS,
     dateFields: ['createdAt', 'audit.createDateTime', 'audit.lastUpdateDateTime']
   });
-  const filter = combineMongoFilters(scopeFilter, queryFilter);
-  const sort = buildMongoSortFromQuery(query, options?.sort || null);
-  const { skip, limit } = resolveMongoPagination(query, options?.pagination || null);
+  const filter = combineMongoFilters(scopeFilter, splitQuery.orgFilter, queryFilter);
+  const rows = await collection.find(filter).toArray();
+  return rows.map(normalizeMongoDocument).filter(Boolean).map(normalizeAccessProfileScope);
+}
 
-  let cursor = collection.find(filter);
-  if (sort && Object.keys(sort).length) cursor = cursor.sort(sort);
-  if (skip > 0) cursor = cursor.skip(skip);
-  if (limit > 0) cursor = cursor.limit(limit);
-
-  const rows = await cursor.toArray();
-  return rows.map(normalizeMongoDocument).filter(Boolean);
+async function listMongoAccesses(options = {}) {
+  const query = options?.query || {};
+  const rows = dedupeAccessProfilesById(await listMongoAccessesRaw(options));
+  return applySortAndPagination(rows, query, options?.sort || null);
 }
 
 const accessRepository = {
@@ -61,13 +117,14 @@ const accessRepository = {
       json: async () => {
         const query = options?.query || {};
         const scope = options?.scope || {};
-        return accessModel.queryAccesses({
+        const rows = await accessModel.queryAccesses({
           query,
           scope,
           projection: options?.projection || null,
           pagination: options?.pagination || null,
           sort: options?.sort || null
         });
+        return Array.isArray(rows) ? rows.map(normalizeAccessProfileScope) : [];
       },
       mongo: async () => listMongoAccesses(options)
     }, 'core.accesses.list');
@@ -87,14 +144,11 @@ const accessRepository = {
         return Array.isArray(rows) ? rows.length : 0;
       },
       mongo: async () => {
-        const collection = getMongoCollection('accesses');
-        const scopeFilter = buildAccessScopeFilter(options?.scope || {});
-        const queryFilter = buildMongoFilterFromQuery(query, {
-          defaultSearchFields: ['id', 'userId', 'orgId', 'profileName', 'scope'],
-          dateFields: ['createdAt', 'audit.createDateTime', 'audit.lastUpdateDateTime']
+        const rows = await listMongoAccessesRaw({
+          ...options,
+          query
         });
-        const filter = combineMongoFilters(scopeFilter, queryFilter);
-        return Number(await collection.countDocuments(filter));
+        return dedupeAccessProfilesById(rows).length;
       }
     }, 'core.accesses.count');
   },
@@ -114,8 +168,11 @@ const accessRepository = {
 
   async getById(id, options = {}) {
     return runByRepositoryBackend(options, {
-      json: async () => accessModel.getAccessById(id),
-      mongo: async () => normalizeMongoDocument(await getMongoCollection('accesses').findOne(resolveMongoIdFilter(id)))
+      json: async () => normalizeAccessProfileScope(await accessModel.getAccessById(id)),
+      mongo: async () => {
+        const rows = await getMongoCollection('accesses').find(resolveMongoIdFilter(id)).toArray();
+        return dedupeAccessProfilesById(rows.map(normalizeMongoDocument).filter(Boolean))[0] || null;
+      }
     }, 'core.accesses.getById');
   },
 
@@ -127,7 +184,7 @@ const accessRepository = {
         const payload = { ...(data || {}) };
         payload.id = await generateUniqueStringId(collection, payload.id);
         await collection.insertOne(payload);
-        return normalizeMongoDocument(payload);
+        return normalizeAccessProfileScope(normalizeMongoDocument(payload));
       }
     }, 'core.accesses.create');
   },
@@ -137,13 +194,17 @@ const accessRepository = {
       json: async () => accessModel.updateAccess(id, data),
       mongo: async () => {
         const collection = getMongoCollection('accesses');
-        const existing = await collection.findOne(resolveMongoIdFilter(id));
+        const matches = await collection.find(resolveMongoIdFilter(id)).toArray();
+        const existing = (Array.isArray(matches) ? matches : []).reduce(
+          (preferred, candidate) => choosePreferredAccessProfile(preferred, candidate),
+          null
+        );
         if (!existing) throw new Error('Access record not found');
         const merged = deepMerge(existing, data || {});
         merged.id = toPublicId(existing?.id || existing?._id);
         const { _id, ...toSet } = merged;
         await collection.updateOne({ _id: existing._id }, { $set: toSet });
-        return normalizeMongoDocument(await collection.findOne({ _id: existing._id }));
+        return normalizeAccessProfileScope(normalizeMongoDocument(await collection.findOne({ _id: existing._id })));
       }
     }, 'core.accesses.update');
   },

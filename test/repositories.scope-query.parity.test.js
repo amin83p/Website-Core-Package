@@ -74,6 +74,76 @@ test('accessRepository.list keeps global and active-org profiles only', async ()
   });
 });
 
+test('accessRepository.list searches active-org access profiles by name', async () => {
+  const sample = [
+    { id: '1', name: 'Global Access', orgId: null },
+    { id: '2', name: 'Teacher Admin', orgId: '7' },
+    { id: '3', name: 'Teacher Other Org', orgId: '8' },
+    { id: '4', name: 'Student Admin', orgId: '7' }
+  ];
+
+  await withStub(accessModel, 'getAllAccesses', async () => sample, async () => {
+    const rows = await accessRepository.list({
+      query: {
+        q: 'Teacher',
+        searchFields: 'name'
+      },
+      scope: { canViewAll: false, includeGlobal: true, orgId: '7' }
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, '2');
+  });
+});
+
+test('accessRepository.list includes legacy scoped-org access profiles and normalizes orgId', async () => {
+  const sample = [
+    { id: '1', name: 'Global Access', orgId: null },
+    { id: '2', name: 'Legacy Teacher Admin', scope: { type: 'org', orgId: '7' } },
+    { id: '3', name: 'Legacy Other Org', scope: { type: 'org', orgId: '8' } }
+  ];
+
+  await withStub(accessModel, 'getAllAccesses', async () => sample, async () => {
+    const rows = await accessRepository.list({
+      query: {
+        q: 'Legacy',
+        searchFields: 'name'
+      },
+      scope: { canViewAll: false, includeGlobal: true, orgId: '7' }
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, '2');
+    assert.equal(rows[0].orgId, '7');
+  });
+});
+
+test('accessRepository.list collapses duplicate access profile ids', async () => {
+  const sample = [
+    {
+      id: '191019',
+      name: 'PTE_APPLICANT',
+      orgId: '7',
+      validity: {},
+      audit: { lastUpdateDateTime: '2026-01-01T00:00:00.000Z' }
+    },
+    {
+      id: '191019',
+      name: 'PTE_APPLICANT',
+      orgId: '7',
+      validity: { startDate: '2026-06-01', endDate: '2026-12-31' },
+      audit: { lastUpdateDateTime: '2026-06-10T00:00:00.000Z' }
+    }
+  ];
+
+  await withStub(accessModel, 'getAllAccesses', async () => sample, async () => {
+    const rows = await accessRepository.list({
+      scope: { canViewAll: false, includeGlobal: true, orgId: '7' }
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, '191019');
+    assert.equal(rows[0].validity.startDate, '2026-06-01');
+  });
+});
+
 test('symbolRepository.list keeps global and active-org symbols', async () => {
   const sample = [
     { id: '1', name: 'Global', orgId: null },

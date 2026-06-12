@@ -354,6 +354,8 @@ document.addEventListener('DOMContentLoaded', () => {
           GenericPicker.open(GenericPickerPresets.accessProfile({
               title: 'Select System Access Profile',
               placeholder: 'Search global profiles...',
+              searchFields: 'id,name,description,orgId,adminCategories',
+              limit: 50,
               context: GenericPickerContexts.globalSystemProfiles(),
               onSelect: async (item) => {
                   // ✅ CHECK: Must be a GLOBAL profile (orgId is null/false)
@@ -914,9 +916,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btn) {
           const orgIdx = parseInt(btn.dataset.orgIdx);
           const targetOrg = currentOrgsState[orgIdx];
+          const targetOrgId = String(targetOrg?.orgId ?? '').trim();
 
           GenericPicker.open(GenericPickerPresets.accessProfile({
               title: `Assign Access to ${targetOrg.name}`,
+              apiEndpoint: `/accesses?orgId=${encodeURIComponent(targetOrgId)}`,
+              searchFields: 'id,name,description,orgId,adminCategories',
+              limit: 50,
               context: GenericPickerContexts.orgScope(targetOrg, { label: 'Target Organization' }),
               onSelect: async (item) => {
                   // Check Org Match

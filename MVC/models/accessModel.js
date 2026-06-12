@@ -4,6 +4,11 @@ const path = require('path');
 const { queueWrite } = require('../utils/fileQueue');
 const { applyGenericFilter } = require('../utils/queryEngine');
 const { toPublicId, idsEqual } = require('../utils/idAdapter');
+const {
+  resolveAccessProfileOrgId,
+  normalizeAccessProfileScope,
+  dedupeAccessProfilesById
+} = require('../utils/accessProfileScopeUtils');
 const { getEntityQueryExecutor } = require('./queryExecutionBridge');
 const dataPath = path.join(__dirname, '../../data/accesses.json');
 // ✅ Import valid categories to ensure data integrity
@@ -27,7 +32,7 @@ function applyAccessScope(rows, scope = {}) {
   const orgId = toPublicId(scope?.orgId) || null;
 
   return list.filter((row) => {
-    const itemOrgId = toPublicId(row?.orgId) || null;
+    const itemOrgId = resolveAccessProfileOrgId(row) || null;
     if (includeGlobal && !itemOrgId) return true;
     if (orgId && itemOrgId === orgId) return true;
     return false;
@@ -71,12 +76,15 @@ async function queryAccesses(options = {}) {
     ? getAllAccessesFn()
     : getAllAccesses());
   const scopedAccesses = applyAccessScope(allAccesses, plan.scope);
-  return applyGenericFilter(scopedAccesses, plan.query, plan.fallback);
+  return dedupeAccessProfilesById(applyGenericFilter(scopedAccesses, plan.query, plan.fallback));
 }
 
 async function getAccessById(id) {
   const list = await getAllAccesses();
-  return list.find((a) => idsEqual(a?.id, id));
+  const matches = list.filter((a) => idsEqual(a?.id, id));
+  const deduped = dedupeAccessProfilesById(matches);
+  const found = deduped[0] || null;
+  return found ? normalizeAccessProfileScope(found) : found;
 }
 
 function generateId() {
@@ -96,7 +104,7 @@ function validateData(item, allItems = []) {
   const duplicate = allItems.find(a => {
     const sameName = a.name === item.name;
     const distinctId = !idsEqual(a?.id, item?.id);
-    const sameOrg = toPublicId(a?.orgId || 'global') === toPublicId(item?.orgId || 'global');
+    const sameOrg = toPublicId(resolveAccessProfileOrgId(a) || 'global') === toPublicId(resolveAccessProfileOrgId(item) || 'global');
     return sameName && distinctId && sameOrg;
   });
 
