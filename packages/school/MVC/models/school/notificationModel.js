@@ -36,6 +36,18 @@ function cleanId(value, { max = 120, allowEmpty = false } = {}) {
   return text;
 }
 
+function cleanPersonId(value, { max = 120, allowEmpty = true } = {}) {
+  let id = '';
+  try {
+    id = cleanId(value, { max, allowEmpty });
+  } catch {
+    return '';
+  }
+  const token = String(id || '').trim().toUpperCase();
+  if (!token || token === 'NO_PERSONID' || token === 'NO_PERSON_ID') return '';
+  return id;
+}
+
 function cleanDateOnly(value, { allowEmpty = true } = {}) {
   if (value === undefined || value === null || value === '') return allowEmpty ? '' : null;
   const text = String(value).trim();
@@ -85,8 +97,14 @@ function sanitizeLifecycleEvents(events) {
     .map((event) => ({
       at: cleanString(event?.at, { max: 40, allowEmpty: true }) || new Date().toISOString(),
       action: cleanString(event?.action, { max: 80, allowEmpty: true }),
+      personId: cleanPersonId(event?.personId, { max: 120, allowEmpty: true }),
+      personName: cleanString(event?.personName, { max: 160, allowEmpty: true }),
       actorId: cleanId(event?.actorId, { max: 120, allowEmpty: true }) || '',
+      actorUserId: cleanId(event?.actorUserId || event?.actorId, { max: 120, allowEmpty: true }) || '',
+      actorPersonId: cleanPersonId(event?.actorPersonId, { max: 120, allowEmpty: true }),
       actorName: cleanString(event?.actorName, { max: 160, allowEmpty: true }),
+      targetPersonId: cleanPersonId(event?.targetPersonId, { max: 120, allowEmpty: true }),
+      targetPersonName: cleanString(event?.targetPersonName, { max: 160, allowEmpty: true }),
       oldStatus: cleanString(event?.oldStatus, { max: 40, allowEmpty: true }),
       newStatus: cleanString(event?.newStatus, { max: 40, allowEmpty: true }),
       note: cleanString(event?.note, { max: 1000, allowEmpty: true }),

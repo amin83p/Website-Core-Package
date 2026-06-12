@@ -8,6 +8,7 @@ const adminChekersService = requireCoreModule('MVC/services/adminChekersService'
 
 const OPEN_STATUSES = new Set(['open', 'in_progress']);
 const CLOSED_STATUSES = new Set(['resolved', 'dismissed']);
+const INVALID_LIFECYCLE_PERSON_IDS = new Set(['NO_PERSONID', 'NO_PERSON_ID']);
 
 function cleanString(value, max = 5000) {
   if (value === undefined || value === null) return '';
@@ -18,6 +19,20 @@ function cleanString(value, max = 5000) {
 function cleanDate(value) {
   const text = cleanString(value, 20);
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+}
+
+function normalizeLifecyclePersonId(value) {
+  const id = toPublicId(value || '');
+  if (!id) return '';
+  return INVALID_LIFECYCLE_PERSON_IDS.has(String(id).toUpperCase()) ? '' : id;
+}
+
+function firstLifecyclePersonId(...values) {
+  for (const value of values) {
+    const id = normalizeLifecyclePersonId(value);
+    if (id) return id;
+  }
+  return '';
 }
 
 function normalizeStatus(value, fallback = 'open') {
@@ -89,6 +104,14 @@ async function resolveActorName(user) {
   });
 }
 
+async function resolvePersonName(personId, fallback = '') {
+  const id = normalizeLifecyclePersonId(personId);
+  if (!id) return cleanString(fallback, 160);
+  return personDisplayNameService.resolvePersonDisplayName(id, {
+    fallback: cleanString(fallback || id, 160)
+  });
+}
+
 function isAdminViewer(user) {
   return Boolean(adminChekersService.isSuperAdmin(user) || adminChekersService.isOrgAdmin(user));
 }
@@ -107,16 +130,10 @@ function assertNotificationWorkflowOwner(user, notification, action = 'manage th
   throw error;
 }
 
-function assertTaskAssigneeIsOtherPerson(user, assignment) {
+function assertTaskAssigneeSelected(assignment) {
   const assignedPersonId = toPublicId(assignment?.assignedPersonId || '');
   if (!assignedPersonId) {
     const error = new Error('Select a person assignee before assigning this task.');
-    error.statusCode = 400;
-    throw error;
-  }
-  const actorPersonId = getActorPersonId(user);
-  if (actorPersonId && idsEqual(actorPersonId, assignedPersonId)) {
-    const error = new Error('Assign this task to another person, not yourself.');
     error.statusCode = 400;
     throw error;
   }
@@ -164,16 +181,54 @@ function normalizeQueryScope(reqUser, query = {}) {
   };
 }
 
-async function buildLifecycleEvent({ action, actorUser, oldStatus = '', newStatus = '', note = '', snapshot = {} }) {
+async function buildLifecycleEvent({
+  action,
+  actorUser,
+  oldStatus = '',
+  newStatus = '',
+  note = '',
+  snapshot = {},
+  personId = '',
+  personName = '',
+  targetPersonId = '',
+  targetPersonName = ''
+}) {
+  const actorUserId = getActorId(actorUser);
+  const actorPersonId = getActorPersonId(actorUser);
+  const actorName = await resolveActorName(actorUser);
+  const safeSnapshot = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) ? snapshot : {};
+  const resolvedTargetPersonId = firstLifecyclePersonId(
+    targetPersonId,
+    safeSnapshot.targetPersonId,
+    safeSnapshot.taskAssignedPersonId,
+    safeSnapshot.assignedPersonId,
+    safeSnapshot.requesterPersonId
+  );
+  const resolvedTargetPersonName = await resolvePersonName(
+    resolvedTargetPersonId,
+    targetPersonName || safeSnapshot.targetPersonName || safeSnapshot.taskAssignedPersonName || safeSnapshot.assignedPersonName || safeSnapshot.requesterName || resolvedTargetPersonId
+  );
+  const resolvedPersonId = firstLifecyclePersonId(personId, resolvedTargetPersonId, actorPersonId);
+  const resolvedPersonName = await resolvePersonName(
+    resolvedPersonId,
+    personName || resolvedTargetPersonName || actorName || resolvedPersonId
+  );
+
   return {
     at: new Date().toISOString(),
     action: cleanString(action, 80),
-    actorId: getActorId(actorUser),
-    actorName: await resolveActorName(actorUser),
+    personId: resolvedPersonId,
+    personName: resolvedPersonName,
+    actorId: actorUserId,
+    actorUserId,
+    actorPersonId,
+    actorName,
+    targetPersonId: resolvedTargetPersonId || resolvedPersonId,
+    targetPersonName: resolvedTargetPersonName || resolvedPersonName,
     oldStatus: cleanString(oldStatus, 40),
     newStatus: cleanString(newStatus, 40),
     note: cleanString(note, 1000),
-    snapshot
+    snapshot: safeSnapshot
   };
 }
 
@@ -188,6 +243,9 @@ function buildNotificationSummary(row) {
     status: cleanString(row?.status, 40),
     assignedRole: cleanString(row?.assignedRole, 120),
     assignedPersonId: toPublicId(row?.assignedPersonId),
+    assignedPersonName: cleanString(row?.assignedPersonName, 160),
+    requesterPersonId: toPublicId(row?.requesterPersonId || row?.metadata?.requesterPersonId),
+    requesterName: cleanString(row?.requesterName || row?.metadata?.requesterName, 160),
     dueDate: cleanDate(row?.dueDate)
   };
 }
@@ -201,21 +259,89 @@ function assertSameOrg(row, reqUser) {
   throw error;
 }
 
-async function enrichLifecycleForDisplay(lifecycle = []) {
+function findLifecycleTaskContext(row = {}, event = {}) {
+  const snapshot = event?.snapshot && typeof event.snapshot === 'object' && !Array.isArray(event.snapshot) ? event.snapshot : {};
+  const targetTaskId = toPublicId(snapshot.taskId || '');
+  const tasks = Array.isArray(row?.tasks) ? row.tasks : [];
+  if (targetTaskId) {
+    const byId = tasks.find((task) => idsEqual(task?.id, targetTaskId));
+    if (byId) return byId;
+  }
+  return tasks.find((task) => normalizeLifecyclePersonId(task?.assignedPersonId)) || {};
+}
+
+async function enrichLifecycleForDisplay(lifecycle = [], row = {}) {
   const events = Array.isArray(lifecycle) ? lifecycle : [];
   return Promise.all(events.map(async (event) => {
-    const actorName = await personDisplayNameService.resolveUserIdDisplayName(event?.actorId, {
+    const snapshot = event?.snapshot && typeof event.snapshot === 'object' && !Array.isArray(event.snapshot) ? event.snapshot : {};
+    const taskContext = findLifecycleTaskContext(row, event);
+    const actorUserId = toPublicId(event?.actorUserId || event?.actorId || '');
+    const actorPersonId = firstLifecyclePersonId(event?.actorPersonId);
+    const actorName = actorPersonId
+      ? await resolvePersonName(actorPersonId, event?.actorName || actorPersonId)
+      : await personDisplayNameService.resolveUserIdDisplayName(actorUserId, {
       fallback: cleanString(event?.actorName || event?.actorId || 'System', 160)
     });
-    return { ...event, actorName };
+    const targetPersonId = firstLifecyclePersonId(
+      event?.targetPersonId,
+      snapshot.targetPersonId,
+      snapshot.taskAssignedPersonId,
+      snapshot.assignedPersonId,
+      taskContext?.assignedPersonId,
+      row?.assignedPersonId,
+      row?.metadata?.requesterPersonId,
+      snapshot.requesterPersonId
+    );
+    const targetPersonName = await resolvePersonName(
+      targetPersonId,
+      event?.targetPersonName
+        || snapshot.targetPersonName
+        || snapshot.taskAssignedPersonName
+        || snapshot.assignedPersonName
+        || taskContext?.assignedPersonName
+        || row?.assignedPersonName
+        || row?.metadata?.requesterName
+        || snapshot.requesterName
+        || targetPersonId
+    );
+    const personId = firstLifecyclePersonId(event?.personId, targetPersonId, actorPersonId);
+    const personName = await resolvePersonName(
+      personId,
+      event?.personName || targetPersonName || actorName || personId
+    );
+    const actorDiffers = Boolean(actorPersonId && personId && !idsEqual(actorPersonId, personId));
+    const displayPersonLabel = actorDiffers && actorName
+      ? `${personName || personId} (by ${actorName})`
+      : (personName || personId || actorName || 'System');
+    return {
+      ...event,
+      personId,
+      personName,
+      actorId: actorUserId,
+      actorUserId,
+      actorPersonId,
+      actorName,
+      targetPersonId: targetPersonId || personId,
+      targetPersonName: targetPersonName || personName,
+      displayPersonLabel
+    };
   }));
 }
 
 async function enrichTaskForDisplay(task = {}) {
   const assignedPersonId = toPublicId(task.assignedPersonId || '');
-  if (!assignedPersonId) return task;
-  return {
+  const taskStatus = normalizeTaskStatus(task.status, 'open');
+  const next = {
     ...task,
+    status: assignedPersonId && taskStatus === 'open' ? 'in_progress' : taskStatus
+  };
+  if (assignedPersonId && taskStatus === 'open') {
+    next.startedAt = cleanString(task.startedAt || task.reassignedAt || task.assignedAt || task.updatedAt || task.createdAt, 40) || new Date().toISOString();
+    next.assignedAt = cleanString(task.assignedAt || task.reassignedAt || next.startedAt, 40);
+  }
+  if (!assignedPersonId) return next;
+  return {
+    ...next,
     assignedPersonName: await personDisplayNameService.resolvePersonDisplayName(assignedPersonId, {
       fallback: task.assignedPersonName || assignedPersonId
     })
@@ -227,7 +353,7 @@ async function enrichNotificationForDisplay(row) {
   const assignedPersonId = toPublicId(row.assignedPersonId || '');
   const next = {
     ...row,
-    lifecycle: await enrichLifecycleForDisplay(row.lifecycle),
+    lifecycle: await enrichLifecycleForDisplay(row.lifecycle, row),
     tasks: await Promise.all((Array.isArray(row.tasks) ? row.tasks : []).map(enrichTaskForDisplay))
   };
   if (assignedPersonId) {
@@ -473,7 +599,7 @@ async function buildDefaultReviewTask(input = {}) {
     assignedPersonId: assignment.assignedPersonId,
     assignedRole: assignment.assignedRole,
     assignedPersonName: assignment.assignedPersonName,
-    status: 'open',
+    status: assignment.assignedPersonId ? 'in_progress' : 'open',
     now
   });
   return {
@@ -548,6 +674,8 @@ async function upsertSourceNotification(input = {}, actorUser = null) {
       oldStatus: base.status || '',
       newStatus: next.status,
       note: cleanString(routedInput.note || '', 1000),
+      targetPersonId: assignment.assignedPersonId || routedInput?.metadata?.requesterPersonId,
+      targetPersonName: assignment.assignedPersonName || routedInput?.metadata?.requesterName,
       snapshot: buildNotificationSummary(next)
     })
   ];
@@ -599,6 +727,8 @@ async function resolveSourceNotification(input = {}, actorUser = null) {
         oldStatus,
         newStatus: nextStatus,
         note: cleanString(input.note || '', 1000),
+        targetPersonId: existing.assignedPersonId || existing?.metadata?.requesterPersonId,
+        targetPersonName: existing.assignedPersonName || existing?.metadata?.requesterName,
         snapshot: buildNotificationSummary({ ...existing, status: nextStatus })
       })
     ]
@@ -628,6 +758,7 @@ async function upsertLeaveRequestNotification(leaveRequest = {}, actorUser = nul
     metadata: {
       leaveRequestStatus: leaveRequest.status,
       requesterPersonId: leaveRequest.requesterPersonId,
+      requesterName,
       requesterRole: leaveRequest.requesterRole
     },
     note: options.note || ''
@@ -672,6 +803,8 @@ async function updateNotificationStatus(reqUser, id, input = {}) {
         oldStatus: existing.status,
         newStatus: nextStatus,
         note: cleanString(input.note, 1000),
+        targetPersonId: existing.assignedPersonId || existing?.metadata?.requesterPersonId,
+        targetPersonName: existing.assignedPersonName || existing?.metadata?.requesterName,
         snapshot: buildNotificationSummary({ ...existing, status: nextStatus })
       })
     ]
@@ -722,6 +855,8 @@ async function reassignNotification(reqUser, id, input = {}) {
         oldStatus: existing.status,
         newStatus: existing.status,
         note: assignment.assignedPersonId ? `Assigned to ${assignment.assignedPersonName || assignment.assignedPersonId}.` : 'Notification was unassigned.',
+        targetPersonId: assignment.assignedPersonId || previousAssignedPersonId || existing?.metadata?.requesterPersonId,
+        targetPersonName: assignment.assignedPersonName || existing.assignedPersonName || existing?.metadata?.requesterName,
         snapshot: buildNotificationSummary({
           ...existing,
           assignedRole: assignment.assignedRole,
@@ -739,7 +874,7 @@ async function addNotificationTask(reqUser, id, input = {}) {
   if (!existing) throw new Error('Notification was not found.');
   assertNotificationWorkflowOwner(reqUser, existing, 'assign tasks for this notification');
   const assignment = await resolveAssignmentInput(input);
-  assertTaskAssigneeIsOtherPerson(reqUser, assignment);
+  assertTaskAssigneeSelected(assignment);
   const now = new Date().toISOString();
   const taskTiming = normalizeTaskWithTiming({
     actor: true,
@@ -747,7 +882,7 @@ async function addNotificationTask(reqUser, id, input = {}) {
     assignedPersonId: assignment.assignedPersonId,
     assignedRole: assignment.assignedRole,
     assignedPersonName: assignment.assignedPersonName,
-    status: 'open',
+    status: assignment.assignedPersonId ? 'in_progress' : 'open',
     now
   });
   const tasks = notificationModel.sanitizeTasks([
@@ -784,7 +919,13 @@ async function addNotificationTask(reqUser, id, input = {}) {
         oldStatus: existing.status,
         newStatus: existing.status === 'open' ? 'in_progress' : existing.status,
         note: cleanString(input.title || 'Task added.', 1000),
-        snapshot: buildNotificationSummary(existing)
+        targetPersonId: assignment.assignedPersonId,
+        targetPersonName: assignment.assignedPersonName,
+        snapshot: {
+          ...buildNotificationSummary(existing),
+          taskAssignedPersonId: assignment.assignedPersonId,
+          taskAssignedPersonName: assignment.assignedPersonName
+        }
       })
     ]
   };
@@ -797,7 +938,16 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
   const canManageWorkflow = canManageNotificationWorkflow(reqUser, existing);
   const targetTaskId = toPublicId(taskId);
   const now = new Date().toISOString();
+  const rejectTaskWorkflowChange = (message, statusCode = 400) => {
+    const error = new Error(message);
+    error.statusCode = statusCode;
+    throw error;
+  };
   let found = false;
+  let lifecycleTargetPersonId = '';
+  let lifecycleTargetPersonName = '';
+  let lifecyclePreviousAssignedPersonId = '';
+  let lifecyclePreviousAssignedPersonName = '';
   const tasks = [];
   for (const task of (Array.isArray(existing.tasks) ? existing.tasks : [])) {
     if (!idsEqual(task?.id, targetTaskId)) {
@@ -809,7 +959,9 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
       ...task,
       status: normalizeTaskStatus(task?.status, 'open')
     };
-    const requestedStatus = normalizeTaskStatus(input.status, task.status || 'open');
+    const previousStatus = taskCopy.status;
+    const statusProvided = Object.prototype.hasOwnProperty.call(input, 'status');
+    const requestedStatus = statusProvided ? normalizeTaskStatus(input.status, '') : '';
     const assignmentProvided = Object.prototype.hasOwnProperty.call(input, 'assignedPersonId')
       || Object.prototype.hasOwnProperty.call(input, 'assignedPersonName')
       || Object.prototype.hasOwnProperty.call(input, 'assignedRole');
@@ -830,11 +982,25 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
         throw error;
       }
     }
+    if (assignmentProvided && !['open', 'in_progress'].includes(previousStatus)) {
+      rejectTaskWorkflowChange('Completed or cancelled tasks cannot be reassigned.');
+    }
+    if (!assignmentProvided) {
+      if (detailProvided) {
+        rejectTaskWorkflowChange('Task details can only be changed while reassigning the task.');
+      }
+      if (requestedStatus !== 'done') {
+        rejectTaskWorkflowChange('Task status can only be completed from this workflow.');
+      }
+      if (previousStatus !== 'in_progress') {
+        rejectTaskWorkflowChange('Only started tasks can be completed.');
+      }
+    }
     const assignment = canManageWorkflow
       ? await resolveAssignmentInput(input, taskCopy)
       : await resolveAssignmentInput({}, taskCopy);
     if (canManageWorkflow && assignmentProvided) {
-      assertTaskAssigneeIsOtherPerson(reqUser, assignment);
+      assertTaskAssigneeSelected(assignment);
     }
     const previousAssignedPersonId = toPublicId(taskCopy.assignedPersonId || '');
     const nextAssignedPersonId = toPublicId(assignment.assignedPersonId || '');
@@ -845,7 +1011,7 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
       && nextAssignedPersonId
       && !idsEqual(previousAssignedPersonId, nextAssignedPersonId)
     );
-    const nextStatus = shouldClosePreviousAssignment ? 'open' : requestedStatus;
+    const nextStatus = assignmentProvided ? 'in_progress' : 'done';
     const nextTaskTiming = normalizeTaskWithTiming({
       actor: true,
       task: taskCopy,
@@ -856,12 +1022,9 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
       now
     });
     const normalizedNote = cleanString(input.note ?? task.note, 1000);
-    const previousStatus = normalizeTaskStatus(task?.status, 'open');
     const completedAt = nextTaskTiming.status === 'done'
       ? (task.completedAt || cleanString(taskCopy.completedAt, 40) || now)
-      : (nextTaskTiming.status === 'cancelled'
-        ? (task.completedAt || cleanString(task.completedAt, 40) || now)
-        : (nextStatus === 'open' && previousStatus !== 'open' ? '' : cleanString(task.completedAt, 40)));
+      : '';
     const previousAssignmentHistory = Array.isArray(taskCopy.assignmentHistory) ? taskCopy.assignmentHistory : [];
     const closedAssignmentEntry = shouldClosePreviousAssignment
       ? buildCompletedAssignmentHistoryEntry(taskCopy, nextTaskTiming.reassignedAt || now, assignment)
@@ -882,6 +1045,10 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
     updated.assignedPersonId = nextTaskTiming.assignedPersonId;
     updated.assignedPersonName = nextTaskTiming.assignedPersonName;
     updated.dueDate = cleanDate(input.dueDate ?? task.dueDate);
+    lifecycleTargetPersonId = updated.assignedPersonId || previousAssignedPersonId;
+    lifecycleTargetPersonName = updated.assignedPersonName || taskCopy.assignedPersonName || lifecycleTargetPersonId;
+    lifecyclePreviousAssignedPersonId = previousAssignedPersonId;
+    lifecyclePreviousAssignedPersonName = taskCopy.assignedPersonName || previousAssignedPersonId;
     tasks.push(updated);
     }
   if (!found) throw new Error('Notification task was not found.');
@@ -905,7 +1072,15 @@ async function updateNotificationTask(reqUser, id, taskId, input = {}) {
         oldStatus: existing.status,
         newStatus: nextStatus,
         note: cleanString(input.note || '', 1000),
-        snapshot: { taskId: targetTaskId }
+        targetPersonId: lifecycleTargetPersonId,
+        targetPersonName: lifecycleTargetPersonName,
+        snapshot: {
+          taskId: targetTaskId,
+          taskAssignedPersonId: lifecycleTargetPersonId,
+          taskAssignedPersonName: lifecycleTargetPersonName,
+          previousAssignedPersonId: lifecyclePreviousAssignedPersonId,
+          previousAssignedPersonName: lifecyclePreviousAssignedPersonName
+        }
       })
     ]
   };
@@ -935,8 +1110,10 @@ module.exports = {
   _private: {
     buildLifecycleEvent,
     buildNotificationSummary,
+    enrichLifecycleForDisplay,
     findBySource,
     applyRoutingRule,
+    normalizeLifecyclePersonId,
     resolveAssignmentInput
   }
 };

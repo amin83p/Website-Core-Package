@@ -38,9 +38,99 @@
     if (statusValue === 'in_progress') return 'notification-task-card-progress';
     return 'notification-task-card-open';
   }
+  function displayValue(value, fallback = '-') {
+    const text = String(value || '').trim();
+    return text || fallback;
+  }
+  function formatDateTime(value) {
+    const text = String(value || '').trim();
+    if (!text) return '-';
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return text;
+    return parsed.toLocaleString('en-CA', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
 %>
 
 <style>
+  .notification-readable-card {
+    border: 1px solid rgba(33, 37, 41, .08);
+    border-radius: 8px;
+    background: #fff;
+  }
+  .notification-data-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .85rem;
+  }
+  .notification-data-item {
+    min-width: 0;
+    border: 1px solid rgba(33, 37, 41, .08);
+    border-radius: 8px;
+    background: #fff;
+    padding: .85rem 1rem;
+  }
+  .notification-data-item-wide {
+    grid-column: 1 / -1;
+  }
+  .notification-data-label {
+    margin-bottom: .3rem;
+    color: #6c757d;
+    font-size: .76rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .notification-data-value {
+    color: #212529;
+    font-size: .98rem;
+    font-weight: 600;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .notification-data-support {
+    margin-top: .2rem;
+    color: #6c757d;
+    font-size: .88rem;
+    line-height: 1.35;
+  }
+  .notification-summary-card {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    border: 1px solid rgba(33, 37, 41, .08);
+    border-radius: 8px;
+    padding: 1rem;
+    min-height: 92px;
+  }
+  .notification-summary-icon {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .72);
+    color: #212529;
+    flex: 0 0 auto;
+  }
+  .notification-summary-label {
+    color: #495057;
+    font-size: .82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .notification-summary-value {
+    color: #212529;
+    font-size: 1.9rem;
+    font-weight: 800;
+    line-height: 1;
+  }
   .notification-lifecycle-timeline {
     position: relative;
     display: grid;
@@ -85,9 +175,10 @@
   }
   .notification-task-card {
     border: 1px solid rgba(33, 37, 41, .08);
-    border-radius: 10px;
+    border-radius: 8px;
     background: #fff8e1;
-    padding: .9rem 1rem;
+    padding: 1.1rem 1.15rem;
+    font-size: .98rem;
   }
   .notification-task-card-open {
     background: #fff8e1;
@@ -99,9 +190,49 @@
     background: #e2f5ea;
   }
   .notification-task-meta {
-    font-size: 0.84rem;
+    font-size: .92rem;
+  }
+  .notification-task-title {
+    color: #212529;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .notification-task-description {
+    color: #495057;
+    font-size: .95rem;
+    line-height: 1.45;
+  }
+  .notification-task-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+  }
+  .notification-task-meta-item {
+    min-width: 0;
+    border: 1px solid rgba(33, 37, 41, .08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .72);
+    padding: .7rem .8rem;
+  }
+  .notification-task-meta-label {
+    color: #6c757d;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .notification-task-meta-value {
+    color: #212529;
+    font-size: .9rem;
+    font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
   @media (max-width: 575.98px) {
+    .notification-data-grid,
+    .notification-task-meta-grid {
+      grid-template-columns: 1fr;
+    }
     .notification-lifecycle-item {
       grid-template-columns: 40px minmax(0, 1fr);
     }
@@ -113,6 +244,11 @@
     .notification-lifecycle-item:not(:last-child)::before {
       left: 19px;
       top: 40px;
+    }
+  }
+  @media (min-width: 576px) and (max-width: 991.98px) {
+    .notification-task-meta-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 </style>
@@ -127,11 +263,72 @@
       <a href="<%= schoolSectionDashboardHref %>" class="btn btn-filled btn-secondary"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>
       <a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="btn btn-filled btn-secondary"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>
       <a href="/school/notifications" class="btn btn-outline-secondary"><i class="bi bi-list-ul me-1"></i> Notifications</a>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#notificationLifecycleModal">
+        <i class="bi bi-clock-history me-1"></i> Lifecycle
+      </button>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between gap-2">
+      <h2 class="h5 mb-0"><i class="bi bi-list-task me-2"></i>Task Summary</h2>
+      <button
+        class="btn btn-outline-secondary btn-sm"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#notificationTaskSummaryCollapse"
+        aria-expanded="true"
+        aria-controls="notificationTaskSummaryCollapse"
+        title="Toggle task summary">
+        <i id="notificationTaskSummaryIcon" class="bi bi-chevron-up"></i>
+      </button>
+    </div>
+    <div class="collapse show" id="notificationTaskSummaryCollapse">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-6 col-lg-3">
+            <div class="notification-summary-card bg-warning-subtle">
+              <div class="notification-summary-icon"><i class="bi bi-inbox fs-5"></i></div>
+              <div>
+                <div class="notification-summary-label">Open</div>
+                <div class="notification-summary-value"><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'open').length %></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6 col-lg-3">
+            <div class="notification-summary-card bg-primary-subtle">
+              <div class="notification-summary-icon"><i class="bi bi-play-circle fs-5"></i></div>
+              <div>
+                <div class="notification-summary-label">In Progress</div>
+                <div class="notification-summary-value"><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'in_progress').length %></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6 col-lg-3">
+            <div class="notification-summary-card bg-success-subtle">
+              <div class="notification-summary-icon"><i class="bi bi-check2-circle fs-5"></i></div>
+              <div>
+                <div class="notification-summary-label">Done</div>
+                <div class="notification-summary-value"><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'done').length %></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6 col-lg-3">
+            <div class="notification-summary-card bg-secondary-subtle">
+              <div class="notification-summary-icon"><i class="bi bi-slash-circle fs-5"></i></div>
+              <div>
+                <div class="notification-summary-label">Cancelled</div>
+                <div class="notification-summary-value"><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'cancelled').length %></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="row g-3">
-    <div class="col-lg-8">
+    <div class="col-12">
       <div class="card shadow-sm border-0 mb-3">
         <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
           <h2 class="h5 mb-0">Notification Details</h2>
@@ -141,30 +338,37 @@
           </div>
         </div>
         <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-sm-4">Message</dt>
-            <dd class="col-sm-8"><%= row.message || '-' %></dd>
-            <dt class="col-sm-4">Source</dt>
-            <dd class="col-sm-8">
-              <div><%= String(row.sourceType || 'manual').replace(/_/g, ' ') %></div>
+          <div class="notification-data-grid">
+            <div class="notification-data-item notification-data-item-wide">
+              <div class="notification-data-label">Message</div>
+              <div class="notification-data-value"><%= displayValue(row.message) %></div>
+            </div>
+            <div class="notification-data-item">
+              <div class="notification-data-label">Source</div>
+              <div class="notification-data-value text-capitalize"><%= String(row.sourceType || 'manual').replace(/_/g, ' ') %></div>
               <% if (row.sourceUrl) { %>
-                <a href="<%= row.sourceUrl %>"><%= row.sourceId || 'Open source record' %></a>
+                <div class="notification-data-support"><a href="<%= row.sourceUrl %>"><%= displayValue(row.sourceId, 'Open source record') %></a></div>
               <% } else { %>
-                <span class="text-muted"><%= row.sourceId || '-' %></span>
+                <div class="notification-data-support"><%= displayValue(row.sourceId) %></div>
               <% } %>
-            </dd>
-            <dt class="col-sm-4">Assigned</dt>
-            <dd class="col-sm-8">
-              <div><%= row.assignedPersonName || row.assignedPersonId || 'Unassigned' %></div>
-              <% if (row.assignedRole) { %><div class="small text-muted"><%= row.assignedRole %></div><% } %>
-            </dd>
-            <dt class="col-sm-4">Due Date</dt>
-            <dd class="col-sm-8"><%= row.dueDate || '-' %></dd>
+            </div>
+            <div class="notification-data-item">
+              <div class="notification-data-label">Assigned</div>
+              <div class="notification-data-value"><%= displayValue(row.assignedPersonName || row.assignedPersonId, 'Unassigned') %></div>
+              <% if (row.assignedRole) { %><div class="notification-data-support"><%= row.assignedRole %></div><% } %>
+            </div>
+            <div class="notification-data-item">
+              <div class="notification-data-label">Due Date</div>
+              <div class="notification-data-value"><%= displayValue(row.dueDate) %></div>
+            </div>
             <% if (row.resolvedAt) { %>
-              <dt class="col-sm-4">Resolved</dt>
-              <dd class="col-sm-8"><%= row.resolvedAt %> by <%= row.resolvedByName || row.resolvedBy || 'System' %></dd>
+              <div class="notification-data-item">
+                <div class="notification-data-label">Resolved</div>
+                <div class="notification-data-value"><%= formatDateTime(row.resolvedAt) %></div>
+                <div class="notification-data-support">By <%= displayValue(row.resolvedByName || row.resolvedBy, 'System') %></div>
+              </div>
             <% } %>
-          </dl>
+          </div>
         </div>
         <div class="card-footer bg-white d-flex flex-wrap justify-content-end gap-2">
           <% if (canManageNotificationStatus) { %>
@@ -202,49 +406,80 @@
               <div class="notification-task-card <%= taskStatusClass(taskStatus) %>">
                 <div class="d-flex flex-wrap justify-content-between gap-2">
                   <div>
-                    <div class="fw-bold"><%= task.title || task.id %></div>
-                    <div class="small text-muted"><%= task.description || '' %></div>
-                    <div class="small mt-1">Assigned: <%= task.assignedPersonName || task.assignedPersonId || 'Unassigned' %></div>
-                    <% if (task.assignedRole) { %><div class="small text-muted"><%= task.assignedRole %></div><% } %>
+                    <div class="notification-task-title"><%= displayValue(task.title || task.id, 'Task') %></div>
+                    <% if (task.description) { %>
+                      <div class="notification-task-description mt-1"><%= task.description %></div>
+                    <% } %>
+                    <div class="notification-data-support mt-2">
+                      <i class="bi bi-person-check me-1"></i>
+                      Assigned to <strong><%= displayValue(task.assignedPersonName || task.assignedPersonId, 'Unassigned') %></strong>
+                      <% if (task.assignedRole) { %><span class="ms-1">(<%= task.assignedRole %>)</span><% } %>
+                    </div>
                   </div>
                   <span class="badge align-self-start <%= taskStatus === 'done' ? 'bg-success' : (taskStatus === 'in_progress' ? 'bg-primary' : (taskStatus === 'cancelled' ? 'bg-secondary' : 'bg-warning text-dark')) %>"><%= statusLabel(taskStatus) %></span>
                 </div>
-                <div class="small text-muted notification-task-meta mt-2">
-                  <div>Assigned at: <%= task.assignedAt || '-' %></div>
-                  <div>Started at: <%= task.startedAt || '-' %></div>
-                  <div>Reassigned at: <%= task.reassignedAt || '-' %></div>
-                  <div>Completed at: <%= task.completedAt || '-' %></div>
+                <div class="notification-task-meta notification-task-meta-grid mt-3">
+                  <div class="notification-task-meta-item">
+                    <div class="notification-task-meta-label">Assigned</div>
+                    <div class="notification-task-meta-value"><%= formatDateTime(task.assignedAt) %></div>
+                  </div>
+                  <div class="notification-task-meta-item">
+                    <div class="notification-task-meta-label">Started</div>
+                    <div class="notification-task-meta-value"><%= formatDateTime(task.startedAt) %></div>
+                  </div>
+                  <div class="notification-task-meta-item">
+                    <div class="notification-task-meta-label">Reassigned</div>
+                    <div class="notification-task-meta-value"><%= formatDateTime(task.reassignedAt) %></div>
+                  </div>
+                  <div class="notification-task-meta-item">
+                    <div class="notification-task-meta-label">Completed</div>
+                    <div class="notification-task-meta-value"><%= formatDateTime(task.completedAt) %></div>
+                  </div>
                 </div>
                 <% if (taskAssignmentHistory.length) { %>
                   <div class="d-grid gap-2 mt-3">
                     <% taskAssignmentHistory.forEach((assignment) => { %>
-                      <div class="border rounded bg-white p-2">
+                      <div class="border rounded bg-white p-3">
                         <div class="d-flex flex-wrap justify-content-between gap-2">
                           <div>
                             <div class="fw-semibold">
                               <i class="bi bi-person-check me-1"></i>
-                              Previous assignment: <%= assignment.assignedPersonName || assignment.assignedPersonId || 'Previous assignee' %>
+                              Previous assignment: <%= displayValue(assignment.assignedPersonName || assignment.assignedPersonId, 'Previous assignee') %>
                             </div>
-                            <% if (assignment.assignedRole) { %><div class="small text-muted"><%= assignment.assignedRole %></div><% } %>
+                            <% if (assignment.assignedRole) { %><div class="notification-data-support"><%= assignment.assignedRole %></div><% } %>
                           </div>
                           <span class="badge bg-success align-self-start">Completed</span>
                         </div>
-                        <div class="small text-muted notification-task-meta mt-2">
-                          <div>Assigned at: <%= assignment.assignedAt || '-' %></div>
-                          <div>Started: <%= assignment.startedAt ? `Yes (${assignment.startedAt})` : 'No' %></div>
-                          <div>Assigned to another at: <%= assignment.reassignedAt || assignment.completedAt || '-' %></div>
+                        <div class="notification-task-meta notification-task-meta-grid mt-3">
+                          <div class="notification-task-meta-item">
+                            <div class="notification-task-meta-label">Assigned</div>
+                            <div class="notification-task-meta-value"><%= formatDateTime(assignment.assignedAt) %></div>
+                          </div>
+                          <div class="notification-task-meta-item">
+                            <div class="notification-task-meta-label">Started</div>
+                            <div class="notification-task-meta-value"><%= formatDateTime(assignment.startedAt) %></div>
+                          </div>
+                          <div class="notification-task-meta-item">
+                            <div class="notification-task-meta-label">Moved</div>
+                            <div class="notification-task-meta-value"><%= formatDateTime(assignment.reassignedAt || assignment.completedAt) %></div>
+                          </div>
                         </div>
-                        <div class="small text-muted mt-2">
+                        <div class="notification-data-support mt-2">
                           This previous assignment cannot be reopened because the task is now assigned to another person.
                         </div>
                       </div>
                     <% }) %>
                   </div>
                 <% } %>
-                <% if (task.note) { %><div class="small text-muted mt-2"><%= task.note %></div><% } %>
-                <% if (canManageTask) { %>
+                <% if (task.note) { %><div class="notification-data-support mt-2"><%= task.note %></div><% } %>
+                <%
+                  const taskIsActive = taskStatus === 'open' || taskStatus === 'in_progress';
+                  const canReassignTask = canManageTaskWorkflowFlag && taskIsActive;
+                  const canCompleteTask = canManageTask && taskStatus === 'in_progress';
+                %>
+                <% if (canReassignTask || canCompleteTask) { %>
                   <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
-                    <% if (canManageTaskWorkflowFlag) { %>
+                    <% if (canReassignTask) { %>
                       <button class="btn btn-outline-primary btn-sm notification-task-reassign-action"
                         data-task-id="<%= task.id %>"
                         data-status="<%= taskStatus %>"
@@ -254,16 +489,8 @@
                         <i class="bi bi-person-check me-1"></i> Reassign
                       </button>
                     <% } %>
-                    <% if (canManageTaskWorkflowFlag && taskStatus === 'open') { %>
-                      <button class="btn btn-outline-primary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="in_progress"><i class="bi bi-play-circle me-1"></i> Start</button>
-                    <% } %>
-                    <% if (taskStatus === 'open' || taskStatus === 'in_progress') { %>
+                    <% if (canCompleteTask) { %>
                       <button class="btn btn-outline-success btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="done" data-status-confirm="true"><i class="bi bi-check2 me-1"></i> Complete</button>
-                      <% if (canManageTaskWorkflowFlag) { %>
-                        <button class="btn btn-outline-secondary btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="cancelled"><i class="bi bi-slash-circle me-1"></i> Cancel</button>
-                      <% } %>
-                    <% } else if (canManageTaskWorkflowFlag) { %>
-                      <button class="btn btn-outline-warning btn-sm notification-task-action" data-task-id="<%= task.id %>" data-status="open"><i class="bi bi-arrow-counterclockwise me-1"></i> Reopen</button>
                     <% } %>
                   </div>
                 <% } %>
@@ -305,54 +532,45 @@
           <% } %>
         </div>
       </div>
-
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-white">
-          <h2 class="h5 mb-0">Lifecycle</h2>
-        </div>
-        <div class="card-body">
-          <% if (!lifecycleEvents.length) { %>
-            <div class="text-muted">No lifecycle entries recorded.</div>
-          <% } %>
-          <div class="notification-lifecycle-timeline">
-            <% lifecycleEvents.forEach((event) => { %>
-              <% const meta = lifecycleMeta[event.action] || { icon: 'bi-clock-history', tone: 'secondary', label: formatAction(event.action) }; %>
-              <div class="notification-lifecycle-item">
-                <div class="notification-lifecycle-marker text-<%= meta.tone %>">
-                  <i class="bi <%= meta.icon %> fs-5"></i>
-                </div>
-                <div class="notification-lifecycle-card">
-                  <div class="d-flex justify-content-between gap-2">
-                    <div>
-                      <div class="fw-bold"><%= meta.label || formatAction(event.action) %></div>
-                      <div class="small text-muted"><%= event.actorName || event.actorId || 'System' %></div>
-                    </div>
-                    <div class="text-end small text-muted">
-                      <div><%= event.at || '-' %></div>
-                      <div><%= statusLabel(event.oldStatus) %> -> <%= statusLabel(event.newStatus) %></div>
-                    </div>
-                  </div>
-                  <% if (event.note) { %>
-                    <div class="small mt-2 text-muted"><%= event.note %></div>
-                  <% } %>
-                </div>
-              </div>
-            <% }) %>
-          </div>
-        </div>
-      </div>
     </div>
+  </div>
+</div>
 
-    <div class="col-lg-4">
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-white">
-          <h2 class="h5 mb-0">Task Summary</h2>
-        </div>
-        <div class="card-body small">
-          <div class="d-flex justify-content-between mb-2"><span>Open</span><strong><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'open').length %></strong></div>
-          <div class="d-flex justify-content-between mb-2"><span>In Progress</span><strong><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'in_progress').length %></strong></div>
-          <div class="d-flex justify-content-between mb-2"><span>Done</span><strong><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'done').length %></strong></div>
-          <div class="d-flex justify-content-between"><span>Cancelled</span><strong><%= visibleTasks.filter((task) => String(task.status || '').toLowerCase() === 'cancelled').length %></strong></div>
+<div class="modal fade" id="notificationLifecycleModal" tabindex="-1" aria-labelledby="notificationLifecycleModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="notificationLifecycleModalLabel"><i class="bi bi-clock-history me-2"></i>Lifecycle</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <% if (!lifecycleEvents.length) { %>
+          <div class="text-muted">No lifecycle entries recorded.</div>
+        <% } %>
+        <div class="notification-lifecycle-timeline">
+          <% lifecycleEvents.forEach((event) => { %>
+            <% const meta = lifecycleMeta[event.action] || { icon: 'bi-clock-history', tone: 'secondary', label: formatAction(event.action) }; %>
+            <div class="notification-lifecycle-item">
+              <div class="notification-lifecycle-marker text-<%= meta.tone %>">
+                <i class="bi <%= meta.icon %> fs-5"></i>
+              </div>
+              <div class="notification-lifecycle-card">
+                <div class="d-flex justify-content-between gap-2">
+                  <div>
+                    <div class="fw-bold"><%= meta.label || formatAction(event.action) %></div>
+                    <div class="small text-muted"><%= event.displayPersonLabel || event.personName || event.personId || 'System' %></div>
+                  </div>
+                  <div class="text-end small text-muted">
+                    <div><%= event.at || '-' %></div>
+                    <div><%= statusLabel(event.oldStatus) %> -> <%= statusLabel(event.newStatus) %></div>
+                  </div>
+                </div>
+                <% if (event.note) { %>
+                  <div class="small mt-2 text-muted"><%= event.note %></div>
+                <% } %>
+              </div>
+            </div>
+          <% }) %>
         </div>
       </div>
     </div>
@@ -369,6 +587,17 @@
     const taskAssigneeId = document.getElementById('taskAssignedPersonId');
     const taskAssigneeName = document.getElementById('taskAssignedPersonName');
     const taskAssigneeLabel = document.getElementById('taskAssigneeLabel');
+    const taskSummaryCollapse = document.getElementById('notificationTaskSummaryCollapse');
+    const taskSummaryIcon = document.getElementById('notificationTaskSummaryIcon');
+
+    taskSummaryCollapse?.addEventListener('shown.bs.collapse', () => {
+      taskSummaryIcon?.classList.remove('bi-chevron-down');
+      taskSummaryIcon?.classList.add('bi-chevron-up');
+    });
+    taskSummaryCollapse?.addEventListener('hidden.bs.collapse', () => {
+      taskSummaryIcon?.classList.remove('bi-chevron-up');
+      taskSummaryIcon?.classList.add('bi-chevron-down');
+    });
 
     function escapeHtml(value) {
       return String(value || '').replace(/[&<>"']/g, (ch) => ({
@@ -407,7 +636,7 @@
       return id ? `${name || id} (${id})` : (name || 'Selected person');
     }
 
-    async function pickPerson(title, onSelect, options = {}) {
+    async function pickPerson(title, onSelect) {
       if (!window.GenericPicker || !window.GenericPickerPresets) {
         await showNotificationMessage({
           title: 'Person Picker',
@@ -430,14 +659,6 @@
         const item = Array.isArray(selected) ? selected[0] : selected;
         if (!item) return;
         const personId = String(item?.personId || item?.id || '').trim();
-        if (options.excludeCurrentPerson && currentPersonId && personId && personId === currentPersonId) {
-          showNotificationMessage({
-            title: 'Choose Another Person',
-            icon: 'warning',
-            message: 'Assign this task to another person, not yourself.'
-          });
-          return;
-        }
         const label = displayNameForPickerItem(item);
         onSelect({ personId, label });
       };
@@ -574,7 +795,7 @@
         const taskId = button.dataset.taskId || '';
         const status = button.dataset.status || '';
         if (!taskId || !status) return;
-        const label = status === 'done' ? 'Complete' : (status === 'cancelled' ? 'Cancel' : 'Update');
+        const label = 'Complete';
         const isTask = true;
         const note = await requestNote({ status, titlePrefix: label, isTask });
         if (note === null) return;
@@ -598,12 +819,11 @@
         if (result !== 'Pick Person') return;
         await pickPerson('Select Task Assignee', async ({ personId, label }) => {
           await postJson(`/school/notifications/api/${encodeURIComponent(notificationId)}/tasks/${encodeURIComponent(taskId)}`, {
-            status: button.dataset.status || '',
             assignedPersonId: personId,
             assignedPersonName: label,
             assignedRole: ''
           });
-        }, { excludeCurrentPerson: true });
+        });
       });
     });
 
@@ -616,7 +836,7 @@
         if (taskAssigneeId) taskAssigneeId.value = personId;
         if (taskAssigneeName) taskAssigneeName.value = label;
         if (taskAssigneeLabel) taskAssigneeLabel.value = label;
-      }, { excludeCurrentPerson: true });
+      });
     });
 
     taskForm?.addEventListener('submit', async (event) => {
@@ -637,14 +857,6 @@
           title: 'Assignee Required',
           icon: 'warning',
           message: 'Select another person before assigning this task.'
-        });
-        return;
-      }
-      if (currentPersonId && assignedPersonId === currentPersonId) {
-        await showNotificationMessage({
-          title: 'Choose Another Person',
-          icon: 'warning',
-          message: 'Assign this task to another person, not yourself.'
         });
         return;
       }

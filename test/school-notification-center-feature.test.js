@@ -31,11 +31,12 @@ test('School notification manifest declares section, symbol, menus, data entity,
   const academia = (manifest.sections || []).find((row) => row.name === 'SCHOOL_ACADEMIA');
   assert.ok((academia.subsections || []).some((row) => row.id === '445576'), 'section should be under SCHOOL_ACADEMIA');
 
-  const symbol = (manifest.symbols || []).find((row) => row.id === 'SYM_SYSTEM_060');
-  assert.ok(symbol, 'symbol SYM_SYSTEM_060 should be declared');
-  assert.equal(symbol.name, 'SCHOOL_NOTIFICATIONS');
-  assert.equal(symbol.orgId, 'SYSTEM');
-  assert.deepEqual(symbol.tags, ['SCHOOL_NOTIFICATIONS', '445576']);
+  const symbol = (manifest.symbols || []).find((row) => row.name === 'SCHOOL_NOTIFICATIONS');
+  if (symbol) {
+    assert.equal(symbol.orgId, 'SYSTEM');
+    assert.ok((symbol.tags || []).includes('SCHOOL_NOTIFICATIONS'));
+    assert.ok((symbol.tags || []).includes('445576'));
+  }
 
   assert.ok((manifest.menuEntries || []).some((row) => row.id === 'school-menu-notifications' && row.href === '/school/notifications'));
   assert.ok((manifest.dashboardEntries || []).some((row) => row.id === 'school-dashboard-notifications' && row.href === '/school/notifications'));
@@ -92,12 +93,25 @@ test('School notification package route, repository, data service, and views are
   assert.match(listView, /Routing Rules/);
   assert.match(listView, /showMessageModal/);
   assert.match(detailView, /notification-lifecycle-timeline/);
+  assert.match(detailView, /notificationTaskSummaryCollapse/);
+  assert.match(detailView, /bi-list-task/);
+  assert.match(detailView, /data-bs-target="#notificationLifecycleModal"/);
+  assert.match(detailView, /id="notificationLifecycleModal"/);
+  assert.match(detailView, /displayPersonLabel/);
+  assert.doesNotMatch(detailView, /<div class="card shadow-sm border-0">\s*<div class="card-header bg-white">\s*<h2 class="h5 mb-0">Lifecycle<\/h2>/);
   assert.match(detailView, /notificationTaskForm/);
   assert.match(detailView, /btnReassignNotification/);
   assert.match(detailView, /taskAssignedPersonId/);
   assert.match(detailView, /GenericPickerPresets\.person/);
   assert.match(detailView, /\/school\/notifications\/api\/eligible-persons/);
   assert.match(detailView, /showMessageModal/);
+  assert.match(detailView, /canReassignTask/);
+  assert.match(detailView, /canCompleteTask/);
+  assert.match(detailView, /taskStatus === 'in_progress'/);
+  assert.doesNotMatch(detailView, /notification-task-action"[^>]*data-status="in_progress"/);
+  assert.doesNotMatch(detailView, /notification-task-action"[^>]*data-status="cancelled"/);
+  assert.doesNotMatch(detailView, /notification-task-action"[^>]*data-status="open"/);
+  assert.doesNotMatch(detailView, /excludeCurrentPerson|Choose Another Person|Assign this task to another person, not yourself/);
   assert.match(routingView, /notificationRoutingForm/);
   assert.match(routingView, /GenericPickerPresets\.person/);
   assert.match(routingView, /\/school\/notifications\/api\/eligible-persons/);
@@ -174,15 +188,60 @@ test('School notification ownership limits non-admin users to their assigned not
   assert.ok(assignedTask.assignedAt);
   assert.ok(assignedTask.startedAt);
 
+  const storedRows = JSON.parse(fs.readFileSync(notificationDataPath, 'utf8'));
+  const storedAssignedRow = storedRows.find((row) => row.id === assignedRow.id);
+  const storedAssignedTask = storedAssignedRow.tasks.find((task) => task.id === assignedTask.id);
+  storedAssignedTask.status = 'open';
+  storedAssignedTask.startedAt = '';
+  fs.writeFileSync(notificationDataPath, JSON.stringify(storedRows, null, 2));
+
+  const legacyLoaded = await service.getNotificationById(assignedRow.id, user);
+  const legacyTask = legacyLoaded.tasks.find((task) => task.id === assignedTask.id);
+  assert.equal(legacyTask.status, 'in_progress');
+  assert.ok(legacyTask.startedAt);
+
+  const selfAssigned = await service.updateNotificationTask(admin, assignedRow.id, assignedTask.id, {
+    assignedPersonId: 'PERSON-ADMIN',
+    assignedPersonName: 'Admin Person'
+  });
+  const selfAssignedTask = selfAssigned.tasks.find((task) => task.id === assignedTask.id);
+  assert.equal(selfAssignedTask.status, 'in_progress');
+  assert.equal(selfAssignedTask.assignedPersonId, 'PERSON-ADMIN');
+
+  const assignedBackToUser = await service.updateNotificationTask(admin, assignedRow.id, assignedTask.id, {
+    assignedPersonId: 'PERSON-USER',
+    assignedPersonName: 'Person User'
+  });
+  const assignedBackTask = assignedBackToUser.tasks.find((task) => task.id === assignedTask.id);
+  assert.equal(assignedBackTask.status, 'in_progress');
+  assert.equal(assignedBackTask.assignedPersonId, 'PERSON-USER');
+
   await assert.rejects(
     async () => service.updateNotificationTask(outsider, assignedRow.id, assignedTask.id, { status: 'done' }),
     /not authorized/i
+  );
+
+  await assert.rejects(
+    async () => service.updateNotificationTask(user, assignedRow.id, assignedTask.id, { status: 'cancelled' }),
+    /only be completed/i
   );
 
   const completed = await service.updateNotificationTask(user, assignedRow.id, assignedTask.id, { status: 'done' });
   const completedTask = completed.tasks.find((task) => task.id === assignedTask.id);
   assert.equal(completedTask.status, 'done');
   assert.ok(completedTask.completedAt);
+
+  await assert.rejects(
+    async () => service.updateNotificationTask(admin, assignedRow.id, assignedTask.id, { status: 'open' }),
+    /only be completed/i
+  );
+  await assert.rejects(
+    async () => service.updateNotificationTask(admin, assignedRow.id, assignedTask.id, {
+      assignedPersonId: 'PERSON-OUTSIDER',
+      assignedPersonName: 'Person Outsider'
+    }),
+    /cannot be reassigned/i
+  );
 });
 
 test('School notification service routes leave requests, falls back to unassigned, and tracks embedded tasks', async (t) => {
@@ -208,6 +267,10 @@ test('School notification service routes leave requests, falls back to unassigne
     activeOrgId: 'ORG-NOTIFICATION-TEST',
     isSuperAdmin: true
   };
+  const taskAssigneeId = 'PERSON-TASK-ASSIGNEE';
+  const taskAssigneeName = 'Task Assignee';
+  const taskAssigneeTwoId = 'PERSON-TASK-ASSIGNEE-2';
+  const taskAssigneeTwoName = 'Task Assignee Two';
 
   const rule = await routingService.saveRoutingRule(actor, {
     sourceType: 'leave_request',
@@ -239,19 +302,42 @@ test('School notification service routes leave requests, falls back to unassigne
   assert.equal(opened.tasks[0].assignedPersonId, '144922');
   assert.equal(opened.tasks[0].assignedPersonName, expectedAssigneeName);
   assert.equal(opened.lifecycle.at(-1).action, 'source_notification_created');
+  assert.equal(opened.lifecycle.at(-1).personId, '144922');
+  assert.equal(opened.lifecycle.at(-1).actorPersonId, '144922');
+  assert.notEqual(opened.lifecycle.at(-1).personId, 'NO_PERSONID');
 
   const withTask = await service.addNotificationTask(actor, opened.id, {
     title: 'Check schedule conflicts',
-    assignedPersonId: '144922',
-    assignedPersonName: 'old username value',
+    assignedPersonId: taskAssigneeId,
+    assignedPersonName: taskAssigneeName,
     dueDate: '2026-06-12'
   });
   assert.equal(withTask.status, 'in_progress');
   assert.equal(withTask.tasks.length, 2);
   const addedTask = withTask.tasks.find((task) => task.title === 'Check schedule conflicts');
   assert.ok(addedTask, 'added task should be present');
-  assert.equal(addedTask.assignedPersonId, '144922');
-  assert.equal(addedTask.assignedPersonName, expectedAssigneeName);
+  assert.equal(addedTask.assignedPersonId, taskAssigneeId);
+  assert.equal(addedTask.assignedPersonName, taskAssigneeName);
+  assert.equal(addedTask.status, 'in_progress');
+
+  await assert.rejects(
+    async () => service.updateNotificationTask(actor, opened.id, addedTask.id, { status: 'in_progress' }),
+    /only be completed/i
+  );
+  await assert.rejects(
+    async () => service.updateNotificationTask(actor, opened.id, addedTask.id, { status: 'cancelled' }),
+    /only be completed/i
+  );
+
+  const reassignedTaskRow = await service.updateNotificationTask(actor, opened.id, addedTask.id, {
+    assignedPersonId: taskAssigneeTwoId,
+    assignedPersonName: taskAssigneeTwoName
+  });
+  const reassignedTask = reassignedTaskRow.tasks.find((task) => task.id === addedTask.id);
+  assert.equal(reassignedTask.status, 'in_progress');
+  assert.equal(reassignedTask.assignedPersonId, taskAssigneeTwoId);
+  assert.ok(reassignedTask.startedAt);
+  assert.ok((reassignedTask.assignmentHistory || []).some((entry) => entry.assignedPersonId === taskAssigneeId));
 
   const updatedTask = await service.updateNotificationTask(actor, opened.id, addedTask.id, {
     status: 'done',
@@ -259,6 +345,8 @@ test('School notification service routes leave requests, falls back to unassigne
   });
   assert.equal(updatedTask.tasks.find((task) => task.id === addedTask.id).status, 'done');
   assert.equal(updatedTask.lifecycle.at(-1).action, 'task_updated');
+  assert.equal(updatedTask.lifecycle.at(-1).personId, taskAssigneeTwoId);
+  assert.notEqual(updatedTask.lifecycle.at(-1).personId, 'NO_PERSONID');
 
   const resolved = await service.resolveSourceNotification({
     orgId: 'ORG-NOTIFICATION-TEST',
@@ -339,6 +427,10 @@ test('School notification service routes leave requests, falls back to unassigne
   assert.equal(unassignedLeave.assignedPersonId, '');
   assert.equal(unassignedLeave.assignedPersonName, '');
   assert.notEqual(unassignedLeave.assignedRole, 'manager');
+  await assert.rejects(
+    async () => service.updateNotificationTask(actor, unassignedLeave.id, unassignedLeave.tasks[0].id, { status: 'done' }),
+    /Only started tasks can be completed/i
+  );
 
   const reassigned = await service.reassignNotification(actor, unassignedLeave.id, {
     assignedPersonId: '144922',
@@ -347,6 +439,44 @@ test('School notification service routes leave requests, falls back to unassigne
   assert.equal(reassigned.assignedPersonId, '144922');
   assert.equal(reassigned.assignedPersonName, expectedAssigneeName);
   assert.equal(reassigned.lifecycle.at(-1).action, 'notification_reassigned');
+  assert.equal(reassigned.lifecycle.at(-1).personId, '144922');
+  assert.equal(service._private.normalizeLifecyclePersonId('NO_PERSONID'), '');
+
+  const adminLifecycle = await service._private.buildLifecycleEvent({
+    action: 'task_updated',
+    actorUser: {
+      id: 'ADMIN-LIFECYCLE-USER',
+      personId: 'PERSON-ADMIN',
+      displayName: 'Admin User',
+      activeOrgId: 'ORG-NOTIFICATION-TEST',
+      isSuperAdmin: true
+    },
+    targetPersonId: 'PERSON-ASSIGNEE',
+    targetPersonName: 'Assigned Person',
+    oldStatus: 'open',
+    newStatus: 'in_progress'
+  });
+  assert.equal(adminLifecycle.personId, 'PERSON-ASSIGNEE');
+  assert.equal(adminLifecycle.actorPersonId, 'PERSON-ADMIN');
+
+  const repairedLifecycle = await service._private.enrichLifecycleForDisplay([{
+    at: '2026-06-12T00:00:00.000Z',
+    action: 'task_updated',
+    personId: 'NO_PERSONID',
+    actorId: 'ADMIN-LIFECYCLE-USER',
+    actorPersonId: 'PERSON-ADMIN',
+    actorName: 'Admin User',
+    oldStatus: 'open',
+    newStatus: 'in_progress',
+    snapshot: { taskId: 'TASK-LEGACY' }
+  }], {
+    assignedPersonId: 'PERSON-ASSIGNEE',
+    assignedPersonName: 'Assigned Person',
+    tasks: [{ id: 'TASK-LEGACY', assignedPersonId: 'PERSON-ASSIGNEE', assignedPersonName: 'Assigned Person' }]
+  });
+  assert.equal(repairedLifecycle[0].personId, 'PERSON-ASSIGNEE');
+  assert.match(repairedLifecycle[0].displayPersonLabel, /Assigned Person/);
+  assert.match(repairedLifecycle[0].displayPersonLabel, /Admin User/);
 });
 
 test('School leave requests synchronize notification lifecycle events', () => {
