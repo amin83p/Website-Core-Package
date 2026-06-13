@@ -303,6 +303,77 @@ function buildNotificationActionLinks(row) {
   return actions;
 }
 
+function buildClassActionLinks(row) {
+  const id = normalizeText(row?.id);
+  const encodedId = encodeURIComponent(id);
+  const lifecycleMode = lower(row?.registrationMode || 'term_based') === 'rolling' ? 'rolling' : 'term_based';
+  const actions = [
+    { label: 'Wizard', href: `/school/classes/edit-wizard/${encodedId}`, icon: 'bi bi-magic', tone: 'info' },
+    { label: 'Edit', href: `/school/classes/edit/${encodedId}`, icon: 'bi bi-pencil-square', tone: 'primary' }
+  ];
+
+  if (lifecycleMode === 'rolling') {
+    actions.unshift(
+      { label: 'Enrollment', href: `/school/classes/${encodedId}/rolling-enrollment`, icon: 'bi bi-person-check', tone: 'primary' },
+      { label: 'Rollover', href: `/school/classes/${encodedId}/cycle-rollover`, icon: 'bi bi-arrow-repeat', tone: 'warning' }
+    );
+  }
+
+  return actions;
+}
+
+function normalizeScheduleLabel(schedule) {
+  const current = schedule && typeof schedule === 'object' ? schedule.current : null;
+  if (!current || typeof current !== 'object') return 'Not scheduled';
+  const startDate = normalizeText(current.startDate);
+  const endDate = normalizeText(current.endDate);
+  const startTime = normalizeText(current.startTime);
+  const endTime = normalizeText(current.endTime);
+  const days = Array.isArray(current.daysOfWeek) ? current.daysOfWeek : [];
+  const datePart = startDate || endDate ? `${startDate || '?'} -> ${endDate || 'Open'}` : '';
+  const dayPart = days.length ? days.map((day) => normalizeText(day).slice(0, 3)).filter(Boolean).join(', ') : '';
+  const timePart = startTime || endTime ? `${startTime || '?'} - ${endTime || '?'}` : '';
+  return [datePart, dayPart, timePart].filter(Boolean).join(' | ') || 'Not scheduled';
+}
+
+function normalizeClassRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const lifecycleMode = lower(row?.registrationMode || 'term_based') === 'rolling' ? 'rolling' : 'term_based';
+    const subjects = Array.isArray(row?.curriculum?.subjects) ? row.curriculum.subjects : [];
+    return {
+      id: normalizeText(row?.id),
+      title: normalizeText(row?.title || row?.name || row?.id || 'Class'),
+      status: normalizeText(row?.status || 'unknown'),
+      orgId: normalizeText(row?.orgId),
+      deliveryDepartmentName: normalizeText(row?.deliveryDepartmentName || row?.deliveryDepartmentId || ''),
+      lifecycleMode,
+      activePeriodCount: Number(row?.activePeriodCount || 0),
+      openPeriodCount: Number(row?.openPeriodCount || 0),
+      cycleNo: Number(row?.cycleNo || 1),
+      cycleStartDate: normalizeText(row?.cycleStartDate),
+      cycleEndDate: normalizeText(row?.cycleEndDate),
+      isClosedForNewEnrollment: Boolean(row?.isClosedForNewEnrollment),
+      scheduleLabel: normalizeScheduleLabel(row?.schedule),
+      subjectLabels: subjects.map((subject) => normalizeText(subject?.code || subject?.subjectId)).filter(Boolean),
+      totalHours: Number(row?.curriculum?.totalHours || 0),
+      actions: buildClassActionLinks(row)
+    };
+  });
+}
+
+function objectSearchText(value) {
+  if (value === undefined || value === null) return '';
+  if (Array.isArray(value)) return value.map(objectSearchText).join(' ');
+  if (typeof value === 'object') return Object.values(value).map(objectSearchText).join(' ');
+  return normalizeText(value);
+}
+
+function rowMatchesWorkspaceSearch(row, searchTerm) {
+  const term = lower(searchTerm);
+  if (!term) return true;
+  return lower(objectSearchText(row)).includes(term);
+}
+
 function normalizeNotificationRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => ({
     id: normalizeText(row?.id),
@@ -386,6 +457,38 @@ async function getNotificationSummary(req) {
 
 async function getWorkspaceSection(sectionKey, queryInput, req) {
   const key = lower(sectionKey);
+  const query = await buildDataServiceQuery(queryInput || {});
+
+  if (key === 'classes') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Classes',
+      sectionId: SECTIONS.SCHOOL_CLASSES
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Classes.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const fetchQuery = {
+      ...query,
+      searchFields: query.searchFields || 'id,title,status,deliveryDepartmentName,deliveryDepartmentId,registrationMode,curriculum.subjects.code,curriculum.subjects.subjectId'
+    };
+    delete fetchQuery.page;
+    delete fetchQuery.limit;
+    const rows = await dataService.fetchData('classes', fetchQuery, req.user, { scopeId: access.scopeId });
+    return {
+      section: {
+        key: 'classes',
+        label: 'Classes',
+        icon: 'bi bi-easel-fill',
+        sourceUrl: '/school/classes'
+      },
+      rows: normalizeClassRows(rows),
+      total: Array.isArray(rows) ? rows.length : 0,
+      searchQuery: normalizeText(query.q || ''),
+      refreshedAt: new Date().toISOString()
+    };
+  }
 
   if (key !== 'notifications') {
     const error = new Error('This Master Hub section is not available on-page yet.');
@@ -393,7 +496,18 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     throw error;
   }
 
-  const rows = await getActiveUserNotifications(req, queryInput || {});
+  const access = await evaluateModuleAccess(req, {
+    label: 'Notifications',
+    sectionId: SECTIONS.SCHOOL_NOTIFICATIONS
+  });
+  if (!access.allowed) {
+    const error = new Error('You do not have access to Notifications.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const notificationRows = await getActiveUserNotifications(req, queryInput || {});
+  const rows = notificationRows.filter((row) => rowMatchesWorkspaceSearch(row, query.q || ''));
 
   return {
     section: {
@@ -405,6 +519,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     rows: normalizeNotificationRows(rows),
     total: rows.length,
     unresolvedCount: rows.filter(hasIncompleteNotificationWork).length,
+    searchQuery: normalizeText(query.q || ''),
     refreshedAt: new Date().toISOString()
   };
 }

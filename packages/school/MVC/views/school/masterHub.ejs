@@ -293,6 +293,12 @@
     gap: 0.35rem;
   }
 
+  .school-master-hub .hub-workspace-toolbar {
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(248, 250, 252, 0.82);
+  }
+
   .school-master-hub .hub-hero {
     padding: 1.25rem;
     background:
@@ -430,9 +436,18 @@
 
   <div class="hub-section-panel" aria-label="School Master Hub sections">
     <div class="hub-section-panel-inner">
-      <a class="hub-section-segment" href="/school/classes">
+      <div class="hub-section-segment hub-notification-segment">
+        <span class="hub-notification-count is-muted" id="schoolMasterHubNotificationCount">-</span>
+        <button type="button" class="hub-section-main-link" data-hub-workspace-section="notifications">
+          <span><i class="bi bi-bell-fill me-1"></i> Notification</span>
+        </button>
+        <button type="button" class="hub-notification-gear" id="schoolMasterHubNotificationSettings" aria-label="Notification refresh settings">
+          <i class="bi bi-gear-fill"></i>
+        </button>
+      </div>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="classes">
         <span><i class="bi bi-easel-fill me-1"></i> Class</span>
-      </a>
+      </button>
       <a class="hub-section-segment" href="/school/sessions">
         <span><i class="bi bi-calendar2-week-fill me-1"></i> Sessions</span>
       </a>
@@ -445,15 +460,6 @@
       <a class="hub-section-segment" href="/school/grades-matrix">
         <span><i class="bi bi-journal-check me-1"></i> Gradebook</span>
       </a>
-      <div class="hub-section-segment hub-notification-segment">
-        <span class="hub-notification-count is-muted" id="schoolMasterHubNotificationCount">-</span>
-        <button type="button" class="hub-section-main-link" data-hub-workspace-section="notifications">
-          <span><i class="bi bi-bell-fill me-1"></i> Notification</span>
-        </button>
-        <button type="button" class="hub-notification-gear" id="schoolMasterHubNotificationSettings" aria-label="Notification refresh settings">
-          <i class="bi bi-gear-fill"></i>
-        </button>
-      </div>
     </div>
   </div>
 
@@ -545,6 +551,8 @@
   <% } %>
 </div>
 
+<%- include('partials/modal', { user }) %>
+
 <script>
 (function () {
   const root = document.querySelector('[data-master-hub]');
@@ -597,7 +605,6 @@
     if (typeof window.showMessageModal === 'function') {
       return window.showMessageModal(options || {});
     }
-    renderWorkspaceStatus(String(options?.message || options?.title || 'Message modal is not available.'), 'bi-exclamation-triangle', 'danger');
     return null;
   }
 
@@ -710,7 +717,11 @@
 
   const workspaceState = {
     currentSection: '',
-    loading: false
+    loading: false,
+    serverSearch: {
+      notifications: '',
+      classes: ''
+    }
   };
 
   const workspaceSections = {
@@ -719,6 +730,12 @@
       endpoint: '/school/master-hub/api/workspace/notifications',
       sourceUrl: '/school/notifications',
       icon: 'bi bi-bell-fill'
+    },
+    classes: {
+      label: 'Classes',
+      endpoint: '/school/master-hub/api/workspace/classes',
+      sourceUrl: '/school/classes',
+      icon: 'bi bi-easel-fill'
     }
   };
 
@@ -760,6 +777,69 @@
     return 'text-bg-info';
   }
 
+  function workspaceToolbarHtml(key, options) {
+    const opts = options || {};
+    const label = opts.label || 'records';
+    const serverValue = workspaceState.serverSearch[key] || '';
+    return [
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-2 align-items-end">',
+      '<div class="col-lg-6">',
+      '<label class="form-label small fw-semibold" for="hubServerSearch_' + escapeHtml(key) + '">DB Search</label>',
+      '<div class="input-group">',
+      '<input type="search" class="form-control form-control-sm" id="hubServerSearch_' + escapeHtml(key) + '" data-hub-server-search-input="' + escapeHtml(key) + '" value="' + escapeHtml(serverValue) + '" placeholder="Search ' + escapeHtml(label) + ' in database...">',
+      '<button type="button" class="btn btn-primary btn-sm" data-hub-server-search-button="' + escapeHtml(key) + '"><i class="bi bi-search me-1"></i> Search</button>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" data-hub-server-search-clear="' + escapeHtml(key) + '"><i class="bi bi-x-circle me-1"></i> Clear</button>',
+      '</div>',
+      '</div>',
+      '<div class="col-lg-6">',
+      '<label class="form-label small fw-semibold" for="hubTableSearch_' + escapeHtml(key) + '">Search Visible Table</label>',
+      '<input type="search" class="form-control form-control-sm" id="hubTableSearch_' + escapeHtml(key) + '" data-hub-table-search-input="' + escapeHtml(key) + '" placeholder="Filter displayed rows...">',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function bindWorkspaceSearchControls(key) {
+    if (!els.workspace) return;
+    const serverInput = els.workspace.querySelector('[data-hub-server-search-input="' + key + '"]');
+    const serverButton = els.workspace.querySelector('[data-hub-server-search-button="' + key + '"]');
+    const clearButton = els.workspace.querySelector('[data-hub-server-search-clear="' + key + '"]');
+    const tableInput = els.workspace.querySelector('[data-hub-table-search-input="' + key + '"]');
+
+    const runServerSearch = function () {
+      workspaceState.serverSearch[key] = String(serverInput ? serverInput.value : '').trim();
+      loadWorkspaceSection(key);
+    };
+
+    if (serverButton) serverButton.addEventListener('click', runServerSearch);
+    if (serverInput) {
+      serverInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          runServerSearch();
+        }
+      });
+    }
+    if (clearButton) {
+      clearButton.addEventListener('click', function () {
+        workspaceState.serverSearch[key] = '';
+        if (serverInput) serverInput.value = '';
+        loadWorkspaceSection(key);
+      });
+    }
+    if (tableInput) {
+      tableInput.addEventListener('input', function () {
+        const term = String(tableInput.value || '').trim().toLowerCase();
+        els.workspace.querySelectorAll('[data-hub-workspace-row]').forEach(function (row) {
+          const text = String(row.getAttribute('data-search-text') || row.textContent || '').toLowerCase();
+          row.classList.toggle('d-none', Boolean(term && !text.includes(term)));
+        });
+      });
+    }
+  }
+
   function renderNotificationWorkspace(payload) {
     const section = payload && payload.section ? payload.section : workspaceSections.notifications;
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
@@ -773,8 +853,19 @@
             '</a>'
           ].join('');
         }).join('');
+        const searchText = [
+          row.title,
+          row.id,
+          row.status,
+          row.severity,
+          row.sourceType,
+          row.sourceId,
+          row.assignedPersonName,
+          row.assignedRole,
+          row.dueDate
+        ].join(' ');
         return [
-          '<tr>',
+          '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
           '<td class="ps-4">',
           '<div class="fw-semibold">' + escapeHtml(row.title || row.id || 'Notification') + '</div>',
           '<div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div>',
@@ -804,6 +895,7 @@
       '<a href="' + escapeHtml(section.sourceUrl || '/school/notifications') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
       '</div>',
       '</div>',
+      workspaceToolbarHtml('notifications', { label: 'notifications' }),
       '<div class="table-responsive">',
       '<table class="table align-middle hub-workspace-table">',
       '<thead class="table-light">',
@@ -838,6 +930,114 @@
         }
       });
     }
+    bindWorkspaceSearchControls('notifications');
+  }
+
+  function classStatusBadgeClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (value === 'active') return 'text-bg-success';
+    if (value === 'draft') return 'text-bg-warning';
+    if (value === 'completed') return 'text-bg-primary';
+    if (value === 'cancelled') return 'text-bg-danger';
+    return 'text-bg-secondary';
+  }
+
+  function renderClassWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : workspaceSections.classes;
+    const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const body = rows.length
+      ? rows.map(function (row) {
+        const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+          return [
+            '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener">',
+            '<i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open'),
+            '</a>'
+          ].join('');
+        }).join('');
+        const subjects = Array.isArray(row.subjectLabels) && row.subjectLabels.length
+          ? row.subjectLabels.map(function (label) {
+            return '<span class="badge text-bg-light border me-1 mb-1">' + escapeHtml(label) + '</span>';
+          }).join('')
+          : '<span class="text-muted small">No subjects</span>';
+        const lifecycle = row.lifecycleMode === 'rolling'
+          ? 'Rolling' + (row.cycleNo ? ' | Cycle #' + escapeHtml(row.cycleNo) : '')
+          : 'Term-Based';
+        const searchText = [
+          row.title,
+          row.id,
+          row.status,
+          row.deliveryDepartmentName,
+          lifecycle,
+          row.scheduleLabel,
+          Array.isArray(row.subjectLabels) ? row.subjectLabels.join(' ') : '',
+          row.totalHours
+        ].join(' ');
+        return [
+          '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+          '<td class="ps-4">',
+          '<div class="fw-semibold">' + escapeHtml(row.title || row.id || 'Class') + '</div>',
+          '<div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div>',
+          '</td>',
+          '<td>' + escapeHtml(row.deliveryDepartmentName || '-') + '</td>',
+          '<td>' + escapeHtml(lifecycle) + '<div class="small text-muted">Active periods: ' + escapeHtml(row.activePeriodCount || 0) + '</div></td>',
+          '<td>' + escapeHtml(row.scheduleLabel || 'Not scheduled') + '</td>',
+          '<td>' + subjects + '<div class="small text-muted mt-1">' + escapeHtml(row.totalHours || 0) + ' total hrs</div></td>',
+          '<td><span class="badge ' + classStatusBadgeClass(row.status) + '">' + escapeHtml(String(row.status || 'unknown').toUpperCase()) + '</span></td>',
+          '<td class="pe-4"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
+          '</tr>'
+        ].join('');
+      }).join('')
+      : '<tr><td colspan="7" class="text-center text-muted py-5">No classes found.</td></tr>';
+
+    els.workspace.innerHTML = [
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-easel-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Classes') + '</h2>',
+      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' class(es). Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
+      '</div>',
+      '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="classes"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>',
+      '<a href="' + escapeHtml(section.sourceUrl || '/school/classes') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      workspaceToolbarHtml('classes', { label: 'classes' }),
+      '<div class="table-responsive">',
+      '<table class="table align-middle hub-workspace-table">',
+      '<thead class="table-light">',
+      '<tr>',
+      '<th class="ps-4">Class</th>',
+      '<th>Delivery Dept</th>',
+      '<th>Lifecycle</th>',
+      '<th>Schedule</th>',
+      '<th>Curriculum</th>',
+      '<th>Status</th>',
+      '<th class="pe-4 text-end">Actions</th>',
+      '</tr>',
+      '</thead>',
+      '<tbody>',
+      body,
+      '</tbody>',
+      '</table>',
+      '</div>',
+      '</div>'
+    ].join('');
+
+    const reload = els.workspace.querySelector('[data-hub-workspace-reload]');
+    if (reload) {
+      reload.addEventListener('click', async function () {
+        const shouldReload = await confirmHubReload({
+          title: 'Reload Classes',
+          message: 'Reload the classes list inside Master Hub?'
+        });
+        if (shouldReload) {
+          loadWorkspaceSection(reload.getAttribute('data-hub-workspace-reload') || 'classes');
+        }
+      });
+    }
+    bindWorkspaceSearchControls('classes');
   }
 
   async function loadWorkspaceSection(sectionKey) {
@@ -854,7 +1054,11 @@
     }
 
     try {
-      const response = await fetch(config.endpoint, {
+      const requestQuery = new URLSearchParams();
+      const serverSearch = String(workspaceState.serverSearch[key] || '').trim();
+      if (serverSearch) requestQuery.set('q', serverSearch);
+      const requestUrl = config.endpoint + (requestQuery.toString() ? '?' + requestQuery.toString() : '');
+      const response = await fetch(requestUrl, {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin'
       });
@@ -868,6 +1072,8 @@
       if (key === 'notifications') {
         renderNotificationWorkspace(payload);
         setNotificationCount(payload.unresolvedCount || 0, false);
+      } else if (key === 'classes') {
+        renderClassWorkspace(payload);
       }
     } catch (error) {
       renderWorkspaceStatus(error.message || 'Unable to load this section.', 'bi-exclamation-triangle', 'danger');
