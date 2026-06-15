@@ -16,7 +16,7 @@ router.use((req, res, next) => {
   next();
 });
 
-router.use('/master-hub', require('./schoolMasterHubRoutes'));
+router.use('/master-hub', require('./schoolMasterAcademiaHubRoutes'));
 router.use('/students', require('./studentRoutes'));
 router.use('/teachers', require('./teacherRoutes'));
 router.use('/staff', require('./staffRoutes'));

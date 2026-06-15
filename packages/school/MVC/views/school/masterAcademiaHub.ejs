@@ -1,0 +1,3496 @@
+<%
+  const safeModules = Array.isArray(modules) ? modules : [];
+  const initialType = String(defaultType || safeModules[0]?.type || '').trim();
+%>
+
+<style>
+  .school-master-hub {
+    --hub-left-safe: clamp(3.75rem, 5vw, 5.5rem);
+    width: 100vw;
+    max-width: none;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .school-master-hub .hub-shell {
+    display: grid;
+    grid-template-columns: minmax(390px, 540px) minmax(0, 1fr);
+    gap: 0;
+    min-height: calc(100vh - 92px);
+    padding-left: var(--hub-left-safe);
+    transition: grid-template-columns 180ms ease;
+  }
+
+  .school-master-hub .hub-page-header {
+    padding-left: var(--hub-left-safe);
+    padding-right: 1rem;
+  }
+
+  .school-master-hub .hub-section-panel {
+    margin-left: var(--hub-left-safe);
+    margin-right: 1rem;
+    margin-bottom: 1rem;
+    padding: 0;
+    border: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 1rem;
+    background:
+      linear-gradient(135deg, rgba(2, 132, 199, 0.08), rgba(34, 197, 94, 0.06)),
+      #ffffff;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-section-panel-inner {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    direction: rtl;
+  }
+
+  .school-master-hub .hub-section-segment {
+    appearance: none;
+    position: relative;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-left: 1px solid rgba(15, 23, 42, 0.09);
+    background: rgba(255, 255, 255, 0.68);
+    color: #475569;
+    padding: 1rem 1.1rem;
+    min-height: 4.25rem;
+    text-align: center;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  }
+
+  .school-master-hub .hub-section-segment:first-child {
+    border-left: 0;
+  }
+
+  .school-master-hub .hub-section-segment:hover,
+  .school-master-hub .hub-section-segment.is-active {
+    background: #0284c7;
+    color: #ffffff;
+    transform: translateY(-1px);
+  }
+
+  .school-master-hub .hub-section-main-link {
+    appearance: none;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-decoration: none;
+    font: inherit;
+  }
+
+  .school-master-hub .hub-section-segment > span,
+  .school-master-hub .hub-section-main-link > span {
+    direction: ltr;
+  }
+
+  .school-master-hub .hub-notification-count {
+    position: absolute;
+    top: 0.42rem;
+    left: 0.42rem;
+    z-index: 3;
+    min-width: 1.65rem;
+    height: 1.65rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.72rem;
+    line-height: 1;
+    box-shadow: 0 8px 18px rgba(239, 68, 68, 0.24);
+  }
+
+  .school-master-hub .hub-notification-count.is-muted {
+    background: #94a3b8;
+    box-shadow: none;
+  }
+
+  .school-master-hub .hub-notification-gear {
+    position: absolute;
+    top: 0.42rem;
+    right: 0.42rem;
+    z-index: 4;
+    width: 1.8rem;
+    height: 1.8rem;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #0f172a;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 160ms ease, background 160ms ease;
+  }
+
+  .school-master-hub .hub-notification-gear:hover {
+    transform: rotate(32deg);
+    background: #ffffff;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-shell {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .school-master-hub .hub-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    min-height: calc(100vh - 92px);
+    border-right: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 0;
+    background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.14), transparent 36%),
+      linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 12px 0 35px rgba(15, 23, 42, 0.07);
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-sidebar-inner {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 92px);
+  }
+
+  .school-master-hub .hub-sidebar-header {
+    padding: 1.2rem 1.2rem 0.85rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-collapse-toggle {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+  }
+
+  .school-master-hub .hub-tab {
+    width: 100%;
+    border: 0;
+    border-right: 1px solid rgba(15, 23, 42, 0.07);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+    background: transparent;
+    padding: 0.75rem 0.7rem;
+    text-align: center;
+    transition: background 160ms ease, transform 160ms ease;
+  }
+
+  .school-master-hub .hub-tab-shell {
+    position: relative;
+    min-width: 0;
+  }
+
+  .school-master-hub .hub-tab-open-section {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    z-index: 2;
+    width: 1.85rem;
+    height: 1.85rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-tab:hover,
+  .school-master-hub .hub-tab.active {
+    background: rgba(2, 132, 199, 0.09);
+  }
+
+  .school-master-hub .hub-tab.active {
+    box-shadow: inset 0 -4px 0 #0284c7;
+  }
+
+  .school-master-hub .hub-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+.school-master-hub .hub-tab.hub-tab-loading {
+    animation: schoolHubBeat 850ms ease-in-out infinite;
+  }
+
+  @keyframes schoolHubBeat {
+    0%, 100% {
+      transform: scale(1);
+      background: rgba(2, 132, 199, 0.09);
+    }
+    50% {
+      transform: scale(1.025);
+      background: rgba(2, 132, 199, 0.18);
+    }
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-sidebar-header-text,
+  .school-master-hub.hub-sidebar-collapsed .hub-tab-label,
+  .school-master-hub.hub-sidebar-collapsed .hub-tab-open-section,
+  .school-master-hub.hub-sidebar-collapsed .hub-sidebar-content {
+    display: none !important;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-sidebar-header {
+    padding: 1rem 0.65rem;
+    display: flex;
+    justify-content: center;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-tab {
+    justify-content: center !important;
+    padding: 1rem 0.65rem;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-tabs {
+    display: block;
+  }
+
+  .school-master-hub.hub-sidebar-collapsed .hub-tab-main {
+    justify-content: center;
+  }
+.school-master-hub .hub-main {
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-stage-empty {
+    min-height: calc(100vh - 92px);
+    display: grid;
+    place-items: center;
+    color: #94a3b8;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(14, 165, 233, 0.08), transparent 28%),
+      radial-gradient(circle at 80% 30%, rgba(34, 197, 94, 0.08), transparent 30%),
+      #ffffff;
+  }
+
+  .school-master-hub .hub-workspace {
+    min-height: calc(100vh - 92px);
+    padding: 1.25rem;
+    background:
+      radial-gradient(circle at 15% 15%, rgba(14, 165, 233, 0.08), transparent 28%),
+      radial-gradient(circle at 85% 20%, rgba(34, 197, 94, 0.08), transparent 30%),
+      #ffffff;
+  }
+
+  .school-master-hub .hub-workspace-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1.2rem;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-workspace-header {
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.08), rgba(34, 197, 94, 0.07));
+  }
+
+  .school-master-hub .hub-workspace-table {
+    min-width: 860px;
+    margin-bottom: 0;
+  }
+
+  .school-master-hub .hub-attendance-matrix-wrap {
+    max-height: calc(100vh - 310px);
+    overflow: auto;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1rem;
+    background: #ffffff;
+  }
+
+  .school-master-hub .hub-attendance-table {
+    min-width: 920px;
+    margin-bottom: 0;
+  }
+
+  .school-master-hub .hub-attendance-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f8fafc;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-attendance-rollup,
+  .school-master-hub .hub-attendance-student {
+    position: sticky;
+    z-index: 3;
+    background: #ffffff;
+  }
+
+  .school-master-hub .hub-attendance-rollup {
+    left: 0;
+    width: 98px;
+    min-width: 98px;
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-attendance-student {
+    left: 98px;
+    min-width: 220px;
+    border-right: 2px solid rgba(15, 23, 42, 0.1);
+  }
+
+  .school-master-hub .hub-attendance-table th.hub-attendance-rollup,
+  .school-master-hub .hub-attendance-table th.hub-attendance-student {
+    background: #f8fafc;
+    z-index: 4;
+  }
+
+  .school-master-hub .hub-attendance-cell {
+    min-width: 86px;
+    text-align: center;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: background 160ms ease, transform 160ms ease;
+  }
+
+  .school-master-hub .hub-attendance-cell:hover {
+    background: #eff6ff;
+    transform: translateY(-1px);
+  }
+
+  .school-master-hub .attendance-status-present { color: #198754; font-weight: 800; }
+  .school-master-hub .attendance-status-late { color: #f59f00; font-weight: 800; }
+  .school-master-hub .attendance-status-excused { color: #0dcaf0; font-weight: 800; }
+  .school-master-hub .attendance-status-absent { color: #dc3545; font-weight: 800; }
+  .school-master-hub .attendance-status-na { color: #94a3b8; }
+
+  .school-master-hub .session-row {
+    cursor: default;
+    transition: filter 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .school-master-hub .session-row:hover {
+    filter: brightness(0.985);
+  }
+
+  .school-master-hub .session-row.session-row-locked {
+    box-shadow: inset 4px 0 0 #6c757d;
+  }
+
+  .school-master-hub .status-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.35em 0.65em;
+    border-radius: 4px;
+  }
+
+  .school-master-hub .hub-schedule-tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 1.15rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(248, 250, 252, 0.85);
+  }
+
+  .school-master-hub .hub-schedule-person-tab {
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .school-master-hub .hub-schedule-event {
+    border-left: 5px solid #0d6efd;
+  }
+
+  .school-master-hub .hub-schedule-event.is-leave {
+    border-left-color: #f08c00;
+    background: linear-gradient(90deg, #fff9db 0%, #ffffff 72%);
+  }
+
+  .school-master-hub .hub-schedule-event.has-overlap {
+    box-shadow: inset 0 0 0 1px rgba(220, 53, 69, 0.32);
+  }
+
+  .school-master-hub .schedule-hours-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    padding: 0.4rem 0.7rem;
+    font-weight: 800;
+    border: 1px solid transparent;
+    box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .schedule-hours-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .school-master-hub .hours-category-default {
+    background: #f8f9fa;
+    color: #495057;
+    border-color: #dee2e6;
+  }
+
+  .school-master-hub .hub-schedule-visual {
+    padding: 1rem 1.15rem 1.25rem;
+  }
+
+  .school-master-hub .hub-schedule-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.8rem 1.15rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.88);
+  }
+
+  .school-master-hub .timeline-container {
+    position: relative;
+    border: 1px solid #dee2e6;
+    border-radius: 0.75rem;
+    background: #fff;
+    margin-bottom: 1rem;
+    overflow: hidden;
+  }
+
+  .school-master-hub .timeline-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 0.55rem 0.9rem;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .school-master-hub .timeline-header.conflict {
+    background: #dc3545;
+    color: #fff;
+  }
+
+  .school-master-hub .timeline-body {
+    position: relative;
+    min-height: 64px;
+    background-image: repeating-linear-gradient(to right, transparent, transparent calc(6.66% - 1px), #f1f3f5 calc(6.66% - 1px), #f1f3f5 6.66%);
+  }
+
+  .school-master-hub .hour-markers {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .school-master-hub .hour-marker {
+    flex: 1;
+    border-right: 1px dashed #e9ecef;
+    position: relative;
+  }
+
+  .school-master-hub .hour-label {
+    position: absolute;
+    bottom: -20px;
+    left: -10px;
+    font-size: 0.65rem;
+    color: #adb5bd;
+  }
+
+  .school-master-hub .event-block {
+    position: absolute;
+    min-height: 48px;
+    border-radius: 0.45rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+    font-size: 0.7rem;
+    line-height: 1.1;
+    padding: 4px 6px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    transition: transform 0.1s;
+    border-left: 4px solid rgba(0,0,0,0.3);
+    z-index: 10;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .school-master-hub .event-block:hover {
+    transform: scale(1.02);
+    z-index: 20;
+  }
+
+  .school-master-hub .event-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .school-master-hub .event-leave {
+    background: linear-gradient(135deg, #fff3bf 0%, #ffd43b 100%);
+    color: #4d3200;
+    border-left-color: #f08c00;
+    border: 1px solid #fcc419;
+    box-shadow: 0 3px 10px rgba(240, 140, 0, 0.22);
+  }
+
+  .school-master-hub .role-teacher {
+    background-color: #0dcaf0;
+    color: #000;
+  }
+
+  .school-master-hub .role-student {
+    background-color: #0d6efd;
+    color: #fff;
+  }
+
+  .school-master-hub .role-staff {
+    background-color: #e2e3e5;
+    color: #41464b;
+  }
+
+  .school-master-hub .single-day-list .day-card {
+    border: 1px solid #dee2e6;
+    border-radius: 0.8rem;
+    background: #fff;
+    margin-bottom: 0.9rem;
+    overflow: hidden;
+  }
+
+  .school-master-hub .single-day-list .day-card-header {
+    padding: 0.65rem 0.9rem;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .school-master-hub .single-day-list .day-card-header.conflict {
+    background: #f8d7da;
+    color: #842029;
+  }
+
+  .school-master-hub .single-day-list .event-row {
+    display: grid;
+    grid-template-columns: 170px 1fr auto;
+    gap: 0.85rem;
+    align-items: start;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px dashed #e9ecef;
+  }
+
+  .school-master-hub .single-day-list .event-row:last-child {
+    border-bottom: none;
+  }
+
+  .school-master-hub .single-day-list .event-row.overlap {
+    background: #fff5f5;
+  }
+
+  .school-master-hub .single-day-list .event-row.leave-event {
+    background: linear-gradient(90deg, #fff9db 0%, #ffffff 72%);
+    border-left: 5px solid #f08c00;
+  }
+
+  .school-master-hub .single-day-list .event-time {
+    font-weight: 700;
+    color: #0d6efd;
+    white-space: nowrap;
+  }
+
+  .school-master-hub .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+
+  .school-master-hub .cal-day {
+    aspect-ratio: 1 / 1;
+    border: 1px solid #f8f9fa;
+    border-radius: 0.35rem;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: 0.2s;
+    font-size: 0.85rem;
+  }
+
+  .school-master-hub .cal-day.empty {
+    color: #adb5bd;
+    cursor: default;
+  }
+
+  .school-master-hub .cal-day.active {
+    background-color: #e7f1ff;
+    border-color: #b6d4fe;
+    color: #084298;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .school-master-hub .cal-day.conflict {
+    background-color: #f8d7da;
+    border-color: #f5c2c7;
+    color: #842029;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .school-master-hub .cal-day.leave {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+    color: #664d03;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .school-master-hub .cal-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    border-radius: 10px;
+    color: white;
+  }
+
+  .school-master-hub .hub-workspace-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+
+  .school-master-hub .hub-workspace-toolbar {
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(248, 250, 252, 0.82);
+  }
+
+  .school-master-hub .hub-hero {
+    padding: 1.25rem;
+    background:
+      linear-gradient(135deg, rgba(2, 132, 199, 0.11), rgba(34, 197, 94, 0.09)),
+      #f8fafc;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-content {
+    padding: 1rem 1.25rem 1.25rem;
+  }
+
+  .school-master-hub .hub-sidebar-content {
+    flex: 1;
+    min-height: 0;
+    padding: 1rem;
+    overflow: auto;
+  }
+
+  .school-master-hub .hub-table-wrap {
+    overflow: auto;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1rem;
+  }
+
+  .school-master-hub .hub-table {
+    min-width: 980px;
+    margin-bottom: 0;
+  }
+
+  .school-master-hub .hub-person-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .school-master-hub .hub-person-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+    padding: 0.9rem;
+  }
+
+  .school-master-hub .hub-person-card:hover {
+    border-color: rgba(2, 132, 199, 0.28);
+  }
+
+  .school-master-hub .hub-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .school-master-hub .hub-card-details {
+    display: none;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-person-card.is-expanded .hub-card-details {
+    display: block;
+  }
+
+  .school-master-hub .hub-card-toggle {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+  }
+
+  .school-master-hub .hub-card-actions .btn {
+    white-space: nowrap;
+  }
+
+  .school-master-hub .hub-load-more-wrap {
+    display: grid;
+    place-items: center;
+    padding: 0.25rem 0 1rem;
+  }
+
+  .school-master-hub .hub-row-actions {
+    min-width: 158px;
+  }
+
+  .school-master-hub .hub-action-menu {
+    min-width: 12rem;
+  }
+
+  .school-master-hub .hub-empty {
+    min-height: 220px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    color: #64748b;
+  }
+
+  @media (max-width: 991.98px) {
+    .school-master-hub .hub-section-panel {
+      margin-left: 1rem;
+    }
+
+    .school-master-hub .hub-section-panel-inner {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .school-master-hub .hub-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .school-master-hub .hub-sidebar {
+      position: static;
+      min-height: auto;
+    }
+
+    .school-master-hub .hub-sidebar-inner {
+      min-height: auto;
+    }
+  }
+</style>
+
+<div class="container-fluid school-master-hub hub-sidebar-collapsed py-3"
+     data-master-hub
+     data-modules='<%- JSON.stringify(safeModules) %>'
+     data-default-type="<%= initialType %>">
+  <div class="hub-page-header d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+    <div>
+      <div class="text-uppercase text-muted small fw-bold">School Package</div>
+      <h1 class="h3 mb-1">Master Academia Hub</h1>
+      <p class="text-muted mb-0">Review school people records from one full-width workspace.</p>
+    </div>
+    <a href="<%= schoolSectionDashboardHref || '/school' %>" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-speedometer2 me-1"></i> Academia Dashboard
+    </a>
+  </div>
+
+  <div class="hub-section-panel" aria-label="School Master Hub sections">
+    <div class="hub-section-panel-inner">
+      <div class="hub-section-segment hub-notification-segment">
+        <span class="hub-notification-count is-muted" id="schoolMasterHubNotificationCount">-</span>
+        <button type="button" class="hub-section-main-link" data-hub-workspace-section="notifications">
+          <span><i class="bi bi-bell-fill me-1"></i> Notification</span>
+        </button>
+        <button type="button" class="hub-notification-gear" id="schoolMasterHubNotificationSettings" aria-label="Notification refresh settings">
+          <i class="bi bi-gear-fill"></i>
+        </button>
+      </div>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="classes">
+        <span><i class="bi bi-easel-fill me-1"></i> Class</span>
+      </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="sessions">
+        <span><i class="bi bi-calendar2-week-fill me-1"></i> Sessions</span>
+      </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="schedule">
+        <span><i class="bi bi-calendar-check-fill me-1"></i> Schedule</span>
+      </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="attendance">
+        <span><i class="bi bi-clipboard-check-fill me-1"></i> Attendance</span>
+      </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="leave-requests">
+        <span><i class="bi bi-calendar-heart me-1"></i> Leave Requests</span>
+      </button>
+    </div>
+  </div>
+
+  <% if (!safeModules.length) { %>
+    <div class="hub-main">
+      <div class="hub-empty">
+        <div>
+          <i class="bi bi-shield-lock display-5 d-block mb-3"></i>
+          <h2 class="h5">No people directory access</h2>
+          <p class="mb-0">You need access to Students, Teachers, or Staff to use the School Master Hub.</p>
+        </div>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="hub-shell">
+      <aside class="hub-sidebar">
+        <div class="hub-sidebar-inner">
+          <div class="hub-sidebar-header d-flex align-items-center justify-content-between gap-2">
+            <div class="hub-sidebar-header-text">
+              <div class="text-uppercase text-muted small fw-bold">People Lists</div>
+              <div class="fw-semibold">Choose a directory</div>
+            </div>
+            <button type="button"
+                    class="btn btn-outline-secondary btn-sm hub-collapse-toggle"
+                    id="schoolMasterHubCollapseSidebar"
+                    title="Collapse sidebar">
+              <i class="bi bi-layout-sidebar-inset"></i>
+            </button>
+          </div>
+          <div class="hub-tabs" id="schoolMasterHubTabs">
+            <% safeModules.forEach((item) => { %>
+              <div class="hub-tab-shell">
+                <button type="button"
+                        class="hub-tab position-relative"
+                        data-hub-tab="<%= item.type %>">
+                  <span class="hub-tab-main d-flex align-items-center justify-content-center gap-2">
+                    <i class="<%= item.icon %> <%= item.color || '' %>"></i>
+                    <span class="hub-tab-label">
+                      <span class="fw-semibold d-block"><%= item.label %></span>
+                    </span>
+                  </span>
+                </button>
+                <% if (item.directoryUrl) { %>
+                  <a class="btn btn-outline-secondary btn-sm hub-tab-open-section"
+                     href="<%= item.directoryUrl %>"
+                     target="_blank"
+                     rel="noopener"
+                     title="Open <%= item.label %> in a new tab"
+                     aria-label="Open <%= item.label %> in a new tab">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                  </a>
+                <% } %>
+              </div>
+            <% }); %>
+          </div>
+
+          <div class="hub-sidebar-content">
+            <div class="mb-3">
+              <label for="schoolMasterHubSearch" class="form-label fw-semibold">Search selected list</label>
+              <input type="search"
+                     id="schoolMasterHubSearch"
+                     class="form-control"
+                     placeholder="Search name, email, phone, ID, status, or department">
+            </div>
+            <div id="schoolMasterHubStatus" class="alert alert-info d-none" role="status"></div>
+            <div id="schoolMasterHubList"></div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="hub-main">
+        <section class="hub-hero d-none">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+              <div class="text-uppercase text-muted small fw-bold" id="schoolMasterHubEyebrow">Directory</div>
+              <h2 class="h4 mb-1" id="schoolMasterHubTitle">Loading...</h2>
+              <p class="text-muted mb-0" id="schoolMasterHubMeta">Preparing the workspace.</p>
+            </div>
+            <div class="d-flex gap-2">
+              <a href="#" class="btn btn-outline-primary btn-sm disabled" id="schoolMasterHubOpenDirectory">
+                <i class="bi bi-box-arrow-up-right me-1"></i> Open Directory
+              </a>
+              <button type="button" class="btn btn-primary btn-sm" id="schoolMasterHubRefreshCurrent">
+                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="hub-workspace" id="schoolMasterHubWorkspace" data-hub-workspace>
+          <div class="hub-stage-empty">
+            <div class="text-center px-4">
+              <i class="bi bi-grid-1x2-fill display-5 d-block mb-3"></i>
+              <h2 class="h5 text-slate-600">Master Hub canvas</h2>
+              <p class="mb-0">Select a section button above to work inside the hub, or select a person on the left.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/modal', { user }) %>
+<%- include('partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const root = document.querySelector('[data-master-hub]');
+  if (!root) return;
+
+  let modules = [];
+  try {
+    modules = JSON.parse(root.getAttribute('data-modules') || '[]');
+  } catch (error) {
+    modules = [];
+  }
+
+  const state = {
+    currentType: root.getAttribute('data-default-type') || (modules[0] && modules[0].type) || '',
+    page: 1,
+    loading: false,
+    lastSearch: '',
+    loadedRows: [],
+    pagination: null
+  };
+
+  const els = {
+    tabs: root.querySelectorAll('[data-hub-tab]'),
+    counts: root.querySelectorAll('[data-hub-count]'),
+    title: document.getElementById('schoolMasterHubTitle'),
+    eyebrow: document.getElementById('schoolMasterHubEyebrow'),
+    meta: document.getElementById('schoolMasterHubMeta'),
+    list: document.getElementById('schoolMasterHubList'),
+    status: document.getElementById('schoolMasterHubStatus'),
+    search: document.getElementById('schoolMasterHubSearch'),
+    refreshCurrent: document.getElementById('schoolMasterHubRefreshCurrent'),
+    openDirectory: document.getElementById('schoolMasterHubOpenDirectory'),
+    collapseSidebar: document.getElementById('schoolMasterHubCollapseSidebar'),
+    notificationCount: document.getElementById('schoolMasterHubNotificationCount'),
+    notificationSettings: document.getElementById('schoolMasterHubNotificationSettings'),
+    workspace: document.getElementById('schoolMasterHubWorkspace'),
+    workspaceButtons: root.querySelectorAll('[data-hub-workspace-section]')
+  };
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async function showHubMessage(options) {
+    if (typeof window.showMessageModal === 'function') {
+      return window.showMessageModal(options || {});
+    }
+    return null;
+  }
+
+  async function confirmHubReload({ title = 'Reload Master Hub', message = 'Reload this Master Hub view?' } = {}) {
+    const selected = await showHubMessage({
+      title,
+      icon: 'warning',
+      message,
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Reload', class: 'btn-primary' }
+      ]
+    });
+    return selected === 'Reload';
+  }
+
+  async function showCloseLimitationMessage() {
+    return showHubMessage({
+      title: 'Close Master Hub',
+      icon: 'info',
+      message: 'Browser tab close is controlled by the browser, so the app cannot replace it with this message modal. Use in-page navigation when you want a modal-confirmed exit.',
+      buttons: [
+        { text: 'OK', class: 'btn-primary' }
+      ]
+    });
+  }
+
+  const notificationState = {
+    intervalSeconds: 60,
+    timer: null,
+    loading: false
+  };
+
+  function setNotificationCount(value, muted) {
+    if (!els.notificationCount) return;
+    els.notificationCount.textContent = String(value == null ? '-' : value);
+    els.notificationCount.classList.toggle('is-muted', Boolean(muted));
+  }
+
+  async function refreshNotificationCount() {
+    if (notificationState.loading || !els.notificationCount) return;
+    notificationState.loading = true;
+
+    try {
+      const response = await fetch('/school/master-hub/api/notification-count', {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to read notification count.' };
+      });
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Unable to read notification count.');
+      }
+      setNotificationCount(payload.unresolvedCount || 0, false);
+    } catch (error) {
+      setNotificationCount('-', true);
+    } finally {
+      notificationState.loading = false;
+    }
+  }
+
+  function restartNotificationTimer() {
+    if (notificationState.timer) {
+      window.clearInterval(notificationState.timer);
+      notificationState.timer = null;
+    }
+
+    refreshNotificationCount();
+    notificationState.timer = window.setInterval(refreshNotificationCount, Math.max(10, notificationState.intervalSeconds) * 1000);
+  }
+
+  function applyNotificationInterval(value) {
+    const parsed = Number(value);
+    notificationState.intervalSeconds = Number.isFinite(parsed) && parsed >= 10 ? parsed : 60;
+    restartNotificationTimer();
+  }
+
+  async function openNotificationSettings() {
+    if (typeof window.showMessageModal !== 'function') {
+      renderWorkspaceStatus('Message modal is not available on this page.', 'bi-exclamation-triangle', 'danger');
+      return;
+    }
+
+    const inputId = 'schoolMasterHubNotificationIntervalInput';
+    const selected = await window.showMessageModal({
+      title: 'Notification refresh timer',
+      icon: 'info',
+      size: 'md',
+      message: [
+        '<p class="mb-3">Set how often Master Hub checks unresolved or incomplete notifications while this page remains open.</p>',
+        '<label class="form-label fw-semibold" for="' + inputId + '">Interval timer, in seconds</label>',
+        '<div class="input-group">',
+        '<input type="number" class="form-control" id="' + inputId + '" min="10" step="5" value="' + escapeHtml(notificationState.intervalSeconds || 60) + '">',
+        '<span class="input-group-text">seconds</span>',
+        '</div>',
+        '<div class="form-text">Default is 60 seconds. Minimum allowed value is 10 seconds.</div>'
+      ].join(''),
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Save Timer', class: 'btn-primary' }
+      ]
+    });
+
+    if (selected === 'Save Timer') {
+      const input = document.getElementById(inputId);
+      applyNotificationInterval(input ? input.value : 60);
+    }
+  }
+
+  const workspaceState = {
+    currentSection: '',
+    loading: false,
+    serverSearch: {
+      notifications: '',
+      classes: ''
+    }
+  };
+
+  const workspaceSections = {
+    notifications: {
+      label: 'Notifications',
+      endpoint: '/school/master-hub/api/workspace/notifications',
+      sourceUrl: '/school/notifications',
+      icon: 'bi bi-bell-fill'
+    },
+    classes: {
+      label: 'Classes',
+      endpoint: '/school/master-hub/api/workspace/classes',
+      sourceUrl: '/school/classes',
+      icon: 'bi bi-easel-fill'
+    }
+  };
+
+  function setWorkspaceButtons(activeKey) {
+    els.workspaceButtons.forEach(function (button) {
+      const key = button.getAttribute('data-hub-workspace-section') || '';
+      const segment = button.closest('.hub-section-segment');
+      if (segment) {
+        segment.classList.toggle('is-active', key === activeKey);
+      }
+    });
+  }
+
+  function renderWorkspaceStatus(message, icon, tone) {
+    if (!els.workspace) return;
+    els.workspace.innerHTML = [
+      '<div class="hub-stage-empty text-' + escapeHtml(tone || 'muted') + '">',
+      '<div class="text-center px-4">',
+      '<i class="bi ' + escapeHtml(icon || 'bi-grid-1x2-fill') + ' display-5 d-block mb-3"></i>',
+      '<h2 class="h5">' + escapeHtml(message || 'Select a section to begin.') + '</h2>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function statusBadgeClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (value === 'resolved') return 'text-bg-success';
+    if (value === 'in_progress') return 'text-bg-primary';
+    if (value === 'dismissed') return 'text-bg-secondary';
+    return 'text-bg-warning';
+  }
+
+  function severityBadgeClass(severity) {
+    const value = String(severity || '').toLowerCase();
+    if (value === 'critical' || value === 'high') return 'text-bg-danger';
+    if (value === 'warning' || value === 'medium') return 'text-bg-warning';
+    if (value === 'success' || value === 'low') return 'text-bg-success';
+    return 'text-bg-info';
+  }
+
+  function workspaceToolbarHtml(key, options) {
+    const opts = options || {};
+    const label = opts.label || 'records';
+    const serverValue = workspaceState.serverSearch[key] || '';
+    return [
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-2 align-items-end">',
+      '<div class="col-lg-6">',
+      '<label class="form-label small fw-semibold" for="hubServerSearch_' + escapeHtml(key) + '">DB Search</label>',
+      '<div class="input-group">',
+      '<input type="search" class="form-control form-control-sm" id="hubServerSearch_' + escapeHtml(key) + '" data-hub-server-search-input="' + escapeHtml(key) + '" value="' + escapeHtml(serverValue) + '" placeholder="Search ' + escapeHtml(label) + ' in database...">',
+      '<button type="button" class="btn btn-primary btn-sm" data-hub-server-search-button="' + escapeHtml(key) + '"><i class="bi bi-search me-1"></i> Search</button>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" data-hub-server-search-clear="' + escapeHtml(key) + '"><i class="bi bi-x-circle me-1"></i> Clear</button>',
+      '</div>',
+      '</div>',
+      '<div class="col-lg-6">',
+      '<label class="form-label small fw-semibold" for="hubTableSearch_' + escapeHtml(key) + '">Search Visible Table</label>',
+      '<input type="search" class="form-control form-control-sm" id="hubTableSearch_' + escapeHtml(key) + '" data-hub-table-search-input="' + escapeHtml(key) + '" placeholder="Filter displayed rows...">',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function bindWorkspaceSearchControls(key) {
+    if (!els.workspace) return;
+    const serverInput = els.workspace.querySelector('[data-hub-server-search-input="' + key + '"]');
+    const serverButton = els.workspace.querySelector('[data-hub-server-search-button="' + key + '"]');
+    const clearButton = els.workspace.querySelector('[data-hub-server-search-clear="' + key + '"]');
+    const tableInput = els.workspace.querySelector('[data-hub-table-search-input="' + key + '"]');
+
+    const runServerSearch = function () {
+      workspaceState.serverSearch[key] = String(serverInput ? serverInput.value : '').trim();
+      loadWorkspaceSection(key);
+    };
+
+    if (serverButton) serverButton.addEventListener('click', runServerSearch);
+    if (serverInput) {
+      serverInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          runServerSearch();
+        }
+      });
+    }
+    if (clearButton) {
+      clearButton.addEventListener('click', function () {
+        workspaceState.serverSearch[key] = '';
+        if (serverInput) serverInput.value = '';
+        loadWorkspaceSection(key);
+      });
+    }
+    if (tableInput) {
+      tableInput.addEventListener('input', function () {
+        const term = String(tableInput.value || '').trim().toLowerCase();
+        els.workspace.querySelectorAll('[data-hub-workspace-row]').forEach(function (row) {
+          const text = String(row.getAttribute('data-search-text') || row.textContent || '').toLowerCase();
+          row.classList.toggle('d-none', Boolean(term && !text.includes(term)));
+        });
+      });
+    }
+  }
+
+  function renderNotificationWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : workspaceSections.notifications;
+    const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const body = rows.length
+      ? rows.map(function (row) {
+        const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+          return [
+            '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener">',
+            '<i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open'),
+            '</a>'
+          ].join('');
+        }).join('');
+        const searchText = [
+          row.title,
+          row.id,
+          row.status,
+          row.severity,
+          row.sourceType,
+          row.sourceId,
+          row.assignedPersonName,
+          row.assignedRole,
+          row.dueDate
+        ].join(' ');
+        return [
+          '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+          '<td class="ps-4">',
+          '<div class="fw-semibold">' + escapeHtml(row.title || row.id || 'Notification') + '</div>',
+          '<div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div>',
+          '</td>',
+          '<td><span class="badge ' + statusBadgeClass(row.status) + '">' + escapeHtml(String(row.status || 'open').replace(/_/g, ' ')) + '</span></td>',
+          '<td><span class="badge ' + severityBadgeClass(row.severity) + '">' + escapeHtml(row.severity || 'info') + '</span></td>',
+          '<td>' + escapeHtml(row.sourceType || '-') + '<div class="small text-muted">' + escapeHtml(row.sourceId || '') + '</div></td>',
+          '<td>' + escapeHtml(row.assignedPersonName || row.assignedRole || '-') + '</td>',
+          '<td class="text-nowrap">' + escapeHtml(row.dueDate || '-') + '</td>',
+          '<td class="text-nowrap">' + escapeHtml(row.incompleteTaskCount || 0) + ' / ' + escapeHtml(row.taskCount || 0) + '</td>',
+          '<td class="pe-4"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
+          '</tr>'
+        ].join('');
+      }).join('')
+      : '<tr><td colspan="8" class="text-center text-muted py-5">No notifications assigned to you.</td></tr>';
+
+    els.workspace.innerHTML = [
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-bell-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Notifications') + '</h2>',
+      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' notification(s) related to you. Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
+      '</div>',
+      '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="notifications"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>',
+      '<a href="' + escapeHtml(section.sourceUrl || '/school/notifications') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      workspaceToolbarHtml('notifications', { label: 'notifications' }),
+      '<div class="table-responsive">',
+      '<table class="table align-middle hub-workspace-table">',
+      '<thead class="table-light">',
+      '<tr>',
+      '<th class="ps-4">Notification</th>',
+      '<th>Status</th>',
+      '<th>Severity</th>',
+      '<th>Source</th>',
+      '<th>Assigned</th>',
+      '<th>Due</th>',
+      '<th>Tasks</th>',
+      '<th class="pe-4 text-end">Actions</th>',
+      '</tr>',
+      '</thead>',
+      '<tbody>',
+      body,
+      '</tbody>',
+      '</table>',
+      '</div>',
+      '</div>'
+    ].join('');
+
+    const reload = els.workspace.querySelector('[data-hub-workspace-reload]');
+    if (reload) {
+      reload.addEventListener('click', async function () {
+        const shouldReload = await confirmHubReload({
+          title: 'Reload Notifications',
+          message: 'Reload the notifications list inside Master Hub?'
+        });
+        if (shouldReload) {
+          loadWorkspaceSection(reload.getAttribute('data-hub-workspace-reload') || 'notifications');
+        }
+      });
+    }
+    bindWorkspaceSearchControls('notifications');
+  }
+
+  function classStatusBadgeClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (value === 'active') return 'text-bg-success';
+    if (value === 'draft') return 'text-bg-warning';
+    if (value === 'completed') return 'text-bg-primary';
+    if (value === 'cancelled') return 'text-bg-danger';
+    return 'text-bg-secondary';
+  }
+
+  function renderClassWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : workspaceSections.classes;
+    const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    const notLoaded = payload && payload.notLoaded === true;
+    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const body = rows.length
+      ? rows.map(function (row) {
+        const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+          return [
+            '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener">',
+            '<i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open'),
+            '</a>'
+          ].join('');
+        }).join('');
+        const subjects = Array.isArray(row.subjectLabels) && row.subjectLabels.length
+          ? row.subjectLabels.map(function (label) {
+            return '<span class="badge text-bg-light border me-1 mb-1">' + escapeHtml(label) + '</span>';
+          }).join('')
+          : '<span class="text-muted small">No subjects</span>';
+        const lifecycle = row.lifecycleMode === 'rolling'
+          ? 'Rolling' + (row.cycleNo ? ' | Cycle #' + escapeHtml(row.cycleNo) : '')
+          : 'Term-Based';
+        const searchText = [
+          row.title,
+          row.id,
+          row.status,
+          row.deliveryDepartmentName,
+          lifecycle,
+          row.scheduleLabel,
+          Array.isArray(row.subjectLabels) ? row.subjectLabels.join(' ') : '',
+          row.totalHours
+        ].join(' ');
+        return [
+          '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+          '<td class="ps-4">',
+          '<div class="fw-semibold">' + escapeHtml(row.title || row.id || 'Class') + '</div>',
+          '<div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div>',
+          '</td>',
+          '<td>' + escapeHtml(row.deliveryDepartmentName || '-') + '</td>',
+          '<td>' + escapeHtml(lifecycle) + '<div class="small text-muted">Active periods: ' + escapeHtml(row.activePeriodCount || 0) + '</div></td>',
+          '<td>' + escapeHtml(row.scheduleLabel || 'Not scheduled') + '</td>',
+          '<td>' + subjects + '<div class="small text-muted mt-1">' + escapeHtml(row.totalHours || 0) + ' total hrs</div></td>',
+          '<td><span class="badge ' + classStatusBadgeClass(row.status) + '">' + escapeHtml(String(row.status || 'unknown').toUpperCase()) + '</span></td>',
+          '<td class="pe-4"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
+          '</tr>'
+        ].join('');
+      }).join('')
+      : (notLoaded
+        ? '<tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-arrow-clockwise d-block fs-2 mb-2"></i>Click <strong>Load Classes</strong> or use DB Search to load class records.</td></tr>'
+        : '<tr><td colspan="7" class="text-center text-muted py-5">No classes found.</td></tr>');
+
+    els.workspace.innerHTML = [
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-easel-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Classes') + '</h2>',
+      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' class(es). Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
+      '</div>',
+      '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="classes"><i class="bi bi-arrow-clockwise me-1"></i> ' + (notLoaded ? 'Load Classes' : 'Refresh') + '</button>',
+      '<a href="' + escapeHtml(section.sourceUrl || '/school/classes') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      workspaceToolbarHtml('classes', { label: 'classes' }),
+      '<div class="table-responsive">',
+      '<table class="table align-middle hub-workspace-table">',
+      '<thead class="table-light">',
+      '<tr>',
+      '<th class="ps-4">Class</th>',
+      '<th>Delivery Dept</th>',
+      '<th>Lifecycle</th>',
+      '<th>Schedule</th>',
+      '<th>Curriculum</th>',
+      '<th>Status</th>',
+      '<th class="pe-4 text-end">Actions</th>',
+      '</tr>',
+      '</thead>',
+      '<tbody>',
+      body,
+      '</tbody>',
+      '</table>',
+      '</div>',
+      '</div>'
+    ].join('');
+
+    const reload = els.workspace.querySelector('[data-hub-workspace-reload]');
+    if (reload) {
+      reload.addEventListener('click', async function () {
+        const shouldReload = notLoaded ? true : await confirmHubReload({
+          title: 'Reload Classes',
+          message: 'Reload the classes list inside Master Hub?'
+        });
+        if (shouldReload) {
+          loadWorkspaceSection(reload.getAttribute('data-hub-workspace-reload') || 'classes');
+        }
+      });
+    }
+    bindWorkspaceSearchControls('classes');
+  }
+
+  function hubTodayIso() {
+    const now = new Date();
+    const local = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+    return local.toISOString().slice(0, 10);
+  }
+
+  function hubDateToIso(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+    return local.toISOString().slice(0, 10);
+  }
+
+  function normalizeSessionStatusCode(value) {
+    return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+
+  function toSessionStatusLabel(status) {
+    const normalized = normalizeSessionStatusCode(status);
+    if (!normalized) return 'Status';
+    return normalized.replace(/_/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+  }
+
+  function normalizeHubHexColor(value, fallback) {
+    const raw = String(value || '').trim();
+    const normalized = raw.startsWith('#') ? raw : '#' + raw;
+    return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized) ? normalized : (fallback || '#e2e3e5');
+  }
+
+  function hubColorToRgba(value, alpha, fallback) {
+    const hex = normalizeHubHexColor(value, fallback || '#e2e3e5').replace('#', '');
+    const full = hex.length === 3 ? hex.split('').map(function (ch) { return ch + ch; }).join('') : hex;
+    const r = Number.parseInt(full.slice(0, 2), 16);
+    const g = Number.parseInt(full.slice(2, 4), 16);
+    const b = Number.parseInt(full.slice(4, 6), 16);
+    const safeAlpha = Math.max(0, Math.min(1, Number(alpha)));
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + safeAlpha + ')';
+  }
+
+  function buildSessionStatusMetaMap(statusMeta) {
+    const map = new Map();
+    (Array.isArray(statusMeta) ? statusMeta : []).forEach(function (row) {
+      const code = normalizeSessionStatusCode(row && row.code);
+      if (code) map.set(code, row);
+    });
+    return map;
+  }
+
+  function buildSessionStatusBadgeHtml(status, statusMap) {
+    const normalized = normalizeSessionStatusCode(status);
+    const meta = statusMap.get(normalized);
+    if (meta) {
+      return '<span class="status-badge border" style="background:' + escapeHtml(meta.colorBg || '#e2e3e5') + ';color:' + escapeHtml(meta.colorText || '#41464b') + ';border-color:' + escapeHtml(meta.colorBorder || '#c6c8ca') + ' !important;">' + escapeHtml(meta.label || toSessionStatusLabel(normalized)) + '</span>';
+    }
+    return '<span class="status-badge bg-secondary bg-opacity-10 text-secondary border border-secondary-subtle">' + escapeHtml(toSessionStatusLabel(normalized || 'other')) + '</span>';
+  }
+
+  function buildSessionRowStyle(status, locked, statusMap) {
+    const normalized = normalizeSessionStatusCode(status);
+    const meta = statusMap.get(normalized);
+    const colorBg = normalizeHubHexColor(meta && meta.colorBg, normalized === 'holiday' ? '#fff3cd' : '#e2e3e5');
+    const colorBorder = normalizeHubHexColor(meta && meta.colorBorder, normalized === 'holiday' ? '#ffe69c' : '#c6c8ca');
+    const baseLayer = 'linear-gradient(' + hubColorToRgba(colorBg, 0.20, colorBg) + ', ' + hubColorToRgba(colorBg, 0.20, colorBg) + ')';
+    const lockLayer = locked
+      ? ', repeating-linear-gradient(-45deg, ' + hubColorToRgba('#6c757d', 0.08, '#6c757d') + ' 0 10px, ' + hubColorToRgba('#adb5bd', 0.18, '#adb5bd') + ' 10px 20px)'
+      : '';
+    return [
+      'background-color:' + hubColorToRgba(colorBg, locked ? 0.14 : 0.20, colorBg),
+      'background-image:' + baseLayer + lockLayer,
+      'border-left:4px solid ' + (locked ? '#6c757d' : colorBorder)
+    ].join(';');
+  }
+
+  function hubInputValue(id) {
+    const el = document.getElementById(id);
+    return el ? String(el.value || '').trim() : '';
+  }
+
+  let hubSessionTeacherSelections = [];
+
+  function resolveHubTeacherId(item) {
+    if (!item || typeof item !== 'object') return '';
+    return String(item.personId || item.teacherPersonId || (item.person && item.person.id) || item.id || item._id || '').trim();
+  }
+
+  function formatHubTeacherName(item, fallbackId) {
+    if (!item || typeof item !== 'object') return String(fallbackId || '').trim();
+    const direct = String(item.displayName || item.fullName || item.personName || item.name || item.title || '').trim();
+    if (direct && direct !== '[object Object]') return direct;
+    const personName = item.person && item.person.name ? item.person.name : null;
+    const nameObject = item.name && typeof item.name === 'object' ? item.name : personName;
+    if (nameObject && typeof nameObject === 'object') {
+      const fromObject = [
+        nameObject.first || nameObject.given || '',
+        nameObject.middle || '',
+        nameObject.last || nameObject.family || ''
+      ].map(function (part) { return String(part || '').trim(); }).filter(Boolean).join(' ');
+      if (fromObject) return fromObject;
+    }
+    const fromFlat = [
+      item.firstName || item.first || '',
+      item.middleName || item.middle || '',
+      item.lastName || item.last || ''
+    ].map(function (part) { return String(part || '').trim(); }).filter(Boolean).join(' ');
+    return fromFlat || String(fallbackId || item.id || '').trim();
+  }
+
+  function splitHubIdList(value) {
+    return String(value || '').split(',').map(function (item) {
+      return item.trim();
+    }).filter(Boolean);
+  }
+
+  function sameHubIdList(first, second) {
+    const left = splitHubIdList(first).join(',');
+    const right = splitHubIdList(second).join(',');
+    return left === right;
+  }
+
+  function getHubSessionTeacherDisplay(filterValue) {
+    const ids = splitHubIdList(filterValue);
+    if (!ids.length) return '';
+    const selectionMap = new Map(hubSessionTeacherSelections.map(function (item) {
+      return [String(item.id || '').trim(), item];
+    }));
+    return ids.map(function (id) {
+      const selected = selectionMap.get(id);
+      return selected ? (selected.name || selected.id) : id;
+    }).join(', ');
+  }
+
+  function renderHubSessionTeacherChips() {
+    const container = document.getElementById('hubSessionTeacherChips');
+    if (!container) return;
+    if (!hubSessionTeacherSelections.length) {
+      container.innerHTML = '<div class="text-muted small">No teacher filter selected.</div>';
+      return;
+    }
+    container.innerHTML = hubSessionTeacherSelections.map(function (item) {
+      return [
+        '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1">',
+        '<span>' + escapeHtml(item.name || item.id) + '</span>',
+        '<button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove ' + escapeHtml(item.name || item.id) + '" data-hub-session-remove-teacher="' + escapeHtml(item.id) + '"></button>',
+        '</span>'
+      ].join('');
+    }).join('');
+  }
+
+  function syncHubSessionTeacherInputs() {
+    const idEl = document.getElementById('hubSessionTeacherId');
+    const nameEl = document.getElementById('hubSessionTeacherName');
+    const ids = hubSessionTeacherSelections.map(function (item) { return item.id; }).filter(Boolean);
+    if (idEl) idEl.value = ids.join(',');
+    if (nameEl) nameEl.value = hubSessionTeacherSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    renderHubSessionTeacherChips();
+  }
+
+  function appendSessionWorkspaceQuery(requestQuery) {
+    const values = {
+      startDate: hubInputValue('hubSessionStartDate'),
+      endDate: hubInputValue('hubSessionEndDate'),
+      startTime: hubInputValue('hubSessionStartTime'),
+      endTime: hubInputValue('hubSessionEndTime'),
+      teacherId: hubInputValue('hubSessionTeacherId'),
+      classId: hubInputValue('hubSessionClassId'),
+      status: hubInputValue('hubSessionStatus')
+    };
+
+    Object.keys(values).forEach(function (key) {
+      if (values[key]) requestQuery.set(key, values[key]);
+    });
+  }
+
+  function setHubSessionDateRange(range) {
+    const startEl = document.getElementById('hubSessionStartDate');
+    const endEl = document.getElementById('hubSessionEndDate');
+    if (!startEl || !endEl) return;
+    const today = new Date();
+    let start = new Date(today);
+    let end = new Date(today);
+
+    if (range === 'allTime') {
+      startEl.value = '';
+      endEl.value = '';
+      loadWorkspaceSection('sessions');
+      return;
+    }
+    if (range === 'thisWeek') {
+      const day = today.getDay() || 7;
+      start.setDate(today.getDate() - (day - 1));
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (range === 'thisMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    }
+
+    startEl.value = hubDateToIso(start);
+    endEl.value = hubDateToIso(end);
+    loadWorkspaceSection('sessions');
+  }
+
+  function truncateHubText(value, maxLength) {
+    const text = String(value || '').trim();
+    if (!text) return '-';
+    const limit = Number(maxLength || 40);
+    return text.length > limit ? text.slice(0, limit) + '...' : text;
+  }
+
+  function openHubSessionTeacherPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.teacher({
+      title: 'Filter by Teachers',
+      placeholder: 'Search teachers, select one or more...',
+      multiselect: true,
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const teacherId = resolveHubTeacherId(item);
+          const teacherName = formatHubTeacherName(item, teacherId);
+          if (teacherId && !hubSessionTeacherSelections.some(function (row) { return row.id === teacherId; })) {
+            hubSessionTeacherSelections.push({ id: teacherId, name: teacherName });
+          }
+        });
+        syncHubSessionTeacherInputs();
+        loadWorkspaceSection('sessions');
+      }
+    }));
+  }
+
+  function openHubSessionClassPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Class Picker', icon: 'warning', message: 'Class picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.class({
+      title: 'Filter by Class',
+      icon: 'bi-book',
+      onSelect: function (item) {
+        const idEl = document.getElementById('hubSessionClassId');
+        const nameEl = document.getElementById('hubSessionClassName');
+        if (idEl) idEl.value = item.id || '';
+        if (nameEl) nameEl.value = item.title || item.name || item.id || '';
+        loadWorkspaceSection('sessions');
+      }
+    }));
+  }
+
+  function bindSessionWorkspaceControls() {
+    const loadBtn = document.getElementById('hubSessionFilterLoad');
+    if (loadBtn) loadBtn.addEventListener('click', function () { loadWorkspaceSection('sessions'); });
+
+    root.querySelectorAll('[data-hub-session-range]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setHubSessionDateRange(btn.getAttribute('data-hub-session-range') || 'today');
+      });
+    });
+
+    const statusEl = document.getElementById('hubSessionStatus');
+    if (statusEl) statusEl.addEventListener('change', function () { loadWorkspaceSection('sessions'); });
+
+    const openTeacher = document.getElementById('hubSessionOpenTeacherPicker');
+    if (openTeacher) openTeacher.addEventListener('click', openHubSessionTeacherPicker);
+    const clearTeacher = document.getElementById('hubSessionClearTeacher');
+    if (clearTeacher) clearTeacher.addEventListener('click', function () {
+      hubSessionTeacherSelections = [];
+      syncHubSessionTeacherInputs();
+      loadWorkspaceSection('sessions');
+    });
+    const teacherChips = document.getElementById('hubSessionTeacherChips');
+    if (teacherChips) {
+      teacherChips.addEventListener('click', function (event) {
+        const removeBtn = event.target && event.target.closest('[data-hub-session-remove-teacher]');
+        if (!removeBtn) return;
+        const removeId = removeBtn.getAttribute('data-hub-session-remove-teacher') || '';
+        hubSessionTeacherSelections = hubSessionTeacherSelections.filter(function (item) {
+          return item.id !== removeId;
+        });
+        syncHubSessionTeacherInputs();
+        loadWorkspaceSection('sessions');
+      });
+    }
+
+    const openClass = document.getElementById('hubSessionOpenClassPicker');
+    if (openClass) openClass.addEventListener('click', openHubSessionClassPicker);
+    const clearClass = document.getElementById('hubSessionClearClass');
+    if (clearClass) clearClass.addEventListener('click', function () {
+      const idEl = document.getElementById('hubSessionClassId');
+      const nameEl = document.getElementById('hubSessionClassName');
+      if (idEl) idEl.value = '';
+      if (nameEl) nameEl.value = '';
+      loadWorkspaceSection('sessions');
+    });
+
+    const reload = els.workspace.querySelector('[data-hub-workspace-reload="sessions"]');
+    if (reload) {
+      reload.addEventListener('click', async function () {
+        const shouldReload = notLoaded ? true : await confirmHubReload({
+          title: 'Reload Sessions',
+          message: 'Reload the sessions list inside Master Hub?'
+        });
+        if (shouldReload) loadWorkspaceSection('sessions');
+      });
+    }
+
+    bindWorkspaceSearchControls('sessions');
+  }
+
+  function renderSessionWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : {};
+    const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    const notLoaded = payload && payload.notLoaded === true;
+    const filters = payload && payload.filters ? payload.filters : {};
+    const filterTeacherIds = splitHubIdList(filters.teacherId || '');
+    if (filterTeacherIds.length) {
+      const existingById = new Map(hubSessionTeacherSelections.map(function (item) {
+        return [String(item.id || '').trim(), item];
+      }));
+      hubSessionTeacherSelections = filterTeacherIds.map(function (id) {
+        return existingById.get(id) || { id: id, name: id };
+      });
+    } else {
+      hubSessionTeacherSelections = [];
+    }
+    const statusMeta = Array.isArray(payload && payload.statusMeta) ? payload.statusMeta : [];
+    const statusMap = buildSessionStatusMetaMap(statusMeta);
+    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const selectedStatus = normalizeSessionStatusCode(filters.status || '');
+    const statusOptions = statusMeta.map(function (row) {
+      const code = normalizeSessionStatusCode(row && row.code);
+      if (!code) return '';
+      return '<option value="' + escapeHtml(code) + '"' + (code === selectedStatus ? ' selected' : '') + '>' + escapeHtml(row.label || toSessionStatusLabel(code)) + '</option>';
+    }).join('');
+
+    const body = rows.length
+      ? rows.map(function (row) {
+        const dateLabel = row.date
+          ? new Date(row.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+          : '-';
+        const badgeHtml = buildSessionStatusBadgeHtml(row.status, statusMap);
+        const rowStyle = buildSessionRowStyle(row.status, row.locked === true, statusMap);
+        const commentsIcon = row.hasComments ? '<i class="bi bi-chat-dots-fill text-primary ms-1" title="Interactive notes inside"></i>' : '';
+        const detailUrl = '/school/classes/' + encodeURIComponent(row.classId || '') + '/sessions/' + encodeURIComponent(row.sessionId || '');
+        const searchText = [
+          row.sessionId,
+          row.classId,
+          row.className,
+          row.teacherName,
+          row.date,
+          row.startTime,
+          row.endTime,
+          row.status,
+          row.notes
+        ].join(' ');
+        return [
+          '<tr class="session-row ' + (row.locked ? 'session-row-locked' : '') + '" data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '" style="' + escapeHtml(rowStyle) + '">',
+          '<td class="ps-4 fw-bold text-dark">' + escapeHtml(dateLabel) + '<div class="small text-muted">' + escapeHtml(row.date || '') + '</div></td>',
+          '<td class="text-muted small"><i class="bi bi-clock me-1"></i>' + escapeHtml(row.startTime || '00:00') + ' - ' + escapeHtml(row.endTime || '00:00') + '</td>',
+          '<td><div class="fw-semibold text-primary">' + escapeHtml(row.className || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.classId || '') + '</div></td>',
+          '<td>' + escapeHtml(row.teacherName || 'Unassigned') + '</td>',
+          '<td>' + badgeHtml + (row.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : '') + '</td>',
+          '<td class="text-muted small fst-italic">' + escapeHtml(truncateHubText(row.notes, 42)) + commentsIcon + '</td>',
+          '<td class="pe-4 text-end"><a class="btn btn-sm btn-light border text-primary" href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-in-right me-1"></i>Open</a></td>',
+          '</tr>'
+        ].join('');
+      }).join('')
+      : (notLoaded
+        ? '<tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-arrow-clockwise d-block fs-2 mb-2"></i>Set filters if needed, then click <strong>Filter</strong> or <strong>Load Sessions</strong>.</td></tr>'
+        : '<tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-search d-block fs-2 mb-2"></i>No sessions found matching these filters.</td></tr>');
+
+    els.workspace.innerHTML = [
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar2-week-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Sessions') + '</h2>',
+      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' session(s). Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
+      '</div>',
+      '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="sessions"><i class="bi bi-arrow-clockwise me-1"></i> ' + (notLoaded ? 'Load Sessions' : 'Refresh') + '</button>',
+      '<a href="' + escapeHtml(section.sourceUrl || '/school/sessions') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-md-2"><label class="form-label fw-bold small">Start Date</label><input type="date" id="hubSessionStartDate" class="form-control form-control-sm" value="' + escapeHtml(filters.startDate || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small">End Date</label><input type="date" id="hubSessionEndDate" class="form-control form-control-sm" value="' + escapeHtml(filters.endDate || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small">Start Time</label><input type="time" id="hubSessionStartTime" class="form-control form-control-sm" value="' + escapeHtml(filters.startTime || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small">End Time</label><input type="time" id="hubSessionEndTime" class="form-control form-control-sm" value="' + escapeHtml(filters.endTime || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small">Status</label><select id="hubSessionStatus" class="form-select form-select-sm"><option value="">All Statuses</option>' + statusOptions + '</select></div>',
+      '<div class="col-md-2"><button type="button" id="hubSessionFilterLoad" class="btn btn-primary btn-sm w-100 fw-bold"><i class="bi bi-funnel-fill me-1"></i> Filter</button></div>',
+      '<div class="col-md-6"><label class="form-label fw-bold small">Filter by Teachers</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionTeacherId" value="' + escapeHtml(filters.teacherId || '') + '"><input type="text" id="hubSessionTeacherName" class="form-control bg-white" placeholder="All Teachers..." value="' + escapeHtml(getHubSessionTeacherDisplay(filters.teacherId || '')) + '" readonly><button type="button" class="btn btn-outline-danger" id="hubSessionClearTeacher" title="Clear All"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionOpenTeacherPicker" title="Select Teachers"><i class="bi bi-people-fill"></i></button></div><div id="hubSessionTeacherChips" class="mt-2"></div><div class="form-text">Use the picker checkbox list to add multiple teachers. Remove individual teachers from the chips below.</div></div>',
+      '<div class="col-md-6"><label class="form-label fw-bold small">Filter by Class</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionClassId" value="' + escapeHtml(filters.classId || '') + '"><input type="text" id="hubSessionClassName" class="form-control bg-white" placeholder="All Classes..." value="' + escapeHtml(filters.classId || '') + '" readonly><button type="button" class="btn btn-outline-danger" id="hubSessionClearClass" title="Clear"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionOpenClassPicker"><i class="bi bi-book"></i></button></div></div>',
+      '</div>',
+      '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-range="today">Today</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-range="thisWeek">This Week</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-range="thisMonth">This Month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-range="allTime">All Time</button>',
+      '</div>',
+      '</div>',
+      workspaceToolbarHtml('sessions', { label: 'sessions' }),
+      '<div class="table-responsive">',
+      '<table class="table table-hover align-middle hub-workspace-table">',
+      '<thead class="table-light">',
+      '<tr>',
+      '<th class="ps-4">Date</th>',
+      '<th>Time</th>',
+      '<th>Class</th>',
+      '<th>Teacher</th>',
+      '<th>Status</th>',
+      '<th>Notes</th>',
+      '<th class="pe-4 text-end">Action</th>',
+      '</tr>',
+      '</thead>',
+      '<tbody>',
+      body,
+      '</tbody>',
+      '</table>',
+      '</div>',
+      '</div>'
+    ].join('');
+
+    renderHubSessionTeacherChips();
+    bindSessionWorkspaceControls();
+  }
+
+  const hubScheduleState = {
+    persons: [],
+    activePersonId: '',
+    eventsByPersonId: {},
+    statusMetaByPersonId: {},
+    loadedPersonIds: new Set(),
+    loadingPersonId: ''
+  };
+
+  function resolveHubSchedulePersonId(item) {
+    return String(item?.personId || item?.id || item?._id || '').trim();
+  }
+
+  function formatHubSchedulePersonName(item, fallbackId) {
+    const direct = String(item?.displayName || item?.fullName || item?.label || item?.personName || item?.name || '').trim();
+    if (direct && direct !== '[object Object]') return direct;
+    const objectName = item?.name && typeof item.name === 'object' ? item.name : null;
+    if (objectName) {
+      const fromObject = [objectName.first, objectName.middle, objectName.last]
+        .map(function (part) { return String(part || '').trim(); })
+        .filter(Boolean)
+        .join(' ');
+      if (fromObject) return fromObject;
+    }
+    const fromParts = [item?.firstName, item?.middleName, item?.lastName]
+      .map(function (part) { return String(part || '').trim(); })
+      .filter(Boolean)
+      .join(' ');
+    return fromParts || String(fallbackId || '').trim();
+  }
+
+  function normalizeHubScheduleRole(value) {
+    return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+
+  function isHubScheduleLeaveEvent(event) {
+    return [
+      event?.eventType,
+      event?.targetType,
+      event?.status,
+      event?.role,
+      event?.roleLabel
+    ].map(function (value) {
+      return String(value || '').trim().toLowerCase();
+    }).some(function (value) {
+      return value === 'leave_request' || value === 'approved_leave' || value === 'approved_leave_snapshot' || value === 'leave';
+    });
+  }
+
+  function buildHubScheduleStatusMap(statusMeta) {
+    const map = new Map();
+    (Array.isArray(statusMeta) ? statusMeta : []).forEach(function (row) {
+      const code = normalizeSessionStatusCode(row && row.code);
+      if (code) map.set(code, row);
+    });
+    return map;
+  }
+
+  function hubScheduleStatusLabel(status, statusMap) {
+    const normalized = normalizeSessionStatusCode(status);
+    const meta = statusMap.get(normalized);
+    if (meta && meta.label) return meta.label;
+    if (normalized === 'approved_leave' || normalized === 'approved_leave_snapshot') return 'Approved Leave';
+    return toSessionStatusLabel(normalized || 'scheduled');
+  }
+
+  function hubScheduleStatusBadge(status, statusMap) {
+    const normalized = normalizeSessionStatusCode(status);
+    const meta = statusMap.get(normalized);
+    if (meta) {
+      return '<span class="status-badge border" style="background:' + escapeHtml(meta.colorBg || '#e2e3e5') + ';color:' + escapeHtml(meta.colorText || '#41464b') + ';border-color:' + escapeHtml(meta.colorBorder || '#c6c8ca') + ' !important;">' + escapeHtml(meta.label || hubScheduleStatusLabel(status, statusMap)) + '</span>';
+    }
+    if (normalized === 'approved_leave' || normalized === 'approved_leave_snapshot') {
+      return '<span class="status-badge border" style="background:#fff3cd;color:#7a4d00;border-color:#f59f00 !important;">Approved Leave</span>';
+    }
+    return '<span class="status-badge bg-secondary bg-opacity-10 text-secondary border border-secondary-subtle">' + escapeHtml(hubScheduleStatusLabel(status, statusMap)) + '</span>';
+  }
+
+  function getHubScheduleRange() {
+    const today = hubTodayIso();
+    return {
+      startDate: hubInputValue('hubScheduleStartDate') || today,
+      endDate: hubInputValue('hubScheduleEndDate') || today
+    };
+  }
+
+  function setHubScheduleRange(range) {
+    const startEl = document.getElementById('hubScheduleStartDate');
+    const endEl = document.getElementById('hubScheduleEndDate');
+    if (!startEl || !endEl) return;
+    const today = new Date();
+    let start = new Date(today);
+    let end = new Date(today);
+
+    if (range === 'week') {
+      const day = today.getDay() || 7;
+      start.setDate(today.getDate() - (day - 1));
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (range === 'lastMonth') {
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0);
+    } else if (range === 'lastTwoMonth') {
+      start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0);
+    } else if (range === 'lastThreeMonth') {
+      start = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0);
+    } else if (range === 'first15') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 15);
+    } else if (range === 'second15') {
+      start = new Date(today.getFullYear(), today.getMonth(), 16);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (range === 'month') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (range === 'twoMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+    } else if (range === 'threeMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 3, 0);
+    }
+
+    startEl.value = hubDateToIso(start);
+    endEl.value = hubDateToIso(end);
+    hubScheduleState.eventsByPersonId = {};
+    hubScheduleState.statusMetaByPersonId = {};
+    hubScheduleState.loadedPersonIds.clear();
+    refreshHubScheduleActiveView();
+  }
+
+  function activeHubSchedulePerson() {
+    return hubScheduleState.persons.find(function (person) {
+      return person.id === hubScheduleState.activePersonId;
+    }) || null;
+  }
+
+  function renderHubScheduleTabs() {
+    const host = document.getElementById('hubSchedulePersonTabs');
+    if (!host) return;
+    if (!hubScheduleState.persons.length) {
+      host.innerHTML = '<div class="text-muted small">Select one or more school people to create schedule tabs.</div>';
+      return;
+    }
+    host.innerHTML = hubScheduleState.persons.map(function (person) {
+      const active = person.id === hubScheduleState.activePersonId;
+      return [
+        '<button type="button" class="btn btn-sm ' + (active ? 'btn-primary' : 'btn-outline-primary') + ' hub-schedule-person-tab" data-hub-schedule-person-tab="' + escapeHtml(person.id) + '">',
+        '<i class="bi bi-person-circle"></i>',
+        '<span>' + escapeHtml(person.name || person.id) + '</span>',
+        '<span class="badge ' + (active ? 'text-bg-light' : 'text-bg-primary') + '">' + escapeHtml((person.availableRoles || []).length || 'All') + '</span>',
+        '</button>'
+      ].join('');
+    }).join('');
+  }
+
+  function renderHubScheduleRoleOptions(person) {
+    const roleSelect = document.getElementById('hubScheduleRole');
+    if (!roleSelect) return;
+    const currentRole = String(person?.selectedRole || '').trim();
+    const roles = Array.isArray(person?.availableRoles) ? person.availableRoles : [];
+    roleSelect.innerHTML = '<option value="">All Roles</option>' + roles.map(function (role) {
+      const key = String(role?.key || '').trim();
+      if (!key) return '';
+      return '<option value="' + escapeHtml(key) + '"' + (key === currentRole ? ' selected' : '') + '>' + escapeHtml(role.label || toSessionStatusLabel(key)) + '</option>';
+    }).join('');
+  }
+
+  const HUB_TIMELINE_START_HOUR = 7;
+  const HUB_TIMELINE_END_HOUR = 22;
+  const HUB_TIMELINE_TOTAL_MINUTES = (HUB_TIMELINE_END_HOUR - HUB_TIMELINE_START_HOUR) * 60;
+
+  function hubScheduleTimeToMinutes(timeStr) {
+    if (!timeStr) return 0;
+    const parts = String(timeStr || '').split(':').map(Number);
+    const hour = Number(parts[0] || 0);
+    const minute = Number(parts[1] || 0);
+    return (hour * 60) + minute;
+  }
+
+  function hubScheduleCalculatePosition(startStr, endStr) {
+    let startMin = hubScheduleTimeToMinutes(startStr);
+    let endMin = hubScheduleTimeToMinutes(endStr);
+    const timelineStartMin = HUB_TIMELINE_START_HOUR * 60;
+    const timelineEndMin = HUB_TIMELINE_END_HOUR * 60;
+    if (startMin < timelineStartMin) startMin = timelineStartMin;
+    if (endMin > timelineEndMin) endMin = timelineEndMin;
+    if (endMin <= startMin) endMin = startMin + 30;
+    return {
+      left: ((startMin - timelineStartMin) / HUB_TIMELINE_TOTAL_MINUTES) * 100,
+      width: ((endMin - startMin) / HUB_TIMELINE_TOTAL_MINUTES) * 100,
+      startMin,
+      endMin
+    };
+  }
+
+  function getHubScheduleEventTitle(event) {
+    return String(event?.className || event?.title || event?.label || event?.classId || 'Schedule Item').trim();
+  }
+
+  function getHubScheduleEventDetailsUrl(event) {
+    return String(event?.detailsUrl || '').trim() || (
+      event?.sessionId && event?.classId
+        ? '/school/classes/' + encodeURIComponent(event.classId) + '/sessions/' + encodeURIComponent(event.sessionId)
+        : ''
+    );
+  }
+
+  function groupHubScheduleEventsByDate(events) {
+    const grouped = {};
+    (Array.isArray(events) ? events : []).forEach(function (event) {
+      const date = String(event?.date || '').trim();
+      if (!date) return;
+      if (!grouped[date]) grouped[date] = [];
+      grouped[date].push(event);
+    });
+    Object.keys(grouped).forEach(function (date) {
+      grouped[date].sort(function (a, b) {
+        const aStart = hubScheduleTimeToMinutes(a?.start);
+        const bStart = hubScheduleTimeToMinutes(b?.start);
+        if (aStart !== bStart) return aStart - bStart;
+        return getHubScheduleEventTitle(a).localeCompare(getHubScheduleEventTitle(b));
+      });
+    });
+    return grouped;
+  }
+
+  function renderHubScheduleLegend(mode) {
+    const host = document.getElementById('hubScheduleLegend');
+    if (!host) return;
+    if (mode === 'calendar') {
+      host.innerHTML = '<div class="text-primary fw-bold"><i class="bi bi-circle-fill small"></i> Active Day</div><div class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Conflict Day</div><div class="text-warning fw-bold"><i class="bi bi-circle-fill small"></i> Leave Day</div><div class="text-muted small">Click any day to zoom in</div>';
+      return;
+    }
+    if (mode === 'timeline') {
+      host.innerHTML = '<div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0dcaf0;"></span> Teacher/Staff</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#0d6efd;"></span> Student</div><div><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#ffd43b;"></span> Approved Leave</div><div class="text-danger fw-bold"><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:#dc3545;"></span> Overlap</div>';
+      return;
+    }
+    host.innerHTML = '<div class="text-muted small">Vertical full-detail view for selected day</div>';
+  }
+
+  function renderHubScheduleSingleDayView(eventsByDate, statusMap) {
+    const dates = Object.keys(eventsByDate || {}).sort();
+    if (!dates.length) {
+      return '<div class="alert alert-light text-center border py-4 text-muted">No schedule items found for this day.</div>';
+    }
+    let html = '<div class="single-day-list">';
+    dates.forEach(function (dateStr) {
+      const dateObj = new Date(dateStr + 'T00:00:00');
+      const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      const dayEvents = eventsByDate[dateStr] || [];
+      const hasConflict = dayEvents.some(function (event) { return event?.hasOverlap; });
+      html += '<div class="day-card"><div class="day-card-header ' + (hasConflict ? 'conflict' : '') + '"><span>' + escapeHtml(displayDate) + '</span><span class="badge ' + (hasConflict ? 'bg-danger' : 'bg-primary') + '">' + escapeHtml(dayEvents.length) + ' item' + (dayEvents.length === 1 ? '' : 's') + '</span></div>';
+      dayEvents.forEach(function (event) {
+        const leave = isHubScheduleLeaveEvent(event);
+        const title = getHubScheduleEventTitle(event);
+        const detailUrl = getHubScheduleEventDetailsUrl(event);
+        const statusBadge = hubScheduleStatusBadge(event?.status, statusMap);
+        html += [
+          '<div class="event-row ' + (event?.hasOverlap ? 'overlap ' : '') + (leave ? 'leave-event' : '') + '">',
+          '<div class="event-time">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</div>',
+          '<div>',
+          '<div class="fw-bold">' + escapeHtml(title) + '</div>',
+          '<div class="mt-1 d-flex flex-wrap gap-2 align-items-center">',
+          '<span class="badge ' + (leave ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-primary-subtle text-primary border') + '">' + escapeHtml(leave ? 'Approved Leave' : (event?.role || event?.roleLabel || '-')) + '</span>',
+          statusBadge,
+          '<span class="text-muted small">' + escapeHtml(Number(event?.duration || 0).toFixed(2)) + ' h</span>',
+          event?.hasOverlap ? '<span class="badge bg-danger">Overlap</span>' : '',
+          '</div>',
+          '</div>',
+          '<div class="event-actions">' + (detailUrl ? '<a class="btn btn-sm btn-outline-primary" href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener">Open</a>' : '<span class="text-muted small">No details</span>') + '</div>',
+          '</div>'
+        ].join('');
+      });
+      html += '</div>';
+    });
+    return html + '</div>';
+  }
+
+  function renderHubScheduleTimelineView(eventsByDate, statusMap) {
+    let html = '';
+    Object.keys(eventsByDate || {}).sort().forEach(function (dateStr) {
+      const dayEvents = eventsByDate[dateStr] || [];
+      const dateObj = new Date(dateStr + 'T00:00:00');
+      const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      const tracks = [];
+      const hasConflict = dayEvents.some(function (event) { return event?.hasOverlap; });
+
+      dayEvents.forEach(function (event) {
+        const pos = hubScheduleCalculatePosition(event?.start, event?.end);
+        event.__hubPos = pos;
+        let placed = false;
+        for (let i = 0; i < tracks.length; i += 1) {
+          const lastEvent = tracks[i][tracks[i].length - 1];
+          if (lastEvent.__hubPos.endMin <= pos.startMin) {
+            tracks[i].push(event);
+            event.__hubTrackIndex = i;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          tracks.push([event]);
+          event.__hubTrackIndex = tracks.length - 1;
+        }
+      });
+
+      const bodyHeight = Math.max(64, tracks.length * 56 + 10);
+      html += '<div class="timeline-container shadow-sm ' + (hasConflict ? 'border-danger' : '') + '"><div class="timeline-header ' + (hasConflict ? 'conflict' : '') + '"><span>' + escapeHtml(displayDate) + '</span><span>' + (hasConflict ? '<i class="bi bi-exclamation-triangle-fill me-1"></i> Conflict Detected' : '') + '</span></div><div class="timeline-body pb-3" style="height:' + escapeHtml(bodyHeight) + 'px;">';
+
+      dayEvents.forEach(function (event) {
+        const topPos = (event.__hubTrackIndex * 54) + 5;
+        const leave = isHubScheduleLeaveEvent(event);
+        const roleText = String(event?.role || event?.roleLabel || '').toLowerCase();
+        const cssClass = leave ? 'event-leave' : (roleText.includes('teacher') || roleText.includes('staff') ? 'role-teacher' : 'role-student');
+        const title = getHubScheduleEventTitle(event);
+        const detailUrl = getHubScheduleEventDetailsUrl(event);
+        const encodedDetailUrl = encodeURIComponent(detailUrl);
+        html += [
+          '<div class="event-block ' + cssClass + ' ' + (event?.hasOverlap ? 'border-danger border-2' : '') + '"',
+          ' style="left:' + escapeHtml(event.__hubPos.left) + '%;width:' + escapeHtml(event.__hubPos.width) + '%;top:' + escapeHtml(topPos) + 'px;"',
+          ' title="' + escapeHtml(title) + ' | ' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '"',
+          detailUrl ? ' onclick="window.open(decodeURIComponent(\'' + escapeHtml(encodedDetailUrl) + '\'), \'_blank\')"' : '',
+          '>',
+          '<div class="fw-bold text-truncate">' + escapeHtml(title) + '</div>',
+          '<div class="event-meta x-small"><span class="text-truncate">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</span>' + hubScheduleStatusBadge(event?.status, statusMap) + '</div>',
+          '</div>'
+        ].join('');
+      });
+
+      html += '<div class="hour-markers">';
+      for (let hour = HUB_TIMELINE_START_HOUR; hour < HUB_TIMELINE_END_HOUR; hour += 1) {
+        const label = hour > 12 ? (hour - 12) + 'p' : (hour === 12 ? '12p' : hour + 'a');
+        html += '<div class="hour-marker"><span class="hour-label">' + escapeHtml(label) + '</span></div>';
+      }
+      html += '</div></div></div>';
+    });
+    return html || '<div class="alert alert-light text-center border py-4 text-muted">No schedule items found in this range.</div>';
+  }
+
+  function renderHubScheduleCalendarView(eventsByDate, startStr, endStr) {
+    let current = new Date(startStr + 'T00:00:00');
+    current.setDate(1);
+    const end = new Date(endStr + 'T00:00:00');
+    end.setMonth(end.getMonth() + 1);
+    end.setDate(0);
+    let html = '<div class="row g-4">';
+    while (current <= end) {
+      const year = current.getFullYear();
+      const month = current.getMonth();
+      const monthName = current.toLocaleString('default', { month: 'long', year: 'numeric' });
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      html += '<div class="col-md-6 col-lg-4"><div class="card h-100 shadow-sm border-0"><div class="card-header bg-dark text-white text-center fw-bold py-2">' + escapeHtml(monthName) + '</div><div class="card-body p-2 bg-light"><div class="cal-grid">';
+      ['S','M','T','W','T','F','S'].forEach(function (day) {
+        html += '<div class="text-center x-small fw-bold text-muted mb-1">' + escapeHtml(day) + '</div>';
+      });
+      for (let blank = 0; blank < firstDayIndex; blank += 1) html += '<div class="cal-day empty"></div>';
+      for (let dayNo = 1; dayNo <= daysInMonth; dayNo += 1) {
+        const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(dayNo).padStart(2, '0');
+        const dayEvents = eventsByDate[dateStr] || [];
+        const hasConflict = dayEvents.some(function (event) { return event?.hasOverlap; });
+        const hasLeave = dayEvents.some(isHubScheduleLeaveEvent);
+        const count = dayEvents.length;
+        let classes = 'cal-day ';
+        let badge = '';
+        if (hasConflict) {
+          classes += 'conflict';
+          badge = '<div class="cal-badge bg-danger">' + escapeHtml(count) + '</div>';
+        } else if (hasLeave) {
+          classes += 'leave';
+          badge = '<div class="cal-badge bg-warning text-dark">' + escapeHtml(count) + '</div>';
+        } else if (count > 0) {
+          classes += 'active';
+          badge = '<div class="cal-badge bg-primary">' + escapeHtml(count) + '</div>';
+        } else {
+          classes += 'empty';
+        }
+        html += '<div class="' + classes + '" data-hub-schedule-date="' + escapeHtml(dateStr) + '"><span class="d-block">' + escapeHtml(dayNo) + '</span>' + badge + '</div>';
+      }
+      html += '</div></div></div></div>';
+      current.setMonth(current.getMonth() + 1);
+    }
+    return html + '</div>';
+  }
+
+  function renderHubScheduleEvents(person) {
+    const host = document.getElementById('hubScheduleEvents');
+    if (!host) return;
+    if (!person) {
+      host.innerHTML = '<div class="hub-empty"><div><i class="bi bi-people display-6 d-block mb-3"></i><div class="fw-semibold">Select people to view schedules.</div></div></div>';
+      renderHubScheduleLegend('empty');
+      return;
+    }
+    const events = Array.isArray(hubScheduleState.eventsByPersonId[person.id]) ? hubScheduleState.eventsByPersonId[person.id] : [];
+    const statusMap = buildHubScheduleStatusMap(hubScheduleState.statusMetaByPersonId[person.id] || []);
+    const hasLoaded = hubScheduleState.loadedPersonIds.has(person.id);
+    if (hubScheduleState.loadingPersonId === person.id) {
+      host.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading schedule for ' + escapeHtml(person.name || person.id) + '...</div></div>';
+      renderHubScheduleLegend('loading');
+      return;
+    }
+    if (!hasLoaded) {
+      host.innerHTML = '<div class="hub-empty"><div><i class="bi bi-arrow-clockwise display-6 d-block mb-3"></i><div class="fw-semibold">Schedule is ready to load for ' + escapeHtml(person.name || person.id) + '.</div><div class="text-muted small mt-1">Set the date range and role, then click <strong>Load Tab</strong> or <strong>Load All</strong>.</div></div></div>';
+      renderHubScheduleLegend('empty');
+      return;
+    }
+    if (!events.length) {
+      host.innerHTML = '<div class="hub-empty"><div><i class="bi bi-calendar-x display-6 d-block mb-3"></i><div class="fw-semibold">No schedule items found for ' + escapeHtml(person.name || person.id) + '.</div></div></div>';
+      renderHubScheduleLegend('empty');
+      return;
+    }
+    const grouped = groupHubScheduleEventsByDate(events);
+    const range = getHubScheduleRange();
+    const startDate = new Date(range.startDate + 'T00:00:00');
+    const endDate = new Date(range.endDate + 'T00:00:00');
+    const diffDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    let mode = 'calendar';
+    let content = '';
+    if (range.startDate === range.endDate || diffDays <= 0) {
+      mode = 'single';
+      content = renderHubScheduleSingleDayView(grouped, statusMap);
+    } else if (diffDays <= 14) {
+      mode = 'timeline';
+      content = renderHubScheduleTimelineView(grouped, statusMap);
+    } else {
+      mode = 'calendar';
+      content = renderHubScheduleCalendarView(grouped, range.startDate, range.endDate);
+    }
+    renderHubScheduleLegend(mode);
+    host.innerHTML = '<div class="hub-schedule-visual">' + content + '</div>';
+  }
+
+  function renderHubScheduleSummary(person) {
+    const host = document.getElementById('hubScheduleSummary');
+    if (!host) return;
+    const events = person ? (hubScheduleState.eventsByPersonId[person.id] || []) : [];
+    const totals = new Map();
+    (Array.isArray(events) ? events : []).forEach(function (event) {
+      const duration = Number(event?.duration || 0);
+      if (!Number.isFinite(duration) || duration <= 0) return;
+      const label = isHubScheduleLeaveEvent(event) ? 'Approved Leave' : String(event?.role || event?.roleLabel || 'Schedule').trim();
+      totals.set(label, Number(totals.get(label) || 0) + duration);
+    });
+    if (!person || !totals.size) {
+      host.innerHTML = '';
+      return;
+    }
+    host.innerHTML = Array.from(totals.entries()).map(function ([label, hours]) {
+      return '<span class="schedule-hours-chip hours-category-default me-1 mb-1"><span class="schedule-hours-dot"></span><span>' + escapeHtml(label) + ': ' + escapeHtml(hours.toFixed(2)) + ' h</span></span>';
+    }).join('');
+  }
+
+  function refreshHubScheduleActiveView() {
+    const person = activeHubSchedulePerson();
+    renderHubScheduleTabs();
+    renderHubScheduleRoleOptions(person);
+    renderHubScheduleSummary(person);
+    renderHubScheduleEvents(person);
+  }
+
+  async function loadHubSchedulePerson(person) {
+    if (!person) return;
+    const range = getHubScheduleRange();
+    const roleSelect = document.getElementById('hubScheduleRole');
+    const role = person.id === hubScheduleState.activePersonId ? String(roleSelect?.value || person.selectedRole || '').trim() : String(person.selectedRole || '').trim();
+    person.selectedRole = role;
+    hubScheduleState.loadingPersonId = person.id;
+    refreshHubScheduleActiveView();
+    if (typeof window.showLoading === 'function') window.showLoading('Loading schedule for ' + (person.name || person.id) + '...');
+    try {
+      const params = new URLSearchParams({
+        personId: person.id,
+        startDate: range.startDate,
+        endDate: range.endDate
+      });
+      if (role) params.set('role', role);
+      const response = await fetch('/school/schedules/api/person-schedule?' + params.toString(), {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to load schedule.' };
+      });
+      if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Unable to load schedule.');
+      hubScheduleState.eventsByPersonId[person.id] = Array.isArray(payload.events) ? payload.events : [];
+      hubScheduleState.statusMetaByPersonId[person.id] = Array.isArray(payload.statusMeta) ? payload.statusMeta : [];
+      hubScheduleState.loadedPersonIds.add(person.id);
+      if (Array.isArray(payload.availableRoles)) person.availableRoles = payload.availableRoles;
+      person.selectedRole = payload.selectedRole || role;
+    } catch (error) {
+      hubScheduleState.eventsByPersonId[person.id] = [];
+      showHubMessage({ title: 'Schedule', icon: 'danger', message: error.message || 'Unable to load schedule.' });
+    } finally {
+      hubScheduleState.loadingPersonId = '';
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+      refreshHubScheduleActiveView();
+    }
+  }
+
+  function loadActiveHubSchedulePerson() {
+    const person = activeHubSchedulePerson();
+    if (person) loadHubSchedulePerson(person);
+  }
+
+  async function loadAllHubSchedulePeople() {
+    for (const person of hubScheduleState.persons) {
+      // eslint-disable-next-line no-await-in-loop
+      await loadHubSchedulePerson(person);
+    }
+  }
+
+  function openHubSchedulePersonPicker() {
+    if (!window.GenericPicker) {
+      showHubMessage({ title: 'Schedule Picker', icon: 'warning', message: 'Generic picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open({
+      title: 'Select School People',
+      icon: 'bi-people-fill',
+      apiEndpoint: '/school/schedules/api/school-person-picker',
+      placeholder: 'Search school people...',
+      multiselect: true,
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      renderer: function (item) {
+        const personId = escapeHtml(resolveHubSchedulePersonId(item));
+        const name = escapeHtml(formatHubSchedulePersonName(item, personId));
+        const roleBadges = (Array.isArray(item?.availableRoles) ? item.availableRoles : [])
+          .map(function (role) { return '<span class="badge bg-light text-secondary border me-1">' + escapeHtml(role.label || role.key || '') + '</span>'; })
+          .join('');
+        return '<div><div class="fw-bold text-dark">' + name + '</div><div class="small text-muted font-monospace">' + personId + '</div><div class="mt-1">' + roleBadges + '</div></div>';
+      },
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubSchedulePersonId(item);
+          if (!id || hubScheduleState.persons.some(function (person) { return person.id === id; })) return;
+          hubScheduleState.persons.push({
+            id,
+            name: formatHubSchedulePersonName(item, id),
+            availableRoles: Array.isArray(item?.availableRoles) ? item.availableRoles : [],
+            selectedRole: ''
+          });
+        });
+        if (!hubScheduleState.activePersonId && hubScheduleState.persons.length) {
+          hubScheduleState.activePersonId = hubScheduleState.persons[0].id;
+        }
+        refreshHubScheduleActiveView();
+      }
+    });
+  }
+
+  function bindHubScheduleControls() {
+    const addBtn = document.getElementById('hubScheduleAddPeople');
+    if (addBtn) addBtn.addEventListener('click', openHubSchedulePersonPicker);
+    const loadBtn = document.getElementById('hubScheduleLoadActive');
+    if (loadBtn) loadBtn.addEventListener('click', loadActiveHubSchedulePerson);
+    const loadAllBtn = document.getElementById('hubScheduleLoadAll');
+    if (loadAllBtn) loadAllBtn.addEventListener('click', loadAllHubSchedulePeople);
+    const roleSelect = document.getElementById('hubScheduleRole');
+    if (roleSelect) roleSelect.addEventListener('change', function () {
+      const person = activeHubSchedulePerson();
+      if (person) {
+        person.selectedRole = roleSelect.value || '';
+        delete hubScheduleState.eventsByPersonId[person.id];
+        delete hubScheduleState.statusMetaByPersonId[person.id];
+        hubScheduleState.loadedPersonIds.delete(person.id);
+        refreshHubScheduleActiveView();
+      }
+    });
+    root.querySelectorAll('[data-hub-schedule-range]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setHubScheduleRange(btn.getAttribute('data-hub-schedule-range') || 'day');
+      });
+    });
+    const tabs = document.getElementById('hubSchedulePersonTabs');
+    if (tabs) {
+      tabs.addEventListener('click', function (event) {
+        const tab = event.target && event.target.closest('[data-hub-schedule-person-tab]');
+        if (!tab) return;
+        hubScheduleState.activePersonId = tab.getAttribute('data-hub-schedule-person-tab') || hubScheduleState.activePersonId;
+        refreshHubScheduleActiveView();
+      });
+    }
+    const removeBtn = document.getElementById('hubScheduleRemoveActive');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', function () {
+        const activeId = hubScheduleState.activePersonId;
+        hubScheduleState.persons = hubScheduleState.persons.filter(function (person) { return person.id !== activeId; });
+        delete hubScheduleState.eventsByPersonId[activeId];
+        delete hubScheduleState.statusMetaByPersonId[activeId];
+        hubScheduleState.loadedPersonIds.delete(activeId);
+        hubScheduleState.activePersonId = hubScheduleState.persons[0]?.id || '';
+        refreshHubScheduleActiveView();
+      });
+    }
+    const eventsHost = document.getElementById('hubScheduleEvents');
+    if (eventsHost) {
+      eventsHost.addEventListener('click', function (event) {
+        const day = event.target && event.target.closest('[data-hub-schedule-date]');
+        if (!day) return;
+        const date = day.getAttribute('data-hub-schedule-date') || '';
+        const startEl = document.getElementById('hubScheduleStartDate');
+        const endEl = document.getElementById('hubScheduleEndDate');
+        if (startEl) startEl.value = date;
+        if (endEl) endEl.value = date;
+        hubScheduleState.eventsByPersonId = {};
+        hubScheduleState.statusMetaByPersonId = {};
+        hubScheduleState.loadedPersonIds.clear();
+        refreshHubScheduleActiveView();
+      });
+    }
+  }
+
+  function renderScheduleWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : {};
+    const todayDate = new Date();
+    const day = todayDate.getDay() || 7;
+    const defaultStartDate = new Date(todayDate);
+    defaultStartDate.setDate(todayDate.getDate() - (day - 1));
+    const defaultEndDate = new Date(defaultStartDate);
+    defaultEndDate.setDate(defaultStartDate.getDate() + 6);
+    const defaultStart = hubDateToIso(defaultStartDate);
+    const defaultEnd = hubDateToIso(defaultEndDate);
+    els.workspace.innerHTML = [
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div><div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-check-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Schedule') + '</h2>',
+      '<p class="text-muted mb-0">Select multiple school people, then review each person schedule on its own tab.</p></div>',
+      '<div class="d-flex gap-2"><a href="' + escapeHtml(section.sourceUrl || '/school/schedules') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Master Schedule</a></div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-md-3"><button type="button" id="hubScheduleAddPeople" class="btn btn-outline-primary btn-sm w-100"><i class="bi bi-people-fill me-1"></i>Select People</button></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small">Start Date</label><input type="date" id="hubScheduleStartDate" class="form-control form-control-sm" value="' + escapeHtml(defaultStart) + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small">End Date</label><input type="date" id="hubScheduleEndDate" class="form-control form-control-sm" value="' + escapeHtml(defaultEnd) + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small">Role</label><select id="hubScheduleRole" class="form-select form-select-sm"><option value="">All Roles</option></select></div>',
+      '<div class="col-md-3 d-flex gap-2"><button type="button" id="hubScheduleLoadActive" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-arrow-clockwise me-1"></i>Load Tab</button><button type="button" id="hubScheduleLoadAll" class="btn btn-outline-primary btn-sm flex-fill">Load All</button></div>',
+      '</div>',
+      '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="day">Today</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="week">This Week</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="first15">First 15 Days</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="second15">Second 15 Days</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="month">This Month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="twoMonth">Two-month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="threeMonth">Three-month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="lastMonth">Last Month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="lastTwoMonth">Last Two-month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="lastThreeMonth">Last Three-month</button>',
+      '<button type="button" id="hubScheduleRemoveActive" class="btn btn-sm btn-outline-danger py-0 ms-auto">Remove Active Tab</button>',
+      '</div>',
+      '</div>',
+      '<div class="hub-schedule-tabs" id="hubSchedulePersonTabs"></div>',
+      '<div class="p-3 border-bottom bg-white" id="hubScheduleSummary"></div>',
+      '<div class="hub-schedule-legend" id="hubScheduleLegend"></div>',
+      '<div id="hubScheduleEvents"></div>',
+      '</div>'
+    ].join('');
+    bindHubScheduleControls();
+    refreshHubScheduleActiveView();
+  }
+
+  const hubAttendanceState = {
+    data: null
+  };
+
+  function hubAttendanceToYmd(date) {
+    if (!date || Number.isNaN(date.getTime())) return '';
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  }
+
+  function setHubAttendanceRange(range) {
+    const startEl = document.getElementById('hubAttendanceStartDate');
+    const endEl = document.getElementById('hubAttendanceEndDate');
+    if (!startEl || !endEl) return;
+
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const day = today.getDay() || 7;
+    let start = null;
+    let end = null;
+
+    if (range === 'today') {
+      start = new Date(startOfDay);
+      end = new Date(startOfDay);
+    } else if (range === 'twoWeeks') {
+      start = new Date(startOfDay);
+      start.setDate(startOfDay.getDate() - (day - 1));
+      end = new Date(start);
+      end.setDate(start.getDate() + 13);
+    } else if (range === 'thisWeek') {
+      start = new Date(startOfDay);
+      start.setDate(startOfDay.getDate() - (day - 1));
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (range === 'prevWeek') {
+      start = new Date(startOfDay);
+      start.setDate(startOfDay.getDate() - (day - 1) - 7);
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (range === 'thisMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (range === 'prevMonth') {
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0);
+    } else if (range === 'allTime') {
+      startEl.value = '';
+      endEl.value = '';
+      return;
+    }
+
+    startEl.value = hubAttendanceToYmd(start);
+    endEl.value = hubAttendanceToYmd(end);
+  }
+
+  function renderAttendanceWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : {
+      key: 'attendance',
+      label: 'Attendance',
+      icon: 'bi bi-clipboard-check-fill',
+      sourceUrl: '/school/attendances'
+    };
+    els.workspace.innerHTML = [
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div><div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-clipboard-check-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Attendance') + '</h2>',
+      '<p class="text-muted mb-0">Select a class and load its attendance matrix inside Master Hub. Open cells in the full Attendance page for deeper editing.</p></div>',
+      '<div class="d-flex gap-2"><a href="' + escapeHtml(section.sourceUrl || '/school/attendances') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Attendance</a></div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-xl-4 col-lg-5"><label class="form-label fw-bold small">Class</label><div class="input-group"><input type="hidden" id="hubAttendanceClassId"><input type="text" id="hubAttendanceClassName" class="form-control form-control-sm" placeholder="Select class..." readonly><button type="button" class="btn btn-outline-primary btn-sm" id="hubAttendancePickClass"><i class="bi bi-search"></i></button></div></div>',
+      '<div class="col-md-3 col-lg-2"><label class="form-label fw-bold small">Start Date</label><input type="date" id="hubAttendanceStartDate" class="form-control form-control-sm"></div>',
+      '<div class="col-md-3 col-lg-2"><label class="form-label fw-bold small">End Date</label><input type="date" id="hubAttendanceEndDate" class="form-control form-control-sm"></div>',
+      '<div class="col-md-6 col-lg-3"><label class="form-label fw-bold small">Search Loaded Matrix</label><input type="search" id="hubAttendanceTableSearch" class="form-control form-control-sm" placeholder="Filter loaded students..."></div>',
+      '<div class="col-md-6 col-lg-1"><button type="button" id="hubAttendanceLoad" class="btn btn-primary btn-sm w-100"><i class="bi bi-arrow-repeat me-1"></i>Load</button></div>',
+      '</div>',
+      '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-attendance-range="today">Today</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-attendance-range="thisWeek">This Week</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-attendance-range="twoWeeks">Two Weeks</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-attendance-range="prevWeek">Prev Week</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-attendance-range="thisMonth">This Month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-attendance-range="prevMonth">Prev Month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-attendance-range="allTime">All Time</button>',
+      '</div>',
+      '</div>',
+      '<div class="p-3 border-bottom bg-white" id="hubAttendanceStatus"><div class="text-muted small"><i class="bi bi-info-circle me-1"></i> Attendance is not loaded automatically. Select a class, choose a range, then click Load.</div></div>',
+      '<div class="p-3" id="hubAttendanceResult"><div class="hub-empty"><div><i class="bi bi-clipboard-check display-6 d-block mb-3"></i><div class="fw-semibold">Waiting for attendance load.</div><div class="text-muted small mt-1">The matrix will appear here after you load a class.</div></div></div></div>',
+      '</div>'
+    ].join('');
+    setHubAttendanceRange('thisWeek');
+    if (hubAttendanceState.data) renderHubAttendanceMatrix(hubAttendanceState.data);
+    bindHubAttendanceControls();
+  }
+
+  function bindHubAttendanceControls() {
+    const pickerBtn = document.getElementById('hubAttendancePickClass');
+    const loadBtn = document.getElementById('hubAttendanceLoad');
+    const tableSearch = document.getElementById('hubAttendanceTableSearch');
+
+    if (pickerBtn) {
+      pickerBtn.addEventListener('click', function () {
+        if (typeof GenericPicker === 'undefined' || typeof GenericPickerPresets === 'undefined' || !GenericPickerPresets.class) {
+          showHubInlineMessage('Attendance', 'Class picker is not available on this page yet.', 'warning');
+          return;
+        }
+        GenericPicker.open(GenericPickerPresets.class({
+          title: 'Select Class',
+          icon: 'bi-book',
+          onSelect: function (item) {
+            const classId = String(item && item.id ? item.id : '').trim();
+            const title = String((item && (item.title || item.name || item.label)) || classId || '').trim();
+            const classIdEl = document.getElementById('hubAttendanceClassId');
+            const classNameEl = document.getElementById('hubAttendanceClassName');
+            if (classIdEl) classIdEl.value = classId;
+            if (classNameEl) classNameEl.value = title;
+          }
+        }));
+      });
+    }
+
+    root.querySelectorAll('[data-hub-attendance-range]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        setHubAttendanceRange(button.getAttribute('data-hub-attendance-range') || '');
+      });
+    });
+
+    if (loadBtn) {
+      loadBtn.addEventListener('click', function () {
+        loadHubAttendanceMatrix();
+      });
+    }
+
+    if (tableSearch) {
+      tableSearch.addEventListener('input', function () {
+        if (hubAttendanceState.data) renderHubAttendanceMatrix(hubAttendanceState.data);
+      });
+    }
+  }
+
+  async function showHubInlineMessage(title, message, icon) {
+    if (typeof showMessageModal === 'function') {
+      return showMessageModal({
+        title: title || 'Master Hub',
+        icon: icon || 'info',
+        message: message || '',
+        buttons: [{ text: 'OK', class: 'btn-primary', value: true }]
+      });
+    }
+    return null;
+  }
+
+  async function loadHubAttendanceMatrix() {
+    const classId = String(document.getElementById('hubAttendanceClassId')?.value || '').trim();
+    const classNameEl = document.getElementById('hubAttendanceClassName');
+    const startDate = String(document.getElementById('hubAttendanceStartDate')?.value || '').trim();
+    const endDate = String(document.getElementById('hubAttendanceEndDate')?.value || '').trim();
+    const loadBtn = document.getElementById('hubAttendanceLoad');
+    const status = document.getElementById('hubAttendanceStatus');
+
+    if (!classId) {
+      await showHubInlineMessage('Attendance', 'Please select a class before loading attendance.', 'warning');
+      return;
+    }
+
+    const originalHtml = loadBtn ? loadBtn.innerHTML : '';
+    if (loadBtn) {
+      loadBtn.disabled = true;
+      loadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Loading';
+    }
+    if (status) status.innerHTML = '<div class="text-muted small"><i class="bi bi-arrow-repeat me-1"></i> Loading attendance matrix...</div>';
+    if (typeof window.showLoading === 'function') window.showLoading('Loading attendance matrix...');
+
+    try {
+      const params = new URLSearchParams({ classId: classId });
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      const response = await fetch('/school/attendances/api/data?' + params.toString(), {
+        cache: 'no-store',
+        headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' },
+        credentials: 'same-origin'
+      });
+      const result = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to load attendance matrix.' };
+      });
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Unable to load attendance matrix.');
+
+      hubAttendanceState.data = result;
+      if (classNameEl) classNameEl.value = result.className || classNameEl.value || classId;
+      renderHubAttendanceMatrix(result);
+    } catch (error) {
+      if (status) status.innerHTML = '<div class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>' + escapeHtml(error.message || 'Unable to load attendance matrix.') + '</div>';
+      await showHubInlineMessage('Attendance', error.message || 'Unable to load attendance matrix.', 'error');
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+      if (loadBtn) {
+        loadBtn.disabled = false;
+        loadBtn.innerHTML = originalHtml;
+      }
+    }
+  }
+
+  function hubAttendanceStatusIcon(status) {
+    const value = String(status || '').trim().toLowerCase();
+    if (value === 'present') return '<i class="bi bi-check-circle-fill attendance-status-present" title="Present"></i>';
+    if (value === 'late') return '<i class="bi bi-clock-fill attendance-status-late" title="Late"></i>';
+    if (value === 'excused') return '<i class="bi bi-envelope-paper-fill attendance-status-excused" title="Excused"></i>';
+    if (value === 'absent') return '<i class="bi bi-x-circle-fill attendance-status-absent" title="Absent"></i>';
+    return '<i class="bi bi-dash attendance-status-na" title="No record"></i>';
+  }
+
+  function renderHubAttendanceMatrix(result) {
+    const output = document.getElementById('hubAttendanceResult');
+    const status = document.getElementById('hubAttendanceStatus');
+    if (!output || !result) return;
+
+    const tableSearch = String(document.getElementById('hubAttendanceTableSearch')?.value || '').trim().toLowerCase();
+    const sessions = Array.isArray(result.sessions) ? result.sessions : [];
+    const matrix = (Array.isArray(result.matrix) ? result.matrix : []).filter(function (student) {
+      if (!tableSearch) return true;
+      return [student.name, student.personId].filter(Boolean).join(' ').toLowerCase().includes(tableSearch);
+    });
+    const startDate = String(document.getElementById('hubAttendanceStartDate')?.value || '').trim();
+    const endDate = String(document.getElementById('hubAttendanceEndDate')?.value || '').trim();
+
+    if (status) {
+      status.innerHTML = [
+        '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">',
+        '<div><div class="fw-bold">' + escapeHtml(result.className || 'Class Attendance') + '</div>',
+        '<div class="text-muted small">' + escapeHtml(String(matrix.length)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions. Last loaded: ' + escapeHtml(new Date().toLocaleString()) + '</div></div>',
+        '<div class="small text-muted"><span class="me-3"><i class="bi bi-check-circle-fill attendance-status-present"></i> Present</span><span class="me-3"><i class="bi bi-clock-fill attendance-status-late"></i> Late</span><span class="me-3"><i class="bi bi-envelope-paper-fill attendance-status-excused"></i> Excused</span><span><i class="bi bi-x-circle-fill attendance-status-absent"></i> Absent</span></div>',
+        '</div>'
+      ].join('');
+    }
+
+    if (!sessions.length) {
+      output.innerHTML = '<div class="hub-empty"><div><i class="bi bi-calendar-x display-6 d-block mb-3"></i><div class="fw-semibold">No active attendance sessions found for this range.</div><div class="text-muted small mt-1">Adjust the date range or choose All Time, then load again.</div></div></div>';
+      return;
+    }
+
+    const headerCells = sessions.map(function (session) {
+      const dateText = String(session.date || '').trim();
+      const displayDate = dateText
+        ? new Date(dateText + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : String(session.id || '');
+      return '<th class="text-center small">' + escapeHtml(displayDate) + '</th>';
+    }).join('');
+
+    const bodyRows = matrix.length ? matrix.map(function (student) {
+      const summary = student.summary || {};
+      const present = Number(summary.totalPresentSessions || 0);
+      const absent = Number(summary.totalAbsentSessions || 0);
+      const percent = summary.performancePercent == null ? '-' : String(summary.performancePercent) + '%';
+      const records = Array.isArray(student.records) ? student.records : [];
+      const cells = records.map(function (record) {
+        const sessionId = String(record.sessionId || '').trim();
+        const notesExist = Array.isArray(record.comments) && record.comments.length > 0;
+        return [
+          '<td class="hub-attendance-cell" data-hub-attendance-cell data-person-id="' + escapeHtml(student.personId || '') + '" data-session-id="' + escapeHtml(sessionId) + '" title="Open this attendance record in the full Attendance page">',
+          hubAttendanceStatusIcon(record.status),
+          notesExist ? '<div class="small mt-1"><i class="bi bi-chat-dots-fill text-primary"></i></div>' : '',
+          '</td>'
+        ].join('');
+      }).join('');
+      return [
+        '<tr>',
+        '<td class="hub-attendance-rollup text-center small"><div><span class="text-success fw-bold">' + escapeHtml(String(present)) + '</span><span class="text-muted"> / </span><span class="text-danger fw-bold">' + escapeHtml(String(absent)) + '</span></div><div class="text-primary fw-bold">' + escapeHtml(percent) + '</div></td>',
+        '<td class="hub-attendance-student"><div class="fw-semibold">' + escapeHtml(student.name || 'Student') + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>',
+        cells,
+        '</tr>'
+      ].join('');
+    }).join('') : '<tr><td colspan="' + escapeHtml(String(sessions.length + 2)) + '" class="text-center text-muted py-5">No matching students in the loaded matrix.</td></tr>';
+
+    output.innerHTML = [
+      '<div class="hub-attendance-matrix-wrap">',
+      '<table class="table table-hover align-middle hub-attendance-table">',
+      '<thead><tr><th class="hub-attendance-rollup text-center small">Rollup<br><span class="text-muted fw-normal">P / A / %</span></th><th class="hub-attendance-student">Student</th>' + headerCells + '</tr></thead>',
+      '<tbody>' + bodyRows + '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+
+    output.querySelectorAll('[data-hub-attendance-cell]').forEach(function (cell) {
+      cell.addEventListener('click', function () {
+        const personId = cell.getAttribute('data-person-id') || '';
+        const sessionId = cell.getAttribute('data-session-id') || '';
+        const url = new URL('/school/attendances', window.location.origin);
+        url.searchParams.set('classId', result.classId || '');
+        if (startDate) url.searchParams.set('startDate', startDate);
+        if (endDate) url.searchParams.set('endDate', endDate);
+        if (personId) url.searchParams.set('studentId', personId);
+        if (sessionId) url.searchParams.set('sessionId', sessionId);
+        window.open(url.pathname + url.search, '_blank', 'noopener');
+      });
+    });
+  }
+
+  function leaveRequestBadgeClass(status) {
+    const value = String(status || '').trim().toLowerCase();
+    if (value === 'approved') return 'text-bg-success';
+    if (value === 'submitted' || value === 'pending_reapproval') return 'text-bg-warning';
+    if (value === 'rejected' || value === 'cancelled') return 'text-bg-danger';
+    return 'text-bg-secondary';
+  }
+
+  function formatLeaveStatus(status) {
+    return String(status || 'unknown').replace(/_/g, ' ').toUpperCase();
+  }
+
+  function renderLeaveRequestWorkspace(payload) {
+    const section = payload.section || {
+      key: 'leave-requests',
+      label: 'Leave Requests',
+      icon: 'bi bi-calendar-heart',
+      sourceUrl: '/school/leave-requests'
+    };
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    const notLoaded = payload.notLoaded === true;
+    const searchValue = workspaceState.serverSearch['leave-requests'] || payload.searchQuery || '';
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-heart') + ' me-2"></i>' + escapeHtml(section.label || 'Leave Requests') + '</h2>',
+      '<p class="text-muted mb-0">Review visible leave requests inside Master Hub. Use actions to open request workflows in a new browser tab.</p>',
+      '</div>',
+      '<div class="hub-workspace-actions">',
+      '<a class="btn btn-outline-secondary btn-sm" href="' + escapeHtml(section.sourceUrl || '/school/leave-requests') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-lg-5">',
+      '<label class="form-label small fw-semibold" for="hubServerSearch_leave_requests">DB Search</label>',
+      '<div class="input-group input-group-sm">',
+      '<input type="search" class="form-control" id="hubServerSearch_leave_requests" data-hub-server-search-input="leave-requests" value="' + escapeHtml(searchValue) + '" placeholder="Search leave requests...">',
+      '<button type="button" class="btn btn-outline-primary" data-hub-server-search-button="leave-requests"><i class="bi bi-search me-1"></i>Search</button>',
+      '<button type="button" class="btn btn-outline-secondary" data-hub-server-search-clear="leave-requests">Clear</button>',
+      '</div>',
+      '</div>',
+      '<div class="col-lg-4">',
+      '<label class="form-label small fw-semibold" for="hubTableSearch_leave_requests">Search Visible Table</label>',
+      '<input type="search" class="form-control form-control-sm" id="hubTableSearch_leave_requests" data-hub-table-search-input="leave-requests" placeholder="Filter displayed rows...">',
+      '</div>',
+      '<div class="col-lg-3 d-flex justify-content-lg-end gap-2">',
+      '<button type="button" class="btn btn-primary btn-sm w-100" data-hub-load-workspace="leave-requests"><i class="bi bi-arrow-repeat me-1"></i>Load Leave Requests</button>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '<div class="p-3 border-bottom bg-white">',
+      '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">',
+      '<div class="small text-muted">' + (notLoaded ? 'Leave requests are not loaded automatically. Click Load Leave Requests when ready.' : 'Showing ' + escapeHtml(String(rows.length)) + ' leave request(s). Last refreshed: ' + escapeHtml(payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : new Date().toLocaleString()) + '.') + '</div>',
+      '<div class="small text-muted"><span class="badge text-bg-warning me-1">SUBMITTED</span><span class="badge text-bg-success me-1">APPROVED</span><span class="badge text-bg-danger">FINAL</span></div>',
+      '</div>',
+      '</div>',
+      '<div class="p-3">',
+      notLoaded ? '<div class="hub-empty"><div><i class="bi bi-calendar-heart display-6 d-block mb-3"></i><div class="fw-semibold">Leave requests are ready to load.</div><div class="text-muted small mt-1">Click the load button above to retrieve the visible leave request list.</div></div></div>' : renderLeaveRequestRows(rows),
+      '</div>',
+      '</div>',
+      '</section>'
+    ].join('');
+    bindWorkspaceSearchControls('leave-requests');
+    const loadButton = els.workspace.querySelector('[data-hub-load-workspace="leave-requests"]');
+    if (loadButton) {
+      loadButton.addEventListener('click', function () {
+        loadWorkspaceSection('leave-requests');
+      });
+    }
+  }
+
+  function renderLeaveRequestRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return '<div class="hub-empty"><div><i class="bi bi-calendar-x display-6 d-block mb-3"></i><div class="fw-semibold">No leave requests found.</div><div class="text-muted small mt-1">Try clearing search filters or open the full page for more actions.</div></div></div>';
+    }
+
+    const body = rows.map(function (row) {
+      const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+        return '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener"><i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open') + '</a>';
+      }).join('');
+      return [
+        '<tr data-hub-workspace-row>',
+        '<td class="ps-3"><div class="fw-bold text-primary">' + escapeHtml(row.id || '-') + '</div><div class="small text-muted">Requested: ' + escapeHtml(row.requestDate || '-') + '</div><div class="x-small text-muted">Revision: ' + escapeHtml(String(row.revisionNo || 1)) + '</div></td>',
+        '<td><div class="fw-bold">' + escapeHtml(row.requesterName || '-') + '</div><div class="small text-muted">' + escapeHtml(row.requesterRole || '-') + '</div><div class="x-small text-muted font-monospace">' + escapeHtml(row.requesterPersonId || '-') + '</div></td>',
+        '<td class="small"><div>' + escapeHtml(row.windowLabel || '-') + '</div><div class="text-muted">' + escapeHtml(row.timeLabel || '-') + '</div></td>',
+        '<td class="small">' + escapeHtml(row.reason || '-') + '</td>',
+        '<td><span class="badge ' + escapeHtml(leaveRequestBadgeClass(row.status)) + '">' + escapeHtml(formatLeaveStatus(row.status)) + '</span></td>',
+        '<td class="text-end pe-3"><div class="hub-workspace-actions">' + (actions || '<span class="text-muted small">No actions</span>') + '</div></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+
+    return [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table">',
+      '<thead><tr><th class="ps-3">Request</th><th>Person</th><th>Window</th><th>Reason</th><th>Status</th><th class="text-end pe-3">Actions</th></tr></thead>',
+      '<tbody>',
+      body,
+      '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
+  const hubWorkspaceNodeCache = new Map();
+
+  function preserveCurrentHubWorkspace(nextKey) {
+    const currentKey = String(workspaceState.currentSection || '').trim().toLowerCase();
+    if (!currentKey || currentKey === String(nextKey || '').trim().toLowerCase() || !els.workspace) return;
+    let bucket = hubWorkspaceNodeCache.get(currentKey);
+    if (!bucket) {
+      bucket = document.createElement('div');
+      hubWorkspaceNodeCache.set(currentKey, bucket);
+    }
+    while (els.workspace.firstChild) {
+      bucket.appendChild(els.workspace.firstChild);
+    }
+  }
+
+  function restoreHubWorkspaceFromCache(key) {
+    const cacheKey = String(key || '').trim().toLowerCase();
+    const bucket = hubWorkspaceNodeCache.get(cacheKey);
+    if (!bucket || !bucket.childNodes.length || !els.workspace) return false;
+    while (els.workspace.firstChild) {
+      els.workspace.removeChild(els.workspace.firstChild);
+    }
+    while (bucket.firstChild) {
+      els.workspace.appendChild(bucket.firstChild);
+    }
+    workspaceState.currentSection = cacheKey;
+    setWorkspaceButtons(cacheKey);
+    if (cacheKey === 'schedule') refreshHubScheduleActiveView();
+    return true;
+  }
+
+  async function loadWorkspaceSection(sectionKey) {
+    const key = String(sectionKey || '').trim().toLowerCase();
+    if (key === 'sessions' && !workspaceSections.sessions) {
+      workspaceSections.sessions = {
+        label: 'Sessions',
+        endpoint: '/school/master-hub/api/workspace/sessions',
+        icon: 'bi bi-calendar2-week-fill'
+      };
+    }
+    if (key === 'schedule' && !workspaceSections.schedule) {
+      workspaceSections.schedule = {
+        label: 'Schedule',
+        endpoint: '/school/master-hub/api/workspace/schedule',
+        icon: 'bi bi-calendar-check-fill'
+      };
+    }
+    if (key === 'attendance' && !workspaceSections.attendance) {
+      workspaceSections.attendance = {
+        label: 'Attendance',
+        endpoint: '/school/master-hub/api/workspace/attendance',
+        icon: 'bi bi-clipboard-check-fill'
+      };
+    }
+    if (key === 'leave-requests' && !workspaceSections['leave-requests']) {
+      workspaceSections['leave-requests'] = {
+        label: 'Leave Requests',
+        endpoint: '/school/master-hub/api/workspace/leave-requests',
+        icon: 'bi bi-calendar-heart'
+      };
+    }
+    const config = workspaceSections[key];
+    if (!config || workspaceState.loading) return;
+
+    preserveCurrentHubWorkspace(key);
+    if (restoreHubWorkspaceFromCache(key)) return;
+
+    const requestQuery = new URLSearchParams();
+    const serverSearch = String(workspaceState.serverSearch[key] || '').trim();
+    if (serverSearch) requestQuery.set('q', serverSearch);
+    if (key === 'sessions') appendSessionWorkspaceQuery(requestQuery);
+
+    workspaceState.currentSection = key;
+    workspaceState.loading = true;
+    setWorkspaceButtons(key);
+    renderWorkspaceStatus('Loading ' + config.label + '...', 'bi-arrow-repeat', 'muted');
+    if (typeof window.showLoading === 'function') {
+      window.showLoading('Loading ' + config.label + '...');
+    }
+
+    try {
+      const requestUrl = config.endpoint + (requestQuery.toString() ? '?' + requestQuery.toString() : '');
+      const response = await fetch(requestUrl, {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to load this section.' };
+      });
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Unable to load this section.');
+      }
+
+      if (key === 'notifications') {
+        renderNotificationWorkspace(payload);
+        setNotificationCount(payload.unresolvedCount || 0, false);
+      } else if (key === 'classes') {
+        renderClassWorkspace(payload);
+      } else if (key === 'sessions') {
+        renderSessionWorkspace(payload);
+      } else if (key === 'schedule') {
+        renderScheduleWorkspace(payload);
+      } else if (key === 'attendance') {
+        renderAttendanceWorkspace(payload);
+      } else if (key === 'leave-requests') {
+        renderLeaveRequestWorkspace(payload);
+      }
+    } catch (error) {
+      renderWorkspaceStatus(error.message || 'Unable to load this section.', 'bi-exclamation-triangle', 'danger');
+    } finally {
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+      workspaceState.loading = false;
+    }
+  }
+
+  function openWorkspaceSection(sectionKey) {
+    const key = String(sectionKey || '').trim().toLowerCase();
+    if (!key || workspaceState.loading) return;
+
+    preserveCurrentHubWorkspace(key);
+    if (restoreHubWorkspaceFromCache(key)) return;
+
+    workspaceState.currentSection = key;
+    setWorkspaceButtons(key);
+
+    if (key === 'classes') {
+      renderClassWorkspace({
+        status: 'success',
+        notLoaded: true,
+        section: {
+          key: 'classes',
+          label: 'Classes',
+          icon: 'bi bi-easel-fill',
+          sourceUrl: '/school/classes'
+        },
+        rows: [],
+        total: 0
+      });
+      return;
+    }
+
+    if (key === 'sessions') {
+      renderSessionWorkspace({
+        status: 'success',
+        notLoaded: true,
+        section: {
+          key: 'sessions',
+          label: 'Sessions',
+          icon: 'bi bi-calendar2-week-fill',
+          sourceUrl: '/school/sessions'
+        },
+        rows: [],
+        total: 0,
+        filters: {},
+        statusMeta: []
+      });
+      return;
+    }
+
+    if (key === 'schedule') {
+      renderScheduleWorkspace({
+        status: 'success',
+        section: {
+          key: 'schedule',
+          label: 'Schedule',
+          icon: 'bi bi-calendar-check-fill',
+          sourceUrl: '/school/schedules'
+        }
+      });
+      return;
+    }
+
+    if (key === 'attendance') {
+      renderAttendanceWorkspace({
+        status: 'success',
+        section: {
+          key: 'attendance',
+          label: 'Attendance',
+          icon: 'bi bi-clipboard-check-fill',
+          sourceUrl: '/school/attendances'
+        },
+        rows: [],
+        total: 0
+      });
+      return;
+    }
+
+    if (key === 'leave-requests') {
+      renderLeaveRequestWorkspace({
+        status: 'success',
+        notLoaded: true,
+        section: {
+          key: 'leave-requests',
+          label: 'Leave Requests',
+          icon: 'bi bi-calendar-heart',
+          sourceUrl: '/school/leave-requests'
+        },
+        rows: [],
+        total: 0
+      });
+      return;
+    }
+
+    loadWorkspaceSection(key);
+  }
+
+  function findModule(type) {
+    return modules.find((item) => item.type === type) || null;
+  }
+
+  function setStatus(message, tone) {
+    if (!els.status) return;
+    const text = String(message || '').trim();
+    els.status.className = 'alert alert-' + (tone || 'info') + ' ' + (text ? '' : 'd-none');
+    els.status.textContent = text;
+  }
+
+  function setTabLoading(type, loading) {
+    root.querySelectorAll('[data-hub-tab]').forEach(function (tab) {
+      if (tab.getAttribute('data-hub-tab') === type) tab.classList.toggle('hub-tab-loading', loading === true);
+    });
+  }
+
+  function setLoading(isLoading, type) {
+    state.loading = isLoading;
+    root.querySelectorAll('[data-hub-refresh]').forEach(function (btn) {
+      btn.classList.toggle('disabled', isLoading);
+    });
+    if (type) setTabLoading(type, isLoading);
+  }
+
+  function syncActiveTab() {
+    els.tabs.forEach(function (tab) {
+      tab.classList.toggle('active', tab.getAttribute('data-hub-tab') === state.currentType);
+    });
+    const module = findModule(state.currentType);
+    if (els.openDirectory) {
+      if (module && module.directoryUrl) {
+        els.openDirectory.href = module.directoryUrl;
+        els.openDirectory.classList.remove('disabled');
+      } else {
+        els.openDirectory.href = '#';
+        els.openDirectory.classList.add('disabled');
+      }
+    }
+  }
+
+  function updateCount(type, total) {
+    els.counts.forEach(function (badge) {
+      if (badge.getAttribute('data-hub-count') === type) {
+        badge.textContent = Number.isFinite(Number(total)) ? String(total) : '-';
+      }
+    });
+  }
+
+  function renderEmpty(message, icon) {
+    if (!els.list) return;
+    els.list.innerHTML = [
+      '<div class="hub-empty">',
+      '<div>',
+      '<i class="bi ' + escapeHtml(icon || 'bi-search') + ' display-6 d-block mb-3"></i>',
+      '<div class="fw-semibold">' + escapeHtml(message || 'Start searching to find records.') + '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderSearchPrompt() {
+    const module = findModule(state.currentType);
+    const label = module ? module.label : 'records';
+    renderEmpty('Type at least 2 characters to search ' + label + '.', 'bi-search');
+  }
+
+  function renderRows(rows) {
+    if (!els.list) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      renderEmpty('No matching active records were found.');
+      return;
+    }
+
+    const body = rows.map(function (row, idx) {
+      const actions = Array.isArray(row.actions) ? row.actions : [];
+      const actionLinks = actions.map(function (action) {
+        return [
+          '<a class="btn btn-outline-' + escapeHtml(action.tone || 'secondary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener">',
+          '<i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open'),
+          '</a>'
+        ].join('');
+      }).join('');
+      const cardId = 'schoolHubCardDetails_' + escapeHtml(row.id || idx);
+
+      return [
+        '<article class="hub-person-card" data-hub-card>',
+        '<div class="d-flex justify-content-between align-items-start gap-2">',
+        '<div class="min-w-0">',
+        '<div class="fw-semibold text-truncate">' + escapeHtml(row.name || '-') + '</div>',
+        '<div class="text-muted small font-monospace">' + escapeHtml(row.id || '') + '</div>',
+        '</div>',
+        '<div class="d-flex align-items-center gap-2 flex-shrink-0">',
+        '<span class="badge text-bg-light border">' + escapeHtml(row.status || 'Active') + '</span>',
+        '<button type="button" class="btn btn-outline-secondary btn-sm hub-card-toggle" data-hub-card-toggle aria-expanded="false" aria-controls="' + cardId + '">',
+        '<i class="bi bi-chevron-down"></i>',
+        '</button>',
+        '</div>',
+        '</div>',
+        '<div class="hub-card-details" id="' + cardId + '">',
+        '<div class="small text-muted">',
+        '<div><i class="bi bi-person-badge me-1"></i>' + escapeHtml(row.personId || '-') + '</div>',
+        '<div><i class="bi bi-envelope me-1"></i>' + escapeHtml(row.email || '-') + '</div>',
+        '<div><i class="bi bi-telephone me-1"></i>' + escapeHtml(row.phone || '-') + '</div>',
+        '</div>',
+        '<div class="d-flex justify-content-between align-items-center gap-2 mt-2">',
+        '<span class="small text-muted">' + escapeHtml(row.detailLabel || 'Detail') + '</span>',
+        '<span class="small text-end">' + escapeHtml(row.detail || '-') + '</span>',
+        '</div>',
+        '<div class="hub-card-actions mt-3">',
+        actionLinks || '<span class="text-muted small">No actions</span>',
+        '</div>',
+        '</div>',
+        '</article>'
+      ].join('');
+    }).join('');
+
+    const pagination = state.pagination || {};
+    const hasMore = Number(pagination.currentPage || 1) < Number(pagination.totalPages || 1);
+    const totalItems = Number(pagination.totalItems || rows.length || 0);
+    const footer = hasMore
+      ? [
+        '<div class="hub-load-more-wrap">',
+        '<button type="button" class="btn btn-outline-primary btn-sm" id="schoolMasterHubLoadMore">',
+        '<i class="bi bi-plus-circle me-1"></i> Load More',
+        '</button>',
+        '<div class="text-muted small mt-2">Showing ' + escapeHtml(rows.length) + ' of ' + escapeHtml(totalItems) + '</div>',
+        '</div>'
+      ].join('')
+      : '<div class="text-muted small text-center py-2">Showing ' + escapeHtml(rows.length) + ' of ' + escapeHtml(totalItems) + '</div>';
+
+    els.list.innerHTML = '<div class="hub-person-list">' + body + footer + '</div>';
+    const loadMoreBtn = document.getElementById('schoolMasterHubLoadMore');
+    if (loadMoreBtn) {
+      loadMoreBtn.addEventListener('click', function () {
+        searchCurrent({ append: true });
+      });
+    }
+    els.list.querySelectorAll('[data-hub-card-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const card = btn.closest('[data-hub-card]');
+        if (!card) return;
+        const expanded = !card.classList.contains('is-expanded');
+        card.classList.toggle('is-expanded', expanded);
+        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        btn.innerHTML = expanded ? '<i class="bi bi-chevron-up"></i>' : '<i class="bi bi-chevron-down"></i>';
+      });
+    });
+  }
+
+  function updateHeader(result) {
+    const module = result && result.module ? result.module : findModule(state.currentType);
+    if (els.eyebrow) els.eyebrow.textContent = module ? module.sectionId : 'Directory';
+    if (els.title) els.title.textContent = module ? module.label : 'School Master Hub';
+    if (els.meta) {
+      const refreshed = result && result.refreshedAt ? new Date(result.refreshedAt).toLocaleString() : 'not loaded yet';
+      els.meta.textContent = String(result && result.total != null ? result.total : 0) + ' matching records. Last refreshed: ' + refreshed + '.';
+    }
+  }
+
+  async function searchCurrent(options) {
+    if (!state.currentType || state.loading) return;
+    const opts = options || {};
+    const term = String((els.search && els.search.value) || '').trim();
+    state.lastSearch = term;
+    syncActiveTab();
+
+    if (term.length < 2) {
+      updateCount(state.currentType, '-');
+      state.page = 1;
+      state.loadedRows = [];
+      state.pagination = null;
+      setStatus('', 'info');
+      renderSearchPrompt();
+      return;
+    }
+
+    const type = state.currentType;
+    state.page = opts.append === true ? Number(state.page || 1) + 1 : 1;
+    const query = new URLSearchParams({
+      type: type,
+      page: String(state.page || 1),
+      q: term
+    });
+
+    setLoading(true, type);
+    setStatus('Searching ' + (findModule(type)?.label || 'records') + '...', 'info');
+    if (typeof window.showLoading === 'function') {
+      window.showLoading('Searching ' + (findModule(type)?.label || 'records') + '...');
+    }
+
+    try {
+      const response = await fetch('/school/master-hub/api/list?' + query.toString(), {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const contentType = response.headers.get('content-type') || '';
+      const payload = contentType.includes('application/json') ? await response.json() : { status: 'error', message: await response.text() };
+      if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Unable to search list.');
+      updateHeader(payload);
+      updateCount(type, payload.total);
+      state.pagination = payload.pagination || null;
+      state.loadedRows = opts.append === true
+        ? state.loadedRows.concat(payload.rows || [])
+        : (payload.rows || []);
+      renderRows(state.loadedRows);
+      setStatus('', 'info');
+    } catch (error) {
+      renderEmpty(error.message || 'Unable to search list.', 'bi-exclamation-triangle');
+      setStatus(error.message || 'Unable to search list.', 'danger');
+    } finally {
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+      setLoading(false, type);
+    }
+  }
+
+  let searchTimer = null;
+  if (els.search) {
+    els.search.addEventListener('input', function () {
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(searchCurrent, 280);
+    });
+  }
+
+  if (els.refreshCurrent) {
+    els.refreshCurrent.addEventListener('click', searchCurrent);
+  }
+
+  if (els.notificationSettings) {
+    els.notificationSettings.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      openNotificationSettings();
+    });
+  }
+
+  els.workspaceButtons.forEach(function (button) {
+    button.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceSection(button.getAttribute('data-hub-workspace-section') || '');
+    });
+  });
+
+  function syncSidebarToggle() {
+    if (!els.collapseSidebar) return;
+    const collapsed = root.classList.contains('hub-sidebar-collapsed');
+    els.collapseSidebar.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+    els.collapseSidebar.innerHTML = collapsed
+      ? '<i class="bi bi-layout-sidebar-inset-reverse"></i>'
+      : '<i class="bi bi-layout-sidebar-inset"></i>';
+  }
+
+  if (els.collapseSidebar) {
+    els.collapseSidebar.addEventListener('click', function () {
+      root.classList.toggle('hub-sidebar-collapsed');
+      syncSidebarToggle();
+    });
+  }
+
+  root.querySelectorAll('[data-hub-tab]').forEach(function (tab) {
+    tab.addEventListener('click', function (event) {
+      if (event.target && event.target.closest('[data-hub-refresh]')) return;
+      state.currentType = tab.getAttribute('data-hub-tab') || state.currentType;
+      state.page = 1;
+      state.loadedRows = [];
+      state.pagination = null;
+      if (els.search) els.search.value = '';
+      updateCount(state.currentType, '-');
+      syncActiveTab();
+      renderSearchPrompt();
+      setStatus('', 'info');
+    });
+  });
+
+  root.querySelectorAll('[data-hub-refresh]').forEach(function (btn) {
+    btn.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      state.currentType = btn.getAttribute('data-hub-refresh') || state.currentType;
+      searchCurrent();
+    });
+  });
+
+  document.addEventListener('keydown', async function (event) {
+    const key = String(event.key || '').toLowerCase();
+    const isReloadShortcut = event.key === 'F5' || ((event.ctrlKey || event.metaKey) && key === 'r');
+    const isCloseShortcut = (event.ctrlKey || event.metaKey) && key === 'w';
+
+    if (isReloadShortcut) {
+      event.preventDefault();
+      event.stopPropagation();
+      const shouldReload = await confirmHubReload({
+        title: 'Reload Master Hub',
+        message: 'Reloading will clear the current in-page Master Hub view. Continue?'
+      });
+      if (shouldReload) {
+        window.location.reload();
+      }
+      return;
+    }
+
+    if (isCloseShortcut) {
+      event.preventDefault();
+      event.stopPropagation();
+      await showCloseLimitationMessage();
+    }
+  });
+
+  function confirmMasterHubUnload(event) {
+    const message = 'Leave School Master Hub? Your current in-page workspace state may be cleared.';
+    event.preventDefault();
+    event.returnValue = message;
+    return message;
+  }
+
+  window.addEventListener('beforeunload', confirmMasterHubUnload);
+  window.onbeforeunload = confirmMasterHubUnload;
+
+  if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+  restartNotificationTimer();
+  syncSidebarToggle();
+  syncActiveTab();
+  renderSearchPrompt();
+}());
+</script>

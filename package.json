@@ -55,7 +55,7 @@
     "school:build:install-zip": "node scripts/packages/build-package-install-zip.js --package-id school",
     "school:manifest:audit": "node scripts/school/audit-school-package-manifest.js",
     "school:manifest:audit:apply": "node scripts/school/audit-school-package-manifest.js --apply",
-    "school:master-hub:seed": "node scripts/seed-school-master-hub-section.js --db app",
+    "school:master-academia-hub:seed": "node scripts/seed-school-master-academia-hub-section.js --db app",
     "membership:period-org:migrate": "node scripts/migrate-membership-period-org-scope.js",
     "school:enrollment-periods:backfill": "node scripts/school/migration/backfillClassEnrollmentPeriods.js",
     "school:enrollment-periods:backfill:apply": "node scripts/school/migration/backfillClassEnrollmentPeriods.js --apply",

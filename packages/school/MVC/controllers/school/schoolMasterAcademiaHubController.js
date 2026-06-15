@@ -1,19 +1,19 @@
-const masterHubService = require('../../services/school/schoolMasterHubService');
+const masterAcademiaHubService = require('../../services/school/schoolMasterAcademiaHubService');
 
-exports.showMasterHubPage = async (req, res) => {
+exports.showMasterAcademiaHubPage = async (req, res) => {
   try {
-    const modules = await masterHubService.resolveAccessibleModules(req);
+    const modules = await masterAcademiaHubService.resolveAccessibleModules(req);
     const defaultModule = modules[0] || null;
 
-    res.render('school/masterHub', {
-      title: 'School Master Hub',
+    res.render('school/masterAcademiaHub', {
+      title: 'Master Academia Hub',
       modules,
       defaultType: defaultModule ? defaultModule.type : '',
       user: req.user
     });
   } catch (error) {
     res.status(500).render('error', {
-      title: 'School Master Hub',
+      title: 'Master Academia Hub',
       error,
       message: error.message,
       user: req.user
@@ -24,20 +24,20 @@ exports.showMasterHubPage = async (req, res) => {
 exports.listPeoplePanel = async (req, res) => {
   try {
     const type = String(req.query.type || '').trim().toLowerCase();
-    const result = await masterHubService.getPeoplePanelRows(type, req.query, req);
+    const result = await masterAcademiaHubService.getPeoplePanelRows(type, req.query, req);
     res.json({ status: 'success', ...result });
   } catch (error) {
     const statusCode = error.statusCode || 500;
     res.status(statusCode).json({
       status: 'error',
-      message: error.message || 'Unable to load School Master Hub list.'
+      message: error.message || 'Unable to load Master Academia Hub list.'
     });
   }
 };
 
 exports.getNotificationCount = async (req, res) => {
   try {
-    const result = await masterHubService.getNotificationSummary(req);
+    const result = await masterAcademiaHubService.getNotificationSummary(req);
     res.json({ status: 'success', ...result });
   } catch (error) {
     const statusCode = error.statusCode || 500;
@@ -51,13 +51,13 @@ exports.getNotificationCount = async (req, res) => {
 exports.getWorkspaceSection = async (req, res) => {
   try {
     const sectionKey = String(req.params.sectionKey || '').trim().toLowerCase();
-    const result = await masterHubService.getWorkspaceSection(sectionKey, req.query, req);
+    const result = await masterAcademiaHubService.getWorkspaceSection(sectionKey, req.query, req);
     res.json({ status: 'success', ...result });
   } catch (error) {
     const statusCode = error.statusCode || 500;
     res.status(statusCode).json({
       status: 'error',
-      message: error.message || 'Unable to load this Master Hub section.'
+      message: error.message || 'Unable to load this Master Academia Hub section.'
     });
   }
 };

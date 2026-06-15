@@ -1,6 +1,8 @@
 const dataService = require('./schoolDataService');
 const notificationService = require('./notificationService');
+const leaveRequestService = require('./leaveRequestService');
 const personDisplayNameService = require('./personDisplayNameService');
+const sessionExplorerService = require('./sessionExplorerService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
@@ -392,6 +394,45 @@ function normalizeNotificationRows(rows) {
   }));
 }
 
+function buildLeaveRequestActionLinks(row) {
+  const id = normalizeText(row?.id);
+  const encodedId = encodeURIComponent(id);
+  const status = lower(row?.status || 'submitted');
+  const actions = [
+    { label: 'Details', href: `/school/leave-requests/detail/${encodedId}`, icon: 'bi bi-eye', tone: 'secondary' }
+  ];
+
+  if (!['rejected', 'cancelled'].includes(status)) {
+    actions.push({ label: 'Edit', href: `/school/leave-requests/edit/${encodedId}`, icon: 'bi bi-pencil-square', tone: 'primary' });
+  }
+
+  return actions;
+}
+
+function normalizeLeaveRequestRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const startDate = normalizeText(row?.startDate);
+    const endDate = normalizeText(row?.endDate || row?.startDate);
+    const allDay = row?.allDay !== false;
+    const timeLabel = allDay ? 'All day' : `${normalizeText(row?.startTime || '--:--')} - ${normalizeText(row?.endTime || '--:--')}`;
+    return {
+      id: normalizeText(row?.id),
+      requesterName: normalizeText(row?.requesterName || row?.requesterPersonId || '-'),
+      requesterPersonId: normalizeText(row?.requesterPersonId),
+      requesterRole: normalizeText(row?.requesterRole || '-'),
+      status: normalizeText(row?.status || 'submitted'),
+      reason: normalizeText(row?.reason || '-'),
+      requestDate: normalizeText(row?.requestDate || row?.audit?.createDateTime || ''),
+      startDate,
+      endDate,
+      windowLabel: startDate && endDate && endDate !== startDate ? `${startDate} to ${endDate}` : (startDate || '-'),
+      timeLabel,
+      revisionNo: Number(row?.revisionNo || 1),
+      actions: buildLeaveRequestActionLinks(row)
+    };
+  });
+}
+
 function addRoleTokens(target, value) {
   if (Array.isArray(value)) {
     value.forEach((item) => addRoleTokens(target, item));
@@ -490,8 +531,110 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     };
   }
 
+  if (key === 'sessions') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Sessions',
+      sectionId: SECTIONS.SCHOOL_SESSIONS
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Sessions.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const result = await sessionExplorerService.listSessions(req, queryInput || {});
+    const rows = Array.isArray(result.rows) ? result.rows : [];
+    return {
+      section: {
+        key: 'sessions',
+        label: 'Sessions',
+        icon: 'bi bi-calendar2-week-fill',
+        sourceUrl: '/school/sessions'
+      },
+      rows,
+      total: rows.length,
+      pagination: result.pagination,
+      statusMeta: result.statusMeta,
+      filters: result.filters,
+      searchQuery: normalizeText(query.q || ''),
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  if (key === 'schedule') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Schedule',
+      sectionId: SECTIONS.SCHOOL_SCHEDULES
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Schedule.');
+      error.statusCode = 403;
+      throw error;
+    }
+    return {
+      section: {
+        key: 'schedule',
+        label: 'Schedule',
+        icon: 'bi bi-calendar-check-fill',
+        sourceUrl: '/school/schedules'
+      },
+      rows: [],
+      total: 0,
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  if (key === 'attendance') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Attendance',
+      sectionId: SECTIONS.SCHOOL_ATTENDANCES
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Attendance.');
+      error.statusCode = 403;
+      throw error;
+    }
+    return {
+      section: {
+        key: 'attendance',
+        label: 'Attendance',
+        icon: 'bi bi-clipboard-check-fill',
+        sourceUrl: '/school/attendances'
+      },
+      rows: [],
+      total: 0,
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  if (key === 'leave-requests') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Leave Requests',
+      sectionId: SECTIONS.SCHOOL_LEAVE_REQUESTS
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Leave Requests.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const rows = await leaveRequestService.listVisibleRequests(req.user, queryInput || {});
+    const normalizedRows = normalizeLeaveRequestRows(rows)
+      .filter((row) => rowMatchesWorkspaceSearch(row, query.q || ''));
+    return {
+      section: {
+        key: 'leave-requests',
+        label: 'Leave Requests',
+        icon: 'bi bi-calendar-heart',
+        sourceUrl: '/school/leave-requests'
+      },
+      rows: normalizedRows,
+      total: normalizedRows.length,
+      searchQuery: normalizeText(query.q || ''),
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
   if (key !== 'notifications') {
-    const error = new Error('This Master Hub section is not available on-page yet.');
+    const error = new Error('This Master Academia Hub section is not available on-page yet.');
     error.statusCode = 404;
     throw error;
   }

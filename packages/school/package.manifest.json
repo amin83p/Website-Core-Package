@@ -2739,9 +2739,9 @@
     },
     {
       "id": "445577",
-      "name": "SCHOOL_MASTER_HUB",
+      "name": "SCHOOL_MASTER_ACADEMIA_HUB",
       "category": "SCHOOL",
-      "description": "Full-width School Master Hub for reviewing student, teacher, and staff directories from one workspace.",
+      "description": "Full-width Master Academia Hub for reviewing people, attendance, schedules, sessions, classes, notifications, and leave requests from one workspace.",
       "active": true,
       "trackState": true,
       "minimumAccessRequirement": 5,
@@ -3159,11 +3159,11 @@
     },
     {
       "id": "SYM_SYSTEM_060",
-      "name": "SCHOOL_MASTER_HUB",
+      "name": "SCHOOL_MASTER_ACADEMIA_HUB",
       "type": "class",
       "value": "bi bi-grid-1x2-fill",
       "tags": [
-        "SCHOOL_MASTER_HUB",
+        "SCHOOL_MASTER_ACADEMIA_HUB",
         "SCHOOL_MASTER_HUB",
         "SCHOOL_PEOPLE",
         "445577"
@@ -7157,7 +7157,7 @@
     },
     {
       "id": "school-menu-master-hub",
-      "label": "Master Hub",
+      "label": "Master Academia Hub",
       "href": "/school/master-hub",
       "icon": "bi bi-grid-1x2-fill",
       "visibility": "authenticated",
@@ -7268,10 +7268,10 @@
     },
     {
       "id": "school-dashboard-master-hub",
-      "label": "Master Hub",
+      "label": "Master Academia Hub",
       "href": "/school/master-hub",
       "icon": "bi bi-grid-1x2-fill",
-      "description": "Open the School Master Hub for students, teachers, and staff.",
+      "description": "Open the Master Academia Hub for people, attendance, schedules, sessions, classes, notifications, and leave requests.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",

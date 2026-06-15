@@ -8,7 +8,8 @@ const NOW = new Date().toISOString();
 const ROOT_DIR = path.resolve(__dirname, '..');
 
 const SECTION_ID = '445577';
-const SECTION_NAME = 'SCHOOL_MASTER_HUB';
+const SECTION_NAME = 'SCHOOL_MASTER_ACADEMIA_HUB';
+const LEGACY_SECTION_NAME = 'SCHOOL_MASTER_HUB';
 const SECTION_HOME_URL = '/school/master-hub';
 const SYMBOL_ID = 'SYM_SYSTEM_060';
 const PARENT_SECTION = { id: '122740', name: 'SCHOOL' };
@@ -23,7 +24,7 @@ const SECTION_DOC = Object.freeze({
   id: SECTION_ID,
   name: SECTION_NAME,
   category: 'SCHOOL',
-  description: 'Full-width School Master Hub for reviewing student, teacher, and staff directories from one workspace.',
+  description: 'Full-width Master Academia Hub for reviewing people, attendance, schedules, sessions, classes, notifications, and leave requests from one workspace.',
   active: true,
   trackState: true,
   minimumAccessRequirement: 5,
@@ -127,7 +128,8 @@ function mergeOperations(existingOps = []) {
 async function upsertSection(sections) {
   const existing =
     await sections.findOne({ id: SECTION_ID })
-    || await sections.findOne({ name: { $regex: new RegExp(`^${escapeRegex(SECTION_NAME)}$`, 'i') } });
+    || await sections.findOne({ name: { $regex: new RegExp(`^${escapeRegex(SECTION_NAME)}$`, 'i') } })
+    || await sections.findOne({ name: { $regex: new RegExp(`^${escapeRegex(LEGACY_SECTION_NAME)}$`, 'i') } });
   const next = {
     ...SECTION_DOC,
     id: String(existing?.id || SECTION_DOC.id),
@@ -206,7 +208,7 @@ function buildSymbolDoc(sectionId) {
     value: 'bi bi-grid-1x2-fill',
     tags: [
       SECTION_NAME,
-      'SCHOOL_MASTER_HUB',
+      LEGACY_SECTION_NAME,
       'SCHOOL_PEOPLE',
       String(sectionId || SECTION_ID)
     ],
@@ -221,6 +223,10 @@ async function upsertSymbol(symbols, sectionId) {
     await symbols.findOne({ id: symbolDoc.id })
     || await symbols.findOne({
       name: { $regex: new RegExp(`^${escapeRegex(SECTION_NAME)}$`, 'i') },
+      $or: [{ orgId: 'SYSTEM' }, { orgId: { $exists: false } }, { orgId: null }, { orgId: '' }]
+    })
+    || await symbols.findOne({
+      name: { $regex: new RegExp(`^${escapeRegex(LEGACY_SECTION_NAME)}$`, 'i') },
       $or: [{ orgId: 'SYSTEM' }, { orgId: { $exists: false } }, { orgId: null }, { orgId: '' }]
     });
   const next = {
@@ -252,13 +258,13 @@ async function main() {
     await removeFromLegacyParent(db.collection('sections'), section);
     await linkUnderParent(db.collection('sections'), section);
     await upsertSymbol(db.collection('symbols'), section.id);
-    console.log('School Master Hub section/symbol seed complete.');
+    console.log('Master Academia Hub section/symbol seed complete.');
   } finally {
     await client.close();
   }
 }
 
 main().catch((error) => {
-  console.error(`School Master Hub section/symbol seed failed: ${error.message}`);
+  console.error(`Master Academia Hub section/symbol seed failed: ${error.message}`);
   process.exit(1);
 });

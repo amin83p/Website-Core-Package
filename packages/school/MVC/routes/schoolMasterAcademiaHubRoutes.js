@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../controllers/school/schoolMasterHubController');
+const ctrl = require('../controllers/school/schoolMasterAcademiaHubController');
 const {
   requireAuth,
   requireAccess,
@@ -22,19 +22,20 @@ const WORKSPACE_READ_SECTIONS = Object.freeze([
   SECTIONS.SCHOOL_SCHEDULES,
   SECTIONS.SCHOOL_ATTENDANCES,
   SECTIONS.SCHOOL_GRADEBOOK,
-  SECTIONS.SCHOOL_NOTIFICATIONS
+  SECTIONS.SCHOOL_NOTIFICATIONS,
+  SECTIONS.SCHOOL_LEAVE_REQUESTS
 ]);
 
 router.use(requireAuth);
 
 router.get('/',
   requireAccessAny(PEOPLE_READ_SECTIONS, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_MASTER_HUB, OPERATIONS.READ_ALL),
-  ctrl.showMasterHubPage);
+  trackActionState(SECTIONS.SCHOOL_MASTER_ACADEMIA_HUB, OPERATIONS.READ_ALL),
+  ctrl.showMasterAcademiaHubPage);
 
 router.get('/api/list',
   requireAccessAny(PEOPLE_READ_SECTIONS, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_MASTER_HUB, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_MASTER_ACADEMIA_HUB, OPERATIONS.READ_ALL),
   ctrl.listPeoplePanel);
 
 router.get('/api/notification-count',
@@ -44,7 +45,7 @@ router.get('/api/notification-count',
 
 router.get('/api/workspace/:sectionKey',
   requireAccessAny(WORKSPACE_READ_SECTIONS, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_MASTER_HUB, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_MASTER_ACADEMIA_HUB, OPERATIONS.READ_ALL),
   ctrl.getWorkspaceSection);
 
 module.exports = router;
