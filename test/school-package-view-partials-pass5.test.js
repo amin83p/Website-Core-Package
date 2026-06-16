@@ -2,9 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const ejs = require('ejs');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
+const CORE_VIEW_ROOT = path.join(ROOT_DIR, 'MVC/views');
 const SCHOOL_VIEW_ROOT = path.join(ROOT_DIR, 'packages/school/MVC/views/school');
+const SCHOOL_PACKAGE_VIEW_ROOT = path.join(ROOT_DIR, 'packages/school/MVC/views');
 const SCHOOL_PARTIAL_ROOT = path.join(ROOT_DIR, 'packages/school/MVC/views/partials');
 
 function walkFiles(directory) {
@@ -22,15 +25,12 @@ function walkFiles(directory) {
   return out;
 }
 
-test('school package should mirror shared partials required by school package views', () => {
-  assert.equal(fs.existsSync(SCHOOL_PARTIAL_ROOT), true);
-
+test('school package views should use core shared partials without local shared partial mirrors', () => {
   const partialFiles = walkFiles(SCHOOL_PARTIAL_ROOT)
     .map((filePath) => path.relative(SCHOOL_PARTIAL_ROOT, filePath).replace(/\\/g, '/'))
     .filter((filePath) => filePath.endsWith('.ejs'));
 
-  // Core school views rely heavily on these shared partials.
-  const requiredPartials = [
+  const forbiddenMirrors = [
     'dashboard/unifiedDashboard.ejs',
     'modal_GenericPicker.ejs',
     'pagination.ejs',
@@ -39,9 +39,16 @@ test('school package should mirror shared partials required by school package vi
     'tablePages-end.ejs'
   ];
 
-  const missing = requiredPartials.filter((partialPath) => !partialFiles.includes(partialPath));
-  assert.deepEqual(missing, []);
-  assert.equal(partialFiles.length > 0, true);
+  const mirrored = forbiddenMirrors.filter((partialPath) => partialFiles.includes(partialPath));
+  assert.deepEqual(mirrored, []);
+
+  forbiddenMirrors.forEach((partialPath) => {
+    assert.equal(
+      fs.existsSync(path.join(CORE_VIEW_ROOT, 'partials', partialPath)),
+      true,
+      `Expected shared core partial to exist: ${partialPath}`
+    );
+  });
 });
 
 test('school package views should use stable partial include paths', () => {
@@ -61,4 +68,42 @@ test('school package views should use stable partial include paths', () => {
   });
 
   assert.deepEqual(offenders, []);
+});
+
+test('school rolling enrollment below-heading include resolves through package view root', async () => {
+  const rollingEnrollmentView = path.join(SCHOOL_VIEW_ROOT, 'class/rollingEnrollment.ejs');
+  const rollingEnrollmentSource = fs.readFileSync(rollingEnrollmentView, 'utf8');
+
+  assert.match(
+    rollingEnrollmentSource,
+    /belowHeadingInclude:\s*['"]school\/class\/rollingEnrollmentBelowHeading['"]/,
+    'rolling enrollment should use a view-root relative belowHeadingInclude path'
+  );
+  assert.doesNotMatch(
+    rollingEnrollmentSource,
+    /belowHeadingInclude:\s*['"]\.\.\//,
+    'rolling enrollment belowHeadingInclude must not traverse relative to the core partial folder'
+  );
+
+  const tableStartPath = path.join(CORE_VIEW_ROOT, 'partials/tablePages-start.ejs');
+  const html = await ejs.renderFile(tableStartPath, {
+    title: 'Rolling Enrollment',
+    user: {},
+    tableName: 'schoolClassEnrollmentPeriods',
+    belowHeadingInclude: 'school/class/rollingEnrollmentBelowHeading',
+    classData: {
+      id: 'CLS_TEST',
+      title: 'Test Class',
+      registrationMode: 'rolling'
+    },
+    lifecycleContext: {
+      activePeriodCount: 1,
+      openPeriodCount: 1
+    }
+  }, {
+    views: [CORE_VIEW_ROOT, SCHOOL_PACKAGE_VIEW_ROOT]
+  });
+
+  assert.match(html, /Test Class/);
+  assert.match(html, /Rolling/);
 });
