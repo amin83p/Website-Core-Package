@@ -290,7 +290,10 @@
     } else {
       studentTbody.innerHTML = studentRows.map((row) => `
         <tr>
-          <td class="font-monospace">${htmlEscape(String(row.studentId || '-'))}</td>
+          <td>
+            <div class="fw-semibold">${htmlEscape(String(row.studentLabel || row.studentName || row.studentId || '-'))}</div>
+            <div class="x-small text-muted font-monospace">${htmlEscape(String(row.studentId || '-'))}</div>
+          </td>
           <td>${htmlEscape(String(row.periodCount || 0))}</td>
           <td>${htmlEscape(String(row.splitCount || 0))}</td>
           <td>${htmlEscape(String(row.moveWholeCount || 0))}</td>

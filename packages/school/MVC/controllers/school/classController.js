@@ -2199,6 +2199,47 @@ async function attachStudentLabelsToEnrollmentPeriodRows(periodRows, user) {
   }));
 }
 
+async function enrichCycleRolloverPreviewStudentLabels(preview, user) {
+  const studentRows = Array.isArray(preview?.carryForwardPreview?.students)
+    ? preview.carryForwardPreview.students
+    : [];
+  if (!studentRows.length) return preview;
+
+  const [students, persons] = await Promise.all([
+    schoolDataService.fetchData('students', {}, user),
+    dataService.fetchData('persons', {}, user, PERSON_QUERY_OPTIONS)
+  ]);
+
+  const personNameMap = new Map((Array.isArray(persons) ? persons : []).map((person) => {
+    const pid = toPublicId(person?.id);
+    const preferred = String(person?.preferredName || person?.name?.preferred || '').trim();
+    const fullName = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
+    const label = preferred || fullName || String(person?.displayName || pid || '').trim();
+    return [pid, label || pid];
+  }));
+  const studentLabelMap = new Map((Array.isArray(students) ? students : []).map((student) => {
+    const studentId = toPublicId(student?.id);
+    const personId = toPublicId(student?.personId);
+    const name = personNameMap.get(personId) || studentId;
+    const studentNumber = String(student?.studentNumber || '').trim();
+    return [studentId, studentNumber ? `${name} (${studentNumber})` : name];
+  }));
+
+  return {
+    ...preview,
+    carryForwardPreview: {
+      ...preview.carryForwardPreview,
+      students: studentRows.map((row) => {
+        const studentId = toPublicId(row?.studentId);
+        return {
+          ...row,
+          studentLabel: studentLabelMap.get(studentId) || studentId
+        };
+      })
+    }
+  };
+}
+
 async function showRollingEnrollmentPage(req, res) {
   try {
     const { classData } = await getClassByIdWithOrgCheck(req.params.id, req.user);
@@ -2293,11 +2334,12 @@ async function previewCycleRollover(req, res) {
       cycleEndDate: String(req.body?.cycleEndDate || '').trim(),
       currentCycleEndDate: String(req.body?.currentCycleEndDate || '').trim()
     }, req.user);
+    const enrichedPreview = await enrichCycleRolloverPreviewStudentLabels(preview, req.user);
 
     return res.json({
       status: 'success',
       message: 'Cycle rollover preview generated.',
-      data: preview
+      data: enrichedPreview
     });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
