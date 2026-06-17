@@ -25,7 +25,21 @@ const PRIOR_LIST_SEARCHABLE_FIELDS = Object.freeze([
 ]);
 
 function asIdArray(value) {
-  return Array.from(new Set((Array.isArray(value) ? value : [])
+  let raw = value;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) raw = [];
+    else if (trimmed.startsWith('[')) {
+      try {
+        raw = JSON.parse(trimmed);
+      } catch (_) {
+        raw = trimmed.split(',');
+      }
+    } else {
+      raw = trimmed.split(',');
+    }
+  }
+  return Array.from(new Set((Array.isArray(raw) ? raw : [])
     .map((item) => toPublicId(item))
     .filter(Boolean)));
 }
@@ -149,11 +163,27 @@ exports.showPage = async (req, res) => {
       print: true,
       btn_export: true,
       newUrl: 'school/programs/prior-subject-credits',
-      newLabel: null,
+      newHref: '/school/programs/prior-subject-credits/new',
+      newLabel: 'Add Credit',
       actionStateId: req.actionStateId
     });
   } catch (error) {
     if (isAjax(req)) return res.status(500).json({ status: 'error', message: error.message });
+    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+exports.showCreateForm = async (req, res) => {
+  try {
+    res.render('school/program/priorSubjectCreditForm', {
+      title: 'Add Prior Subject Credit',
+      user: req.user,
+      priorSources: [...studentProgramPriorSubjectModel.PRIOR_SUBJECT_SOURCES],
+      actionStateId: req.actionStateId,
+      formData: {},
+      formError: ''
+    });
+  } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
   }
 };
@@ -244,12 +274,11 @@ exports.listRecords = async (req, res) => {
   }
 };
 
-exports.createBatch = async (req, res) => {
-  try {
+async function createPriorCredits(req) {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const studentId = toPublicId(req.body?.studentId || '');
     const programId = toPublicId(req.body?.programId || '');
-    const subjectIds = asIdArray(req.body?.subjectIds);
+    const subjectIds = asIdArray(req.body?.subjectIds ?? req.body?.subjectIdsJson);
     const sourceRaw = String(req.body?.source || 'manual_waiver').trim().toLowerCase();
     const source = studentProgramPriorSubjectModel.PRIOR_SUBJECT_SOURCES.includes(sourceRaw)
       ? sourceRaw
@@ -257,10 +286,10 @@ exports.createBatch = async (req, res) => {
     const evidenceNote = String(req.body?.evidenceNote || '').trim();
 
     if (!studentId || !programId) {
-      return res.status(400).json({ status: 'error', message: 'studentId and programId are required.' });
+      throw new Error('studentId and programId are required.');
     }
     if (!subjectIds.length) {
-      return res.status(400).json({ status: 'error', message: 'Select at least one subject.' });
+      throw new Error('Select at least one subject.');
     }
 
     const subjects = await schoolDataService.fetchData('subjects', { page: 1, limit: 3000 }, req.user);
@@ -272,16 +301,13 @@ exports.createBatch = async (req, res) => {
     );
     const invalidSubjects = subjectIds.filter((sid) => !orgSubjectIds.has(sid));
     if (invalidSubjects.length) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'One or more subjects are not in the active organization.'
-      });
+      throw new Error('One or more subjects are not in the active organization.');
     }
 
     const student = await schoolDataService.getDataById('students', studentId, req.user);
     const program = await schoolDataService.getDataById('programs', programId, req.user);
     if (!student || !program || !idsEqual(student.orgId, activeOrgId) || !idsEqual(program.orgId, activeOrgId)) {
-      return res.status(400).json({ status: 'error', message: 'Student or program not found in the active organization.' });
+      throw new Error('Student or program not found in the active organization.');
     }
 
     const existingRows = await schoolDataService.fetchData('studentProgramPriorSubjects', {
@@ -341,16 +367,41 @@ exports.createBatch = async (req, res) => {
       }
     }
 
-    return res.json({
+    return {
       status: 'success',
       createdCount: created.length,
       created,
       errors,
       skippedDuplicateSubjectIds,
       skippedDuplicateCount: skippedDuplicateSubjectIds.length
-    });
+    };
+}
+
+exports.createBatch = async (req, res) => {
+  try {
+    return res.json(await createPriorCredits(req));
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.createFromForm = async (req, res) => {
+  try {
+    const result = await createPriorCredits(req);
+    const params = new URLSearchParams();
+    params.set('created', String(result.createdCount || 0));
+    if (result.skippedDuplicateCount) params.set('skipped', String(result.skippedDuplicateCount));
+    if (Array.isArray(result.errors) && result.errors.length) params.set('warnings', String(result.errors.length));
+    return res.redirect(`/school/programs/prior-subject-credits?${params.toString()}`);
+  } catch (error) {
+    return res.status(400).render('school/program/priorSubjectCreditForm', {
+      title: 'Add Prior Subject Credit',
+      user: req.user,
+      priorSources: [...studentProgramPriorSubjectModel.PRIOR_SUBJECT_SOURCES],
+      actionStateId: req.actionStateId,
+      formData: req.body || {},
+      formError: error.message
+    });
   }
 };
 

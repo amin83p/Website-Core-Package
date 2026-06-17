@@ -93,6 +93,13 @@
             "category": "maintenance",
             "status": "root-active",
             "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "scripts/mongo-railway/insert-school-prior-subject-credits-section.mongosh.js",
+            "target": "packages/school/scripts/maintenance/insert-school-prior-subject-credits-section.mongosh.js",
+            "category": "maintenance",
+            "status": "root-active",
+            "targetStatus": "package-mirrored"
         }
     ],
     "docs": [

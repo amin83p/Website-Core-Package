@@ -44,38 +44,67 @@ router.get('/registrations/:id',
   programRegistrationCtrl.showRegistrationDetails);
 
 router.get('/prior-subject-credits',
-  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.READ_ALL, { keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.READ_ALL, { keepActive: true }),
   studentProgramPriorSubjectCtrl.showPage);
 
+router.get('/prior-subject-credits/new',
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE, { keepActive: true }),
+  studentProgramPriorSubjectCtrl.showCreateForm);
+
+router.post('/prior-subject-credits/new',
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  studentProgramPriorSubjectCtrl.createFromForm);
+
 router.get('/prior-subject-credits/delete/:id',
-  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.DELETE),
-  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.DELETE, { keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.DELETE, { keepActive: true }),
   studentProgramPriorSubjectCtrl.deleteRecordByIdParam);
 
 router.get('/prior-subject-credits/api/student-programs',
-  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.READ_ALL, { keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.READ_ALL, { keepActive: true }),
   studentProgramPriorSubjectCtrl.listStudentRegisteredPrograms);
 
 router.get('/prior-subject-credits/api/records',
-  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.READ_ALL, { keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.READ_ALL, { keepActive: true }),
   studentProgramPriorSubjectCtrl.listRecords);
 
 router.post('/prior-subject-credits/api/batch',
-  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE),
-  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE, { requireToken: true, keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.CREATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   studentProgramPriorSubjectCtrl.createBatch);
 
 router.post('/prior-subject-credits/api/revoke',
-  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.UPDATE, { requireToken: true, keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   studentProgramPriorSubjectCtrl.revokeRecord);
 
 router.post('/prior-subject-credits/api/delete',
-  requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.DELETE),
-  trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
+  requireAccess(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_PRIOR_SUBJECT_CREDITS, OPERATIONS.DELETE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   studentProgramPriorSubjectCtrl.deleteRecord);
 
 router.post('/register-students/preview',

@@ -170,6 +170,9 @@
           "id": "445564"
         },
         {
+          "id": "445578"
+        },
+        {
           "id": "445565"
         },
         {
@@ -1367,6 +1370,56 @@
       "mainDashboardDisplay": false,
       "navigatorSection": false,
       "homeURL": "/school/programs/registrations",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "445578",
+      "name": "SCHOOL_PRIOR_SUBJECT_CREDITS",
+      "category": "SCHOOL",
+      "description": "Manage student prior subject credits that can satisfy prerequisite and progression checks.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/programs/prior-subject-credits",
       "inactiveMessage": "",
       "message": "",
       "operations": [
@@ -2954,6 +3007,18 @@
       "adoptExisting": true
     },
     {
+      "id": "SYM_SYSTEM_084",
+      "name": "SCHOOL_PRIOR_SUBJECT_CREDITS",
+      "type": "class",
+      "value": "bi bi-mortarboard",
+      "tags": [
+        "SCHOOL_PRIOR_SUBJECT_CREDITS",
+        "445578"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
       "id": "SYM_SYSTEM_054",
       "name": "SCHOOL_PROGRAMS",
       "type": "class",
@@ -3864,6 +3929,40 @@
             {
               "operationId": "OP1005",
               "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445578",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_ORG",
               "maxAttemptsPerSession": null,
               "maxSessionDurationMinutes": null,
               "maxFetchUploadVolumeKB": null
@@ -7164,6 +7263,16 @@
       "target": "_self",
       "category": "School",
       "active": true
+    },
+    {
+      "id": "school-menu-prior-subject-credits",
+      "label": "Prior Subject Credits",
+      "href": "/school/programs/prior-subject-credits",
+      "icon": "bi bi-mortarboard",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
     }
   ],
   "dashboardEntries": [
@@ -7272,6 +7381,17 @@
       "href": "/school/master-hub",
       "icon": "bi bi-grid-1x2-fill",
       "description": "Open the Master Academia Hub for people, attendance, schedules, sessions, classes, notifications, and leave requests.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
+      "id": "school-dashboard-prior-subject-credits",
+      "label": "Prior Subject Credits",
+      "href": "/school/programs/prior-subject-credits",
+      "icon": "bi bi-mortarboard",
+      "description": "Manage student prior subject credits for prerequisite checks.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",

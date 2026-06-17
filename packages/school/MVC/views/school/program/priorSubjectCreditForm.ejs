@@ -1,0 +1,321 @@
+<%
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const fd = (typeof formData !== 'undefined' && formData) ? formData : {};
+  const selectedSubjectsJson = fd.subjectRowsJson || fd.subjectIdsJson || '[]';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="page-heading size-md m-0"><i class="bi bi-mortarboard me-2"></i>Add Prior Subject Credit</h1>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="/school/programs/prior-subject-credits" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to List
+      </a>
+    </div>
+  </div>
+
+  <% if (typeof formError !== 'undefined' && formError) { %>
+    <div class="alert alert-danger py-2"><%= formError %></div>
+  <% } %>
+
+  <div class="form-container wide" style="max-width: 1100px;">
+    <form id="priorSubjectCreditForm" action="/school/programs/prior-subject-credits/new" method="POST">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
+      <input type="hidden" name="studentId" id="prior_inp_studentId" value="<%= fd.studentId || '' %>">
+      <input type="hidden" name="studentLabel" id="prior_inp_studentLabelHidden" value="<%= fd.studentLabel || '' %>">
+      <input type="hidden" name="subjectIdsJson" id="prior_subject_ids_json" value="<%= fd.subjectIdsJson || '[]' %>">
+      <input type="hidden" name="subjectRowsJson" id="prior_subject_rows_json" value="<%= selectedSubjectsJson || '[]' %>">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-person-vcard me-2"></i>Student and Program</h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-7">
+              <label class="form-label fw-bold">Student *</label>
+              <div class="input-group">
+                <input type="text" id="prior_inp_studentLabel" class="form-control size-md bg-white" value="<%= fd.studentLabel || '' %>" placeholder="Select student..." readonly required>
+                <button type="button" class="btn btn-outline-primary" id="prior_btn_pickStudent" title="Pick student">
+                  <i class="bi bi-person-vcard"></i>
+                </button>
+              </div>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label fw-bold" for="prior_sel_program">Program *</label>
+              <select id="prior_sel_program" name="programId" class="form-select size-md" data-initial-value="<%= fd.programId || '' %>" disabled required>
+                <option value="">Select a student first</option>
+              </select>
+              <div class="form-text small text-muted">Programs listed here are approved registrations for the selected student.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between gap-2 flex-wrap">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-journal-bookmark me-2"></i>Subjects</h6>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="prior_btn_pickSubjects">
+            <i class="bi bi-plus-circle me-1"></i>Add Subjects
+          </button>
+        </div>
+        <div class="card-body p-4">
+          <ul class="list-group list-group-flush border rounded small" id="prior_subject_list" style="max-height: 18rem; overflow-y: auto;">
+            <li class="list-group-item text-muted py-3">No subjects added yet.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-clipboard-check me-2"></i>Evidence</h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="prior_sel_source">Source</label>
+              <select id="prior_sel_source" name="source" class="form-select size-md">
+                <% (priorSources || []).forEach(function (src) { %>
+                  <option value="<%= src %>" <%= (fd.source || 'manual_waiver') === src ? 'selected' : '' %>><%= String(src).replace(/_/g, ' ') %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label fw-bold" for="prior_txt_evidence">Evidence / notes</label>
+              <textarea id="prior_txt_evidence" name="evidenceNote" class="form-control" rows="3" placeholder="Transcript reference, placement exam, waiver..."><%= fd.evidenceNote || '' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">
+          <i class="bi bi-check2-circle me-1"></i>Save Credits
+        </button>
+        <a href="/school/programs/prior-subject-credits" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/modal_GenericPicker') %>
+
+<script>
+(function () {
+  const actionStateId = <%- JSON.stringify(String(asid || '')) %>;
+  const initialStudentId = <%- JSON.stringify(String(fd.studentId || '')) %>;
+  const initialProgramId = <%- JSON.stringify(String(fd.programId || '')) %>;
+  const initialSubjectsRaw = <%- JSON.stringify(String(selectedSubjectsJson || '[]')) %>;
+  let priorSelectedSubjects = [];
+
+  const qs = (id) => document.getElementById(id);
+
+  function escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function parseInitialSubjects(raw) {
+    try {
+      const parsed = JSON.parse(String(raw || '[]'));
+      if (Array.isArray(parsed)) {
+        return parsed.map(function (item) {
+          if (typeof item === 'string') return { id: item, label: item };
+          return { id: String(item.id || '').trim(), label: String(item.label || item.name || item.id || '').trim() };
+        }).filter(function (row) { return row.id; });
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  function modalMessageHtml(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+  }
+
+  async function showMsg(title, icon, message) {
+    if (typeof window.showMessageModal !== 'function') {
+      console.error(String(message || title || 'Message modal is not available.'));
+      return;
+    }
+    await window.showMessageModal({
+      title: title,
+      icon: icon || 'info',
+      message: modalMessageHtml(message),
+      buttons: [{ text: 'OK', class: 'btn-primary' }]
+    });
+  }
+
+  function subjectRowFromPickerItem(item) {
+    const id = String(item && item.id != null ? item.id : '').trim();
+    if (!id) return null;
+    const code = String(item.code || '').trim();
+    const name = String(item.name || item.title || '').trim();
+    const label = [code, name].filter(Boolean).join(' - ') || id;
+    return { id: id, label: label };
+  }
+
+  function selectedSubjectIds() {
+    return priorSelectedSubjects.map(function (r) { return r.id; }).filter(Boolean);
+  }
+
+  function syncSubjectFields() {
+    const ids = selectedSubjectIds();
+    const idsInput = qs('prior_subject_ids_json');
+    const rowsInput = qs('prior_subject_rows_json');
+    if (idsInput) idsInput.value = JSON.stringify(ids);
+    if (rowsInput) rowsInput.value = JSON.stringify(priorSelectedSubjects);
+  }
+
+  function renderPriorSubjectList() {
+    const ul = qs('prior_subject_list');
+    if (!ul) return;
+    syncSubjectFields();
+    if (!priorSelectedSubjects.length) {
+      ul.innerHTML = '<li class="list-group-item text-muted py-3">No subjects added yet. Use <strong>Add Subjects</strong> to pick courses.</li>';
+      return;
+    }
+    ul.innerHTML = priorSelectedSubjects.map(function (row) {
+      const slab = escHtml(row.label || row.id);
+      const sidVis = escHtml(row.id);
+      const sidAttr = encodeURIComponent(row.id);
+      return '<li class="list-group-item d-flex justify-content-between align-items-center gap-2 py-2">'
+        + '<div class="min-w-0"><div class="fw-semibold text-truncate" title="' + slab + '">' + slab + '</div>'
+        + '<div class="x-small text-muted font-monospace text-truncate">' + sidVis + '</div></div>'
+        + '<button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0 prior_btn_remove_subject" data-subject-id="' + sidAttr + '" title="Remove">&times;</button>'
+        + '</li>';
+    }).join('');
+  }
+
+  function resetProgramSelect(placeholderText, disabled) {
+    const sel = qs('prior_sel_program');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">' + escHtml(placeholderText || 'Select program') + '</option>';
+    sel.value = '';
+    sel.disabled = !!disabled;
+  }
+
+  async function loadProgramsForStudent(studentId, selectedProgramId) {
+    const sel = qs('prior_sel_program');
+    if (!sel) return;
+    sel.disabled = true;
+    sel.innerHTML = '<option value="">Loading programs...</option>';
+    try {
+      let url = '/school/programs/prior-subject-credits/api/student-programs?studentId=' + encodeURIComponent(studentId);
+      if (actionStateId) url += '&actionStateId=' + encodeURIComponent(actionStateId);
+      const res = await fetch(url, { headers: { 'X-AJAX-Request': 'true' } });
+      const data = await res.json();
+      if (data.status === 'error') throw new Error(data.message || 'Failed to load programs.');
+      const programs = Array.isArray(data.programs) ? data.programs : [];
+      if (!programs.length) {
+        resetProgramSelect('No approved program registrations', true);
+        return;
+      }
+      const opts = ['<option value="">Select program</option>'].concat(programs.map(function (p) {
+        const id = escHtml(p.id || '');
+        const lab = escHtml(p.label || p.id || '');
+        return '<option value="' + id + '">' + lab + '</option>';
+      }));
+      sel.innerHTML = opts.join('');
+      sel.disabled = false;
+      if (selectedProgramId) sel.value = String(selectedProgramId);
+    } catch (e) {
+      resetProgramSelect('Could not load programs', true);
+      showMsg('Programs', 'error', e.message || 'Failed to load programs.');
+    }
+  }
+
+  function pickStudent() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showMsg('Picker unavailable', 'warning', 'Student picker is not loaded on this page.');
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.student({
+      title: 'Select Student',
+      multiselect: false,
+      searchFields: 'id,firstName,lastName,name.first,name.last,studentNumber,personId',
+      context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (selected) {
+        const item = Array.isArray(selected) ? selected[0] : selected;
+        if (!item) return;
+        const id = String(item.id || '').trim();
+        const firstName = String(item.firstName || (item.name && item.name.first) || '').trim();
+        const lastName = String(item.lastName || (item.name && item.name.last) || '').trim();
+        const personName = [firstName, lastName].filter(Boolean).join(' ').trim();
+        const studentNum = String(item.studentNumber || '').trim();
+        const label = studentNum ? (personName + ' (' + studentNum + ')') : (personName || id);
+        qs('prior_inp_studentId').value = id;
+        qs('prior_inp_studentLabel').value = label;
+        qs('prior_inp_studentLabelHidden').value = label;
+        resetProgramSelect('Loading programs...', true);
+        loadProgramsForStudent(id, '');
+      }
+    }));
+  }
+
+  function pickPriorSubjects() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showMsg('Picker unavailable', 'warning', 'Subject picker is not loaded on this page.');
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.subject({
+      title: 'Select Subject',
+      icon: 'bi-journal-bookmark',
+      multiselect: true,
+      placeholder: 'Search subjects, select multiple, then Add Selected...',
+      context: (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (items) {
+        const rows = Array.isArray(items) ? items : [items];
+        rows.forEach(function (item) {
+          const row = subjectRowFromPickerItem(item);
+          if (!row) return;
+          if (priorSelectedSubjects.some(function (s) { return s.id === row.id; })) return;
+          priorSelectedSubjects.push(row);
+        });
+        renderPriorSubjectList();
+      }
+    }));
+  }
+
+  qs('prior_btn_pickStudent')?.addEventListener('click', pickStudent);
+  qs('prior_btn_pickSubjects')?.addEventListener('click', pickPriorSubjects);
+  qs('prior_subject_list')?.addEventListener('click', function (ev) {
+    const btn = ev.target && ev.target.closest && ev.target.closest('.prior_btn_remove_subject');
+    if (!btn) return;
+    let id = btn.getAttribute('data-subject-id') || '';
+    try { id = decodeURIComponent(id); } catch (_) {}
+    priorSelectedSubjects = priorSelectedSubjects.filter(function (row) { return row.id !== id; });
+    renderPriorSubjectList();
+  });
+
+  qs('priorSubjectCreditForm')?.addEventListener('submit', async function (ev) {
+    syncSubjectFields();
+    if (!String(qs('prior_inp_studentId')?.value || '').trim() || !String(qs('prior_sel_program')?.value || '').trim()) {
+      ev.preventDefault();
+      await showMsg('Missing fields', 'warning', 'Select a student and program.');
+      return;
+    }
+    if (!selectedSubjectIds().length) {
+      ev.preventDefault();
+      await showMsg('Missing subjects', 'warning', 'Add one or more subjects using Add Subjects.');
+    }
+  });
+
+  priorSelectedSubjects = parseInitialSubjects(initialSubjectsRaw);
+  renderPriorSubjectList();
+  if (initialStudentId) {
+    loadProgramsForStudent(initialStudentId, initialProgramId);
+  }
+})();
+</script>
