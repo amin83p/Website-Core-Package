@@ -24,13 +24,13 @@
     font-size: 0.78rem;
     white-space: nowrap;
   }
-  .rolling-enrollment-page .row-actions-wrap {
+  .rolling-enrollment-page .rolling-row-actions-wrap {
     position: relative;
     display: inline-block;
   }
   /* Base menu look (also when portaled to body so it is not clipped by the table) */
-  .rolling-enrollment-page .row-actions-wrap .row-actions-menu,
-  body > .row-actions-menu.row-actions-menu--floating {
+  .rolling-enrollment-page .rolling-row-actions-wrap .rolling-row-actions-menu,
+  body > .rolling-row-actions-menu.rolling-row-actions-menu--floating {
     min-width: 148px;
     max-width: min(100vw - 1rem, 220px);
     z-index: 1100;
@@ -40,24 +40,24 @@
     box-shadow: 0 0.45rem 1rem rgba(0, 0, 0, 0.15);
     padding: 0.35rem;
   }
-  .rolling-enrollment-page .row-actions-wrap > .row-actions-menu:not(.row-actions-menu--floating) {
+  .rolling-enrollment-page .rolling-row-actions-wrap > .rolling-row-actions-menu:not(.rolling-row-actions-menu--floating) {
     position: absolute;
     right: 0;
     top: calc(100% + 0.25rem);
     z-index: 15;
   }
-  .rolling-enrollment-page .row-actions-menu .btn,
-  body > .row-actions-menu.row-actions-menu--floating .btn {
+  .rolling-enrollment-page .rolling-row-actions-menu .btn,
+  body > .rolling-row-actions-menu.rolling-row-actions-menu--floating .btn {
     width: 100%;
     text-align: left;
     justify-content: flex-start;
     margin-bottom: 0.25rem;
   }
-  .rolling-enrollment-page .row-actions-menu .btn:last-child,
-  body > .row-actions-menu.row-actions-menu--floating .btn:last-child {
+  .rolling-enrollment-page .rolling-row-actions-menu .btn:last-child,
+  body > .rolling-row-actions-menu.rolling-row-actions-menu--floating .btn:last-child {
     margin-bottom: 0;
   }
-  body > .row-actions-menu.row-actions-menu--floating {
+  body > .rolling-row-actions-menu.rolling-row-actions-menu--floating {
     position: fixed;
     margin: 0;
   }
@@ -1251,8 +1251,17 @@
     if (isMutating && actionStateId && normalizedPayload && typeof normalizedPayload === 'object' && !normalizedPayload.actionStateId) {
       normalizedPayload.actionStateId = actionStateId;
     }
-    const urlWithActionState = (!isMutating && actionStateId)
-      ? `${url}${url.includes('?') ? '&' : '?'}actionStateId=${encodeURIComponent(actionStateId)}`
+    const classScopedEnrollmentAction = isMutating
+      && /^\/school\/classes\/api\/enrollment-periods\/(preview-create|create-with-transactions|create|check-overlap|evaluate-reentry)(\?|$)/.test(String(url || ''));
+    const urlParams = [];
+    if (!isMutating && actionStateId) {
+      urlParams.push('actionStateId=' + encodeURIComponent(actionStateId));
+    }
+    if (classScopedEnrollmentAction && classId && !/[?&]id=/.test(String(url || ''))) {
+      urlParams.push('id=' + encodeURIComponent(classId));
+    }
+    const urlWithActionState = urlParams.length
+      ? `${url}${url.includes('?') ? '&' : '?'}${urlParams.join('&')}`
       : url;
     const headers = { 'X-AJAX-Request': 'true' };
     if (actionStateId) headers['X-Action-State-Id'] = actionStateId;
@@ -1311,11 +1320,11 @@
           <td>${htmlEscape(funderLabel)}</td>
           <td>${htmlEscape(String(row?.authorizationRef || '-'))}</td>
           <td class="text-end table-actions pe-4">
-            <div class="row-actions-wrap">
-              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-period-id="${htmlEscape(String(row?.id || ''))}">
+            <div class="rolling-row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm rolling-row-actions-toggle" data-period-id="${htmlEscape(String(row?.id || ''))}">
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
-              <div class="row-actions-menu d-none" data-period-id="${htmlEscape(String(row?.id || ''))}">
+              <div class="rolling-row-actions-menu d-none" data-period-id="${htmlEscape(String(row?.id || ''))}">
                 <button type="button" class="btn btn-outline-primary btn-sm btn-row-edit" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-pencil-square me-1"></i>Edit</button>
                 ${canReviewDraft ? `<button type="button" class="btn btn-outline-primary btn-sm btn-row-review-draft" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-journal-text me-1"></i>Review Draft</button>` : ''}
                 <button type="button" class="btn btn-outline-secondary btn-sm btn-row-reentry" data-period-id="${htmlEscape(String(row?.id || ''))}"><i class="bi bi-arrow-repeat me-1"></i>Next</button>
@@ -1683,11 +1692,11 @@
 
   function findWrapByPeriodId(periodId) {
     const want = String(periodId || '');
-    const btns = document.querySelectorAll('.rolling-enrollment-page .btn-row-actions-toggle');
+    const btns = document.querySelectorAll('.rolling-enrollment-page .rolling-row-actions-toggle');
     for (let i = 0; i < btns.length; i += 1) {
       const b = btns[i];
       if (String(b.getAttribute('data-period-id') || '') === want) {
-        return b.closest('.row-actions-wrap');
+        return b.closest('.rolling-row-actions-wrap');
       }
     }
     return null;
@@ -1701,7 +1710,7 @@
 
   function resetFloatingMenuStyles(menu) {
     if (!menu) return;
-    menu.classList.remove('row-actions-menu--floating');
+    menu.classList.remove('rolling-row-actions-menu--floating');
     menu.style.left = '';
     menu.style.top = '';
     menu.style.right = '';
@@ -1719,7 +1728,7 @@
     const rectTop = rect.top / zoom;
     const rectRight = rect.right / zoom;
     const rectBottom = rect.bottom / zoom;
-    menu.classList.add('row-actions-menu--floating');
+    menu.classList.add('rolling-row-actions-menu--floating');
     menu.style.visibility = 'hidden';
     menu.style.position = 'fixed';
     menu.style.left = '0';
@@ -1745,14 +1754,14 @@
   }
 
   function repositionOpenRowActionMenu() {
-    const menu = document.querySelector('.row-actions-menu.row-actions-menu--floating:not(.d-none)');
+    const menu = document.querySelector('.rolling-row-actions-menu.rolling-row-actions-menu--floating:not(.d-none)');
     if (!menu) return;
     const wrap = findWrapByPeriodId(menu.getAttribute('data-period-id'));
     if (wrap) placeFloatingRowMenu(menu, wrap);
   }
 
   function closeAllActionMenus() {
-    document.querySelectorAll('.row-actions-menu').forEach((menu) => {
+    document.querySelectorAll('.rolling-row-actions-menu').forEach((menu) => {
       menu.classList.add('d-none');
       resetFloatingMenuStyles(menu);
       dockRowActionsMenu(menu);
@@ -1764,15 +1773,15 @@
   document.querySelector('.rolling-enrollment-page .table-scroll-wrapper')?.addEventListener('scroll', repositionOpenRowActionMenu, { passive: true });
 
   document.addEventListener('click', (event) => {
-    const toggleBtn = event.target.closest('.btn-row-actions-toggle');
+    const toggleBtn = event.target.closest('.rolling-row-actions-toggle');
     if (toggleBtn) {
       const periodId = String(toggleBtn.getAttribute('data-period-id') || '').trim();
-      const targetMenu = Array.from(document.querySelectorAll('.row-actions-menu'))
+      const targetMenu = Array.from(document.querySelectorAll('.rolling-row-actions-menu'))
         .find((menu) => String(menu.getAttribute('data-period-id') || '').trim() === periodId);
       const willOpen = targetMenu ? targetMenu.classList.contains('d-none') : false;
       closeAllActionMenus();
       if (targetMenu && willOpen) {
-        const wrap = toggleBtn.closest('.row-actions-wrap');
+        const wrap = toggleBtn.closest('.rolling-row-actions-wrap');
         targetMenu.classList.remove('d-none');
         document.body.appendChild(targetMenu);
         placeFloatingRowMenu(targetMenu, wrap);
@@ -1825,7 +1834,7 @@
       return;
     }
 
-    if (!event.target.closest('.row-actions-wrap') && !event.target.closest('.row-actions-menu')) {
+    if (!event.target.closest('.rolling-row-actions-wrap') && !event.target.closest('.rolling-row-actions-menu')) {
       closeAllActionMenus();
     }
   });
