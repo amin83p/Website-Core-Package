@@ -82,13 +82,14 @@
         <th>Session Date</th>
         <th>Template</th>
         <th>Teacher</th>
+        <th>Student</th>
         <th>Status</th>
         <th class="text-end pe-4">Actions</th>
       </tr>
     </thead>
     <tbody>
       <% if (!data || !data.length) { %>
-        <tr><td colspan="7" class="text-center py-4 text-muted">No report instances found.</td></tr>
+        <tr><td colspan="8" class="text-center py-4 text-muted">No report instances found.</td></tr>
       <% } %>
       <% (data || []).forEach((row) => { %>
         <% const lifecycleMode = String(row?.classLifecycle?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based'; %>
@@ -96,7 +97,11 @@
         <% const lifecycleClosed = row?.classLifecycle?.isClosedForNewEnrollment === true || String(row?.classLifecycle?.isClosedForNewEnrollment || '').trim().toLowerCase() === 'true'; %>
         <tr>
           <td class="ps-4">
-            <div class="fw-bold text-dark font-monospace"><%= row.id %></div>
+            <% if (row.isPendingAssignment) { %>
+              <div class="fw-bold text-primary">Pending report</div>
+            <% } else { %>
+              <div class="fw-bold text-dark font-monospace"><%= row.id %></div>
+            <% } %>
             <div class="x-small text-muted">Assignment: <%= row.assignmentId || '-' %></div>
           </td>
           <td>
@@ -119,10 +124,23 @@
             <div class="fw-bold text-dark"><%= row.templateTitle %></div>
             <div class="x-small text-muted">v<%= Number(row.templateVersion || 1) %></div>
           </td>
-          <td class="font-monospace"><%= row.teacherId || '-' %></td>
+          <td>
+            <div><%= row.teacherName || row.teacherId || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= row.teacherId || '-' %></div>
+          </td>
+          <td>
+            <div><%= row.studentName || (row.studentId ? row.studentId : 'Whole class') %></div>
+            <% if (row.studentId) { %>
+              <div class="x-small text-muted font-monospace"><%= row.studentId %></div>
+            <% } %>
+          </td>
           <td>
             <% const status = String(row.status || '').toLowerCase(); %>
-            <span class="badge <%= status === 'submitted' ? 'bg-success' : (status === 'locked' ? 'bg-dark' : 'bg-warning text-dark') %>"><%= status || '-' %></span>
+            <% if (row.isPendingAssignment) { %>
+              <span class="badge bg-info-subtle text-info-emphasis border">pending</span>
+            <% } else { %>
+              <span class="badge <%= status === 'submitted' ? 'bg-success' : (status === 'locked' ? 'bg-dark' : 'bg-warning text-dark') %>"><%= status || '-' %></span>
+            <% } %>
           </td>
           <td class="table-actions pe-4">
             <div class="row-actions-wrap">
@@ -137,11 +155,16 @@
                 <% if (row.classId) { %>
                   <a href="/school/classes/edit-wizard/<%= encodeURIComponent(row.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-2"></i>Lifecycle</a>
                 <% } %>
-                <a href="/school/reports/instances/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right me-2"></i>Open</a>
-                <% if (row.hasDocxTemplate) { %>
-                  <a href="/school/reports/instances/export/<%= row.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm"><i class="bi bi-filetype-docx me-2"></i>DOCX</a>
+                <% if (row.isPendingAssignment) { %>
+                  <a href="/school/reports/instances/start/<%= encodeURIComponent(row.assignmentId) %>?teacherId=<%= encodeURIComponent(row.teacherId || '') %><%= row.studentId ? ('&studentId=' + encodeURIComponent(row.studentId)) : '' %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-play-circle me-2"></i>Start</a>
+                  <a href="/school/reports/assignments/edit/<%= encodeURIComponent(row.assignmentId) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-2"></i>Assignment</a>
+                <% } else { %>
+                  <a href="/school/reports/instances/edit/<%= row.id %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right me-2"></i>Open</a>
+                  <% if (row.hasDocxTemplate) { %>
+                    <a href="/school/reports/instances/export/<%= row.id %>?format=docx&download=1" class="btn btn-outline-primary btn-sm"><i class="bi bi-filetype-docx me-2"></i>DOCX</a>
+                  <% } %>
+                  <a href="/school/reports/instances/export/<%= row.id %>?download=1" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-2"></i>Payload</a>
                 <% } %>
-                <a href="/school/reports/instances/export/<%= row.id %>?download=1" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-2"></i>Payload</a>
               </div>
             </div>
           </td>

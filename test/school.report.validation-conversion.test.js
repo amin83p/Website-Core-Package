@@ -1,8 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const reportRuleEngineService = require('../MVC/services/school/reportRuleEngineService');
-const reportService = require('../MVC/services/school/reportService');
+const reportRuleEngineService = require('../packages/school/MVC/services/school/reportRuleEngineService');
+const reportService = require('../packages/school/MVC/services/school/reportService');
 
 test('safe expression blocks unknown globals', () => {
   assert.throws(

@@ -5,6 +5,7 @@ const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
+const { normalizePrefillKey } = require('../../services/school/reportPrefillKeyUtils');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/reportTemplates.json');
 
@@ -177,7 +178,7 @@ function sanitizeField(rawField, index) {
     backgroundColor: visualOnly ? '' : cleanHexColor(rawField.backgroundColor, { allowEmpty: true }),
     helpText: cleanString(rawField.helpText, { max: 400, allowEmpty: true }),
     placeholder: cleanString(rawField.placeholder, { max: 200, allowEmpty: true }),
-    prefillKey: cleanString(rawField.prefillKey, { max: 120, allowEmpty: true }),
+    prefillKey: normalizePrefillKey(cleanString(rawField.prefillKey, { max: 120, allowEmpty: true })),
     options,
     validationRules: visualOnly ? [] : sanitizeValidationRules(rawField.validationRules),
     conversionRule: visualOnly ? sanitizeConversionRule({ enabled: false, expression: '', onError: 'use_raw' }) : sanitizeConversionRule(rawField.conversionRule)

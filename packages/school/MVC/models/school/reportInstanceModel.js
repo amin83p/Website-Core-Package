@@ -11,7 +11,7 @@ if (!fsSync.existsSync(dataPath)) {
   fsSync.writeFileSync(dataPath, '[]');
 }
 
-const INSTANCE_STATUSES = new Set(['draft', 'submitted', 'locked']);
+const INSTANCE_STATUSES = new Set(['draft', 'submitted', 'locked', 'archived']);
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -94,7 +94,9 @@ function sanitizeAudit(v, existingAudit = {}) {
     lastUpdateUser: cleanString(raw.lastUpdateUser, { max: 80, allowEmpty: true }),
     lastUpdateDateTime: cleanString(raw.lastUpdateDateTime, { max: 60, allowEmpty: true }),
     submittedAt: cleanString(raw.submittedAt || existingAudit.submittedAt, { max: 60, allowEmpty: true }),
-    lockedAt: cleanString(raw.lockedAt || existingAudit.lockedAt, { max: 60, allowEmpty: true })
+    lockedAt: cleanString(raw.lockedAt || existingAudit.lockedAt, { max: 60, allowEmpty: true }),
+    archivedAt: cleanString(raw.archivedAt || existingAudit.archivedAt, { max: 60, allowEmpty: true }),
+    archivedReason: cleanString(raw.archivedReason || existingAudit.archivedReason, { max: 500, allowEmpty: true })
   };
 }
 
@@ -228,6 +230,7 @@ async function updateInstance(id, updates) {
     };
     if (sanitized.status === 'submitted' && !nextAudit.submittedAt) nextAudit.submittedAt = new Date().toISOString();
     if (sanitized.status === 'locked' && !nextAudit.lockedAt) nextAudit.lockedAt = new Date().toISOString();
+    if (sanitized.status === 'archived' && !nextAudit.archivedAt) nextAudit.archivedAt = new Date().toISOString();
 
     all[index] = {
       ...existing,

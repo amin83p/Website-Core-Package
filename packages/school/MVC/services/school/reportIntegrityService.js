@@ -1,10 +1,12 @@
 const schoolDataService = require('./schoolDataService');
 const schoolRepositories = require('../../repositories/school');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
+const { requireCoreModule } = require('./schoolCoreContracts');
 const {
   isRecordAccessibleByOrg,
   canBypassOrgScope
 } = require('./schoolDataScopeBuilder');
+const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function inferAssignmentReportScope(row) {
   const explicit = String(row?.reportScope || '').trim().toLowerCase();
@@ -38,7 +40,7 @@ async function resolveClassStudentIds({
     sessionDates: (Array.isArray(sessions) ? sessions : []).map((row) => String(row?.date || '').trim()).filter(Boolean),
     startDate: referenceDate,
     endDate: referenceDate,
-    canonicalStatuses: ['active', 'planned']
+    canonicalStatuses: classEnrollmentReadService.getReportRosterStatusesForClass(classData)
   });
   const activeStudentIds = snapshot?.studentIds instanceof Set ? [...snapshot.studentIds] : [];
   if (!activeStudentIds.length) return [];
@@ -167,6 +169,25 @@ function buildClassInstructorSet(classRow) {
     if (personId) set.add(personId);
   });
   return set;
+}
+
+function isArchivedInstance(instance) {
+  return String(instance?.status || '').trim().toLowerCase() === 'archived';
+}
+
+function assertInstanceAssignmentConsistency(instance, assignment) {
+  if (!assignment) {
+    throw new Error('Report assignment for this instance is no longer available.');
+  }
+  if (!idsEqual(instance?.orgId, assignment?.orgId)) {
+    throw new Error('Report instance no longer matches its assignment organization.');
+  }
+  if (!idsEqual(instance?.classId, assignment?.classId)) {
+    throw new Error('Report instance no longer matches its assignment class.');
+  }
+  if (!idsEqual(instance?.templateId, assignment?.templateId)) {
+    throw new Error('Report instance no longer matches its assignment template.');
+  }
 }
 
 async function assertNoAssignmentScheduleConflicts({
@@ -528,9 +549,14 @@ const reportIntegrityService = {
   async getAccessibleInstanceOrThrow(instanceId, reqUser) {
     const instance = await schoolRepositories.reportInstances.getById(instanceId);
     if (!instance) throw new Error('Report instance not found.');
+    if (isArchivedInstance(instance)) {
+      throw new Error('This report instance has been archived and cannot be opened.');
+    }
     if (!isRecordAccessibleByOrg(instance, reqUser)) {
       throw new Error('Instance is not accessible in this organization.');
     }
+    const assignment = await schoolRepositories.reportAssignments.getById(instance.assignmentId);
+    assertInstanceAssignmentConsistency(instance, assignment);
     return instance;
   },
 

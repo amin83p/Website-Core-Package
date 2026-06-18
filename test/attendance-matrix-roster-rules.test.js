@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { applyAttendanceMatrixRosterRules, resolvePolicy } = require('../MVC/services/school/attendanceMatrixMetricsService');
+const { applyAttendanceMatrixRosterRules, resolvePolicy } = require('../packages/school/MVC/services/school/attendanceMatrixMetricsService');
 
 const policy = resolvePolicy({}, {
   scheduledMinutes: 180,

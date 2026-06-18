@@ -6,7 +6,7 @@ const {
   resolvePolicy,
   scheduledMinutesFromSession,
   parseTimeToMinutes
-} = require('../MVC/services/school/attendanceMatrixMetricsService');
+} = require('../packages/school/MVC/services/school/attendanceMatrixMetricsService');
 
 const policy180 = {
   scheduledMinutes: 180,

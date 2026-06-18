@@ -171,7 +171,7 @@ async function resolveClassStudentIds({ classData, sessions = [], reqUser, refer
     sessionDates: (Array.isArray(sessions) ? sessions : []).map((row) => String(row?.date || '').trim()).filter(Boolean),
     startDate: referenceDate,
     endDate: referenceDate,
-    canonicalStatuses: ['active', 'planned']
+    canonicalStatuses: classEnrollmentReadService.getReportRosterStatusesForClass(classData)
   });
   const activeStudentIds = snapshot?.studentIds instanceof Set ? [...snapshot.studentIds] : [];
   if (!activeStudentIds.length) return [];
@@ -302,7 +302,8 @@ async function buildPersonNameMap(reqUser) {
     const id = toPublicId(person?.id);
     if (!id) return;
     const fullName = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
-    map.set(id, fullName || id);
+    const preferred = String(person?.name?.preferred || '').trim();
+    map.set(id, preferred || fullName || id);
   });
   return map;
 }
@@ -322,7 +323,10 @@ async function listAllReportInstances(reqUser) {
 function buildHomeSummary(allTemplates, allAssignments, allInstances, reqUser) {
   const templates = filterRecordsByOrg(allTemplates, reqUser);
   const assignments = filterRecordsByOrg(allAssignments, reqUser);
-  const instances = filterRecordsByOrg(allInstances, reqUser);
+  const assignmentIds = new Set(assignments.map((row) => toPublicId(row?.id)).filter(Boolean));
+  const instances = filterRecordsByOrg(allInstances, reqUser)
+    .filter(isActiveReportInstance)
+    .filter((row) => assignmentIds.has(toPublicId(row?.assignmentId)));
 
   return {
     templateCount: templates.length,
@@ -331,6 +335,50 @@ function buildHomeSummary(allTemplates, allAssignments, allInstances, reqUser) {
     draftCount: instances.filter((row) => String(row.status || '') === 'draft').length,
     submittedCount: instances.filter((row) => String(row.status || '') === 'submitted').length
   };
+}
+
+function isActiveReportInstance(row) {
+  return String(row?.status || '').trim().toLowerCase() !== 'archived';
+}
+
+function isActiveReportAssignment(row) {
+  return String(row?.status || '').trim().toLowerCase() === 'active';
+}
+
+function buildInstanceIdentityKey(assignmentId = '', teacherId = '', targetKey = 'class') {
+  return [
+    toPublicId(assignmentId),
+    toPublicId(teacherId),
+    String(targetKey || 'class').trim() || 'class'
+  ].join('|');
+}
+
+function resolveAssignmentTargetDate(assignment = {}) {
+  return String(
+    assignment?.reportDueDate ||
+    assignment?.dueDate ||
+    assignment?.sessionDate ||
+    ''
+  ).trim();
+}
+
+async function resolvePendingAssignmentStudentTargets({ assignment, classItem, reqUser, students = [] } = {}) {
+  const reportScope = inferAssignmentReportScope(assignment);
+  if (reportScope === 'class') return [''];
+  if (reportScope === 'selected_students') {
+    return [...new Set((Array.isArray(assignment?.targetStudentIds) ? assignment.targetStudentIds : [])
+      .map((id) => toPublicId(id))
+      .filter(Boolean))];
+  }
+  if (!classItem) return [];
+  const sessions = await schoolDataService.getClassSessions(toPublicId(classItem?.id), reqUser);
+  return resolveClassStudentIds({
+    classData: classItem,
+    sessions,
+    reqUser,
+    referenceDate: resolveAssignmentTargetDate(assignment),
+    students
+  });
 }
 
 function buildTemplateSavePayload({
@@ -568,11 +616,13 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
 }
 
 async function buildInstanceListRows({ reqUser, assignmentFilter = '', q = '' }) {
-  const [allInstances, allAssignments, allTemplates, classes] = await Promise.all([
+  const [allInstances, allAssignments, allTemplates, classes, students, personMap] = await Promise.all([
     listAllReportInstances(reqUser),
     listAllReportAssignments(reqUser),
     listAllReportTemplates(reqUser),
-    schoolDataService.fetchData('classes', {}, reqUser)
+    schoolDataService.fetchData('classes', {}, reqUser),
+    schoolDataService.fetchData('students', {}, reqUser),
+    buildPersonNameMap(reqUser)
   ]);
   const assignmentMap = new Map(
     (Array.isArray(allAssignments) ? allAssignments : [])
@@ -590,28 +640,112 @@ async function buildInstanceListRows({ reqUser, assignmentFilter = '', q = '' })
       .filter(([id]) => Boolean(id))
   );
 
-  return filterRecordsByOrg(allInstances, reqUser)
+  const activeInstanceRows = filterRecordsByOrg(allInstances, reqUser)
+    .filter(isActiveReportInstance)
+    .filter((row) => assignmentMap.has(toPublicId(row?.assignmentId)))
     .map((row) => {
       const assignment = assignmentMap.get(toPublicId(row?.assignmentId)) || null;
       const template = templateMap.get(toPublicId(row?.templateId)) || null;
       const classItem = classMap.get(toPublicId(row?.classId)) || null;
+      const teacherId = toPublicId(row?.teacherId);
+      const studentId = toPublicId(row?.studentId);
       return {
         ...row,
+        isPendingAssignment: false,
         classTitle: classItem?.title || row.classId,
         classLifecycle: buildClassLifecycleSnapshot(classItem || {}),
         templateTitle: template?.title || row.templateId,
         hasDocxTemplate: Boolean(template?.docxTemplate?.path),
-        assignmentStatus: assignment?.status || ''
+        assignmentStatus: assignment?.status || '',
+        teacherName: personMap.get(teacherId) || teacherId || '-',
+        studentName: studentId ? (personMap.get(studentId) || studentId) : 'Whole class'
       };
-    })
+    });
+
+  const existingInstanceKeys = new Set(
+    activeInstanceRows.map((row) => buildInstanceIdentityKey(row.assignmentId, row.teacherId, row.targetKey || 'class'))
+  );
+
+  const pendingRows = [];
+  const scopedAssignments = filterRecordsByOrg(allAssignments, reqUser)
+    .filter(isActiveReportAssignment)
+    .filter((row) => !assignmentFilter || idsEqual(row.id, assignmentFilter));
+
+  for (const assignment of scopedAssignments) {
+    const assignmentId = toPublicId(assignment?.id);
+    if (!assignmentId) continue;
+    const classItem = classMap.get(toPublicId(assignment?.classId)) || null;
+    const template = templateMap.get(toPublicId(assignment?.templateId)) || null;
+    const teacherIds = [...new Set((Array.isArray(assignment?.teacherIds) ? assignment.teacherIds : [])
+      .map((id) => toPublicId(id))
+      .filter(Boolean))];
+    if (!teacherIds.length) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const targetStudentIds = await resolvePendingAssignmentStudentTargets({
+      assignment,
+      classItem,
+      reqUser,
+      students
+    });
+    const targets = targetStudentIds.length ? targetStudentIds : [''];
+
+    teacherIds.forEach((teacherId) => {
+      targets.forEach((studentId) => {
+        const targetKey = studentId ? `student:${studentId}` : 'class';
+        const identityKey = buildInstanceIdentityKey(assignmentId, teacherId, targetKey);
+        if (existingInstanceKeys.has(identityKey)) return;
+        pendingRows.push({
+          id: `pending-${assignmentId}-${teacherId}-${targetKey}`.replace(/[^A-Za-z0-9_-]/g, '-'),
+          isPendingAssignment: true,
+          orgId: assignment.orgId,
+          assignmentId,
+          classId: assignment.classId,
+          sessionId: assignment.sessionId,
+          sessionDate: String(assignment.sessionDate || assignment.reportDueDate || assignment.dueDate || '').trim(),
+          templateId: assignment.templateId,
+          templateVersion: assignment.templateVersion || template?.version || 1,
+          teacherId,
+          teacherName: personMap.get(teacherId) || teacherId || '-',
+          studentId,
+          studentName: studentId ? (personMap.get(studentId) || studentId) : 'Whole class',
+          targetKey,
+          status: 'pending',
+          classTitle: classItem?.title || assignment.classId,
+          classLifecycle: buildClassLifecycleSnapshot(classItem || {}),
+          templateTitle: template?.title || assignment.templateId,
+          hasDocxTemplate: Boolean(template?.docxTemplate?.path),
+          assignmentStatus: assignment.status || '',
+          audit: assignment.audit || {}
+        });
+      });
+    });
+  }
+
+  return [...activeInstanceRows, ...pendingRows]
     .filter((row) => !assignmentFilter || idsEqual(row.assignmentId, assignmentFilter))
     .filter((row) => {
       if (!q) return true;
-      return [row.id, row.assignmentId, row.classTitle, row.templateTitle, row.status, row.sessionDate, row.teacherId]
+      return [
+        row.id,
+        row.assignmentId,
+        row.classTitle,
+        row.templateTitle,
+        row.status,
+        row.sessionDate,
+        row.teacherId,
+        row.teacherName,
+        row.studentId,
+        row.studentName
+      ]
         .map((v) => String(v || '').toLowerCase())
         .some((v) => v.includes(q));
     })
-    .sort((a, b) => String(b.audit?.createDateTime || '').localeCompare(String(a.audit?.createDateTime || '')));
+    .sort((a, b) => {
+      const dateCompare = String(b.sessionDate || '').localeCompare(String(a.sessionDate || ''));
+      if (dateCompare) return dateCompare;
+      if (a.isPendingAssignment !== b.isPendingAssignment) return a.isPendingAssignment ? -1 : 1;
+      return String(b.audit?.createDateTime || '').localeCompare(String(a.audit?.createDateTime || ''));
+    });
 }
 
 async function buildPersonReportListContext({ reqUser, requestedScope = '', requestedPersonId = '', q = '' }) {
@@ -673,6 +807,8 @@ async function buildPersonReportListContext({ reqUser, requestedScope = '', requ
   }
 
   const rows = filterRecordsByOrg(allInstances, reqUser)
+    .filter(isActiveReportInstance)
+    .filter((row) => assignmentMap.has(toPublicId(row?.assignmentId)))
     .filter((row) => {
       const rowTeacherId = toPublicId(row?.teacherId);
       const rowStudentId = toPublicId(row?.studentId);

@@ -3,6 +3,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const OPEN_PERIOD_STATUSES = new Set(['active', 'planned']);
+const REPORT_ROSTER_OPEN_STATUSES = Object.freeze(['active', 'planned']);
 const HISTORICAL_ROLLING_ROSTER_STATUSES = Object.freeze(['active', 'planned', 'completed']);
 
 function normalizeStatus(value) {
@@ -90,8 +91,19 @@ function buildCountMapFromCanonical(rows = [], referenceDate = '') {
   return map;
 }
 
+function isRollingClassItem(classItem = {}) {
+  return normalizeStatus(classItem?.registrationMode) === 'rolling';
+}
+
+function getReportRosterStatusesForClass(classItem = {}) {
+  return isRollingClassItem(classItem)
+    ? HISTORICAL_ROLLING_ROSTER_STATUSES
+    : REPORT_ROSTER_OPEN_STATUSES;
+}
+
 const classEnrollmentReadService = {
   HISTORICAL_ROLLING_ROSTER_STATUSES,
+  getReportRosterStatusesForClass,
 
   async listActiveStudentIdsForClass({
     classId,

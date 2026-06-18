@@ -1015,7 +1015,7 @@ schoolRepositories.reportInstances.findByAssignmentTeacherTarget = async (assign
         query: {
           assignmentId__eq: assignmentId,
           teacherId__eq: teacherId,
-          targetType__eq: targetKey,
+          targetKey__eq: targetKey,
           page: 1,
           limit: 1
         },
