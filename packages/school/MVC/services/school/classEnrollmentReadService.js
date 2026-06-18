@@ -3,6 +3,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const OPEN_PERIOD_STATUSES = new Set(['active', 'planned']);
+const HISTORICAL_ROLLING_ROSTER_STATUSES = Object.freeze(['active', 'planned', 'completed']);
 
 function normalizeStatus(value) {
   return String(value || '').trim().toLowerCase();
@@ -90,6 +91,8 @@ function buildCountMapFromCanonical(rows = [], referenceDate = '') {
 }
 
 const classEnrollmentReadService = {
+  HISTORICAL_ROLLING_ROSTER_STATUSES,
+
   async listActiveStudentIdsForClass({
     classId,
     classItem = null,

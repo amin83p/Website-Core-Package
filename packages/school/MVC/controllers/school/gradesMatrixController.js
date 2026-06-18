@@ -267,6 +267,7 @@ async function buildGradesMatrixPayload(req, query) {
 
   const activeOrgId = String(req.user?.activeOrgId || classData?.orgId || '').trim();
   const sessionDates = filteredSessions.map((row) => String(row?.date || '').trim()).filter(Boolean);
+  const isRollingClass = String(classData?.registrationMode || '').trim().toLowerCase() === 'rolling';
   const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
     classId: classData.id,
     classItem: classData,
@@ -274,7 +275,10 @@ async function buildGradesMatrixPayload(req, query) {
     activeOrgId,
     sessionDates,
     startDate,
-    endDate
+    endDate,
+    canonicalStatuses: isRollingClass
+      ? classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES
+      : null
   });
   const studentIds = enrollmentSnapshot.studentIds instanceof Set ? enrollmentSnapshot.studentIds : new Set();
   const activePersonIds = new Set();

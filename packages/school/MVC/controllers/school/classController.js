@@ -1124,6 +1124,9 @@ function sortSessionContentItemsByOrder(items = [], order = []) {
 async function resolveSessionRosterPersonIds({ classData, session, reqUser, students = [] } = {}) {
     const activeOrgId = String(reqUser?.activeOrgId || classData?.orgId || '').trim();
     const sessionDate = normalizeDateOnlyValue(session?.date);
+    const rosterStatuses = getClassRegistrationModeKey(classData) === 'rolling'
+        ? classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES
+        : ['active'];
     const studentRows = Array.isArray(students) ? students : [];
     const studentToPersonMap = new Map(
         studentRows
@@ -1138,7 +1141,7 @@ async function resolveSessionRosterPersonIds({ classData, session, reqUser, stud
         sessionDates: sessionDate ? [sessionDate] : [],
         startDate: sessionDate,
         endDate: sessionDate,
-        canonicalStatuses: ['active']
+        canonicalStatuses: rosterStatuses
     });
 
     const snapshotIds = enrollmentSnapshot?.studentIds instanceof Set

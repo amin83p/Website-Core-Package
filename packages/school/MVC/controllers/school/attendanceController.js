@@ -34,9 +34,9 @@ function resolveDateWindow({ sessions = [], startDate = '', endDate = '' } = {})
     return { start, end };
 }
 
-function activePeriodOverlapsWindow(period, windowStart, windowEnd) {
+function historicalRosterPeriodOverlapsWindow(period, windowStart, windowEnd) {
     const status = String(period?.status || '').trim().toLowerCase();
-    if (status !== 'active') return false;
+    if (!classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES.includes(status)) return false;
     const start = normalizeDateOnly(period?.startDate);
     const end = normalizeDateOnly(period?.endDate) || '9999-12-31';
     const ws = normalizeDateOnly(windowStart);
@@ -185,7 +185,7 @@ async function getAttendanceData(req, res) {
             sessionDates,
             startDate: String(startDate || '').trim(),
             endDate: String(endDate || '').trim(),
-            // Attendance Matrix should show only approved/active rolling enrollments.
+            // Attendance Matrix should use historical rolling rosters for matching session/date windows.
             canonicalStatuses: ['active']
         });
         const registrationMode = String(classData?.registrationMode || '').trim().toLowerCase();
@@ -200,7 +200,7 @@ async function getAttendanceData(req, res) {
             const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData.id, req.user);
             (Array.isArray(periodRows) ? periodRows : []).forEach((period) => {
                 if (activeOrgId && !idsEqual(period?.orgId, activeOrgId)) return;
-                if (!activePeriodOverlapsWindow(period, window.start, window.end)) return;
+                if (!historicalRosterPeriodOverlapsWindow(period, window.start, window.end)) return;
                 const sid = String(period?.studentId || '').trim();
                 const pid = String(studentToPersonMap.get(sid) || '').trim();
                 if (pid) activePersonIds.add(pid);
