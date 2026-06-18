@@ -4,8 +4,30 @@ const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const reportRuleEngineService = require('./reportRuleEngineService');
+const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
+const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
+const { getPrefillValue, normalizePrefillKey } = require('./reportPrefillKeyUtils');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
+/**
+ * PREFILL_CATALOG - Curated list of template variable keys available for report prefill.
+ * 
+ * KEY BEHAVIOR & SCOPE:
+ * - `common`: Available for all report types (class-scope and each-student-scope)
+ * - `classOnly`: Behave differently depending on assignment.reportScope:
+ *     * class-scope reports: Aggregate counts (e.g., class_attendance_present = total present count)
+ *     * each-student-scope reports: Student-specific metrics (e.g., class_attendance_present = Attendance Matrix % for that student)
+ * - `studentOnly`: Only available for each-student-scope reports; populated for target student
+ * - `gradebookPeriodClass` / `gradebookPeriodStudent`: Period-based grade aggregates
+ * - `examPeriodClass` / `examPeriodStudent`: Period-based exam stats
+ * 
+ * CRITICAL NOTES:
+ * - Attendance Matrix percent treats missing/unmarked attendance marks as absent
+ * - All keys must be produced by buildPrefillSnapshot(); audit test verifies this
+ * - Keys are validated at template save-time via validateTemplatePrefillKeys()
+ * - Type conversion applied at runtime (checkbox→boolean, number→finite)
+ * - Braced keys {{key}} normalized to bare keys at save time
+ */
 const PREFILL_CATALOG = Object.freeze({
   common: Object.freeze([
     Object.freeze({ key: 'teacher_id', label: 'Teacher ID', description: 'Teacher person id assigned to this report instance.' }),
@@ -24,11 +46,11 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'session_end_time', label: 'Session End Time', description: 'Selected session end time.' })
   ]),
   classOnly: Object.freeze([
-    Object.freeze({ key: 'class_attendance_total', label: 'Class Attendance Total', description: 'Total roster count for the selected session.' }),
-    Object.freeze({ key: 'class_attendance_present', label: 'Class Attendance Present', description: 'Students marked present in selected session.' }),
-    Object.freeze({ key: 'class_attendance_late', label: 'Class Attendance Late', description: 'Students marked late in selected session.' }),
-    Object.freeze({ key: 'class_attendance_excused', label: 'Class Attendance Excused', description: 'Students marked excused in selected session.' }),
-    Object.freeze({ key: 'class_attendance_absent', label: 'Class Attendance Absent', description: 'Students marked absent in selected session.' }),
+    Object.freeze({ key: 'class_attendance_total', label: 'Class Attendance Total', description: 'Class session roster count, or report-period session count for each-student reports.' }),
+    Object.freeze({ key: 'class_attendance_present', label: 'Class Attendance Present', description: 'Class present count, or Attendance Matrix percent for each-student report periods.' }),
+    Object.freeze({ key: 'class_attendance_late', label: 'Class Attendance Late', description: 'Class late count, or report-period late count for each-student reports.' }),
+    Object.freeze({ key: 'class_attendance_excused', label: 'Class Attendance Excused', description: 'Class excused count, or report-period excused count for each-student reports.' }),
+    Object.freeze({ key: 'class_attendance_absent', label: 'Class Attendance Absent', description: 'Class absent count, or missing/absent report-period session count for each-student reports.' }),
     Object.freeze({ key: 'class_attendance_span_sessions', label: 'Class Attendance Span Sessions', description: 'Number of sessions in the report period.' }),
     Object.freeze({ key: 'class_attendance_span_unique_students', label: 'Class Attendance Span Unique Students', description: 'Unique students observed across sessions in the report period.' }),
     Object.freeze({ key: 'class_attendance_span_total', label: 'Class Attendance Span Total', description: 'Total attendance rows across sessions in the report period.' }),
@@ -197,7 +219,7 @@ function buildClassAttendanceSummary(session) {
   return summary;
 }
 
-async function buildStudentAttendanceSummary(sessions, studentId, statusMap = null) {
+async function buildStudentAttendanceSummary(sessions, studentId, statusMap = null, options = {}) {
   const out = {
     totalSessions: 0,
     present: 0,
@@ -211,6 +233,11 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
   const target = toPublicId(studentId);
   if (!target) return out;
   const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
+  const countMissingAsAbsent = options?.countMissingAsAbsent === true;
+  const classData = options?.classData && typeof options.classData === 'object' ? options.classData : {};
+  const orgPolicyLayer = options?.orgPolicyLayer && typeof options.orgPolicyLayer === 'object' ? options.orgPolicyLayer : {};
+  const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
+  const matrixRecords = [];
 
   sessions.forEach((session) => {
     if (sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(effectiveStatusMap, {
@@ -219,7 +246,19 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
     })) return;
     const roster = Array.isArray(session?.roster) ? session.roster : [];
     const row = roster.find((item) => idsEqual(item?.personId, target));
-    if (!row) return;
+    if (!row) {
+      if (countMissingAsAbsent) {
+        out.totalSessions += 1;
+        out.absent += 1;
+        matrixRecords.push({
+          status: 'absent',
+          lateMinutes: 0,
+          earlyLeaveMinutes: 0,
+          scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(session, matrixPolicy.scheduledMinutes)
+        });
+      }
+      return;
+    }
     out.totalSessions += 1;
 
     const status = String(row?.attendance || '').toLowerCase();
@@ -230,11 +269,21 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
 
     out.lateMinutes += normalizeNumber(row?.lateMinutes);
     out.earlyLeaveMinutes += normalizeNumber(row?.earlyLeaveMinutes);
+    matrixRecords.push({
+      status,
+      lateMinutes: row?.lateMinutes || 0,
+      earlyLeaveMinutes: row?.earlyLeaveMinutes || 0,
+      scheduledMinutes: attendanceMatrixMetricsService.scheduledMinutesFromSession(session, matrixPolicy.scheduledMinutes)
+    });
   });
 
-  out.attendancePercent = out.totalSessions > 0
+  const matrixSummary = attendanceMatrixMetricsService.computeStudentMatrixSummary(matrixRecords, classData, orgPolicyLayer);
+  out.attendancePercent = Number.isFinite(Number(matrixSummary.performancePercent))
+    ? Number(matrixSummary.performancePercent)
+    : (out.totalSessions > 0
     ? Number((((out.present + out.late + out.excused) / out.totalSessions) * 100).toFixed(2))
-    : 0;
+    : 0);
+  out.matrixDisqualifiedSessionCount = Number(matrixSummary.disqualifiedSessionCount || 0);
 
   return out;
 }
@@ -552,19 +601,24 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     const id = toPublicId(person?.id);
     if (!id) return;
     const fullName = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
-    personMap.set(id, fullName || id);
+    const preferred = String(person?.name?.preferred || '').trim();
+    personMap.set(id, preferred || fullName || id);
   });
   const resolvedTeacherId = toPublicId(teacherId || session?.delivery?.deliveredBy || assignment?.teacherIds?.[0]);
   const resolvedTeacherName = personMap.get(resolvedTeacherId) || resolvedTeacherId || '';
 
-  const classAttendance = buildClassAttendanceSummary(session);
   const reportPeriod = resolveReportPeriod(assignment, session);
   const studentPersonId = toPublicId(studentId);
   const studentRecord = students.find((row) => idsEqual(row?.personId, studentPersonId)) || null;
   const studentPerson = persons.find((row) => idsEqual(row?.id, studentPersonId)) || null;
   const reportOrgId = toPublicId(classData?.orgId || assignment?.orgId || studentRecord?.orgId);
   const statusMap = await sessionStatusPolicyService.getStatusMap(reportOrgId || reqUser?.activeOrgId || '', { includeInactive: true });
-  const studentAttendance = await buildStudentAttendanceSummary(sessions, studentId, statusMap);
+  const orgPolicyLayer = await attendanceMatrixPolicyModel.getPolicyForOrg(reportOrgId || reqUser?.activeOrgId || '');
+  const classAttendance = buildClassAttendanceSummary(session);
+  const studentAttendance = await buildStudentAttendanceSummary(sessions, studentId, statusMap, {
+    classData,
+    orgPolicyLayer
+  });
   const periodSessions = filterSessionsByDateRange(sessions, reportPeriod.startDate, reportPeriod.dueDate);
   const periodSessionsGrade = filterPeriodSessionsForGradeMetrics(sessions, reportPeriod.startDate, reportPeriod.dueDate, statusMap);
   const gradebookPeriodStats = computeReportPeriodGradebookStats(periodSessionsGrade, studentPersonId);
@@ -577,7 +631,20 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     studentRecord?.id
   );
   const classAttendanceSpan = await buildClassAttendanceSpanSummary(periodSessions, statusMap);
-  const studentAttendanceSpan = await buildStudentAttendanceSummary(periodSessions, studentId, statusMap);
+  const studentAttendanceSpan = await buildStudentAttendanceSummary(periodSessions, studentId, statusMap, {
+    countMissingAsAbsent: true,
+    classData,
+    orgPolicyLayer
+  });
+  const primaryAttendance = studentPersonId
+    ? {
+        total: studentAttendanceSpan.totalSessions,
+        present: studentAttendanceSpan.attendancePercent,
+        late: studentAttendanceSpan.late,
+        excused: studentAttendanceSpan.excused,
+        absent: studentAttendanceSpan.absent
+      }
+    : classAttendance;
   const reportOrg = organizations.find((row) => idsEqual(row?.id, reportOrgId)) || null;
   const studentOrgId = toPublicId(studentRecord?.orgId || reportOrgId);
   const studentOrg = organizations.find((row) => idsEqual(row?.id, studentOrgId)) || null;
@@ -635,11 +702,11 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_self_fund: studentRecord ? studentRecord?.selfFund === true : '',
     student_funder_note: String(studentRecord?.funderNote || ''),
     student_record_notes: String(studentRecord?.notes || ''),
-    class_attendance_total: classAttendance.total,
-    class_attendance_present: classAttendance.present,
-    class_attendance_late: classAttendance.late,
-    class_attendance_excused: classAttendance.excused,
-    class_attendance_absent: classAttendance.absent,
+    class_attendance_total: primaryAttendance.total,
+    class_attendance_present: primaryAttendance.present,
+    class_attendance_late: primaryAttendance.late,
+    class_attendance_excused: primaryAttendance.excused,
+    class_attendance_absent: primaryAttendance.absent,
     class_attendance_span_sessions: classAttendanceSpan.sessionCount,
     class_attendance_span_unique_students: classAttendanceSpan.uniqueStudents,
     class_attendance_span_total: classAttendanceSpan.total,
@@ -688,9 +755,9 @@ function mergeTemplateData(template, instance, assignment = null) {
       return;
     }
     if (field.readOnly === true) {
-      const pk = String(field.prefillKey || '').trim();
-      if (pk && prefill[pk] !== undefined) {
-        merged[field.id] = prefill[pk];
+      const resolved = getPrefillValue(prefill, field.prefillKey);
+      if (resolved.found) {
+        merged[field.id] = resolved.value;
         return;
       }
     }
@@ -708,9 +775,9 @@ function mergeTemplateData(template, instance, assignment = null) {
         return;
       }
     }
-    const prefillKey = String(field.prefillKey || '').trim();
-    if (prefillKey && prefill[prefillKey] !== undefined) {
-      merged[field.id] = prefill[prefillKey];
+    const resolved = getPrefillValue(prefill, field.prefillKey);
+    if (resolved.found) {
+      merged[field.id] = resolved.value;
     }
   });
 
@@ -796,6 +863,48 @@ function getPrefillCatalog() {
   };
 }
 
+/**
+ * validateTemplatePrefillKeys - Validates all prefill keys in template fields against PREFILL_CATALOG whitelist.
+ * 
+ * PURPOSE: Prevent templates from referencing undefined/non-existent prefill keys.
+ * Called at template save-time (reportController.saveTemplate) to catch errors immediately.
+ * 
+ * KEY FEATURES:
+ * - Returns array of invalid field entries (empty array = all valid)
+ * - Normalizes braced keys {{key}} before validation
+ * - Skips visual-only fields (section, divider) which cannot have prefillKey
+ * - Each invalid entry includes: fieldId, label, prefillKey (for user messaging)
+ * 
+ * @param {Object} templateOrSchema - Full template object or just schema object
+ * @returns {Array} Array of {fieldId, label, prefillKey} for invalid keys; empty if all valid
+ */
+function validateTemplatePrefillKeys(templateOrSchema) {
+  const schema = templateOrSchema?.schema && typeof templateOrSchema.schema === 'object'
+    ? templateOrSchema.schema
+    : templateOrSchema;
+  const fields = Array.isArray(schema?.fields) ? schema.fields : [];
+  const allowed = new Set(
+    Object.values(getPrefillCatalog())
+      .flat()
+      .map((item) => item.key)
+  );
+  const invalid = [];
+
+  fields.forEach((field) => {
+    if (isVisualOnlyField(field)) return;
+    const key = normalizePrefillKey(field?.prefillKey || '');
+    if (!key) return;
+    if (allowed.has(key)) return;
+    invalid.push({
+      fieldId: String(field?.id || ''),
+      label: String(field?.label || field?.id || ''),
+      prefillKey: String(field?.prefillKey || '')
+    });
+  });
+
+  return invalid;
+}
+
 module.exports = {
   buildPrefillSnapshot,
   // Runs dependency-aware calculated fields on merged answers.
@@ -804,5 +913,7 @@ module.exports = {
   partitionInstanceSave,
   buildPlaceholderPayloadDetailed,
   buildPlaceholderPayload,
-  getPrefillCatalog
+  getPrefillCatalog,
+  validateTemplatePrefillKeys,
+  normalizePrefillKey
 };

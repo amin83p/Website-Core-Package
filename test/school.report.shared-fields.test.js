@@ -3,8 +3,33 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 
-const reportService = require('../MVC/services/school/reportService');
+const reportService = require('../packages/school/MVC/services/school/reportService');
+const { normalizePrefillKey } = require('../packages/school/MVC/services/school/reportPrefillKeyUtils');
+const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+const sessionStatusPolicyService = require('../packages/school/MVC/services/school/sessionStatusPolicyService');
+const attendanceMatrixPolicyModel = require('../packages/school/MVC/models/school/attendanceMatrixPolicyModel');
+const { requireCoreModule } = require('../packages/school/MVC/services/school/schoolCoreContracts');
+const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
+
+const ROOT = path.resolve(__dirname, '..');
+
+function withPatched(target, replacements, callback) {
+  const originals = {};
+  Object.entries(replacements).forEach(([key, value]) => {
+    originals[key] = target[key];
+    target[key] = value;
+  });
+  return Promise.resolve()
+    .then(callback)
+    .finally(() => {
+      Object.entries(originals).forEach(([key, value]) => {
+        target[key] = value;
+      });
+    });
+}
 
 test('mergeTemplateData uses assignment.sharedAnswers for shared fields when each_student', () => {
   const template = {
@@ -42,6 +67,356 @@ test('mergeTemplateData prefers prefill snapshot for readOnly fields with prefil
   };
   const merged = reportService.mergeTemplateData(template, instance, null);
   assert.equal(merged.ro, 'Ms. Smith');
+});
+
+test('mergeTemplateData resolves brace-wrapped prefill keys and preserves zero values', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'Attendance', type: 'number', prefillKey: '{{class_attendance_present}}' },
+        { id: 'RawAttendance', type: 'number', prefillKey: 'class_attendance_present' }
+      ]
+    }
+  };
+  const instance = {
+    answers: {},
+    prefillSnapshot: { class_attendance_present: 0 }
+  };
+  const merged = reportService.mergeTemplateData(template, instance, null);
+  assert.equal(merged.Attendance, 0);
+  assert.equal(merged.RawAttendance, 0);
+});
+
+test('report prefill key normalization removes template braces', () => {
+  assert.equal(normalizePrefillKey('{{class_attendance_present}}'), 'class_attendance_present');
+  assert.equal(normalizePrefillKey('{{ class_attendance_present }}'), 'class_attendance_present');
+  assert.equal(normalizePrefillKey('class_attendance_present'), 'class_attendance_present');
+});
+
+test('report template prefill key validation rejects values outside the catalog', () => {
+  const invalid = reportService.validateTemplatePrefillKeys({
+    fields: [
+      { id: 'ok', label: 'OK', type: 'number', prefillKey: '{{class_attendance_present}}' },
+      { id: 'blank', label: 'Blank', type: 'number', prefillKey: '' },
+      { id: 'bad', label: 'Bad Default', type: 'number', prefillKey: '50' },
+      { id: 'section', label: 'Section', type: 'section', prefillKey: '50' }
+    ]
+  });
+
+  assert.deepEqual(invalid, [
+    { fieldId: 'bad', label: 'Bad Default', prefillKey: '50' }
+  ]);
+});
+
+test('report template save and instance hydration use normalized prefill keys', () => {
+  const templateModelSource = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/models/school/reportTemplateModel.js'), 'utf8');
+  const controllerSource = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/controllers/school/reportController.js'), 'utf8');
+  assert.match(templateModelSource, /normalizePrefillKey\(cleanString\(rawField\.prefillKey/);
+  assert.match(controllerSource, /getPrefillValue\(prefill,\s*field\?\.prefillKey\)/);
+  assert.match(controllerSource, /const rawPrefill = resolvedPrefill\.value/);
+});
+
+test('buildPrefillSnapshot uses attendance matrix percent and counts missing marks as absent', async () => {
+  const assignment = {
+    id: 'ASN-1',
+    orgId: '900000',
+    classId: 'CLASS-1',
+    sessionId: 'SES-3',
+    sessionDate: '2026-06-18',
+    reportStartDate: '2026-06-16',
+    reportDueDate: '2026-06-18',
+    teacherIds: ['TEACHER-1']
+  };
+  const sessions = [
+    { sessionId: 'SES-1', date: '2026-06-16', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'present' }] },
+    { sessionId: 'SES-2', date: '2026-06-17', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STUDENT-PERSON-1', attendance: 'late', lateMinutes: 15 }] },
+    { sessionId: 'SES-3', date: '2026-06-18', status: 'scheduled', startTime: '09:00', endTime: '10:00', roster: [] }
+  ];
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-1') return { id: 'CLASS-1', orgId: '900000', title: 'Class One' };
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    fetchData: async (entityType) => {
+      if (entityType === 'students') return [{ id: 'STU-1', orgId: '900000', personId: 'STUDENT-PERSON-1' }];
+      if (entityType === 'examAssignments') return [];
+      return [];
+    }
+  }, async () => {
+    await withPatched(dataServiceGlobal, {
+      fetchData: async (entityType) => {
+        if (entityType === 'persons') {
+          return [
+            { id: 'TEACHER-1', name: { preferred: 'Teacher One' } },
+            { id: 'STUDENT-PERSON-1', name: { first: 'Student', last: 'One' } }
+          ];
+        }
+        if (entityType === 'organizations') return [{ id: '900000', name: 'Org One' }];
+        return [];
+      }
+    }, async () => {
+      await withPatched(sessionStatusPolicyService, {
+        getStatusMap: async () => new Map()
+      }, async () => {
+        await withPatched(attendanceMatrixPolicyModel, {
+          getPolicyForOrg: async () => ({
+            scheduledMinutes: 60,
+            disqualifyLateMinutes: 30,
+            disqualifyEarlyLeaveMinutes: 30,
+            disqualifyCombinedMissedMinutes: null
+          })
+        }, async () => {
+          const snapshot = await reportService.buildPrefillSnapshot({
+            assignment,
+            teacherId: 'TEACHER-1',
+            studentId: 'STUDENT-PERSON-1',
+            reqUser: { id: 'USER-1', activeOrgId: '900000' }
+          });
+
+          assert.equal(snapshot.class_attendance_total, 3);
+          assert.equal(snapshot.class_attendance_present, 58.33);
+          assert.equal(snapshot.class_attendance_absent, 1);
+          assert.equal(snapshot.student_attendance_span_total_sessions, 3);
+          assert.equal(snapshot.student_attendance_span_present, 1);
+          assert.equal(snapshot.student_attendance_span_late, 1);
+          assert.equal(snapshot.student_attendance_span_absent, 1);
+          assert.equal(snapshot.student_attendance_span_percent, 58.33);
+        });
+      });
+    });
+  });
+});
+
+test('report template prefill catalog keys are all produced with correct representative calculations', async () => {
+  const assignment = {
+    id: 'ASN-FULL',
+    orgId: '900000',
+    classId: 'CLASS-FULL',
+    sessionId: 'SES-3',
+    sessionDate: '2026-06-18',
+    reportStartDate: '2026-06-16',
+    reportDueDate: '2026-06-18',
+    teacherIds: ['TEACHER-1']
+  };
+  const sessions = [
+    {
+      sessionId: 'SES-1',
+      date: '2026-06-16',
+      status: 'completed',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [
+        { personId: 'STUDENT-PERSON-1', attendance: 'present' },
+        { personId: 'STUDENT-PERSON-2', attendance: 'present' }
+      ],
+      gradebooks: [{ totalScore: 10, includeInGradeCalculation: true, scores: { 'STUDENT-PERSON-1': 8, 'STUDENT-PERSON-2': 10 } }]
+    },
+    {
+      sessionId: 'SES-2',
+      date: '2026-06-17',
+      status: 'completed',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [
+        { personId: 'STUDENT-PERSON-1', attendance: 'late', lateMinutes: 15 },
+        { personId: 'STUDENT-PERSON-2', attendance: 'absent' }
+      ],
+      quizzes: [{ totalScore: 20, includeInGradeCalculation: true, scores: { 'STUDENT-PERSON-1': 10, 'STUDENT-PERSON-2': 20 } }]
+    },
+    {
+      sessionId: 'SES-3',
+      date: '2026-06-18',
+      status: 'scheduled',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: [],
+      assignments: [{ totalScore: 5, includeInGradeCalculation: true, scores: { 'STUDENT-PERSON-1': 5 } }]
+    }
+  ];
+  const examRows = [
+    {
+      id: 'EX-1',
+      orgId: '900000',
+      studentId: 'STU-1',
+      status: 'graded',
+      startWindowUtc: '2026-06-16T08:00:00.000Z',
+      endWindowUtc: '2026-06-16T20:00:00.000Z',
+      percentageComputed: 90,
+      scoreComputed: 18,
+      maxScoreComputed: 20
+    },
+    {
+      id: 'EX-2',
+      orgId: '900000',
+      studentId: 'STU-2',
+      status: 'submitted',
+      startWindowUtc: '2026-06-17T08:00:00.000Z',
+      endWindowUtc: '2026-06-17T20:00:00.000Z',
+      percentageComputed: 70,
+      scoreComputed: 14,
+      maxScoreComputed: 20
+    },
+    {
+      id: 'EX-3',
+      orgId: '900000',
+      studentId: 'STU-1',
+      status: 'cancelled',
+      startWindowUtc: '2026-06-17T08:00:00.000Z',
+      endWindowUtc: '2026-06-17T20:00:00.000Z',
+      percentageComputed: 100,
+      scoreComputed: 20,
+      maxScoreComputed: 20
+    },
+    {
+      id: 'EX-4',
+      orgId: '900000',
+      studentId: 'STU-1',
+      status: 'graded',
+      startWindowUtc: '2026-07-01T08:00:00.000Z',
+      endWindowUtc: '2026-07-01T20:00:00.000Z',
+      percentageComputed: 100,
+      scoreComputed: 20,
+      maxScoreComputed: 20
+    }
+  ];
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-FULL') {
+        return { id: 'CLASS-FULL', orgId: '900000', title: 'Full Audit Class' };
+      }
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    fetchData: async (entityType) => {
+      if (entityType === 'students') {
+        return [
+          {
+            id: 'STU-1',
+            localId: 'L-1',
+            orgId: '900000',
+            personId: 'STUDENT-PERSON-1',
+            enrollmentDate: '2026-01-05',
+            countryOfOrigin: 'Canada',
+            feeCategory: 'funded',
+            academicStatus: 'active',
+            sendingOrganization: 'Sender Org',
+            funderOrganization: 'Funder Org',
+            funderAccountId: 'FA-1',
+            studentAccountId: 'SA-1',
+            studentIdAtFunder: 'SID-FUNDER',
+            selfFund: false,
+            funderNote: 'Funder note',
+            notes: 'Student note'
+          }
+        ];
+      }
+      if (entityType === 'examAssignments') return examRows;
+      return [];
+    }
+  }, async () => {
+    await withPatched(dataServiceGlobal, {
+      fetchData: async (entityType) => {
+        if (entityType === 'persons') {
+          return [
+            { id: 'TEACHER-1', name: { preferred: 'Teacher One', first: 'Teacher', last: 'Uno' } },
+            {
+              id: 'STUDENT-PERSON-1',
+              active: true,
+              name: { preferred: 'Student Preferred', first: 'Student', middle: 'M', last: 'One' },
+              demographics: { gender: 'F', dateOfBirth: '2000-01-01' },
+              contact: { email: 'student@example.com', phones: [{ number: '555-0100' }] },
+              avatarUrl: '/avatar.png',
+              notes: 'Person note',
+              address: { line1: '1 Main', line2: 'Unit 2', city: 'Calgary', province: 'AB', postalCode: 'T1T1T1', country: 'Canada' },
+              organizations: [{ orgId: '900000', role: 'student', memberStatus: 'active' }]
+            },
+            { id: 'STUDENT-PERSON-2', name: { first: 'Other', last: 'Student' } }
+          ];
+        }
+        if (entityType === 'organizations') {
+          return [{ id: '900000', identity: { displayName: 'Equilibrium School' }, name: 'Fallback Org' }];
+        }
+        return [];
+      }
+    }, async () => {
+      await withPatched(sessionStatusPolicyService, {
+        getStatusMap: async () => new Map()
+      }, async () => {
+        await withPatched(attendanceMatrixPolicyModel, {
+          getPolicyForOrg: async () => ({
+            scheduledMinutes: 60,
+            disqualifyLateMinutes: 30,
+            disqualifyEarlyLeaveMinutes: 30,
+            disqualifyCombinedMissedMinutes: null
+          })
+        }, async () => {
+          const snapshot = await reportService.buildPrefillSnapshot({
+            assignment,
+            teacherId: 'TEACHER-1',
+            studentId: 'STUDENT-PERSON-1',
+            reqUser: { id: 'USER-1', activeOrgId: '900000' }
+          });
+
+          const catalogKeys = Object.values(reportService.getPrefillCatalog())
+            .flat()
+            .map((item) => item.key);
+          const missing = catalogKeys.filter((key) => !Object.prototype.hasOwnProperty.call(snapshot, key));
+          assert.deepEqual(missing, []);
+
+          assert.equal(snapshot.teacher_name, 'Teacher One');
+          assert.equal(snapshot.class_name, 'Full Audit Class');
+          assert.equal(snapshot.report_org_name, 'Equilibrium School');
+          assert.equal(snapshot.report_period_start_date, '2026-06-16');
+          assert.equal(snapshot.report_period_due_date, '2026-06-18');
+          assert.equal(snapshot.report_period_days, 3);
+          assert.equal(snapshot.session_id, 'SES-3');
+          assert.equal(snapshot.session_date, '2026-06-18');
+          assert.equal(snapshot.student_preferred_name, 'Student Preferred');
+          assert.equal(snapshot.student_full_name, 'Student One');
+          assert.equal(snapshot.student_email, 'student@example.com');
+          assert.equal(snapshot.student_phone, '555-0100');
+          assert.equal(snapshot.student_org_member_role, 'student');
+
+          assert.equal(snapshot.class_attendance_total, 3);
+          assert.equal(snapshot.class_attendance_present, 58.33);
+          assert.equal(snapshot.class_attendance_late, 1);
+          assert.equal(snapshot.class_attendance_absent, 1);
+          assert.equal(snapshot.class_attendance_span_sessions, 3);
+          assert.equal(snapshot.class_attendance_span_unique_students, 2);
+          assert.equal(snapshot.class_attendance_span_total, 4);
+          assert.equal(snapshot.class_attendance_span_present, 2);
+          assert.equal(snapshot.class_attendance_span_late, 1);
+          assert.equal(snapshot.class_attendance_span_absent, 1);
+          assert.equal(snapshot.class_attendance_span_percent, 75);
+          assert.equal(snapshot.student_attendance_span_total_sessions, 3);
+          assert.equal(snapshot.student_attendance_span_percent, 58.33);
+
+          assert.equal(snapshot.class_gradebook_period_sessions_count, 3);
+          assert.equal(snapshot.class_gradebook_period_activity_count, 3);
+          assert.equal(snapshot.class_gradebook_period_avg_percent, 76.67);
+          assert.equal(snapshot.class_gradebook_period_points_earned, 28);
+          assert.equal(snapshot.class_gradebook_period_points_possible, 40);
+          assert.equal(snapshot.student_gradebook_period_activity_count, 2);
+          assert.equal(snapshot.student_gradebook_period_avg_percent, 65);
+          assert.equal(snapshot.student_gradebook_period_points_earned, 18);
+          assert.equal(snapshot.student_gradebook_period_points_possible, 30);
+
+          assert.equal(snapshot.class_exam_period_assignment_count, 2);
+          assert.equal(snapshot.class_exam_period_graded_count, 1);
+          assert.equal(snapshot.class_exam_period_submitted_count, 2);
+          assert.equal(snapshot.class_exam_period_avg_percent, 80);
+          assert.equal(snapshot.student_exam_period_assignment_count, 1);
+          assert.equal(snapshot.student_exam_period_graded_count, 1);
+          assert.equal(snapshot.student_exam_period_avg_percent, 90);
+          assert.equal(snapshot.student_exam_period_total_score, 18);
+          assert.equal(snapshot.student_exam_period_total_max_score, 20);
+        });
+      });
+    });
+  });
 });
 
 test('partitionInstanceSave splits shared vs student answers for each_student', () => {
@@ -110,4 +485,175 @@ test('mergeTemplateData does not emit values for visual-only rows', () => {
   const merged = reportService.mergeTemplateData(template, instance, { reportScope: 'class' });
   assert.equal(merged.per, 'ok');
   assert.equal(Object.prototype.hasOwnProperty.call(merged, '__section_1'), false);
+});
+
+// Edge case tests for comprehensive prefill coverage
+test('buildPrefillSnapshot handles empty class with no sessions in report period', async () => {
+  const assignment = {
+    id: 'ASN-EMPTY',
+    orgId: '900000',
+    classId: 'CLASS-EMPTY',
+    reportStartDate: '2026-06-16',
+    reportDueDate: '2026-06-18',
+    teacherIds: ['TEACHER-1']
+  };
+  const sessions = [
+    { sessionId: 'SES-PAST', date: '2026-06-10', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [] }
+  ];
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-EMPTY') return { id: 'CLASS-EMPTY', orgId: '900000', title: 'Empty Class' };
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    fetchData: async (entityType) => {
+      if (entityType === 'students') return [];
+      if (entityType === 'examAssignments') return [];
+      return [];
+    }
+  }, async () => {
+    await withPatched(dataServiceGlobal, {
+      fetchData: async (entityType) => {
+        if (entityType === 'persons') return [{ id: 'TEACHER-1', name: { first: 'Teacher', last: 'One' } }];
+        if (entityType === 'organizations') return [{ id: '900000', identity: { displayName: 'School' }, name: 'School' }];
+        return [];
+      }
+    }, async () => {
+      await withPatched(sessionStatusPolicyService, {
+        getStatusMap: async () => new Map()
+      }, async () => {
+        await withPatched(attendanceMatrixPolicyModel, {
+          getPolicyForOrg: async () => ({
+            scheduledMinutes: 60,
+            disqualifyLateMinutes: 30,
+            disqualifyEarlyLeaveMinutes: 30,
+            disqualifyCombinedMissedMinutes: null
+          })
+        }, async () => {
+          const snapshot = await reportService.buildPrefillSnapshot({
+            assignment,
+            teacherId: 'TEACHER-1',
+            reqUser: { id: 'USER-1', activeOrgId: '900000' }
+          });
+
+          const catalogKeys = Object.values(reportService.getPrefillCatalog())
+            .flat()
+            .map((item) => item.key);
+          const missing = catalogKeys.filter((key) => !Object.prototype.hasOwnProperty.call(snapshot, key));
+          assert.deepEqual(missing, [], 'All catalog keys must be present even for empty class');
+
+          // Verify empty class produces zero/null values correctly
+          assert.equal(snapshot.class_attendance_total, 0, 'Empty class should have 0 total attendance');
+          assert.equal(snapshot.class_attendance_span_sessions, 0, 'Empty class should have 0 sessions in report period');
+          assert.equal(snapshot.class_attendance_span_unique_students, 0, 'Empty class should have 0 unique students');
+        });
+      });
+    });
+  });
+});
+
+test('buildPrefillSnapshot handles student with all absent attendance marks', async () => {
+  const assignment = {
+    id: 'ASN-ABSENT',
+    orgId: '900000',
+    classId: 'CLASS-1',
+    sessionId: 'SES-3',
+    reportStartDate: '2026-06-16',
+    reportDueDate: '2026-06-18',
+    teacherIds: ['TEACHER-1']
+  };
+  const sessions = [
+    { sessionId: 'SES-1', date: '2026-06-16', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STU-ABSENT', attendance: 'absent' }] },
+    { sessionId: 'SES-2', date: '2026-06-17', status: 'completed', startTime: '09:00', endTime: '10:00', roster: [{ personId: 'STU-ABSENT', attendance: 'absent' }] },
+    { sessionId: 'SES-3', date: '2026-06-18', status: 'scheduled', startTime: '09:00', endTime: '10:00', roster: [] }
+  ];
+
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLASS-1') return { id: 'CLASS-1', orgId: '900000', title: 'Class One' };
+      return null;
+    },
+    getClassSessions: async () => sessions,
+    fetchData: async (entityType) => {
+      if (entityType === 'students') return [{ id: 'STU-1', orgId: '900000', personId: 'STU-ABSENT' }];
+      if (entityType === 'examAssignments') return [];
+      return [];
+    }
+  }, async () => {
+    await withPatched(dataServiceGlobal, {
+      fetchData: async (entityType) => {
+        if (entityType === 'persons') {
+          return [
+            { id: 'TEACHER-1', name: { first: 'Teacher', last: 'One' } },
+            { id: 'STU-ABSENT', name: { first: 'Absent', last: 'Student' } }
+          ];
+        }
+        if (entityType === 'organizations') return [{ id: '900000', identity: { displayName: 'School' }, name: 'School' }];
+        return [];
+      }
+    }, async () => {
+      await withPatched(sessionStatusPolicyService, {
+        getStatusMap: async () => new Map()
+      }, async () => {
+        await withPatched(attendanceMatrixPolicyModel, {
+          getPolicyForOrg: async () => ({
+            scheduledMinutes: 60,
+            disqualifyLateMinutes: 30,
+            disqualifyEarlyLeaveMinutes: 30,
+            disqualifyCombinedMissedMinutes: null
+          })
+        }, async () => {
+          const snapshot = await reportService.buildPrefillSnapshot({
+            assignment,
+            teacherId: 'TEACHER-1',
+            studentId: 'STU-ABSENT',
+            reqUser: { id: 'USER-1', activeOrgId: '900000' }
+          });
+
+          const catalogKeys = Object.values(reportService.getPrefillCatalog())
+            .flat()
+            .map((item) => item.key);
+          const missing = catalogKeys.filter((key) => !Object.prototype.hasOwnProperty.call(snapshot, key));
+          assert.deepEqual(missing, [], 'All catalog keys must be present for all-absent student');
+
+          // Verify all-absent student produces 0% attendance
+          assert.equal(snapshot.student_attendance_percent, 0, 'All-absent student should have 0% attendance');
+          assert.equal(snapshot.class_attendance_span_absent, 2, '2 absences in class span');
+          assert.equal(snapshot.class_attendance_span_present, 0, 'No present marks in class span');
+        });
+      });
+    });
+  });
+});
+
+test('validateTemplatePrefillKeys rejects all live templates with invalid keys', () => {
+  const templatesPath = path.join(ROOT, 'data/school/reportTemplates.json');
+  if (!fs.existsSync(templatesPath)) {
+    console.warn('⚠ Live templates file not found; skipping validation check');
+    return;
+  }
+
+  const templates = JSON.parse(fs.readFileSync(templatesPath, 'utf8'));
+  if (!Array.isArray(templates)) {
+    console.warn('⚠ reportTemplates.json is not an array; skipping validation check');
+    return;
+  }
+
+  const invalidTemplates = [];
+  templates.forEach((template) => {
+    const invalid = reportService.validateTemplatePrefillKeys(template);
+    if (invalid.length > 0) {
+      invalidTemplates.push({
+        templateId: template.id,
+        errors: invalid
+      });
+    }
+  });
+
+  assert.deepEqual(
+    invalidTemplates,
+    [],
+    `Live templates must not contain invalid prefill keys. Found issues in: ${invalidTemplates.map((t) => t.templateId).join(', ')}`
+  );
 });

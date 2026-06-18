@@ -13,6 +13,7 @@ const reportDocxRenderService = require('../../services/school/reportDocxRenderS
 const reportIntegrityService = require('../../services/school/reportIntegrityService');
 const reportViewService = require('../../services/school/reportViewService');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
+const { getPrefillValue } = require('../../services/school/reportPrefillKeyUtils');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const reportTemplateModel = require('../../models/school/reportTemplateModel');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
@@ -38,11 +39,13 @@ const HOME_CARD_VISIBLE_OPERATION_IDS = Object.freeze([
 
 function formatPersonDisplayName(person) {
   if (!person || typeof person !== 'object') return '';
+  const preferred = String(person?.name?.preferred || '').trim();
+  if (preferred) return preferred;
   const first = String(person?.name?.first || '').trim();
   const last = String(person?.name?.last || '').trim();
   const combined = `${first} ${last}`.trim();
   if (combined) return combined;
-  return String(person?.name?.preferred || '').trim();
+  return String(person?.displayName || person?.fullName || person?.id || '').trim();
 }
 
 function buildReportInstanceDetailsForView(inst, {
@@ -193,7 +196,7 @@ function sendGuardedResponse(res, guardResult, duplicateMessage, duplicateStatus
   return false;
 }
 
-function hydrateInitialAnswersFromPrefill(template, instance) {
+function hydrateInitialAnswersFromPrefill(template, instance, options = {}) {
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
   const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
     ? instance.prefillSnapshot
@@ -201,20 +204,20 @@ function hydrateInitialAnswersFromPrefill(template, instance) {
   const currentAnswers = instance?.answers && typeof instance.answers === 'object'
     ? { ...instance.answers }
     : {};
+  const overwritePrefillFields = options?.overwritePrefillFields === true;
   let changed = false;
 
   fields.forEach((field) => {
     const type = String(field?.type || '').trim().toLowerCase();
     if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
-    const prefillKey = String(field?.prefillKey || '').trim();
-    if (!prefillKey) return;
-    if (!Object.prototype.hasOwnProperty.call(prefill, prefillKey)) return;
+    const resolvedPrefill = getPrefillValue(prefill, field?.prefillKey);
+    if (!resolvedPrefill.found) return;
 
     const currentValue = currentAnswers[field.id];
     const hasCurrentValue = !(currentValue === undefined || currentValue === null || String(currentValue) === '');
-    if (hasCurrentValue) return;
+    if (hasCurrentValue && !overwritePrefillFields) return;
 
-    const rawPrefill = prefill[prefillKey];
+    const rawPrefill = resolvedPrefill.value;
     let nextValue = rawPrefill;
     if (type === 'checkbox') {
       nextValue = rawPrefill === true || String(rawPrefill).toLowerCase() === 'true' || String(rawPrefill) === '1';
@@ -383,6 +386,17 @@ async function saveTemplate(req, res) {
       reqUser: req.user,
       uploadedFile: req.file
     });
+    // Validate prefill keys against catalog whitelist before saving template
+    // This prevents templates from referencing undefined/non-existent prefill values
+    // Audit test (school.report.shared-fields.test.js) ensures all catalog keys are produced by buildPrefillSnapshot
+    const invalidPrefillKeys = reportService.validateTemplatePrefillKeys(payload.schema);
+    if (invalidPrefillKeys.length) {
+      const details = invalidPrefillKeys
+        .slice(0, 5)
+        .map((item) => `${item.label || item.fieldId}: ${item.prefillKey}`)
+        .join('; ');
+      throw new Error(`Invalid report prefill key${invalidPrefillKeys.length === 1 ? '' : 's'}: ${details}. Choose a key from the prefill catalog or leave the field blank.`);
+    }
 
     if (isEdit) {
       await schoolDataService.updateData('reportTemplates', id, payload, req.user);
@@ -744,7 +758,7 @@ async function startInstance(req, res) {
       assignmentId: req.params.assignmentId,
       reqUser: req.user,
       requestedTeacherId: req.query.teacherId,
-      fallbackTeacherId: req.user?.id || '',
+      fallbackTeacherId: req.user?.personId || '',
       requestedStudentId: req.query.studentId
     });
 
@@ -826,8 +840,13 @@ async function showInstanceEditor(req, res) {
         studentId: instance.studentId,
         reqUser: req.user
       });
+      const hydrated = hydrateInitialAnswersFromPrefill(template, {
+        ...instance,
+        prefillSnapshot: refreshed
+      }, { overwritePrefillFields: true });
       await schoolDataService.updateData('reportInstances', instance.id, {
         prefillSnapshot: refreshed,
+        ...(hydrated.changed ? { answers: hydrated.answers } : {}),
         audit: {
           lastUpdateUser: req.user?.id || '',
           lastUpdateDateTime: new Date().toISOString()
@@ -857,18 +876,26 @@ async function showInstanceEditor(req, res) {
       prefill: latestInstance?.prefillSnapshot || {}
     });
 
-    const [classSessions, teacherPerson, studentRegistry] = await Promise.all([
+    const studentPersonId = String(latestInstance.studentId || '').trim();
+    const [classSessions, teacherPerson, studentRowsByPerson, studentPersonDirect] = await Promise.all([
       schoolDataService.getClassSessions(latestInstance.classId, req.user),
       latestInstance.teacherId
         ? dataServiceGlobal.getDataById('persons', latestInstance.teacherId, req.user, PERSON_QUERY_OPTIONS)
         : Promise.resolve(null),
-      latestInstance.studentId
-        ? schoolDataService.getDataById('students', latestInstance.studentId, req.user)
+      studentPersonId
+        ? schoolDataService.fetchData('students', { personId__eq: studentPersonId, page: 1, limit: 1 }, req.user)
+        : Promise.resolve([]),
+      studentPersonId
+        ? dataServiceGlobal.getDataById('persons', studentPersonId, req.user, PERSON_QUERY_OPTIONS)
         : Promise.resolve(null)
     ]);
-    const studentPerson = studentRegistry && studentRegistry.personId
+    let studentRegistry = Array.isArray(studentRowsByPerson) && studentRowsByPerson.length ? studentRowsByPerson[0] : null;
+    if (!studentRegistry && studentPersonId) {
+      studentRegistry = await schoolDataService.getDataById('students', studentPersonId, req.user);
+    }
+    const studentPerson = studentPersonDirect || (studentRegistry && studentRegistry.personId
       ? await dataServiceGlobal.getDataById('persons', studentRegistry.personId, req.user, PERSON_QUERY_OPTIONS)
-      : null;
+      : null);
     const instanceDetails = buildReportInstanceDetailsForView(latestInstance, {
       assignment,
       classData,
