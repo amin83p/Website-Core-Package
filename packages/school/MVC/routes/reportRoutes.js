@@ -119,6 +119,21 @@ router.post('/instances/edit/:id',
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.saveInstance);
 
+router.get('/instances/edit/:id/prefill-preview',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.previewInstancePrefillRefresh);
+
+router.post('/instances/edit/:id/prefill-apply',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.applyInstancePrefillRefresh);
+
 router.post('/instances/lock/:id',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),

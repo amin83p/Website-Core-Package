@@ -237,6 +237,96 @@ function hydrateInitialAnswersFromPrefill(template, instance, options = {}) {
   return { changed, answers: currentAnswers };
 }
 
+function coercePrefillValueForField(field, rawPrefill) {
+  const type = String(field?.type || '').trim().toLowerCase();
+  if (type === 'checkbox') {
+    return rawPrefill === true || String(rawPrefill).toLowerCase() === 'true' || String(rawPrefill) === '1';
+  }
+  if (type === 'number') {
+    const n = Number(rawPrefill);
+    return Number.isFinite(n) ? n : '';
+  }
+  if (rawPrefill === undefined || rawPrefill === null) return '';
+  return String(rawPrefill).trim();
+}
+
+function stableValueToken(value) {
+  if (value === undefined) return '__undefined__';
+  try {
+    return JSON.stringify(value);
+  } catch (_) {
+    return String(value);
+  }
+}
+
+function buildAssignmentSnapshotFallback(instance, assignment) {
+  return assignment || {
+    classId: instance.classId,
+    orgId: instance.orgId,
+    sessionId: instance.sessionId,
+    sessionDate: instance.sessionDate,
+    teacherIds: [instance.teacherId].filter(Boolean),
+    reportStartDate: instance.reportStartDate,
+    reportDueDate: instance.reportDueDate,
+    dueDate: instance.dueDate
+  };
+}
+
+async function buildPrefillRefreshPreview({ instance, template, assignment, reqUser }) {
+  const oldPrefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
+    ? instance.prefillSnapshot
+    : {};
+  const refreshedPrefill = await reportService.buildPrefillSnapshot({
+    assignment: buildAssignmentSnapshotFallback(instance, assignment),
+    teacherId: instance.teacherId,
+    studentId: instance.studentId,
+    reqUser
+  });
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const currentMerged = reportService.mergeTemplateData(template, instance, assignment);
+  const changesByKey = new Map();
+
+  fields.forEach((field) => {
+    const type = String(field?.type || '').trim().toLowerCase();
+    if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
+    const prefillKey = reportService.normalizePrefillKey(field?.prefillKey || '');
+    if (!prefillKey) return;
+
+    const oldResolved = getPrefillValue(oldPrefill, prefillKey);
+    const newResolved = getPrefillValue(refreshedPrefill, prefillKey);
+    if (!newResolved.found) return;
+
+    const oldRawValue = oldResolved.found ? oldResolved.value : undefined;
+    const newRawValue = newResolved.value;
+    const oldValue = coercePrefillValueForField(field, oldRawValue);
+    const newValue = coercePrefillValueForField(field, newRawValue);
+    if (stableValueToken(oldRawValue) === stableValueToken(newRawValue)) return;
+
+    if (!changesByKey.has(prefillKey)) {
+      changesByKey.set(prefillKey, {
+        prefillKey,
+        oldRawValue,
+        newRawValue,
+        fields: []
+      });
+    }
+
+    changesByKey.get(prefillKey).fields.push({
+      fieldId: String(field.id || ''),
+      label: String(field.label || field.id || ''),
+      type,
+      oldValue,
+      newValue,
+      currentValue: currentMerged[field.id]
+    });
+  });
+
+  return {
+    refreshedPrefill,
+    changes: Array.from(changesByKey.values())
+  };
+}
+
 async function showHome(req, res) {
   try {
     const [allTemplates, allAssignments, allInstances] = await Promise.all([
@@ -828,33 +918,6 @@ async function showInstanceEditor(req, res) {
     ]);
     if (!template) throw new Error('Template not found for this report instance.');
 
-    if (String(req.query.refreshPrefill || '') === '1' && String(instance.status || '') !== 'locked') {
-      const refreshed = await reportService.buildPrefillSnapshot({
-        assignment: assignment || {
-          classId: instance.classId,
-          sessionId: instance.sessionId,
-          sessionDate: instance.sessionDate,
-          teacherIds: [instance.teacherId]
-        },
-        teacherId: instance.teacherId,
-        studentId: instance.studentId,
-        reqUser: req.user
-      });
-      const hydrated = hydrateInitialAnswersFromPrefill(template, {
-        ...instance,
-        prefillSnapshot: refreshed
-      }, { overwritePrefillFields: true });
-      await schoolDataService.updateData('reportInstances', instance.id, {
-        prefillSnapshot: refreshed,
-        ...(hydrated.changed ? { answers: hydrated.answers } : {}),
-        audit: {
-          lastUpdateUser: req.user?.id || '',
-          lastUpdateDateTime: new Date().toISOString()
-        }
-      }, req.user);
-      return res.redirect(`/school/reports/instances/edit/${instance.id}`);
-    }
-
     let latestInstance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
     if (String(latestInstance?.status || '').toLowerCase() !== 'locked') {
       const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance);
@@ -1044,6 +1107,97 @@ async function saveInstance(req, res) {
   }
 }
 
+async function previewInstancePrefillRefresh(req, res) {
+  try {
+    const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(req.params.id, req.user);
+    const [template, assignment] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
+      schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
+    ]);
+    if (!template) throw new Error('Template not found.');
+
+    if (String(instance.status || '').toLowerCase() === 'locked') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Locked report instances cannot refresh prefill values.'
+      });
+    }
+
+    const preview = await buildPrefillRefreshPreview({ instance, template, assignment, reqUser: req.user });
+    return res.json({
+      status: 'success',
+      message: preview.changes.length
+        ? `${preview.changes.length} prefill key update${preview.changes.length === 1 ? '' : 's'} found.`
+        : 'No prefill value changes were found.',
+      changes: preview.changes,
+      changedCount: preview.changes.length
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function applyInstancePrefillRefresh(req, res) {
+  try {
+    const instance = await reportIntegrityService.getEditableInstanceOrThrow(req.params.id, req.user);
+    const [template, assignment] = await Promise.all([
+      schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
+      schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
+    ]);
+    if (!template) throw new Error('Template not found.');
+
+    const rawSelected = Array.isArray(req.body?.selectedKeys)
+      ? req.body.selectedKeys
+      : String(req.body?.selectedKeys || '').split(',');
+    const selectedKeys = new Set(
+      rawSelected
+        .map((key) => reportService.normalizePrefillKey(key))
+        .filter(Boolean)
+    );
+    if (!selectedKeys.size) {
+      throw new Error('Select at least one prefill key to replace.');
+    }
+
+    const preview = await buildPrefillRefreshPreview({ instance, template, assignment, reqUser: req.user });
+    const selectedChanges = preview.changes.filter((change) => selectedKeys.has(change.prefillKey));
+    if (!selectedChanges.length) {
+      throw new Error('The selected prefill keys no longer have changes to apply.');
+    }
+
+    const nextPrefill = {
+      ...((instance.prefillSnapshot && typeof instance.prefillSnapshot === 'object') ? instance.prefillSnapshot : {})
+    };
+    const nextAnswers = {
+      ...((instance.answers && typeof instance.answers === 'object') ? instance.answers : {})
+    };
+    selectedChanges.forEach((change) => {
+      nextPrefill[change.prefillKey] = change.newRawValue;
+      (change.fields || []).forEach((fieldChange) => {
+        if (!fieldChange?.fieldId) return;
+        nextAnswers[fieldChange.fieldId] = fieldChange.newValue;
+      });
+    });
+
+    await schoolDataService.updateData('reportInstances', instance.id, {
+      prefillSnapshot: nextPrefill,
+      answers: nextAnswers,
+      audit: {
+        lastUpdateUser: req.user?.id || '',
+        lastUpdateDateTime: new Date().toISOString(),
+        prefillRefreshedAt: new Date().toISOString()
+      }
+    }, req.user);
+
+    return res.json({
+      status: 'success',
+      message: `Applied ${selectedChanges.length} selected prefill update${selectedChanges.length === 1 ? '' : 's'}.`,
+      appliedCount: selectedChanges.length
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function lockInstance(req, res) {
   let guardKey = '';
   try {
@@ -1150,6 +1304,8 @@ module.exports = {
   startInstance,
   showInstanceEditor,
   saveInstance,
+  previewInstancePrefillRefresh,
+  applyInstancePrefillRefresh,
   lockInstance,
   exportInstance
 };

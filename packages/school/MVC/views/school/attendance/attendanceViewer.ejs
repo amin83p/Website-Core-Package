@@ -215,6 +215,48 @@
 window.currentMatrixData = null;
 let currentMentions = [];
 let detailsModalInstance = null;
+let attendanceMatrixBusyToken = null;
+let attendanceMatrixBusyDepth = 0;
+
+function showAttendanceMatrixMessage({ title = 'Attendance Matrix', icon = 'info', message = '', buttons = null } = {}) {
+    try { hideAttendanceMatrixBusy(true); } catch (_) {}
+    const safeMessage = String(message || '').trim() || 'Operation could not be completed.';
+    const safeButtons = Array.isArray(buttons) && buttons.length
+        ? buttons
+        : [{ text: 'Close', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }];
+    if (typeof window.showMessageModal === 'function') {
+        return window.showMessageModal({ title, icon, message: safeMessage, buttons: safeButtons });
+    }
+    alert(safeMessage.replace(/<[^>]*>/g, ''));
+    return Promise.resolve();
+}
+
+function showAttendanceMatrixBusy({
+    title = 'Working...',
+    note = 'Please wait while the attendance matrix is updated.',
+    operation = 'Attendance Matrix'
+} = {}) {
+    attendanceMatrixBusyDepth += 1;
+    if (typeof window.showLoading === 'function') {
+        if (!attendanceMatrixBusyToken) {
+            attendanceMatrixBusyToken = window.showLoading({ title, note, operation });
+        } else if (typeof window.updateLoading === 'function') {
+            window.updateLoading({ title, note, operation });
+        }
+    }
+}
+
+function hideAttendanceMatrixBusy(force = false) {
+    attendanceMatrixBusyDepth = force ? 0 : Math.max(0, attendanceMatrixBusyDepth - 1);
+    if (attendanceMatrixBusyDepth > 0) return;
+    try {
+        if (typeof window.hideLoading === 'function') {
+            if (attendanceMatrixBusyToken) window.hideLoading(attendanceMatrixBusyToken);
+            else window.hideLoading();
+        }
+    } catch (_) {}
+    attendanceMatrixBusyToken = null;
+}
 
 window.ATTENDANCE_PAGE_INITIAL = <%- JSON.stringify({
     classId: typeof initialClassId !== 'undefined' ? initialClassId : '',
@@ -324,7 +366,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentMentions.push({ id: item.id, name: name });
                     renderMentions();
                 } else if (!item.id || item.id === 'undefined') {
-                    alert("Error: Could not retrieve a valid Person ID.");
+                    showAttendanceMatrixMessage({
+                        title: 'Tag User',
+                        icon: 'error',
+                        message: 'Could not retrieve a valid Person ID.'
+                    });
                 }
             }
         }));
@@ -344,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- 3. Render Engine ---
-    document.getElementById('btn_loadData').addEventListener('click', async () => {
+    async function loadAttendanceMatrixData(options = {}) {
         const classId = document.getElementById('filter_classId').value;
         const startDate = document.getElementById('filter_startDate').value;
         const endDate = document.getElementById('filter_endDate').value;
@@ -353,8 +399,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const btn = document.getElementById('btn_loadData');
         const originalHtml = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        btn.disabled = true;
+        const skipButtonBusy = options && options.skipButtonBusy === true;
+        if (skipButtonBusy && options.loadingNote && typeof window.updateLoading === 'function') {
+            window.updateLoading({
+                title: options.loadingTitle || 'Refreshing Attendance Matrix',
+                note: options.loadingNote,
+                operation: 'Attendance Matrix'
+            });
+        }
+        if (!skipButtonBusy) {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            btn.disabled = true;
+        }
 
         try {
             const url = `/school/attendances/api/data?classId=${classId}&startDate=${startDate}&endDate=${endDate}`;
@@ -476,14 +532,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error(error);
-            if (typeof showMessageModal === 'function') {
-                showMessageModal({ title: 'Error', icon: 'error', message: error.message, buttons: [{ text: 'Close', class: 'btn-secondary' }] });
-            } else { alert(error.message); }
+            showAttendanceMatrixMessage({
+                title: 'Error',
+                icon: 'error',
+                message: error.message,
+                buttons: [{ text: 'Close', class: 'btn-secondary' }]
+            });
         } finally {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
+            if (!skipButtonBusy) {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
         }
-    });
+    }
+
+    document.getElementById('btn_loadData').addEventListener('click', () => loadAttendanceMatrixData());
 
     // --- 4. Interactive Note Saving Logic ---
     document.getElementById('btn_saveComment').addEventListener('click', async () => {
@@ -497,6 +560,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('btn_saveComment');
         const origBtn = btn.innerHTML;
         btn.innerHTML = 'Saving...'; btn.disabled = true;
+        showAttendanceMatrixBusy({
+            title: 'Saving Comment',
+            note: 'Please wait while the attendance note is saved and the matrix refreshes.',
+            operation: 'Attendance Matrix'
+        });
 
         try {
             const payload = {
@@ -525,7 +593,11 @@ document.addEventListener('DOMContentLoaded', () => {
             currentMentions = [];
             renderMentions();
             
-            document.getElementById('btn_loadData').click();
+            await loadAttendanceMatrixData({
+                skipButtonBusy: true,
+                loadingTitle: 'Refreshing Attendance Matrix',
+                loadingNote: 'Refreshing the attendance matrix after saving the note...'
+            });
 
             const thread = document.getElementById('det_commentsThread');
             let mentionHtml = '';
@@ -540,8 +612,15 @@ document.addEventListener('DOMContentLoaded', () => {
             thread.scrollTop = thread.scrollHeight;
 
         } catch (err) {
-            alert(err.message);
+            hideAttendanceMatrixBusy(true);
+            showAttendanceMatrixMessage({
+                title: 'Error',
+                icon: 'error',
+                message: err.message,
+                buttons: [{ text: 'Close', class: 'btn-secondary' }]
+            });
         } finally {
+            hideAttendanceMatrixBusy();
             btn.innerHTML = origBtn; btn.disabled = false;
         }
     });
@@ -564,6 +643,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const origBtn = btn.innerHTML;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
             btn.disabled = true;
+            if (detailsModalInstance) detailsModalInstance.hide();
+            showAttendanceMatrixBusy({
+                title: 'Saving Attendance',
+                note: 'Please wait while attendance changes are applied and the matrix refreshes.',
+                operation: 'Attendance Matrix'
+            });
 
             try {
                 const payload = {
@@ -589,13 +674,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (guarded.stop) return;
                 if (result.status !== 'success') throw new Error(result.message);
 
-                if (detailsModalInstance) detailsModalInstance.hide();
-                document.getElementById('btn_loadData').click();
+                await loadAttendanceMatrixData({
+                    skipButtonBusy: true,
+                    loadingTitle: 'Refreshing Attendance Matrix',
+                    loadingNote: 'Refreshing the attendance matrix after saving attendance...'
+                });
             } catch (err) {
-                if (typeof showMessageModal === 'function') {
-                    showMessageModal({ title: 'Error', icon: 'error', message: err.message, buttons: [{ text: 'Close', class: 'btn-secondary' }] });
-                } else { alert(err.message); }
+                hideAttendanceMatrixBusy(true);
+                showAttendanceMatrixMessage({
+                    title: 'Error',
+                    icon: 'error',
+                    message: err.message,
+                    buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                });
             } finally {
+                hideAttendanceMatrixBusy();
                 btn.innerHTML = origBtn;
                 btn.disabled = false;
             }

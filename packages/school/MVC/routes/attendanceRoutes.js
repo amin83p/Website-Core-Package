@@ -14,6 +14,13 @@ const { requireAttendanceMatrixPolicyAdmin } = requireCoreModule('MVC/middleware
 
 router.use(requireAuth);
 
+const attendanceMatrixMutationActionState = Object.freeze({
+  requireToken: true,
+  keepActive: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+});
+
 router.get('/settings',
   requireAttendanceMatrixPolicyAdmin(),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { keepActive: true }),
@@ -36,12 +43,12 @@ router.get('/api/data',
 
 router.post('/api/comment',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, attendanceMatrixMutationActionState),
   ctrl.addAttendanceComment);
 
 router.post('/api/update-roster-cell',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, attendanceMatrixMutationActionState),
   ctrl.updateAttendanceRosterCell);
 
 module.exports = router;
