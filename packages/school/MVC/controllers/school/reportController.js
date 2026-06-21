@@ -317,7 +317,9 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
       type,
       oldValue,
       newValue,
-      currentValue: currentMerged[field.id]
+      currentValue: currentMerged[field.id],
+      oldRawValue,
+      newRawValue
     });
   });
 
@@ -1176,6 +1178,28 @@ async function applyInstancePrefillRefresh(req, res) {
         if (!fieldChange?.fieldId) return;
         nextAnswers[fieldChange.fieldId] = fieldChange.newValue;
       });
+    });
+
+    const mergedAfterPrefillRefresh = reportService.mergeTemplateData(
+      template,
+      {
+        ...(instance || {}),
+        prefillSnapshot: nextPrefill,
+        answers: nextAnswers
+      },
+      assignment
+    );
+    const recomputedAfterPrefillRefresh = reportService.recomputeCalculatedAnswers({
+      template,
+      mergedAnswers: mergedAfterPrefillRefresh,
+      prefill: nextPrefill
+    });
+    const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+    fields.forEach((field) => {
+      const type = String(field?.type || '').trim().toLowerCase();
+      if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
+      if (String(field?.valueMode || 'manual').trim().toLowerCase() !== 'calculated') return;
+      nextAnswers[field.id] = recomputedAfterPrefillRefresh.answers[field.id];
     });
 
     await schoolDataService.updateData('reportInstances', instance.id, {

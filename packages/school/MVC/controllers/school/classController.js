@@ -160,6 +160,14 @@ function parseBoolean(value, fallback = false) {
     return fallback;
 }
 
+function normalizeSessionRatingPercent(value, fallback = 100) {
+    const fallbackNumber = Number(fallback);
+    const safeFallback = Number.isFinite(fallbackNumber) ? fallbackNumber : 100;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(safeFallback * 100) / 100));
+    return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
+}
+
 function toArrayOfStrings(value) {
     if (Array.isArray(value)) {
         return value.map((row) => String(row || '').trim()).filter(Boolean);
@@ -4202,7 +4210,16 @@ async function manageSession1(req, res) {
         
         activePersonIds.forEach((pid) => {
             if (!session.roster.find((r) => idsEqual(r.personId, pid))) {
-                session.roster.push({ personId: pid, attendance: 'present', notes: '', comments: [] }); 
+                session.roster.push({
+                    personId: pid,
+                    attendance: 'present',
+                    notes: '',
+                    comments: [],
+                    classEffortPercent: 100,
+                    classParticipationPercent: 100,
+                    respectsTeachersPercent: 100,
+                    respectsStudentsPercent: 100
+                }); 
             }
         });
 
@@ -4210,7 +4227,15 @@ async function manageSession1(req, res) {
             const pid = cleanPersonId(r.personId);
             const person = persons.find((p) => idsEqual(p.id, pid));
             const displayName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : 'Unknown Student';
-            return { ...r, personId: pid, name: displayName };
+            return {
+                ...r,
+                personId: pid,
+                name: displayName,
+                classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent),
+                classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent),
+                respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent),
+                respectsStudentsPercent: normalizeSessionRatingPercent(r.respectsStudentsPercent)
+            };
         });
 
         mergeGradebookScorePersonsIntoEnrichedRoster(enrichedRoster, session, persons, {
@@ -4276,12 +4301,28 @@ async function saveSession1(req, res) {
             sessions[sessionIndex].roster = incomingRoster.map(incRec => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
+                const existingClassEffort = normalizeSessionRatingPercent(existRec.classEffortPercent);
+                const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent);
+                const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent);
+                const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent);
                 return {
                     personId: incomingPersonId,
                     attendance: incRec.attendance,
                     lateMinutes: incRec.lateMinutes,
                     earlyLeaveMinutes: incRec.earlyLeaveMinutes,
                     excuseRef: incRec.excuseRef,
+                    classEffortPercent: incRec.classEffortPercent === undefined
+                        ? existingClassEffort
+                        : normalizeSessionRatingPercent(incRec.classEffortPercent, existingClassEffort),
+                    classParticipationPercent: incRec.classParticipationPercent === undefined
+                        ? existingClassParticipation
+                        : normalizeSessionRatingPercent(incRec.classParticipationPercent, existingClassParticipation),
+                    respectsTeachersPercent: incRec.respectsTeachersPercent === undefined
+                        ? existingRespectsTeachers
+                        : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, existingRespectsTeachers),
+                    respectsStudentsPercent: incRec.respectsStudentsPercent === undefined
+                        ? existingRespectsStudents
+                        : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, existingRespectsStudents),
                     notes: existRec.notes || '',       // Preserve existing student-specific notes if any
                     comments: existRec.comments || []  // PRESERVE the interactive admin comments!
                 };
@@ -4360,7 +4401,16 @@ async function manageSession(req, res) {
 
         activePersonIds.forEach((pid) => {
             if (!session.roster.find((r) => idsEqual(r.personId, pid))) {
-                session.roster.push({ personId: pid, attendance: 'present', notes: '', comments: [] }); 
+                session.roster.push({
+                    personId: pid,
+                    attendance: 'present',
+                    notes: '',
+                    comments: [],
+                    classEffortPercent: 100,
+                    classParticipationPercent: 100,
+                    respectsTeachersPercent: 100,
+                    respectsStudentsPercent: 100
+                }); 
             }
         });
 
@@ -4368,7 +4418,15 @@ async function manageSession(req, res) {
             const pid = cleanPersonId(r.personId);
             const person = persons.find((p) => idsEqual(p.id, pid));
             const displayName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : 'Unknown Student';
-            return { ...r, personId: pid, name: displayName };
+            return {
+                ...r,
+                personId: pid,
+                name: displayName,
+                classEffortPercent: normalizeSessionRatingPercent(r.classEffortPercent),
+                classParticipationPercent: normalizeSessionRatingPercent(r.classParticipationPercent),
+                respectsTeachersPercent: normalizeSessionRatingPercent(r.respectsTeachersPercent),
+                respectsStudentsPercent: normalizeSessionRatingPercent(r.respectsStudentsPercent)
+            };
         });
 
         mergeGradebookScorePersonsIntoEnrichedRoster(enrichedRoster, session, persons, {
@@ -4695,12 +4753,28 @@ async function saveSession(req, res) {
                 const existRec = existingRoster.find((r) => idsEqual(r.personId, incomingPersonId)) || {};
                 const normalizedAttendance = String(incRec.attendance || 'absent').trim().toLowerCase();
                 const attendance = allowedAttendance.has(normalizedAttendance) ? normalizedAttendance : 'absent';
+                const existingClassEffort = normalizeSessionRatingPercent(existRec.classEffortPercent);
+                const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent);
+                const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent);
+                const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent);
                 const merged = {
                     personId: incomingPersonId,
                     attendance,
                     lateMinutes: incRec.lateMinutes,
                     earlyLeaveMinutes: incRec.earlyLeaveMinutes,
                     excuseRef: incRec.excuseRef,
+                    classEffortPercent: incRec.classEffortPercent === undefined
+                        ? existingClassEffort
+                        : normalizeSessionRatingPercent(incRec.classEffortPercent, existingClassEffort),
+                    classParticipationPercent: incRec.classParticipationPercent === undefined
+                        ? existingClassParticipation
+                        : normalizeSessionRatingPercent(incRec.classParticipationPercent, existingClassParticipation),
+                    respectsTeachersPercent: incRec.respectsTeachersPercent === undefined
+                        ? existingRespectsTeachers
+                        : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, existingRespectsTeachers),
+                    respectsStudentsPercent: incRec.respectsStudentsPercent === undefined
+                        ? existingRespectsStudents
+                        : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, existingRespectsStudents),
                     notes: existRec.notes || '',
                     comments: existRec.comments || []
                 };

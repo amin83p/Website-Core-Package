@@ -131,7 +131,7 @@
         <% } %>
         <a href="/school/reports/instances/export/<%= instance.id %>?download=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
         <% if (!isLocked) { %>
-          <button type="button" class="btn btn-outline-primary btn-sm" id="btnReviewPrefillUpdates"><i class="bi bi-arrow-repeat me-1"></i>Review Prefill Updates</button>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnReviewPrefillUpdates"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
         <% } %>
         <button type="button" class="btn btn-warning btn-md btn-filled ms-auto" id="btnCloseReportInstance"><i class="bi bi-x-lg me-1"></i>Close</button>
       </div>
@@ -503,7 +503,7 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title"><i class="bi bi-arrow-repeat me-2"></i>Review Prefill Updates</h5>
+        <h5 class="modal-title"><i class="bi bi-arrow-repeat me-2"></i>Preview Prefill Updates</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -519,10 +519,10 @@
             <thead>
               <tr>
                 <th style="width: 48px;">Use</th>
-                <th>Prefill Key</th>
                 <th>Linked Fields</th>
-                <th>Current Value</th>
-                <th>New Value</th>
+                <th>Current Report Value</th>
+                <th>Stored Prefill Value</th>
+                <th>Recalculated Value</th>
               </tr>
             </thead>
             <tbody id="prefillRefreshRows"></tbody>
@@ -557,9 +557,6 @@
     const summaryFocusStorageKey = 'report_instance_validation_focus';
     let prefillRefreshModal = null;
     let prefillRefreshChanges = [];
-    if (prefillRefreshModalEl && typeof bootstrap !== 'undefined') {
-      prefillRefreshModal = new bootstrap.Modal(prefillRefreshModalEl);
-    }
 
     function showReportInstanceMessage({ title = 'Report Instance', icon = 'info', message = '', buttons = null } = {}) {
       if (typeof showMessageModal === 'function') {
@@ -600,6 +597,117 @@
         if (token && typeof window.hideLoading === 'function') window.hideLoading(token);
       } catch (_) {}
     }
+
+    function getPrefillRefreshModal() {
+      if (!prefillRefreshModalEl) return null;
+      if (prefillRefreshModal) return prefillRefreshModal;
+      if (typeof window.bootstrap !== 'undefined' && window.bootstrap?.Modal) {
+        prefillRefreshModal = window.bootstrap.Modal.getOrCreateInstance
+          ? window.bootstrap.Modal.getOrCreateInstance(prefillRefreshModalEl)
+          : new window.bootstrap.Modal(prefillRefreshModalEl);
+        return prefillRefreshModal;
+      }
+      return null;
+    }
+
+    function showPrefillRefreshModalFallback() {
+      if (!prefillRefreshModalEl) return false;
+      prefillRefreshModalEl.classList.add('show');
+      prefillRefreshModalEl.style.display = 'block';
+      prefillRefreshModalEl.removeAttribute('aria-hidden');
+      prefillRefreshModalEl.setAttribute('aria-modal', 'true');
+      prefillRefreshModalEl.setAttribute('role', 'dialog');
+      document.body.classList.add('modal-open');
+      let backdrop = document.getElementById('prefillRefreshReviewBackdrop');
+      if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'prefillRefreshReviewBackdrop';
+        backdrop.className = 'modal-backdrop fade show';
+        document.body.appendChild(backdrop);
+      }
+      return true;
+    }
+
+    function hidePrefillRefreshModalFallback() {
+      if (!prefillRefreshModalEl) return;
+      prefillRefreshModalEl.classList.remove('show');
+      prefillRefreshModalEl.style.display = 'none';
+      prefillRefreshModalEl.setAttribute('aria-hidden', 'true');
+      prefillRefreshModalEl.removeAttribute('aria-modal');
+      prefillRefreshModalEl.removeAttribute('role');
+      const backdrop = document.getElementById('prefillRefreshReviewBackdrop');
+      if (backdrop) backdrop.remove();
+      document.body.classList.remove('modal-open');
+    }
+
+    function showPrefillRefreshModal() {
+      const modal = getPrefillRefreshModal();
+      if (modal) {
+        modal.show();
+        return true;
+      }
+      return showPrefillRefreshModalFallback();
+    }
+
+    function hidePrefillRefreshModal() {
+      const modal = getPrefillRefreshModal();
+      if (modal) modal.hide();
+      hidePrefillRefreshModalFallback();
+    }
+
+    async function readJsonResponse(response, fallbackMessage) {
+      const text = await response.text();
+      let result = null;
+      try {
+        result = JSON.parse(text || '{}');
+      } catch (_) {
+        const stripped = String(text || '')
+          .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        throw new Error(stripped || fallbackMessage || 'Request failed.');
+      }
+      if (!response.ok || result?.status === 'error') {
+        throw new Error(result?.message || fallbackMessage || 'Request failed.');
+      }
+      return result;
+    }
+
+    function bindPrefillRefreshControls() {
+      if (btnReviewPrefillUpdates && btnReviewPrefillUpdates.dataset.prefillRefreshBound !== '1') {
+        btnReviewPrefillUpdates.dataset.prefillRefreshBound = '1';
+        btnReviewPrefillUpdates.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          reviewPrefillUpdates();
+        });
+      }
+      if (btnApplyPrefillRefresh && btnApplyPrefillRefresh.dataset.prefillRefreshBound !== '1') {
+        btnApplyPrefillRefresh.dataset.prefillRefreshBound = '1';
+        btnApplyPrefillRefresh.addEventListener('click', (event) => {
+          event.preventDefault();
+          applySelectedPrefillUpdates();
+        });
+      }
+      if (btnToggleAllPrefillRefresh && btnToggleAllPrefillRefresh.dataset.prefillRefreshBound !== '1') {
+        btnToggleAllPrefillRefresh.dataset.prefillRefreshBound = '1';
+        btnToggleAllPrefillRefresh.addEventListener('click', () => {
+          const boxes = Array.from(document.querySelectorAll('.js-prefill-refresh-key'));
+          const shouldCheck = boxes.some((box) => !box.checked);
+          boxes.forEach((box) => { box.checked = shouldCheck; });
+          btnToggleAllPrefillRefresh.textContent = shouldCheck ? 'Clear All' : 'Select All';
+        });
+      }
+      prefillRefreshModalEl?.querySelectorAll('[data-bs-dismiss="modal"]').forEach((btn) => {
+        if (btn.dataset.prefillRefreshDismissBound === '1') return;
+        btn.dataset.prefillRefreshDismissBound = '1';
+        btn.addEventListener('click', () => hidePrefillRefreshModal());
+      });
+    }
+
+    bindPrefillRefreshControls();
 
     async function confirmLeave(title, message, confirmLabel) {
       const confirmText = confirmLabel || 'Close';
@@ -650,15 +758,16 @@
       }
       prefillRefreshRows.innerHTML = prefillRefreshChanges.map((change) => {
         const fields = Array.isArray(change.fields) ? change.fields : [];
-        const labels = fields.map((field) => `${field.label || field.fieldId} (${field.fieldId})`).join(', ');
+        const labels = fields.map((field) => field.label || field.fieldId || 'Report field').join(', ');
         const currentValues = fields.map((field) => formatPreviewValue(field.currentValue)).join('<hr class="my-1">');
+        const oldValues = fields.map((field) => formatPreviewValue(field.oldValue)).join('<hr class="my-1">');
         const newValues = fields.map((field) => formatPreviewValue(field.newValue)).join('<hr class="my-1">');
         return `
           <tr>
             <td><input type="checkbox" class="form-check-input js-prefill-refresh-key" value="${escapeHtml(change.prefillKey)}" checked></td>
-            <td><code>${escapeHtml(change.prefillKey)}</code></td>
             <td>${escapeHtml(labels || '-')}</td>
             <td>${currentValues || '<span class="text-muted">empty</span>'}</td>
+            <td>${oldValues || '<span class="text-muted">empty</span>'}</td>
             <td>${newValues || '<span class="text-muted">empty</span>'}</td>
           </tr>
         `;
@@ -676,8 +785,7 @@
           headers: { 'X-AJAX-Request': 'true', 'Accept': 'application/json' },
           cache: 'no-store'
         });
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message || 'Could not preview prefill updates.');
+        const result = await readJsonResponse(response, 'Could not preview prefill updates.');
         renderPrefillRefreshRows(result.changes || []);
         hideLoadingToken(token);
         if (!Array.isArray(result.changes) || !result.changes.length) {
@@ -688,7 +796,13 @@
           });
           return;
         }
-        if (prefillRefreshModal) prefillRefreshModal.show();
+        if (!showPrefillRefreshModal()) {
+          await showReportInstanceMessage({
+            title: 'Prefill Updates Ready',
+            icon: 'info',
+            message: 'Prefill changes were found, but the preview modal could not be opened on this page.'
+          });
+        }
       } catch (error) {
         hideLoadingToken(token);
         await showReportInstanceMessage({
@@ -711,7 +825,7 @@
         });
         return;
       }
-      if (prefillRefreshModal) prefillRefreshModal.hide();
+      hidePrefillRefreshModal();
       const token = showLoadingToken({
         title: 'Applying Prefill Updates',
         note: 'Please wait while selected prefill values are replaced.',
@@ -728,8 +842,7 @@
           },
           body: JSON.stringify({ selectedKeys, actionStateId })
         });
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message || 'Could not apply selected prefill updates.');
+        const result = await readJsonResponse(response, 'Could not apply selected prefill updates.');
         hideLoadingToken(token);
         await showReportInstanceMessage({
           title: 'Prefill Updated',
@@ -1328,22 +1441,45 @@
     focusValidationSummaryIfRequested();
 
     if (formEl) {
-      let validationDebounceTimer = null;
-      const scheduleClientValidation = () => {
-        if (validationDebounceTimer) clearTimeout(validationDebounceTimer);
-        validationDebounceTimer = setTimeout(() => {
-          validationDebounceTimer = null;
-          runClientValidation();
-        }, 120);
-      };
-      formEl.querySelectorAll('.js-report-field').forEach((input) => {
-        input.addEventListener('input', scheduleClientValidation);
-        input.addEventListener('change', scheduleClientValidation);
-      });
-      runClientValidation();
+      try {
+        let validationDebounceTimer = null;
+        const scheduleClientValidation = () => {
+          if (validationDebounceTimer) clearTimeout(validationDebounceTimer);
+          validationDebounceTimer = setTimeout(() => {
+            validationDebounceTimer = null;
+            runClientValidation();
+          }, 120);
+        };
+        formEl.querySelectorAll('.js-report-field').forEach((input) => {
+          input.addEventListener('input', scheduleClientValidation);
+          input.addEventListener('change', scheduleClientValidation);
+        });
+        runClientValidation();
 
-      formEl.querySelectorAll('button[type="submit"][name="submitAction"][value="submit"]').forEach((btn) => {
-        btn.addEventListener('click', async (event) => {
+        formEl.querySelectorAll('button[type="submit"][name="submitAction"][value="submit"]').forEach((btn) => {
+          btn.addEventListener('click', async (event) => {
+            const summary = runClientValidation();
+            if (!summary.errors.length) return;
+            event.preventDefault();
+            const first = summary.errors[0];
+            if (typeof showMessageModal === 'function') {
+              await showMessageModal({
+                title: 'Validation Error',
+                icon: 'warning',
+                message: `${first.message} Please fix validation errors before submitting.`,
+                buttons: [{ text: 'OK', class: 'btn-primary' }]
+              });
+            } else {
+              window.alert(`${first.message} Please fix validation errors before submitting.`);
+            }
+          });
+        });
+
+        formEl.addEventListener('submit', async (event) => {
+          const submitter = event.submitter || null;
+          const submitAction = String(submitter?.value || '').trim().toLowerCase();
+          rememberValidationSummaryFocus(submitAction);
+          if (submitAction !== 'submit') return;
           const summary = runClientValidation();
           if (!summary.errors.length) return;
           event.preventDefault();
@@ -1358,29 +1494,10 @@
           } else {
             window.alert(`${first.message} Please fix validation errors before submitting.`);
           }
-        });
-      });
-
-      formEl.addEventListener('submit', async (event) => {
-        const submitter = event.submitter || null;
-        const submitAction = String(submitter?.value || '').trim().toLowerCase();
-        rememberValidationSummaryFocus(submitAction);
-        if (submitAction !== 'submit') return;
-        const summary = runClientValidation();
-        if (!summary.errors.length) return;
-        event.preventDefault();
-        const first = summary.errors[0];
-        if (typeof showMessageModal === 'function') {
-          await showMessageModal({
-            title: 'Validation Error',
-            icon: 'warning',
-            message: `${first.message} Please fix validation errors before submitting.`,
-            buttons: [{ text: 'OK', class: 'btn-primary' }]
-          });
-        } else {
-          window.alert(`${first.message} Please fix validation errors before submitting.`);
-        }
-      }, true);
+        }, true);
+      } catch (error) {
+        console.error('Report editor validation initialization failed:', error);
+      }
     }
 
     if (btnClose) {
@@ -1406,14 +1523,7 @@
       });
     }
 
-    btnReviewPrefillUpdates?.addEventListener('click', reviewPrefillUpdates);
-    btnApplyPrefillRefresh?.addEventListener('click', applySelectedPrefillUpdates);
-    btnToggleAllPrefillRefresh?.addEventListener('click', () => {
-      const boxes = Array.from(document.querySelectorAll('.js-prefill-refresh-key'));
-      const shouldCheck = boxes.some((box) => !box.checked);
-      boxes.forEach((box) => { box.checked = shouldCheck; });
-      btnToggleAllPrefillRefresh.textContent = shouldCheck ? 'Clear All' : 'Select All';
-    });
+    bindPrefillRefreshControls();
   })();
 </script>
 

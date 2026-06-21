@@ -6,6 +6,21 @@
     .btn-check[value="late"]:checked + .att-label { background-color: #ffc107; color: #000; font-weight: bold; }
     .btn-check[value="excused"]:checked + .att-label { background-color: #0dcaf0; color: #000; font-weight: bold; }
     .btn-check[value="absent"]:checked + .att-label { background-color: #dc3545; color: #fff; font-weight: bold; }
+    .conduct-rating-input {
+        max-width: 7rem;
+        text-align: center;
+        font-weight: 700;
+        border-radius: 10px;
+    }
+    .conduct-rating-input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 0.18rem rgba(37, 99, 235, 0.12);
+    }
+    .conduct-rating-help {
+        color: #64748b;
+        font-size: 0.75rem;
+        line-height: 1.25;
+    }
 
     .comment-thread { max-height: 250px; overflow-y: auto; background: #f8f9fa; border-radius: 6px; padding: 10px; }
     .comment-bubble { background: #fff; border: 1px solid #e9ecef; border-radius: 8px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
@@ -251,6 +266,11 @@
         return s.replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029').replace(/&/g, '\\u0026');
     } %>
     <%
+        const sessionRatingValue = (value) => {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return 100;
+            return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
+        };
         const statusRows = Array.isArray(sessionStatusMeta) ? sessionStatusMeta : [];
         const activeStatusRows = statusRows.filter((row) => row && row.active !== false);
         const availableStatusRows = activeStatusRows.length ? activeStatusRows : statusRows;
@@ -389,6 +409,9 @@
                 <button type="button" class="session-manager-nav-item active" data-session-panel="attendance" role="tab" aria-selected="true">
                     <i class="bi bi-people-fill fs-5"></i><span class="session-manager-nav-label">Attendance</span>
                 </button>
+                <button type="button" class="session-manager-nav-item" data-session-panel="conduct" role="tab" aria-selected="false">
+                    <i class="bi bi-person-hearts fs-5"></i><span class="session-manager-nav-label">Class Conduct</span>
+                </button>
                 <button type="button" class="session-manager-nav-item" data-session-panel="session" role="tab" aria-selected="false">
                     <i class="bi bi-journal-text fs-5"></i><span class="session-manager-nav-label">Session &amp; notes</span>
                 </button>
@@ -495,6 +518,59 @@
                                                     <input type="hidden" class="att-leave" value="<%= student.earlyLeaveMinutes || '' %>">
                                                     <input type="hidden" class="att-excuse" value="<%= student.excuseRef || '' %>">
                                                     <input type="hidden" class="att-comments" value='<%- JSON.stringify(student.comments || []) %>'>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="session-panel" id="session-panel-conduct" role="tabpanel">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                        <div>
+                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-person-hearts me-2"></i>Class Conduct</h5>
+                            <div class="conduct-rating-help mt-1">Values default to 100%. Adjust only when a student's effort, participation, or respect needs a different session rating.</div>
+                        </div>
+                        <span class="badge bg-light text-dark border"><%= session.roster.length %> Students</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: min(70vh, 700px); overflow-y: auto;">
+                            <table class="table table-hover align-middle mb-0" id="conductTable">
+                                <thead class="table-light position-sticky top-0" style="z-index: 1;">
+                                    <tr>
+                                        <th class="ps-4">Student Name</th>
+                                        <th class="text-center">Class Effort</th>
+                                        <th class="text-center">Class Participation</th>
+                                        <th class="text-center">Respects The Teachers</th>
+                                        <th class="text-center pe-4">Treats Other Students With Respect</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% if (session.roster.length === 0) { %>
+                                        <tr><td colspan="5" class="text-center py-4 text-muted">No active students enrolled.</td></tr>
+                                    <% } else { %>
+                                        <% session.roster.forEach((student) => { %>
+                                            <tr class="conduct-row" data-personid="<%= student.personId %>">
+                                                <td class="ps-4 fw-bold align-middle">
+                                                    <%= student.name %>
+                                                    <div class="small text-muted font-monospace"><%= student.personId %></div>
+                                                </td>
+                                                <td class="text-center">
+                                                    <input type="number" class="form-control form-control-sm conduct-rating-input mx-auto conduct-class-effort" min="0" max="100" step="1" value="<%= sessionRatingValue(student.classEffortPercent) %>" <%- disabledAttr %>>
+                                                </td>
+                                                <td class="text-center">
+                                                    <input type="number" class="form-control form-control-sm conduct-rating-input mx-auto conduct-class-participation" min="0" max="100" step="1" value="<%= sessionRatingValue(student.classParticipationPercent) %>" <%- disabledAttr %>>
+                                                </td>
+                                                <td class="text-center">
+                                                    <input type="number" class="form-control form-control-sm conduct-rating-input mx-auto conduct-respects-teachers" min="0" max="100" step="1" value="<%= sessionRatingValue(student.respectsTeachersPercent) %>" <%- disabledAttr %>>
+                                                </td>
+                                                <td class="text-center pe-4">
+                                                    <input type="number" class="form-control form-control-sm conduct-rating-input mx-auto conduct-respects-students" min="0" max="100" step="1" value="<%= sessionRatingValue(student.respectsStudentsPercent) %>" <%- disabledAttr %>>
                                                 </td>
                                             </tr>
                                         <% }) %>
@@ -2012,14 +2088,34 @@ document.addEventListener('DOMContentLoaded', () => {
             const room = document.getElementById('sessionRoom').value;
 
             const roster = [];
+            const conductRowsByPersonId = new Map(Array.from(document.querySelectorAll('.conduct-row')).map((row) => [row.getAttribute('data-personid'), row]));
+            const readConductRating = (conductRow, selector) => {
+                if (!conductRow) return 100;
+                const raw = conductRow.querySelector(selector)?.value;
+                const n = Number(String(raw ?? '').trim());
+                if (!Number.isFinite(n)) return 100;
+                return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
+            };
             document.querySelectorAll('.roster-row').forEach(row => {
                 const personId = row.getAttribute('data-personid');
                 const attendance = row.querySelector('.att-radio:checked')?.value || 'absent';
                 const lateMinutes = row.querySelector('.att-late').value || null;
                 const earlyLeaveMinutes = row.querySelector('.att-leave').value || null;
                 const excuseRef = row.querySelector('.att-excuse').value || '';
+                const conductRow = conductRowsByPersonId.get(personId);
 
-                roster.push({ personId, attendance, lateMinutes, earlyLeaveMinutes, excuseRef, notes: '' });
+                roster.push({
+                    personId,
+                    attendance,
+                    lateMinutes,
+                    earlyLeaveMinutes,
+                    excuseRef,
+                    notes: '',
+                    classEffortPercent: readConductRating(conductRow, '.conduct-class-effort'),
+                    classParticipationPercent: readConductRating(conductRow, '.conduct-class-participation'),
+                    respectsTeachersPercent: readConductRating(conductRow, '.conduct-respects-teachers'),
+                    respectsStudentsPercent: readConductRating(conductRow, '.conduct-respects-students')
+                });
             });
 
             const payload = {

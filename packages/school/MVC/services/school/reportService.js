@@ -126,7 +126,21 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_attendance_span_absent', label: 'Student Attendance Span Absent', description: 'Absent count for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_percent', label: 'Student Attendance Span Percent', description: 'Attendance percentage for this student within report period.' }),
     Object.freeze({ key: 'student_attendance_span_late_minutes', label: 'Student Attendance Span Late Minutes', description: 'Late minutes for this student within report period.' }),
-    Object.freeze({ key: 'student_attendance_span_early_leave_minutes', label: 'Student Attendance Span Early Leave Minutes', description: 'Early-leave minutes for this student within report period.' })
+    Object.freeze({ key: 'student_attendance_span_early_leave_minutes', label: 'Student Attendance Span Early Leave Minutes', description: 'Early-leave minutes for this student within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_attended_sessions', label: 'Student Punctuality Span Attended Sessions', description: 'Attended sessions used for punctuality within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_on_time_sessions', label: 'Student Punctuality Span On-Time Sessions', description: 'Attended sessions with no late arrival and no left-early minutes within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_late_sessions', label: 'Student Punctuality Span Late Sessions', description: 'Attended sessions with late-arrival minutes within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_left_early_sessions', label: 'Student Punctuality Span Left-Early Sessions', description: 'Attended sessions with left-early minutes within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_late_minutes', label: 'Student Punctuality Span Late Minutes', description: 'Total late-arrival minutes across attended sessions within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_left_early_minutes', label: 'Student Punctuality Span Left-Early Minutes', description: 'Total left-early minutes across attended sessions within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_total_issue_sessions', label: 'Student Punctuality Span Total Issue Sessions', description: 'Attended sessions with either late-arrival or left-early minutes within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_percent', label: 'Student Punctuality Span Percent', description: 'On-time percentage across attended sessions within report period.' }),
+    Object.freeze({ key: 'student_punctuality_span_label', label: 'Student Punctuality Span Label', description: 'Readable punctuality label for the report period.' }),
+    Object.freeze({ key: 'student_session_rating_span_rated_sessions', label: 'Student Session Rating Span Rated Sessions', description: 'Attended sessions used for session rating averages within report period.' }),
+    Object.freeze({ key: 'student_session_rating_span_class_effort_percent', label: 'Student Session Rating Span Class Effort %', description: 'Average class effort rating across attended sessions within report period.' }),
+    Object.freeze({ key: 'student_session_rating_span_class_participation_percent', label: 'Student Session Rating Span Class Participation %', description: 'Average class participation rating across attended sessions within report period.' }),
+    Object.freeze({ key: 'student_session_rating_span_respects_teachers_percent', label: 'Student Session Rating Span Respects The Teachers %', description: 'Average respects-the-teachers rating across attended sessions within report period.' }),
+    Object.freeze({ key: 'student_session_rating_span_respects_students_percent', label: 'Student Session Rating Span Treats Other Students With Respect %', description: 'Average treats-other-students-with-respect rating across attended sessions within report period.' })
   ]),
   gradebookPeriodStudent: Object.freeze([
     Object.freeze({ key: 'student_gradebook_period_activity_count', label: 'Student Gradebook Period Activities', description: 'Include-in-grade activities in period where student not absent and has a score.' }),
@@ -286,6 +300,135 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
   out.matrixDisqualifiedSessionCount = Number(matrixSummary.disqualifiedSessionCount || 0);
 
   return out;
+}
+
+function getPunctualityLabel(percent, attendedSessions) {
+  if (!Number.isFinite(Number(attendedSessions)) || Number(attendedSessions) <= 0) return 'Not available';
+  const p = Number(percent);
+  if (!Number.isFinite(p)) return 'Not available';
+  if (p >= 95) return 'Excellent punctuality';
+  if (p >= 85) return 'Good punctuality';
+  if (p >= 70) return 'Needs attention';
+  return 'Punctuality concern';
+}
+
+function buildStudentPunctualitySummary(sessions, studentId, statusMap = null, options = {}) {
+  const out = {
+    attendedSessions: 0,
+    onTimeSessions: 0,
+    lateSessions: 0,
+    leftEarlySessions: 0,
+    lateMinutes: 0,
+    leftEarlyMinutes: 0,
+    totalIssueSessions: 0,
+    punctualityPercent: 'N/A',
+    punctualityLabel: 'Not available'
+  };
+
+  const target = toPublicId(studentId);
+  if (!target) return out;
+  const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
+  const classData = options?.classData && typeof options.classData === 'object' ? options.classData : {};
+  const orgPolicyLayer = options?.orgPolicyLayer && typeof options.orgPolicyLayer === 'object' ? options.orgPolicyLayer : {};
+  const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
+
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    if (sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(effectiveStatusMap, {
+      status: session?.status,
+      notes: session?.notes
+    })) return;
+    const roster = Array.isArray(session?.roster) ? session.roster : [];
+    const row = roster.find((item) => idsEqual(item?.personId, target));
+    if (!row) return;
+
+    const normalized = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(row, matrixPolicy);
+    const status = String(normalized?.attendance || '').trim().toLowerCase();
+    if (status !== 'present' && status !== 'late' && status !== 'excused') return;
+
+    const late = Math.max(0, normalizeNumber(normalized?.lateMinutes));
+    const leftEarly = Math.max(0, normalizeNumber(normalized?.earlyLeaveMinutes));
+    out.attendedSessions += 1;
+    out.lateMinutes += late;
+    out.leftEarlyMinutes += leftEarly;
+    if (late > 0) out.lateSessions += 1;
+    if (leftEarly > 0) out.leftEarlySessions += 1;
+    if (late > 0 || leftEarly > 0) out.totalIssueSessions += 1;
+    if (late <= 0 && leftEarly <= 0) out.onTimeSessions += 1;
+  });
+
+  if (out.attendedSessions > 0) {
+    out.punctualityPercent = Number(((out.onTimeSessions / out.attendedSessions) * 100).toFixed(2));
+  }
+  out.punctualityLabel = getPunctualityLabel(out.punctualityPercent, out.attendedSessions);
+  return out;
+}
+
+function normalizeSessionRatingPercent(value, fallback = 100) {
+  const fallbackNumber = Number(fallback);
+  const safeFallback = Number.isFinite(fallbackNumber) ? fallbackNumber : 100;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(safeFallback * 100) / 100));
+  return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
+}
+
+function averageSessionRating(values) {
+  const rows = (Array.isArray(values) ? values : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+  if (!rows.length) return 'N/A';
+  return Number((rows.reduce((sum, value) => sum + value, 0) / rows.length).toFixed(2));
+}
+
+function buildStudentSessionRatingSummary(sessions, studentId, statusMap = null, options = {}) {
+  const ratings = {
+    classEffort: [],
+    classParticipation: [],
+    respectsTeachers: [],
+    respectsStudents: []
+  };
+
+  const target = toPublicId(studentId);
+  if (!target) {
+    return {
+      ratedSessions: 0,
+      classEffortPercent: 'N/A',
+      classParticipationPercent: 'N/A',
+      respectsTeachersPercent: 'N/A',
+      respectsStudentsPercent: 'N/A'
+    };
+  }
+
+  const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
+  const classData = options?.classData && typeof options.classData === 'object' ? options.classData : {};
+  const orgPolicyLayer = options?.orgPolicyLayer && typeof options.orgPolicyLayer === 'object' ? options.orgPolicyLayer : {};
+  const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
+
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    if (sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(effectiveStatusMap, {
+      status: session?.status,
+      notes: session?.notes
+    })) return;
+    const roster = Array.isArray(session?.roster) ? session.roster : [];
+    const row = roster.find((item) => idsEqual(item?.personId, target));
+    if (!row) return;
+
+    const normalized = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(row, matrixPolicy);
+    const status = String(normalized?.attendance || '').trim().toLowerCase();
+    if (status !== 'present' && status !== 'late' && status !== 'excused') return;
+
+    ratings.classEffort.push(normalizeSessionRatingPercent(row?.classEffortPercent));
+    ratings.classParticipation.push(normalizeSessionRatingPercent(row?.classParticipationPercent));
+    ratings.respectsTeachers.push(normalizeSessionRatingPercent(row?.respectsTeachersPercent));
+    ratings.respectsStudents.push(normalizeSessionRatingPercent(row?.respectsStudentsPercent));
+  });
+
+  return {
+    ratedSessions: ratings.classEffort.length,
+    classEffortPercent: averageSessionRating(ratings.classEffort),
+    classParticipationPercent: averageSessionRating(ratings.classParticipation),
+    respectsTeachersPercent: averageSessionRating(ratings.respectsTeachers),
+    respectsStudentsPercent: averageSessionRating(ratings.respectsStudents)
+  };
 }
 
 function toPrintableValue(value) {
@@ -636,6 +779,14 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     classData,
     orgPolicyLayer
   });
+  const studentPunctualitySpan = buildStudentPunctualitySummary(periodSessions, studentId, statusMap, {
+    classData,
+    orgPolicyLayer
+  });
+  const studentSessionRatingSpan = buildStudentSessionRatingSummary(periodSessions, studentId, statusMap, {
+    classData,
+    orgPolicyLayer
+  });
   const primaryAttendance = studentPersonId
     ? {
         total: studentAttendanceSpan.totalSessions,
@@ -731,6 +882,20 @@ async function buildPrefillSnapshot({ assignment, teacherId = '', studentId = ''
     student_attendance_span_percent: studentAttendanceSpan.attendancePercent,
     student_attendance_span_late_minutes: studentAttendanceSpan.lateMinutes,
     student_attendance_span_early_leave_minutes: studentAttendanceSpan.earlyLeaveMinutes,
+    student_punctuality_span_attended_sessions: studentPunctualitySpan.attendedSessions,
+    student_punctuality_span_on_time_sessions: studentPunctualitySpan.onTimeSessions,
+    student_punctuality_span_late_sessions: studentPunctualitySpan.lateSessions,
+    student_punctuality_span_left_early_sessions: studentPunctualitySpan.leftEarlySessions,
+    student_punctuality_span_late_minutes: studentPunctualitySpan.lateMinutes,
+    student_punctuality_span_left_early_minutes: studentPunctualitySpan.leftEarlyMinutes,
+    student_punctuality_span_total_issue_sessions: studentPunctualitySpan.totalIssueSessions,
+    student_punctuality_span_percent: studentPunctualitySpan.punctualityPercent,
+    student_punctuality_span_label: studentPunctualitySpan.punctualityLabel,
+    student_session_rating_span_rated_sessions: studentSessionRatingSpan.ratedSessions,
+    student_session_rating_span_class_effort_percent: studentSessionRatingSpan.classEffortPercent,
+    student_session_rating_span_class_participation_percent: studentSessionRatingSpan.classParticipationPercent,
+    student_session_rating_span_respects_teachers_percent: studentSessionRatingSpan.respectsTeachersPercent,
+    student_session_rating_span_respects_students_percent: studentSessionRatingSpan.respectsStudentsPercent,
     student_org_member_role: String(studentOrgMembership?.role || ''),
     student_org_member_status: String(studentOrgMembership?.memberStatus || ''),
     ...gradebookPeriodStats,
