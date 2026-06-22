@@ -1316,6 +1316,57 @@ async function pickerSchoolSchedulePersons(req, res) {
     }
 }
 
+async function listActiveTeacherSchedulePersons(req, res) {
+    try {
+        const activeOrgId = getActiveScheduleOrgId(req.user);
+        const [teachers, persons] = await Promise.all([
+            schoolDataService.fetchData('teachers', {}, req.user),
+            dataService.fetchData('persons', {}, req.user, PERSON_QUERY_OPTIONS),
+        ]);
+
+        const personMap = new Map((Array.isArray(persons) ? persons : [])
+            .map((person) => [normalizeId(person?.id || person?._id), person]));
+        const seenPersonIds = new Set();
+        const items = [];
+
+        (Array.isArray(teachers) ? teachers : []).forEach((teacher) => {
+            if (!rowBelongsToActiveOrg(teacher, activeOrgId) || !isActiveSchoolIdentityRow(teacher)) return;
+            const personId = normalizeId(teacher?.personId);
+            if (!personId || seenPersonIds.has(personId)) return;
+            seenPersonIds.add(personId);
+
+            const person = personMap.get(personId) || { id: personId };
+            const displayName = buildPersonDisplayName(person, personId);
+            const availableRoles = [{ key: 'teacher', label: 'Teacher', source: 'school-record' }];
+            items.push({
+                id: personId,
+                personId,
+                teacherId: normalizeId(teacher?.id),
+                firstName: person?.name?.first || teacher?.firstName || '',
+                middleName: person?.name?.middle || '',
+                lastName: person?.name?.last || teacher?.lastName || '',
+                displayName,
+                name: displayName,
+                availableRoles,
+                roles: ['teacher'],
+                roleLabels: ['Teacher'],
+                selectedRole: 'teacher'
+            });
+        });
+
+        items.sort((a, b) => String(a.displayName || a.id).localeCompare(String(b.displayName || b.id)));
+
+        res.json({
+            status: 'success',
+            items,
+            data: items,
+            total: items.length
+        });
+    } catch (error) {
+        res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 async function showGlobalSchedulePage(req, res) {
     res.render('school/schedule/globalSchedule', {
         title: 'Global Schedule Comparison',
@@ -1391,6 +1442,7 @@ module.exports = {
     getMyScheduleData,
     getPersonSchedule,
     pickerSchoolSchedulePersons,
+    listActiveTeacherSchedulePersons,
     showGlobalSchedulePage,
     getGlobalSchedule
 };

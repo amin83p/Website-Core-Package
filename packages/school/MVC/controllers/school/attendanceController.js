@@ -45,6 +45,19 @@ function historicalRosterPeriodOverlapsWindow(period, windowStart, windowEnd) {
     return start <= we && end >= ws;
 }
 
+function isActiveAttendanceClass(row = {}) {
+    const status = String(row?.status || '').trim().toLowerCase();
+    return status === 'active';
+}
+
+function classBelongsToActiveOrg(row = {}, activeOrgId = '') {
+    const scopedOrgId = String(activeOrgId || '').trim();
+    if (!scopedOrgId) return true;
+    const rowOrgId = String(row?.orgId || row?.organizationId || row?.schoolOrgId || '').trim();
+    if (!rowOrgId) return true;
+    return idsEqual(rowOrgId, scopedOrgId);
+}
+
 async function showAttendancePage(req, res) {
     try {
         const canManageAttendanceMatrixPolicy = await userCanManageAttendanceMatrixPolicy(req.user, req.ip);
@@ -97,6 +110,37 @@ async function showAttendancePage(req, res) {
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    }
+}
+
+async function listActiveAttendanceClasses(req, res) {
+    try {
+        const activeOrgId = String(req.user?.activeOrgId || '').trim();
+        const classes = await schoolDataService.fetchData('classes', {}, req.user);
+        const items = (Array.isArray(classes) ? classes : [])
+            .filter((row) => classBelongsToActiveOrg(row, activeOrgId))
+            .filter(isActiveAttendanceClass)
+            .map((row) => ({
+                id: String(row?.id || '').trim(),
+                classId: String(row?.id || '').trim(),
+                title: String(row?.title || row?.name || row?.id || '').trim(),
+                name: String(row?.title || row?.name || row?.id || '').trim(),
+                status: String(row?.status || '').trim(),
+                orgId: String(row?.orgId || '').trim(),
+                registrationMode: String(row?.registrationMode || '').trim(),
+                cycleNo: row?.cycleNo || ''
+            }))
+            .filter((row) => row.id)
+            .sort((a, b) => String(a.title || a.id).localeCompare(String(b.title || b.id)));
+
+        res.json({
+            status: 'success',
+            items,
+            data: items,
+            total: items.length
+        });
+    } catch (error) {
+        res.status(400).json({ status: 'error', message: error.message });
     }
 }
 
@@ -455,6 +499,7 @@ module.exports = {
     showAttendancePage,
     showAttendanceMatrixSettings,
     saveAttendanceMatrixSettings,
+    listActiveAttendanceClasses,
     getAttendanceData,
     addAttendanceComment,
     updateAttendanceRosterCell

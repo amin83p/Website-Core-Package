@@ -1,12 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const classController = require('../MVC/controllers/school/classController');
-const schoolDataService = require('../MVC/services/school/schoolDataService');
-const idempotencyGuardService = require('../MVC/services/school/idempotencyGuardService');
+const classController = require('../packages/school/MVC/controllers/school/classController');
+const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
+const idempotencyGuardService = require('../packages/school/MVC/services/school/idempotencyGuardService');
 
 const schoolMethodNames = [
   'getDataById',
+  'fetchData',
   'getClassEnrollmentPeriodsByClassId',
   'createClassEnrollmentPeriod',
   'closeClassEnrollmentPeriod',
@@ -100,7 +101,23 @@ function applyClassLookupStubs(additional = {}) {
         id: String(id || 'CLS-1'),
         orgId: 'ORG-1',
         title: 'Rolling Class A',
-        registrationMode: 'rolling'
+        registrationMode: 'rolling',
+        status: 'active',
+        credits: 1,
+        billingMode: 'no_charge',
+        allowedProgramTerms: [{ programId: 'PGM-1', termId: '', order: 1 }],
+        curriculum: {
+          subjects: [{ subjectId: 'SUB-1', code: 'SUB1', name: 'Subject One', weight: 100 }]
+        }
+      };
+    }
+    if (entityType === 'programs') {
+      return {
+        id: String(id || 'PGM-1'),
+        orgId: 'ORG-1',
+        status: 'active',
+        name: 'Program One',
+        subjects: [{ subjectId: 'SUB-1', programCredits: 1, prerequisites: [], subjectType: 'main' }]
       };
     }
     if (entityType === 'classEnrollmentPeriods') {
@@ -110,7 +127,31 @@ function applyClassLookupStubs(additional = {}) {
         orgId: 'ORG-1'
       };
     }
+    if (entityType === 'students') {
+      return {
+        id: String(id || 'STU-1'),
+        personId: String(id || 'STU-1'),
+        orgId: 'ORG-1',
+        status: 'Active',
+        feeCategory: 'standard'
+      };
+    }
     return null;
+  };
+  schoolDataService.fetchData = async (entityType) => {
+    if (entityType === 'studentProgramRegistrations') {
+      return [{
+        id: 'SPR-1',
+        orgId: 'ORG-1',
+        studentId: 'STU-1',
+        programId: 'PGM-1',
+        status: 'registered',
+        registrationDate: '2026-02-01'
+      }];
+    }
+    if (entityType === 'studentTermRegistrations') return [];
+    if (entityType === 'subjects') return [];
+    return [];
   };
 
   Object.entries(additional).forEach(([name, fn]) => {

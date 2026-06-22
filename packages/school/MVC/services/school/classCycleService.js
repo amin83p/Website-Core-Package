@@ -459,6 +459,7 @@ async function createNextCycleFromCurrentClassTemplate(currentClassId, input = {
     ...(currentClass?.enrollment && typeof currentClass.enrollment === 'object' ? currentClass.enrollment : {}),
     students: []
   };
+  nextPayload.sessions = [];
 
   const createdClass = await dependencies.repositories.classes.create(nextPayload, options);
 

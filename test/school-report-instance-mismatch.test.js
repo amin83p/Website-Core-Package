@@ -194,3 +194,22 @@ test('report instance list renders pending assigned reports with start action an
   assert.match(source, /\/school\/reports\/instances\/start\//);
   assert.match(source, /studentId=/);
 });
+
+test('report instance save route accepts safe action-state fallback for stale editor tabs', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/routes/reportRoutes.js'), 'utf8');
+  assert.match(
+    source,
+    /router\.post\('\/instances\/edit\/:id'[\s\S]*trackActionState\(REPORT_INSTANCE_SECTION,\s*OPERATIONS\.UPDATE,\s*\{[\s\S]*requireToken:\s*true[\s\S]*allowOperationTokenFallback:\s*true[\s\S]*allowInactiveTokenFallback:\s*true[\s\S]*\}\)/,
+    'report instance save route should allow fallback for stale/expired action-state tokens'
+  );
+});
+
+test('report instance editor prevents duplicate saves and explains expired form sessions', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/report/instanceEditor.ejs'), 'utf8');
+  assert.match(source, /name="actionStateId"\s+value="<%= actionStateId \|\| '' %>"/);
+  assert.match(source, /reportInstanceSubmitting/);
+  assert.match(source, /setReportInstanceSubmitting\(true,\s*submitter\)/);
+  assert.match(source, /Form Session Expired/);
+  assert.match(source, /This report form session is no longer active/);
+  assert.doesNotMatch(source, /If you need this for your work, an administrator can add it to your profile/);
+});

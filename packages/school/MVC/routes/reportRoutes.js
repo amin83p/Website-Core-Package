@@ -202,7 +202,11 @@ router.get('/instances/edit/:id',
 
 router.post('/instances/edit/:id',
   requireReportInstanceEditorAccess,
-  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.saveInstance);
 
 router.get('/instances/edit/:id/prefill-preview',

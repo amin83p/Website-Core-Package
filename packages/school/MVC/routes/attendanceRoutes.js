@@ -41,6 +41,11 @@ router.get('/api/data',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
   ctrl.getAttendanceData);
 
+router.get('/api/active-classes',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL),
+  ctrl.listActiveAttendanceClasses);
+
 router.post('/api/comment',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, attendanceMatrixMutationActionState),

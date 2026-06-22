@@ -2392,6 +2392,44 @@
     }
   }
 
+  async function loadAllActiveHubScheduleTeachers() {
+    if (typeof window.showLoading === 'function') window.showLoading('Loading active teachers...');
+    try {
+      const response = await fetch('/school/schedules/api/active-teachers', {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to load active teachers.' };
+      });
+      if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Unable to load active teachers.');
+      const rows = Array.isArray(payload.items) ? payload.items : (Array.isArray(payload.data) ? payload.data : []);
+      if (!rows.length) {
+        showHubMessage({ title: 'Schedule', icon: 'info', message: 'No active teachers were found for the active organization.' });
+        return;
+      }
+      hubScheduleState.persons = rows.map(function (item) {
+        const id = resolveHubSchedulePersonId(item);
+        return {
+          id,
+          name: formatHubSchedulePersonName(item, id),
+          availableRoles: Array.isArray(item?.availableRoles) ? item.availableRoles : [{ key: 'teacher', label: 'Teacher' }],
+          selectedRole: 'teacher'
+        };
+      }).filter(function (person) { return !!person.id; });
+      hubScheduleState.activePersonId = hubScheduleState.persons[0]?.id || '';
+      hubScheduleState.eventsByPersonId = {};
+      hubScheduleState.statusMetaByPersonId = {};
+      hubScheduleState.loadedPersonIds.clear();
+      refreshHubScheduleActiveView();
+      await loadAllHubSchedulePeople();
+    } catch (error) {
+      showHubMessage({ title: 'Schedule', icon: 'danger', message: error.message || 'Unable to load active teachers.' });
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+    }
+  }
+
   function openHubSchedulePersonPicker() {
     if (!window.GenericPicker) {
       showHubMessage({ title: 'Schedule Picker', icon: 'warning', message: 'Generic picker is not available yet.' });
@@ -2436,6 +2474,8 @@
   function bindHubScheduleControls() {
     const addBtn = document.getElementById('hubScheduleAddPeople');
     if (addBtn) addBtn.addEventListener('click', openHubSchedulePersonPicker);
+    const activeTeachersBtn = document.getElementById('hubScheduleAllActiveTeachers');
+    if (activeTeachersBtn) activeTeachersBtn.addEventListener('click', loadAllActiveHubScheduleTeachers);
     const loadBtn = document.getElementById('hubScheduleLoadActive');
     if (loadBtn) loadBtn.addEventListener('click', loadActiveHubSchedulePerson);
     const loadAllBtn = document.getElementById('hubScheduleLoadAll');
@@ -2515,11 +2555,11 @@
       '</div>',
       '<div class="hub-workspace-toolbar">',
       '<div class="row g-3 align-items-end">',
-      '<div class="col-md-3"><button type="button" id="hubScheduleAddPeople" class="btn btn-outline-primary btn-sm w-100"><i class="bi bi-people-fill me-1"></i>Select People</button></div>',
+      '<div class="col-md-4"><div class="d-flex gap-2"><button type="button" id="hubScheduleAddPeople" class="btn btn-outline-primary btn-sm flex-fill"><i class="bi bi-people-fill me-1"></i>Select People</button><button type="button" id="hubScheduleAllActiveTeachers" class="btn btn-outline-info btn-sm flex-fill"><i class="bi bi-person-video3 me-1"></i>All Active Teacher</button></div></div>',
       '<div class="col-md-2"><label class="form-label fw-bold small">Start Date</label><input type="date" id="hubScheduleStartDate" class="form-control form-control-sm" value="' + escapeHtml(defaultStart) + '"></div>',
       '<div class="col-md-2"><label class="form-label fw-bold small">End Date</label><input type="date" id="hubScheduleEndDate" class="form-control form-control-sm" value="' + escapeHtml(defaultEnd) + '"></div>',
       '<div class="col-md-2"><label class="form-label fw-bold small">Role</label><select id="hubScheduleRole" class="form-select form-select-sm"><option value="">All Roles</option></select></div>',
-      '<div class="col-md-3 d-flex gap-2"><button type="button" id="hubScheduleLoadActive" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-arrow-clockwise me-1"></i>Load Tab</button><button type="button" id="hubScheduleLoadAll" class="btn btn-outline-primary btn-sm flex-fill">Load All</button></div>',
+      '<div class="col-md-2 d-flex gap-2"><button type="button" id="hubScheduleLoadActive" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-arrow-clockwise me-1"></i>Load Tab</button><button type="button" id="hubScheduleLoadAll" class="btn btn-outline-primary btn-sm flex-fill">Load All</button></div>',
       '</div>',
       '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
       '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-schedule-range="day">Today</button>',
@@ -2546,7 +2586,9 @@
   }
 
   const hubAttendanceState = {
-    data: null
+    data: null,
+    batch: [],
+    activeBatchClassKey: ''
   };
 
   function hubAttendanceToYmd(date) {
@@ -2614,12 +2656,12 @@
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div><div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
       '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-clipboard-check-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Attendance') + '</h2>',
-      '<p class="text-muted mb-0">Select a class and load its attendance matrix inside Master Hub. Open cells in the full Attendance page for deeper editing.</p></div>',
+      '<p class="text-muted mb-0">Select a class or load all active classes, then review attendance matrices inside Master Hub. Open cells in the full Attendance page for deeper editing.</p></div>',
       '<div class="d-flex gap-2"><a href="' + escapeHtml(section.sourceUrl || '/school/attendances') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Attendance</a></div>',
       '</div>',
       '<div class="hub-workspace-toolbar">',
       '<div class="row g-3 align-items-end">',
-      '<div class="col-xl-4 col-lg-5"><label class="form-label fw-bold small">Class</label><div class="input-group"><input type="hidden" id="hubAttendanceClassId"><input type="text" id="hubAttendanceClassName" class="form-control form-control-sm" placeholder="Select class..." readonly><button type="button" class="btn btn-outline-primary btn-sm" id="hubAttendancePickClass"><i class="bi bi-search"></i></button></div></div>',
+      '<div class="col-xl-4 col-lg-5"><label class="form-label fw-bold small">Class</label><div class="input-group"><input type="hidden" id="hubAttendanceClassId"><input type="text" id="hubAttendanceClassName" class="form-control form-control-sm" placeholder="Select class..." readonly><button type="button" class="btn btn-outline-primary btn-sm" id="hubAttendancePickClass" title="Select Class"><i class="bi bi-search"></i></button><button type="button" class="btn btn-outline-info btn-sm" id="hubAttendanceLoadActiveClasses" title="Load all active classes"><i class="bi bi-easel-fill me-1"></i>All Active Classes</button></div></div>',
       '<div class="col-md-3 col-lg-2"><label class="form-label fw-bold small">Start Date</label><input type="date" id="hubAttendanceStartDate" class="form-control form-control-sm"></div>',
       '<div class="col-md-3 col-lg-2"><label class="form-label fw-bold small">End Date</label><input type="date" id="hubAttendanceEndDate" class="form-control form-control-sm"></div>',
       '<div class="col-md-6 col-lg-3"><label class="form-label fw-bold small">Search Loaded Matrix</label><input type="search" id="hubAttendanceTableSearch" class="form-control form-control-sm" placeholder="Filter loaded students..."></div>',
@@ -2635,18 +2677,23 @@
       '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-attendance-range="allTime">All Time</button>',
       '</div>',
       '</div>',
-      '<div class="p-3 border-bottom bg-white" id="hubAttendanceStatus"><div class="text-muted small"><i class="bi bi-info-circle me-1"></i> Attendance is not loaded automatically. Select a class, choose a range, then click Load.</div></div>',
+      '<div class="p-3 border-bottom bg-white" id="hubAttendanceStatus"><div class="text-muted small"><i class="bi bi-info-circle me-1"></i> Attendance is not loaded automatically. Select a class or use All Active Classes, choose a range, then click Load.</div></div>',
       '<div class="p-3" id="hubAttendanceResult"><div class="hub-empty"><div><i class="bi bi-clipboard-check display-6 d-block mb-3"></i><div class="fw-semibold">Waiting for attendance load.</div><div class="text-muted small mt-1">The matrix will appear here after you load a class.</div></div></div></div>',
       '</div>'
     ].join('');
     setHubAttendanceRange('thisWeek');
-    if (hubAttendanceState.data) renderHubAttendanceMatrix(hubAttendanceState.data);
+    if (hubAttendanceState.batch && hubAttendanceState.batch.length) {
+      renderHubAttendanceBatch(hubAttendanceState.batch);
+    } else if (hubAttendanceState.data) {
+      renderHubAttendanceMatrix(hubAttendanceState.data);
+    }
     bindHubAttendanceControls();
   }
 
   function bindHubAttendanceControls() {
     const pickerBtn = document.getElementById('hubAttendancePickClass');
     const loadBtn = document.getElementById('hubAttendanceLoad');
+    const loadActiveClassesBtn = document.getElementById('hubAttendanceLoadActiveClasses');
     const tableSearch = document.getElementById('hubAttendanceTableSearch');
 
     if (pickerBtn) {
@@ -2682,9 +2729,19 @@
       });
     }
 
+    if (loadActiveClassesBtn) {
+      loadActiveClassesBtn.addEventListener('click', function () {
+        loadAllActiveHubAttendanceClasses();
+      });
+    }
+
     if (tableSearch) {
       tableSearch.addEventListener('input', function () {
-        if (hubAttendanceState.data) renderHubAttendanceMatrix(hubAttendanceState.data);
+        if (hubAttendanceState.batch && hubAttendanceState.batch.length) {
+          renderHubAttendanceBatch(hubAttendanceState.batch);
+        } else if (hubAttendanceState.data) {
+          renderHubAttendanceMatrix(hubAttendanceState.data);
+        }
       });
     }
   }
@@ -2741,6 +2798,8 @@
       if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Unable to load attendance matrix.');
 
       hubAttendanceState.data = result;
+      hubAttendanceState.batch = [];
+      hubAttendanceState.activeBatchClassKey = '';
       if (classNameEl) classNameEl.value = result.className || classNameEl.value || classId;
       renderHubAttendanceMatrix(result);
     } catch (error) {
@@ -2755,6 +2814,93 @@
     }
   }
 
+  async function loadHubAttendanceMatrixForClass(classRow, startDate, endDate) {
+    const classId = String(classRow?.id || classRow?.classId || '').trim();
+    if (!classId) return { status: 'error', className: 'Unknown Class', message: 'Class id is missing.' };
+    const params = new URLSearchParams({ classId: classId });
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    const response = await fetch('/school/attendances/api/data?' + params.toString(), {
+      cache: 'no-store',
+      headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' },
+      credentials: 'same-origin'
+    });
+    const result = await response.json().catch(function () {
+      return { status: 'error', message: 'Unable to load attendance matrix.' };
+    });
+    const guarded = typeof window.applyGuardedApiResult === 'function'
+      ? await window.applyGuardedApiResult(result, { busyTitle: 'Load In Progress', replayTitle: 'Load Already Completed' })
+      : { stop: false };
+    if (guarded.stop) return { status: 'skipped', classId, className: classRow?.title || classRow?.name || classId };
+    if (!response.ok || result.status !== 'success') {
+      return {
+        status: 'error',
+        classId,
+        className: classRow?.title || classRow?.name || classId,
+        message: result.message || 'Unable to load attendance matrix.'
+      };
+    }
+    return result;
+  }
+
+  async function loadAllActiveHubAttendanceClasses() {
+    const startDate = String(document.getElementById('hubAttendanceStartDate')?.value || '').trim();
+    const endDate = String(document.getElementById('hubAttendanceEndDate')?.value || '').trim();
+    const status = document.getElementById('hubAttendanceStatus');
+    const output = document.getElementById('hubAttendanceResult');
+    const button = document.getElementById('hubAttendanceLoadActiveClasses');
+    const originalHtml = button ? button.innerHTML : '';
+
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Loading';
+    }
+    if (status) status.innerHTML = '<div class="text-muted small"><i class="bi bi-arrow-repeat me-1"></i> Loading active classes...</div>';
+    if (output) output.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted small">Loading attendance for active classes...</div></div>';
+    if (typeof window.showLoading === 'function') window.showLoading('Loading attendance for active classes...');
+
+    try {
+      const response = await fetch('/school/attendances/api/active-classes', {
+        cache: 'no-store',
+        headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to load active classes.' };
+      });
+      if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Unable to load active classes.');
+      const classes = Array.isArray(payload.items) ? payload.items : (Array.isArray(payload.data) ? payload.data : []);
+      if (!classes.length) {
+        hubAttendanceState.data = null;
+        hubAttendanceState.batch = [];
+        hubAttendanceState.activeBatchClassKey = '';
+        if (status) status.innerHTML = '<div class="text-muted small"><i class="bi bi-info-circle me-1"></i>No active classes found for the active organization.</div>';
+        if (output) output.innerHTML = '<div class="hub-empty"><div><i class="bi bi-easel display-6 d-block mb-3"></i><div class="fw-semibold">No active classes found.</div></div></div>';
+        return;
+      }
+
+      const results = [];
+      for (const classRow of classes) {
+        if (status) status.innerHTML = '<div class="text-muted small"><i class="bi bi-arrow-repeat me-1"></i> Loading ' + escapeHtml(classRow.title || classRow.name || classRow.id || 'class') + '...</div>';
+        // eslint-disable-next-line no-await-in-loop
+        results.push(await loadHubAttendanceMatrixForClass(classRow, startDate, endDate));
+      }
+      hubAttendanceState.data = null;
+      hubAttendanceState.batch = results.filter(function (row) { return row && row.status !== 'skipped'; });
+      hubAttendanceState.activeBatchClassKey = getHubAttendanceBatchClassKey(hubAttendanceState.batch[0], 0);
+      renderHubAttendanceBatch(hubAttendanceState.batch);
+    } catch (error) {
+      if (status) status.innerHTML = '<div class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>' + escapeHtml(error.message || 'Unable to load active classes.') + '</div>';
+      await showHubInlineMessage('Attendance', error.message || 'Unable to load active classes.', 'error');
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = originalHtml;
+      }
+    }
+  }
+
   function hubAttendanceStatusIcon(status) {
     const value = String(status || '').trim().toLowerCase();
     if (value === 'present') return '<i class="bi bi-check-circle-fill attendance-status-present" title="Present"></i>';
@@ -2762,6 +2908,10 @@
     if (value === 'excused') return '<i class="bi bi-envelope-paper-fill attendance-status-excused" title="Excused"></i>';
     if (value === 'absent') return '<i class="bi bi-x-circle-fill attendance-status-absent" title="Absent"></i>';
     return '<i class="bi bi-dash attendance-status-na" title="No record"></i>';
+  }
+
+  function getHubAttendanceBatchClassKey(row, index) {
+    return String(row?.classId || row?.id || row?.className || ('class-' + String(index + 1))).trim();
   }
 
   function renderHubAttendanceMatrix(result) {
@@ -2841,6 +2991,140 @@
         const sessionId = cell.getAttribute('data-session-id') || '';
         const url = new URL('/school/attendances', window.location.origin);
         url.searchParams.set('classId', result.classId || '');
+        if (startDate) url.searchParams.set('startDate', startDate);
+        if (endDate) url.searchParams.set('endDate', endDate);
+        if (personId) url.searchParams.set('studentId', personId);
+        if (sessionId) url.searchParams.set('sessionId', sessionId);
+        window.open(url.pathname + url.search, '_blank', 'noopener');
+      });
+    });
+  }
+
+  function renderHubAttendanceBatch(results) {
+    const output = document.getElementById('hubAttendanceResult');
+    const status = document.getElementById('hubAttendanceStatus');
+    if (!output) return;
+    const rows = Array.isArray(results) ? results : [];
+    if (!rows.length) {
+      if (status) status.innerHTML = '<div class="text-muted small"><i class="bi bi-info-circle me-1"></i>No attendance matrices are loaded.</div>';
+      output.innerHTML = '<div class="hub-empty"><div><i class="bi bi-clipboard-check display-6 d-block mb-3"></i><div class="fw-semibold">No attendance loaded.</div></div></div>';
+      return;
+    }
+
+    const tableSearch = String(document.getElementById('hubAttendanceTableSearch')?.value || '').trim().toLowerCase();
+    const successful = rows.filter(function (row) { return row.status === 'success'; });
+    const failed = rows.filter(function (row) { return row.status !== 'success'; });
+    const totalSessions = successful.reduce(function (sum, row) { return sum + (Array.isArray(row.sessions) ? row.sessions.length : 0); }, 0);
+    const totalStudents = successful.reduce(function (sum, row) {
+      const matrix = Array.isArray(row.matrix) ? row.matrix : [];
+      if (!tableSearch) return sum + matrix.length;
+      return sum + matrix.filter(function (student) {
+        return [student.name, student.personId].filter(Boolean).join(' ').toLowerCase().includes(tableSearch);
+      }).length;
+    }, 0);
+
+    if (status) {
+      status.innerHTML = '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2"><div><div class="fw-bold">All Active Classes Attendance</div><div class="text-muted small">' + escapeHtml(String(successful.length)) + ' classes loaded, ' + escapeHtml(String(totalStudents)) + ' visible students, ' + escapeHtml(String(totalSessions)) + ' sessions. Last loaded: ' + escapeHtml(new Date().toLocaleString()) + '</div></div>' + (failed.length ? '<span class="badge text-bg-warning">' + escapeHtml(String(failed.length)) + ' failed</span>' : '') + '</div>';
+    }
+
+    function renderBatchClassPanel(row) {
+      if (row.status !== 'success') {
+        return '<div class="card border-danger-subtle shadow-sm mb-3"><div class="card-body"><div class="fw-bold text-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + escapeHtml(row.className || row.classId || 'Class') + '</div><div class="text-muted small mt-1">' + escapeHtml(row.message || 'Unable to load this class.') + '</div></div></div>';
+      }
+      const sessions = Array.isArray(row.sessions) ? row.sessions : [];
+      const matrix = (Array.isArray(row.matrix) ? row.matrix : []).filter(function (student) {
+        if (!tableSearch) return true;
+        return [student.name, student.personId].filter(Boolean).join(' ').toLowerCase().includes(tableSearch);
+      });
+      if (!sessions.length) {
+        return '<div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white fw-bold">' + escapeHtml(row.className || row.classId || 'Class') + '</div><div class="card-body"><div class="text-muted small"><i class="bi bi-calendar-x me-1"></i>No active attendance sessions found for this range.</div></div></div>';
+      }
+      const headerCells = sessions.map(function (session) {
+        const dateText = String(session.date || '').trim();
+        const displayDate = dateText
+          ? new Date(dateText + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : String(session.id || '');
+        return '<th class="text-center small">' + escapeHtml(displayDate) + '</th>';
+      }).join('');
+      const bodyRows = matrix.length ? matrix.map(function (student) {
+        const summary = student.summary || {};
+        const present = Number(summary.totalPresentSessions || 0);
+        const absent = Number(summary.totalAbsentSessions || 0);
+        const percent = summary.performancePercent == null ? '-' : String(summary.performancePercent) + '%';
+        const records = Array.isArray(student.records) ? student.records : [];
+        const cells = records.map(function (record) {
+          const sessionId = String(record.sessionId || '').trim();
+          const notesExist = Array.isArray(record.comments) && record.comments.length > 0;
+          return '<td class="hub-attendance-cell" data-hub-attendance-cell data-class-id="' + escapeHtml(row.classId || '') + '" data-person-id="' + escapeHtml(student.personId || '') + '" data-session-id="' + escapeHtml(sessionId) + '" title="Open this attendance record in the full Attendance page">' + hubAttendanceStatusIcon(record.status) + (notesExist ? '<div class="small mt-1"><i class="bi bi-chat-dots-fill text-primary"></i></div>' : '') + '</td>';
+        }).join('');
+        return '<tr><td class="hub-attendance-rollup text-center small"><div><span class="text-success fw-bold">' + escapeHtml(String(present)) + '</span><span class="text-muted"> / </span><span class="text-danger fw-bold">' + escapeHtml(String(absent)) + '</span></div><div class="text-primary fw-bold">' + escapeHtml(percent) + '</div></td><td class="hub-attendance-student"><div class="fw-semibold">' + escapeHtml(student.name || 'Student') + '</div><div class="text-muted small font-monospace">' + escapeHtml(student.personId || '') + '</div></td>' + cells + '</tr>';
+      }).join('') : '<tr><td colspan="' + escapeHtml(String(sessions.length + 2)) + '" class="text-center text-muted py-5">No matching students in this class matrix.</td></tr>';
+      return '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2"><div><div class="fw-bold">' + escapeHtml(row.className || row.classId || 'Class') + '</div><div class="text-muted small">' + escapeHtml(String(matrix.length)) + ' visible students, ' + escapeHtml(String(sessions.length)) + ' sessions</div></div><a class="btn btn-outline-primary btn-sm" href="/school/attendances?classId=' + encodeURIComponent(row.classId || '') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a></div><div class="card-body p-0"><div class="hub-attendance-matrix-wrap border-0"><table class="table table-hover align-middle hub-attendance-table mb-0"><thead><tr><th class="hub-attendance-rollup text-center small">Rollup<br><span class="text-muted fw-normal">P / A / %</span></th><th class="hub-attendance-student">Student</th>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div></div></div>';
+    }
+
+    if (rows.length > 1) {
+      const activeKeyExists = rows.some(function (row, index) {
+        return getHubAttendanceBatchClassKey(row, index) === hubAttendanceState.activeBatchClassKey;
+      });
+      if (!hubAttendanceState.activeBatchClassKey || !activeKeyExists) {
+        hubAttendanceState.activeBatchClassKey = getHubAttendanceBatchClassKey(rows[0], 0);
+      }
+      const activeRow = rows.find(function (row, index) {
+        return getHubAttendanceBatchClassKey(row, index) === hubAttendanceState.activeBatchClassKey;
+      }) || rows[0];
+      const tabs = rows.map(function (row, index) {
+        const classKey = getHubAttendanceBatchClassKey(row, index);
+        const isActive = classKey === hubAttendanceState.activeBatchClassKey;
+        const sessionCount = Array.isArray(row.sessions) ? row.sessions.length : 0;
+        const studentCount = Array.isArray(row.matrix) ? row.matrix.length : 0;
+        const badgeClass = row.status === 'success'
+          ? (isActive ? 'text-bg-light' : 'text-bg-primary')
+          : 'text-bg-warning';
+        const badgeText = row.status === 'success'
+          ? String(studentCount) + ' students'
+          : 'Needs attention';
+        return [
+          '<button type="button" class="btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-outline-primary') + ' hub-schedule-person-tab" data-hub-attendance-class-tab="' + escapeHtml(classKey) + '">',
+          '<i class="bi bi-easel-fill"></i>',
+          '<span>' + escapeHtml(row.className || row.classId || 'Class') + '</span>',
+          row.status === 'success' ? '<span class="text-muted small">' + escapeHtml(String(sessionCount)) + ' sessions</span>' : '',
+          '<span class="badge ' + badgeClass + '">' + escapeHtml(badgeText) + '</span>',
+          '</button>'
+        ].join('');
+      }).join('');
+
+      output.innerHTML = [
+        '<div class="card border-0 shadow-sm">',
+        '<div class="hub-schedule-tabs" id="hubAttendanceClassTabs">',
+        tabs,
+        '</div>',
+        '<div class="card-body">',
+        '<div id="hubAttendanceClassTabContent">',
+        renderBatchClassPanel(activeRow),
+        '</div>',
+        '</div>',
+        '</div>'
+      ].join('');
+
+      output.querySelectorAll('[data-hub-attendance-class-tab]').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          hubAttendanceState.activeBatchClassKey = tab.getAttribute('data-hub-attendance-class-tab') || hubAttendanceState.activeBatchClassKey;
+          renderHubAttendanceBatch(hubAttendanceState.batch);
+        });
+      });
+    } else {
+      output.innerHTML = rows.map(renderBatchClassPanel).join('');
+    }
+
+    output.querySelectorAll('[data-hub-attendance-cell]').forEach(function (cell) {
+      cell.addEventListener('click', function () {
+        const classId = cell.getAttribute('data-class-id') || '';
+        const personId = cell.getAttribute('data-person-id') || '';
+        const sessionId = cell.getAttribute('data-session-id') || '';
+        const startDate = String(document.getElementById('hubAttendanceStartDate')?.value || '').trim();
+        const endDate = String(document.getElementById('hubAttendanceEndDate')?.value || '').trim();
+        const url = new URL('/school/attendances', window.location.origin);
+        if (classId) url.searchParams.set('classId', classId);
         if (startDate) url.searchParams.set('startDate', startDate);
         if (endDate) url.searchParams.set('endDate', endDate);
         if (personId) url.searchParams.set('studentId', personId);

@@ -159,6 +159,70 @@ test('action-state middleware keeps opted-in runtime tokens active after success
   assert.equal(completeCalls, 0);
 });
 
+test('action-state middleware can mint replacement state after inactive token when route opts in', async () => {
+  const calls = [];
+  dataService.logActionStateAttempt = async (userId, sectionId, operationId, targetKey, limits, forceId, context) => {
+    calls.push({ userId, sectionId, operationId, targetKey, forceId, context });
+    if (forceId === 'OLD-READ-TOKEN') {
+      throw new Error('Action State is no longer active.');
+    }
+    return {
+      id: 'REPLACEMENT-TOKEN',
+      targetKey,
+      attemptCount: 1
+    };
+  };
+  dataService.updateActionStateProgress = async () => {};
+  dataService.completeActionState = async () => {};
+  dataService.failActionState = async () => {};
+  dataService.recordActionStateRetryableError = async () => {};
+
+  const req = createReq();
+  const res = createRes();
+  let nextCalled = false;
+  const middleware = trackActionState(SECTIONS.TASKS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  });
+
+  await middleware(req, res, () => {
+    nextCalled = true;
+  });
+
+  assert.equal(nextCalled, true);
+  assert.equal(res.statusCode, 200);
+  assert.equal(req.actionStateId, 'REPLACEMENT-TOKEN');
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].forceId, 'OLD-READ-TOKEN');
+  assert.equal(calls[1].forceId, null);
+  assert.equal(calls[1].targetKey, 'S-1');
+  assert.equal(calls[1].context.actionStateFallback.reason, 'inactive_or_expired_token');
+});
+
+test('action-state middleware rejects inactive token when inactive fallback is not enabled', async () => {
+  dataService.logActionStateAttempt = async () => {
+    throw new Error('Action State is no longer active.');
+  };
+
+  const req = createReq();
+  const res = createRes();
+  let nextCalled = false;
+  const middleware = trackActionState(SECTIONS.TASKS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true
+  });
+
+  await middleware(req, res, () => {
+    nextCalled = true;
+  });
+
+  assert.equal(nextCalled, false);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.payload.status, 'error');
+  assert.match(res.payload.message, /Action State is no longer active/);
+});
+
 test('action-state middleware keeps strict operation validation unless route opts in', async () => {
   dataService.logActionStateAttempt = async () => {
     throw new Error('Action State Token does not belong to this operation.');

@@ -557,6 +557,8 @@
     const summaryFocusStorageKey = 'report_instance_validation_focus';
     let prefillRefreshModal = null;
     let prefillRefreshChanges = [];
+    let reportInstanceSubmitting = false;
+    let reportInstanceSubmitLoadingToken = null;
 
     function showReportInstanceMessage({ title = 'Report Instance', icon = 'info', message = '', buttons = null } = {}) {
       if (typeof showMessageModal === 'function') {
@@ -596,6 +598,46 @@
       try {
         if (token && typeof window.hideLoading === 'function') window.hideLoading(token);
       } catch (_) {}
+    }
+
+    function getReportInstanceActionStateId() {
+      return String(
+        formEl?.querySelector('input[name="actionStateId"]')?.value
+        || document.getElementById('reportInstanceActionStateId')?.value
+        || ''
+      ).trim();
+    }
+
+    function setReportInstanceSubmitting(isSubmitting, submitter = null) {
+      reportInstanceSubmitting = Boolean(isSubmitting);
+      if (!formEl) return;
+      formEl.querySelectorAll('button[type="submit"]').forEach((button) => {
+        button.disabled = reportInstanceSubmitting;
+        if (reportInstanceSubmitting) button.setAttribute('aria-disabled', 'true');
+        else button.removeAttribute('aria-disabled');
+      });
+      if (reportInstanceSubmitting && submitter) {
+        submitter.dataset.originalText = submitter.dataset.originalText || submitter.innerHTML;
+        submitter.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Saving...';
+      }
+    }
+
+    async function showExpiredActionStateMessage() {
+      const message = 'This report form session is no longer active. Reload the report instance, review your changes, and save again.';
+      if (typeof showMessageModal === 'function') {
+        const result = await showMessageModal({
+          title: 'Form Session Expired',
+          icon: 'warning',
+          message,
+          buttons: [
+            { text: 'Stay', class: 'btn-secondary' },
+            { text: 'Reload', class: 'btn-primary' }
+          ]
+        });
+        if (result === 'Reload') window.location.reload();
+        return;
+      }
+      window.alert(message);
     }
 
     function getPrefillRefreshModal() {
@@ -1479,21 +1521,44 @@
           const submitter = event.submitter || null;
           const submitAction = String(submitter?.value || '').trim().toLowerCase();
           rememberValidationSummaryFocus(submitAction);
-          if (submitAction !== 'submit') return;
-          const summary = runClientValidation();
-          if (!summary.errors.length) return;
-          event.preventDefault();
-          const first = summary.errors[0];
-          if (typeof showMessageModal === 'function') {
-            await showMessageModal({
-              title: 'Validation Error',
-              icon: 'warning',
-              message: `${first.message} Please fix validation errors before submitting.`,
-              buttons: [{ text: 'OK', class: 'btn-primary' }]
-            });
-          } else {
-            window.alert(`${first.message} Please fix validation errors before submitting.`);
+          if (!getReportInstanceActionStateId()) {
+            event.preventDefault();
+            await showExpiredActionStateMessage();
+            return;
           }
+          if (submitAction === 'submit') {
+            const summary = runClientValidation();
+            if (summary.errors.length) {
+              event.preventDefault();
+              const first = summary.errors[0];
+              if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                  title: 'Validation Error',
+                  icon: 'warning',
+                  message: `${first.message} Please fix validation errors before submitting.`,
+                  buttons: [{ text: 'OK', class: 'btn-primary' }]
+                });
+              } else {
+                window.alert(`${first.message} Please fix validation errors before submitting.`);
+              }
+              return;
+            }
+          }
+          if (reportInstanceSubmitting) {
+            event.preventDefault();
+            await showReportInstanceMessage({
+              title: 'Save Already Running',
+              icon: 'info',
+              message: 'This report save is already in progress. Please wait for it to finish.'
+            });
+            return;
+          }
+          setReportInstanceSubmitting(true, submitter);
+          reportInstanceSubmitLoadingToken = showLoadingToken({
+            title: submitAction === 'submit' ? 'Submitting Report' : 'Saving Report',
+            note: 'Please wait while this report instance is saved.',
+            operation: 'Report Instance'
+          });
         }, true);
       } catch (error) {
         console.error('Report editor validation initialization failed:', error);
