@@ -48,5 +48,28 @@
     "latestEntryId": "873821",
     "lastRebuiltAt": "2026-04-01T16:33:50.733Z",
     "id": "902561"
+  },
+  {
+    "id": "ASNP-STU-1-PGM-1",
+    "studentId": "STU-1",
+    "programId": "PGM-1",
+    "orgId": "",
+    "personId": "",
+    "currentTermId": "",
+    "standing": "pending",
+    "credits": {
+      "attempted": 0,
+      "earned": 0,
+      "mainEarned": 0,
+      "essentialEarned": 0,
+      "optionalEarned": 0
+    },
+    "results": {
+      "passedSubjects": [],
+      "failedSubjects": [],
+      "activeClasses": []
+    },
+    "latestEntryId": "",
+    "lastRebuiltAt": "2026-06-22T18:56:28.608Z"
   }
 ]
