@@ -409,6 +409,29 @@ function buildLeaveRequestActionLinks(row) {
   return actions;
 }
 
+function buildHolidayActionLinks(row) {
+  if (!row) return [];
+  return [
+    { label: 'Edit', action: 'edit', icon: 'bi bi-pencil-square', tone: 'primary' },
+    { label: 'Delete', action: 'delete', icon: 'bi bi-trash', tone: 'danger' }
+  ];
+}
+
+function resolveHolidayYear(value) {
+  const candidate = normalizeText(value);
+  return /^\d{4}$/.test(candidate) ? candidate : String(new Date().getFullYear());
+}
+
+function buildHolidayYearOptions(selectedYear) {
+  const selected = Number(resolveHolidayYear(selectedYear));
+  const years = new Set();
+  for (let year = selected - 2; year <= selected + 3; year += 1) {
+    years.add(String(year));
+  }
+  years.add(String(new Date().getFullYear()));
+  return Array.from(years).sort();
+}
+
 function normalizeLeaveRequestRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => {
     const startDate = normalizeText(row?.startDate);
@@ -431,6 +454,18 @@ function normalizeLeaveRequestRows(rows) {
       actions: buildLeaveRequestActionLinks(row)
     };
   });
+}
+
+function normalizeHolidayRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: normalizeText(row?.id),
+    date: normalizeText(row?.date),
+    title: normalizeText(row?.title || row?.name || 'Holiday'),
+    type: normalizeText(row?.type || 'Holiday'),
+    notes: normalizeText(row?.notes || ''),
+    orgId: normalizeText(row?.orgId || ''),
+    actions: buildHolidayActionLinks(row)
+  }));
 }
 
 function addRoleTokens(target, value) {
@@ -628,6 +663,45 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       },
       rows: normalizedRows,
       total: normalizedRows.length,
+      searchQuery: normalizeText(query.q || ''),
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  if (key === 'holidays') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Holidays',
+      sectionId: SECTIONS.SCHOOL_HOLIDAYS
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Holidays.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const targetYear = resolveHolidayYear(queryInput?.year || query.year);
+    const fetchQuery = {
+      ...query,
+      searchFields: query.searchFields || 'id,date,title,type,notes,orgId'
+    };
+    delete fetchQuery.year;
+    delete fetchQuery.page;
+    delete fetchQuery.limit;
+    const rows = await dataService.fetchData('holidays', fetchQuery, req.user, { scopeId: access.scopeId });
+    const normalizedRows = normalizeHolidayRows(rows)
+      .filter((row) => row.date && String(row.date).startsWith(targetYear))
+      .filter((row) => rowMatchesWorkspaceSearch(row, query.q || ''))
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    return {
+      section: {
+        key: 'holidays',
+        label: 'Holidays',
+        icon: 'bi bi-calendar-event-fill',
+        sourceUrl: '/school/holidays'
+      },
+      rows: normalizedRows,
+      total: normalizedRows.length,
+      currentYear: targetYear,
+      yearOptions: buildHolidayYearOptions(targetYear),
       searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()
     };

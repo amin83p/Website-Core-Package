@@ -851,6 +851,9 @@
       <button type="button" class="hub-section-segment" data-hub-workspace-section="leave-requests">
         <span><i class="bi bi-calendar-heart me-1"></i> Leave Requests</span>
       </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="holidays">
+        <span><i class="bi bi-calendar-event-fill me-1"></i> Holidays</span>
+      </button>
     </div>
   </div>
 
@@ -1124,8 +1127,10 @@
     loading: false,
     serverSearch: {
       notifications: '',
-      classes: ''
-    }
+      classes: '',
+      holidays: ''
+    },
+    holidaysYear: String(new Date().getFullYear())
   };
 
   const workspaceSections = {
@@ -1140,6 +1145,12 @@
       endpoint: '/school/master-hub/api/workspace/classes',
       sourceUrl: '/school/classes',
       icon: 'bi bi-easel-fill'
+    },
+    holidays: {
+      label: 'Holidays',
+      endpoint: '/school/master-hub/api/workspace/holidays',
+      sourceUrl: '/school/holidays',
+      icon: 'bi bi-calendar-event-fill'
     }
   };
 
@@ -3242,6 +3253,277 @@
     ].join('');
   }
 
+  function renderHolidayWorkspace(payload) {
+    const section = payload.section || {
+      key: 'holidays',
+      label: 'Holidays',
+      icon: 'bi bi-calendar-event-fill',
+      sourceUrl: '/school/holidays'
+    };
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    const notLoaded = payload.notLoaded === true;
+    const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const currentYear = String(payload.currentYear || workspaceState.holidaysYear || new Date().getFullYear());
+    workspaceState.holidaysYear = currentYear;
+    const yearOptions = Array.isArray(payload.yearOptions) && payload.yearOptions.length
+      ? payload.yearOptions
+      : Array.from({ length: 5 }, function (_unused, index) { return String(new Date().getFullYear() - 1 + index); });
+    const yearSelect = yearOptions.map(function (year) {
+      const value = String(year);
+      return '<option value="' + escapeHtml(value) + '"' + (value === currentYear ? ' selected' : '') + '>' + escapeHtml(value) + '</option>';
+    }).join('');
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-event-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Holidays') + '</h2>',
+      '<p class="text-muted mb-0">Review school holidays and off days inside Master Hub. Open the full page for add, edit, and delete workflows.</p>',
+      '</div>',
+      '<div class="hub-workspace-actions">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-load-workspace="holidays"><i class="bi bi-arrow-repeat me-1"></i>' + (notLoaded ? 'Load Holidays' : 'Refresh') + '</button>',
+      '<a class="btn btn-primary btn-sm" href="' + escapeHtml(section.sourceUrl || '/school/holidays') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-md-3 col-lg-2">',
+      '<label class="form-label small fw-semibold" for="hubHolidayYear">Year</label>',
+      '<select class="form-select form-select-sm" id="hubHolidayYear">' + yearSelect + '</select>',
+      '</div>',
+      '<div class="col-md-5 col-lg-4">',
+      '<label class="form-label small fw-semibold" for="hubServerSearch_holidays">DB Search</label>',
+      '<div class="input-group input-group-sm">',
+      '<input type="search" class="form-control" id="hubServerSearch_holidays" data-hub-server-search-input="holidays" value="' + escapeHtml(workspaceState.serverSearch.holidays || '') + '" placeholder="Search holidays in database...">',
+      '<button type="button" class="btn btn-primary" data-hub-server-search-button="holidays"><i class="bi bi-search me-1"></i>Search</button>',
+      '<button type="button" class="btn btn-outline-secondary" data-hub-server-search-clear="holidays">Clear</button>',
+      '</div>',
+      '</div>',
+      '<div class="col-md-4 col-lg-3">',
+      '<label class="form-label small fw-semibold" for="hubTableSearch_holidays">Search Visible Table</label>',
+      '<input type="search" class="form-control form-control-sm" id="hubTableSearch_holidays" data-hub-table-search-input="holidays" placeholder="Filter displayed rows...">',
+      '</div>',
+      '<div class="col-lg-3 d-flex justify-content-lg-end gap-2">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-load-workspace="holidays"><i class="bi bi-arrow-repeat me-1"></i>' + (notLoaded ? 'Load Holidays' : 'Refresh') + '</button>',
+      '<button type="button" class="btn btn-primary btn-sm" id="hubHolidayAddBtn"><i class="bi bi-plus-circle me-1"></i>Add Holiday</button>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '<div class="p-3 border-bottom bg-white">',
+      '<div class="small text-muted">' + (notLoaded ? 'Holidays are not loaded automatically. Choose a year and click Load Holidays when ready.' : 'Showing ' + escapeHtml(String(rows.length)) + ' holiday/off-day record(s) for ' + escapeHtml(currentYear) + '. Last refreshed: ' + escapeHtml(refreshed) + '.') + '</div>',
+      '</div>',
+      '<div class="p-3">',
+      notLoaded ? '<div class="hub-empty"><div><i class="bi bi-calendar-event display-6 d-block mb-3"></i><div class="fw-semibold">Holidays are ready to load.</div><div class="text-muted small mt-1">Click the load button above to retrieve holiday and off-day records.</div></div></div>' : renderHolidayRows(rows),
+      '</div>',
+      renderHolidayEditorModal(),
+      '</div>',
+      '</section>'
+    ].join('');
+
+    bindWorkspaceSearchControls('holidays');
+    bindHolidayWorkspaceControls();
+  }
+
+  function renderHolidayEditorModal() {
+    return [
+      '<div class="modal fade" id="hubHolidayModal" tabindex="-1" aria-hidden="true">',
+      '<div class="modal-dialog">',
+      '<div class="modal-content">',
+      '<div class="modal-header bg-primary text-white">',
+      '<h5 class="modal-title fw-bold" id="hubHolidayModalTitle">Add Holiday</h5>',
+      '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>',
+      '</div>',
+      '<div class="modal-body">',
+      '<form id="hubHolidayForm">',
+      '<input type="hidden" id="hubHolidayId">',
+      '<div class="mb-3"><label class="form-label fw-bold" for="hubHolidayDate">Date *</label><input type="date" id="hubHolidayDate" class="form-control" required></div>',
+      '<div class="mb-3"><label class="form-label fw-bold" for="hubHolidayTitle">Title *</label><input type="text" id="hubHolidayTitle" class="form-control" required></div>',
+      '<div class="mb-3"><label class="form-label fw-bold" for="hubHolidayType">Type</label><select id="hubHolidayType" class="form-select"><option value="National Holiday">National Holiday</option><option value="School Break">School Break</option><option value="Staff Development">Staff Development</option><option value="Weather Emergency">Weather / Emergency</option><option value="Other">Other</option></select></div>',
+      '<div class="mb-3"><label class="form-label fw-bold" for="hubHolidayNotes">Notes</label><textarea id="hubHolidayNotes" class="form-control" rows="2"></textarea></div>',
+      '</form>',
+      '</div>',
+      '<div class="modal-footer bg-light">',
+      '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>',
+      '<button type="button" class="btn btn-primary fw-bold" id="hubHolidaySaveBtn">Save Holiday</button>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function bindHolidayWorkspaceControls() {
+    const loadButton = els.workspace.querySelector('[data-hub-load-workspace="holidays"]');
+    if (loadButton) {
+      loadButton.addEventListener('click', function () {
+        loadWorkspaceSection('holidays');
+      });
+    }
+    const yearSelect = document.getElementById('hubHolidayYear');
+    if (yearSelect) {
+      yearSelect.addEventListener('change', function () {
+        workspaceState.holidaysYear = String(yearSelect.value || new Date().getFullYear());
+        loadWorkspaceSection('holidays');
+      });
+    }
+    const addButton = document.getElementById('hubHolidayAddBtn');
+    if (addButton) {
+      addButton.addEventListener('click', function () {
+        openHubHolidayModal({});
+      });
+    }
+    els.workspace.querySelectorAll('[data-hub-holiday-edit]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        openHubHolidayModal({
+          id: button.getAttribute('data-id') || '',
+          date: button.getAttribute('data-date') || '',
+          title: button.getAttribute('data-title') || '',
+          type: button.getAttribute('data-type') || 'National Holiday',
+          notes: button.getAttribute('data-notes') || ''
+        });
+      });
+    });
+    els.workspace.querySelectorAll('[data-hub-holiday-delete]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        deleteHubHoliday(button.getAttribute('data-id') || '', button.getAttribute('data-title') || 'Holiday');
+      });
+    });
+    const saveButton = document.getElementById('hubHolidaySaveBtn');
+    if (saveButton) saveButton.addEventListener('click', saveHubHoliday);
+  }
+
+  function openHubHolidayModal(row) {
+    const modalEl = document.getElementById('hubHolidayModal');
+    const form = document.getElementById('hubHolidayForm');
+    if (!modalEl || !form) return;
+    const selectedYear = String(document.getElementById('hubHolidayYear')?.value || workspaceState.holidaysYear || new Date().getFullYear());
+    const fallbackDate = selectedYear + '-01-01';
+    document.getElementById('hubHolidayModalTitle').textContent = row.id ? 'Edit Holiday' : 'Add Holiday';
+    document.getElementById('hubHolidayId').value = row.id || '';
+    document.getElementById('hubHolidayDate').value = row.date || fallbackDate;
+    document.getElementById('hubHolidayTitle').value = row.title || '';
+    document.getElementById('hubHolidayType').value = row.type || 'National Holiday';
+    document.getElementById('hubHolidayNotes').value = row.notes || '';
+    if (typeof bootstrap !== 'undefined') {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  async function saveHubHoliday() {
+    const form = document.getElementById('hubHolidayForm');
+    const saveButton = document.getElementById('hubHolidaySaveBtn');
+    if (!form || !saveButton) return;
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+    const originalHtml = saveButton.innerHTML;
+    saveButton.disabled = true;
+    saveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    try {
+      const payload = {
+        id: document.getElementById('hubHolidayId')?.value || '',
+        date: document.getElementById('hubHolidayDate')?.value || '',
+        title: document.getElementById('hubHolidayTitle')?.value || '',
+        type: document.getElementById('hubHolidayType')?.value || 'National Holiday',
+        notes: document.getElementById('hubHolidayNotes')?.value || ''
+      };
+      const response = await fetch('/school/holidays/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to save holiday.' };
+      });
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Unable to save holiday.');
+      const modalEl = document.getElementById('hubHolidayModal');
+      if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+      await showHubMessage({ title: 'Holiday Saved', icon: 'success', message: result.message || 'Holiday saved successfully.', buttons: [{ text: 'OK', class: 'btn-success' }] });
+      workspaceState.holidaysYear = String(payload.date || '').slice(0, 4) || workspaceState.holidaysYear;
+      loadWorkspaceSection('holidays');
+    } catch (error) {
+      await showHubMessage({ title: 'Save Failed', icon: 'error', message: error.message || 'Unable to save holiday.', buttons: [{ text: 'Close', class: 'btn-danger' }] });
+    } finally {
+      saveButton.disabled = false;
+      saveButton.innerHTML = originalHtml;
+    }
+  }
+
+  async function deleteHubHoliday(id, title) {
+    if (!id) return;
+    const selected = await showHubMessage({
+      title: 'Delete Holiday',
+      icon: 'warning',
+      message: 'Delete "' + title + '" from the holiday list?',
+      buttons: [
+        { text: 'Cancel', class: 'btn-secondary' },
+        { text: 'Delete', class: 'btn-danger' }
+      ]
+    });
+    if (selected !== 'Delete') return;
+    try {
+      const response = await fetch('/school/holidays/delete/' + encodeURIComponent(id), {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' },
+        credentials: 'same-origin'
+      });
+      const result = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to delete holiday.' };
+      });
+      const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, { busyTitle: 'Delete In Progress', replayTitle: 'Delete Already Processed' })
+        : { stop: false };
+      if (guarded.stop) return;
+      if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Unable to delete holiday.');
+      await showHubMessage({ title: 'Holiday Deleted', icon: 'success', message: result.message || 'Holiday removed successfully.', buttons: [{ text: 'OK', class: 'btn-success' }] });
+      loadWorkspaceSection('holidays');
+    } catch (error) {
+      await showHubMessage({ title: 'Delete Failed', icon: 'error', message: error.message || 'Unable to delete holiday.', buttons: [{ text: 'Close', class: 'btn-danger' }] });
+    }
+  }
+
+  function renderHolidayRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return '<div class="hub-empty"><div><i class="bi bi-calendar-x display-6 d-block mb-3"></i><div class="fw-semibold">No holidays found.</div><div class="text-muted small mt-1">Try clearing search filters or open the full page for more actions.</div></div></div>';
+    }
+
+    const body = rows.map(function (row) {
+      const searchText = [row.id, row.date, row.title, row.type, row.notes, row.orgId].filter(Boolean).join(' ');
+      return [
+        '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+        '<td class="ps-3"><div class="fw-bold text-primary">' + escapeHtml(row.date || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div></td>',
+        '<td><div class="fw-semibold">' + escapeHtml(row.title || 'Holiday') + '</div><div class="small text-muted">' + escapeHtml(row.notes || '-') + '</div></td>',
+        '<td><span class="badge text-bg-info">' + escapeHtml(row.type || 'Holiday') + '</span></td>',
+        '<td class="small text-muted">' + escapeHtml(row.orgId || '-') + '</td>',
+        '<td class="text-end pe-3">',
+        '<div class="hub-workspace-actions">',
+        '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-holiday-edit data-id="' + escapeHtml(row.id || '') + '" data-date="' + escapeHtml(row.date || '') + '" data-title="' + escapeHtml(row.title || '') + '" data-type="' + escapeHtml(row.type || '') + '" data-notes="' + escapeHtml(row.notes || '') + '"><i class="bi bi-pencil-square me-1"></i>Edit</button>',
+        '<button type="button" class="btn btn-outline-danger btn-sm" data-hub-holiday-delete data-id="' + escapeHtml(row.id || '') + '" data-title="' + escapeHtml(row.title || 'Holiday') + '"><i class="bi bi-trash me-1"></i>Delete</button>',
+        '</div>',
+        '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+
+    return [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table">',
+      '<thead><tr><th class="ps-3">Date</th><th>Holiday / Off Day</th><th>Type</th><th>Org</th><th class="text-end pe-3">Actions</th></tr></thead>',
+      '<tbody>',
+      body,
+      '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
   const hubWorkspaceNodeCache = new Map();
 
   function preserveCurrentHubWorkspace(nextKey) {
@@ -3303,6 +3585,13 @@
         icon: 'bi bi-calendar-heart'
       };
     }
+    if (key === 'holidays' && !workspaceSections.holidays) {
+      workspaceSections.holidays = {
+        label: 'Holidays',
+        endpoint: '/school/master-hub/api/workspace/holidays',
+        icon: 'bi bi-calendar-event-fill'
+      };
+    }
     const config = workspaceSections[key];
     if (!config || workspaceState.loading) return;
 
@@ -3313,6 +3602,7 @@
     const serverSearch = String(workspaceState.serverSearch[key] || '').trim();
     if (serverSearch) requestQuery.set('q', serverSearch);
     if (key === 'sessions') appendSessionWorkspaceQuery(requestQuery);
+    if (key === 'holidays') requestQuery.set('year', workspaceState.holidaysYear || String(new Date().getFullYear()));
 
     workspaceState.currentSection = key;
     workspaceState.loading = true;
@@ -3348,6 +3638,8 @@
         renderAttendanceWorkspace(payload);
       } else if (key === 'leave-requests') {
         renderLeaveRequestWorkspace(payload);
+      } else if (key === 'holidays') {
+        renderHolidayWorkspace(payload);
       }
     } catch (error) {
       renderWorkspaceStatus(error.message || 'Unable to load this section.', 'bi-exclamation-triangle', 'danger');
@@ -3443,6 +3735,23 @@
         },
         rows: [],
         total: 0
+      });
+      return;
+    }
+
+    if (key === 'holidays') {
+      renderHolidayWorkspace({
+        status: 'success',
+        notLoaded: true,
+        section: {
+          key: 'holidays',
+          label: 'Holidays',
+          icon: 'bi bi-calendar-event-fill',
+          sourceUrl: '/school/holidays'
+        },
+        rows: [],
+        total: 0,
+        currentYear: workspaceState.holidaysYear || String(new Date().getFullYear())
       });
       return;
     }
