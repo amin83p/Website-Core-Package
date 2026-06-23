@@ -32,6 +32,7 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/payRates(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_PAY_RATES },
     { pattern: /^\/school\/session-statuses(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SESSION_STATUSES },
     { pattern: /^\/school\/timesheetPeriods(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TIMESHEET_PERIODS },
+    { pattern: /^\/school\/timesheets\/manage(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT },
     { pattern: /^\/school\/timesheets(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TIMESHEETS },
     { pattern: /^\/school\/withdrawal(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_WITHDRAWAL }
 ]);

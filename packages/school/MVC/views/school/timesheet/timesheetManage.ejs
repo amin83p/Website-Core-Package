@@ -1,0 +1,364 @@
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: false,
+  print,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACCOUNTING" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-calculator me-1"></i> Accounting Dashboard</a>'
+  ],
+  manageBtns: [
+    '<a href="/school/timesheets/my-timesheets" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-person-lines-fill me-1"></i> My Timesheets</a>',
+    '<a href="/school/timesheetPeriods" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-calendar-week me-1"></i> Periods</a>'
+  ]
+}) %>
+
+<style>
+  .timesheet-manage-toolbar {
+    background: linear-gradient(135deg, #f8fbff 0%, #eef6f2 100%);
+    border: 1px solid rgba(21, 87, 36, 0.12);
+  }
+  .timesheet-role-pill {
+    letter-spacing: .02em;
+  }
+  .timesheet-status-dot {
+    width: .65rem;
+    height: .65rem;
+    border-radius: 999px;
+    display: inline-block;
+  }
+</style>
+
+<div class="card border-0 shadow-sm mb-4 timesheet-manage-toolbar">
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-12 col-lg-5">
+        <label for="periodSelect" class="form-label fw-bold small mb-1">
+          <i class="bi bi-calendar-week me-1"></i> Timesheet Period
+        </label>
+        <select id="periodSelect" class="form-select border-secondary shadow-sm">
+          <option value="">Select a period...</option>
+          <% (periods || []).forEach((period) => { %>
+            <option value="<%= period.id %>">
+              <%= period.name %> | <%= period.startDate %> to <%= period.endDate %> | <%= String(period.status || '').toUpperCase() %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-12 col-lg-3">
+        <label for="personSearch" class="form-label fw-bold small mb-1">
+          <i class="bi bi-search me-1"></i> Search Loaded Rows
+        </label>
+        <input type="search" id="personSearch" class="form-control border-secondary shadow-sm" placeholder="Search name, id, role, status...">
+      </div>
+      <div class="col-12 col-lg-4 d-flex flex-wrap gap-2">
+        <button type="button" id="btnLoadRoster" class="btn btn-success btn-filled px-4">
+          <i class="bi bi-cloud-download me-1"></i> Load Timesheets
+        </button>
+        <button type="button" id="btnClearRoster" class="btn btn-outline-secondary">
+          <i class="bi bi-x-circle me-1"></i> Clear
+        </button>
+      </div>
+    </div>
+    <div id="periodMeta" class="small text-muted mt-3">
+      Pick a timesheet period, then load the active teacher/staff roster for your active organization.
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div>
+      <h5 class="mb-0 fw-bold"><i class="bi bi-people-fill me-2 text-primary"></i> Period Timesheets</h5>
+      <div class="small text-muted" id="rosterCount">No period loaded yet.</div>
+    </div>
+    <div class="small text-muted">Rows are scoped to the active organization.</div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" id="timesheetManageTable">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-4">Person</th>
+          <th>Roles</th>
+          <th>Department/Profile</th>
+          <th class="text-center">Timesheet Status</th>
+          <th class="text-end">Total Hours</th>
+          <th class="text-end pe-4">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="timesheetRosterBody">
+        <tr>
+          <td colspan="6" class="text-center py-5 text-muted">
+            <i class="bi bi-calendar2-check fs-1 d-block mb-2"></i>
+            Select a period and click <b>Load Timesheets</b>.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="departmentSummaryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light">
+        <div>
+          <h5 class="modal-title fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i> Department Hours Summary</h5>
+          <div class="small text-muted" id="departmentSummarySubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="departmentSummaryContent" class="table-responsive"></div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<span id="urlRef" data-id="school/timesheets/manage" hidden></span>
+<%- include('partials/tablePages-end') %>
+
+<script>
+(function () {
+  const periodSelect = document.getElementById('periodSelect');
+  const btnLoad = document.getElementById('btnLoadRoster');
+  const btnClear = document.getElementById('btnClearRoster');
+  const personSearch = document.getElementById('personSearch');
+  const tbody = document.getElementById('timesheetRosterBody');
+  const rosterCount = document.getElementById('rosterCount');
+  const periodMeta = document.getElementById('periodMeta');
+  const summaryModalEl = document.getElementById('departmentSummaryModal');
+  const summarySubtitle = document.getElementById('departmentSummarySubtitle');
+  const summaryContent = document.getElementById('departmentSummaryContent');
+  let loadedRows = [];
+  let loadedPeriod = null;
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function showMessage(options) {
+    if (typeof window.showMessageModal === 'function') return window.showMessageModal(options);
+    if (options && options.message) alert(String(options.message).replace(/<[^>]+>/g, ' '));
+    return Promise.resolve();
+  }
+
+  function statusBadge(status) {
+    const normalized = String(status || 'not_started').toLowerCase();
+    const map = {
+      not_started: ['#6c757d', 'Not Started', 'secondary'],
+      draft: ['#0dcaf0', 'Draft', 'info'],
+      submitted: ['#0d6efd', 'Submitted', 'primary'],
+      processed: ['#198754', 'Processed', 'success']
+    };
+    const meta = map[normalized] || ['#6c757d', normalized.replace(/_/g, ' '), 'secondary'];
+    return '<span class="badge bg-' + meta[2] + '"><span class="timesheet-status-dot bg-white bg-opacity-75 me-1"></span>' + escapeHtml(meta[1].toUpperCase()) + '</span>';
+  }
+
+  function rolePills(roles) {
+    const list = Array.isArray(roles) ? roles : [];
+    if (!list.length) return '<span class="text-muted">-</span>';
+    return list.map((role) => {
+      const label = String(role || '').toUpperCase();
+      const klass = role === 'teacher' ? 'bg-primary' : 'bg-success';
+      return '<span class="badge ' + klass + ' timesheet-role-pill me-1">' + escapeHtml(label) + '</span>';
+    }).join('');
+  }
+
+  function renderRows() {
+    const term = String(personSearch?.value || '').trim().toLowerCase();
+    const rows = loadedRows.filter((row) => {
+      if (!term) return true;
+      const haystack = [
+        row.personId,
+        row.name,
+        row.email,
+        row.departmentHint,
+        row.status,
+        ...(Array.isArray(row.roles) ? row.roles : [])
+      ].join(' ').toLowerCase();
+      return haystack.includes(term);
+    });
+
+    rosterCount.textContent = loadedPeriod
+      ? `${rows.length} of ${loadedRows.length} eligible person(s) shown for ${loadedPeriod.name || loadedPeriod.id}.`
+      : 'No period loaded yet.';
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No matching teacher/staff timesheets found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((row) => {
+      const hours = Number(row.totalHours || 0).toFixed(2);
+      return `
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark">${escapeHtml(row.name || row.personId)}</div>
+            <div class="small text-muted font-monospace">${escapeHtml(row.personId)}</div>
+            ${row.email ? `<div class="small text-muted">${escapeHtml(row.email)}</div>` : ''}
+          </td>
+          <td>${rolePills(row.roles)}</td>
+          <td class="small text-muted">${escapeHtml(row.departmentHint || '-')}</td>
+          <td class="text-center">${statusBadge(row.status)}</td>
+          <td class="text-end fw-bold text-success">${hours} Hrs</td>
+          <td class="text-end pe-4">
+            <div class="btn-group btn-group-sm">
+              <a class="btn btn-outline-primary" href="${escapeHtml(row.openUrl)}" target="_blank" rel="noopener">
+                <i class="bi bi-box-arrow-up-right me-1"></i> Open
+              </a>
+              <button type="button" class="btn btn-outline-secondary" data-summary-person="${escapeHtml(row.personId)}">
+                <i class="bi bi-diagram-3 me-1"></i> Summary
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function fetchJson(url) {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json', 'X-AJAX-Request': 'true' }
+    });
+    const payload = await res.json();
+    if (!res.ok || payload.status !== 'success') throw new Error(payload.message || 'Request failed.');
+    return payload;
+  }
+
+  async function loadRoster() {
+    const periodId = String(periodSelect.value || '').trim();
+    if (!periodId) {
+      await showMessage({ title: 'Timesheet Management', icon: 'warning', message: 'Please select a timesheet period first.' });
+      return;
+    }
+
+    const original = btnLoad.innerHTML;
+    btnLoad.disabled = true;
+    btnLoad.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Loading...';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading eligible timesheets...</td></tr>';
+
+    try {
+      const payload = await fetchJson('/school/timesheets/manage/api/roster?periodId=' + encodeURIComponent(periodId));
+      loadedRows = Array.isArray(payload.rows) ? payload.rows : [];
+      loadedPeriod = payload.period || null;
+      if (loadedPeriod) {
+        periodMeta.innerHTML = '<b>' + escapeHtml(loadedPeriod.name || loadedPeriod.id) + '</b> | ' +
+          escapeHtml(loadedPeriod.startDate || '') + ' to ' + escapeHtml(loadedPeriod.endDate || '') +
+          ' | Deadline: <b class="text-danger">' + escapeHtml(loadedPeriod.submissionDeadline || '-') + '</b>';
+      }
+      renderRows();
+    } catch (error) {
+      loadedRows = [];
+      loadedPeriod = null;
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-danger">' + escapeHtml(error.message || String(error)) + '</td></tr>';
+      await showMessage({ title: 'Load Failed', icon: 'error', message: escapeHtml(error.message || String(error)) });
+    } finally {
+      btnLoad.disabled = false;
+      btnLoad.innerHTML = original;
+    }
+  }
+
+  function renderSummary(payload) {
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    const totals = payload.totals || {};
+    summarySubtitle.textContent = `${payload.person?.name || payload.person?.id || ''} | ${payload.period?.name || payload.period?.id || ''}`;
+
+    if (!rows.length) {
+      summaryContent.innerHTML = '<div class="text-center text-muted py-4">No payable hours were found for this period/person.</div>';
+      return;
+    }
+
+    summaryContent.innerHTML = `
+      <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Department</th>
+            <th class="text-end">Auto Session Hours</th>
+            <th class="text-end">Manual Hours</th>
+            <th class="text-end">Report Task Hours</th>
+            <th class="text-end">Entries</th>
+            <th class="text-end">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => `
+            <tr>
+              <td>
+                <div class="fw-bold">${escapeHtml(row.departmentName || 'No Department')}</div>
+                ${row.departmentId ? `<div class="small text-muted font-monospace">${escapeHtml(row.departmentId)}</div>` : ''}
+              </td>
+              <td class="text-end">${Number(row.autoHours || 0).toFixed(2)}</td>
+              <td class="text-end">${Number(row.manualHours || 0).toFixed(2)}</td>
+              <td class="text-end">${Number(row.reportHours || 0).toFixed(2)}</td>
+              <td class="text-end">${Number(row.entryCount || 0)}</td>
+              <td class="text-end fw-bold text-success">${Number(row.totalHours || 0).toFixed(2)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th>Total</th>
+            <th class="text-end">${Number(totals.autoHours || 0).toFixed(2)}</th>
+            <th class="text-end">${Number(totals.manualHours || 0).toFixed(2)}</th>
+            <th class="text-end">${Number(totals.reportHours || 0).toFixed(2)}</th>
+            <th class="text-end">${Number(totals.entryCount || 0)}</th>
+            <th class="text-end text-success">${Number(totals.totalHours || 0).toFixed(2)}</th>
+          </tr>
+        </tfoot>
+      </table>
+    `;
+  }
+
+  async function loadSummary(personId) {
+    const periodId = String(periodSelect.value || '').trim();
+    if (!periodId || !personId) return;
+    summarySubtitle.textContent = 'Loading...';
+    summaryContent.innerHTML = '<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading department totals...</div>';
+    new bootstrap.Modal(summaryModalEl).show();
+
+    try {
+      const payload = await fetchJson('/school/timesheets/manage/api/department-summary?periodId=' + encodeURIComponent(periodId) + '&personId=' + encodeURIComponent(personId));
+      renderSummary(payload);
+    } catch (error) {
+      summaryContent.innerHTML = '<div class="text-center py-5 text-danger">' + escapeHtml(error.message || String(error)) + '</div>';
+    }
+  }
+
+  btnLoad?.addEventListener('click', loadRoster);
+  btnClear?.addEventListener('click', () => {
+    loadedRows = [];
+    loadedPeriod = null;
+    if (periodSelect) periodSelect.value = '';
+    if (personSearch) personSearch.value = '';
+    rosterCount.textContent = 'No period loaded yet.';
+    periodMeta.textContent = 'Pick a timesheet period, then load the active teacher/staff roster for your active organization.';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Select a period and click <b>Load Timesheets</b>.</td></tr>';
+  });
+  personSearch?.addEventListener('input', renderRows);
+  periodSelect?.addEventListener('change', () => {
+    loadedRows = [];
+    loadedPeriod = null;
+    if (personSearch) personSearch.value = '';
+    rosterCount.textContent = 'No period loaded yet.';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Click <b>Load Timesheets</b> to load this period.</td></tr>';
+  });
+  tbody?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-summary-person]');
+    if (!btn) return;
+    loadSummary(btn.getAttribute('data-summary-person'));
+  });
+})();
+</script>

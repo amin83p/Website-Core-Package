@@ -31,18 +31,6 @@
         </select>
     </div>
 
-    <% if (isSystemSuperAdmin) { %>
-        <div>
-            <label for="topOrgFilter" class="form-label fw-bold small mb-1"><i class="bi bi-building me-1"></i> Organization</label>
-            <select id="topOrgFilter" class="form-select border-secondary shadow-sm" style="min-width: 220px;" onchange="filterTimesheets()">
-                <option value="">All Organizations</option>
-                <% (orgFilterOptions || []).forEach(opt => { %>
-                    <option value="<%= opt.id %>" <%= String(selectedOrgId || '') === String(opt.id) ? 'selected' : '' %>><%= opt.name %></option>
-                <% }); %>
-            </select>
-        </div>
-    <% } %>
-
     <% if (isAdmin) { %>
         <div style="min-width: 300px; max-width: 400px;">
             <label class="form-label fw-bold small mb-1 text-primary"><i class="bi bi-shield-lock me-1"></i> Admin View: Select Teacher</label>
@@ -82,9 +70,6 @@
     <thead>
       <tr>
         <th class="draggable ps-4" data-column="name">Period Name</th>
-        <% if (isSystemSuperAdmin) { %>
-            <th class="draggable" data-column="orgName">Organization</th>
-        <% } %>
         <th class="draggable" data-column="dates">Dates</th>
         <th class="draggable" data-column="deadline">Deadline</th>
         <th class="draggable text-center" data-column="myStatus">Target Status</th>
@@ -94,15 +79,12 @@
     </thead>
     <tbody>
       <% if(data.length === 0) { %>
-         <tr><td colspan="<%= isSystemSuperAdmin ? 7 : 6 %>" class="text-center py-4 text-muted">No periods available for this filter.</td></tr>
+         <tr><td colspan="6" class="text-center py-4 text-muted">No periods available for this filter.</td></tr>
       <% } %>
       
       <% data.forEach(p => { %>
         <tr>
           <td class="ps-4 fw-bold text-dark"><i class="bi bi-calendar-range me-2 text-muted"></i><%= p.name %></td>
-          <% if (isSystemSuperAdmin) { %>
-            <td class="small text-muted"><%= p.orgName || p.orgId || '-' %></td>
-          <% } %>
           <td class="small text-muted"><%= p.startDate %> <i class="bi bi-arrow-right mx-1"></i> <%= p.endDate %></td>
           <td class="small fw-bold text-danger"><%= p.submissionDeadline %></td>
           <td class="text-center">
@@ -146,14 +128,11 @@
 <script>
 function filterTimesheets() {
     const year = document.getElementById('topYearFilter').value;
-    const orgEl = document.getElementById('topOrgFilter');
-    const orgId = orgEl ? orgEl.value : '';
     const teacherId = document.getElementById('filter_teacherId') ? document.getElementById('filter_teacherId').value : '';
     
     const urlParams = new URLSearchParams(window.location.search);
     urlParams.set('year', year);
-    if (orgId) urlParams.set('orgId', orgId);
-    else urlParams.delete('orgId');
+    urlParams.delete('orgId');
     
     if (teacherId) {
         urlParams.set('teacherId', teacherId);

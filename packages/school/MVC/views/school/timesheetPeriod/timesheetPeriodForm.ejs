@@ -10,7 +10,7 @@
       <% if(isEdit) { %> <span class="badge bg-primary border font-monospace">ID: <%= p.id %></span> <% } %>
   </div>
 
-  <div class="form-container wide" style="max-width: 900px;">
+  <div class="form-container wide" style="max-width: 1400px;">
     <form id="periodForm" action="<%= isEdit ? '/school/timesheetPeriods/edit/'+p.id : '/school/timesheetPeriods/new' %>" method="POST">
       <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
       

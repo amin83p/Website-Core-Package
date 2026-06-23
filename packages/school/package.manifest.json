@@ -280,6 +280,9 @@
         },
         {
           "id": "445568"
+        },
+        {
+          "id": "445579"
         }
       ],
       "related": [],
@@ -2451,6 +2454,32 @@
       "adoptExisting": true
     },
     {
+      "id": "445579",
+      "name": "SCHOOL_TIMESHEET_MANAGEMENT",
+      "category": "SCHOOL",
+      "description": "Manage period-level timesheet rosters and review department hour summaries for teacher and staff timesheets.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/timesheets/manage",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
       "id": "332226",
       "name": "SCHOOL_TRANSACTION_TEMPLATES",
       "category": "SCHOOL",
@@ -3170,6 +3199,18 @@
       "tags": [
         "SCHOOL_TIMESHEETS",
         "445568"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_061",
+      "name": "SCHOOL_TIMESHEET_MANAGEMENT",
+      "type": "class",
+      "value": "bi bi-table",
+      "tags": [
+        "SCHOOL_TIMESHEET_MANAGEMENT",
+        "445579"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true

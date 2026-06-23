@@ -28,7 +28,12 @@ router.post('/recover/:id',
 
 router.post('/api/sync-owner-names',
   requireAccess(SECTIONS.SCHOOL_ACCOUNTS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ACCOUNTS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_ACCOUNTS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true,
+    keepActive: true
+  }),
   ctrl.syncOwnerAccountNamesFromPersons);
 
 router.get('/help',

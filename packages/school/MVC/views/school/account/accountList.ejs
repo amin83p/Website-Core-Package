@@ -130,6 +130,13 @@
         .replace(/'/g, '&#039;');
     }
 
+    function renderSafeMessageHtml(v) {
+      return escapeHtml(v)
+        .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
+        .replace(/&lt;b&gt;/gi, '<b>')
+        .replace(/&lt;\/b&gt;/gi, '</b>');
+    }
+
     if (!btn) return;
     btn.addEventListener('click', async function () {
       const confirmMsg = 'Sync linked student/teacher/staff sub-account names from the Persons directory for the active org?';
@@ -216,7 +223,7 @@
           await window.showMessageModal({
             title: 'Sync failed',
             icon: 'error',
-            message: escapeHtml(err?.message || String(err)),
+            message: renderSafeMessageHtml(err?.message || String(err)),
             buttons: [{ text: 'Close', class: 'btn-secondary btn-md' }]
           });
         } else {
