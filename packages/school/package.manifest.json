@@ -198,6 +198,9 @@
         },
         {
           "id": "290216"
+        },
+        {
+          "id": "445580"
         }
       ],
       "related": [],
@@ -779,6 +782,56 @@
         },
         {
           "id": "OP1022",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "445580",
+      "name": "SCHOOL_ACTIVITIES",
+      "category": "SCHOOL",
+      "description": "Define school activities such as PD sessions, track attendee participation, and reflect payable attendance into schedules and timesheets.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/activities",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
+        },
+        {
+          "id": "OP1005",
           "sessionAttempts": 5,
           "sessionTime": 15,
           "active": true
@@ -3276,6 +3329,18 @@
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_062",
+      "name": "SCHOOL_ACTIVITIES",
+      "type": "class",
+      "value": "bi bi-calendar-event",
+      "tags": [
+        "SCHOOL_ACTIVITIES",
+        "445580"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
     }
   ],
   "accesses": [
@@ -4514,6 +4579,47 @@
             {
               "operationId": "OP1005",
               "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "445580",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1001",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1002",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1004",
+              "scopeId": "SCP_ORG",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            },
+            {
+              "operationId": "OP1005",
+              "scopeId": "SCP_ORG",
               "maxAttemptsPerSession": null,
               "maxSessionDurationMinutes": null,
               "maxFetchUploadVolumeKB": null
@@ -7167,6 +7273,16 @@
       "entityType": "notificationRoutingRules",
       "label": "Notification Routing Rules",
       "collectionName": "schoolNotificationRoutingRules"
+    },
+    {
+      "entityType": "activityCategories",
+      "label": "Activity Categories",
+      "collectionName": "schoolActivityCategories"
+    },
+    {
+      "entityType": "activities",
+      "label": "School Activities",
+      "collectionName": "schoolActivities"
     }
   ],
   "dataSchemas": [],
@@ -7314,6 +7430,16 @@
       "target": "_self",
       "category": "School",
       "active": true
+    },
+    {
+      "id": "school-menu-activities",
+      "label": "School Activities",
+      "href": "/school/activities",
+      "icon": "bi bi-calendar-event",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
     }
   ],
   "dashboardEntries": [
@@ -7433,6 +7559,17 @@
       "href": "/school/programs/prior-subject-credits",
       "icon": "bi bi-mortarboard",
       "description": "Manage student prior subject credits for prerequisite checks.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
+      "id": "school-dashboard-activities",
+      "label": "School Activities",
+      "href": "/school/activities",
+      "icon": "bi bi-calendar-event",
+      "description": "Define PD sessions and other school activities, select attendees, and reflect payable attendance into timesheets.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",

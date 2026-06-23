@@ -137,3 +137,4 @@ test('school package route wrappers should resolve core routes through core cont
 
   assert.deepEqual(offenders, []);
 });
+

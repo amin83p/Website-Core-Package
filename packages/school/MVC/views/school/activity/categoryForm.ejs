@@ -1,0 +1,47 @@
+<% const row = category || {}; %>
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-tags me-2"></i><%= title %></h1>
+  </div>
+  <div class="form-container wide" style="max-width: 900px;">
+    <form method="POST" action="<%= isEdit ? '/school/activities/categories/edit/' + row.id : '/school/activities/categories/new' %>">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Code *</label>
+              <input type="text" name="code" class="form-control size-md" value="<%= row.code || '' %>" required>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label fw-bold">Name *</label>
+              <input type="text" name="name" class="form-control size-md" value="<%= row.name || '' %>" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Description</label>
+              <textarea name="description" rows="3" class="form-control size-md"><%= row.description || '' %></textarea>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" name="defaultPaid" id="defaultPaid" <%= row.defaultPaid ? 'checked' : '' %>>
+                <label class="form-check-label fw-bold" for="defaultPaid">Payable by default</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Status</label>
+              <select name="active" class="form-select size-md">
+                <option value="true" <%= row.active === false ? '' : 'selected' %>>Active</option>
+                <option value="false" <%= row.active === false ? 'selected' : '' %>>Inactive</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Category</button>
+        <a href="/school/activities/categories" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+

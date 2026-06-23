@@ -12,6 +12,7 @@ if (!fsSync.existsSync(dataPath)) {
 }
 
 const TIMESHEET_PERIOD_STATUSES = new Set(['open', 'locked', 'processed']);
+const DEFAULT_SUBMISSION_DEADLINE_TIME = '23:59';
 
 function cleanString(v, { max = 500, allowEmpty = true } = {}) {
     if (v === undefined || v === null) return allowEmpty ? '' : null;
@@ -42,6 +43,21 @@ function cleanDate(v, { fieldLabel = 'Date', allowEmpty = false } = {}) {
     return d.toISOString().slice(0, 10);
 }
 
+function cleanTime(v, { fieldLabel = 'Time', allowEmpty = true, defaultValue = DEFAULT_SUBMISSION_DEADLINE_TIME } = {}) {
+    if (v === undefined || v === null || String(v).trim() === '') {
+        if (allowEmpty) return defaultValue;
+        throw new Error(`${fieldLabel} is required.`);
+    }
+
+    const s = String(v).trim();
+    if (!/^\d{2}:\d{2}$/.test(s)) throw new Error(`Invalid ${fieldLabel}. Use HH:mm.`);
+    const [hours, minutes] = s.split(':').map((part) => Number(part));
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        throw new Error(`Invalid ${fieldLabel}. Use HH:mm.`);
+    }
+    return s;
+}
+
 function normalizeName(value) {
     return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -56,6 +72,7 @@ function sanitizeTimesheetPeriodInput(input, { isUpdate = false } = {}) {
     const startDate = cleanDate(input.startDate, { fieldLabel: 'Start Date' });
     const endDate = cleanDate(input.endDate, { fieldLabel: 'End Date' });
     const submissionDeadline = cleanDate(input.submissionDeadline, { fieldLabel: 'Submission Deadline' });
+    const submissionDeadlineTime = cleanTime(input.submissionDeadlineTime, { fieldLabel: 'Submission Deadline Time' });
 
     if (startDate > endDate) throw new Error('Start Date cannot be after End Date.');
 
@@ -68,6 +85,7 @@ function sanitizeTimesheetPeriodInput(input, { isUpdate = false } = {}) {
         startDate,
         endDate,
         submissionDeadline,
+        submissionDeadlineTime,
         status,
         notes: cleanString(input.notes, { max: 1000, allowEmpty: true })
     };
@@ -196,7 +214,9 @@ module.exports = {
     addTimesheetPeriod,
     updateTimesheetPeriod,
     deleteTimesheetPeriod,
-    TIMESHEET_PERIOD_STATUSES: Object.freeze([...TIMESHEET_PERIOD_STATUSES])
+    TIMESHEET_PERIOD_STATUSES: Object.freeze([...TIMESHEET_PERIOD_STATUSES]),
+    DEFAULT_SUBMISSION_DEADLINE_TIME,
+    sanitizeTimesheetPeriodInput
 };
 
 

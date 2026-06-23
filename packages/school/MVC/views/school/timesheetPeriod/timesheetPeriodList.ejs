@@ -1,3 +1,11 @@
+<%
+  function formatDeadline(period) {
+    const date = period && period.submissionDeadline ? String(period.submissionDeadline) : '-';
+    const time = period && period.submissionDeadlineTime ? String(period.submissionDeadlineTime) : '23:59';
+    return date === '-' ? '-' : `${date} ${time}`;
+  }
+%>
+
 <%- include('partials/tablePages-start', {
   title,
   newUrl, 
@@ -43,7 +51,7 @@
           <td class="ps-4 fw-bold text-dark"><i class="bi bi-calendar-range me-2 text-muted"></i><%= item.name %></td>
           <td class="small text-muted"><%= item.startDate %></td>
           <td class="small text-muted"><%= item.endDate %></td>
-          <td class="small fw-bold text-danger"><i class="bi bi-exclamation-circle me-1"></i><%= item.submissionDeadline %></td>
+          <td class="small fw-bold text-danger"><i class="bi bi-exclamation-circle me-1"></i><%= formatDeadline(item) %></td>
           <td class="text-center">
              <% 
                let badgeClass = 'bg-secondary';

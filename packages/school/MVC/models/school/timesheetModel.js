@@ -1,4 +1,4 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/timesheetModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -56,6 +56,7 @@ function sanitizeEntry(entry) {
     if (!sessionId) throw new Error('Timesheet entry sessionId is required.');
 
     const isReportReflection = entry.isReportReflection === true || sessionId.startsWith('rptref-');
+    const isSchoolActivity = entry.isSchoolActivity === true || sessionId.startsWith('act-');
 
     if (entry.isDeleted === true) {
         return {
@@ -77,6 +78,20 @@ function sanitizeEntry(entry) {
         isManual: Boolean(entry.isManual)
     };
     if (isReportReflection) row.isReportReflection = true;
+    if (isSchoolActivity) {
+        row.isSchoolActivity = true;
+        row.activityId = cleanString(entry.activityId, { max: 80, allowEmpty: true });
+        row.departmentId = cleanString(entry.departmentId, { max: 80, allowEmpty: true });
+        row.departmentName = cleanString(entry.departmentName, { max: 180, allowEmpty: true });
+        row.categoryName = cleanString(entry.categoryName, { max: 180, allowEmpty: true });
+        row.compensationLookup = entry.compensationLookup && typeof entry.compensationLookup === 'object' && !Array.isArray(entry.compensationLookup)
+            ? {
+                personId: cleanString(entry.compensationLookup.personId, { max: 80, allowEmpty: true }),
+                departmentId: cleanString(entry.compensationLookup.departmentId, { max: 80, allowEmpty: true }),
+                activityId: cleanString(entry.compensationLookup.activityId, { max: 80, allowEmpty: true })
+            }
+            : {};
+    }
     return row;
 }
 
@@ -193,5 +208,6 @@ module.exports = {
     clearByOrg,
     TIMESHEET_STATUSES: Object.freeze([...TIMESHEET_STATUSES])
 };
+
 
 

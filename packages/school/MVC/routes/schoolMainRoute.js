@@ -29,6 +29,7 @@ router.use('/transactions', require('./transactionsManagerRoutes'));
 router.use('/academic-ledger', require('./academicLedgerRoutes'));
 router.use('/sample-data', require('./sampleDataRoutes'));
 router.use('/departments', require('./departmentRoutes'));
+router.use('/activities', require('./activityRoutes'));
 router.use('/subjects', require('./subjectRoutes'));
 router.use('/terms', require('./termRoutes'));
 router.use('/payRates', require('./payRateRoutes'));
@@ -49,3 +50,4 @@ router.use('/withdrawal', require('./withdrawalRoutes'));
 router.use('/', require('./schoolRoutes'));
 
 module.exports = router;
+

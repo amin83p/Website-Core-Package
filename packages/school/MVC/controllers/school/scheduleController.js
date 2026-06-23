@@ -8,6 +8,7 @@ const adminChekersService = requireCoreModule('MVC/services/adminChekersService'
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
+const activityService = require('../../services/school/activityService');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
@@ -1067,6 +1068,15 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
     });
     events.push(...approvedLeaveEvents);
 
+    const activityEvents = await activityService.getScheduleEventsForPerson({
+        orgId: activeOrgId,
+        personId: normalizedPersonId,
+        startDate,
+        endDate,
+        reqUser
+    });
+    events.push(...activityEvents);
+
     sortEventsChronologically(events);
     markOverlappingEvents(events);
 
@@ -1446,3 +1456,4 @@ module.exports = {
     showGlobalSchedulePage,
     getGlobalSchedule
 };
+

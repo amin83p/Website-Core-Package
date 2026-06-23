@@ -6,6 +6,8 @@ const subjectModel = require('../../models/school/subjectModel');
 const classModel = require('../../models/school/classModel');
 const holidayModel = require('../../models/school/holidayModel');
 const departmentModel = require('../../models/school/departmentModel');
+const activityCategoryModel = require('../../models/school/activityCategoryModel');
+const activityModel = require('../../models/school/activityModel');
 const payRateModel = require('../../models/school/payRateModel');
 const sessionStatusModel = require('../../models/school/sessionStatusModel');
 const timesheetPeriodModel = require('../../models/school/timesheetPeriodModel');
@@ -766,6 +768,26 @@ const schoolRepositories = {
     remove: departmentModel.deleteDepartment,
     defaultSearchFields: ['id', 'name', 'code', 'description']
   }),
+  activityCategories: createSchoolRepository({
+    entityName: 'activityCategories',
+    collectionName: 'schoolActivityCategories',
+    getAll: activityCategoryModel.getAllCategories,
+    getById: activityCategoryModel.getCategoryById,
+    create: activityCategoryModel.addCategory,
+    update: activityCategoryModel.updateCategory,
+    remove: activityCategoryModel.deleteCategory,
+    defaultSearchFields: ['id', 'orgId', 'code', 'name', 'description']
+  }),
+  activities: createSchoolRepository({
+    entityName: 'activities',
+    collectionName: 'schoolActivities',
+    getAll: activityModel.getAllActivities,
+    getById: activityModel.getActivityById,
+    create: activityModel.addActivity,
+    update: activityModel.updateActivity,
+    remove: activityModel.deleteActivity,
+    defaultSearchFields: ['id', 'orgId', 'title', 'categoryId', 'departmentId', 'status', 'location']
+  }),
   teachers: createSchoolRepository({
     entityName: 'teachers',
     collectionName: 'schoolTeachers',
@@ -1210,6 +1232,40 @@ schoolRepositories.studentProgramPriorSubjects.clearByOrg = async (orgId, option
       };
     }
   }, 'school.studentProgramPriorSubjects.clearByOrg');
+};
+
+schoolRepositories.activityCategories.clearByOrg = async (orgId, options = {}) => {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('orgId is required to clear activity categories.');
+  return runByRepositoryBackend(options, {
+    json: async () => {
+      const rows = await schoolRepositories.activityCategories.list({}, options);
+      const matches = rows.filter((row) => idsEqual(row?.orgId, targetOrgId));
+      for (const row of matches) await schoolRepositories.activityCategories.remove(row.id, options);
+      return { deletedCount: matches.length };
+    },
+    mongo: async () => {
+      const result = await getMongoCollection('schoolActivityCategories').deleteMany({ orgId: targetOrgId });
+      return { deletedCount: result.deletedCount || 0 };
+    }
+  }, 'school.activityCategories.clearByOrg');
+};
+
+schoolRepositories.activities.clearByOrg = async (orgId, options = {}) => {
+  const targetOrgId = toPublicId(orgId);
+  if (!targetOrgId) throw new Error('orgId is required to clear activities.');
+  return runByRepositoryBackend(options, {
+    json: async () => {
+      const rows = await schoolRepositories.activities.list({}, options);
+      const matches = rows.filter((row) => idsEqual(row?.orgId, targetOrgId));
+      for (const row of matches) await schoolRepositories.activities.remove(row.id, options);
+      return { deletedCount: matches.length };
+    },
+    mongo: async () => {
+      const result = await getMongoCollection('schoolActivities').deleteMany({ orgId: targetOrgId });
+      return { deletedCount: result.deletedCount || 0 };
+    }
+  }, 'school.activities.clearByOrg');
 };
 
 schoolRepositories.classEnrollmentPeriods.clearByOrg = async (orgId, options = {}) => {
@@ -1817,6 +1873,8 @@ assertQueryableCrudRepository('schoolRepositories.classes', schoolRepositories.c
 assertQueryableCrudRepository('schoolRepositories.holidays', schoolRepositories.holidays);
 assertQueryableCrudRepository('schoolRepositories.terms', schoolRepositories.terms);
 assertQueryableCrudRepository('schoolRepositories.departments', schoolRepositories.departments);
+assertQueryableCrudRepository('schoolRepositories.activityCategories', schoolRepositories.activityCategories);
+assertQueryableCrudRepository('schoolRepositories.activities', schoolRepositories.activities);
 assertQueryableCrudRepository('schoolRepositories.teachers', schoolRepositories.teachers);
 assertQueryableCrudRepository('schoolRepositories.staff', schoolRepositories.staff);
 assertQueryableCrudRepository('schoolRepositories.payRates', schoolRepositories.payRates);
@@ -1831,4 +1889,6 @@ assertQueryableCrudRepository('schoolRepositories.notifications', schoolReposito
 assertQueryableCrudRepository('schoolRepositories.notificationRoutingRules', schoolRepositories.notificationRoutingRules);
 
 module.exports = schoolRepositories;
+
+
 

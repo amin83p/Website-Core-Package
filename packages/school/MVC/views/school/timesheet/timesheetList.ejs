@@ -4,6 +4,14 @@
   if (!yearOptions.includes(selectedYear)) yearOptions.unshift(selectedYear);
 %>
 
+<%
+  function formatDeadline(period) {
+    const date = period && period.submissionDeadline ? String(period.submissionDeadline) : '-';
+    const time = period && period.submissionDeadlineTime ? String(period.submissionDeadlineTime) : '23:59';
+    return date === '-' ? '-' : `${date} ${time}`;
+  }
+%>
+
 <%- include('partials/tablePages-start', {
   title: title, 
   newUrl, 
@@ -86,7 +94,7 @@
         <tr>
           <td class="ps-4 fw-bold text-dark"><i class="bi bi-calendar-range me-2 text-muted"></i><%= p.name %></td>
           <td class="small text-muted"><%= p.startDate %> <i class="bi bi-arrow-right mx-1"></i> <%= p.endDate %></td>
-          <td class="small fw-bold text-danger"><%= p.submissionDeadline %></td>
+          <td class="small fw-bold text-danger"><%= formatDeadline(p) %></td>
           <td class="text-center">
              <% 
                let badge = 'bg-secondary';

@@ -1,0 +1,341 @@
+<% const row = activity || {}; const attendees = Array.isArray(row.attendees) ? row.attendees : []; %>
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="page-heading size-md m-0"><i class="bi bi-calendar-event me-2"></i><%= title %></h1>
+    <% if (isEdit) { %><span class="badge bg-primary border font-monospace"><%= row.id %></span><% } %>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1180px;">
+    <form id="schoolActivityForm" method="POST" action="<%= isEdit ? '/school/activities/edit/' + row.id : '/school/activities/new' %>">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="attendees" id="activityAttendeesInput" value="[]">
+
+      <script type="application/json" id="activityInitialAttendees"><%- JSON.stringify(attendees) %></script>
+      <script type="application/json" id="activityCategoriesData"><%- JSON.stringify(categories || []) %></script>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label fw-bold">Title *</label>
+              <input type="text" name="title" class="form-control size-md" value="<%= row.title || '' %>" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Status *</label>
+              <select name="status" class="form-select size-md">
+                <% ['draft', 'posted', 'cancelled'].forEach((status) => { %>
+                  <option value="<%= status %>" <%= String(row.status || 'draft') === status ? 'selected' : '' %>><%= status[0].toUpperCase() + status.slice(1) %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Category *</label>
+              <select name="categoryId" id="activityCategoryId" class="form-select size-md" required>
+                <option value="">Select category</option>
+                <% (categories || []).forEach((cat) => { %>
+                  <option value="<%= cat.id %>" <%= String(row.categoryId || '') === String(cat.id) ? 'selected' : '' %> data-paid="<%= cat.defaultPaid ? 'true' : 'false' %>"><%= cat.name || cat.code || cat.id %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Department *</label>
+              <select name="departmentId" class="form-select size-md" required>
+                <option value="">Select department</option>
+                <% (departments || []).forEach((dep) => { %>
+                  <option value="<%= dep.id %>" <%= String(row.departmentId || '') === String(dep.id) ? 'selected' : '' %>><%= (dep.code ? dep.code + ' - ' : '') + (dep.name || dep.id) %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Location</label>
+              <input type="text" name="location" class="form-control size-md" value="<%= row.location || '' %>">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">Date *</label>
+              <input type="date" name="date" class="form-control size-md" value="<%= row.date || '' %>" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">Start *</label>
+              <input type="time" name="startTime" id="activityStartTime" class="form-control size-md" value="<%= row.startTime || '' %>" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">End *</label>
+              <input type="time" name="endTime" id="activityEndTime" class="form-control size-md" value="<%= row.endTime || '' %>" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">Hours *</label>
+              <input type="number" step="0.01" min="0" max="24" name="durationHours" id="activityDurationHours" class="form-control size-md" value="<%= row.durationHours || '' %>" required>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check form-switch mt-4">
+                <input class="form-check-input" type="checkbox" name="paid" id="activityPaid" <%= row.paid ? 'checked' : '' %>>
+                <label class="form-check-label fw-bold" for="activityPaid">Payable activity</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Notes</label>
+              <textarea name="notes" rows="3" class="form-control size-md"><%= row.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="m-0 fw-bold"><i class="bi bi-people me-2"></i>Attendees</h5>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="pickActivityAttendee"><i class="bi bi-person-plus me-1"></i>Add Attendee</button>
+          </div>
+          <div id="activityAttendeesHost"></div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Activity</button>
+        <a href="/school/activities" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/modal_GenericPicker') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('schoolActivityForm');
+  const attendeesInput = document.getElementById('activityAttendeesInput');
+  const attendeesHost = document.getElementById('activityAttendeesHost');
+  const paidInput = document.getElementById('activityPaid');
+  const categorySelect = document.getElementById('activityCategoryId');
+  const startInput = document.getElementById('activityStartTime');
+  const endInput = document.getElementById('activityEndTime');
+  const durationInput = document.getElementById('activityDurationHours');
+  let attendees = JSON.parse(document.getElementById('activityInitialAttendees').textContent || '[]');
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function (ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+    });
+  }
+
+  async function safeShowMessage(options) {
+    if (typeof window.showMessageModal === 'function') return window.showMessageModal(options);
+    console.error('Message modal is not available on this page.', options);
+    return false;
+  }
+
+  function normalizeRole(value) {
+    return String(value || '').trim().toLowerCase().replace(/^school_/, '');
+  }
+
+  function normalizeRoleList(value) {
+    const source = Array.isArray(value) ? value : String(value || '').split(',');
+    const roles = [];
+    source.forEach(function (item) {
+      const role = normalizeRole(typeof item === 'string' ? item : (item?.key || item?.role || item?.name || item?.label));
+      if (role && !roles.includes(role)) roles.push(role);
+    });
+    return roles;
+  }
+
+  function roleLabel(role) {
+    const normalized = normalizeRole(role);
+    if (normalized === 'teacher') return 'Teacher';
+    if (normalized === 'staff') return 'Staff';
+    if (normalized === 'student') return 'Student';
+    return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Participant';
+  }
+
+  function pickDefaultRole(roles, preferred) {
+    const normalizedRoles = normalizeRoleList(roles);
+    const preferredRole = normalizeRole(preferred);
+    if (preferredRole && normalizedRoles.includes(preferredRole)) return preferredRole;
+    if (normalizedRoles.includes('teacher')) return 'teacher';
+    if (normalizedRoles.includes('staff')) return 'staff';
+    if (normalizedRoles.includes('student')) return 'student';
+    return normalizedRoles[0] || preferredRole || 'participant';
+  }
+
+  function buildPersonDisplayName(item, fallback) {
+    const preferred = String(item?.preferredName || item?.name?.preferred || '').trim();
+    if (preferred) return preferred;
+    const first = String(item?.firstName || item?.name?.first || '').trim();
+    const last = String(item?.lastName || item?.name?.last || '').trim();
+    const fullName = [first, last].filter(Boolean).join(' ');
+    if (fullName) return fullName;
+    return String(item?.personName || item?.displayName || fallback || '').trim();
+  }
+
+  function normalizeAttendee(item) {
+    const personId = String(item?.personId || item?.id || '').trim();
+    if (!personId) return null;
+    const roles = normalizeRoleList(item?.roles || item?.availableRoles || item?.role || item?.matchedRole);
+    const selectedRole = pickDefaultRole(roles, item?.role || item?.matchedRole);
+    return {
+      personId,
+      personName: buildPersonDisplayName(item, personId),
+      roles: roles.length ? roles : [selectedRole],
+      role: selectedRole,
+      status: item?.status || 'attended',
+      paid: item?.paid === undefined ? paidInput.checked : item.paid !== false,
+      paidHours: item?.paidHours ?? durationInput.value ?? '',
+      notes: item?.notes || ''
+    };
+  }
+
+  function calculateHours() {
+    if (!startInput.value || !endInput.value) return;
+    const start = startInput.value.split(':').map(Number);
+    const end = endInput.value.split(':').map(Number);
+    const mins = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
+    if (mins > 0 && !durationInput.value) durationInput.value = (mins / 60).toFixed(2);
+  }
+
+  function syncAttendees() {
+    attendeesInput.value = JSON.stringify(attendees);
+  }
+
+  function renderRoleSelect(item, index) {
+    const roles = normalizeRoleList(item.roles || item.role);
+    const selectedRole = pickDefaultRole(roles, item.role);
+    attendees[index].role = selectedRole;
+    attendees[index].roles = roles.length ? roles : [selectedRole];
+    const options = attendees[index].roles.map(function (role) {
+      return '<option value="' + escapeHtml(role) + '" ' + (role === selectedRole ? 'selected' : '') + '>' + escapeHtml(roleLabel(role)) + '</option>';
+    }).join('');
+    return '<select class="form-select form-select-sm js-attendee-role">' + options + '</select>';
+  }
+
+  function renderAttendees() {
+    if (!attendees.length) {
+      attendeesHost.innerHTML = '<div class="text-muted small border rounded p-3 bg-light">No attendees selected yet.</div>';
+      syncAttendees();
+      return;
+    }
+    attendeesHost.innerHTML = attendees.map(function (item, index) {
+      const normalized = normalizeAttendee(item);
+      if (normalized) attendees[index] = normalized;
+      const paid = attendees[index].paid !== false;
+      const status = attendees[index].status || 'attended';
+      return [
+        '<div class="border rounded p-3 mb-2 bg-white" data-attendee-index="' + index + '">',
+        '<div class="row g-2 align-items-end">',
+        '<div class="col-md-3"><div class="fw-bold">' + escapeHtml(attendees[index].personName || attendees[index].personId) + '</div><div class="small text-muted">' + escapeHtml(attendees[index].personId || '') + '</div></div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Role</label>' + renderRoleSelect(attendees[index], index) + '</div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Status</label><select class="form-select form-select-sm js-attendee-status"><option value="attended" ' + (status === 'attended' ? 'selected' : '') + '>Attended</option><option value="absent" ' + (status === 'absent' ? 'selected' : '') + '>Absent</option><option value="excused" ' + (status === 'excused' ? 'selected' : '') + '>Excused</option></select></div>',
+        '<div class="col-md-2"><label class="form-label fw-bold small">Paid Hours</label><input type="number" min="0" max="24" step="0.01" class="form-control form-control-sm js-attendee-hours" value="' + escapeHtml(attendees[index].paidHours ?? durationInput.value ?? '') + '"></div>',
+        '<div class="col-md-2"><div class="form-check form-switch"><input class="form-check-input js-attendee-paid" type="checkbox" ' + (paid ? 'checked' : '') + '><label class="form-check-label small fw-bold">Payable</label></div></div>',
+        '<div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm js-attendee-remove"><i class="bi bi-trash"></i></button></div>',
+        '</div>',
+        '</div>'
+      ].join('');
+    }).join('');
+
+    attendeesHost.querySelectorAll('[data-attendee-index]').forEach(function (row) {
+      const index = Number(row.getAttribute('data-attendee-index'));
+      row.querySelector('.js-attendee-role').addEventListener('change', function (event) { attendees[index].role = event.target.value; syncAttendees(); });
+      row.querySelector('.js-attendee-status').addEventListener('change', function (event) { attendees[index].status = event.target.value; syncAttendees(); });
+      row.querySelector('.js-attendee-hours').addEventListener('input', function (event) { attendees[index].paidHours = event.target.value; syncAttendees(); });
+      row.querySelector('.js-attendee-paid').addEventListener('change', function (event) { attendees[index].paid = event.target.checked; syncAttendees(); });
+      row.querySelector('.js-attendee-remove').addEventListener('click', function () { attendees.splice(index, 1); renderAttendees(); });
+    });
+    syncAttendees();
+  }
+
+  categorySelect?.addEventListener('change', function () {
+    const selected = categorySelect.options[categorySelect.selectedIndex];
+    if (selected && selected.getAttribute('data-paid') === 'true' && !paidInput.checked) paidInput.checked = true;
+  });
+  startInput?.addEventListener('change', calculateHours);
+  endInput?.addEventListener('change', calculateHours);
+
+  document.getElementById('pickActivityAttendee')?.addEventListener('click', async function () {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      await safeShowMessage({ title: 'Picker Unavailable', icon: 'error', message: 'Requester picker is not available on this page.' });
+      return;
+    }
+    const contexts = window.GenericPickerContexts || {};
+    const context = (typeof contexts.activeOrganizationScope === 'function')
+      ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
+      : null;
+    window.GenericPicker.open(window.GenericPickerPresets.person({
+      title: 'Select Attendees',
+      apiEndpoint: '/school/activities/api/eligible-persons',
+      placeholder: 'Search students, teachers, or staff...',
+      multiselect: true,
+      context,
+      onSelect: function (items) {
+        const rows = Array.isArray(items) ? items : [items];
+        let added = 0;
+        rows.forEach(function (item) {
+          const attendee = normalizeAttendee(item);
+          if (!attendee) return;
+          const existing = attendees.find(function (row) { return String(row.personId) === String(attendee.personId); });
+          if (existing) {
+            existing.roles = attendee.roles;
+            existing.role = pickDefaultRole(attendee.roles, existing.role || attendee.role);
+            existing.personName = attendee.personName || existing.personName;
+            return;
+          }
+          attendees.push(attendee);
+          added += 1;
+        });
+        renderAttendees();
+      }
+    }));
+  });
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    syncAttendees();
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    }
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+        body: new URLSearchParams(new FormData(form)).toString()
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: response.ok ? 'Save completed, but the response could not be read.' : 'Save failed.' };
+      });
+      const isSuccess = response.ok && payload.status === 'success';
+
+      await safeShowMessage({
+        title: isSuccess ? 'School Activity Saved' : 'School Activity Not Saved',
+        icon: isSuccess ? 'success' : 'error',
+        message: payload.message || (isSuccess ? 'School activity saved successfully.' : 'Please review the form and try again.'),
+        buttons: [{ text: 'OK', class: isSuccess ? 'btn-success' : 'btn-danger' }]
+      });
+
+      if (isSuccess) {
+        window.location.href = '/school/activities';
+        return;
+      }
+    } catch (error) {
+      await safeShowMessage({
+        title: 'System Error',
+        icon: 'error',
+        message: error.message || 'Unexpected error while saving the school activity.',
+        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+      });
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+      }
+    }
+  });
+
+  renderAttendees();
+});
+</script>
+
+
+

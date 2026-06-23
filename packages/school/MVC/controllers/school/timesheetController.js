@@ -11,6 +11,7 @@ const { assertOrgAccess } = requireCoreModule('MVC/utils/orgContextUtils');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { buildReportReflectionLiveSessions } = require('../../services/school/reportTimesheetReflectionService');
+const activityService = require('../../services/school/activityService');
 
 function getActiveOrgIdOrThrow(reqUser) {
     const activeOrgId = reqUser?.activeOrgId ? String(reqUser.activeOrgId) : '';
@@ -379,6 +380,7 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                 startDate: String(period?.startDate || ''),
                 endDate: String(period?.endDate || ''),
                 submissionDeadline: String(period?.submissionDeadline || ''),
+                submissionDeadlineTime: String(period?.submissionDeadlineTime || '23:59'),
                 status: String(period?.status || '')
             },
             rows
@@ -446,6 +448,14 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
         reqUser
     });
 
+    const activityEntries = await activityService.getTimesheetEntriesForPerson({
+        orgId: activeOrgId,
+        personId,
+        periodStartDate: period.startDate,
+        periodEndDate: period.endDate,
+        reqUser
+    });
+
     const existingEntries = Array.isArray(existing?.entries) ? existing.entries : [];
     const deletedAutoSessionIds = existingEntries
         .filter((entry) => entry?.isDeleted === true)
@@ -461,7 +471,7 @@ async function buildEffectiveTimesheetEntries({ period, personId, activeOrgId, r
     const manualEntries = existingEntries
         .filter((entry) => entry?.isManual === true && entry?.isDeleted !== true)
         .map((entry) => ({ ...entry, isManual: true }));
-    const autoEntries = [...liveSessions, ...reportReflectionSessions]
+    const autoEntries = [...liveSessions, ...reportReflectionSessions, ...activityEntries]
         .filter((entry) => !deletedAutoSessionIds.includes(String(entry?.sessionId || '').trim()))
         .map((entry) => ({
             ...entry,
@@ -931,3 +941,4 @@ exports.saveTimesheet = async (req, res) => {
         res.status(400).json({ status: 'error', message: error.message });
     }
 };
+

@@ -3,6 +3,12 @@
   const isManuallyEdited = timesheet.entries && timesheet.entries.some(e => e.isManual || e.isDeleted);
 %>
 
+<%
+  const deadlineDate = period && period.submissionDeadline ? String(period.submissionDeadline) : '-';
+  const deadlineTime = period && period.submissionDeadlineTime ? String(period.submissionDeadlineTime) : '23:59';
+  const deadlineLabel = deadlineDate === '-' ? '-' : `${deadlineDate} ${deadlineTime}`;
+%>
+
 <style>
     /* IMPORTANT:
        Bootstrap applies background on td/th, not tr. So we style tr > * and set BS vars. */
@@ -56,7 +62,7 @@
             </div>
             <div class="text-muted small mt-1">
                 <strong>Period:</strong> <%= period.startDate %> to <%= period.endDate %> |
-                <strong>Deadline:</strong> <span class="text-danger fw-bold"><%= period.submissionDeadline %></span>
+                <strong>Deadline:</strong> <span class="text-danger fw-bold"><%= deadlineLabel %></span>
             </div>
         </div>
         <a href="/school/timesheets/my-timesheets" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back</a>

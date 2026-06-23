@@ -238,6 +238,12 @@
     return payload;
   }
 
+  function formatPeriodDeadline(period) {
+    const date = period && period.submissionDeadline ? String(period.submissionDeadline) : '-';
+    const time = period && period.submissionDeadlineTime ? String(period.submissionDeadlineTime) : '23:59';
+    return date === '-' ? '-' : date + ' ' + time;
+  }
+
   async function loadRoster() {
     const periodId = String(periodSelect.value || '').trim();
     if (!periodId) {
@@ -257,7 +263,7 @@
       if (loadedPeriod) {
         periodMeta.innerHTML = '<b>' + escapeHtml(loadedPeriod.name || loadedPeriod.id) + '</b> | ' +
           escapeHtml(loadedPeriod.startDate || '') + ' to ' + escapeHtml(loadedPeriod.endDate || '') +
-          ' | Deadline: <b class="text-danger">' + escapeHtml(loadedPeriod.submissionDeadline || '-') + '</b>';
+          ' | Deadline: <b class="text-danger">' + escapeHtml(formatPeriodDeadline(loadedPeriod)) + '</b>';
       }
       renderRows();
     } catch (error) {

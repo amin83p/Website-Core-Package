@@ -1,0 +1,211 @@
+<%
+  const stateFilters = (filters && typeof filters === 'object') ? filters : {};
+  const activeStatus = String(stateFilters.status || '').trim().toLowerCase();
+  const activeCategoryId = String(stateFilters.categoryId || '').trim();
+  const totalMatchedRows = Number(pagination?.totalItems ?? pagination?.total ?? (Array.isArray(data) ? data.length : 0));
+  const hasActivityFiltersApplied = Boolean(
+    String(stateFilters.q || '').trim()
+    || activeStatus
+    || activeCategoryId
+  );
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  btn_export: true,
+  print,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-mortarboard me-1"></i> School Academia</a>',
+    '<a href="/school/activities/categories" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-tags me-1"></i> Activity Categories</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+    <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Activities</div>
+    <button
+      id="schoolActivityFilterToggleBtn"
+      type="button"
+      class="btn btn-outline-secondary btn-sm px-2"
+      data-bs-toggle="collapse"
+      data-bs-target="#schoolActivityFilterCollapse"
+      aria-expanded="<%= hasActivityFiltersApplied ? 'true' : 'false' %>"
+      aria-controls="schoolActivityFilterCollapse"
+      aria-label="<%= hasActivityFiltersApplied ? 'Close filters' : 'Open filters' %>">
+      <i id="schoolActivityFilterToggleIcon" class="bi <%= hasActivityFiltersApplied ? 'bi-chevron-up' : 'bi-chevron-down' %>"></i>
+    </button>
+  </div>
+  <div class="collapse<%= hasActivityFiltersApplied ? ' show' : '' %>" id="schoolActivityFilterCollapse">
+    <form method="GET" action="/school/activities" id="schoolActivityFilterForm" class="card-body p-3">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-6 col-xl-3">
+          <label class="form-label">Category</label>
+          <select name="categoryId" class="form-select size-md">
+            <option value="">All Categories</option>
+            <% (categories || []).forEach((cat) => { %>
+              <option value="<%= cat.id %>" <%= activeCategoryId === String(cat.id) ? 'selected' : '' %>><%= cat.name || cat.code || cat.id %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select size-md">
+            <option value="">All Statuses</option>
+            <% ['draft', 'posted', 'cancelled'].forEach((status) => { %>
+              <option value="<%= status %>" <%= activeStatus === status ? 'selected' : '' %>><%= status[0].toUpperCase() + status.slice(1) %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <label class="form-label">Search</label>
+          <input type="search" name="q" class="form-control size-md" value="<%= stateFilters.q || '' %>" placeholder="Search activities by title, category, department, location, or status...">
+        </div>
+        <div class="col-md-6 col-xl-3 d-flex justify-content-xl-end gap-2 pt-xl-4">
+          <a href="/school/activities" class="btn btn-outline-secondary btn-md">Reset</a>
+          <button type="submit" class="btn btn-filled btn-primary btn-md">
+            <i class="bi bi-funnel me-1"></i> Apply
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="small text-muted">
+      Matched rows: <span class="fw-bold text-dark"><%= totalMatchedRows.toLocaleString() %></span>
+    </div>
+    <div class="small text-muted">
+      Showing page: <span class="fw-bold text-dark"><%= Number(pagination?.currentPage || pagination?.page || 1) %> / <%= Number(pagination?.totalPages || 1) %></span>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search activities by title, category, department, location, or status...',
+  fields: []
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4 draggable" data-column="title">Activity<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="categoryName">Category<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="departmentName">Department<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="date">Date / Time<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="attendees">Attendance<span class="sort-icon"></span></th>
+        <th class="draggable" data-column="status">Status<span class="sort-icon"></span></th>
+        <th class="text-end pe-4">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">No school activities found.</td>
+        </tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const attendees = Array.isArray(item.attendees) ? item.attendees : []; %>
+        <% const status = String(item.status || 'draft').toLowerCase(); %>
+        <% const statusClass = status === 'posted' ? 'bg-success' : (status === 'cancelled' ? 'bg-secondary' : 'bg-info text-dark'); %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold text-dark"><%= item.title || '-' %></div>
+            <div class="x-small text-muted font-monospace"><%= item.id || '-' %></div>
+            <% if (item.location) { %>
+              <div class="x-small text-muted mt-1"><i class="bi bi-geo-alt me-1"></i><%= item.location %></div>
+            <% } %>
+          </td>
+          <td>
+            <div class="small text-dark"><%= item.categoryName || item.categoryId || '-' %></div>
+          </td>
+          <td>
+            <div class="small text-dark"><%= item.departmentName || item.departmentId || '-' %></div>
+          </td>
+          <td>
+            <div class="small fw-bold text-dark"><%= item.date || '-' %></div>
+            <div class="x-small text-muted"><%= item.startTime || '-' %> - <%= item.endTime || '-' %> | <%= Number(item.durationHours || 0).toFixed(2) %> h</div>
+          </td>
+          <td>
+            <div class="small text-dark"><%= attendees.length %> attendee<%= attendees.length === 1 ? '' : 's' %></div>
+            <div class="x-small text-muted"><%= item.paid ? 'Payable activity' : 'Unpaid activity' %></div>
+          </td>
+          <td>
+            <span class="badge <%= statusClass %> text-capitalize"><%= status || '-' %></span>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>" title="Row actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <a href="/school/activities/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <button type="button" class="btn btn-outline-danger btn-sm js-delete-activity" data-id="<%= item.id %>">
+                  <i class="bi bi-trash me-2"></i>Delete
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<span id="urlRef" data-id="school/activities" hidden></span>
+
+<%- include('partials/pagination', { pagination, filters, baseUrlPath: newUrl }) %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const collapse = document.getElementById('schoolActivityFilterCollapse');
+  const icon = document.getElementById('schoolActivityFilterToggleIcon');
+  if (collapse && icon) {
+    collapse.addEventListener('show.bs.collapse', function () {
+      icon.classList.remove('bi-chevron-down');
+      icon.classList.add('bi-chevron-up');
+    });
+    collapse.addEventListener('hide.bs.collapse', function () {
+      icon.classList.remove('bi-chevron-up');
+      icon.classList.add('bi-chevron-down');
+    });
+  }
+
+  document.querySelectorAll('.js-delete-activity').forEach(function (button) {
+    button.addEventListener('click', async function () {
+      const id = button.getAttribute('data-id');
+      const confirmed = await showMessageModal({
+        title: 'Delete Activity',
+        icon: 'warning',
+        message: 'Delete this activity?',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: false },
+          { text: 'Delete', class: 'btn-danger', value: true }
+        ]
+      });
+      if (!confirmed) return;
+      const response = await fetch('/school/activities/delete/' + encodeURIComponent(id), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify({ actionStateId: '<%= actionStateId || "" %>' })
+      });
+      const payload = await response.json().catch(function () { return { status: 'error', message: 'Delete failed.' }; });
+      await showMessageModal({ title: payload.status === 'success' ? 'Deleted' : 'Error', icon: payload.status === 'success' ? 'success' : 'error', message: payload.message || 'Operation completed.' });
+      if (payload.status === 'success') window.location.reload();
+    });
+  });
+});
+</script>
+
+<%- include('partials/tablePages-end') %>
+

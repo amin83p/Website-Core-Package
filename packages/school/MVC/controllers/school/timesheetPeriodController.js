@@ -163,6 +163,7 @@ exports.saveTimesheetPeriod = async (req, res) => {
             startDate: req.body.startDate,
             endDate: req.body.endDate,
             submissionDeadline: req.body.submissionDeadline,
+            submissionDeadlineTime: req.body.submissionDeadlineTime || '23:59',
             status: req.body.status || 'open',
             notes: String(req.body.notes || '').trim()
         };

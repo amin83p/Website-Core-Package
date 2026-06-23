@@ -38,6 +38,8 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   holidays: { repository: schoolRepositories.holidays },
   terms: { repository: schoolRepositories.terms },
   departments: { repository: schoolRepositories.departments },
+  activityCategories: { repository: schoolRepositories.activityCategories },
+  activities: { repository: schoolRepositories.activities },
   teachers: { repository: schoolRepositories.teachers },
   staff: { repository: schoolRepositories.staff },
   payRates: { repository: schoolRepositories.payRates },
@@ -315,6 +317,8 @@ const schoolDataService = {
   getAccessibleHolidays: async (requestingUser) => schoolDataService.fetchData('holidays', {}, requestingUser),
   getAccessibleTerms: async (requestingUser) => schoolDataService.fetchData('terms', {}, requestingUser),
   getAccessibleDepartments: async (requestingUser) => schoolDataService.fetchData('departments', {}, requestingUser),
+  getAccessibleActivityCategories: async (requestingUser) => schoolDataService.fetchData('activityCategories', {}, requestingUser),
+  getAccessibleActivities: async (requestingUser) => schoolDataService.fetchData('activities', {}, requestingUser),
   getAccessibleTeachers: async (requestingUser) => schoolDataService.fetchData('teachers', {}, requestingUser),
   getAccessibleStaff: async (requestingUser) => schoolDataService.fetchData('staff', {}, requestingUser),
   getAccessiblePayRates: async (requestingUser) => schoolDataService.fetchData('payRates', {}, requestingUser),
@@ -367,3 +371,4 @@ const schoolDataService = {
 };
 
 module.exports = schoolDataService;
+

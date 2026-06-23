@@ -2,6 +2,7 @@
   const p = period || {};
   const isEdit = !!p.id;
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const submissionDeadlineTime = p.submissionDeadlineTime || '23:59';
 %>
 
 <div class="sections-page">
@@ -34,20 +35,23 @@
            </div>
 
            <div class="row mt-2">
-              <div class="col-md-4 mb-3">
+              <div class="col-md-3 mb-3">
                  <label class="form-label fw-bold">Start Date *</label>
                  <input type="date" name="startDate" class="form-control size-md" value="<%= p.startDate || '' %>" required>
               </div>
-              <div class="col-md-4 mb-3">
+              <div class="col-md-3 mb-3">
                  <label class="form-label fw-bold">End Date *</label>
                  <input type="date" name="endDate" class="form-control size-md" value="<%= p.endDate || '' %>" required>
               </div>
-              <div class="col-md-4 mb-3">
-                 <label class="form-label fw-bold text-danger"><i class="bi bi-clock-history"></i> Submission Deadline *</label>
+              <div class="col-md-3 mb-3">
+                 <label class="form-label fw-bold text-danger"><i class="bi bi-calendar-event"></i> Deadline Date *</label>
                  <input type="date" name="submissionDeadline" class="form-control size-md border-danger text-danger fw-bold" value="<%= p.submissionDeadline || '' %>" required>
               </div>
+              <div class="col-md-3 mb-3">
+                 <label class="form-label fw-bold text-danger"><i class="bi bi-clock-history"></i> Deadline Time *</label>
+                 <input type="time" name="submissionDeadlineTime" class="form-control size-md border-danger text-danger fw-bold" value="<%= submissionDeadlineTime %>" required>
+              </div>
            </div>
-
            <div class="row mt-2">
                <div class="col-12 mb-3">
                  <label class="form-label fw-bold">Internal Notes</label>
