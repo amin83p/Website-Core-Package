@@ -122,7 +122,7 @@ async function saveRoutingRule(reqUser, input = {}) {
     active,
     assigneePersonId,
     assigneePersonName,
-    label: cleanString(input.label || (sourceType === 'leave_request' ? 'Leave Request Reviewer' : ''), 160),
+    label: cleanString(input.label || (sourceType === 'leave_request' ? 'Leave Request Reviewer' : (sourceType === 'student_session_case' ? 'Student Case Reviewer' : '')), 160),
     notes: cleanString(input.notes, 2000),
     audit: {
       updatedBy: getActorId(reqUser)

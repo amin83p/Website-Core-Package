@@ -545,6 +545,13 @@
             "category": "package-preparation",
             "status": "root-active",
             "targetStatus": "package-mirrored"
+        },
+        {
+            "source": "test/school-session-student-cases-feature.test.js",
+            "target": "packages/school/test/school-session-student-cases-feature.test.js",
+            "category": "feature-regression",
+            "status": "root-active",
+            "targetStatus": "package-planned"
         }
     ]
 }

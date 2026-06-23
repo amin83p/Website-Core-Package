@@ -35,6 +35,7 @@ const gradesMatrixController = require('./gradesMatrixController');
 const accessService = requireCoreModule('MVC/services/security/index');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
+const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { isRollingClassWorkflowEnabledForClass } = require('../../services/school/phase2FeatureFlagService');
 const {
@@ -4670,6 +4671,11 @@ async function manageSession(req, res) {
             classData?.orgId || getActiveOrgIdOrThrow(req.user)
         );
         const attendanceMatrixPolicyResolved = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerMs);
+        const sessionStudentCases = await sessionStudentCaseService.listCasesForSession({
+            classId,
+            sessionId,
+            reqUser: req.user
+        });
 
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
@@ -4688,6 +4694,7 @@ async function manageSession(req, res) {
             isSessionLocked, 
             isReadOnly,
             attendanceMatrixPolicyResolved,
+            sessionStudentCases,
             includeModal: true,  
             user: req.user,
             actionStateId: req.actionStateId
@@ -4697,6 +4704,48 @@ async function manageSession(req, res) {
     }
 }
 
+async function listSessionStudentCases(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const cases = await sessionStudentCaseService.listCasesForSession({ classId, sessionId, reqUser: req.user });
+        return res.json({ status: 'success', cases });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function saveSessionStudentCase(req, res) {
+    try {
+        const { id: classId, sessionId, caseId = '' } = req.params;
+        const saved = await sessionStudentCaseService.saveCase({
+            classId,
+            sessionId,
+            caseId,
+            input: req.body || {},
+            reqUser: req.user
+        });
+        return res.json({ status: 'success', message: 'Student case saved.', case: saved });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function updateSessionStudentCaseStatus(req, res) {
+    try {
+        const { id: classId, sessionId, caseId } = req.params;
+        const saved = await sessionStudentCaseService.updateStatus({
+            classId,
+            sessionId,
+            caseId,
+            status: req.body?.status,
+            note: req.body?.note || '',
+            reqUser: req.user
+        });
+        return res.json({ status: 'success', message: 'Student case updated.', case: saved });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
 async function saveSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -5076,7 +5125,7 @@ module.exports = {
   createNextClassCycleFromTemplate,
   carryForwardClassCycleStudents,
   splitClassEnrollmentPeriodsForCycleBoundary,
-  saveSession, saveSessionGradebooks, manageSession,
+  saveSession, saveSessionGradebooks, manageSession, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus,
   showFinalGradesPage,
   postOfficialFinalGradesWorkflow,
   showEnrollmentOutcomesPage,

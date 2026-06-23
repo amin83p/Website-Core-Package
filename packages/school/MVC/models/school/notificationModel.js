@@ -14,7 +14,7 @@ if (!fsSync.existsSync(dataPath)) {
 
 const NOTIFICATION_STATUSES = Object.freeze(['open', 'in_progress', 'resolved', 'dismissed']);
 const NOTIFICATION_SEVERITIES = Object.freeze(['info', 'warning', 'urgent', 'error']);
-const NOTIFICATION_SOURCE_TYPES = Object.freeze(['leave_request', 'timesheet', 'manual']);
+const NOTIFICATION_SOURCE_TYPES = Object.freeze(['leave_request', 'student_session_case', 'timesheet', 'manual']);
 const NOTIFICATION_TASK_STATUSES = Object.freeze(['open', 'in_progress', 'done', 'cancelled']);
 
 function isPlainObject(value) {

@@ -11,6 +11,13 @@ const { SECTIONS, OPERATIONS } = require('./schoolRouteDependencies');
 
 router.use(requireAuth);
 
+const sessionManagerMutationActionState = {
+  requireToken: true,
+  keepActive: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+};
+
 const rollingEnrollmentMutationActionState = {
   requireToken: true,
   keepActive: true,
@@ -299,7 +306,21 @@ router.get('/:id/sessions/:sessionId',
   // Session manager posts to session UPDATE; mint the matching token on page load.
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   ctrl.manageSession);
-router.post('/:id/sessions/:sessionId/gradebooks/save',
+router.get('/:id/sessions/:sessionId/cases',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
+  ctrl.listSessionStudentCases);
+router.post('/:id/sessions/:sessionId/cases',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),
+  ctrl.saveSessionStudentCase);
+router.post('/:id/sessions/:sessionId/cases/:caseId',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),
+  ctrl.saveSessionStudentCase);
+router.post('/:id/sessions/:sessionId/cases/:caseId/status',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),
+  ctrl.updateSessionStudentCaseStatus);router.post('/:id/sessions/:sessionId/gradebooks/save',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: true }),
   ctrl.saveSessionGradebooks);

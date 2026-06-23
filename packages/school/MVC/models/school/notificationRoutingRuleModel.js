@@ -12,7 +12,7 @@ if (!fsSync.existsSync(dataPath)) {
   fsSync.writeFileSync(dataPath, '[]');
 }
 
-const NOTIFICATION_ROUTING_SOURCE_TYPES = Object.freeze(['leave_request', 'timesheet', 'manual']);
+const NOTIFICATION_ROUTING_SOURCE_TYPES = Object.freeze(['leave_request', 'student_session_case', 'timesheet', 'manual']);
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

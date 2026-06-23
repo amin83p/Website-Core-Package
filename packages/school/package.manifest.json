@@ -7275,6 +7275,11 @@
       "collectionName": "schoolNotificationRoutingRules"
     },
     {
+      "entityType": "sessionStudentCases",
+      "label": "Session Student Cases",
+      "collectionName": "schoolSessionStudentCases"
+    },
+    {
       "entityType": "activityCategories",
       "label": "Activity Categories",
       "collectionName": "schoolActivityCategories"

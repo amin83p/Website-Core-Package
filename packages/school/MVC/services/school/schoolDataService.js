@@ -52,7 +52,8 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   classEnrollmentPeriods: { repository: schoolRepositories.classEnrollmentPeriods },
   leaveRequests: { repository: schoolRepositories.leaveRequests },
   notifications: { repository: schoolRepositories.notifications },
-  notificationRoutingRules: { repository: schoolRepositories.notificationRoutingRules }
+  notificationRoutingRules: { repository: schoolRepositories.notificationRoutingRules },
+  sessionStudentCases: { repository: schoolRepositories.sessionStudentCases }
 });
 
 const SCHOOL_INDEX_DOCS = Object.freeze({

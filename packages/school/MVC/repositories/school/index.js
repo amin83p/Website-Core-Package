@@ -36,6 +36,7 @@ const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentP
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
 const notificationModel = require('../../models/school/notificationModel');
 const notificationRoutingRuleModel = require('../../models/school/notificationRoutingRuleModel');
+const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -944,7 +945,33 @@ const schoolRepositories = {
     ],
     dateFields: ['requestDate', 'startDate', 'endDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
   }),
-  notifications: createSchoolRepository({
+  sessionStudentCases: createSchoolRepository({
+    entityName: 'sessionStudentCases',
+    collectionName: 'schoolSessionStudentCases',
+    getAll: sessionStudentCaseModel.getAllSessionStudentCases,
+    getById: sessionStudentCaseModel.getSessionStudentCaseById,
+    create: sessionStudentCaseModel.addSessionStudentCase,
+    update: sessionStudentCaseModel.updateSessionStudentCase,
+    remove: sessionStudentCaseModel.deleteSessionStudentCase,
+    defaultSearchFields: [
+      'id',
+      'orgId',
+      'classId',
+      'classTitle',
+      'sessionId',
+      'studentPersonId',
+      'studentName',
+      'teacherPersonId',
+      'teacherName',
+      'category',
+      'severity',
+      'status',
+      'summary',
+      'details',
+      'additionalComments'
+    ],
+    dateFields: ['sessionDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
+  }),  notifications: createSchoolRepository({
     entityName: 'notifications',
     collectionName: 'schoolNotifications',
     getAll: notificationModel.getAllNotifications,
@@ -1885,6 +1912,7 @@ assertQueryableCrudRepository('schoolRepositories.studentProgramRegistrations', 
 assertQueryableCrudRepository('schoolRepositories.studentTermRegistrations', schoolRepositories.studentTermRegistrations);
 assertQueryableCrudRepository('schoolRepositories.classEnrollmentPeriods', schoolRepositories.classEnrollmentPeriods);
 assertQueryableCrudRepository('schoolRepositories.leaveRequests', schoolRepositories.leaveRequests);
+assertQueryableCrudRepository('schoolRepositories.sessionStudentCases', schoolRepositories.sessionStudentCases);
 assertQueryableCrudRepository('schoolRepositories.notifications', schoolRepositories.notifications);
 assertQueryableCrudRepository('schoolRepositories.notificationRoutingRules', schoolRepositories.notificationRoutingRules);
 
