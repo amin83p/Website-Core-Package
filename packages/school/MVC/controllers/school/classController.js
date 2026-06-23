@@ -1571,6 +1571,14 @@ function assertRollingSessionsWithinCycleWindowOrThrow(input = {}) {
     throw new Error(parts.join(' '));
 }
 
+function assertSessionManagerSessionWithinCycleWindowOrThrow(classData = {}, session = {}) {
+    assertRollingSessionsWithinCycleWindowOrThrow({
+        registrationMode: classData?.registrationMode || 'term_based',
+        cycleStartDate: classData?.cycleStartDate || '',
+        cycleEndDate: classData?.cycleEndDate || '',
+        sessions: [session]
+    });
+}
 function buildClassFromBody(body, reqUserId, isNew = false, activeOrgId = '', existingRecord = null) {
   const now = new Date().toISOString();
   const curriculum = normalizeCurriculum(parseData(body.curriculum) || { subjects: [], totalHours: 0 });
@@ -2410,8 +2418,9 @@ async function editClass(req, res) {
     } else {
         updates.postingTemplates = [];
     }
-    updates.audit.createUser = existing.audit.createUser;
-    updates.audit.createDateTime = existing.audit.createDateTime;
+    const existingAudit = existing?.audit && typeof existing.audit === 'object' ? existing.audit : {};
+    updates.audit.createUser = existingAudit.createUser || existing?.createUser || req.user?.id || '';
+    updates.audit.createDateTime = existingAudit.createDateTime || existing?.createDateTime || new Date().toISOString();
     updates.statusHistory = existing.statusHistory || [];
     if (updates.status !== existing.status) updates.statusHistory.push({ status: updates.status, date: new Date().toISOString(), updatedBy: req.user?.id, reason: 'Updated via form' });
     updates.enrollment.students = existing.enrollment?.students || [];
@@ -4693,13 +4702,14 @@ async function saveSession(req, res) {
         const { id: classId, sessionId } = req.params;
         const { status, notes, room, roster, contentItems, contentOrder } = req.body; 
         const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
-        const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
-            includeInactive: true
-        });
-
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
+        assertSessionManagerSessionWithinCycleWindowOrThrow(classData, sessions[sessionIndex]);
+
+        const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(req.user), {
+            includeInactive: true
+        });
 
         // --- Backend Save Protection ---
         const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
@@ -4798,11 +4808,12 @@ async function saveSession(req, res) {
 async function saveSessionGradebooks(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        await getClassByIdWithOrgCheck(classId, req.user);
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user);
 
         const sessions = await schoolDataService.getClassSessions(classId, req.user);
         const sessionIndex = sessions.findIndex((s) => s.sessionId === sessionId);
         if (sessionIndex === -1) throw new Error('Session not found');
+        assertSessionManagerSessionWithinCycleWindowOrThrow(classData, sessions[sessionIndex]);
 
         const isSessionLocked = sessions[sessionIndex].locked === true || String(sessions[sessionIndex].locked) === 'true';
         let canOverride = await adminChekersService.isAdminForRequestAsync(

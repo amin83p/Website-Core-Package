@@ -369,6 +369,7 @@
            <div class="card bg-light border-0 mb-4">
              <div class="card-body">
                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-magic me-2"></i>Batch Session Generator</h6>
+               <div class="alert alert-info border small py-2 mb-3 d-none" id="rollingSessionWindowHint"></div>
                <div class="row g-2 mb-3">
                   <div class="col-md-2"><label class="form-label x-small">Start Date</label><input type="date" id="bg_start" class="form-control size-sm"></div>
                   <div class="col-md-2"><label class="form-label x-small">End Date</label><input type="date" id="bg_end" class="form-control size-sm"></div>
@@ -830,6 +831,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const cycleEndDateInput = document.getElementById('inp_cycleEndDate');
     const cycleNoInput = document.getElementById('inp_cycleNo');
     const isClosedEnrollmentInput = document.getElementById('inp_isClosedForNewEnrollment');
+    const rollingSessionWindowHint = document.getElementById('rollingSessionWindowHint');
+    const rollingSessionDateInputs = ['bg_start', 'bg_end', 'mod_date']
+        .map((id) => document.getElementById(id))
+        .filter(Boolean);
     const rollingFieldsWrap = document.getElementById('rollingLifecycleFields');
     const termLifecycleHint = document.getElementById('termLifecycleHint');
     const lifecycleModeBadge = document.getElementById('lifecycle_modeBadge');
@@ -1054,6 +1059,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAllowedProgramTerms();
         renderPendingEligibilityProgram();
         refreshEvaluationWeightsModeUi();
+        refreshRollingSessionDateBounds();
     }
 
     function validateLifecycleInputs() {
@@ -1100,6 +1106,29 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function refreshRollingSessionDateBounds() {
+        const bounds = getRollingCycleBounds();
+        if (!bounds || bounds.error) {
+            rollingSessionDateInputs.forEach((input) => {
+                input.removeAttribute('min');
+                input.removeAttribute('max');
+            });
+            if (rollingSessionWindowHint) {
+                rollingSessionWindowHint.className = 'alert alert-warning border small py-2 mb-3' + (isRollingMode() ? '' : ' d-none');
+                rollingSessionWindowHint.textContent = bounds?.error || '';
+            }
+            return;
+        }
+        rollingSessionDateInputs.forEach((input) => {
+            input.min = bounds.startToken;
+            if (bounds.endToken) input.max = bounds.endToken;
+            else input.removeAttribute('max');
+        });
+        if (rollingSessionWindowHint) {
+            rollingSessionWindowHint.className = 'alert alert-info border small py-2 mb-3';
+            rollingSessionWindowHint.textContent = `Rolling sessions must be scheduled from ${bounds.startToken}${bounds.endToken ? ` to ${bounds.endToken}` : ' onward'}.`;
+        }
+    }
     function findSessionCycleWindowViolations(sessionRows = []) {
         if (!isRollingMode()) return [];
         const bounds = getRollingCycleBounds();
@@ -1611,6 +1640,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     registrationModeInput?.addEventListener('change', refreshLifecycleModeUi);
+    cycleStartDateInput?.addEventListener('change', refreshRollingSessionDateBounds);
+    cycleEndDateInput?.addEventListener('change', refreshRollingSessionDateBounds);
     btnCheckRollingIntegrity?.addEventListener('click', runRollingIntegrityCheckFromApi);
     btnCycleClose?.addEventListener('click', handleCloseCycleAction);
     btnCycleCreateNext?.addEventListener('click', handleCreateNextCycleAction);
@@ -2446,6 +2477,7 @@ document.addEventListener('DOMContentLoaded', () => {
         _prevRollingModeForEval = null;
         _savedExamWeightsBackup = null;
         refreshEvaluationWeightsModeUi();
+        refreshRollingSessionDateBounds();
     }
 
     function openTransactionDefinitionPicker(onSelect) {

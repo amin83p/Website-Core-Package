@@ -289,6 +289,15 @@
         const gradesMatrixHref = '/school/grades-matrix?classId=' + encodeURIComponent(classData.id) + '&range=allTime';
         const smRegMode = String(classData.registrationMode || 'term_based').trim().toLowerCase();
         const smIsRolling = smRegMode === 'rolling';
+        const smCycleStart = String(classData.cycleStartDate || '').trim();
+        const smCycleEnd = String(classData.cycleEndDate || '').trim();
+        const smCycleWindowLabel = smIsRolling
+            ? (smCycleStart ? `${smCycleStart}${smCycleEnd ? ' to ' + smCycleEnd : ' onward'}` : 'Cycle start date missing')
+            : '';
+        const smSessionDate = String(session.date || '').trim();
+        const smSessionOutsideCycle = smIsRolling
+            && smCycleStart
+            && (smSessionDate < smCycleStart || (smCycleEnd && smSessionDate > smCycleEnd));
         const finalGradesNavHref = smIsRolling
             ? '/school/classes/' + encodeURIComponent(classData.id) + '/enrollment-outcomes'
             : '/school/classes/' + encodeURIComponent(classData.id) + '/final-grades';
@@ -342,6 +351,12 @@
                             <div class="info-label">Time</div>
                             <div class="info-value text-nowrap"><%= session.startTime %> – <%= session.endTime %></div>
                         </div>
+                        <% if (smIsRolling) { %>
+                        <div class="info-block">
+                            <div class="info-label">Cycle window</div>
+                            <div class="info-value text-nowrap"><%= smCycleWindowLabel %></div>
+                        </div>
+                        <% } %>
                     </div>
                 </div>
                 <div class="col-12 col-md-auto ms-md-auto session-manager-location-block text-md-end">
@@ -349,6 +364,15 @@
                     <input type="text" id="sessionRoom" class="form-control form-control-sm text-md-end" value="<%= session.room || '' %>" placeholder="Room, lab, field…" <%- disabledAttr %> autocomplete="off">
                 </div>
             </div>
+            <% if (smIsRolling) { %>
+              <div class="alert <%= smSessionOutsideCycle ? 'alert-danger' : 'alert-info' %> border small py-2 mb-3">
+                <% if (smSessionOutsideCycle) { %>
+                  This session date is outside the rolling cycle window. Update the class cycle dates or rebuild the session ledger before saving session changes.
+                <% } else { %>
+                  Rolling sessions are limited to the cycle window: <strong><%= smCycleWindowLabel %></strong>.
+                <% } %>
+              </div>
+            <% } %>
             <div class="row g-2 align-items-end">
                 <div class="col-md-4">
                     <label class="info-label d-block" for="sessionStatusSelect">Session status</label>

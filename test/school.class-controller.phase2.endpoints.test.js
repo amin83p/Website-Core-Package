@@ -17,7 +17,10 @@ const schoolMethodNames = [
   'closeClassCycle',
   'createNextClassCycleFromTemplate',
   'carryForwardClassCycleStudents',
-  'splitClassEnrollmentPeriodsForCycleBoundary'
+  'splitClassEnrollmentPeriodsForCycleBoundary',
+  'getClassSessions',
+  'saveClassSessions',
+  'updateData'
 ];
 
 const guardMethodNames = [
@@ -506,4 +509,153 @@ test('checkConflicts rejects rolling sessions outside cycle window', async () =>
   assert.equal(res.statusCode, 400);
   assert.equal(res.payload.status, 'error');
   assert.match(String(res.payload.message || ''), /within cycle dates/i);
+});
+
+test('editClass saves rolling session payload when legacy class audit is missing', async () => {
+  applyDefaultGuardStubs();
+  let updateCalls = 0;
+  let saveSessionCalls = 0;
+  let capturedUpdates = null;
+
+  applyClassLookupStubs({
+    getDataById: async (entityType, id) => {
+      if (entityType === 'classes') {
+        return {
+          id: String(id || 'CLS-1'),
+          orgId: 'ORG-1',
+          title: 'Legacy Rolling Class',
+          registrationMode: 'rolling',
+          status: 'active',
+          allowedProgramTerms: [{ programId: 'PGM-1', termId: '', order: 1 }],
+          enrollment: { maxCapacity: 30, students: [] },
+          statusHistory: []
+        };
+      }
+      if (entityType === 'departments') {
+        return { id: 'DPT-1', orgId: 'ORG-1', code: 'PD', name: 'Professional Development' };
+      }
+      return null;
+    },
+    fetchData: async (entityType) => {
+      if (entityType === 'programs') {
+        return [{ id: 'PGM-1', orgId: 'ORG-1', code: 'PGM', name: 'Program One' }];
+      }
+      if (entityType === 'terms') return [];
+      if (entityType === 'classes') return [];
+      return [];
+    },
+    updateData: async (entityType, id, updates) => {
+      updateCalls += 1;
+      capturedUpdates = { entityType, id, updates };
+      return { id, ...updates };
+    },
+    saveClassSessions: async () => {
+      saveSessionCalls += 1;
+    }
+  });
+
+  const req = createReq({
+    params: { id: 'CLS-1' },
+    body: {
+      title: 'Legacy Rolling Class',
+      status: 'active',
+      registrationMode: 'rolling',
+      cycleStartDate: '2026-07-01',
+      cycleEndDate: '2026-07-31',
+      deliveryDepartmentId: 'DPT-1',
+      billingMode: 'no_charge',
+      credits: '1',
+      allowedProgramTerms: JSON.stringify([{ programId: 'PGM-1', termId: '', order: 1 }]),
+      curriculum: JSON.stringify({ subjects: [], totalHours: 0 }),
+      pricing: JSON.stringify({ feeRules: [] }),
+      postingTemplates: JSON.stringify([]),
+      schedule: JSON.stringify({ current: {}, history: [] }),
+      instructors: JSON.stringify([]),
+      enrollment: JSON.stringify({ maxCapacity: 30, students: [] }),
+      evaluation: JSON.stringify({ passingScore: 60, weights: {} }),
+      sessions: JSON.stringify([
+        { sessionId: 'SES-1', date: '2026-07-10', startTime: '09:00', endTime: '10:00', status: 'scheduled' }
+      ])
+    }
+  });
+  const res = createRes();
+  await classController.editClass(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.payload.status, 'success');
+  assert.equal(updateCalls, 1);
+  assert.equal(saveSessionCalls, 1);
+  assert.equal(capturedUpdates.updates.audit.createUser, 'USR-1');
+  assert.ok(capturedUpdates.updates.audit.createDateTime);
+});
+test('saveSession rejects an existing rolling session outside the cycle window', async () => {
+  applyDefaultGuardStubs();
+  applyClassLookupStubs({});
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        cycleStartDate: '2026-07-01',
+        cycleEndDate: '2026-07-31'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    { sessionId: 'SES-1', date: '2026-08-01', startTime: '09:00', endTime: '11:00', status: 'scheduled' }
+  ]);
+  schoolDataService.saveClassSessions = async () => {
+    throw new Error('saveClassSessions should not be called for an out-of-window rolling session.');
+  };
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    body: { status: 'scheduled', notes: 'Attempt save' }
+  });
+  const res = createRes();
+  await classController.saveSession(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.payload.status, 'error');
+  assert.match(String(res.payload.message || ''), /within cycle dates/i);
+  assert.match(String(res.payload.message || ''), /2026-08-01/);
+});
+
+test('saveSessionGradebooks rejects an existing rolling session outside the cycle window', async () => {
+  applyDefaultGuardStubs();
+  applyClassLookupStubs({});
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'classes') {
+      return {
+        id: String(id || 'CLS-1'),
+        orgId: 'ORG-1',
+        title: 'Rolling Class A',
+        registrationMode: 'rolling',
+        cycleStartDate: '2026-07-01',
+        cycleEndDate: '2026-07-31'
+      };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    { sessionId: 'SES-1', date: '2026-06-30', startTime: '09:00', endTime: '11:00', status: 'scheduled' }
+  ]);
+  schoolDataService.saveClassSessions = async () => {
+    throw new Error('saveClassSessions should not be called for an out-of-window rolling session.');
+  };
+
+  const req = createReq({
+    params: { id: 'CLS-1', sessionId: 'SES-1' },
+    body: { gradebooks: [] }
+  });
+  const res = createRes();
+  await classController.saveSessionGradebooks(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.payload.status, 'error');
+  assert.match(String(res.payload.message || ''), /within cycle dates/i);
+  assert.match(String(res.payload.message || ''), /2026-06-30/);
 });
