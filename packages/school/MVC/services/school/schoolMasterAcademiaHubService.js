@@ -1,10 +1,12 @@
 const dataService = require('./schoolDataService');
+const schoolRepositories = require('../../repositories/school');
 const notificationService = require('./notificationService');
 const leaveRequestService = require('./leaveRequestService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionExplorerService = require('./sessionExplorerService');
+const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
@@ -53,6 +55,10 @@ function normalizeText(value = '') {
 
 function lower(value = '') {
   return normalizeText(value).toLowerCase();
+}
+
+function getHubActiveOrgId(user) {
+  return toPublicId(user?.activeOrgId || user?.activeOrganization?.id || user?.primaryOrgId || '');
 }
 
 function isArchived(moduleType, row) {
@@ -468,6 +474,96 @@ function normalizeHolidayRows(rows) {
   }));
 }
 
+function buildSessionIssueActionLinks(row) {
+  const classId = normalizeText(row?.classId);
+  const sessionId = normalizeText(row?.sessionId);
+  const caseId = normalizeText(row?.id);
+  if (!classId || !sessionId || !caseId) return [];
+  return [{
+    label: 'Review',
+    href: `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}?caseId=${encodeURIComponent(caseId)}`,
+    icon: 'bi bi-box-arrow-in-right',
+    tone: 'primary'
+  }];
+}
+
+function normalizeSessionIssueRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const updatedAt = normalizeText(row?.audit?.lastUpdateDateTime || row?.audit?.createDateTime || '');
+    return {
+      id: normalizeText(row?.id),
+      classId: normalizeText(row?.classId),
+      classTitle: normalizeText(row?.classTitle || row?.className || row?.classId || 'Class'),
+      sessionId: normalizeText(row?.sessionId),
+      sessionDate: normalizeText(row?.sessionDate),
+      sessionStartTime: normalizeText(row?.sessionStartTime),
+      sessionEndTime: normalizeText(row?.sessionEndTime),
+      studentPersonId: normalizeText(row?.studentPersonId),
+      studentName: normalizeText(row?.studentName || row?.studentPersonId || '-'),
+      teacherPersonId: normalizeText(row?.teacherPersonId),
+      teacherName: normalizeText(row?.teacherName || row?.teacherPersonId || 'Unassigned'),
+      category: lower(row?.category || 'other'),
+      severity: lower(row?.severity || 'info'),
+      status: lower(row?.status || 'open'),
+      summary: normalizeText(row?.summary || '-'),
+      updatedAt,
+      actions: buildSessionIssueActionLinks(row)
+    };
+  });
+}
+
+function splitFilterIds(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => normalizeText(item))
+    .filter(Boolean);
+}
+
+function sessionIssueMatchesFilters(row, queryInput = {}, searchTerm = '') {
+  const severity = lower(queryInput.severity || '');
+  const category = lower(queryInput.category || '');
+  const statusGroup = lower(queryInput.statusGroup || '');
+  const startDate = normalizeText(queryInput.startDate || '');
+  const endDate = normalizeText(queryInput.endDate || '');
+  const classIds = splitFilterIds(queryInput.classId || queryInput.classIds);
+  const teacherIds = splitFilterIds(queryInput.teacherPersonId || queryInput.teacherId || queryInput.teacherIds);
+  const studentIds = splitFilterIds(queryInput.studentPersonId || queryInput.studentId || queryInput.studentIds);
+  const rowStatus = lower(row?.status || '');
+
+  if (severity && lower(row?.severity) !== severity) return false;
+  if (category && lower(row?.category) !== category) return false;
+  if (statusGroup === 'open' && !['open', 'in_progress', 'reopened'].includes(rowStatus)) return false;
+  if (statusGroup === 'resolved' && !['resolved', 'cancelled'].includes(rowStatus)) return false;
+  if (startDate && normalizeText(row?.sessionDate) < startDate) return false;
+  if (endDate && normalizeText(row?.sessionDate) > endDate) return false;
+  if (classIds.length && !classIds.some((id) => idsEqual(row?.classId, id))) return false;
+  if (teacherIds.length && !teacherIds.some((id) => idsEqual(row?.teacherPersonId, id))) return false;
+  if (studentIds.length && !studentIds.some((id) => idsEqual(row?.studentPersonId, id))) return false;
+
+  return rowMatchesWorkspaceSearch(row, searchTerm);
+}
+
+function sortSessionIssueRows(rows) {
+  const severityRank = new Map([
+    ['urgent', 0],
+    ['warning', 1],
+    ['info', 2]
+  ]);
+  const statusRank = new Map([
+    ['open', 0],
+    ['in_progress', 0],
+    ['reopened', 0],
+    ['resolved', 1],
+    ['cancelled', 2]
+  ]);
+  return [...(Array.isArray(rows) ? rows : [])].sort((a, b) => {
+    const statusDelta = (statusRank.get(a.status) ?? 9) - (statusRank.get(b.status) ?? 9);
+    if (statusDelta) return statusDelta;
+    const severityDelta = (severityRank.get(a.severity) ?? 9) - (severityRank.get(b.severity) ?? 9);
+    if (severityDelta) return severityDelta;
+    return String(b.sessionDate || b.updatedAt || '').localeCompare(String(a.sessionDate || a.updatedAt || ''));
+  });
+}
 function addRoleTokens(target, value) {
   if (Array.isArray(value)) {
     value.forEach((item) => addRoleTokens(target, item));
@@ -595,6 +691,52 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     };
   }
 
+  if (key === 'session-issues') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Session Issues',
+      sectionId: SECTIONS.SCHOOL_SESSIONS
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Session Issues.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const rawRows = await schoolRepositories.sessionStudentCases.list({
+      query: {},
+      scope: { activeOrgId: getHubActiveOrgId(req.user) }
+    });
+    const rows = sortSessionIssueRows(normalizeSessionIssueRows(rawRows)
+      .filter((row) => sessionIssueMatchesFilters(row, queryInput || {}, query.q || '')));
+    return {
+      section: {
+        key: 'session-issues',
+        label: 'Session Issues',
+        icon: 'bi bi-exclamation-triangle-fill',
+        sourceUrl: '/school/sessions'
+      },
+      rows,
+      total: rows.length,
+      filters: {
+        severity: lower(queryInput?.severity || ''),
+        category: lower(queryInput?.category || ''),
+        statusGroup: lower(queryInput?.statusGroup || ''),
+        classId: normalizeText(queryInput?.classId || queryInput?.classIds || ''),
+        teacherPersonId: normalizeText(queryInput?.teacherPersonId || queryInput?.teacherId || queryInput?.teacherIds || ''),
+        studentPersonId: normalizeText(queryInput?.studentPersonId || queryInput?.studentId || queryInput?.studentIds || ''),
+        startDate: normalizeText(queryInput?.startDate || ''),
+        endDate: normalizeText(queryInput?.endDate || '')
+      },
+      severityOptions: sessionStudentCaseModel.CASE_SEVERITIES || ['info', 'warning', 'urgent'],
+      categoryOptions: sessionStudentCaseModel.CASE_CATEGORIES || ['learning', 'technology', 'engagement', 'behavior', 'support', 'resources', 'lesson_delivery', 'other'],
+      statusGroupOptions: [
+        { value: '', label: 'All Cases' },
+        { value: 'open', label: 'Open / Active' },
+        { value: 'resolved', label: 'Resolved / Cancelled' }
+      ],
+      searchQuery: normalizeText(query.q || ''),
+      refreshedAt: new Date().toISOString()
+    };
+  }
   if (key === 'schedule') {
     const access = await evaluateModuleAccess(req, {
       label: 'Schedule',

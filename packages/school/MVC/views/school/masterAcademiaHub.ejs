@@ -842,6 +842,9 @@
       <button type="button" class="hub-section-segment" data-hub-workspace-section="sessions">
         <span><i class="bi bi-calendar2-week-fill me-1"></i> Sessions</span>
       </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="session-issues">
+        <span><i class="bi bi-exclamation-triangle-fill me-1"></i> Session Issues</span>
+      </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="schedule">
         <span><i class="bi bi-calendar-check-fill me-1"></i> Schedule</span>
       </button>
@@ -1128,6 +1131,7 @@
     serverSearch: {
       notifications: '',
       classes: '',
+      'session-issues': '',
       holidays: ''
     },
     holidaysYear: String(new Date().getFullYear())
@@ -1557,6 +1561,9 @@
   }
 
   let hubSessionTeacherSelections = [];
+  let hubSessionIssueTeacherSelections = [];
+  let hubSessionIssueStudentSelections = [];
+  let hubSessionIssueClassSelections = [];
 
   function resolveHubTeacherId(item) {
     if (!item || typeof item !== 'object') return '';
@@ -1916,6 +1923,416 @@
     bindSessionWorkspaceControls();
   }
 
+  function toHubTitleCase(value) {
+    return String(value || '').replace(/_/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+  }
+
+  function sessionIssueBadgeClass(value, type) {
+    const key = String(value || '').toLowerCase();
+    if (type === 'severity') {
+      if (key === 'urgent') return 'bg-danger';
+      if (key === 'warning') return 'bg-warning text-dark';
+      return 'bg-info text-dark';
+    }
+    if (key === 'resolved') return 'bg-success';
+    if (key === 'cancelled') return 'bg-secondary';
+    if (key === 'in_progress') return 'bg-primary';
+    if (key === 'reopened') return 'bg-warning text-dark';
+    return 'bg-dark';
+  }
+
+  function formatHubSessionIssueDate(dateValue) {
+    const raw = String(dateValue || '').trim();
+    if (!raw) return '-';
+    try {
+      return new Date(raw + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (error) {
+      return raw;
+    }
+  }
+
+  function formatHubSessionIssueDateTime(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '-';
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleString();
+  }
+
+  function resolveHubClassId(item) {
+    if (!item || typeof item !== 'object') return '';
+    return String(item.id || item.classId || item._id || '').trim();
+  }
+
+  function formatHubClassName(item, fallbackId) {
+    if (!item || typeof item !== 'object') return String(fallbackId || '').trim();
+    const direct = String(item.title || item.name || item.className || item.label || '').trim();
+    return direct && direct !== '[object Object]' ? direct : String(fallbackId || item.id || '').trim();
+  }
+
+  function renderSessionIssueTeacherChips() {
+    const container = document.getElementById('hubSessionIssueTeacherChips');
+    if (!container) return;
+    if (!hubSessionIssueTeacherSelections.length) {
+      container.innerHTML = '<div class="text-muted small">No teacher filter selected.</div>';
+      return;
+    }
+    container.innerHTML = hubSessionIssueTeacherSelections.map(function (item) {
+      return '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1"><span>' + escapeHtml(item.name || item.id) + '</span><button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove ' + escapeHtml(item.name || item.id) + '" data-hub-session-issue-remove-teacher="' + escapeHtml(item.id) + '"></button></span>';
+    }).join('');
+  }
+
+  function renderSessionIssueStudentChips() {
+    const container = document.getElementById('hubSessionIssueStudentChips');
+    if (!container) return;
+    if (!hubSessionIssueStudentSelections.length) {
+      container.innerHTML = '<div class="text-muted small">No student filter selected.</div>';
+      return;
+    }
+    container.innerHTML = hubSessionIssueStudentSelections.map(function (item) {
+      return '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1"><span>' + escapeHtml(item.name || item.id) + '</span><button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove ' + escapeHtml(item.name || item.id) + '" data-hub-session-issue-remove-student="' + escapeHtml(item.id) + '"></button></span>';
+    }).join('');
+  }
+  function renderSessionIssueClassChips() {
+    const container = document.getElementById('hubSessionIssueClassChips');
+    if (!container) return;
+    if (!hubSessionIssueClassSelections.length) {
+      container.innerHTML = '<div class="text-muted small">No class filter selected.</div>';
+      return;
+    }
+    container.innerHTML = hubSessionIssueClassSelections.map(function (item) {
+      return '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1"><span>' + escapeHtml(item.name || item.id) + '</span><button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove ' + escapeHtml(item.name || item.id) + '" data-hub-session-issue-remove-class="' + escapeHtml(item.id) + '"></button></span>';
+    }).join('');
+  }
+
+  function syncSessionIssueInputs() {
+    const teacherIdEl = document.getElementById('hubSessionIssueTeacherId');
+    const teacherNameEl = document.getElementById('hubSessionIssueTeacherName');
+    const studentIdEl = document.getElementById('hubSessionIssueStudentId');
+    const studentNameEl = document.getElementById('hubSessionIssueStudentName');
+    const classIdEl = document.getElementById('hubSessionIssueClassId');
+    const classNameEl = document.getElementById('hubSessionIssueClassName');
+    if (teacherIdEl) teacherIdEl.value = hubSessionIssueTeacherSelections.map(function (item) { return item.id; }).filter(Boolean).join(',');
+    if (teacherNameEl) teacherNameEl.value = hubSessionIssueTeacherSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    if (studentIdEl) studentIdEl.value = hubSessionIssueStudentSelections.map(function (item) { return item.id; }).filter(Boolean).join(',');
+    if (studentNameEl) studentNameEl.value = hubSessionIssueStudentSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    if (classIdEl) classIdEl.value = hubSessionIssueClassSelections.map(function (item) { return item.id; }).filter(Boolean).join(',');
+    if (classNameEl) classNameEl.value = hubSessionIssueClassSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    renderSessionIssueTeacherChips();
+    renderSessionIssueStudentChips();
+    renderSessionIssueClassChips();
+  }
+
+  function appendSessionIssueWorkspaceQuery(requestQuery) {
+    const values = {
+      startDate: hubInputValue('hubSessionIssueStartDate'),
+      endDate: hubInputValue('hubSessionIssueEndDate'),
+      severity: hubInputValue('hubSessionIssueSeverity'),
+      category: hubInputValue('hubSessionIssueCategory'),
+      statusGroup: hubInputValue('hubSessionIssueStatusGroup'),
+      classId: hubInputValue('hubSessionIssueClassId'),
+      teacherPersonId: hubInputValue('hubSessionIssueTeacherId'),
+      studentPersonId: hubInputValue('hubSessionIssueStudentId')
+    };
+    Object.keys(values).forEach(function (key) {
+      if (values[key]) requestQuery.set(key, values[key]);
+    });
+  }
+
+  function setHubSessionIssueDateRange(range) {
+    const startEl = document.getElementById('hubSessionIssueStartDate');
+    const endEl = document.getElementById('hubSessionIssueEndDate');
+    if (!startEl || !endEl) return;
+    const today = new Date();
+    let start = new Date(today);
+    let end = new Date(today);
+
+    if (range === 'allTime') {
+      startEl.value = '';
+      endEl.value = '';
+      loadWorkspaceSection('session-issues');
+      return;
+    }
+    if (range === 'thisWeek') {
+      const day = today.getDay() || 7;
+      start.setDate(today.getDate() - (day - 1));
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (range === 'last7') {
+      start.setDate(today.getDate() - 6);
+    } else if (range === 'thisMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    }
+    startEl.value = hubDateToIso(start);
+    endEl.value = hubDateToIso(end);
+    loadWorkspaceSection('session-issues');
+  }
+
+  function openHubSessionIssueTeacherPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Teacher Picker', icon: 'warning', message: 'Teacher picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.teacher({
+      title: 'Filter Session Issues by Teachers',
+      placeholder: 'Search teachers, select one or more...',
+      multiselect: true,
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubTeacherId(item);
+          const name = formatHubTeacherName(item, id);
+          if (id && !hubSessionIssueTeacherSelections.some(function (row) { return row.id === id; })) {
+            hubSessionIssueTeacherSelections.push({ id, name });
+          }
+        });
+        syncSessionIssueInputs();
+        loadWorkspaceSection('session-issues');
+      }
+    }));
+  }
+
+  function openHubSessionIssueStudentPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Student Picker', icon: 'warning', message: 'Student picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.student({
+      title: 'Filter Session Issues by Students',
+      placeholder: 'Search students, select one or more...',
+      multiselect: true,
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubSchedulePersonId(item);
+          const name = formatHubSchedulePersonName(item, id);
+          if (id && !hubSessionIssueStudentSelections.some(function (row) { return row.id === id; })) {
+            hubSessionIssueStudentSelections.push({ id, name });
+          }
+        });
+        syncSessionIssueInputs();
+        loadWorkspaceSection('session-issues');
+      }
+    }));
+  }
+  function openHubSessionIssueClassPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Class Picker', icon: 'warning', message: 'Class picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.class({
+      title: 'Filter Session Issues by Classes',
+      icon: 'bi-book',
+      multiselect: true,
+      onSelect: function (items) {
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubClassId(item);
+          const name = formatHubClassName(item, id);
+          if (id && !hubSessionIssueClassSelections.some(function (row) { return row.id === id; })) {
+            hubSessionIssueClassSelections.push({ id, name });
+          }
+        });
+        syncSessionIssueInputs();
+        loadWorkspaceSection('session-issues');
+      }
+    }));
+  }
+
+  function bindSessionIssueWorkspaceControls() {
+    const loadBtn = document.getElementById('hubSessionIssueFilterLoad');
+    if (loadBtn) loadBtn.addEventListener('click', function () { loadWorkspaceSection('session-issues'); });
+    const resetBtn = document.getElementById('hubSessionIssueReset');
+    if (resetBtn) resetBtn.addEventListener('click', function () {
+      ['hubSessionIssueStartDate', 'hubSessionIssueEndDate', 'hubSessionIssueSeverity', 'hubSessionIssueCategory', 'hubSessionIssueStatusGroup'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      hubSessionIssueTeacherSelections = [];
+      hubSessionIssueClassSelections = [];
+      syncSessionIssueInputs();
+      workspaceState.serverSearch['session-issues'] = '';
+      const searchInput = document.getElementById('hubServerSearch_session-issues');
+      if (searchInput) searchInput.value = '';
+      loadWorkspaceSection('session-issues');
+    });
+    root.querySelectorAll('[data-hub-session-issue-range]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setHubSessionIssueDateRange(btn.getAttribute('data-hub-session-issue-range') || 'today');
+      });
+    });
+    ['hubSessionIssueSeverity', 'hubSessionIssueCategory', 'hubSessionIssueStatusGroup'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', function () { loadWorkspaceSection('session-issues'); });
+    });
+    const openTeacher = document.getElementById('hubSessionIssueOpenTeacherPicker');
+    if (openTeacher) openTeacher.addEventListener('click', openHubSessionIssueTeacherPicker);
+    const openStudent = document.getElementById('hubSessionIssueOpenStudentPicker');
+    if (openStudent) openStudent.addEventListener('click', openHubSessionIssueStudentPicker);
+    const openClass = document.getElementById('hubSessionIssueOpenClassPicker');
+    if (openClass) openClass.addEventListener('click', openHubSessionIssueClassPicker);
+    const clearTeacher = document.getElementById('hubSessionIssueClearTeacher');
+    if (clearTeacher) clearTeacher.addEventListener('click', function () {
+      hubSessionIssueTeacherSelections = [];
+      syncSessionIssueInputs();
+      loadWorkspaceSection('session-issues');
+    });
+    const clearStudent = document.getElementById('hubSessionIssueClearStudent');
+    if (clearStudent) clearStudent.addEventListener('click', function () {
+      hubSessionIssueStudentSelections = [];
+      syncSessionIssueInputs();
+      loadWorkspaceSection('session-issues');
+    });
+    const clearClass = document.getElementById('hubSessionIssueClearClass');
+    if (clearClass) clearClass.addEventListener('click', function () {
+      hubSessionIssueClassSelections = [];
+      syncSessionIssueInputs();
+      loadWorkspaceSection('session-issues');
+    });
+    const teacherChips = document.getElementById('hubSessionIssueTeacherChips');
+    if (teacherChips) teacherChips.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-session-issue-remove-teacher]');
+      if (!btn) return;
+      const removeId = btn.getAttribute('data-hub-session-issue-remove-teacher') || '';
+      hubSessionIssueTeacherSelections = hubSessionIssueTeacherSelections.filter(function (item) { return item.id !== removeId; });
+      syncSessionIssueInputs();
+      loadWorkspaceSection('session-issues');
+    });
+    const studentChips = document.getElementById('hubSessionIssueStudentChips');
+    if (studentChips) studentChips.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-session-issue-remove-student]');
+      if (!btn) return;
+      const removeId = btn.getAttribute('data-hub-session-issue-remove-student') || '';
+      hubSessionIssueStudentSelections = hubSessionIssueStudentSelections.filter(function (item) { return item.id !== removeId; });
+      syncSessionIssueInputs();
+      loadWorkspaceSection('session-issues');
+    });
+    const classChips = document.getElementById('hubSessionIssueClassChips');
+    if (classChips) classChips.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-session-issue-remove-class]');
+      if (!btn) return;
+      const removeId = btn.getAttribute('data-hub-session-issue-remove-class') || '';
+      hubSessionIssueClassSelections = hubSessionIssueClassSelections.filter(function (item) { return item.id !== removeId; });
+      syncSessionIssueInputs();
+      loadWorkspaceSection('session-issues');
+    });
+    const reload = els.workspace.querySelector('[data-hub-workspace-reload="session-issues"]');
+    if (reload) reload.addEventListener('click', function () { loadWorkspaceSection('session-issues'); });
+    bindWorkspaceSearchControls('session-issues');
+  }
+
+  function renderSessionIssueWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : { label: 'Session Issues', icon: 'bi bi-exclamation-triangle-fill', sourceUrl: '/school/sessions' };
+    const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    const notLoaded = payload && payload.notLoaded === true;
+    const filters = payload && payload.filters ? payload.filters : {};
+    const refreshed = payload && payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const severityOptions = Array.isArray(payload && payload.severityOptions) ? payload.severityOptions : ['info', 'warning', 'urgent'];
+    const categoryOptions = Array.isArray(payload && payload.categoryOptions) ? payload.categoryOptions : ['learning', 'technology', 'engagement', 'behavior', 'support', 'resources', 'lesson_delivery', 'other'];
+    const statusGroupOptions = Array.isArray(payload && payload.statusGroupOptions) ? payload.statusGroupOptions : [
+      { value: '', label: 'All Cases' },
+      { value: 'open', label: 'Open / Active' },
+      { value: 'resolved', label: 'Resolved / Cancelled' }
+    ];
+
+    const teacherIds = splitHubIdList(filters.teacherPersonId || '');
+    const studentIds = splitHubIdList(filters.studentPersonId || '');
+    const classIds = splitHubIdList(filters.classId || '');
+    const existingTeachers = new Map(hubSessionIssueTeacherSelections.map(function (item) { return [String(item.id || '').trim(), item]; }));
+    const existingStudents = new Map(hubSessionIssueStudentSelections.map(function (item) { return [String(item.id || '').trim(), item]; }));
+    const existingClasses = new Map(hubSessionIssueClassSelections.map(function (item) { return [String(item.id || '').trim(), item]; }));
+    hubSessionIssueTeacherSelections = teacherIds.map(function (id) { return existingTeachers.get(id) || { id: id, name: id }; });
+    hubSessionIssueStudentSelections = studentIds.map(function (id) { return existingStudents.get(id) || { id: id, name: id }; });
+    hubSessionIssueClassSelections = classIds.map(function (id) { return existingClasses.get(id) || { id: id, name: id }; });
+
+    const severitySelect = ['<option value="">All Severities</option>'].concat(severityOptions.map(function (item) {
+      const value = String(item || '').toLowerCase();
+      return '<option value="' + escapeHtml(value) + '"' + (value === String(filters.severity || '').toLowerCase() ? ' selected' : '') + '>' + escapeHtml(toHubTitleCase(value)) + '</option>';
+    })).join('');
+    const categorySelect = ['<option value="">All Categories</option>'].concat(categoryOptions.map(function (item) {
+      const value = String(item || '').toLowerCase();
+      return '<option value="' + escapeHtml(value) + '"' + (value === String(filters.category || '').toLowerCase() ? ' selected' : '') + '>' + escapeHtml(toHubTitleCase(value)) + '</option>';
+    })).join('');
+    const statusSelect = statusGroupOptions.map(function (item) {
+      const value = String(item.value || '').toLowerCase();
+      return '<option value="' + escapeHtml(value) + '"' + (value === String(filters.statusGroup || '').toLowerCase() ? ' selected' : '') + '>' + escapeHtml(item.label || toHubTitleCase(value || 'all')) + '</option>';
+    }).join('');
+
+    const body = rows.length
+      ? rows.map(function (row) {
+        const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+          return '<a class="btn btn-outline-' + escapeHtml(action.tone || 'primary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener"><i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open') + '</a>';
+        }).join('');
+        const searchText = [row.id, row.classId, row.classTitle, row.sessionId, row.sessionDate, row.studentName, row.studentPersonId, row.teacherName, row.teacherPersonId, row.category, row.severity, row.status, row.summary].join(' ');
+        return [
+          '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+          '<td class="ps-4"><div class="fw-bold">' + escapeHtml(formatHubSessionIssueDate(row.sessionDate)) + '</div><div class="small text-muted">' + escapeHtml(row.sessionStartTime || '--:--') + ' - ' + escapeHtml(row.sessionEndTime || '--:--') + '</div></td>',
+          '<td><div class="fw-semibold text-primary">' + escapeHtml(row.classTitle || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.classId || '') + '</div></td>',
+          '<td><div class="fw-semibold">' + escapeHtml(row.studentName || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.studentPersonId || '') + '</div></td>',
+          '<td><div>' + escapeHtml(row.teacherName || 'Unassigned') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.teacherPersonId || '') + '</div></td>',
+          '<td class="text-capitalize">' + escapeHtml(toHubTitleCase(row.category || 'other')) + '</td>',
+          '<td><span class="badge ' + sessionIssueBadgeClass(row.severity, 'severity') + '">' + escapeHtml(String(row.severity || 'info').toUpperCase()) + '</span></td>',
+          '<td><span class="badge ' + sessionIssueBadgeClass(row.status, 'status') + '">' + escapeHtml(toHubTitleCase(row.status || 'open')) + '</span></td>',
+          '<td class="text-muted small">' + escapeHtml(truncateHubText(row.summary || '-', 70)) + '</td>',
+          '<td class="small text-muted">' + escapeHtml(formatHubSessionIssueDateTime(row.updatedAt)) + '</td>',
+          '<td class="pe-4 text-end">' + (actions || '-') + '</td>',
+          '</tr>'
+        ].join('');
+      }).join('')
+      : (notLoaded
+        ? '<tr><td colspan="10" class="text-center text-muted py-5"><i class="bi bi-arrow-clockwise d-block fs-2 mb-2"></i>Set filters if needed, then click <strong>Filter</strong> or <strong>Load Session Issues</strong>.</td></tr>'
+        : '<tr><td colspan="10" class="text-center text-muted py-5"><i class="bi bi-search d-block fs-2 mb-2"></i>No session issues found matching these filters.</td></tr>');
+
+    els.workspace.innerHTML = [
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-exclamation-triangle-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Session Issues') + '</h2>',
+      '<p class="text-muted mb-0">' + escapeHtml(payload.total || 0) + ' case(s). Last refreshed: ' + escapeHtml(refreshed) + '.</p>',
+      '</div>',
+      '<div class="d-flex gap-2">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-workspace-reload="session-issues"><i class="bi bi-arrow-clockwise me-1"></i> ' + (notLoaded ? 'Load Session Issues' : 'Refresh') + '</button>',
+      '<a href="' + escapeHtml(section.sourceUrl || '/school/sessions') + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Sessions</a>',
+      '</div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubSessionIssueStartDate">Start Date</label><input type="date" id="hubSessionIssueStartDate" class="form-control form-control-sm" value="' + escapeHtml(filters.startDate || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubSessionIssueEndDate">End Date</label><input type="date" id="hubSessionIssueEndDate" class="form-control form-control-sm" value="' + escapeHtml(filters.endDate || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubSessionIssueSeverity">Severity</label><select id="hubSessionIssueSeverity" class="form-select form-select-sm">' + severitySelect + '</select></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubSessionIssueCategory">Category</label><select id="hubSessionIssueCategory" class="form-select form-select-sm">' + categorySelect + '</select></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubSessionIssueStatusGroup">Status</label><select id="hubSessionIssueStatusGroup" class="form-select form-select-sm">' + statusSelect + '</select></div>',
+      '<div class="col-md-2 d-flex gap-2"><button type="button" id="hubSessionIssueFilterLoad" class="btn btn-primary btn-sm flex-fill fw-bold"><i class="bi bi-funnel-fill me-1"></i> Apply</button><button type="button" id="hubSessionIssueReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise"></i></button></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold small">Classes</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionIssueClassId" value="' + escapeHtml(filters.classId || '') + '"><input type="text" id="hubSessionIssueClassName" class="form-control bg-white" placeholder="All Classes..." readonly><button type="button" class="btn btn-outline-danger" id="hubSessionIssueClearClass" title="Clear Classes"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionIssueOpenClassPicker" title="Select Classes"><i class="bi bi-book"></i></button></div><div id="hubSessionIssueClassChips" class="mt-2"></div></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold small">Students</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionIssueStudentId" value="' + escapeHtml(filters.studentPersonId || '') + '"><input type="text" id="hubSessionIssueStudentName" class="form-control bg-white" placeholder="All Students..." readonly><button type="button" class="btn btn-outline-danger" id="hubSessionIssueClearStudent" title="Clear Students"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionIssueOpenStudentPicker" title="Select Students"><i class="bi bi-mortarboard"></i></button></div><div id="hubSessionIssueStudentChips" class="mt-2"></div></div>',
+      '<div class="col-md-4"><label class="form-label fw-bold small">Teachers</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionIssueTeacherId" value="' + escapeHtml(filters.teacherPersonId || '') + '"><input type="text" id="hubSessionIssueTeacherName" class="form-control bg-white" placeholder="All Teachers..." readonly><button type="button" class="btn btn-outline-danger" id="hubSessionIssueClearTeacher" title="Clear Teachers"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionIssueOpenTeacherPicker" title="Select Teachers"><i class="bi bi-people-fill"></i></button></div><div id="hubSessionIssueTeacherChips" class="mt-2"></div></div>',
+      '</div>',
+      '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-issue-range="today">Today</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-issue-range="thisWeek">This Week</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-issue-range="last7">Last 7 Days</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-issue-range="thisMonth">This Month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-session-issue-range="allTime">All Time</button>',
+      '</div>',
+      '</div>',
+      workspaceToolbarHtml('session-issues', { label: 'session issues' }),
+      '<div class="table-responsive">',
+      '<table class="table table-hover align-middle hub-workspace-table">',
+      '<thead class="table-light"><tr><th class="ps-4">Session Date</th><th>Class</th><th>Student</th><th>Teacher</th><th>Category</th><th>Severity</th><th>Status</th><th>Summary</th><th>Updated</th><th class="pe-4 text-end">Action</th></tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>',
+      '</div>'
+    ].join('');
+
+    syncSessionIssueInputs();
+    bindSessionIssueWorkspaceControls();
+  }
   const hubScheduleState = {
     persons: [],
     activePersonId: '',
@@ -3609,6 +4026,13 @@
         icon: 'bi bi-calendar2-week-fill'
       };
     }
+    if (key === 'session-issues' && !workspaceSections['session-issues']) {
+      workspaceSections['session-issues'] = {
+        label: 'Session Issues',
+        endpoint: '/school/master-hub/api/workspace/session-issues',
+        icon: 'bi bi-exclamation-triangle-fill'
+      };
+    }
     if (key === 'schedule' && !workspaceSections.schedule) {
       workspaceSections.schedule = {
         label: 'Schedule',
@@ -3647,6 +4071,7 @@
     const serverSearch = String(workspaceState.serverSearch[key] || '').trim();
     if (serverSearch) requestQuery.set('q', serverSearch);
     if (key === 'sessions') appendSessionWorkspaceQuery(requestQuery);
+    if (key === 'session-issues') appendSessionIssueWorkspaceQuery(requestQuery);
     if (key === 'holidays') requestQuery.set('year', workspaceState.holidaysYear || String(new Date().getFullYear()));
 
     workspaceState.currentSection = key;
@@ -3677,6 +4102,8 @@
         renderClassWorkspace(payload);
       } else if (key === 'sessions') {
         renderSessionWorkspace(payload);
+      } else if (key === 'session-issues') {
+        renderSessionIssueWorkspace(payload);
       } else if (key === 'schedule') {
         renderScheduleWorkspace(payload);
       } else if (key === 'attendance') {
@@ -3740,6 +4167,22 @@
       return;
     }
 
+    if (key === 'session-issues') {
+      renderSessionIssueWorkspace({
+        status: 'success',
+        notLoaded: true,
+        section: {
+          key: 'session-issues',
+          label: 'Session Issues',
+          icon: 'bi bi-exclamation-triangle-fill',
+          sourceUrl: '/school/sessions'
+        },
+        rows: [],
+        total: 0,
+        filters: {}
+      });
+      return;
+    }
     if (key === 'schedule') {
       renderScheduleWorkspace({
         status: 'success',

@@ -952,6 +952,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.__attendanceMatrixPolicy = <%- JSON.stringify(typeof attendanceMatrixPolicyResolved !== 'undefined' && attendanceMatrixPolicyResolved ? attendanceMatrixPolicyResolved : { disqualifyLateMinutes: 30, disqualifyEarlyLeaveMinutes: 30, disqualifyCombinedMissedMinutes: null, scheduledMinutes: 180 }) %>;
     let studentCasesState = <%- jsonForScript(Array.isArray(sessionStudentCases) ? sessionStudentCases : []) %>;
+    const requestedStudentCaseId = new URLSearchParams(window.location.search || '').get('caseId') || '';
+    let requestedStudentCaseHandled = false;
     let studentCaseModalInstance = null;
     const studentCaseModalEl = document.getElementById('studentCaseModal');
     if (studentCaseModalEl && window.bootstrap) studentCaseModalInstance = new bootstrap.Modal(studentCaseModalEl);
@@ -1265,6 +1267,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (id) setActivePanel(id);
         });
     });
+
+    function openRequestedStudentCaseFromUrl() {
+        const caseId = String(requestedStudentCaseId || '').trim();
+        if (!caseId || requestedStudentCaseHandled) return;
+        requestedStudentCaseHandled = true;
+        setActivePanel('student-cases');
+        const row = getStudentCaseById(caseId);
+        if (row) {
+            openStudentCaseModal({ caseRow: row });
+            return;
+        }
+        showStudentCaseMessage('Case Not Found', 'The requested student case was not found for this session.', 'warning');
+    }
+
+    openRequestedStudentCaseFromUrl();
 
     async function confirmSessionNavigation(title, message, confirmButtonText) {
         const msg = message || 'You may lose unsaved changes unless you save first. Continue?';
