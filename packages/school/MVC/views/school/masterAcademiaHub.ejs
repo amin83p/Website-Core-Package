@@ -851,6 +851,9 @@
       <button type="button" class="hub-section-segment" data-hub-workspace-section="attendance">
         <span><i class="bi bi-clipboard-check-fill me-1"></i> Attendance</span>
       </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="timesheet-periods">
+        <span><i class="bi bi-calendar-week-fill me-1"></i> Timesheet Periods</span>
+      </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="leave-requests">
         <span><i class="bi bi-calendar-heart me-1"></i> Leave Requests</span>
       </button>
@@ -1132,6 +1135,7 @@
       notifications: '',
       classes: '',
       'session-issues': '',
+      'timesheet-periods': '',
       holidays: ''
     },
     holidaysYear: String(new Date().getFullYear())
@@ -1149,6 +1153,12 @@
       endpoint: '/school/master-hub/api/workspace/classes',
       sourceUrl: '/school/classes',
       icon: 'bi bi-easel-fill'
+    },
+    'timesheet-periods': {
+      label: 'Timesheet Periods',
+      endpoint: '/school/master-hub/api/workspace/timesheet-periods',
+      sourceUrl: '/school/timesheetPeriods',
+      icon: 'bi bi-calendar-week-fill'
     },
     holidays: {
       label: 'Holidays',
@@ -3715,6 +3725,205 @@
     ].join('');
   }
 
+  function timesheetPeriodBadgeClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (value === 'processed') return 'text-bg-success';
+    if (value === 'locked') return 'text-bg-warning';
+    return 'text-bg-primary';
+  }
+
+  function formatHubTimesheetDate(dateValue) {
+    const raw = String(dateValue || '').trim();
+    if (!raw) return '-';
+    try {
+      return new Date(raw + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (error) {
+      return raw;
+    }
+  }
+
+  function formatHubTimesheetDeadline(row) {
+    const date = formatHubTimesheetDate(row && row.submissionDeadline);
+    const time = String((row && row.submissionDeadlineTime) || '23:59').trim() || '23:59';
+    return date === '-' ? '-' : date + ' at ' + time;
+  }
+
+  function appendTimesheetPeriodWorkspaceQuery(requestQuery) {
+    const values = {
+      status: hubInputValue('hubTimesheetPeriodStatus'),
+      periodStartDate: hubInputValue('hubTimesheetPeriodStartDate'),
+      periodEndDate: hubInputValue('hubTimesheetPeriodEndDate'),
+      deadlineStartDate: hubInputValue('hubTimesheetPeriodDeadlineStartDate'),
+      deadlineEndDate: hubInputValue('hubTimesheetPeriodDeadlineEndDate')
+    };
+    Object.keys(values).forEach(function (key) {
+      if (values[key]) requestQuery.set(key, values[key]);
+    });
+  }
+
+  function setHubTimesheetPeriodRange(range) {
+    const periodStartEl = document.getElementById('hubTimesheetPeriodStartDate');
+    const periodEndEl = document.getElementById('hubTimesheetPeriodEndDate');
+    const deadlineStartEl = document.getElementById('hubTimesheetPeriodDeadlineStartDate');
+    const deadlineEndEl = document.getElementById('hubTimesheetPeriodDeadlineEndDate');
+    if (!periodStartEl || !periodEndEl || !deadlineStartEl || !deadlineEndEl) return;
+    const today = new Date();
+    let start = new Date(today);
+    let end = new Date(today);
+
+    deadlineStartEl.value = '';
+    deadlineEndEl.value = '';
+
+    if (range === 'allTime') {
+      periodStartEl.value = '';
+      periodEndEl.value = '';
+      loadWorkspaceSection('timesheet-periods');
+      return;
+    }
+
+    if (range === 'thisMonth') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (range === 'upcoming') {
+      periodStartEl.value = hubDateToIso(today);
+      periodEndEl.value = '';
+      loadWorkspaceSection('timesheet-periods');
+      return;
+    }
+
+    periodStartEl.value = hubDateToIso(start);
+    periodEndEl.value = hubDateToIso(end);
+    loadWorkspaceSection('timesheet-periods');
+  }
+
+  function bindTimesheetPeriodWorkspaceControls() {
+    const loadButtons = els.workspace.querySelectorAll('[data-hub-timesheet-period-load]');
+    loadButtons.forEach(function (button) {
+      button.addEventListener('click', function () { loadWorkspaceSection('timesheet-periods'); });
+    });
+    const resetButton = document.getElementById('hubTimesheetPeriodReset');
+    if (resetButton) {
+      resetButton.addEventListener('click', function () {
+        ['hubTimesheetPeriodStatus', 'hubTimesheetPeriodStartDate', 'hubTimesheetPeriodEndDate', 'hubTimesheetPeriodDeadlineStartDate', 'hubTimesheetPeriodDeadlineEndDate'].forEach(function (id) {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        workspaceState.serverSearch['timesheet-periods'] = '';
+        const searchInput = document.getElementById('hubServerSearch_timesheet-periods');
+        if (searchInput) searchInput.value = '';
+        loadWorkspaceSection('timesheet-periods');
+      });
+    }
+    root.querySelectorAll('[data-hub-timesheet-period-range]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        setHubTimesheetPeriodRange(button.getAttribute('data-hub-timesheet-period-range') || 'activeToday');
+      });
+    });
+    bindWorkspaceSearchControls('timesheet-periods');
+  }
+
+  function renderTimesheetPeriodRows(rows, notLoaded) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return notLoaded
+        ? '<div class="hub-empty"><div><i class="bi bi-calendar-week display-6 d-block mb-3"></i><div class="fw-semibold">Timesheet Periods are ready to load.</div><div class="text-muted small mt-1">Set filters if needed, then click Load Timesheet Periods.</div></div></div>'
+        : '<div class="hub-empty"><div><i class="bi bi-search display-6 d-block mb-3"></i><div class="fw-semibold">No timesheet periods found.</div><div class="text-muted small mt-1">Try clearing filters or open the full page to define a new period.</div></div></div>';
+    }
+
+    const body = rows.map(function (row) {
+      const actions = (Array.isArray(row.actions) ? row.actions : []).map(function (action) {
+        return '<a class="btn btn-outline-' + escapeHtml(action.tone || 'primary') + ' btn-sm" href="' + escapeHtml(action.href || '#') + '" target="_blank" rel="noopener"><i class="' + escapeHtml(action.icon || 'bi bi-box-arrow-up-right') + ' me-1"></i>' + escapeHtml(action.label || 'Open') + '</a>';
+      }).join('');
+      const searchText = [row.id, row.name, row.startDate, row.endDate, row.submissionDeadline, row.submissionDeadlineTime, row.status, row.notes, row.orgId].filter(Boolean).join(' ');
+      return [
+        '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+        '<td class="ps-3"><div class="fw-bold text-primary">' + escapeHtml(row.name || 'Timesheet Period') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.id || '') + '</div></td>',
+        '<td><div class="fw-semibold">' + escapeHtml(formatHubTimesheetDate(row.startDate)) + ' - ' + escapeHtml(formatHubTimesheetDate(row.endDate)) + '</div><div class="small text-muted">' + escapeHtml(row.startDate || '') + ' to ' + escapeHtml(row.endDate || '') + '</div></td>',
+        '<td><div class="fw-semibold">' + escapeHtml(formatHubTimesheetDeadline(row)) + '</div><div class="small text-muted">Date + time</div></td>',
+        '<td><span class="badge ' + timesheetPeriodBadgeClass(row.status) + '">' + escapeHtml(toHubTitleCase(row.status || 'open')) + '</span></td>',
+        '<td class="text-muted small">' + escapeHtml(truncateHubText(row.notes || '-', 90)) + '</td>',
+        '<td class="text-end pe-3"><div class="hub-workspace-actions">' + (actions || '-') + '</div></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+
+    return [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table">',
+      '<thead><tr><th class="ps-3">Period Name</th><th>Period Window</th><th>Submission Deadline</th><th>Status</th><th>Notes</th><th class="text-end pe-3">Actions</th></tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderTimesheetPeriodWorkspace(payload) {
+    const section = payload.section || {
+      key: 'timesheet-periods',
+      label: 'Timesheet Periods',
+      icon: 'bi bi-calendar-week-fill',
+      sourceUrl: '/school/timesheetPeriods'
+    };
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    const notLoaded = payload.notLoaded === true;
+    const filters = payload.filters || {};
+    const refreshed = payload.refreshedAt ? new Date(payload.refreshedAt).toLocaleString() : 'just now';
+    const statusOptions = Array.isArray(payload.statusOptions) && payload.statusOptions.length
+      ? payload.statusOptions
+      : [
+        { value: '', label: 'All Statuses' },
+        { value: 'open', label: 'Open' },
+        { value: 'locked', label: 'Locked' },
+        { value: 'processed', label: 'Processed' }
+      ];
+    const statusSelect = statusOptions.map(function (item) {
+      const value = String(item.value || '').toLowerCase();
+      return '<option value="' + escapeHtml(value) + '"' + (value === String(filters.status || '').toLowerCase() ? ' selected' : '') + '>' + escapeHtml(item.label || toHubTitleCase(value || 'all')) + '</option>';
+    }).join('');
+
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-week-fill') + ' me-2"></i>' + escapeHtml(section.label || 'Timesheet Periods') + '</h2>',
+      '<p class="text-muted mb-0">Review and define timesheet periods from the hub while using the existing protected forms for changes.</p>',
+      '</div>',
+      '<div class="hub-workspace-actions">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" data-hub-timesheet-period-load><i class="bi bi-arrow-repeat me-1"></i>' + (notLoaded ? 'Load Timesheet Periods' : 'Refresh') + '</button>',
+      '<a class="btn btn-primary btn-sm" href="/school/timesheetPeriods/new" target="_blank" rel="noopener"><i class="bi bi-plus-circle me-1"></i> New Period</a>',
+      '<a class="btn btn-outline-secondary btn-sm" href="' + escapeHtml(section.sourceUrl || '/school/timesheetPeriods') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i> Open Full Page</a>',
+      '</div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubTimesheetPeriodStatus">Status</label><select id="hubTimesheetPeriodStatus" class="form-select form-select-sm">' + statusSelect + '</select></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubTimesheetPeriodStartDate">Period From</label><input type="date" id="hubTimesheetPeriodStartDate" class="form-control form-control-sm" value="' + escapeHtml(filters.periodStartDate || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubTimesheetPeriodEndDate">Period To</label><input type="date" id="hubTimesheetPeriodEndDate" class="form-control form-control-sm" value="' + escapeHtml(filters.periodEndDate || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubTimesheetPeriodDeadlineStartDate">Deadline From</label><input type="date" id="hubTimesheetPeriodDeadlineStartDate" class="form-control form-control-sm" value="' + escapeHtml(filters.deadlineStartDate || '') + '"></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small" for="hubTimesheetPeriodDeadlineEndDate">Deadline To</label><input type="date" id="hubTimesheetPeriodDeadlineEndDate" class="form-control form-control-sm" value="' + escapeHtml(filters.deadlineEndDate || '') + '"></div>',
+      '<div class="col-md-2 d-flex gap-2"><button type="button" class="btn btn-primary btn-sm flex-fill fw-bold" data-hub-timesheet-period-load><i class="bi bi-funnel-fill me-1"></i> Apply</button><button type="button" id="hubTimesheetPeriodReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise"></i></button></div>',
+      '</div>',
+      '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-timesheet-period-range="activeToday">Active Today</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-timesheet-period-range="thisMonth">This Month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-timesheet-period-range="upcoming">Upcoming</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-timesheet-period-range="allTime">All Time</button>',
+      '</div>',
+      '</div>',
+      workspaceToolbarHtml('timesheet-periods', { label: 'timesheet periods' }),
+      '<div class="p-3 border-bottom bg-white">',
+      '<div class="small text-muted">' + (notLoaded ? 'Timesheet periods are not loaded automatically. Click Load Timesheet Periods when ready.' : 'Showing ' + escapeHtml(String(rows.length)) + ' timesheet period record(s). Last refreshed: ' + escapeHtml(refreshed) + '.') + '</div>',
+      '</div>',
+      '<div class="p-3">',
+      renderTimesheetPeriodRows(rows, notLoaded),
+      '</div>',
+      '</div>',
+      '</section>'
+    ].join('');
+
+    bindTimesheetPeriodWorkspaceControls();
+  }
   function renderHolidayWorkspace(payload) {
     const section = payload.section || {
       key: 'holidays',
@@ -4047,6 +4256,14 @@
         icon: 'bi bi-clipboard-check-fill'
       };
     }
+    if (key === 'timesheet-periods' && !workspaceSections['timesheet-periods']) {
+      workspaceSections['timesheet-periods'] = {
+        label: 'Timesheet Periods',
+        endpoint: '/school/master-hub/api/workspace/timesheet-periods',
+        sourceUrl: '/school/timesheetPeriods',
+        icon: 'bi bi-calendar-week-fill'
+      };
+    }
     if (key === 'leave-requests' && !workspaceSections['leave-requests']) {
       workspaceSections['leave-requests'] = {
         label: 'Leave Requests',
@@ -4072,6 +4289,7 @@
     if (serverSearch) requestQuery.set('q', serverSearch);
     if (key === 'sessions') appendSessionWorkspaceQuery(requestQuery);
     if (key === 'session-issues') appendSessionIssueWorkspaceQuery(requestQuery);
+    if (key === 'timesheet-periods') appendTimesheetPeriodWorkspaceQuery(requestQuery);
     if (key === 'holidays') requestQuery.set('year', workspaceState.holidaysYear || String(new Date().getFullYear()));
 
     workspaceState.currentSection = key;
@@ -4108,6 +4326,8 @@
         renderScheduleWorkspace(payload);
       } else if (key === 'attendance') {
         renderAttendanceWorkspace(payload);
+      } else if (key === 'timesheet-periods') {
+        renderTimesheetPeriodWorkspace(payload);
       } else if (key === 'leave-requests') {
         renderLeaveRequestWorkspace(payload);
       } else if (key === 'holidays') {
@@ -4207,6 +4427,23 @@
         },
         rows: [],
         total: 0
+      });
+      return;
+    }
+
+    if (key === 'timesheet-periods') {
+      renderTimesheetPeriodWorkspace({
+        status: 'success',
+        notLoaded: true,
+        section: {
+          key: 'timesheet-periods',
+          label: 'Timesheet Periods',
+          icon: 'bi bi-calendar-week-fill',
+          sourceUrl: '/school/timesheetPeriods'
+        },
+        rows: [],
+        total: 0,
+        filters: {}
       });
       return;
     }

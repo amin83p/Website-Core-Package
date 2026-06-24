@@ -423,6 +423,15 @@ function buildHolidayActionLinks(row) {
   ];
 }
 
+function buildTimesheetPeriodActionLinks(row) {
+  const id = normalizeText(row?.id);
+  const encodedId = encodeURIComponent(id);
+  return [
+    { label: 'Edit', href: `/school/timesheetPeriods/edit/${encodedId}`, icon: 'bi bi-pencil-square', tone: 'primary' },
+    { label: 'Delete', href: `/school/timesheetPeriods/delete/${encodedId}`, icon: 'bi bi-trash', tone: 'danger' }
+  ];
+}
+
 function resolveHolidayYear(value) {
   const candidate = normalizeText(value);
   return /^\d{4}$/.test(candidate) ? candidate : String(new Date().getFullYear());
@@ -472,6 +481,64 @@ function normalizeHolidayRows(rows) {
     orgId: normalizeText(row?.orgId || ''),
     actions: buildHolidayActionLinks(row)
   }));
+}
+
+function normalizeTimesheetPeriodRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const submissionDeadlineTime = normalizeText(row?.submissionDeadlineTime || '23:59');
+    return {
+      id: normalizeText(row?.id),
+      name: normalizeText(row?.name || row?.title || row?.id || 'Timesheet Period'),
+      startDate: normalizeText(row?.startDate),
+      endDate: normalizeText(row?.endDate),
+      submissionDeadline: normalizeText(row?.submissionDeadline),
+      submissionDeadlineTime: /^\d{2}:\d{2}$/.test(submissionDeadlineTime) ? submissionDeadlineTime : '23:59',
+      status: lower(row?.status || 'open'),
+      notes: normalizeText(row?.notes || ''),
+      orgId: normalizeText(row?.orgId || ''),
+      actions: buildTimesheetPeriodActionLinks(row)
+    };
+  });
+}
+
+function dateRangeOverlaps(rowStart, rowEnd, filterStart, filterEnd) {
+  const start = normalizeText(rowStart);
+  const end = normalizeText(rowEnd || rowStart);
+  const from = normalizeText(filterStart);
+  const to = normalizeText(filterEnd);
+
+  if (from && end && end < from) return false;
+  if (to && start && start > to) return false;
+  return true;
+}
+
+function timesheetPeriodMatchesFilters(row, queryInput = {}, searchTerm = '') {
+  const status = lower(queryInput.status || '');
+  const periodStartDate = normalizeText(queryInput.periodStartDate || queryInput.startDate || '');
+  const periodEndDate = normalizeText(queryInput.periodEndDate || queryInput.endDate || '');
+  const deadlineStartDate = normalizeText(queryInput.deadlineStartDate || '');
+  const deadlineEndDate = normalizeText(queryInput.deadlineEndDate || '');
+  const deadline = normalizeText(row?.submissionDeadline || '');
+
+  if (status && lower(row?.status || '') !== status) return false;
+  if ((periodStartDate || periodEndDate) && !dateRangeOverlaps(row?.startDate, row?.endDate, periodStartDate, periodEndDate)) return false;
+  if (deadlineStartDate && deadline < deadlineStartDate) return false;
+  if (deadlineEndDate && deadline > deadlineEndDate) return false;
+
+  return rowMatchesWorkspaceSearch(row, searchTerm);
+}
+
+function sortTimesheetPeriodRows(rows) {
+  const statusRank = new Map([
+    ['open', 0],
+    ['locked', 1],
+    ['processed', 2]
+  ]);
+  return [...(Array.isArray(rows) ? rows : [])].sort((a, b) => {
+    const statusDelta = (statusRank.get(a.status) ?? 9) - (statusRank.get(b.status) ?? 9);
+    if (statusDelta) return statusDelta;
+    return String(b.startDate || '').localeCompare(String(a.startDate || ''));
+  });
 }
 
 function buildSessionIssueActionLinks(row) {
@@ -779,6 +846,53 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       },
       rows: [],
       total: 0,
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  if (key === 'timesheet-periods') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Timesheet Periods',
+      sectionId: SECTIONS.SCHOOL_TIMESHEET_PERIODS
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Timesheet Periods.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const fetchQuery = {
+      ...query,
+      searchFields: query.searchFields || 'id,name,startDate,endDate,submissionDeadline,submissionDeadlineTime,status,notes,orgId'
+    };
+    ['status', 'periodStartDate', 'periodEndDate', 'deadlineStartDate', 'deadlineEndDate', 'quickRange', 'page', 'limit'].forEach((keyName) => {
+      delete fetchQuery[keyName];
+    });
+    const rows = await dataService.fetchData('timesheetPeriods', fetchQuery, req.user, { scopeId: access.scopeId });
+    const normalizedRows = sortTimesheetPeriodRows(normalizeTimesheetPeriodRows(rows)
+      .filter((row) => timesheetPeriodMatchesFilters(row, queryInput || {}, query.q || '')));
+    return {
+      section: {
+        key: 'timesheet-periods',
+        label: 'Timesheet Periods',
+        icon: 'bi bi-calendar-week-fill',
+        sourceUrl: '/school/timesheetPeriods'
+      },
+      rows: normalizedRows,
+      total: normalizedRows.length,
+      filters: {
+        status: lower(queryInput?.status || ''),
+        periodStartDate: normalizeText(queryInput?.periodStartDate || queryInput?.startDate || ''),
+        periodEndDate: normalizeText(queryInput?.periodEndDate || queryInput?.endDate || ''),
+        deadlineStartDate: normalizeText(queryInput?.deadlineStartDate || ''),
+        deadlineEndDate: normalizeText(queryInput?.deadlineEndDate || '')
+      },
+      statusOptions: [
+        { value: '', label: 'All Statuses' },
+        { value: 'open', label: 'Open' },
+        { value: 'locked', label: 'Locked' },
+        { value: 'processed', label: 'Processed' }
+      ],
+      searchQuery: normalizeText(query.q || ''),
       refreshedAt: new Date().toISOString()
     };
   }
