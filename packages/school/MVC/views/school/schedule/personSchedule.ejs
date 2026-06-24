@@ -209,6 +209,13 @@
                     <input type="date" id="sch_endDate" class="form-control">
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label fw-bold">Cases</label>
+                    <div class="form-check form-switch pt-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
+                        <label class="form-check-label small fw-semibold" for="sch_hasCases">With cases only</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
                     <button type="button" id="btn_loadSchedule" class="btn btn-primary w-100 fw-bold text-nowrap px-3">Load</button>
                 </div>
             </div>
@@ -281,6 +288,26 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+    function buildSessionCaseBadgeHtml(caseSummary) {
+        if (!caseSummary || !caseSummary.hasCases) return '';
+        const tone = String(caseSummary.badgeTone || 'muted').trim().toLowerCase();
+        const classMap = {
+            danger: 'bg-danger-subtle text-danger-emphasis border-danger-subtle',
+            warning: 'bg-warning-subtle text-warning-emphasis border-warning-subtle',
+            info: 'bg-info-subtle text-info-emphasis border-info-subtle',
+            muted: 'bg-secondary-subtle text-secondary-emphasis border-secondary-subtle'
+        };
+        const label = caseSummary.badgeLabel || `${caseSummary.totalCount || 0} case(s)`;
+        const title = [
+            `Cases: ${caseSummary.totalCount || 0}`,
+            `Active: ${caseSummary.activeCount || 0}`,
+            `Urgent: ${caseSummary.urgentCount || 0}`,
+            `Warning: ${caseSummary.warningCount || 0}`,
+            `Info: ${caseSummary.infoCount || 0}`,
+            `Resolved/closed: ${caseSummary.resolvedCount || 0}`
+        ].join(' | ');
+        return `<span class="badge border ms-1 ${classMap[tone] || classMap.muted}" title="${escapeHtml(title)}"><i class="bi bi-exclamation-diamond-fill me-1"></i>${escapeHtml(label)}</span>`;
     }
     const canSelectAnyPerson = <%- JSON.stringify(canSelectAnyPerson) %>;
     function isLeaveEvent(event) {
@@ -509,6 +536,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    const hasCasesFilter = document.getElementById('sch_hasCases');
+    if (hasCasesFilter) {
+        hasCasesFilter.addEventListener('change', () => {
+            if (document.getElementById('sch_personId').value && document.getElementById('sch_startDate').value && document.getElementById('sch_endDate').value) {
+                document.getElementById('btn_loadSchedule').click();
+            }
+        });
+    }
 
     // --- 2. Data Fetch & Rendering Engine ---
     document.getElementById('btn_loadSchedule').addEventListener('click', async () => {
@@ -526,6 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const params = new URLSearchParams({ personId, startDate: startStr, endDate: endStr });
             if (role) params.set('role', role);
+            if (document.getElementById('sch_hasCases')?.checked) params.set('hasCases', '1');
             const res = await fetch(`/school/schedules/api/person-schedule?${params.toString()}`, {
                 headers: { 'X-AJAX-Request': 'true' }
             });
@@ -659,6 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusLabel = formatStatusLabel(ev?.status);
                 const statusStyle = getStatusTagStyle(ev?.status);
                 const detailsUrl = String(ev?.detailsUrl || '').trim();
+                const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                 const openButton = detailsUrl
                     ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
                     : `<span class="text-muted small">No details</span>`;
@@ -670,6 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="event-meta-line">
                                 <span class="badge ${leaveEvent ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : (String(ev?.role || '').toLowerCase() === 'student' ? 'bg-primary-subtle text-primary border' : 'bg-info-subtle text-info-emphasis border')}">${escapeHtml(leaveEvent ? 'Approved Leave' : (ev?.role || '-'))}</span>
                                 <span class="session-status-tag" style="${statusStyle}">${escapeHtml(statusLabel)}</span>
+                                ${caseBadge}
                                 <span class="text-muted">${Number(ev?.duration || 0).toFixed(2)} h</span>
                             </div>
                             <div class="event-meta-line">${leaveEvent ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Leave request approved and reserved on schedule</span>' : buildLifecycleInline(ev)}</div>
@@ -731,6 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusStyle = getStatusTagStyle(ev.status);
                 const detailsUrl = String(ev.detailsUrl || '').trim();
                 const encodedDetailsUrl = encodeURIComponent(detailsUrl);
+                const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                 const clickHandler = detailsUrl
                     ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"`
                     : '';
@@ -742,6 +781,7 @@ document.addEventListener('DOMContentLoaded', () => {
                              title="${escapeHtml(openHint)}: ${escapeHtml(eventTitle)} | ${escapeHtml(ev.start)} - ${escapeHtml(ev.end)} | ${escapeHtml(statusLabel)}${String(ev?.classLifecycle?.registrationMode || '').trim().toLowerCase() === 'rolling' ? ' | Rolling' : ''}"
                              ${clickHandler}>
                              <div class="fw-bold text-truncate">${escapeHtml(eventTitle)}</div>
+                             ${caseBadge ? `<div>${caseBadge}</div>` : ''}
                              <div class="event-meta x-small">
                                     <span class="text-truncate">${escapeHtml(ev.start)} - ${escapeHtml(ev.end)}</span>
                             <span class="session-status-tag" style="${statusStyle}">${escapeHtml(statusLabel)}</span>

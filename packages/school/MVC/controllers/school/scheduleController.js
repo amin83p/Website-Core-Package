@@ -6,6 +6,7 @@ const schoolDataService = require('../../services/school/schoolDataService');
 const schoolRepositories = require('../../repositories/school');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
+const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const leaveRequestService = require('../../services/school/leaveRequestService');
 const activityService = require('../../services/school/activityService');
@@ -97,6 +98,15 @@ function buildPeriodRanges(anchorDate) {
 function normalizePeriod(value) {
     const key = String(value || '').trim().toLowerCase();
     return PERIOD_KEYS.includes(key) ? key : 'week';
+}
+
+function wantsSessionsWithCasesOnly(query = {}) {
+    return ['1', 'true', 'yes', 'on'].includes(String(query?.hasCases || '').trim().toLowerCase());
+}
+
+function filterEventsWithCasesIfRequested(events, query = {}) {
+    if (!wantsSessionsWithCasesOnly(query)) return Array.isArray(events) ? events : [];
+    return (Array.isArray(events) ? events : []).filter((event) => event?.caseSummary?.hasCases === true);
 }
 
 function parseTimeToMinutes(value) {
@@ -638,6 +648,22 @@ function markOverlappingEvents(events) {
     }
 }
 
+async function attachCaseSummariesToSessionEvents(events, reqUser) {
+    const sessionRefs = (Array.isArray(events) ? events : [])
+        .filter((event) => String(event?.eventType || '').trim().toLowerCase() === 'class_session')
+        .filter((event) => normalizeId(event?.classId) && normalizeId(event?.sessionId))
+        .map((event) => ({ classId: event.classId, sessionId: event.sessionId }));
+    if (!sessionRefs.length) return events;
+
+    const caseSummaries = await sessionStudentCaseService.listSessionCaseSummaries({ sessionRefs, reqUser });
+    return (Array.isArray(events) ? events : []).map((event) => {
+        if (String(event?.eventType || '').trim().toLowerCase() !== 'class_session') return event;
+        const key = sessionStudentCaseService.getSessionCaseSummaryKey(event.classId, event.sessionId);
+        const caseSummary = caseSummaries.get(key) || null;
+        return caseSummary ? { ...event, caseSummary } : event;
+    });
+}
+
 function filterEventsByRange(events, range) {
     if (!range?.start || !range?.end) return [];
     return events.filter((event) => event.date >= range.start && event.date <= range.end);
@@ -1077,6 +1103,7 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
     });
     events.push(...activityEvents);
 
+    events.splice(0, events.length, ...await attachCaseSummariesToSessionEvents(events, reqUser));
     sortEventsChronologically(events);
     markOverlappingEvents(events);
 
@@ -1163,7 +1190,7 @@ async function getMyScheduleData(req, res) {
         const yearlyEvents = result.events || [];
         const totalsByPeriod = {};
         PERIOD_KEYS.forEach((key) => {
-            const periodEvents = filterEventsByRange(yearlyEvents, ranges[key]);
+            const periodEvents = filterEventsWithCasesIfRequested(filterEventsByRange(yearlyEvents, ranges[key]), req.query);
             totalsByPeriod[key] = {
                 period: key,
                 periodLabel: PERIOD_LABELS[key] || key,
@@ -1172,7 +1199,7 @@ async function getMyScheduleData(req, res) {
             };
         });
 
-        const selectedEvents = filterEventsByRange(yearlyEvents, selectedRange).map((event) => ({
+        const selectedEvents = filterEventsWithCasesIfRequested(filterEventsByRange(yearlyEvents, selectedRange), req.query).map((event) => ({
             ...event,
             detailsUrl: String(event?.detailsUrl || '').trim() || (
                 event.sessionId
@@ -1281,7 +1308,7 @@ async function getPersonSchedule(req, res) {
             ? await buildScheduleRoleOptionsForPerson({ personId: effectivePersonId, activeOrgId, reqUser: req.user })
             : (Array.isArray(viewerScheduleAccess.availableRoles) ? viewerScheduleAccess.availableRoles : []);
 
-        const events = filterScheduleEventsForRole(personResult?.events, effectiveRole).map((event) => {
+        const events = filterEventsWithCasesIfRequested(filterScheduleEventsForRole(personResult?.events, effectiveRole), req.query).map((event) => {
             const isLeaveEvent = isApprovedLeaveScheduleEvent(event);
             return {
                 ...event,
@@ -1415,6 +1442,7 @@ async function getGlobalSchedule(req, res) {
             events.push(...personEvents);
         }
 
+        events = filterEventsWithCasesIfRequested(events, req.query);
         events.sort((a, b) => {
             const dateA = new Date(`${a.date}T${a.start || '00:00'}`);
             const dateB = new Date(`${b.date}T${b.start || '00:00'}`);

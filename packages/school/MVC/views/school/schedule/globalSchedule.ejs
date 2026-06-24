@@ -123,20 +123,27 @@
             </div>
 
             <div class="row align-items-end g-3 mb-3">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label fw-bold">Start Date</label>
                     <input type="date" id="sch_startDate" class="form-control">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label fw-bold">End Date</label>
                     <input type="date" id="sch_endDate" class="form-control">
                 </div>
-                <div class="col-md-5 d-flex gap-2">
+                <div class="col-md-4 d-flex gap-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary btn-range flex-grow-1" data-range="day">Today</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary btn-range flex-grow-1" data-range="week">This Week</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary btn-range flex-grow-1" data-range="month">This Month</button>
                 </div>
-                <div class="col-md-1">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Cases</label>
+                    <div class="form-check form-switch pt-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
+                        <label class="form-check-label small fw-semibold" for="sch_hasCases">With cases only</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
                     <button type="button" id="btn_loadSchedule" class="btn btn-success w-100 fw-bold">Load</button>
                 </div>
             </div>
@@ -159,6 +166,27 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    function buildSessionCaseBadgeHtml(caseSummary) {
+        if (!caseSummary || !caseSummary.hasCases) return '';
+        const tone = String(caseSummary.badgeTone || 'muted').trim().toLowerCase();
+        const classMap = {
+            danger: 'bg-danger-subtle text-danger-emphasis border-danger-subtle',
+            warning: 'bg-warning-subtle text-warning-emphasis border-warning-subtle',
+            info: 'bg-info-subtle text-info-emphasis border-info-subtle',
+            muted: 'bg-secondary-subtle text-secondary-emphasis border-secondary-subtle'
+        };
+        const label = caseSummary.badgeLabel || `${caseSummary.totalCount || 0} case(s)`;
+        const title = [
+            `Cases: ${caseSummary.totalCount || 0}`,
+            `Active: ${caseSummary.activeCount || 0}`,
+            `Urgent: ${caseSummary.urgentCount || 0}`,
+            `Warning: ${caseSummary.warningCount || 0}`,
+            `Info: ${caseSummary.infoCount || 0}`,
+            `Resolved/closed: ${caseSummary.resolvedCount || 0}`
+        ].join(' | ');
+        return `<span class="badge border ms-1 ${classMap[tone] || classMap.muted}" title="${escapeHtml(title)}"><i class="bi bi-exclamation-diamond-fill me-1"></i>${escapeHtml(label)}</span>`;
     }
 
     function buildLifecycleInline(event) {
@@ -329,6 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dayEvents.forEach((ev) => {
                 const eventColor = colorMap[ev?.personId] || '#6c757d';
                 const detailsUrl = String(ev?.detailsUrl || '').trim();
+                const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                 const openButton = detailsUrl
                     ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
                     : `<span class="text-muted small">No details</span>`;
@@ -340,6 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="event-meta-line">
                                 <span class="person-chip" style="background:${escapeHtml(eventColor)}">${escapeHtml(ev?.personName || ev?.personId || '-')}</span>
                                 <span>${escapeHtml(ev?.role || '-')}</span>
+                                ${caseBadge}
                                 <span class="text-muted">${Number(ev?.duration || 0).toFixed(2)} h</span>
                             </div>
                             <div class="event-meta-line">${buildLifecycleInline(ev)}</div>
@@ -366,7 +396,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const idsParam = selectedPersons.map(p => p.id).join(',');
-            const res = await fetch(`/school/schedules/api/global-schedule?personIds=${idsParam}&startDate=${startStr}&endDate=${endStr}`, { headers: { 'X-AJAX-Request': 'true' } });
+            const params = new URLSearchParams({ personIds: idsParam, startDate: startStr, endDate: endStr });
+            if (document.getElementById('sch_hasCases')?.checked) params.set('hasCases', '1');
+            const res = await fetch(`/school/schedules/api/global-schedule?${params.toString()}`, { headers: { 'X-AJAX-Request': 'true' } });
             const result = await res.json();
             const guarded = typeof window.applyGuardedApiResult === 'function'
                 ? await window.applyGuardedApiResult(result, { busyTitle: 'Schedule Load In Progress', replayTitle: 'Schedule Already Loaded' })
@@ -440,6 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const eventColor = colorMap[ev.personId] || '#6c757d';
                     const detailsUrl = String(ev.detailsUrl || '').trim();
                     const encodedDetailsUrl = encodeURIComponent(detailsUrl);
+                    const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                     const clickHandler = detailsUrl
                         ? `onclick="window.open(decodeURIComponent('${encodedDetailsUrl}'), '_blank')"`
                         : '';
@@ -451,6 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
                              ${clickHandler}>
                              <div class="fw-bold text-truncate"><i class="bi bi-person-fill"></i> ${ev.personName}</div>
                              <div class="x-small text-truncate">${ev.className} (${ev.start}-${ev.end})</div>
+                             ${caseBadge ? `<div class="x-small">${caseBadge}</div>` : ''}
                         </div>
                     `;
                 });

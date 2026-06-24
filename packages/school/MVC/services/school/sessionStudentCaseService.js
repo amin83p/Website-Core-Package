@@ -58,6 +58,87 @@ function findRosterStudent(session, studentPersonId) {
   return roster.find((row) => idsEqual(row?.personId, target)) || null;
 }
 
+function normalizeCaseStatus(value) {
+  return cleanString(value || 'open', 80).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'open';
+}
+
+function normalizeCaseSeverity(value) {
+  const normalized = cleanString(value || 'info', 80).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (normalized === 'urgent' || normalized === 'warning') return normalized;
+  return 'info';
+}
+
+function isActiveCaseStatus(status) {
+  return ['open', 'in_progress', 'reopened'].includes(normalizeCaseStatus(status));
+}
+
+function getSessionCaseSummaryKey(classId, sessionId) {
+  return `${toPublicId(classId)}::${toPublicId(sessionId)}`;
+}
+
+function emptyCaseSummary() {
+  return {
+    totalCount: 0,
+    activeCount: 0,
+    resolvedCount: 0,
+    urgentCount: 0,
+    warningCount: 0,
+    infoCount: 0,
+    highestActiveSeverity: '',
+    badgeTone: 'muted',
+    badgeLabel: '',
+    hasCases: false,
+    hasActiveCases: false
+  };
+}
+
+function finalizeCaseSummary(summary) {
+  const totalCount = Number(summary.totalCount || 0);
+  const activeCount = Number(summary.activeCount || 0);
+  const resolvedCount = Math.max(0, totalCount - activeCount);
+  let badgeTone = 'muted';
+  if (summary.highestActiveSeverity === 'urgent') badgeTone = 'danger';
+  else if (summary.highestActiveSeverity === 'warning') badgeTone = 'warning';
+  else if (summary.highestActiveSeverity === 'info') badgeTone = 'info';
+
+  return {
+    ...summary,
+    totalCount,
+    activeCount,
+    resolvedCount,
+    badgeTone,
+    badgeLabel: activeCount
+      ? `${activeCount} active case${activeCount === 1 ? '' : 's'}`
+      : (totalCount ? `${totalCount} resolved case${totalCount === 1 ? '' : 's'}` : ''),
+    hasCases: totalCount > 0,
+    hasActiveCases: activeCount > 0
+  };
+}
+
+function summarizeSessionCases(rows = []) {
+  const summary = emptyCaseSummary();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const severity = normalizeCaseSeverity(row?.severity);
+    const active = isActiveCaseStatus(row?.status);
+    summary.totalCount += 1;
+    if (severity === 'urgent') summary.urgentCount += 1;
+    else if (severity === 'warning') summary.warningCount += 1;
+    else summary.infoCount += 1;
+
+    if (active) {
+      summary.activeCount += 1;
+      if (
+        severity === 'urgent'
+        || (severity === 'warning' && summary.highestActiveSeverity !== 'urgent')
+        || (severity === 'info' && !summary.highestActiveSeverity)
+      ) {
+        summary.highestActiveSeverity = severity;
+      }
+    }
+  });
+  return finalizeCaseSummary(summary);
+}
+
 async function resolveStudentName(rosterRow = {}, fallbackId = '') {
   const personId = toPublicId(rosterRow?.personId || fallbackId);
   const existingName = cleanString(rosterRow?.name || rosterRow?.studentName || '', 180);
@@ -120,6 +201,33 @@ async function listCasesForSession({ classId, sessionId, reqUser }) {
   return (Array.isArray(rows) ? rows : [])
     .filter((row) => idsEqual(row?.classId, classId) && idsEqual(row?.sessionId, sessionId))
     .sort((a, b) => String(b?.audit?.lastUpdateDateTime || b?.audit?.createDateTime || '').localeCompare(String(a?.audit?.lastUpdateDateTime || a?.audit?.createDateTime || '')));
+}
+
+async function listSessionCaseSummaries({ sessionRefs = [], reqUser }) {
+  const refs = (Array.isArray(sessionRefs) ? sessionRefs : [])
+    .map((ref) => ({
+      classId: toPublicId(ref?.classId),
+      sessionId: toPublicId(ref?.sessionId)
+    }))
+    .filter((ref) => ref.classId && ref.sessionId);
+  if (!refs.length) return new Map();
+
+  const wanted = new Set(refs.map((ref) => getSessionCaseSummaryKey(ref.classId, ref.sessionId)));
+  const rows = await schoolRepositories.sessionStudentCases.list(normalizeScope(reqUser, {}));
+  const grouped = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const key = getSessionCaseSummaryKey(row?.classId, row?.sessionId);
+    if (!wanted.has(key)) return;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  });
+
+  const summaries = new Map();
+  grouped.forEach((caseRows, key) => {
+    const summary = summarizeSessionCases(caseRows);
+    if (summary.hasCases) summaries.set(key, summary);
+  });
+  return summaries;
 }
 
 async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }) {
@@ -220,10 +328,15 @@ async function updateStatus({ classId, sessionId, caseId, status, note = '', req
 
 module.exports = {
   listCasesForSession,
+  listSessionCaseSummaries,
+  getSessionCaseSummaryKey,
+  summarizeSessionCases,
   saveCase,
   updateStatus,
   _private: {
     caseNotificationPayload,
-    findRosterStudent
+    findRosterStudent,
+    normalizeCaseSeverity,
+    normalizeCaseStatus
   }
 };

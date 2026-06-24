@@ -928,11 +928,6 @@
                     <div class="col-md-3"><label class="form-label fw-bold" for="studentCaseSeverity">Severity</label><select class="form-select" id="studentCaseSeverity"><option value="info">Info</option><option value="warning">Warning</option><option value="urgent">Urgent</option></select></div>
                     <div class="col-md-6"><label class="form-label fw-bold" for="studentCaseSummary">Summary</label><input type="text" class="form-control" id="studentCaseSummary" maxlength="260" placeholder="Short reason for opening this case"></div>
                     <div class="col-12"><label class="form-label fw-bold" for="studentCaseDetails">Issue / support details</label><textarea class="form-control" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea></div>
-                    <div class="col-12"><div class="row g-2" id="studentCaseChecklist">
-                        <% const caseBoolFields = [['wasSubstitute', 'Was this a substitute class?'], ['classWentWellForStudent', 'Did the class go well for the student?'], ['classWentWellForTeacher', 'Did the class go well for you?'], ['teacherTechnologyIssue', 'Technology issue for teacher?'], ['studentTechnologyIssue', 'Technology issue for student?'], ['issueDuringClass', 'Issue office should know about?'], ['struggledWithMaterial', 'Student struggled with material?'], ['requiredAdditionalSupport', 'Student required additional support?'], ['lessonDeliveryDifficulty', 'Difficulty delivering the lesson?'], ['behavioralIssue', 'Behavioral issue?'], ['engagementIssue', 'Engagement issue?'], ['sufficientResources', 'Sufficient resources available?']]; %>
-                        <% caseBoolFields.forEach(([key, label]) => { %><div class="col-md-4"><label class="form-label small fw-semibold" for="studentCase_<%= key %>"><%= label %></label><select class="form-select form-select-sm student-case-bool" id="studentCase_<%= key %>" data-field="<%= key %>"><option value="false">No</option><option value="true">Yes</option></select></div><% }) %>
-                    </div></div>
-                    <div class="col-12"><label class="form-label fw-bold" for="studentCaseAdditionalComments">Additional comments</label><textarea class="form-control" id="studentCaseAdditionalComments" rows="3" maxlength="3000"></textarea></div>
                 </div>
             </div>
             <div class="modal-footer bg-light"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary fw-bold" id="btnSaveStudentCase"><i class="bi bi-save me-1"></i>Save Case</button></div>
@@ -982,6 +977,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         console.warn(`${title || 'Student Case'}: ${message || ''}`);
         return 'OK';
+    }
+
+    let studentCaseBusyToken = null;
+
+    function showStudentCaseBusy(title, message) {
+        if (typeof window.showLoading === 'function') {
+            studentCaseBusyToken = window.showLoading({
+                title: title || 'Student Case',
+                note: message || 'Please wait while the operation is completed.',
+                operation: 'Student Case'
+            });
+        }
+    }
+
+    function hideStudentCaseBusy() {
+        if (typeof window.hideLoading === 'function') {
+            if (studentCaseBusyToken) window.hideLoading(studentCaseBusyToken);
+            else window.hideLoading({ force: true });
+        }
+        studentCaseBusyToken = null;
     }
 
     function studentCaseBadgeClass(value, type) {
@@ -1042,8 +1057,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('studentCaseSeverity').value = 'info';
         document.getElementById('studentCaseSummary').value = '';
         document.getElementById('studentCaseDetails').value = '';
-        document.getElementById('studentCaseAdditionalComments').value = '';
-        document.querySelectorAll('.student-case-bool').forEach((input) => { input.value = 'false'; });
     }
 
     function openStudentCaseModal({ personId, studentName, caseRow = null }) {
@@ -1059,28 +1072,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('studentCaseSeverity').value = row.severity || 'info';
         document.getElementById('studentCaseSummary').value = row.summary || '';
         document.getElementById('studentCaseDetails').value = row.details || '';
-        document.getElementById('studentCaseAdditionalComments').value = row.additionalComments || '';
-        const structured = row.structured || {};
-        document.querySelectorAll('.student-case-bool').forEach((input) => {
-            input.value = structured[input.dataset.field] === true ? 'true' : 'false';
-        });
         if (studentCaseModalInstance) studentCaseModalInstance.show();
     }
 
     function collectStudentCasePayload() {
-        const structured = {};
-        document.querySelectorAll('.student-case-bool').forEach((input) => {
-            structured[input.dataset.field] = input.value === 'true';
-        });
         return {
             actionStateId,
             studentPersonId: document.getElementById('studentCasePersonId').value,
             category: document.getElementById('studentCaseCategory').value,
             severity: document.getElementById('studentCaseSeverity').value,
             summary: document.getElementById('studentCaseSummary').value,
-            details: document.getElementById('studentCaseDetails').value,
-            additionalComments: document.getElementById('studentCaseAdditionalComments').value,
-            structured
+            details: document.getElementById('studentCaseDetails').value
         };
     }
 
@@ -1102,28 +1104,43 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = caseId
             ? `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases/${encodeURIComponent(caseId)}`
             : `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases`;
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-ajax-request': 'true', 'Accept': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const result = await res.json().catch(() => ({}));
-        if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to save student case.');
-        if (studentCaseModalInstance) studentCaseModalInstance.hide();
-        await refreshStudentCases();
-        return showStudentCaseMessage('Case Saved', result.message || 'Student case saved.', 'success');
+        showStudentCaseBusy(caseId ? 'Updating Case' : 'Saving Case', caseId ? 'Updating the student case...' : 'Saving the student case...');
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-ajax-request': 'true', 'Accept': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to save student case.');
+            if (studentCaseModalInstance) studentCaseModalInstance.hide();
+            await refreshStudentCases();
+            hideStudentCaseBusy();
+            return showStudentCaseMessage('Case Saved', result.message || 'Student case saved.', 'success');
+        } catch (error) {
+            hideStudentCaseBusy();
+            throw error;
+        }
     }
 
     async function updateStudentCaseStatus(caseId, status) {
-        const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases/${encodeURIComponent(caseId)}/status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-ajax-request': 'true', 'Accept': 'application/json' },
-            body: JSON.stringify({ actionStateId, status })
-        });
-        const result = await res.json().catch(() => ({}));
-        if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to update student case.');
-        await refreshStudentCases();
-        return showStudentCaseMessage('Case Updated', result.message || 'Student case updated.', 'success');
+        const statusLabel = String(status || '').replace(/_/g, ' ');
+        showStudentCaseBusy('Updating Case', `Applying ${scEscapeHtml(statusLabel)} status...`);
+        try {
+            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases/${encodeURIComponent(caseId)}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-ajax-request': 'true', 'Accept': 'application/json' },
+                body: JSON.stringify({ actionStateId, status })
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to update student case.');
+            await refreshStudentCases();
+            hideStudentCaseBusy();
+            return showStudentCaseMessage('Case Updated', result.message || 'Student case updated.', 'success');
+        } catch (error) {
+            hideStudentCaseBusy();
+            throw error;
+        }
     }
 
     document.addEventListener('click', (event) => {

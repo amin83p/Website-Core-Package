@@ -194,6 +194,13 @@
                     <input type="date" class="form-control" id="ms_anchorDate">
                 </div>
                 <div class="col-xl-2 col-lg-2 col-md-6">
+                    <label class="form-label fw-bold small">Cases</label>
+                    <div class="form-check form-switch pt-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="ms_hasCases">
+                        <label class="form-check-label small fw-semibold" for="ms_hasCases">With cases only</label>
+                    </div>
+                </div>
+                <div class="col-xl-2 col-lg-2 col-md-6">
                     <button type="button" class="btn btn-primary w-100 fw-bold" id="ms_loadBtn">
                         <i class="bi bi-arrow-repeat me-1"></i> Load
                     </button>
@@ -278,6 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         personId: document.getElementById('ms_personId'),
         personName: document.getElementById('ms_personName'),
         anchorDate: document.getElementById('ms_anchorDate'),
+        hasCases: document.getElementById('ms_hasCases'),
         loadBtn: document.getElementById('ms_loadBtn'),
         pickPerson: document.getElementById('ms_pickPerson'),
         clearPerson: document.getElementById('ms_clearPerson'),
@@ -318,6 +326,27 @@ document.addEventListener('DOMContentLoaded', () => {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+
+    const buildSessionCaseBadgeHtml = (caseSummary) => {
+        if (!caseSummary || !caseSummary.hasCases) return '';
+        const tone = String(caseSummary.badgeTone || 'muted').trim().toLowerCase();
+        const classMap = {
+            danger: 'bg-danger-subtle text-danger-emphasis border-danger-subtle',
+            warning: 'bg-warning-subtle text-warning-emphasis border-warning-subtle',
+            info: 'bg-info-subtle text-info-emphasis border-info-subtle',
+            muted: 'bg-secondary-subtle text-secondary-emphasis border-secondary-subtle'
+        };
+        const label = caseSummary.badgeLabel || `${caseSummary.totalCount || 0} case(s)`;
+        const title = [
+            `Cases: ${caseSummary.totalCount || 0}`,
+            `Active: ${caseSummary.activeCount || 0}`,
+            `Urgent: ${caseSummary.urgentCount || 0}`,
+            `Warning: ${caseSummary.warningCount || 0}`,
+            `Info: ${caseSummary.infoCount || 0}`,
+            `Resolved/closed: ${caseSummary.resolvedCount || 0}`
+        ].join(' | ');
+        return `<span class="badge border ms-1 ${classMap[tone] || classMap.muted}" title="${escapeHtml(title)}"><i class="bi bi-exclamation-diamond-fill me-1"></i>${escapeHtml(label)}</span>`;
+    };
 
     const getStatusMeta = (status) => sessionStatusMetaMap.get(normalizeStatusCode(status)) || null;
     const statusStyle = (status) => {
@@ -511,6 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const url = String(event.detailsUrl || '').trim();
             const canOpen = Boolean(url);
+            const caseBadge = buildSessionCaseBadgeHtml(event.caseSummary);
             return `
                 <tr class="session-row" data-url="${escapeHtml(url)}" style="${rowStyle(event.status, event.locked === true)}">
                     <td class="ps-3 fw-semibold">${escapeHtml(dateLabel)}</td>
@@ -520,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="small mt-1">${lifecycleHtml(event)}</div>
                     </td>
                     <td><span class="badge role-badge">${escapeHtml(event.roleLabel || '-')}</span></td>
-                    <td><span class="status-tag" style="${statusStyle(event.status)}">${escapeHtml(statusText(event.status))}</span>${event.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : ''}</td>
+                    <td><span class="status-tag" style="${statusStyle(event.status)}">${escapeHtml(statusText(event.status))}</span>${caseBadge}${event.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : ''}</td>
                     <td class="text-end fw-semibold">${Number(event.duration || 0).toFixed(2)}</td>
                     <td class="text-end pe-3">
                         ${canOpen
@@ -566,6 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
         params.set('period', state.period);
         params.set('anchorDate', String(els.anchorDate?.value || toIsoDate(today)));
         if (state.personId) params.set('personId', state.personId);
+        if (els.hasCases?.checked) params.set('hasCases', '1');
         return params.toString();
     };
 
@@ -640,6 +671,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (els.loadBtn) els.loadBtn.addEventListener('click', loadSchedule);
     if (els.anchorDate) els.anchorDate.addEventListener('change', () => {
+        if (!state.personId && state.isAdminViewer) return;
+        loadSchedule();
+    });
+    if (els.hasCases) els.hasCases.addEventListener('change', () => {
         if (!state.personId && state.isAdminViewer) return;
         loadSchedule();
     });

@@ -1514,6 +1514,27 @@
     return '<span class="status-badge bg-secondary bg-opacity-10 text-secondary border border-secondary-subtle">' + escapeHtml(toSessionStatusLabel(normalized || 'other')) + '</span>';
   }
 
+  function buildSessionCaseBadgeHtml(caseSummary) {
+    if (!caseSummary || !caseSummary.hasCases) return '';
+    const tone = String(caseSummary.badgeTone || 'muted').trim().toLowerCase();
+    const classMap = {
+      danger: 'bg-danger-subtle text-danger-emphasis border-danger-subtle',
+      warning: 'bg-warning-subtle text-warning-emphasis border-warning-subtle',
+      info: 'bg-info-subtle text-info-emphasis border-info-subtle',
+      muted: 'bg-secondary-subtle text-secondary-emphasis border-secondary-subtle'
+    };
+    const label = caseSummary.badgeLabel || (String(caseSummary.totalCount || '0') + ' case(s)');
+    const title = [
+      'Cases: ' + String(caseSummary.totalCount || 0),
+      'Active: ' + String(caseSummary.activeCount || 0),
+      'Urgent: ' + String(caseSummary.urgentCount || 0),
+      'Warning: ' + String(caseSummary.warningCount || 0),
+      'Info: ' + String(caseSummary.infoCount || 0),
+      'Resolved/closed: ' + String(caseSummary.resolvedCount || 0)
+    ].join(' | ');
+    return '<span class="badge border ms-1 ' + (classMap[tone] || classMap.muted) + '" title="' + escapeHtml(title) + '"><i class="bi bi-exclamation-diamond-fill me-1"></i>' + escapeHtml(label) + '</span>';
+  }
+
   function buildSessionRowStyle(status, locked, statusMap) {
     const normalized = normalizeSessionStatusCode(status);
     const meta = statusMap.get(normalized);
@@ -1628,6 +1649,8 @@
     Object.keys(values).forEach(function (key) {
       if (values[key]) requestQuery.set(key, values[key]);
     });
+    const hasCasesEl = document.getElementById('hubSessionHasCases');
+    if (hasCasesEl && hasCasesEl.checked) requestQuery.set('hasCases', '1');
   }
 
   function setHubSessionDateRange(range) {
@@ -1722,6 +1745,8 @@
 
     const statusEl = document.getElementById('hubSessionStatus');
     if (statusEl) statusEl.addEventListener('change', function () { loadWorkspaceSection('sessions'); });
+    const hasCasesEl = document.getElementById('hubSessionHasCases');
+    if (hasCasesEl) hasCasesEl.addEventListener('change', function () { loadWorkspaceSection('sessions'); });
 
     const openTeacher = document.getElementById('hubSessionOpenTeacherPicker');
     if (openTeacher) openTeacher.addEventListener('click', openHubSessionTeacherPicker);
@@ -1802,6 +1827,7 @@
           ? new Date(row.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
           : '-';
         const badgeHtml = buildSessionStatusBadgeHtml(row.status, statusMap);
+        const caseBadgeHtml = buildSessionCaseBadgeHtml(row.caseSummary);
         const rowStyle = buildSessionRowStyle(row.status, row.locked === true, statusMap);
         const commentsIcon = row.hasComments ? '<i class="bi bi-chat-dots-fill text-primary ms-1" title="Interactive notes inside"></i>' : '';
         const detailUrl = '/school/classes/' + encodeURIComponent(row.classId || '') + '/sessions/' + encodeURIComponent(row.sessionId || '');
@@ -1822,7 +1848,7 @@
           '<td class="text-muted small"><i class="bi bi-clock me-1"></i>' + escapeHtml(row.startTime || '00:00') + ' - ' + escapeHtml(row.endTime || '00:00') + '</td>',
           '<td><div class="fw-semibold text-primary">' + escapeHtml(row.className || '-') + '</div><div class="small text-muted font-monospace">' + escapeHtml(row.classId || '') + '</div></td>',
           '<td>' + escapeHtml(row.teacherName || 'Unassigned') + '</td>',
-          '<td>' + badgeHtml + (row.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : '') + '</td>',
+          '<td>' + badgeHtml + caseBadgeHtml + (row.locked ? '<span class="badge bg-dark-subtle text-dark border ms-1"><i class="bi bi-lock-fill me-1"></i>Locked</span>' : '') + '</td>',
           '<td class="text-muted small fst-italic">' + escapeHtml(truncateHubText(row.notes, 42)) + commentsIcon + '</td>',
           '<td class="pe-4 text-end"><a class="btn btn-sm btn-light border text-primary" href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-in-right me-1"></i>Open</a></td>',
           '</tr>'
@@ -1852,6 +1878,7 @@
       '<div class="col-md-2"><label class="form-label fw-bold small">Start Time</label><input type="time" id="hubSessionStartTime" class="form-control form-control-sm" value="' + escapeHtml(filters.startTime || '') + '"></div>',
       '<div class="col-md-2"><label class="form-label fw-bold small">End Time</label><input type="time" id="hubSessionEndTime" class="form-control form-control-sm" value="' + escapeHtml(filters.endTime || '') + '"></div>',
       '<div class="col-md-2"><label class="form-label fw-bold small">Status</label><select id="hubSessionStatus" class="form-select form-select-sm"><option value="">All Statuses</option>' + statusOptions + '</select></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small">Cases</label><div class="form-check form-switch pt-1"><input class="form-check-input" type="checkbox" role="switch" id="hubSessionHasCases" ' + (filters.hasCases ? 'checked' : '') + '><label class="form-check-label small fw-semibold" for="hubSessionHasCases">With cases only</label></div></div>',
       '<div class="col-md-2"><button type="button" id="hubSessionFilterLoad" class="btn btn-primary btn-sm w-100 fw-bold"><i class="bi bi-funnel-fill me-1"></i> Filter</button></div>',
       '<div class="col-md-6"><label class="form-label fw-bold small">Filter by Teachers</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionTeacherId" value="' + escapeHtml(filters.teacherId || '') + '"><input type="text" id="hubSessionTeacherName" class="form-control bg-white" placeholder="All Teachers..." value="' + escapeHtml(getHubSessionTeacherDisplay(filters.teacherId || '')) + '" readonly><button type="button" class="btn btn-outline-danger" id="hubSessionClearTeacher" title="Clear All"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionOpenTeacherPicker" title="Select Teachers"><i class="bi bi-people-fill"></i></button></div><div id="hubSessionTeacherChips" class="mt-2"></div><div class="form-text">Use the picker checkbox list to add multiple teachers. Remove individual teachers from the chips below.</div></div>',
       '<div class="col-md-6"><label class="form-label fw-bold small">Filter by Class</label><div class="input-group input-group-sm"><input type="hidden" id="hubSessionClassId" value="' + escapeHtml(filters.classId || '') + '"><input type="text" id="hubSessionClassName" class="form-control bg-white" placeholder="All Classes..." value="' + escapeHtml(filters.classId || '') + '" readonly><button type="button" class="btn btn-outline-danger" id="hubSessionClearClass" title="Clear"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubSessionOpenClassPicker"><i class="bi bi-book"></i></button></div></div>',
@@ -1973,6 +2000,11 @@
       startDate: hubInputValue('hubScheduleStartDate') || today,
       endDate: hubInputValue('hubScheduleEndDate') || today
     };
+  }
+
+  function hubScheduleHasCasesOnly() {
+    const el = document.getElementById('hubScheduleHasCases');
+    return Boolean(el && el.checked);
   }
 
   function setHubScheduleRange(range) {
@@ -2149,6 +2181,7 @@
         const title = getHubScheduleEventTitle(event);
         const detailUrl = getHubScheduleEventDetailsUrl(event);
         const statusBadge = hubScheduleStatusBadge(event?.status, statusMap);
+        const caseBadge = buildSessionCaseBadgeHtml(event?.caseSummary);
         html += [
           '<div class="event-row ' + (event?.hasOverlap ? 'overlap ' : '') + (leave ? 'leave-event' : '') + '">',
           '<div class="event-time">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</div>',
@@ -2156,6 +2189,7 @@
           '<div class="fw-bold">' + escapeHtml(title) + '</div>',
           '<div class="mt-1 d-flex flex-wrap gap-2 align-items-center">',
           '<span class="badge ' + (leave ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-primary-subtle text-primary border') + '">' + escapeHtml(leave ? 'Approved Leave' : (event?.role || event?.roleLabel || '-')) + '</span>',
+          caseBadge,
           statusBadge,
           '<span class="text-muted small">' + escapeHtml(Number(event?.duration || 0).toFixed(2)) + ' h</span>',
           event?.hasOverlap ? '<span class="badge bg-danger">Overlap</span>' : '',
@@ -2209,6 +2243,7 @@
         const title = getHubScheduleEventTitle(event);
         const detailUrl = getHubScheduleEventDetailsUrl(event);
         const encodedDetailUrl = encodeURIComponent(detailUrl);
+        const caseBadge = buildSessionCaseBadgeHtml(event?.caseSummary);
         html += [
           '<div class="event-block ' + cssClass + ' ' + (event?.hasOverlap ? 'border-danger border-2' : '') + '"',
           ' style="left:' + escapeHtml(event.__hubPos.left) + '%;width:' + escapeHtml(event.__hubPos.width) + '%;top:' + escapeHtml(topPos) + 'px;"',
@@ -2216,6 +2251,7 @@
           detailUrl ? ' onclick="window.open(decodeURIComponent(\'' + escapeHtml(encodedDetailUrl) + '\'), \'_blank\')"' : '',
           '>',
           '<div class="fw-bold text-truncate">' + escapeHtml(title) + '</div>',
+          caseBadge ? '<div class="mt-1">' + caseBadge + '</div>' : '',
           '<div class="event-meta x-small"><span class="text-truncate">' + escapeHtml(event?.start || '-') + ' - ' + escapeHtml(event?.end || '-') + '</span>' + hubScheduleStatusBadge(event?.status, statusMap) + '</div>',
           '</div>'
         ].join('');
@@ -2368,6 +2404,7 @@
         endDate: range.endDate
       });
       if (role) params.set('role', role);
+      if (hubScheduleHasCasesOnly()) params.set('hasCases', '1');
       const response = await fetch('/school/schedules/api/person-schedule?' + params.toString(), {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin'
@@ -2502,6 +2539,13 @@
         refreshHubScheduleActiveView();
       }
     });
+    const hasCasesEl = document.getElementById('hubScheduleHasCases');
+    if (hasCasesEl) hasCasesEl.addEventListener('change', function () {
+      hubScheduleState.eventsByPersonId = {};
+      hubScheduleState.statusMetaByPersonId = {};
+      hubScheduleState.loadedPersonIds.clear();
+      refreshHubScheduleActiveView();
+    });
     root.querySelectorAll('[data-hub-schedule-range]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         setHubScheduleRange(btn.getAttribute('data-hub-schedule-range') || 'day');
@@ -2570,6 +2614,7 @@
       '<div class="col-md-2"><label class="form-label fw-bold small">Start Date</label><input type="date" id="hubScheduleStartDate" class="form-control form-control-sm" value="' + escapeHtml(defaultStart) + '"></div>',
       '<div class="col-md-2"><label class="form-label fw-bold small">End Date</label><input type="date" id="hubScheduleEndDate" class="form-control form-control-sm" value="' + escapeHtml(defaultEnd) + '"></div>',
       '<div class="col-md-2"><label class="form-label fw-bold small">Role</label><select id="hubScheduleRole" class="form-select form-select-sm"><option value="">All Roles</option></select></div>',
+      '<div class="col-md-2"><label class="form-label fw-bold small">Cases</label><div class="form-check form-switch pt-1"><input class="form-check-input" type="checkbox" role="switch" id="hubScheduleHasCases"><label class="form-check-label small fw-semibold" for="hubScheduleHasCases">With cases only</label></div></div>',
       '<div class="col-md-2 d-flex gap-2"><button type="button" id="hubScheduleLoadActive" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-arrow-clockwise me-1"></i>Load Tab</button><button type="button" id="hubScheduleLoadAll" class="btn btn-outline-primary btn-sm flex-fill">Load All</button></div>',
       '</div>',
       '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',

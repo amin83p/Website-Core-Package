@@ -1,4 +1,5 @@
 const schoolDataService = require('./schoolDataService');
+const sessionStudentCaseService = require('./sessionStudentCaseService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 
@@ -47,6 +48,7 @@ function normalizeFilters(query = {}) {
   const teacherId = teacherIds.join(',');
   const classId = query.classId ? String(query.classId).trim() : '';
   const status = normalizeStatusCode(query.status);
+  const hasCases = ['1', 'true', 'yes', 'on'].includes(String(query.hasCases || '').trim().toLowerCase());
 
   if (startDate && endDate && startDate > endDate) {
     throw new Error('startDate cannot be after endDate.');
@@ -64,7 +66,8 @@ function normalizeFilters(query = {}) {
     teacherId,
     teacherIds,
     classId,
-    status
+    status,
+    hasCases
   };
 }
 
@@ -161,6 +164,18 @@ async function listSessions(req, query = {}) {
     rows = rows.filter((row) => normalizeStatusCode(row?.status) === filters.status);
   }
   rows = rows.filter((row) => rowMatchesSearch(row, filters.q));
+
+  const caseSummaries = await sessionStudentCaseService.listSessionCaseSummaries({
+    sessionRefs: rows.map((row) => ({ classId: row.classId, sessionId: row.sessionId })),
+    reqUser: req.user
+  });
+  rows = rows.map((row) => ({
+    ...row,
+    caseSummary: caseSummaries.get(sessionStudentCaseService.getSessionCaseSummaryKey(row.classId, row.sessionId)) || null
+  }));
+  if (filters.hasCases) {
+    rows = rows.filter((row) => row.caseSummary && row.caseSummary.hasCases);
+  }
 
   rows.sort((a, b) => {
     const first = new Date(`${a.date}T${a.startTime}`);
