@@ -5,6 +5,7 @@ const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const schoolDataService = require('../../services/school/schoolDataService'); 
 const schoolRepositories = require('../../repositories/school');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
@@ -22,6 +23,13 @@ const PERIOD_LABELS = Object.freeze({
 
 function normalizeId(value) {
     return String(value || '').trim();
+}
+
+function isScheduleAdminViewer(reqUser) {
+    return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, {
+        orgId: reqUser?.activeOrgId,
+        section: { id: SECTIONS.SCHOOL_SCHEDULES, category: 'SCHOOL' }
+    });
 }
 
 function normalizeTime(value) {
@@ -297,9 +305,7 @@ function getScheduleViewerName({ person, reqUser, personId }) {
 
 async function buildScheduleViewerAccess(reqUser = {}) {
     const canSelectAnyPerson = Boolean(
-        adminChekersService.isOrgAdmin(reqUser)
-        || (typeof adminChekersService.isAdmin === 'function' && adminChekersService.isAdmin(reqUser))
-        || (typeof adminChekersService.isSuperAdmin === 'function' && adminChekersService.isSuperAdmin(reqUser))
+        isScheduleAdminViewer(reqUser)
     );
     const activeOrgId = getActiveScheduleOrgId(reqUser);
 
@@ -1112,7 +1118,7 @@ async function buildEventsForPersonAndRange({ personId, startDate, endDate, reqU
 
 async function showMySchedulePage(req, res) {
     try {
-        const isAdminViewer = adminChekersService.isOrgAdmin(req.user);
+        const isAdminViewer = isScheduleAdminViewer(req.user);
         const queryPersonId = normalizeId(req.query.personId);
         const queryPersonName = String(req.query.personName || '').trim();
 
@@ -1156,7 +1162,7 @@ async function showMySchedulePage(req, res) {
 
 async function getMyScheduleData(req, res) {
     try {
-        const isAdminViewer = adminChekersService.isOrgAdmin(req.user);
+        const isAdminViewer = isScheduleAdminViewer(req.user);
         const requestedPersonId = normalizeId(req.query.personId);
         const selfPersonId = normalizeId(req.user?.personId);
         const targetPersonId = isAdminViewer ? requestedPersonId : selfPersonId;

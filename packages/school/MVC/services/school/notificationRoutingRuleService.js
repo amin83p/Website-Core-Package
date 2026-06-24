@@ -4,6 +4,7 @@ const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 
 function cleanString(value, max = 5000) {
   if (value === undefined || value === null) return '';
@@ -25,7 +26,10 @@ function getActorId(user) {
 }
 
 function isAdminViewer(user) {
-  return Boolean(adminChekersService.isSuperAdmin(user) || adminChekersService.isOrgAdmin(user));
+  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_NOTIFICATIONS, OPERATIONS.CONFIGURE, {
+    orgId: getActiveOrgId(user),
+    section: { id: SECTIONS.SCHOOL_NOTIFICATIONS, category: 'SCHOOL' }
+  }));
 }
 
 function assertAdmin(user) {

@@ -27,6 +27,7 @@ const settingService = require(path.join(REPO_ROOT, 'MVC/services/settingService
 const originals = {
   isSuperAdmin: adminChekersService.isSuperAdmin,
   isOrgAdmin: adminChekersService.isOrgAdmin,
+  isAdminForRequestAsync: adminChekersService.isAdminForRequestAsync,
   fetchData: dataService.fetchData,
   getValue: settingService.getValue,
   listApplicants: pteApplicantRepository.list,
@@ -36,6 +37,7 @@ const originals = {
 function restore() {
   adminChekersService.isSuperAdmin = originals.isSuperAdmin;
   adminChekersService.isOrgAdmin = originals.isOrgAdmin;
+  adminChekersService.isAdminForRequestAsync = originals.isAdminForRequestAsync;
   dataService.fetchData = originals.fetchData;
   settingService.getValue = originals.getValue;
   pteApplicantRepository.list = originals.listApplicants;
@@ -115,7 +117,8 @@ function createUserRows() {
 
 function installCommonStubs() {
   adminChekersService.isSuperAdmin = () => false;
-  adminChekersService.isOrgAdmin = () => true;
+  adminChekersService.isOrgAdmin = () => false;
+  adminChekersService.isAdminForRequestAsync = async (_user, sectionId) => String(sectionId || '') === 'PTE_COURSES';
   settingService.getValue = () => 20;
 
   const personRows = createPersonRows();

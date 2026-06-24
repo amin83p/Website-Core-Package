@@ -2409,5 +2409,17 @@
       "lastUpdateUser": "SYS_ROOT_001",
       "lastUpdateDateTime": "2026-05-27T21:12:31.281Z"
     }
+  },
+  {
+    "id": "SYM_SYSTEM_123",
+    "name": "SCHOOL_TIMESHEET_MANAGEMENT",
+    "type": "class",
+    "value": "bi bi-table",
+    "tags": [
+      "SCHOOL_TIMESHEET_MANAGEMENT",
+      "445579"
+    ],
+    "orgId": "SYSTEM",
+    "adoptExisting": true
   }
 ]

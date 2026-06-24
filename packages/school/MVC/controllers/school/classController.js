@@ -276,6 +276,13 @@ function getClassRegistrationModeKey(classData) {
     return String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
 }
 
+function isSchoolRequestAdmin(reqUser, sectionId, operationId = OPERATIONS.READ_ALL) {
+    return adminChekersService.isAdminForRequest(reqUser, sectionId, operationId, {
+        orgId: reqUser?.activeOrgId,
+        section: { id: sectionId, category: 'SCHOOL' }
+    });
+}
+
 /**
  * Rolling enrollment periods that have ended (or are closed) but have no Pass/Continue/Withdraw decision yet.
  * Excludes draft/planned/cancelled/archived/error rows.
@@ -314,7 +321,7 @@ async function resolveActorDisplayName(reqUser) {
 
 async function buildFinalGradeWorkflowCapabilities(req, classData) {
     const ip = req.ip;
-    const isSuper = adminChekersService.isAdmin(req.user);
+    const isSuper = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.UPDATE);
     const [gbUp, depUp, clsUp] = await Promise.all([
         accessService.evaluateAccess({ user: req.user, sectionId: SECTIONS.SCHOOL_GRADEBOOK, operationId: OPERATIONS.UPDATE, ipAddress: ip }),
         accessService.evaluateAccess({ user: req.user, sectionId: SECTIONS.SCHOOL_DEPARTMENTS, operationId: OPERATIONS.UPDATE, ipAddress: ip }),
@@ -331,7 +338,7 @@ async function buildFinalGradeWorkflowCapabilities(req, classData) {
 
 async function assertFinalGradeWorkflowAccess(req, classData, action) {
     const ip = req.ip;
-    if (adminChekersService.isAdmin(req.user)) return;
+    if (isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.UPDATE)) return;
     if (action === 'teacher_draft' || action === 'teacher_finalize') {
         if (!isUserInstructorOnClass(classData, req.user?.personId)) {
             throw new Error('Only assigned class instructors can edit or submit final grades for this class.');
@@ -4464,7 +4471,7 @@ async function manageSession(req, res) {
             .filter((row) => idsEqual(row?.personId, currentUserPersonId))
             .map((row) => String(row?.id || '').trim())
             .filter(Boolean));
-        const isStaffForExamStart = adminChekersService.isAdmin(req.user)
+        const isStaffForExamStart = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_EXAMS_TAKING, OPERATIONS.START)
             || isUserInstructorOnClass(classData, req.user?.personId);
         const classSubjects = (classData.curriculum?.subjects || []).map(subMap => {
             const fullSubject = allSubjects.find((s) => idsEqual(s.id, subMap.subjectId));
@@ -4601,7 +4608,7 @@ async function manageSession(req, res) {
                 .map((row) => String(row?.personId || '').trim())
                 .filter(Boolean)
         );
-        const isReportAdminViewer = adminChekersService.isAdmin(req.user);
+        const isReportAdminViewer = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL);
         const sessionReportAssignmentRows = [];
         for (const assignment of (Array.isArray(reportAssignments) ? reportAssignments : [])) {
             if (!idsEqual(assignment?.orgId, classData?.orgId)) continue;

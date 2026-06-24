@@ -5,6 +5,7 @@ const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 
 const ACTIVE_REVIEW_STATUSES = new Set(['submitted', 'pending_reapproval']);
 const FINAL_STATUSES = new Set(['rejected', 'cancelled']);
@@ -76,7 +77,10 @@ async function resolveActorName(user) {
 }
 
 function isAdminViewer(user) {
-  return Boolean(adminChekersService.isSuperAdmin(user) || adminChekersService.isOrgAdmin(user));
+  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_LEAVE_REQUESTS, OPERATIONS.READ_ALL, {
+    orgId: getActiveOrgId(user),
+    section: { id: SECTIONS.SCHOOL_LEAVE_REQUESTS, category: 'SCHOOL' }
+  }));
 }
 
 function getRequesterPersonId(user) {

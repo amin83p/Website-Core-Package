@@ -272,16 +272,28 @@ function resolveRequesterUserId(requestingUser) {
   return toPublicId(requestingUser?.id || '') || '';
 }
 
+function isPteSectionAdminSync(requestingUser, sectionId, operationId = OPERATIONS.READ_ALL) {
+  return adminChekersService.isAdminForRequest(requestingUser, sectionId, operationId, {
+    orgId: resolveActiveOrgId(requestingUser),
+    section: { id: sectionId, category: 'PTE' }
+  });
+}
+
+async function isPteSectionAdmin(requestingUser, sectionId, operationId = OPERATIONS.READ_ALL) {
+  return adminChekersService.isAdminForRequestAsync(requestingUser, sectionId, operationId, {
+    orgId: resolveActiveOrgId(requestingUser),
+    section: { id: sectionId, category: 'PTE' }
+  });
+}
+
 function canSelectPracticeStudent(requestingUser) {
-  return adminChekersService.isSuperAdmin(requestingUser) || adminChekersService.isOrgAdmin(requestingUser);
+  return isPteSectionAdminSync(requestingUser, SECTIONS.PTE_PRACTICE_BY_SKILLS, OPERATIONS.READ_ALL);
 }
 
 const FRIENDLY_AI_PROVIDER_INACTIVE_MESSAGE = 'The assigned API Key for scoring is not active';
 
 function canViewDetailedAiScoringProviderErrors(requestingUser) {
-  return adminChekersService.isSuperAdmin(requestingUser)
-    || adminChekersService.isAdmin(requestingUser)
-    || adminChekersService.isOrgAdmin(requestingUser);
+  return isPteSectionAdminSync(requestingUser, SECTIONS.PTE_SCORING, OPERATIONS.READ_ALL);
 }
 
 function normalizeBooleanFlag(value, fallback = false) {
@@ -314,11 +326,7 @@ function hasResolvableAdminHintsOnUser(requestingUser) {
 
 async function canRequesterRescoreSameRevision(requestingUser, accessContext = {}) {
   if (hasExplicitAdminSignalOnUser(requestingUser)) return true;
-  if (
-    adminChekersService.isSuperAdmin(requestingUser)
-    || adminChekersService.isAdmin(requestingUser)
-    || adminChekersService.isOrgAdmin(requestingUser)
-  ) {
+  if (isPteSectionAdminSync(requestingUser, SECTIONS.PTE_PRACTICE_BY_SKILLS, OPERATIONS.AI_SCORING)) {
     return true;
   }
   if (isPracticeQuotaAdminContext(accessContext)) return true;
@@ -438,7 +446,7 @@ async function resolveVisibility(requestingUser, accessContext = {}, options = {
     };
   }
 
-  if (adminChekersService.isOrgAdmin(requestingUser)) {
+  if (await isPteSectionAdmin(requestingUser, SECTIONS.PTE_ATTEMPT_LEDGER)) {
     return {
       mode: 'org',
       activeOrgId,

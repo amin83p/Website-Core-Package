@@ -3,6 +3,7 @@ const schoolDataService = require('../schoolDataService');
 const schoolRepositories = require('../../../repositories/school');
 const withdrawalRepository = require('../../../repositories/school/withdrawalRepository');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const classWithdrawalService = require('./classWithdrawalService');
 const termWithdrawalService = require('./termWithdrawalService');
 const programWithdrawalService = require('./programWithdrawalService');
@@ -21,7 +22,10 @@ function appendNotes(existing, addition) {
 }
 
 function isPrivilegedFinalizer(reqUser) {
-  return adminChekersService.isSuperAdmin(reqUser) || adminChekersService.isOrgAdmin(reqUser);
+  return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_WITHDRAWAL, OPERATIONS.UPDATE, {
+    orgId: reqUser?.activeOrgId,
+    section: { id: SECTIONS.SCHOOL_WITHDRAWAL, category: 'SCHOOL' }
+  });
 }
 
 async function resolveProgramAdministratorPersonIdFromWithdrawal(withdrawal) {

@@ -3,7 +3,7 @@ const ieltsService = require('../../services/ielts/ieltsDataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
-const { SECTIONS } = requireCoreModule('config/accessConstants');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const BILLING_STATUS_OPTIONS = Object.freeze([
@@ -38,18 +38,12 @@ function getActiveUserLabel(user = null) {
   return s(user.fullName) || s(user.username) || s(user.email) || s(user.id) || 'Active User';
 }
 
-function hasSectionAdminAccess(user = null, sectionId = '') {
-  if (!user || !sectionId) return false;
-  const sections = Array.isArray(user?.activeProfile?.sections) ? user.activeProfile.sections : [];
-  return sections.some((row) => idsEqual(row?.sectionId, sectionId) && row?.adminAccess === true);
-}
-
 function canSelectUserOrOrg(user = null) {
   if (!user) return false;
-  if (adminChekersService.isAdmin(user)) return true;
-  if (adminChekersService.isOrgAdmin(user)) return true;
-  if (hasSectionAdminAccess(user, SECTIONS.IELTS_AI_TOKEN_USAGE)) return true;
-  return false;
+  return adminChekersService.isAdminForRequest(user, SECTIONS.IELTS_AI_TOKEN_USAGE, OPERATIONS.READ_ALL, {
+    orgId: user?.activeOrgId,
+    section: { id: SECTIONS.IELTS_AI_TOKEN_USAGE, category: 'IELTS' }
+  });
 }
 
 function buildSelectableOptions(rows = [], reqUser = null) {

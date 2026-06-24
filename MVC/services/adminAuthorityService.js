@@ -1,6 +1,7 @@
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
 const effectiveAccessResolverService = require('./security/effectiveAccessResolverService');
+const { resolveEntity } = require('../utils/entityResolver');
 
 const EMPTY_AUTHORITY = Object.freeze({
   isSuperAdmin: false,
@@ -93,9 +94,23 @@ function getTargetSectionId(sectionId, section) {
 }
 
 function getTargetCategory(section) {
-  const explicit = normalizeCategory(section?.category || section?.categoryId || section?.group || '');
-  if (explicit) return explicit;
-  return section ? 'GENERAL' : '';
+  return normalizeCategory(section?.category || section?.categoryId || section?.group || '');
+}
+
+function sectionHasCategory(section) {
+  return Boolean(getTargetCategory(section));
+}
+
+async function resolveSectionForAuthority(sectionId, section) {
+  if (sectionHasCategory(section)) return section;
+  const targetSectionId = getTargetSectionId(sectionId, section);
+  if (!targetSectionId) return section || null;
+  try {
+    const resolvedSection = await resolveEntity('sections', targetSectionId);
+    return resolvedSection || section || null;
+  } catch (_) {
+    return section || null;
+  }
 }
 
 function getSectionConfig(rows, sectionId) {
@@ -233,8 +248,7 @@ function resolveAdminAuthority({ user, sectionId, orgId, operationId, section } 
   const systemAdmin = Boolean(profileInScope && normalizeBoolean(profile?.fullAdmin, false));
   if (systemAdmin) reasons.push('FULL_SYSTEM_ADMIN_PROFILE');
 
-  const categoryAdmin = Boolean(profileInScope && targetCategory && hasAdminCategory(profile, targetCategory));
-  if (categoryAdmin) reasons.push(`CATEGORY_ADMIN:${targetCategory}`);
+  let categoryAdmin = Boolean(profileInScope && targetCategory && hasAdminCategory(profile, targetCategory));
 
   const profileSection = getSectionConfig(profileInScope ? profile?.sections : null, targetSectionId);
   const policySection = getSectionConfig(policyInScope ? policy?.sections : null, targetSectionId);
@@ -252,6 +266,10 @@ function resolveAdminAuthority({ user, sectionId, orgId, operationId, section } 
   } else if (!policySectionIsBan) {
     grantAdmin = Boolean(policySectionIsFullAccess || normalizeBoolean(profileSection?.adminAccess, false));
   }
+  if (policySectionIsBan || orgPolicySectionIsBan) {
+    categoryAdmin = false;
+  }
+  if (categoryAdmin) reasons.push(`CATEGORY_ADMIN:${targetCategory}`);
   if (grantAdmin) reasons.push(`SECTION_ADMIN:${targetSectionId}`);
   if (policySectionIsFullAccess) reasons.push(`POLICY_SECTION_FULL_ACCESS:${targetSectionId}`);
   if (policySectionIsBan) reasons.push(`POLICY_SECTION_FULL_BAN:${targetSectionId}`);
@@ -316,30 +334,41 @@ function resolveAdminAuthority({ user, sectionId, orgId, operationId, section } 
 }
 
 async function resolveAdminAuthorityAsync({ user, sectionId, orgId, operationId, section, effectiveAccess } = {}) {
-  const syncAuthority = resolveAdminAuthority({ user, sectionId, orgId, operationId, section });
-  if (!user) return syncAuthority;
+  if (!user) return { ...EMPTY_AUTHORITY };
+
+  const resolvedSection = await resolveSectionForAuthority(sectionId, section);
+  const syncAuthority = resolveAdminAuthority({
+    user,
+    sectionId,
+    orgId,
+    operationId,
+    section: resolvedSection || section
+  });
   if (syncAuthority.isSuperAdmin) return syncAuthority;
 
   const resolvedEffective = effectiveAccess
     || await effectiveAccessResolverService.resolveEffectiveAccess({
       user,
       sectionId: syncAuthority.sectionId || sectionId,
-      operationId: syncAuthority.operationId || operationId
+      operationId: syncAuthority.operationId || operationId,
+      orgId: orgId || user?.activeOrgId
     });
 
   const targetSectionId = syncAuthority.sectionId || getTargetSectionId(sectionId, section);
   const targetOperationId = syncAuthority.operationId || normalizeToken(operationId);
-  const targetCategory = syncAuthority.category || getTargetCategory(section);
+  const targetCategory = syncAuthority.category || getTargetCategory(resolvedSection || section);
 
   const sectionBanned = resolvedEffective?.section?.isBanned === true;
   const sectionAdminByEffective = resolvedEffective?.section?.isSectionAdmin === true;
   const operationAdminByEffective = resolvedEffective?.operation?.isOperationAdmin === true;
 
+  let categoryAdmin = syncAuthority.isCategoryAdminForSection;
   let grantAdmin = syncAuthority.isGrantAdminAccessForSection;
   let operationAdmin = syncAuthority.isOperationAdminForRequest;
   const reasons = Array.isArray(syncAuthority.reasons) ? syncAuthority.reasons.slice() : [];
 
   if (sectionBanned) {
+    categoryAdmin = false;
     grantAdmin = false;
     operationAdmin = false;
   } else {
@@ -363,7 +392,7 @@ async function resolveAdminAuthorityAsync({ user, sectionId, orgId, operationId,
   return buildAuthorityPayload({
     superAdmin: syncAuthority.isSuperAdmin,
     systemAdmin: syncAuthority.isSystemAdmin,
-    categoryAdmin: syncAuthority.isCategoryAdminForSection,
+    categoryAdmin,
     grantAdmin,
     operationAdmin,
     reasons,
@@ -421,10 +450,34 @@ function isSystemAdmin(user, orgContext = {}) {
 }
 
 function isOrgAdmin(user, orgContext = {}) {
-  return isSystemAdmin(user, orgContext);
+  return isAdmin(user, orgContext);
+}
+
+async function isOrgAdminAsync(user, orgContext = {}) {
+  return isAdminAsync(user, orgContext);
 }
 
 function isAdmin(user, orgContext = {}) {
+  const targetSectionId = orgContext?.sectionId || orgContext?.section?.id || '';
+  const targetOperationId = orgContext?.operationId || '';
+  if (targetSectionId || orgContext?.section) {
+    if (targetOperationId) {
+      return isAdminForRequest(user, targetSectionId, targetOperationId, orgContext);
+    }
+    return isAdminForSection(user, targetSectionId, orgContext);
+  }
+  return isSystemAdmin(user, orgContext);
+}
+
+async function isAdminAsync(user, orgContext = {}) {
+  const targetSectionId = orgContext?.sectionId || orgContext?.section?.id || '';
+  const targetOperationId = orgContext?.operationId || '';
+  if (targetSectionId || orgContext?.section) {
+    if (targetOperationId) {
+      return isAdminForRequestAsync(user, targetSectionId, targetOperationId, orgContext);
+    }
+    return isAdminForSectionAsync(user, targetSectionId, orgContext);
+  }
   return isSystemAdmin(user, orgContext);
 }
 
@@ -433,8 +486,10 @@ module.exports = {
   resolveAdminAuthorityAsync,
   isSuperAdmin,
   isAdmin,
+  isAdminAsync,
   isSystemAdmin,
   isOrgAdmin,
+  isOrgAdminAsync,
   isAdminForSection,
   isAdminForSectionAsync,
   isAdminForRequest,

@@ -6,12 +6,13 @@ const dataService1 = requireCoreModule('MVC/services/dataService');
 const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { isAjax, buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
-const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { assertOrgAccess } = requireCoreModule('MVC/utils/orgContextUtils');
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { buildReportReflectionLiveSessions } = require('../../services/school/reportTimesheetReflectionService');
 const activityService = require('../../services/school/activityService');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 function getActiveOrgIdOrThrow(reqUser) {
     const activeOrgId = reqUser?.activeOrgId ? String(reqUser.activeOrgId) : '';
@@ -222,9 +223,18 @@ async function resolveSelfTeacherOrThrow(req) {
     return { teacherId: String(person.id), teacherName: buildPersonName(person) };
 }
 
-async function resolveTargetTeacherContext(req, { requireTeacher = true } = {}) {
+async function isTimesheetSectionAdmin(reqUser, operationId = OPERATIONS.READ_ALL) {
+    return adminAuthorityService.isAdminForRequestAsync(
+        reqUser,
+        SECTIONS.SCHOOL_TIMESHEETS,
+        operationId,
+        { section: { id: SECTIONS.SCHOOL_TIMESHEETS } }
+    );
+}
+
+async function resolveTargetTeacherContext(req, { requireTeacher = true, operationId = OPERATIONS.READ_ALL } = {}) {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    const isAdmin = adminChekersService.isAdmin(req.user);
+    const isAdmin = await isTimesheetSectionAdmin(req.user, operationId);
     const overrideTeacherId = isAdmin ? String(req.query.teacherId || '').trim() : '';
 
     // Admin/superadmin can always work via explicit teacher selection,
@@ -612,7 +622,7 @@ exports.listMyTimesheets = async (req, res) => {
             return new Date(p.startDate).getFullYear();
         }))].sort((a, b) => b - a);
 
-        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: false });
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: false, operationId: OPERATIONS.READ_ALL });
 
         const allTimesheets = await dataService.fetchData('timesheets', {}, req.user);
         const targetTimesheets = teacherContext.targetTeacherId
@@ -691,7 +701,7 @@ exports.viewTimesheet = async (req, res) => {
 
         if (period.status === 'locked') throw new Error('Period is for preview and is not open for submissions.');
 
-        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true });
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.READ_ALL });
 
         const maxDailyHours = 12.0;
         const maxSessionHours = 8.0;
@@ -795,7 +805,7 @@ exports.saveTimesheet = async (req, res) => {
         const { status, entries, totalHours } = req.body;
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
 
-        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true });
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.UPDATE });
         guardKey = idempotencyGuardService.createGuardKey([
             'timesheet_save',
             String(activeOrgId || '').trim(),

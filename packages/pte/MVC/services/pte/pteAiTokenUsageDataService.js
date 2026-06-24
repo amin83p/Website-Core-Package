@@ -76,6 +76,13 @@ function resolveRequesterUserId(requestingUser) {
   return toPublicId(requestingUser?.id) || '';
 }
 
+async function isPteSectionAdmin(requestingUser, sectionId, operationId = OPERATIONS.READ_ALL) {
+  return adminChekersService.isAdminForRequestAsync(requestingUser, sectionId, operationId, {
+    orgId: resolveActiveOrgId(requestingUser),
+    section: { id: sectionId, category: 'PTE' }
+  });
+}
+
 function resolveObjectId(value, fallback = 'DRAFT:unknown') {
   const token = cleanString(value, { max: 180, allowEmpty: true }) || '';
   if (token) return token;
@@ -143,7 +150,7 @@ async function resolveVisibility(requestingUser, accessContext = {}) {
     };
   }
 
-  if (adminChekersService.isOrgAdmin(requestingUser)) {
+  if (await isPteSectionAdmin(requestingUser, SECTIONS.PTE_AI_TOKEN_USAGE)) {
     return {
       mode: 'org',
       activeOrgId,

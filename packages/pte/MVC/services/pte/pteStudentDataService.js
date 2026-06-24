@@ -9,6 +9,8 @@ const {
   userMembershipRepository,
   dataService,
   adminChekersService,
+  SECTIONS,
+  OPERATIONS,
   normalizeQueryOptions,
   resolveEntity,
   normalizeMembershipPayload,
@@ -253,6 +255,13 @@ function resolveRequesterUserId(requestingUser) {
   return toPublicId(requestingUser?.id) || '';
 }
 
+async function isPteSectionAdmin(requestingUser, sectionId, operationId = OPERATIONS.READ_ALL) {
+  return adminChekersService.isAdminForRequestAsync(requestingUser, sectionId, operationId, {
+    orgId: resolveActiveOrgId(requestingUser),
+    section: { id: sectionId, category: 'PTE' }
+  });
+}
+
 async function resolveVisibility(requestingUser, accessContext = {}) {
   const activeOrgId = resolveActiveOrgId(requestingUser);
   const requesterUserId = resolveRequesterUserId(requestingUser);
@@ -275,7 +284,7 @@ async function resolveVisibility(requestingUser, accessContext = {}) {
     };
   }
 
-  if (adminChekersService.isOrgAdmin(requestingUser)) {
+  if (await isPteSectionAdmin(requestingUser, SECTIONS.PTE_STUDENTS)) {
     return {
       mode: 'org',
       activeOrgId,

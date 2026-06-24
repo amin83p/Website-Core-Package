@@ -257,6 +257,39 @@ function resolvePersonDisplayName(person, fallback) {
     return full || String(fallback || '').trim() || 'Student';
 }
 
+function resolvePersonMembershipOrgIds(person = null) {
+    const list = Array.isArray(person?.organizations) ? person.organizations : [];
+    return list.map((entry) => String(entry?.orgId || '').trim()).filter(Boolean);
+}
+
+function mapPersonPickerRow(person = null) {
+    const firstName = String(person?.name?.first || person?.firstName || '').trim();
+    const lastName = String(person?.name?.last || person?.lastName || '').trim();
+    const preferredName = String(person?.name?.preferred || person?.preferredName || '').trim();
+    const personId = String(person?.id || '').trim();
+    const emails = Array.isArray(person?.contact?.emails) ? person.contact.emails : [];
+    const contactEmail = String(person?.contact?.email || person?.email || emails[0]?.email || '').trim();
+    const displayName = preferredName
+        || `${firstName} ${lastName}`.trim()
+        || String(person?.displayName || person?.fullName || '').trim()
+        || personId;
+
+    return {
+        id: personId,
+        personId,
+        firstName,
+        lastName,
+        preferredName,
+        email: contactEmail,
+        name: {
+            first: firstName,
+            last: lastName,
+            preferred: preferredName
+        },
+        displayName,
+        organizations: Array.isArray(person?.organizations) ? person.organizations : []
+    };
+}
 function findActiveOrgHeadAccount(accounts, orgId, headCategory, aliases = []) {
     const allowedCategories = new Set(
         [headCategory]
@@ -637,6 +670,36 @@ function logStudentDeleteAuditEvent(level, payload) {
     console.info(`${parts.join(' ')} ${footer.join(' ')}`);
 }
 
+exports.listEligiblePersons = async (req, res) => {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const query = await buildDataServiceQuery(req.query);
+    const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
+    if (query.q === searchDefaultKeyword) query.q = '';
+
+    const persons = await dataServiceGlobal.fetchData('persons', {
+      q: query.q || '',
+      type: query.type || 'contains',
+      searchFields: query.searchFields || 'id,name.first,name.last,name.preferred,preferredName,contact.email,email'
+    }, req.user, PERSON_QUERY_OPTIONS);
+
+    const mapped = (Array.isArray(persons) ? persons : [])
+      .filter((person) => {
+        const orgIds = resolvePersonMembershipOrgIds(person);
+        return orgIds.length === 0 || orgIds.some((orgId) => idsEqual(orgId, activeOrgId));
+      })
+      .map(mapPersonPickerRow);
+
+    const { data, pagination } = paginate(mapped, query);
+    return res.json({
+      status: 'success',
+      results: data,
+      pagination
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
 exports.listStudents = async (req, res) => {
     try {
         let query = await buildDataServiceQuery(req.query);

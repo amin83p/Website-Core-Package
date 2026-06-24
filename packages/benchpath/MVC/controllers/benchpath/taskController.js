@@ -14,6 +14,7 @@ const {
 } = require('../../services/benchpath/taskAuthoring/taskAuthoringCommon');
 const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 
 const DEFAULT_SEARCH_FIELDS = [
   'id',
@@ -269,7 +270,10 @@ async function viewTask(req, res) {
     if (!task) return res.status(404).render('404', { user: req.user || null });
     const { packageData } = await resolveTaskPackage(task, req.user);
     const vm = packageViewModel(task, packageData);
-    const canShowRaw = adminAuthorityService.isAdmin(req.user);
+    const canShowRaw = adminAuthorityService.isAdminForRequest(req.user, SECTIONS.BENCHPATH_TASK_AUTHORING, OPERATIONS.READ_ALL, {
+      orgId: req.user?.activeOrgId,
+      section: { id: SECTIONS.BENCHPATH_TASK_AUTHORING, category: 'BENCHPATH' }
+    });
 
     return res.render('benchpath/task/taskView', {
       title: `BenchPath Task ${task.id}`,

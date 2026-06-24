@@ -4,10 +4,18 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
+
+function isSchoolReportAdminViewer(reqUser) {
+  return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL, {
+    orgId: reqUser?.activeOrgId,
+    section: { id: SECTIONS.SCHOOL_REPORTS_INSTANCES, category: 'SCHOOL' }
+  });
+}
 
 function parseJsonSafe(v, fallback) {
   if (v === undefined || v === null || v === '') return fallback;
@@ -751,7 +759,7 @@ async function buildInstanceListRows({ reqUser, assignmentFilter = '', q = '' })
 async function buildPersonReportListContext({ reqUser, requestedScope = '', requestedPersonId = '', q = '' }) {
   const validScopes = new Set(['teacher', 'staff', 'student']);
   const requestedValidScope = validScopes.has(requestedScope) ? requestedScope : '';
-  const isAdminViewer = adminChekersService.isOrgAdmin(reqUser) || adminChekersService.isSuperAdmin(reqUser);
+  const isAdminViewer = isSchoolReportAdminViewer(reqUser);
   const viewerPersonId = toPublicId(reqUser?.personId);
 
   const [

@@ -5,6 +5,7 @@ const notificationRoutingRuleService = require('./notificationRoutingRuleService
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 
 const OPEN_STATUSES = new Set(['open', 'in_progress']);
 const CLOSED_STATUSES = new Set(['resolved', 'dismissed']);
@@ -113,7 +114,10 @@ async function resolvePersonName(personId, fallback = '') {
 }
 
 function isAdminViewer(user) {
-  return Boolean(adminChekersService.isSuperAdmin(user) || adminChekersService.isOrgAdmin(user));
+  return Boolean(adminChekersService.isAdminForRequest(user, SECTIONS.SCHOOL_NOTIFICATIONS, OPERATIONS.READ_ALL, {
+    orgId: getActiveOrgId(user),
+    section: { id: SECTIONS.SCHOOL_NOTIFICATIONS, category: 'SCHOOL' }
+  }));
 }
 
 function canManageNotificationWorkflow(user, notification) {

@@ -26,5 +26,7 @@ module.exports = {
   decrypt: coreContracts.decrypt,
   runByRepositoryBackend: coreContracts.runByRepositoryBackend,
   getMongoCollection: coreContracts.getMongoCollection,
-  SYSTEM_CONTEXT: coreContracts.SYSTEM_CONTEXT
+  SYSTEM_CONTEXT: coreContracts.SYSTEM_CONTEXT,
+  SECTIONS: coreContracts.SECTIONS,
+  OPERATIONS: coreContracts.OPERATIONS
 };

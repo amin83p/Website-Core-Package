@@ -2526,6 +2526,12 @@
           "sessionAttempts": 5,
           "sessionTime": 15,
           "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 5,
+          "sessionTime": 15,
+          "active": true
         }
       ],
       "subsections": [],
@@ -3257,7 +3263,7 @@
       "adoptExisting": true
     },
     {
-      "id": "SYM_SYSTEM_061",
+      "id": "SYM_SYSTEM_123",
       "name": "SCHOOL_TIMESHEET_MANAGEMENT",
       "type": "class",
       "value": "bi bi-table",

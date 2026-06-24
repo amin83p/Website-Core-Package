@@ -3,6 +3,8 @@ const pteTestVersionRepository = require('../../repositories/pteTestVersionRepos
 const pteAttemptItemRepository = require('../../repositories/pteAttemptItemRepository');
 const {
   adminChekersService,
+  SECTIONS,
+  OPERATIONS,
   activityQuotaLedgerService,
   dataService,
   normalizeQueryOptions,
@@ -122,6 +124,13 @@ function resolveRequesterUserId(requestingUser) {
   return toPublicId(requestingUser?.id) || '';
 }
 
+async function isPteSectionAdmin(requestingUser, sectionId, operationId = OPERATIONS.READ_ALL) {
+  return adminChekersService.isAdminForRequestAsync(requestingUser, sectionId, operationId, {
+    orgId: resolveActiveOrgId(requestingUser),
+    section: { id: sectionId, category: 'PTE' }
+  });
+}
+
 function normalizeScopeName(scopeName = '') {
   const token = String(scopeName || '').trim().toUpperCase();
   if (!token) return '';
@@ -169,7 +178,7 @@ async function resolveVisibility(requestingUser, accessContext = {}) {
     };
   }
 
-  if (adminChekersService.isOrgAdmin(requestingUser)) {
+  if (await isPteSectionAdmin(requestingUser, SECTIONS.PTE_QUESTIONS_BANK)) {
     return {
       mode: 'org',
       activeOrgId,

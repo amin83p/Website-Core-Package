@@ -373,13 +373,15 @@ async function resolveScoringHistoryVisibility(requestingUser, accessContext = {
   assertReadableUserScope(userScope);
 
   const sectionId = String(accessContext?.sectionId || IELTS_SCORING_HISTORY_SECTION).trim() || IELTS_SCORING_HISTORY_SECTION;
-  const operationId = String(accessContext?.operationId || 'READ_ALL').trim() || 'READ_ALL';
+  const operationId = String(accessContext?.operationId || OPERATIONS.READ_ALL).trim() || OPERATIONS.READ_ALL;
   const explicitScopeId = toPublicId(accessContext?.scopeId) || String(accessContext?.scopeId || '').trim() || null;
 
-  const isGlobalAdmin = adminChekersService.isAdmin(requestingUser) || adminChekersService.isSuperAdmin(requestingUser);
-  const isSectionAdmin = await hasSectionAdminAccess(requestingUser, sectionId);
+  const isSectionAdmin = await adminChekersService.isAdminForRequestAsync(requestingUser, sectionId, operationId, {
+    orgId: userScope.activeOrgId,
+    section: { id: sectionId, category: 'IELTS' }
+  });
 
-  if (isGlobalAdmin || isSectionAdmin) {
+  if (isSectionAdmin) {
     return {
       mode: SCORING_SCOPE_MODE.ALL,
       activeOrgId: userScope.activeOrgId,

@@ -639,6 +639,7 @@
       pBtn.addEventListener('click', () => {
         GenericPicker.open(GenericPickerPresets.person({
           title: 'Select Person',
+          apiEndpoint: '/school/staff/api/eligible-persons',
           placeholder: 'Search by name or email...',
           onSelect: (item) => {
             document.getElementById('inp_personId').value = item.id || '';

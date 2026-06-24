@@ -77,11 +77,10 @@ function hasPracticeRescoreAdminContext(adminContext = {}) {
 async function canRequesterRescoreSameRevision(requestingUser = {}, accessContext = {}) {
   if (!requestingUser || typeof requestingUser !== 'object') return false;
   if (hasExplicitAdminSignalOnUser(requestingUser)) return true;
-  if (
-    adminChekersService.isSuperAdmin(requestingUser)
-    || adminChekersService.isAdmin(requestingUser)
-    || adminChekersService.isOrgAdmin(requestingUser)
-  ) {
+  if (adminChekersService.isAdminForRequest(requestingUser, SECTIONS.PTE_PRACTICE_BY_SKILLS, OPERATIONS.AI_SCORING, {
+    orgId: cleanText(requestingUser?.activeOrgId || requestingUser?.primaryOrgId || requestingUser?.orgId, 120),
+    section: { id: SECTIONS.PTE_PRACTICE_BY_SKILLS, category: 'PTE' }
+  })) {
     return true;
   }
   if (hasPracticeRescoreAdminContext(accessContext?.adminContext || {})) return true;

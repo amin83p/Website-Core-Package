@@ -1177,6 +1177,9 @@
       },
       {
         "id": "445568"
+      },
+      {
+        "id": "445579"
       }
     ],
     "related": [],
@@ -9674,5 +9677,37 @@
     "related": [],
     "subsections": [],
     "trackState": true
+  },
+  {
+    "id": "445579",
+    "name": "SCHOOL_TIMESHEET_MANAGEMENT",
+    "category": "SCHOOL",
+    "description": "Manage period-level timesheet rosters and review department hour summaries for teacher and staff timesheets.",
+    "active": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "dashboardDisplay": true,
+    "mainDashboardDisplay": false,
+    "navigatorSection": false,
+    "homeURL": "/school/timesheets/manage",
+    "inactiveMessage": "",
+    "message": "",
+    "operations": [
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "subsections": [],
+    "related": [],
+    "adoptExisting": true
   }
 ]

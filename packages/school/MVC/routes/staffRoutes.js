@@ -21,6 +21,11 @@ router.get('/archived',
   trackActionState(SECTIONS.SCHOOL_STAFF, OPERATIONS.READ_ALL),
   ctrl.listArchivedStaff);
 
+router.get('/api/eligible-persons',
+  requireAccess(SECTIONS.SCHOOL_STAFF, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_STAFF, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
+  ctrl.listEligiblePersons);
+
 router.post('/recover/:id',
   requireAccess(SECTIONS.SCHOOL_STAFF, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_STAFF, OPERATIONS.UPDATE, { requireToken: true }),

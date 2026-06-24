@@ -9,6 +9,7 @@ const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const dataService = requireCoreModule('MVC/services/dataService');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
+const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const schoolDataService = require('../../services/school/schoolDataService');
 const examValidationService = require('../../services/school/examValidationService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
@@ -30,7 +31,10 @@ function hasOwn(obj, key) {
 }
 
 function isExamAdminViewer(reqUser) {
-  return adminChekersService.isOrgAdmin(reqUser) || adminChekersService.isSuperAdmin(reqUser);
+  return adminChekersService.isAdminForRequest(reqUser, SECTIONS.SCHOOL_EXAMS, OPERATIONS.READ_ALL, {
+    orgId: reqUser?.activeOrgId,
+    section: { id: SECTIONS.SCHOOL_EXAMS, category: 'SCHOOL' }
+  });
 }
 
 function normalizeSelectedOptionIds(value) {
@@ -461,7 +465,7 @@ function resolveAllocationSourceSessionMeta(allocation = {}, classRow = null) {
 }
 
 function resolveTeacherViewerContext(req) {
-  const isAdminViewer = adminChekersService.isOrgAdmin(req.user) || adminChekersService.isSuperAdmin(req.user);
+  const isAdminViewer = isExamAdminViewer(req.user);
   const requestedPersonId = normalizeId(req.query?.personId || req.body?.personId);
   if (isAdminViewer) {
     return {
@@ -1196,7 +1200,7 @@ async function reorderQuestions(req, res) {
 
 async function showAllocationForm(req, res) {
   try {
-    const isAdminViewer = adminChekersService.isOrgAdmin(req.user) || adminChekersService.isSuperAdmin(req.user);
+    const isAdminViewer = isExamAdminViewer(req.user);
     return res.render('school/exam/allocationForm', {
       title: 'New Exam Allocation',
       template: null,
@@ -1240,7 +1244,7 @@ async function saveAllocation(req, res) {
     const classRow = await schoolDataService.getDataById('classes', payload.classId, req.user);
     if (!classRow) throw new Error('Selected class was not found.');
 
-    const isAdminViewer = adminChekersService.isOrgAdmin(req.user) || adminChekersService.isSuperAdmin(req.user);
+    const isAdminViewer = isExamAdminViewer(req.user);
     const viewerPersonId = normalizeId(req.user?.personId);
     if (!isAdminViewer) {
       if (!viewerPersonId) throw new Error('Your user account is not linked to a person.');
@@ -1453,7 +1457,7 @@ async function showAllocationEditForm(req, res) {
         ...roster,
         expectedStudentCount: Array.isArray(roster?.studentIds) ? roster.studentIds.length : 0
       },
-      isAdminViewer: adminChekersService.isOrgAdmin(req.user) || adminChekersService.isSuperAdmin(req.user),
+      isAdminViewer: isExamAdminViewer(req.user),
       allocationStatuses: examAllocationModel.ALLOCATION_STATUSES,
       windowPolicyOptions: WINDOW_POLICY_OPTIONS,
       questionPresentationModeOptions: QUESTION_PRESENTATION_MODE_OPTIONS,
@@ -1724,7 +1728,7 @@ async function listAllocations(req, res) {
       };
     });
 
-    const isAdminViewer = adminChekersService.isOrgAdmin(req.user) || adminChekersService.isSuperAdmin(req.user);
+    const isAdminViewer = isExamAdminViewer(req.user);
     const actorId = normalizeId(req.user?.id);
 
     const filtered = enriched
@@ -2525,7 +2529,7 @@ async function listEligibleAllocationClasses(req, res) {
       schoolDataService.fetchData('classes', {}, req.user),
       schoolDataService.fetchData('teachers', {}, req.user)
     ]);
-    const isAdminViewer = adminChekersService.isOrgAdmin(req.user) || adminChekersService.isSuperAdmin(req.user);
+    const isAdminViewer = isExamAdminViewer(req.user);
     const viewerPersonId = normalizeId(req.user?.personId);
     const teacherPersonMap = buildTeacherPersonMap(teachers || []);
 
@@ -2572,7 +2576,7 @@ async function listClassScheduledSessions(req, res) {
     const classRow = await schoolDataService.getDataById('classes', classId, req.user);
     if (!classRow) throw new Error('Class not found.');
 
-    const isAdminViewer = adminChekersService.isOrgAdmin(req.user) || adminChekersService.isSuperAdmin(req.user);
+    const isAdminViewer = isExamAdminViewer(req.user);
     const viewerPersonId = normalizeId(req.user?.personId);
     if (!isAdminViewer) {
       if (!viewerPersonId) throw new Error('Your user account is not linked to a person.');

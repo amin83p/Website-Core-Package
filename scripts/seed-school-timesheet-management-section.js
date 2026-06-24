@@ -6,47 +6,72 @@ const { MongoClient } = require('mongodb');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const ACTOR = 'SYS_ROOT_001';
 const NOW = new Date().toISOString();
-
-const SECTION_ID = '445579';
-const SECTION_NAME = 'SCHOOL_TIMESHEET_MANAGEMENT';
-const SECTION_HOME_URL = '/school/timesheets/manage';
-const SYMBOL_ID = 'SYM_SYSTEM_061';
 const PARENT_SECTION = { id: '225382', name: 'SCHOOL_ACCOUNTING' };
-const INSERT_AFTER_SECTION_ID = '445568';
 
-const SECTION_OPERATIONS = Object.freeze([
-  { id: 'OP1002', sessionAttempts: 5, sessionTime: 15, active: true }
+const SECTION_DEFINITIONS = Object.freeze([
+  {
+    id: '445568',
+    name: 'SCHOOL_TIMESHEETS',
+    homeURL: '/school/timesheets/my-timesheets',
+    description: 'Review and submit teacher and staff timesheets, including controlled edits and approvals.',
+    symbol: {
+      id: 'SYM_SYSTEM_047',
+      value: 'bi bi-clock-history'
+    },
+    insertAfterSectionId: '445567',
+    operations: ['OP1002', 'OP1003', 'OP1005', 'OP1001', 'OP1004']
+  },
+  {
+    id: '445579',
+    name: 'SCHOOL_TIMESHEET_MANAGEMENT',
+    homeURL: '/school/timesheets/manage',
+    description: 'Manage period-level timesheet rosters and review department hour summaries for teacher and staff timesheets.',
+    symbol: {
+      id: 'SYM_SYSTEM_123',
+      value: 'bi bi-table'
+    },
+    insertAfterSectionId: '445568',
+    operations: ['OP1002', 'OP1003']
+  }
 ]);
 
-const SECTION_DOC = Object.freeze({
-  id: SECTION_ID,
-  name: SECTION_NAME,
-  category: 'SCHOOL',
-  description: 'Manage period-level timesheet rosters and review department hour summaries for teacher and staff timesheets.',
-  active: true,
-  trackState: true,
-  minimumAccessRequirement: 1,
-  dashboardDisplay: true,
-  mainDashboardDisplay: false,
-  navigatorSection: false,
-  homeURL: SECTION_HOME_URL,
-  inactiveMessage: '',
-  message: '',
-  operations: SECTION_OPERATIONS,
-  subsections: [],
-  related: [],
-  adoptExisting: true
-});
+function buildOperations(operationIds = []) {
+  return operationIds.map((id) => ({ id, sessionAttempts: 5, sessionTime: 15, active: true }));
+}
 
-const SYMBOL_DOC = Object.freeze({
-  id: SYMBOL_ID,
-  name: SECTION_NAME,
-  type: 'class',
-  value: 'bi bi-table',
-  tags: [SECTION_NAME, SECTION_ID],
-  orgId: 'SYSTEM',
-  adoptExisting: true
-});
+function buildSectionDoc(definition) {
+  return {
+    id: definition.id,
+    name: definition.name,
+    category: 'SCHOOL',
+    description: definition.description,
+    active: true,
+    trackState: true,
+    minimumAccessRequirement: 1,
+    dashboardDisplay: true,
+    mainDashboardDisplay: false,
+    navigatorSection: false,
+    homeURL: definition.homeURL,
+    inactiveMessage: '',
+    message: '',
+    operations: buildOperations(definition.operations),
+    subsections: [],
+    related: [],
+    adoptExisting: true
+  };
+}
+
+function buildSymbolDoc(definition, sectionId = definition.id) {
+  return {
+    id: definition.symbol.id,
+    name: definition.name,
+    type: 'class',
+    value: definition.symbol.value,
+    tags: [definition.name, String(sectionId || definition.id)],
+    orgId: 'SYSTEM',
+    adoptExisting: true
+  };
+}
 
 function loadLocalEnvFile() {
   const envPath = path.join(ROOT_DIR, '.env');
@@ -116,90 +141,90 @@ function buildAudit(existingAudit) {
   };
 }
 
-function mergeOperations(existingOps = []) {
+function mergeOperations(existingOps = [], requiredIds = []) {
   const byId = new Map();
   (Array.isArray(existingOps) ? existingOps : []).forEach((op) => {
     const id = String(op?.id || '').trim();
     if (id) byId.set(id, { ...op, id });
   });
-  SECTION_OPERATIONS.forEach((op) => {
+  buildOperations(requiredIds).forEach((op) => {
     const current = byId.get(op.id);
     byId.set(op.id, current ? { ...op, ...current, active: current.active !== false } : { ...op });
   });
   return [...byId.values()];
 }
 
-async function upsertSection(sections) {
+async function upsertSection(sections, definition) {
+  const sectionDoc = buildSectionDoc(definition);
   const existing =
-    await sections.findOne({ id: SECTION_ID }) ||
-    await sections.findOne({ name: { $regex: new RegExp(`^${escapeRegex(SECTION_NAME)}$`, 'i') } });
+    await sections.findOne({ id: definition.id }) ||
+    await sections.findOne({ name: { $regex: new RegExp(`^${escapeRegex(definition.name)}$`, 'i') } });
   const next = {
-    ...SECTION_DOC,
-    id: String(existing?.id || SECTION_DOC.id),
+    ...sectionDoc,
+    id: String(existing?.id || sectionDoc.id),
     active: existing?.active !== false,
-    operations: mergeOperations(existing?.operations),
+    operations: mergeOperations(existing?.operations, definition.operations),
     subsections: Array.isArray(existing?.subsections) ? existing.subsections : [],
     related: Array.isArray(existing?.related) ? existing.related : [],
     audit: buildAudit(existing?.audit)
   };
   if (!existing) {
     await sections.insertOne(next);
-    console.log(`Inserted section ${SECTION_NAME} (${next.id}).`);
+    console.log(`Inserted section ${definition.name} (${next.id}).`);
     return next;
   }
   await sections.updateOne({ _id: existing._id }, { $set: next });
-  console.log(`Updated section ${SECTION_NAME} (${next.id}).`);
+  console.log(`Updated section ${definition.name} (${next.id}).`);
   return { ...existing, ...next };
 }
 
-async function upsertSymbol(symbols, sectionId) {
-  const symbolDoc = {
-    ...SYMBOL_DOC,
-    tags: [SECTION_NAME, String(sectionId || SECTION_ID)]
-  };
-  const existing =
-    await symbols.findOne({ id: SYMBOL_ID }) ||
-    await symbols.findOne({
-      name: { $regex: new RegExp(`^${escapeRegex(SECTION_NAME)}$`, 'i') },
-      $or: [{ orgId: 'SYSTEM' }, { orgId: { $exists: false } }, { orgId: null }, { orgId: '' }]
-    });
+async function upsertSymbol(symbols, definition, sectionId) {
+  const symbolDoc = buildSymbolDoc(definition, sectionId);
+  const existing = await symbols.findOne({
+    name: { $regex: new RegExp(`^${escapeRegex(definition.name)}$`, 'i') },
+    $or: [{ orgId: 'SYSTEM' }, { orgId: { $exists: false } }, { orgId: null }, { orgId: '' }]
+  });
   const next = {
     ...symbolDoc,
-    id: String(existing?.id || symbolDoc.id),
+    id: symbolDoc.id,
     audit: buildAudit(existing?.audit)
   };
   if (!existing) {
     await symbols.insertOne(next);
-    console.log(`Inserted symbol ${SECTION_NAME} (${next.id}).`);
+    console.log(`Inserted symbol ${definition.name} (${next.id}).`);
     return next;
   }
   await symbols.updateOne({ _id: existing._id }, { $set: next });
-  console.log(`Updated symbol ${SECTION_NAME} (${next.id}).`);
+  console.log(`Updated symbol ${definition.name} (${next.id}).`);
   return { ...existing, ...next };
 }
 
-async function linkUnderSchoolAccounting(sections, childSection) {
+async function linkUnderSchoolAccounting(sections, childSections) {
   const parent =
     await sections.findOne({ id: PARENT_SECTION.id }) ||
     await sections.findOne({ name: { $regex: new RegExp(`^${escapeRegex(PARENT_SECTION.name)}$`, 'i') } });
   if (!parent) {
-    console.warn(`WARNING: ${PARENT_SECTION.name} was not found. Add subsection manually: { id: "${childSection.id}" }`);
+    console.warn(`WARNING: ${PARENT_SECTION.name} was not found. Add timesheet subsections manually.`);
     return;
   }
 
-  const childId = String(childSection?.id || '').trim();
+  const childIds = new Set(childSections.map((row) => String(row?.id || '').trim()).filter(Boolean));
   const normalized = [];
-  let inserted = false;
   (Array.isArray(parent.subsections) ? parent.subsections : []).forEach((row) => {
     const id = String(row?.id || row || '').trim();
-    if (!id || id === childId) return;
+    if (!id || childIds.has(id)) return;
     normalized.push({ id });
-    if (!inserted && id === INSERT_AFTER_SECTION_ID) {
-      normalized.push({ id: childId });
-      inserted = true;
-    }
+    SECTION_DEFINITIONS.forEach((definition) => {
+      const child = childSections.find((item) => String(item?.id || '') === definition.id);
+      if (child && id === definition.insertAfterSectionId && !normalized.some((item) => String(item.id) === String(child.id))) {
+        normalized.push({ id: String(child.id) });
+      }
+    });
   });
-  if (!inserted) normalized.push({ id: childId });
+  childSections.forEach((child) => {
+    const childId = String(child?.id || '').trim();
+    if (childId && !normalized.some((item) => String(item.id) === childId)) normalized.push({ id: childId });
+  });
 
   await sections.updateOne(
     { _id: parent._id },
@@ -211,7 +236,7 @@ async function linkUnderSchoolAccounting(sections, childSection) {
       }
     }
   );
-  console.log(`Linked ${SECTION_NAME} (${childId}) under ${PARENT_SECTION.name}.`);
+  console.log(`Linked timesheet sections under ${PARENT_SECTION.name}.`);
 }
 
 async function main() {
@@ -225,16 +250,24 @@ async function main() {
   await client.connect();
   try {
     const db = client.db(dbName);
-    const section = await upsertSection(db.collection('sections'));
-    await linkUnderSchoolAccounting(db.collection('sections'), section);
-    await upsertSymbol(db.collection('symbols'), section.id);
-    console.log('School Timesheet Management section/symbol seed complete.');
+    const sections = db.collection('sections');
+    const symbols = db.collection('symbols');
+    const sectionRows = [];
+    for (const definition of SECTION_DEFINITIONS) {
+      // eslint-disable-next-line no-await-in-loop
+      const section = await upsertSection(sections, definition);
+      sectionRows.push(section);
+      // eslint-disable-next-line no-await-in-loop
+      await upsertSymbol(symbols, definition, section.id);
+    }
+    await linkUnderSchoolAccounting(sections, sectionRows);
+    console.log('School timesheet access section/symbol seed complete.');
   } finally {
     await client.close();
   }
 }
 
 main().catch((error) => {
-  console.error(`School Timesheet Management section/symbol seed failed: ${error.message}`);
+  console.error(`School timesheet access section/symbol seed failed: ${error.message}`);
   process.exit(1);
 });

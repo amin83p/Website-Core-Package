@@ -7,16 +7,26 @@ function isSuperAdmin(user, orgContext) {
 }
 
 function isAdmin(user, orgContext) {
-  return adminAuthorityService.isSystemAdmin(user, orgContext);
+  return adminAuthorityService.isAdmin(user, orgContext);
+}
+
+async function isAdminAsync(user, orgContext) {
+  return adminAuthorityService.isAdminAsync(user, orgContext);
 }
 
 function isOrgAdmin(user, orgContext) {
   return adminAuthorityService.isOrgAdmin(user, orgContext);
 }
 
+async function isOrgAdminAsync(user, orgContext) {
+  return adminAuthorityService.isOrgAdminAsync(user, orgContext);
+}
+
 module.exports = {
   ...adminAuthorityService,
   isSuperAdmin,
   isAdmin,
-  isOrgAdmin
+  isAdminAsync,
+  isOrgAdmin,
+  isOrgAdminAsync
 };

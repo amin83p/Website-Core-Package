@@ -1,4 +1,5 @@
 const { requireCoreModule } = require('./pteCoreModuleResolver');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 const constants = requireCoreModule('config/constants');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
@@ -58,6 +59,8 @@ module.exports = {
   constants,
   DEFAULTS: constants.DEFAULTS,
   SYSTEM_CONTEXT: constants.SYSTEM_CONTEXT,
+  SECTIONS,
+  OPERATIONS,
   adminChekersService,
   activityQuotaLedgerService,
   consumptionDefinitionPolicyService,
