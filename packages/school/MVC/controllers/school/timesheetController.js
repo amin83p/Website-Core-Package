@@ -133,6 +133,97 @@ function normalizeStatusCode(value) {
     return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'scheduled';
 }
 
+function formatPeriodDeadlineLabel(period) {
+    const deadline = String(period?.submissionDeadline || '').trim();
+    if (!deadline) return '-';
+    const time = String(period?.submissionDeadlineTime || '23:59').trim() || '23:59';
+    return `${deadline} ${time}`;
+}
+
+function formatHourlyRateLabel(value) {
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount <= 0) return 'N/D';
+    return `$${amount.toFixed(2)}/hr`;
+}
+
+function dateOrBoundary(value, fallback) {
+    const text = String(value || '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : fallback;
+}
+
+function ratePeriodOverlapsTimesheetPeriod(ratePeriod, period) {
+    const rateStart = dateOrBoundary(ratePeriod?.effectiveFrom, '0001-01-01');
+    const rateEnd = dateOrBoundary(ratePeriod?.effectiveTo, '9999-12-31');
+    const periodStart = dateOrBoundary(period?.startDate, '0001-01-01');
+    const periodEnd = dateOrBoundary(period?.endDate, '9999-12-31');
+    return rateStart <= periodEnd && periodStart <= rateEnd;
+}
+
+function resolvePayRateForDepartment({ payRates, activeOrgId, personId, roles, departmentId, period }) {
+    const deptId = String(departmentId || '').trim();
+    if (!deptId) return null;
+
+    const roleSet = new Set((Array.isArray(roles) ? roles : [])
+        .map((role) => String(role || '').trim().toLowerCase())
+        .filter(Boolean));
+    const candidates = [];
+
+    (Array.isArray(payRates) ? payRates : []).forEach((profile) => {
+        if (!idsEqual(profile?.orgId, activeOrgId)) return;
+        if (!idsEqual(profile?.personId || profile?.teacherUserId, personId)) return;
+        if (!idsEqual(profile?.departmentId, deptId)) return;
+        const role = String(profile?.personRole || 'teacher').trim().toLowerCase();
+        if (roleSet.size && role && !roleSet.has(role)) return;
+
+        (Array.isArray(profile?.ratePeriods) ? profile.ratePeriods : []).forEach((ratePeriod) => {
+            if (!ratePeriodOverlapsTimesheetPeriod(ratePeriod, period)) return;
+            const hourlyRate = Number(ratePeriod?.hourlyRate);
+            if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) return;
+            candidates.push({
+                payRateId: String(profile?.id || '').trim(),
+                ratePeriodId: String(ratePeriod?.id || '').trim(),
+                personRole: role || '',
+                hourlyRate,
+                effectiveFrom: String(ratePeriod?.effectiveFrom || '').trim(),
+                effectiveTo: String(ratePeriod?.effectiveTo || '').trim(),
+                contractId: String(ratePeriod?.contractId || '').trim()
+            });
+        });
+    });
+
+    candidates.sort((a, b) => {
+        const byDate = dateOrBoundary(b.effectiveFrom, '0001-01-01').localeCompare(dateOrBoundary(a.effectiveFrom, '0001-01-01'));
+        if (byDate) return byDate;
+        return String(b.ratePeriodId || '').localeCompare(String(a.ratePeriodId || ''));
+    });
+
+    return candidates[0] || null;
+}
+
+function shapeTimesheetPeriodPickerRow(period) {
+    const id = String(period?.id || '').trim();
+    const name = String(period?.name || id || 'Timesheet Period').trim();
+    const startDate = String(period?.startDate || '').trim();
+    const endDate = String(period?.endDate || '').trim();
+    const status = String(period?.status || '').trim();
+    const periodWindowLabel = startDate || endDate ? `${startDate || '?'} to ${endDate || '?'}` : '';
+    const deadlineLabel = formatPeriodDeadlineLabel(period);
+    const subtitle = [periodWindowLabel, deadlineLabel !== '-' ? `Deadline: ${deadlineLabel}` : '', status ? `Status: ${status}` : '']
+        .filter(Boolean)
+        .join(' | ');
+    return {
+        ...period,
+        id,
+        name,
+        title: name,
+        displayName: name,
+        subtitle,
+        periodWindowLabel,
+        deadlineLabel,
+        submissionDeadlineTime: String(period?.submissionDeadlineTime || '23:59')
+    };
+}
+
 async function loadTimesheetManagementPeriods(req, query = {}) {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
     const allPeriods = await dataService.fetchData('timesheetPeriods', { ...query, orgId__eq: activeOrgId }, req.user);
@@ -313,11 +404,9 @@ exports.listEligibleTimesheetPersons = async (req, res) => {
 
 exports.showTimesheetManagement = async (req, res) => {
     try {
-        const periods = await loadTimesheetManagementPeriods(req, {});
         res.render('school/timesheet/timesheetManage', {
             title: 'Timesheet Management',
             tableName: 'Timesheet_Management',
-            periods,
             newUrl: 'school/timesheets/manage',
             newLabel: null,
             includeModal: true,
@@ -340,7 +429,7 @@ exports.listTimesheetManagementPeriods = async (req, res) => {
         delete query.orgId__eq;
         const periods = await loadTimesheetManagementPeriods(req, query);
         const { data, pagination } = paginate(periods, query);
-        return res.json({ status: 'success', results: data, pagination });
+        return res.json({ status: 'success', results: data.map(shapeTimesheetPeriodPickerRow), pagination });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
     }
@@ -367,8 +456,10 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                 .filter(([id]) => Boolean(id))
         );
 
+        const requestedTimesheetStatus = String(req.query.timesheetStatus || '').trim().toLowerCase();
         const rows = eligiblePeople.map((personRow) => {
             const timesheet = timesheetByPersonId.get(personRow.personId) || null;
+            const status = String(timesheet?.status || 'not_started').toLowerCase();
             return {
                 personId: personRow.personId,
                 name: personRow.name,
@@ -376,11 +467,11 @@ exports.getTimesheetManagementRoster = async (req, res) => {
                 roles: personRow.roles,
                 departmentHint: personRow.departmentHint,
                 timesheetId: timesheet?.id || '',
-                status: timesheet?.status || 'not_started',
+                status,
                 totalHours: Number(parseFloat(timesheet?.totalHours) || 0),
                 openUrl: `/school/timesheets/editor/${encodeURIComponent(periodId)}?teacherId=${encodeURIComponent(personRow.personId)}`
             };
-        });
+        }).filter((row) => !requestedTimesheetStatus || row.status === requestedTimesheetStatus);
 
         return res.json({
             status: 'success',
@@ -504,10 +595,11 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
         if (!periodId) throw new Error('Timesheet period is required.');
         if (!personId) throw new Error('Person is required.');
 
-        const [period, person, departments] = await Promise.all([
+        const [period, person, departments, payRates] = await Promise.all([
             dataService.getDataById('timesheetPeriods', periodId, req.user),
             getPersonById(personId, req.user),
-            dataService.fetchData('departments', {}, req.user)
+            dataService.fetchData('departments', {}, req.user),
+            dataService.fetchData('payRates', { orgId__eq: activeOrgId, personId__eq: personId }, req.user)
         ]);
         if (!period) throw new Error('Timesheet period not found.');
         assertPeriodOrgAccess(period, activeOrgId, req.user);
@@ -516,6 +608,7 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
         }
 
         const departmentMap = buildDepartmentMap(departments);
+        const personRoles = getTimesheetRolesForPersonInOrg(person, activeOrgId);
         const effective = await buildEffectiveTimesheetEntries({ period, personId, activeOrgId, reqUser: req.user });
         const classMap = new Map((effective.classes || []).map((row) => [String(row?.id || '').trim(), row]));
         const buckets = new Map();
@@ -551,13 +644,29 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
         });
 
         const rows = [...buckets.values()]
-            .map((row) => ({
-                ...row,
-                autoHours: Number(row.autoHours.toFixed(2)),
-                manualHours: Number(row.manualHours.toFixed(2)),
-                reportHours: Number(row.reportHours.toFixed(2)),
-                totalHours: Number(row.totalHours.toFixed(2))
-            }))
+            .map((row) => {
+                const resolvedRate = resolvePayRateForDepartment({
+                    payRates,
+                    activeOrgId,
+                    personId,
+                    roles: personRoles,
+                    departmentId: row.departmentId,
+                    period
+                });
+                return {
+                    ...row,
+                    autoHours: Number(row.autoHours.toFixed(2)),
+                    manualHours: Number(row.manualHours.toFixed(2)),
+                    reportHours: Number(row.reportHours.toFixed(2)),
+                    totalHours: Number(row.totalHours.toFixed(2)),
+                    payRate: resolvedRate ? Number(resolvedRate.hourlyRate.toFixed(2)) : null,
+                    payRateLabel: resolvedRate ? formatHourlyRateLabel(resolvedRate.hourlyRate) : 'N/D',
+                    payRateId: resolvedRate?.payRateId || '',
+                    ratePeriodId: resolvedRate?.ratePeriodId || '',
+                    payRateRole: resolvedRate?.personRole || '',
+                    payRateContractId: resolvedRate?.contractId || ''
+                };
+            })
             .sort((a, b) => String(a.departmentName).localeCompare(String(b.departmentName)));
         const totals = rows.reduce((acc, row) => {
             acc.autoHours += row.autoHours;
@@ -579,7 +688,7 @@ exports.getTimesheetDepartmentSummary = async (req, res) => {
             person: {
                 id: String(person?.id || ''),
                 name: buildPersonName(person),
-                roles: getTimesheetRolesForPersonInOrg(person, activeOrgId)
+                roles: personRoles
             },
             timesheet: {
                 id: effective.timesheet?.id || '',

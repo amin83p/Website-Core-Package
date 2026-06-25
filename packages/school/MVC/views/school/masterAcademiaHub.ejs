@@ -3937,6 +3937,8 @@
 
   const hubTimesheetManagementState = {
     periods: [],
+    years: [],
+    selectedYear: '',
     rows: [],
     period: null
   };
@@ -3945,6 +3947,39 @@
     const num = Number(value || 0);
     if (!Number.isFinite(num)) return '0.00';
     return num.toFixed(2);
+  }
+
+  function getHubTimesheetPeriodYear(period) {
+    const raw = String(period?.startDate || period?.endDate || period?.submissionDeadline || '').trim();
+    const match = raw.match(/^(\d{4})-/);
+    return match ? match[1] : '';
+  }
+
+  function refreshHubTimesheetManagementYears() {
+    const years = Array.from(new Set((Array.isArray(hubTimesheetManagementState.periods) ? hubTimesheetManagementState.periods : [])
+      .map(getHubTimesheetPeriodYear)
+      .filter(Boolean)))
+      .sort(function (a, b) { return String(b).localeCompare(String(a)); });
+    hubTimesheetManagementState.years = years;
+    if (!years.length) {
+      hubTimesheetManagementState.selectedYear = '';
+      return;
+    }
+    if (!hubTimesheetManagementState.selectedYear || !years.includes(String(hubTimesheetManagementState.selectedYear))) {
+      const currentYear = String(new Date().getFullYear());
+      hubTimesheetManagementState.selectedYear = years.includes(currentYear) ? currentYear : years[0];
+    }
+  }
+
+  function renderHubTimesheetManagementYearOptions() {
+    const select = document.getElementById('hubTimesheetManagementYear');
+    if (!select) return;
+    const years = Array.isArray(hubTimesheetManagementState.years) ? hubTimesheetManagementState.years : [];
+    select.innerHTML = years.length
+      ? years.map(function (year) {
+        return '<option value="' + escapeHtml(year) + '"' + (String(year) === String(hubTimesheetManagementState.selectedYear) ? ' selected' : '') + '>' + escapeHtml(year) + '</option>';
+      }).join('')
+      : '<option value="">No years available</option>';
   }
 
   function timesheetManagementStatusBadgeClass(status) {
@@ -3982,10 +4017,15 @@
   }
 
   function renderHubTimesheetManagementPeriodOptions() {
+    renderHubTimesheetManagementYearOptions();
     const select = document.getElementById('hubTimesheetManagementPeriodId');
     if (!select) return;
     const current = String(select.value || '');
-    const periods = Array.isArray(hubTimesheetManagementState.periods) ? hubTimesheetManagementState.periods : [];
+    const selectedYear = String(hubTimesheetManagementState.selectedYear || '');
+    const periods = (Array.isArray(hubTimesheetManagementState.periods) ? hubTimesheetManagementState.periods : [])
+      .filter(function (period) {
+        return !selectedYear || getHubTimesheetPeriodYear(period) === selectedYear;
+      });
     select.innerHTML = '<option value="">Select a timesheet period...</option>' + periods.map(function (period) {
       const id = String(period.id || '');
       const dateWindow = [formatHubTimesheetDate(period.startDate), formatHubTimesheetDate(period.endDate)]
@@ -3996,6 +4036,10 @@
     }).join('');
     if (current && periods.some(function (period) { return String(period.id || '') === current; })) {
       select.value = current;
+    } else if (current) {
+      select.value = '';
+      hubTimesheetManagementState.period = null;
+      hubTimesheetManagementState.rows = [];
     }
   }
 
@@ -4053,7 +4097,7 @@
       const openUrl = row.openUrl || ('/school/timesheets/editor/' + encodeURIComponent(hubTimesheetManagementState.period.id || '') + '?teacherId=' + encodeURIComponent(row.personId || ''));
       return [
         '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
-        '<td class="ps-3"><div class="fw-semibold">' + escapeHtml(row.name || row.personId || 'Unknown Person') + '</div><div class="small text-muted">#' + escapeHtml(row.personId || '-') + (row.email ? ' · ' + escapeHtml(row.email) : '') + '</div></td>',
+        '<td class="ps-3"><div class="fw-semibold">' + escapeHtml(row.name || row.personId || 'Unknown Person') + '</div><div class="small text-muted">#' + escapeHtml(row.personId || '-') + (row.email ? ' - ' + escapeHtml(row.email) : '') + '</div></td>',
         '<td>' + renderTimesheetManagementRoleBadges(row.roles) + '</td>',
         '<td><span class="text-muted">' + escapeHtml(row.departmentHint || 'No Department / Manual') + '</span></td>',
         '<td><span class="badge ' + timesheetManagementStatusBadgeClass(row.status) + '">' + escapeHtml(toHubTitleCase(row.status || 'not_started')) + '</span></td>',
@@ -4102,16 +4146,17 @@
       '</div>',
       '<div class="hub-workspace-toolbar">',
       '<div class="row g-3 align-items-end">',
-      '<div class="col-lg-4">',
-      '<label class="form-label small fw-semibold" for="hubTimesheetManagementPeriodSearch">Find Period</label>',
-      '<div class="input-group input-group-sm">',
-      '<input type="search" class="form-control" id="hubTimesheetManagementPeriodSearch" placeholder="Search periods...">',
-      '<button type="button" class="btn btn-primary" id="hubTimesheetManagementFindPeriods"><i class="bi bi-search me-1"></i>Search</button>',
-      '</div>',
+      '<div class="col-lg-2">',
+      '<label class="form-label small fw-semibold" for="hubTimesheetManagementYear">Year</label>',
+      '<select class="form-select form-select-sm" id="hubTimesheetManagementYear"><option value="">Loading years...</option></select>',
       '</div>',
       '<div class="col-lg-4">',
-      '<label class="form-label small fw-semibold" for="hubTimesheetManagementPeriodId">Timesheet Period</label>',
+      '<label class="form-label small fw-semibold" for="hubTimesheetManagementPeriodId">Timesheet Periods In Selected Year</label>',
       '<select class="form-select form-select-sm" id="hubTimesheetManagementPeriodId"><option value="">Select a timesheet period...</option></select>',
+      '</div>',
+      '<div class="col-lg-2">',
+      '<label class="form-label small fw-semibold" for="hubTimesheetManagementStatusFilter">Timesheet Status</label>',
+      '<select class="form-select form-select-sm" id="hubTimesheetManagementStatusFilter"><option value="">All statuses</option><option value="not_started">Not Started</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="processed">Processed</option></select>',
       '</div>',
       '<div class="col-lg-2">',
       '<label class="form-label small fw-semibold" for="hubTimesheetManagementPersonSearch">Search Loaded Roster</label>',
@@ -4146,7 +4191,7 @@
   function renderTimesheetManagementSummaryModal() {
     return [
       '<div class="modal fade" id="hubTimesheetManagementSummaryModal" tabindex="-1" aria-hidden="true">',
-      '<div class="modal-dialog modal-lg modal-dialog-scrollable">',
+      '<div class="modal-dialog modal-xl modal-dialog-scrollable">',
       '<div class="modal-content">',
       '<div class="modal-header bg-primary text-white">',
       '<div><h5 class="modal-title fw-bold">Department Hours Summary</h5><div class="small opacity-75" id="hubTimesheetManagementSummarySubtitle"></div></div>',
@@ -4163,23 +4208,26 @@
   }
 
   function bindTimesheetManagementWorkspaceControls() {
-    const findButton = document.getElementById('hubTimesheetManagementFindPeriods');
-    const periodSearch = document.getElementById('hubTimesheetManagementPeriodSearch');
+    const yearSelect = document.getElementById('hubTimesheetManagementYear');
     const loadButtons = [
       document.getElementById('hubTimesheetManagementLoadRoster'),
       document.getElementById('hubTimesheetManagementLoadRosterAlt')
     ].filter(Boolean);
     const personSearch = document.getElementById('hubTimesheetManagementPersonSearch');
+    const statusFilter = document.getElementById('hubTimesheetManagementStatusFilter');
     const clearButton = document.getElementById('hubTimesheetManagementClear');
     const host = document.getElementById('hubTimesheetManagementRosterHost');
 
-    if (findButton) findButton.addEventListener('click', function () { loadHubTimesheetManagementPeriods(); });
-    if (periodSearch) {
-      periodSearch.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          loadHubTimesheetManagementPeriods();
-        }
+    if (yearSelect) {
+      yearSelect.addEventListener('change', function () {
+        hubTimesheetManagementState.selectedYear = String(yearSelect.value || '');
+        hubTimesheetManagementState.rows = [];
+        hubTimesheetManagementState.period = null;
+        const personSearchInput = document.getElementById('hubTimesheetManagementPersonSearch');
+        if (personSearchInput) personSearchInput.value = '';
+        renderHubTimesheetManagementPeriodOptions();
+        renderTimesheetManagementRows(true);
+        updateTimesheetManagementMeta();
       });
     }
     loadButtons.forEach(function (button) {
@@ -4190,6 +4238,14 @@
         renderTimesheetManagementRows(false);
       });
     }
+    if (statusFilter) {
+      statusFilter.addEventListener('change', function () {
+        hubTimesheetManagementState.rows = [];
+        hubTimesheetManagementState.period = null;
+        renderTimesheetManagementRows(true);
+        updateTimesheetManagementMeta();
+      });
+    }
     if (clearButton) {
       clearButton.addEventListener('click', function () {
         hubTimesheetManagementState.rows = [];
@@ -4197,6 +4253,7 @@
         const periodSelect = document.getElementById('hubTimesheetManagementPeriodId');
         if (periodSelect) periodSelect.value = '';
         if (personSearch) personSearch.value = '';
+        if (statusFilter) statusFilter.value = '';
         renderTimesheetManagementRows(true);
       });
     }
@@ -4214,20 +4271,19 @@
 
   async function loadHubTimesheetManagementPeriods(options) {
     const quiet = options && options.quiet === true;
-    const search = String(document.getElementById('hubTimesheetManagementPeriodSearch')?.value || '').trim();
     const params = new URLSearchParams();
-    if (search) params.set('q', search);
-    params.set('limit', '50');
+    params.set('limit', '1000');
     try {
       if (!quiet && typeof window.showLoading === 'function') window.showLoading('Loading timesheet periods...');
       const result = await fetchHubTimesheetManagementJson('/school/timesheets/manage/api/periods?' + params.toString());
       hubTimesheetManagementState.periods = Array.isArray(result.results)
         ? result.results
         : (Array.isArray(result.data) ? result.data : []);
+      refreshHubTimesheetManagementYears();
       renderHubTimesheetManagementPeriodOptions();
       updateTimesheetManagementMeta();
     } catch (error) {
-      await showHubMessage({ title: 'Timesheet Period Search Failed', icon: 'error', message: error.message || 'Unable to load timesheet periods.', buttons: [{ text: 'Close', class: 'btn-danger' }] });
+      await showHubMessage({ title: 'Timesheet Period Load Failed', icon: 'error', message: error.message || 'Unable to load timesheet periods.', buttons: [{ text: 'Close', class: 'btn-danger' }] });
     } finally {
       if (!quiet && typeof window.hideLoading === 'function') window.hideLoading({ force: true });
     }
@@ -4241,7 +4297,10 @@
     }
     try {
       if (typeof window.showLoading === 'function') window.showLoading('Loading timesheet roster...');
-      const result = await fetchHubTimesheetManagementJson('/school/timesheets/manage/api/roster?periodId=' + encodeURIComponent(periodId));
+      const rosterParams = new URLSearchParams({ periodId });
+      const requestedStatus = String(document.getElementById('hubTimesheetManagementStatusFilter')?.value || '').trim();
+      if (requestedStatus) rosterParams.set('timesheetStatus', requestedStatus);
+      const result = await fetchHubTimesheetManagementJson('/school/timesheets/manage/api/roster?' + rosterParams.toString());
       hubTimesheetManagementState.period = result.period || { id: periodId };
       hubTimesheetManagementState.rows = Array.isArray(result.rows) ? result.rows : [];
       renderTimesheetManagementRows(false);
@@ -4258,7 +4317,7 @@
     const modalEl = document.getElementById('hubTimesheetManagementSummaryModal');
     const subtitle = document.getElementById('hubTimesheetManagementSummarySubtitle');
     const content = document.getElementById('hubTimesheetManagementSummaryContent');
-    if (subtitle) subtitle.textContent = String(personName || personId) + ' · ' + String(hubTimesheetManagementState.period?.name || periodId);
+    if (subtitle) subtitle.textContent = String(personName || personId) + ' - ' + String(hubTimesheetManagementState.period?.name || periodId);
     if (content) content.innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading summary...</div>';
     if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).show();
     try {
@@ -4288,6 +4347,7 @@
         '<td>' + escapeHtml(formatHubTimesheetHours(row.manualHours)) + '</td>',
         '<td>' + escapeHtml(formatHubTimesheetHours(row.reportTaskHours || row.reportHours)) + '</td>',
         '<td>' + escapeHtml(String(row.entryCount || row.count || 0)) + '</td>',
+        '<td class="fw-semibold">' + escapeHtml(row.payRateLabel || 'N/D') + '</td>',
         '<td class="fw-bold pe-3">' + escapeHtml(formatHubTimesheetHours(row.totalHours || row.hours)) + '</td>',
         '</tr>'
       ].join('');
@@ -4295,7 +4355,7 @@
     content.innerHTML = [
       '<div class="hub-table-wrap">',
       '<table class="table table-sm table-hover align-middle hub-workspace-table mb-0">',
-      '<thead><tr><th class="ps-3">Department</th><th>Auto Hours</th><th>Manual Hours</th><th>Report Task Hours</th><th>Entries</th><th class="pe-3">Total Hours</th></tr></thead>',
+      '<thead><tr><th class="ps-3">Department</th><th>Auto Hours</th><th>Manual Hours</th><th>Report Task Hours</th><th>Entries</th><th>Pay Rate</th><th class="pe-3">Total Hours</th></tr></thead>',
       '<tbody>', body, '</tbody>',
       '</table>',
       '</div>'

@@ -17,10 +17,6 @@
 }) %>
 
 <style>
-  .timesheet-manage-toolbar {
-    background: linear-gradient(135deg, #f8fbff 0%, #eef6f2 100%);
-    border: 1px solid rgba(21, 87, 36, 0.12);
-  }
   .timesheet-role-pill {
     letter-spacing: .02em;
   }
@@ -32,40 +28,50 @@
   }
 </style>
 
-<div class="card border-0 shadow-sm mb-4 timesheet-manage-toolbar">
-  <div class="card-body">
-    <div class="row g-3 align-items-end">
-      <div class="col-12 col-lg-5">
-        <label for="periodSelect" class="form-label fw-bold small mb-1">
-          <i class="bi bi-calendar-week me-1"></i> Timesheet Period
-        </label>
-        <select id="periodSelect" class="form-select border-secondary shadow-sm">
-          <option value="">Select a period...</option>
-          <% (periods || []).forEach((period) => { %>
-            <option value="<%= period.id %>">
-              <%= period.name %> | <%= period.startDate %> to <%= period.endDate %> | <%= String(period.status || '').toUpperCase() %>
-            </option>
-          <% }) %>
-        </select>
-      </div>
-      <div class="col-12 col-lg-3">
-        <label for="personSearch" class="form-label fw-bold small mb-1">
-          <i class="bi bi-search me-1"></i> Search Loaded Rows
-        </label>
-        <input type="search" id="personSearch" class="form-control border-secondary shadow-sm" placeholder="Search name, id, role, status...">
-      </div>
-      <div class="col-12 col-lg-4 d-flex flex-wrap gap-2">
-        <button type="button" id="btnLoadRoster" class="btn btn-success btn-filled px-4">
-          <i class="bi bi-cloud-download me-1"></i> Load Timesheets
-        </button>
-        <button type="button" id="btnClearRoster" class="btn btn-outline-secondary">
-          <i class="bi bi-x-circle me-1"></i> Clear
-        </button>
-      </div>
+<div class="d-flex align-items-end flex-wrap gap-3 mb-4 p-3 bg-light border rounded shadow-sm">
+  <div style="min-width: 320px; max-width: 540px; flex: 1 1 360px;">
+    <label for="periodDisplay" class="form-label fw-bold small mb-1">
+      <i class="bi bi-calendar-week me-1"></i> Timesheet Period
+    </label>
+    <div class="input-group shadow-sm">
+      <input type="hidden" id="periodSelect" value="">
+      <input type="text" id="periodDisplay" class="form-control size-md bg-white border-secondary" placeholder="Select a timesheet period..." readonly>
+      <button type="button" id="btnPickPeriod" class="btn btn-primary btn-filled" title="Select Timesheet Period">
+        <i class="bi bi-search"></i>
+      </button>
+      <button type="button" id="btnClearPeriod" class="btn btn-outline-secondary border-secondary" title="Clear Period">
+        <i class="bi bi-x-lg"></i>
+      </button>
     </div>
-    <div id="periodMeta" class="small text-muted mt-3">
-      Pick a timesheet period, then load the active teacher/staff roster for your active organization.
-    </div>
+  </div>
+  <div style="min-width: 220px; flex: 0 1 240px;">
+    <label for="timesheetStatusFilter" class="form-label fw-bold small mb-1">
+      <i class="bi bi-funnel me-1"></i> Timesheet Status
+    </label>
+    <select id="timesheetStatusFilter" class="form-select size-md border-secondary shadow-sm">
+      <option value="">All statuses</option>
+      <option value="not_started">Not Started</option>
+      <option value="draft">Draft</option>
+      <option value="submitted">Submitted</option>
+      <option value="processed">Processed</option>
+    </select>
+  </div>
+  <div style="min-width: 260px; flex: 1 1 260px;">
+    <label for="personSearch" class="form-label fw-bold small mb-1">
+      <i class="bi bi-search me-1"></i> Search Loaded Rows
+    </label>
+    <input type="search" id="personSearch" class="form-control size-md border-secondary shadow-sm" placeholder="Search name, id, role, status...">
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <button type="button" id="btnLoadRoster" class="btn btn-success btn-filled btn-md">
+      <i class="bi bi-cloud-download me-1"></i> Load Timesheets
+    </button>
+    <button type="button" id="btnClearRoster" class="btn btn-outline-secondary btn-md">
+      <i class="bi bi-x-circle me-1"></i> Clear
+    </button>
+  </div>
+  <div id="periodMeta" class="small text-muted w-100">
+    Pick a timesheet period, then load the active teacher/staff roster for your active organization.
   </div>
 </div>
 
@@ -123,13 +129,18 @@
 
 <span id="urlRef" data-id="school/timesheets/manage" hidden></span>
 <%- include('partials/tablePages-end') %>
+<%- include('partials/modal_GenericPicker', { user }) %>
 
 <script>
 (function () {
   const periodSelect = document.getElementById('periodSelect');
+  const periodDisplay = document.getElementById('periodDisplay');
+  const btnPickPeriod = document.getElementById('btnPickPeriod');
+  const btnClearPeriod = document.getElementById('btnClearPeriod');
   const btnLoad = document.getElementById('btnLoadRoster');
   const btnClear = document.getElementById('btnClearRoster');
   const personSearch = document.getElementById('personSearch');
+  const timesheetStatusFilter = document.getElementById('timesheetStatusFilter');
   const tbody = document.getElementById('timesheetRosterBody');
   const rosterCount = document.getElementById('rosterCount');
   const periodMeta = document.getElementById('periodMeta');
@@ -244,6 +255,55 @@
     return date === '-' ? '-' : date + ' ' + time;
   }
 
+  function formatPeriodPickerLabel(period) {
+    if (!period) return '';
+    const name = period.name || period.title || period.id || 'Timesheet Period';
+    const windowLabel = period.periodWindowLabel || [period.startDate, period.endDate].filter(Boolean).join(' to ');
+    const status = period.status ? String(period.status).toUpperCase() : '';
+    return [name, windowLabel, status].filter(Boolean).join(' | ');
+  }
+
+  function renderPeriodPickerRow(item) {
+    const name = escapeHtml(item?.name || item?.title || item?.id || 'Timesheet Period');
+    const id = escapeHtml(item?.id || '');
+    const windowLabel = escapeHtml(item?.periodWindowLabel || [item?.startDate, item?.endDate].filter(Boolean).join(' to ') || 'No date window');
+    const deadline = escapeHtml(item?.deadlineLabel || formatPeriodDeadline(item));
+    const status = escapeHtml(String(item?.status || '').toUpperCase() || 'STATUS N/D');
+    return `
+      <div class="d-flex justify-content-between align-items-center w-100 gap-3">
+        <div>
+          <div class="fw-bold text-dark">${name}</div>
+          <div class="small text-muted">${windowLabel}</div>
+          <div class="small text-danger">Deadline: ${deadline}</div>
+        </div>
+        <div class="text-end">
+          <span class="badge bg-light text-secondary border">${status}</span>
+          ${id ? `<div class="small text-muted font-monospace mt-1">${id}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function resetLoadedRoster(message) {
+    loadedRows = [];
+    loadedPeriod = null;
+    if (personSearch) personSearch.value = '';
+    rosterCount.textContent = 'No period loaded yet.';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">' + (message || 'Click <b>Load Timesheets</b> to load this period.') + '</td></tr>';
+  }
+
+  function setSelectedPeriod(period) {
+    const id = String(period?.id || '').trim();
+    if (!id) return;
+    periodSelect.value = id;
+    if (periodDisplay) periodDisplay.value = formatPeriodPickerLabel(period);
+    const deadline = formatPeriodDeadline(period);
+    periodMeta.innerHTML = '<b>' + escapeHtml(period.name || period.title || id) + '</b> | ' +
+      escapeHtml(period.periodWindowLabel || [period.startDate, period.endDate].filter(Boolean).join(' to ')) +
+      (deadline !== '-' ? ' | Deadline: <b class="text-danger">' + escapeHtml(deadline) + '</b>' : '');
+    resetLoadedRoster('Click <b>Load Timesheets</b> to load this period.');
+  }
+
   async function loadRoster() {
     const periodId = String(periodSelect.value || '').trim();
     if (!periodId) {
@@ -257,7 +317,10 @@
     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading eligible timesheets...</td></tr>';
 
     try {
-      const payload = await fetchJson('/school/timesheets/manage/api/roster?periodId=' + encodeURIComponent(periodId));
+      const rosterParams = new URLSearchParams({ periodId });
+      const requestedStatus = String(timesheetStatusFilter?.value || '').trim();
+      if (requestedStatus) rosterParams.set('timesheetStatus', requestedStatus);
+      const payload = await fetchJson('/school/timesheets/manage/api/roster?' + rosterParams.toString());
       loadedRows = Array.isArray(payload.rows) ? payload.rows : [];
       loadedPeriod = payload.period || null;
       if (loadedPeriod) {
@@ -296,6 +359,7 @@
             <th class="text-end">Manual Hours</th>
             <th class="text-end">Report Task Hours</th>
             <th class="text-end">Entries</th>
+            <th class="text-end">Pay Rate</th>
             <th class="text-end">Total</th>
           </tr>
         </thead>
@@ -310,6 +374,7 @@
               <td class="text-end">${Number(row.manualHours || 0).toFixed(2)}</td>
               <td class="text-end">${Number(row.reportHours || 0).toFixed(2)}</td>
               <td class="text-end">${Number(row.entryCount || 0)}</td>
+              <td class="text-end fw-bold">${escapeHtml(row.payRateLabel || 'N/D')}</td>
               <td class="text-end fw-bold text-success">${Number(row.totalHours || 0).toFixed(2)}</td>
             </tr>
           `).join('')}
@@ -321,6 +386,7 @@
             <th class="text-end">${Number(totals.manualHours || 0).toFixed(2)}</th>
             <th class="text-end">${Number(totals.reportHours || 0).toFixed(2)}</th>
             <th class="text-end">${Number(totals.entryCount || 0)}</th>
+            <th class="text-end">-</th>
             <th class="text-end text-success">${Number(totals.totalHours || 0).toFixed(2)}</th>
           </tr>
         </tfoot>
@@ -344,22 +410,38 @@
   }
 
   btnLoad?.addEventListener('click', loadRoster);
-  btnClear?.addEventListener('click', () => {
-    loadedRows = [];
-    loadedPeriod = null;
-    if (periodSelect) periodSelect.value = '';
-    if (personSearch) personSearch.value = '';
-    rosterCount.textContent = 'No period loaded yet.';
-    periodMeta.textContent = 'Pick a timesheet period, then load the active teacher/staff roster for your active organization.';
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Select a period and click <b>Load Timesheets</b>.</td></tr>';
+  btnPickPeriod?.addEventListener('click', async () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      await showMessage({ title: 'Timesheet Period Picker', icon: 'warning', message: 'The period picker is not available on this page. Please refresh and try again.' });
+      return;
+    }
+    const context = (window.GenericPickerContexts && typeof window.GenericPickerContexts.activeOrganizationScope === 'function')
+      ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+      : undefined;
+    window.GenericPicker.open(window.GenericPickerPresets.normalizeConfig({
+      title: 'Select Timesheet Period',
+      icon: 'bi-calendar-week',
+      apiEndpoint: '/school/timesheets/manage/api/periods',
+      placeholder: 'Search periods, or type --- to show all...',
+      searchFields: 'id,name,startDate,endDate,status,submissionDeadline,submissionDeadlineTime',
+      limit: 20,
+      context,
+      renderer: renderPeriodPickerRow,
+      onSelect: setSelectedPeriod
+    }));
   });
+  function clearPeriodAndRoster() {
+    if (periodSelect) periodSelect.value = '';
+    if (periodDisplay) periodDisplay.value = '';
+    if (timesheetStatusFilter) timesheetStatusFilter.value = '';
+    periodMeta.textContent = 'Pick a timesheet period, then load the active teacher/staff roster for your active organization.';
+    resetLoadedRoster('Select a period and click <b>Load Timesheets</b>.');
+  }
+  btnClearPeriod?.addEventListener('click', clearPeriodAndRoster);
+  btnClear?.addEventListener('click', clearPeriodAndRoster);
   personSearch?.addEventListener('input', renderRows);
-  periodSelect?.addEventListener('change', () => {
-    loadedRows = [];
-    loadedPeriod = null;
-    if (personSearch) personSearch.value = '';
-    rosterCount.textContent = 'No period loaded yet.';
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Click <b>Load Timesheets</b> to load this period.</td></tr>';
+  timesheetStatusFilter?.addEventListener('change', () => {
+    if (periodSelect.value) loadRoster();
   });
   tbody?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-summary-person]');
