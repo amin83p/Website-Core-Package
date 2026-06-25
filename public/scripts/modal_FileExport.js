@@ -112,9 +112,10 @@ document.addEventListener('DOMContentLoaded', () => {
       updateStatus('Connecting to server...', 10);
       
       // Prepare Request
-      const baseURL =  document.getElementById('urlRef').dataset.id;
+      const baseURL = String(exportForm.dataset.url || document.getElementById('urlRef')?.dataset?.id || '').trim();
       if(!baseURL) throw new Error('The main/base URL not found.');
-      const targetUrl = `/${baseURL}/export`;
+      const normalizedBaseURL = `/${baseURL.replace(/^\/+/, '').replace(/\/+$/, '')}`;
+      const targetUrl = `${normalizedBaseURL}/export`;
 
       // Convert FormData to JSON object including hidden filters
       const bodyData = Object.fromEntries(formData.entries());
@@ -139,8 +140,17 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || 'Server export failed.');
+        const contentType = String(response.headers.get('Content-Type') || '').toLowerCase();
+        let message = `Server export failed with HTTP ${response.status}.`;
+        if (contentType.includes('application/json')) {
+          const err = await response.json();
+          message = err.message || message;
+        } else {
+          const text = await response.text();
+          const title = text.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim();
+          if (title) message = `${message} ${title}`;
+        }
+        throw new Error(message);
       }
 
       updateStatus('Downloading file...', 90);

@@ -8,6 +8,7 @@ const apiProviderCtrl = require('../controllers/ielts/apiProviderController');
 const aiTokenUsageCtrl = require('../controllers/ielts/aiTokenUsageController');
 
 const { requireAuth } = requireCoreModule('MVC/middleware/authMiddleware');
+const adminApproval = requireCoreModule('MVC/middleware/adminApproval');
 const { requireAccess } = requireCoreModule('MVC/middleware/accessMiddleware');
 const { trackActionState } = requireCoreModule('MVC/middleware/actionStateMiddleware');
 const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
@@ -57,6 +58,9 @@ router.get('/task2microassessment', requireAuth, ctrl.showMicroAssessments); // 
 
 // Also allow standard plural URL for consistency
 router.get('/microAssessments', requireAuth, ctrl.showMicroAssessments);
+
+// Export full filtered micro-assessment data
+router.post('/microAssessments/export', requireAuth, adminApproval, ctrl.exportMicroAssessments);
 
 // New Assessment (Form)
 router.get('/microAssessments/new', requireAuth, ctrl.showAddMicroAssessmentForm);

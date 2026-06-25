@@ -854,6 +854,9 @@
       <button type="button" class="hub-section-segment" data-hub-workspace-section="timesheet-periods">
         <span><i class="bi bi-calendar-week-fill me-1"></i> Timesheet Periods</span>
       </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="timesheet-management">
+        <span><i class="bi bi-table me-1"></i> Timesheet Management</span>
+      </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="leave-requests">
         <span><i class="bi bi-calendar-heart me-1"></i> Leave Requests</span>
       </button>
@@ -1136,6 +1139,7 @@
       classes: '',
       'session-issues': '',
       'timesheet-periods': '',
+      'timesheet-management': '',
       holidays: ''
     },
     holidaysYear: String(new Date().getFullYear())
@@ -1159,6 +1163,12 @@
       endpoint: '/school/master-hub/api/workspace/timesheet-periods',
       sourceUrl: '/school/timesheetPeriods',
       icon: 'bi bi-calendar-week-fill'
+    },
+    'timesheet-management': {
+      label: 'Timesheet Management',
+      endpoint: '/school/master-hub/api/workspace/timesheet-management',
+      sourceUrl: '/school/timesheets/manage',
+      icon: 'bi bi-table'
     },
     holidays: {
       label: 'Holidays',
@@ -3924,6 +3934,374 @@
 
     bindTimesheetPeriodWorkspaceControls();
   }
+
+  const hubTimesheetManagementState = {
+    periods: [],
+    rows: [],
+    period: null
+  };
+
+  function formatHubTimesheetHours(value) {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return '0.00';
+    return num.toFixed(2);
+  }
+
+  function timesheetManagementStatusBadgeClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (['approved', 'processed', 'completed', 'paid'].includes(value)) return 'text-bg-success';
+    if (['submitted', 'review', 'pending_review'].includes(value)) return 'text-bg-info';
+    if (['rejected', 'cancelled', 'void'].includes(value)) return 'text-bg-danger';
+    if (['draft', 'not_started', 'missing'].includes(value)) return 'text-bg-secondary';
+    return 'text-bg-primary';
+  }
+
+  function renderTimesheetManagementRoleBadges(roles) {
+    const list = Array.isArray(roles) ? roles : [];
+    if (!list.length) return '<span class="text-muted small">-</span>';
+    return list.map(function (role) {
+      return '<span class="badge rounded-pill text-bg-light border me-1">' + escapeHtml(toHubTitleCase(role)) + '</span>';
+    }).join('');
+  }
+
+  async function fetchHubTimesheetManagementJson(url) {
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      credentials: 'same-origin'
+    });
+    const result = await response.json().catch(function () {
+      return { status: 'error', message: 'Unable to read the server response.' };
+    });
+    if (!response.ok || result.status !== 'success') {
+      throw new Error(result.message || 'Timesheet Management request failed.');
+    }
+    return result;
+  }
+
+  function renderHubTimesheetManagementPeriodOptions() {
+    const select = document.getElementById('hubTimesheetManagementPeriodId');
+    if (!select) return;
+    const current = String(select.value || '');
+    const periods = Array.isArray(hubTimesheetManagementState.periods) ? hubTimesheetManagementState.periods : [];
+    select.innerHTML = '<option value="">Select a timesheet period...</option>' + periods.map(function (period) {
+      const id = String(period.id || '');
+      const dateWindow = [formatHubTimesheetDate(period.startDate), formatHubTimesheetDate(period.endDate)]
+        .filter(function (item) { return item && item !== '-'; })
+        .join(' to ');
+      const label = String(period.name || period.title || period.id || 'Timesheet Period') + (dateWindow ? ' - ' + dateWindow : '');
+      return '<option value="' + escapeHtml(id) + '"' + (id === current ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    }).join('');
+    if (current && periods.some(function (period) { return String(period.id || '') === current; })) {
+      select.value = current;
+    }
+  }
+
+  function updateTimesheetManagementMeta() {
+    const meta = document.getElementById('hubTimesheetManagementPeriodMeta');
+    const count = document.getElementById('hubTimesheetManagementRosterCount');
+    const period = hubTimesheetManagementState.period || null;
+    const rows = Array.isArray(hubTimesheetManagementState.rows) ? hubTimesheetManagementState.rows : [];
+    if (meta) {
+      meta.innerHTML = period
+        ? [
+          '<span class="badge text-bg-light border me-2">' + escapeHtml(period.name || period.id || 'Selected Period') + '</span>',
+          '<span class="text-muted">Window: ' + escapeHtml(formatHubTimesheetDate(period.startDate)) + ' to ' + escapeHtml(formatHubTimesheetDate(period.endDate)) + '</span>',
+          period.submissionDeadline ? '<span class="text-muted ms-2">Deadline: ' + escapeHtml(formatHubTimesheetDeadline(period)) + '</span>' : ''
+        ].join('')
+        : '<span class="text-muted">Select a period, then load the roster.</span>';
+    }
+    if (count) {
+      count.textContent = rows.length ? rows.length + ' eligible person row(s) loaded.' : 'No roster loaded yet.';
+    }
+  }
+
+  function renderTimesheetManagementRows(notLoaded) {
+    const host = document.getElementById('hubTimesheetManagementRosterHost');
+    if (!host) return;
+    const term = String(document.getElementById('hubTimesheetManagementPersonSearch')?.value || '').trim().toLowerCase();
+    const rows = (Array.isArray(hubTimesheetManagementState.rows) ? hubTimesheetManagementState.rows : []).filter(function (row) {
+      if (!term) return true;
+      const haystack = [
+        row.personId,
+        row.name,
+        row.email,
+        Array.isArray(row.roles) ? row.roles.join(' ') : '',
+        row.departmentHint,
+        row.status,
+        row.timesheetId
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(term);
+    });
+
+    if (notLoaded || !hubTimesheetManagementState.period) {
+      host.innerHTML = '<div class="hub-empty"><div><i class="bi bi-table display-6 d-block mb-3"></i><div class="fw-semibold">Timesheet Management is ready.</div><div class="text-muted small mt-1">Select a timesheet period and click Load Roster to review eligible teachers and staff.</div></div></div>';
+      updateTimesheetManagementMeta();
+      return;
+    }
+
+    if (!rows.length) {
+      host.innerHTML = '<div class="hub-empty"><div><i class="bi bi-search display-6 d-block mb-3"></i><div class="fw-semibold">No roster rows found.</div><div class="text-muted small mt-1">Try clearing the person search or select another period.</div></div></div>';
+      updateTimesheetManagementMeta();
+      return;
+    }
+
+    const body = rows.map(function (row) {
+      const searchText = [row.personId, row.name, row.email, row.departmentHint, row.status, Array.isArray(row.roles) ? row.roles.join(' ') : ''].filter(Boolean).join(' ');
+      const openUrl = row.openUrl || ('/school/timesheets/editor/' + encodeURIComponent(hubTimesheetManagementState.period.id || '') + '?teacherId=' + encodeURIComponent(row.personId || ''));
+      return [
+        '<tr data-hub-workspace-row data-search-text="' + escapeHtml(searchText) + '">',
+        '<td class="ps-3"><div class="fw-semibold">' + escapeHtml(row.name || row.personId || 'Unknown Person') + '</div><div class="small text-muted">#' + escapeHtml(row.personId || '-') + (row.email ? ' · ' + escapeHtml(row.email) : '') + '</div></td>',
+        '<td>' + renderTimesheetManagementRoleBadges(row.roles) + '</td>',
+        '<td><span class="text-muted">' + escapeHtml(row.departmentHint || 'No Department / Manual') + '</span></td>',
+        '<td><span class="badge ' + timesheetManagementStatusBadgeClass(row.status) + '">' + escapeHtml(toHubTitleCase(row.status || 'not_started')) + '</span></td>',
+        '<td><span class="fw-bold">' + escapeHtml(formatHubTimesheetHours(row.totalHours)) + '</span><span class="text-muted small ms-1">hrs</span></td>',
+        '<td class="text-end pe-3"><div class="hub-workspace-actions">',
+        '<a class="btn btn-outline-primary btn-sm" href="' + escapeHtml(openUrl) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open Timesheet</a>',
+        '<button type="button" class="btn btn-outline-secondary btn-sm" data-hub-timesheet-management-summary-person="' + escapeHtml(row.personId || '') + '" data-person-name="' + escapeHtml(row.name || row.personId || 'Person') + '"><i class="bi bi-pie-chart me-1"></i>Department Summary</button>',
+        '</div></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+
+    host.innerHTML = [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table">',
+      '<thead><tr><th class="ps-3">Person</th><th>Roles</th><th>Department Hint</th><th>Status</th><th>Total Hours</th><th class="text-end pe-3">Actions</th></tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+    updateTimesheetManagementMeta();
+  }
+
+  function renderTimesheetManagementWorkspace(payload) {
+    const section = payload.section || {
+      key: 'timesheet-management',
+      label: 'Timesheet Management',
+      icon: 'bi bi-table',
+      sourceUrl: '/school/timesheets/manage'
+    };
+    const notLoaded = payload.notLoaded === true;
+
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Master Hub Section</div>',
+      '<h2 class="h5 mb-1"><i class="' + escapeHtml(section.icon || 'bi bi-table') + ' me-2"></i>' + escapeHtml(section.label || 'Timesheet Management') + '</h2>',
+      '<p class="text-muted mb-0">Select a timesheet period, load eligible teachers and staff, open their timesheets, or review department-hour summaries.</p>',
+      '</div>',
+      '<div class="hub-workspace-actions">',
+      '<button type="button" class="btn btn-outline-primary btn-sm" id="hubTimesheetManagementLoadRoster"><i class="bi bi-arrow-repeat me-1"></i>Load Roster</button>',
+      '<a class="btn btn-outline-secondary btn-sm" href="' + escapeHtml(section.sourceUrl || '/school/timesheets/manage') + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open Full Page</a>',
+      '</div>',
+      '</div>',
+      '<div class="hub-workspace-toolbar">',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-lg-4">',
+      '<label class="form-label small fw-semibold" for="hubTimesheetManagementPeriodSearch">Find Period</label>',
+      '<div class="input-group input-group-sm">',
+      '<input type="search" class="form-control" id="hubTimesheetManagementPeriodSearch" placeholder="Search periods...">',
+      '<button type="button" class="btn btn-primary" id="hubTimesheetManagementFindPeriods"><i class="bi bi-search me-1"></i>Search</button>',
+      '</div>',
+      '</div>',
+      '<div class="col-lg-4">',
+      '<label class="form-label small fw-semibold" for="hubTimesheetManagementPeriodId">Timesheet Period</label>',
+      '<select class="form-select form-select-sm" id="hubTimesheetManagementPeriodId"><option value="">Select a timesheet period...</option></select>',
+      '</div>',
+      '<div class="col-lg-2">',
+      '<label class="form-label small fw-semibold" for="hubTimesheetManagementPersonSearch">Search Loaded Roster</label>',
+      '<input type="search" class="form-control form-control-sm" id="hubTimesheetManagementPersonSearch" placeholder="Name, role, status...">',
+      '</div>',
+      '<div class="col-lg-2 d-flex gap-2">',
+      '<button type="button" class="btn btn-primary btn-sm flex-fill fw-bold" id="hubTimesheetManagementLoadRosterAlt"><i class="bi bi-people-fill me-1"></i>Load</button>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="hubTimesheetManagementClear"><i class="bi bi-arrow-counterclockwise"></i></button>',
+      '</div>',
+      '</div>',
+      '<div class="pt-3 mt-3 border-top">',
+      '<div id="hubTimesheetManagementPeriodMeta" class="small"></div>',
+      '<div id="hubTimesheetManagementRosterCount" class="small text-muted mt-1"></div>',
+      '</div>',
+      '</div>',
+      '<div class="p-3">',
+      '<div id="hubTimesheetManagementRosterHost"></div>',
+      '</div>',
+      renderTimesheetManagementSummaryModal(),
+      '</div>',
+      '</section>'
+    ].join('');
+
+    renderHubTimesheetManagementPeriodOptions();
+    bindTimesheetManagementWorkspaceControls();
+    renderTimesheetManagementRows(notLoaded || !hubTimesheetManagementState.period);
+    if (!hubTimesheetManagementState.periods.length) {
+      loadHubTimesheetManagementPeriods({ quiet: true });
+    }
+  }
+
+  function renderTimesheetManagementSummaryModal() {
+    return [
+      '<div class="modal fade" id="hubTimesheetManagementSummaryModal" tabindex="-1" aria-hidden="true">',
+      '<div class="modal-dialog modal-lg modal-dialog-scrollable">',
+      '<div class="modal-content">',
+      '<div class="modal-header bg-primary text-white">',
+      '<div><h5 class="modal-title fw-bold">Department Hours Summary</h5><div class="small opacity-75" id="hubTimesheetManagementSummarySubtitle"></div></div>',
+      '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>',
+      '</div>',
+      '<div class="modal-body" id="hubTimesheetManagementSummaryContent">',
+      '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading summary...</div>',
+      '</div>',
+      '<div class="modal-footer bg-light"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function bindTimesheetManagementWorkspaceControls() {
+    const findButton = document.getElementById('hubTimesheetManagementFindPeriods');
+    const periodSearch = document.getElementById('hubTimesheetManagementPeriodSearch');
+    const loadButtons = [
+      document.getElementById('hubTimesheetManagementLoadRoster'),
+      document.getElementById('hubTimesheetManagementLoadRosterAlt')
+    ].filter(Boolean);
+    const personSearch = document.getElementById('hubTimesheetManagementPersonSearch');
+    const clearButton = document.getElementById('hubTimesheetManagementClear');
+    const host = document.getElementById('hubTimesheetManagementRosterHost');
+
+    if (findButton) findButton.addEventListener('click', function () { loadHubTimesheetManagementPeriods(); });
+    if (periodSearch) {
+      periodSearch.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          loadHubTimesheetManagementPeriods();
+        }
+      });
+    }
+    loadButtons.forEach(function (button) {
+      button.addEventListener('click', loadHubTimesheetManagementRoster);
+    });
+    if (personSearch) {
+      personSearch.addEventListener('input', function () {
+        renderTimesheetManagementRows(false);
+      });
+    }
+    if (clearButton) {
+      clearButton.addEventListener('click', function () {
+        hubTimesheetManagementState.rows = [];
+        hubTimesheetManagementState.period = null;
+        const periodSelect = document.getElementById('hubTimesheetManagementPeriodId');
+        if (periodSelect) periodSelect.value = '';
+        if (personSearch) personSearch.value = '';
+        renderTimesheetManagementRows(true);
+      });
+    }
+    if (host) {
+      host.addEventListener('click', function (event) {
+        const button = event.target && event.target.closest('[data-hub-timesheet-management-summary-person]');
+        if (!button) return;
+        loadHubTimesheetManagementSummary(
+          button.getAttribute('data-hub-timesheet-management-summary-person') || '',
+          button.getAttribute('data-person-name') || 'Person'
+        );
+      });
+    }
+  }
+
+  async function loadHubTimesheetManagementPeriods(options) {
+    const quiet = options && options.quiet === true;
+    const search = String(document.getElementById('hubTimesheetManagementPeriodSearch')?.value || '').trim();
+    const params = new URLSearchParams();
+    if (search) params.set('q', search);
+    params.set('limit', '50');
+    try {
+      if (!quiet && typeof window.showLoading === 'function') window.showLoading('Loading timesheet periods...');
+      const result = await fetchHubTimesheetManagementJson('/school/timesheets/manage/api/periods?' + params.toString());
+      hubTimesheetManagementState.periods = Array.isArray(result.results)
+        ? result.results
+        : (Array.isArray(result.data) ? result.data : []);
+      renderHubTimesheetManagementPeriodOptions();
+      updateTimesheetManagementMeta();
+    } catch (error) {
+      await showHubMessage({ title: 'Timesheet Period Search Failed', icon: 'error', message: error.message || 'Unable to load timesheet periods.', buttons: [{ text: 'Close', class: 'btn-danger' }] });
+    } finally {
+      if (!quiet && typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+    }
+  }
+
+  async function loadHubTimesheetManagementRoster() {
+    const periodId = String(document.getElementById('hubTimesheetManagementPeriodId')?.value || '').trim();
+    if (!periodId) {
+      await showHubMessage({ title: 'Select A Period', icon: 'warning', message: 'Please select a timesheet period before loading the roster.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      return;
+    }
+    try {
+      if (typeof window.showLoading === 'function') window.showLoading('Loading timesheet roster...');
+      const result = await fetchHubTimesheetManagementJson('/school/timesheets/manage/api/roster?periodId=' + encodeURIComponent(periodId));
+      hubTimesheetManagementState.period = result.period || { id: periodId };
+      hubTimesheetManagementState.rows = Array.isArray(result.rows) ? result.rows : [];
+      renderTimesheetManagementRows(false);
+    } catch (error) {
+      await showHubMessage({ title: 'Roster Load Failed', icon: 'error', message: error.message || 'Unable to load the timesheet roster.', buttons: [{ text: 'Close', class: 'btn-danger' }] });
+    } finally {
+      if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
+    }
+  }
+
+  async function loadHubTimesheetManagementSummary(personId, personName) {
+    const periodId = String(hubTimesheetManagementState.period?.id || document.getElementById('hubTimesheetManagementPeriodId')?.value || '').trim();
+    if (!periodId || !personId) return;
+    const modalEl = document.getElementById('hubTimesheetManagementSummaryModal');
+    const subtitle = document.getElementById('hubTimesheetManagementSummarySubtitle');
+    const content = document.getElementById('hubTimesheetManagementSummaryContent');
+    if (subtitle) subtitle.textContent = String(personName || personId) + ' · ' + String(hubTimesheetManagementState.period?.name || periodId);
+    if (content) content.innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading summary...</div>';
+    if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    try {
+      const url = '/school/timesheets/manage/api/department-summary?periodId=' + encodeURIComponent(periodId) + '&personId=' + encodeURIComponent(personId);
+      const result = await fetchHubTimesheetManagementJson(url);
+      renderHubTimesheetManagementSummary(result);
+    } catch (error) {
+      if (content) content.innerHTML = '<div class="alert alert-danger mb-0">' + escapeHtml(error.message || 'Unable to load department summary.') + '</div>';
+    }
+  }
+
+  function renderHubTimesheetManagementSummary(payload) {
+    const content = document.getElementById('hubTimesheetManagementSummaryContent');
+    if (!content) return;
+    const rows = Array.isArray(payload.rows)
+      ? payload.rows
+      : (Array.isArray(payload.departments) ? payload.departments : []);
+    if (!rows.length) {
+      content.innerHTML = '<div class="hub-empty"><div><i class="bi bi-pie-chart display-6 d-block mb-3"></i><div class="fw-semibold">No department hours found.</div><div class="text-muted small mt-1">This timesheet has no effective hours for department grouping.</div></div></div>';
+      return;
+    }
+    const body = rows.map(function (row) {
+      return [
+        '<tr>',
+        '<td class="ps-3"><div class="fw-semibold">' + escapeHtml(row.departmentName || row.department || row.name || 'No Department / Manual') + '</div><div class="small text-muted">' + escapeHtml(row.departmentId || row.id || '-') + '</div></td>',
+        '<td>' + escapeHtml(formatHubTimesheetHours(row.autoHours)) + '</td>',
+        '<td>' + escapeHtml(formatHubTimesheetHours(row.manualHours)) + '</td>',
+        '<td>' + escapeHtml(formatHubTimesheetHours(row.reportTaskHours || row.reportHours)) + '</td>',
+        '<td>' + escapeHtml(String(row.entryCount || row.count || 0)) + '</td>',
+        '<td class="fw-bold pe-3">' + escapeHtml(formatHubTimesheetHours(row.totalHours || row.hours)) + '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    content.innerHTML = [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-sm table-hover align-middle hub-workspace-table mb-0">',
+      '<thead><tr><th class="ps-3">Department</th><th>Auto Hours</th><th>Manual Hours</th><th>Report Task Hours</th><th>Entries</th><th class="pe-3">Total Hours</th></tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
   function renderHolidayWorkspace(payload) {
     const section = payload.section || {
       key: 'holidays',
@@ -4264,6 +4642,14 @@
         icon: 'bi bi-calendar-week-fill'
       };
     }
+    if (key === 'timesheet-management' && !workspaceSections['timesheet-management']) {
+      workspaceSections['timesheet-management'] = {
+        label: 'Timesheet Management',
+        endpoint: '/school/master-hub/api/workspace/timesheet-management',
+        sourceUrl: '/school/timesheets/manage',
+        icon: 'bi bi-table'
+      };
+    }
     if (key === 'leave-requests' && !workspaceSections['leave-requests']) {
       workspaceSections['leave-requests'] = {
         label: 'Leave Requests',
@@ -4328,6 +4714,8 @@
         renderAttendanceWorkspace(payload);
       } else if (key === 'timesheet-periods') {
         renderTimesheetPeriodWorkspace(payload);
+      } else if (key === 'timesheet-management') {
+        renderTimesheetManagementWorkspace(payload);
       } else if (key === 'leave-requests') {
         renderLeaveRequestWorkspace(payload);
       } else if (key === 'holidays') {
@@ -4461,6 +4849,11 @@
         rows: [],
         total: 0
       });
+      return;
+    }
+
+    if (key === 'timesheet-management') {
+      loadWorkspaceSection(key);
       return;
     }
 

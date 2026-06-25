@@ -14,6 +14,7 @@ const repeatedRunAnalysisService = require('../../services/ielts/repeatedRunAnal
 const calibrationEvaluationService = require('../../services/ielts/calibrationEvaluationService');
 const scoringRunControlService = require('../../services/ielts/scoringRunControlService');
 const { buildDataServiceQuery, inferSearchableFields } = requireCoreModule('MVC/utils/generalTools');
+const { Parser } = require('json2csv');
 const { SECTIONS, OPERATIONS } = requireCoreModule('config/accessConstants');
 const {
     assertCreateOrgContextOrThrow: assertCreateOrgContextOrThrowShared,
@@ -85,6 +86,50 @@ function buildRunCategoryKey(label = '', color = '') {
     const fallbackSlug = slug || 'category';
     if (!normalizedColor) return fallbackSlug;
     return `${fallbackSlug}-${normalizedColor}`.slice(0, 80);
+}
+
+function jsonCell(value) {
+    if (value === undefined || value === null) return '';
+    if (typeof value === 'string') return value;
+    try {
+        return JSON.stringify(value);
+    } catch (_) {
+        return String(value);
+    }
+}
+
+function formatMicroAssessmentCsvRow(item = {}) {
+    const signalSource = item.signal_source && typeof item.signal_source === 'object'
+        ? item.signal_source
+        : {};
+    return {
+        ID: item.id || '',
+        Org_ID: item.orgId || '',
+        Question_Key: item.question_key || '',
+        Title: item.title || '',
+        Band: item.band ?? '',
+        Criterion: item.criterion || '',
+        Prompt_Group: item.prompt_group || '',
+        Signal_Kind: item.signal_kind || signalSource.kind || '',
+        Signal_Signals: jsonCell(item.signal_signals || signalSource.signals || []),
+        Scope: item.scope || '',
+        Paragraph_Role_Constraint: item.paragraphRoleConstraint || item.paragraph_role_constraint || '',
+        Atomic_Question: item.atomic_question || '',
+        Rubric_Anchor: item.rubric_anchor || '',
+        Answer_Type: item.answer_type || '',
+        Expected_Evidence_Type: item.expectedEvidenceType || item.expected_evidence_type || '',
+        Scoring_Mode: item.scoringMode || item.scoring_mode || '',
+        Scored_Answers: jsonCell(item.scoredAnswers || item.scored_answers || []),
+        Not_Scored_Answers: jsonCell(item.notScoredAnswers || item.not_scored_answers || []),
+        Polarity: item.polarity || '',
+        Weight: item.weight ?? '',
+        Feedback_Role: item.feedbackRole || item.feedback_role || '',
+        Active: item.is_active === false ? 'No' : 'Yes',
+        Tags: jsonCell(item.tags || []),
+        Notes: item.notes || '',
+        Created_At: item.createdAt || item.createDateTime || item.audit?.createDateTime || '',
+        Updated_At: item.updatedAt || item.lastUpdateDateTime || item.audit?.lastUpdateDateTime || ''
+    };
 }
 
 function resolveRunCategoryFromSession(item = {}) {
@@ -768,6 +813,49 @@ exports.showMicroAssessments = async (req, res) => {
         return res.status(500).json({ status: 'error', error, message: error.message });
       }
       res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user || null });
+    }
+};
+
+exports.exportMicroAssessments = async (req, res) => {
+    try {
+        const dataQuery = await buildDataServiceQuery(req.body || {}, {
+            allowedExactKeys: ['id', 'criterion', 'prompt_group', 'signal_kind', 'status', 'is_active'],
+            allowedSearchFields: ['id', 'question_key', 'title', 'atomic_question', 'criterion', 'prompt_group', 'signal_kind', 'band'],
+            defaultSearchFields: ['id', 'question_key', 'title', 'atomic_question', 'criterion', 'prompt_group', 'signal_kind', 'band']
+        });
+        delete dataQuery.page;
+        delete dataQuery.limit;
+        delete dataQuery.exportSource;
+        delete dataQuery.exportFormat;
+        delete dataQuery.format;
+        delete dataQuery.filters;
+
+        const assessments = await ieltsService.fetchData('microAssessments', dataQuery, req.user);
+        const format = String(req.body?.format || req.body?.exportFormat || 'csv').trim().toLowerCase();
+        const filenameBase = `ielts_micro_assessments_export_${new Date().toISOString().slice(0, 10)}`;
+
+        if (format === 'json') {
+            res.header('Content-Type', 'application/json');
+            res.attachment(`${filenameBase}.json`);
+            return res.send(JSON.stringify(assessments, null, 2));
+        }
+
+        if (format !== 'csv') {
+            return res.status(400).json({ status: 'error', message: 'Invalid export format.' });
+        }
+
+        const rows = assessments.map(formatMicroAssessmentCsvRow);
+        const fields = Object.keys(formatMicroAssessmentCsvRow({}));
+        const csv = new Parser({ fields }).parse(rows);
+        res.header('Content-Type', 'text/csv');
+        res.attachment(`${filenameBase}.csv`);
+        return res.send(csv);
+    } catch (error) {
+        console.error('IELTS micro-assessment export error:', error);
+        return res.status(500).json({
+            status: 'error',
+            message: error.message || 'Failed to export IELTS micro-assessments.'
+        });
     }
 };
 

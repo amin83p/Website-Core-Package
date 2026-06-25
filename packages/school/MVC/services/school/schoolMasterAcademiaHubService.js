@@ -897,6 +897,30 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     };
   }
 
+  if (key === 'timesheet-management') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Timesheet Management',
+      sectionId: SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Timesheet Management.');
+      error.statusCode = 403;
+      throw error;
+    }
+    return {
+      section: {
+        key: 'timesheet-management',
+        label: 'Timesheet Management',
+        icon: 'bi bi-table',
+        sourceUrl: '/school/timesheets/manage'
+      },
+      rows: [],
+      total: 0,
+      filters: {},
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
   if (key === 'leave-requests') {
     const access = await evaluateModuleAccess(req, {
       label: 'Leave Requests',

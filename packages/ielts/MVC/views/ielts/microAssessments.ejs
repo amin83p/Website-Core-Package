@@ -170,7 +170,7 @@
         const modalEl = document.getElementById('importModal');
         if(!modalEl) {
           if(typeof showMessageModal === 'function') {
-              await showMessageModal({ 
+              showMessageModal({
                   title: 'Modal', 
                   icon: 'error', 
                   message: `Modal is not found.`,
@@ -338,7 +338,7 @@
         });
         if(missing){ 
           if(typeof showMessageModal === 'function') {
-              await showMessageModal({ 
+              showMessageModal({
                   title: 'Import Settings', 
                   icon: 'warning', 
                   message:`Please map all required fields.`,
