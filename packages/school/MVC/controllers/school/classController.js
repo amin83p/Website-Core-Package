@@ -4731,7 +4731,10 @@ async function saveSessionStudentCase(req, res) {
             input: req.body || {},
             reqUser: req.user
         });
-        return res.json({ status: 'success', message: 'Student case saved.', case: saved });
+        const message = String(saved?.status || '').toLowerCase() === 'resolved'
+            ? 'Student case saved and resolved.'
+            : 'Student case saved.';
+        return res.json({ status: 'success', message, case: saved });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
     }

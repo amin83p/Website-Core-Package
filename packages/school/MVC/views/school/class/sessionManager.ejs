@@ -930,7 +930,7 @@
                     <div class="col-12"><label class="form-label fw-bold" for="studentCaseDetails">Issue / support details</label><textarea class="form-control" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea></div>
                 </div>
             </div>
-            <div class="modal-footer bg-light"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary fw-bold" id="btnSaveStudentCase"><i class="bi bi-save me-1"></i>Save Case</button></div>
+            <div class="modal-footer bg-light d-flex justify-content-between flex-wrap gap-2"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-outline-success fw-bold" id="btnResolveStudentCase"><i class="bi bi-check2-circle me-1"></i>Save &amp; Resolve</button><button type="button" class="btn btn-primary fw-bold" id="btnSaveStudentCase"><i class="bi bi-save me-1"></i>Save Case</button></div></div>
         </div>
     </div>
 </div>
@@ -1052,6 +1052,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return (Array.isArray(studentCasesState) ? studentCasesState : []).find((row) => String(row.id) === String(id)) || null;
     }
 
+    function setStudentCaseResolveButtonVisible(visible) {
+        const button = document.getElementById('btnResolveStudentCase');
+        if (button) button.classList.toggle('d-none', !visible);
+    }
+
     function resetStudentCaseModal() {
         document.getElementById('studentCaseId').value = '';
         document.getElementById('studentCasePersonId').value = '';
@@ -1059,6 +1064,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('studentCaseSeverity').value = 'info';
         document.getElementById('studentCaseSummary').value = '';
         document.getElementById('studentCaseDetails').value = '';
+        setStudentCaseResolveButtonVisible(true);
     }
 
     function openStudentCaseModal({ personId, studentName, caseRow = null }) {
@@ -1074,6 +1080,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('studentCaseSeverity').value = row.severity || 'info';
         document.getElementById('studentCaseSummary').value = row.summary || '';
         document.getElementById('studentCaseDetails').value = row.details || '';
+        const status = String(row.status || '').trim().toLowerCase();
+        setStudentCaseResolveButtonVisible(!['resolved', 'cancelled'].includes(status));
         if (studentCaseModalInstance) studentCaseModalInstance.show();
     }
 
@@ -1098,15 +1106,17 @@ document.addEventListener('DOMContentLoaded', () => {
         renderStudentCases();
     }
 
-    async function saveStudentCase() {
+    async function saveStudentCase(options = {}) {
         const caseId = document.getElementById('studentCaseId').value;
+        const shouldResolve = options && options.resolve === true;
         const payload = collectStudentCasePayload();
+        if (shouldResolve) payload.status = 'resolved';
         if (!payload.studentPersonId) return showStudentCaseMessage('Student Required', 'Select a student before saving this case.', 'error');
         if (!String(payload.summary || '').trim()) return showStudentCaseMessage('Summary Required', 'Enter a short summary before saving this case.', 'error');
         const url = caseId
             ? `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases/${encodeURIComponent(caseId)}`
             : `/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/cases`;
-        showStudentCaseBusy(caseId ? 'Updating Case' : 'Saving Case', caseId ? 'Updating the student case...' : 'Saving the student case...');
+        showStudentCaseBusy(shouldResolve ? 'Resolving Case' : (caseId ? 'Updating Case' : 'Saving Case'), shouldResolve ? 'Saving changes and resolving the student case...' : (caseId ? 'Updating the student case...' : 'Saving the student case...'));
         try {
             const res = await fetch(url, {
                 method: 'POST',
@@ -1118,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (studentCaseModalInstance) studentCaseModalInstance.hide();
             await refreshStudentCases();
             hideStudentCaseBusy();
-            return showStudentCaseMessage('Case Saved', result.message || 'Student case saved.', 'success');
+            return showStudentCaseMessage(shouldResolve ? 'Case Resolved' : 'Case Saved', result.message || (shouldResolve ? 'Student case saved and resolved.' : 'Student case saved.'), 'success');
         } catch (error) {
             hideStudentCaseBusy();
             throw error;
@@ -1166,6 +1176,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('btnSaveStudentCase')?.addEventListener('click', () => {
         saveStudentCase().catch((error) => showStudentCaseMessage('Save Failed', error.message, 'error'));
+    });
+    document.getElementById('btnResolveStudentCase')?.addEventListener('click', () => {
+        saveStudentCase({ resolve: true }).catch((error) => showStudentCaseMessage('Resolve Failed', error.message, 'error'));
     });
     renderStudentCases();
 

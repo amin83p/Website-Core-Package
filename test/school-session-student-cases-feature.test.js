@@ -35,6 +35,9 @@ test('session manager renders student cases tab, modal, and avoids attendance du
   assert.match(src, /id="session-panel-student-cases"/);
   assert.match(src, /id="studentCaseModal"/);
   assert.match(src, /btn-open-student-case/);
+  assert.match(src, /id="btnResolveStudentCase"/);
+  assert.match(src, /saveStudentCase\(\{ resolve: true \}\)/);
+  assert.match(src, /payload\.status = 'resolved'/);
   assert.doesNotMatch(src, /studentCaseLate/i);
   assert.doesNotMatch(src, /studentCaseAbsent/i);
   assert.doesNotMatch(src, /studentCaseEarly/i);
@@ -108,6 +111,19 @@ test('session student case service creates and resolves source notifications', a
     assert.equal(upsertPayload.sourceType, 'student_session_case');
     assert.equal(upsertPayload.sourceId, 'SSC-1');
 
+    const savedAndResolved = await sessionStudentCaseService.saveCase({
+      classId: 'CLS-1',
+      sessionId: 'SES-1',
+      caseId: 'SSC-1',
+      input: { studentPersonId: 'STU-1', category: 'learning', summary: 'Needs support', details: 'Resolved from modal.', status: 'resolved' },
+      reqUser: user
+    });
+    assert.equal(savedAndResolved.status, 'resolved');
+    assert.equal(savedAndResolved.lifecycle.at(-1).action, 'case_resolved');
+    assert.equal(resolvePayload.sourceType, 'student_session_case');
+    assert.equal(resolvePayload.sourceId, 'SSC-1');
+
+    resolvePayload = null;
     const resolved = await sessionStudentCaseService.updateStatus({
       classId: 'CLS-1',
       sessionId: 'SES-1',

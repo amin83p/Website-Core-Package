@@ -244,9 +244,16 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
   }
 
   const oldStatus = existing?.status || '';
-  const status = existing?.status === 'resolved' ? 'reopened' : (input.status || existing?.status || 'open');
+  const requestedStatus = normalizeCaseStatus(input.status || '');
+  const status = requestedStatus === 'resolved'
+    ? 'resolved'
+    : (existing?.status === 'resolved' ? 'reopened' : (requestedStatus || existing?.status || 'open'));
+  if (!['resolved', 'reopened', 'cancelled', 'open', 'in_progress'].includes(status)) throw new Error('Invalid case status.');
+  const lifecycleAction = status === 'resolved'
+    ? 'case_resolved'
+    : (existing ? (oldStatus === 'resolved' ? 'case_reopened' : 'case_updated') : 'case_created');
   const lifecycleEvent = await enrichActor(buildLifecycleEvent({
-    action: existing ? (oldStatus === 'resolved' ? 'case_reopened' : 'case_updated') : 'case_created',
+    action: lifecycleAction,
     reqUser,
     oldStatus,
     newStatus: status,
@@ -281,7 +288,17 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser }
     ? await schoolRepositories.sessionStudentCases.update(existing.id, payload, normalizeScope(reqUser))
     : await schoolRepositories.sessionStudentCases.create(payload, normalizeScope(reqUser));
 
-  await notificationService.upsertSourceNotification(caseNotificationPayload(saved), reqUser);
+  if (status === 'resolved' || status === 'cancelled') {
+    await notificationService.resolveSourceNotification({
+      orgId: saved.orgId,
+      sourceType: 'student_session_case',
+      sourceId: saved.id,
+      status: 'resolved',
+      note: input.resolutionNote || input.details || input.summary || 'Student session case was resolved.'
+    }, reqUser);
+  } else {
+    await notificationService.upsertSourceNotification(caseNotificationPayload(saved), reqUser);
+  }
   return saved;
 }
 
