@@ -11,6 +11,13 @@ const {
 
 router.use(requireAuth);
 
+const timesheetEditorMutationActionState = {
+  requireToken: true,
+  keepActive: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+};
+
 router.get('/manage',
   requireAccess(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_TIMESHEET_MANAGEMENT, OPERATIONS.READ_ALL),
@@ -43,12 +50,26 @@ router.get('/api/eligible-persons',
 
 router.get('/editor/:periodId',
   requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
   ctrl.viewTimesheet);
+
+router.get('/editor/:periodId/prior-adjustments',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.READ_ALL, { requireToken: false }),
+  ctrl.getPriorAdjustments);
+
+router.post('/editor/:periodId/apply-prior-adjustments',
+  requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, timesheetEditorMutationActionState),
+  ctrl.applyPriorAdjustments);
 
 router.post('/editor/:periodId/save',
   requireAccess(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_TIMESHEETS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.saveTimesheet);
 
 module.exports = router;

@@ -47,6 +47,54 @@ function cleanHours(v, { min = 0, max = 24 } = {}) {
     return Number(n.toFixed(2));
 }
 
+function sanitizeSnapshotEntry(entry) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || entry.isDeleted === true) return null;
+    const sessionId = cleanString(entry.sessionId, { max: 80, allowEmpty: false });
+    if (!sessionId) return null;
+    const row = {
+        sessionId,
+        date: cleanDate(entry.date, { allowEmpty: true }),
+        className: cleanString(entry.className, { max: 200, allowEmpty: true }),
+        classId: cleanString(entry.classId, { max: 64, allowEmpty: true }) || null,
+        hours: cleanHours(entry.hours ?? entry.durationHours ?? 0, { min: 0, max: 24 }),
+        status: cleanString(entry.status, { max: 40, allowEmpty: true }).toLowerCase() || 'manual',
+        isManual: Boolean(entry.isManual)
+    };
+    if (entry.isReportReflection === true || sessionId.startsWith('rptref-')) row.isReportReflection = true;
+    if (entry.isSchoolActivity === true || sessionId.startsWith('act-')) row.isSchoolActivity = true;
+    return row;
+}
+
+function sanitizeSubmissionSnapshot(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const submittedAt = cleanString(input.submittedAt, { max: 40, allowEmpty: false });
+    if (!submittedAt) return null;
+    const sourcePeriodId = cleanId(input.sourcePeriodId, { max: 64, allowEmpty: false });
+    const sourcePeriodName = cleanString(input.sourcePeriodName, { max: 120, allowEmpty: true });
+    if (!sourcePeriodId) return null;
+    const entries = (Array.isArray(input.entries) ? input.entries : [])
+        .map(sanitizeSnapshotEntry)
+        .filter(Boolean);
+    return {
+        submittedAt,
+        sourcePeriodId: String(sourcePeriodId),
+        sourcePeriodName: String(sourcePeriodName || ''),
+        entries
+    };
+}
+
+function sanitizeAdjustmentMeta(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+    return {
+        sourcePeriodId: cleanString(input.sourcePeriodId, { max: 64, allowEmpty: true }),
+        sourceSessionId: cleanString(input.sourceSessionId, { max: 80, allowEmpty: true }),
+        sourceSessionDate: cleanDate(input.sourceSessionDate, { allowEmpty: true }),
+        snapshotHours: cleanHours(input.snapshotHours ?? 0, { min: -24, max: 24 }),
+        currentHours: cleanHours(input.currentHours ?? 0, { min: -24, max: 24 }),
+        deltaHours: cleanHours(input.deltaHours ?? 0, { min: -24, max: 24 })
+    };
+}
+
 function sanitizeEntry(entry) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
         throw new Error('Invalid timesheet entry payload.');
@@ -57,6 +105,7 @@ function sanitizeEntry(entry) {
 
     const isReportReflection = entry.isReportReflection === true || sessionId.startsWith('rptref-');
     const isSchoolActivity = entry.isSchoolActivity === true || sessionId.startsWith('act-');
+    const isPriorPeriodAdjustment = entry.isPriorPeriodAdjustment === true || sessionId.startsWith('adj-');
 
     if (entry.isDeleted === true) {
         return {
@@ -65,7 +114,8 @@ function sanitizeEntry(entry) {
         };
     }
 
-    const hours = cleanHours(entry.hours ?? entry.durationHours ?? 0, { min: 0, max: 24 });
+    const hoursMin = isPriorPeriodAdjustment ? -24 : 0;
+    const hours = cleanHours(entry.hours ?? entry.durationHours ?? 0, { min: hoursMin, max: 24 });
 
     const row = {
         sessionId,
@@ -75,8 +125,12 @@ function sanitizeEntry(entry) {
         hours,
         status: cleanString(entry.status, { max: 40, allowEmpty: true }).toLowerCase() || 'manual',
         comment: cleanString(entry.comment, { max: 1000, allowEmpty: true }),
-        isManual: Boolean(entry.isManual)
+        isManual: Boolean(entry.isManual) || isPriorPeriodAdjustment
     };
+    if (isPriorPeriodAdjustment) {
+        row.isPriorPeriodAdjustment = true;
+        row.adjustmentMeta = sanitizeAdjustmentMeta(entry.adjustmentMeta);
+    }
     if (isReportReflection) row.isReportReflection = true;
     if (isSchoolActivity) {
         row.isSchoolActivity = true;
@@ -120,7 +174,7 @@ function sanitizeTimesheetPayload(input) {
         return sum + (Number(e.hours) || 0);
     }, 0);
 
-    return {
+    const result = {
         orgId: String(orgId),
         periodId: String(periodId),
         teacherId: String(teacherId),
@@ -128,6 +182,18 @@ function sanitizeTimesheetPayload(input) {
         entries,
         totalHours: Number(computedTotal.toFixed(2))
     };
+
+    if (input.submissionSnapshot !== undefined) {
+        const snapshot = sanitizeSubmissionSnapshot(input.submissionSnapshot);
+        if (snapshot) result.submissionSnapshot = snapshot;
+    }
+
+    if (input.priorPeriodAdjustmentsAppliedFrom !== undefined) {
+        const appliedFrom = cleanId(input.priorPeriodAdjustmentsAppliedFrom, { max: 64, allowEmpty: true });
+        if (appliedFrom) result.priorPeriodAdjustmentsAppliedFrom = String(appliedFrom);
+    }
+
+    return result;
 }
 
 async function getAllTimesheets() {
@@ -162,7 +228,7 @@ async function saveTimesheet(data) {
                 throw new Error('Security Violation: orgId mismatch.');
             }
 
-            all[existingIndex] = {
+            const merged = {
                 ...existing,
                 ...sanitized,
                 orgId: existing.orgId || sanitized.orgId,
@@ -171,6 +237,13 @@ async function saveTimesheet(data) {
                     lastUpdateDateTime: new Date().toISOString()
                 }
             };
+            if (sanitized.submissionSnapshot === undefined && existing.submissionSnapshot) {
+                merged.submissionSnapshot = existing.submissionSnapshot;
+            }
+            if (sanitized.priorPeriodAdjustmentsAppliedFrom === undefined && existing.priorPeriodAdjustmentsAppliedFrom) {
+                merged.priorPeriodAdjustmentsAppliedFrom = existing.priorPeriodAdjustmentsAppliedFrom;
+            }
+            all[existingIndex] = merged;
 
             await fs.writeFile(dataPath, JSON.stringify(all, null, 2));
             return all[existingIndex];
@@ -206,6 +279,9 @@ module.exports = {
     getTimesheetById,
     saveTimesheet,
     clearByOrg,
+    sanitizeTimesheetPayload,
+    sanitizeSubmissionSnapshot,
+    sanitizeSnapshotEntry,
     TIMESHEET_STATUSES: Object.freeze([...TIMESHEET_STATUSES])
 };
 

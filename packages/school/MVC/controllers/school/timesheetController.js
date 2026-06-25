@@ -12,6 +12,8 @@ const sessionStatusPolicyService = require('../../services/school/sessionStatusP
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const { buildReportReflectionLiveSessions } = require('../../services/school/reportTimesheetReflectionService');
 const activityService = require('../../services/school/activityService');
+const priorPeriodAdjustmentService = require('../../services/school/timesheetPriorPeriodAdjustmentService');
+const { sanitizeSnapshotEntry } = require('../../models/school/timesheetModel');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 function getActiveOrgIdOrThrow(reqUser) {
@@ -123,10 +125,28 @@ function resolveDepartmentName(departmentId, explicitName, departmentMap) {
 
 function resolveTimesheetEntryHours(entry) {
     if (!entry || entry.isDeleted) return 0;
-    if (entry.isManual) return Number(parseFloat(entry.durationHours) || parseFloat(entry.hours) || 0);
+    if (entry.isManual || entry.isPriorPeriodAdjustment) {
+        return Number(parseFloat(entry.durationHours) || parseFloat(entry.hours) || 0);
+    }
     const formulaHours = Number(entry.timesheetHours);
     if (Number.isFinite(formulaHours)) return Number(formulaHours.toFixed(2));
     return Number(parseFloat(entry.durationHours) || parseFloat(entry.hours) || 0);
+}
+
+function buildSubmissionSnapshot({ normalizedEntries, period, existingTimesheet }) {
+    if (existingTimesheet?.submissionSnapshot?.submittedAt) {
+        return existingTimesheet.submissionSnapshot;
+    }
+    const entries = normalizedEntries
+        .filter((entry) => entry && entry.isDeleted !== true && entry.isPriorPeriodAdjustment !== true)
+        .map((entry) => sanitizeSnapshotEntry(entry))
+        .filter(Boolean);
+    return {
+        submittedAt: new Date().toISOString(),
+        sourcePeriodId: String(period.id),
+        sourcePeriodName: String(period.name || ''),
+        entries
+    };
 }
 
 function normalizeStatusCode(value) {
@@ -887,6 +907,29 @@ exports.viewTimesheet = async (req, res) => {
         const allHolidays = await dataService.fetchData('holidays', {}, req.user);
         const holidays = allHolidays.filter((h) => h.date >= period.startDate && h.date <= period.endDate);
 
+        const isReadOnly = !teacherContext.isAdmin && (
+            timesheet.status === 'submitted' ||
+            timesheet.status === 'processed' ||
+            period.status === 'processed'
+        );
+
+        let priorReviewPending = false;
+        if (!isReadOnly && (timesheet.status === 'draft' || !timesheet.id)) {
+            const prior = await priorPeriodAdjustmentService.findPriorSubmittedTimesheet({
+                teacherId: teacherContext.targetTeacherId,
+                currentPeriod: period,
+                activeOrgId,
+                reqUser: req.user
+            });
+            if (prior) {
+                const alreadyReviewed = Boolean(
+                    timesheet.priorPeriodAdjustmentsAppliedFrom &&
+                    idsEqual(timesheet.priorPeriodAdjustmentsAppliedFrom, prior.priorPeriod.id)
+                );
+                priorReviewPending = !alreadyReviewed;
+            }
+        }
+
         res.render('school/timesheet/timesheetEditor', {
             title: `Timesheet: ${period.name}`,
             period,
@@ -897,10 +940,12 @@ exports.viewTimesheet = async (req, res) => {
             maxSessionHours,
             sessionStatusMeta,
             isAdmin: teacherContext.isAdmin,
+            isReadOnly,
             user: req.user,
             targetTeacherId: teacherContext.targetTeacherId,
             includeModal: true,
-            actionStateId: req.actionStateId
+            actionStateId: req.actionStateId,
+            showPriorAdjustmentReview: priorReviewPending
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -1027,6 +1072,7 @@ exports.saveTimesheet = async (req, res) => {
         if (nextStatus === 'submitted') {
             const hasNonFinalAutoSession = normalizedEntries.some((entry) => {
                 if (!entry || entry.isDeleted || entry.isManual) return false;
+                if (entry.isPriorPeriodAdjustment === true) return false;
                 return entry.isFinalStatus === false;
             });
             if (hasNonFinalAutoSession) {
@@ -1043,6 +1089,18 @@ exports.saveTimesheet = async (req, res) => {
             totalHours: parseFloat(totalHours) || 0
         };
 
+        if (nextStatus === 'submitted') {
+            payload.submissionSnapshot = buildSubmissionSnapshot({
+                normalizedEntries,
+                period,
+                existingTimesheet: existing
+            });
+        }
+
+        if (existing?.priorPeriodAdjustmentsAppliedFrom) {
+            payload.priorPeriodAdjustmentsAppliedFrom = existing.priorPeriodAdjustmentsAppliedFrom;
+        }
+
         if (existing?.id) {
             await dataService.updateData('timesheets', existing.id, payload, req.user);
         } else {
@@ -1058,6 +1116,211 @@ exports.saveTimesheet = async (req, res) => {
     } catch (error) {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
         res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.getPriorAdjustments = async (req, res) => {
+    try {
+        const { periodId } = req.params;
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+
+        const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+        if (!period) throw new Error('Period not found.');
+        assertPeriodOrgAccess(period, activeOrgId, req.user);
+
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.READ_ALL });
+        const existing = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
+
+        const prior = await priorPeriodAdjustmentService.findPriorSubmittedTimesheet({
+            teacherId: teacherContext.targetTeacherId,
+            currentPeriod: period,
+            activeOrgId,
+            reqUser: req.user
+        });
+
+        if (!prior) {
+            return res.json({
+                status: 'success',
+                hasPriorPeriod: false,
+                needsReview: false,
+                adjustments: [],
+                alreadyApplied: false
+            });
+        }
+
+        const alreadyApplied = Boolean(
+            existing?.priorPeriodAdjustmentsAppliedFrom &&
+            idsEqual(existing.priorPeriodAdjustmentsAppliedFrom, prior.priorPeriod.id)
+        );
+
+        const snapshotEntries = priorPeriodAdjustmentService.resolveSnapshotEntries(prior.priorTimesheet);
+        const priorReviewSummary = {
+            entryCount: snapshotEntries.length,
+            totalSnapshotHours: Number(snapshotEntries.reduce((sum, entry) => sum + (Number(entry?.hours) || 0), 0).toFixed(2)),
+            submittedAt: String(prior.priorTimesheet?.submissionSnapshot?.submittedAt || prior.priorTimesheet?.audit?.lastUpdateDateTime || '')
+        };
+
+        let adjustments = [];
+        if (!alreadyApplied) {
+            adjustments = await priorPeriodAdjustmentService.detectAdjustments({
+                priorTimesheet: prior.priorTimesheet,
+                priorPeriod: prior.priorPeriod,
+                currentPeriod: period,
+                teacherId: teacherContext.targetTeacherId,
+                activeOrgId,
+                reqUser: req.user
+            });
+        }
+
+        const existingAdjIds = new Set(
+            (Array.isArray(existing?.entries) ? existing.entries : [])
+                .filter((entry) => entry?.isPriorPeriodAdjustment === true)
+                .map((entry) => String(entry?.sessionId || '').trim())
+                .filter(Boolean)
+        );
+        const pendingAdjustments = adjustments.filter(
+            (adj) => !existingAdjIds.has(String(adj.adjustmentSessionId || '').trim())
+        );
+
+        const needsReview = !alreadyApplied;
+
+        return res.json({
+            status: 'success',
+            hasPriorPeriod: true,
+            needsReview,
+            priorPeriod: {
+                id: String(prior.priorPeriod.id || ''),
+                name: String(prior.priorPeriod.name || ''),
+                startDate: String(prior.priorPeriod.startDate || ''),
+                endDate: String(prior.priorPeriod.endDate || '')
+            },
+            priorReviewSummary,
+            adjustments: pendingAdjustments,
+            alreadyApplied
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.applyPriorAdjustments = async (req, res) => {
+    let guardKey = '';
+    try {
+        const { periodId } = req.params;
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+
+        const teacherContext = await resolveTargetTeacherContext(req, { requireTeacher: true, operationId: OPERATIONS.UPDATE });
+        guardKey = idempotencyGuardService.createGuardKey([
+            'timesheet_apply_prior_adjustments',
+            String(activeOrgId || '').trim(),
+            String(periodId || '').trim(),
+            String(teacherContext?.targetTeacherId || '').trim()
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({
+            key: guardKey,
+            runningTtlMs: 120000,
+            replayTtlMs: 15000
+        });
+        if (sendGuardedResponse(req, res, guardResult, 'Prior-period adjustment apply is already in progress. Please wait.')) return;
+
+        const period = await dataService.getDataById('timesheetPeriods', periodId, req.user);
+        if (!period) throw new Error('Period not found.');
+        assertPeriodOrgAccess(period, activeOrgId, req.user);
+
+        if (period.status === 'processed') {
+            throw new Error('<b>Security Error</b><br>This period has been processed by payroll and is locked.');
+        }
+
+        const existing = await dataService.getTimesheetByPeriodAndTeacher(periodId, teacherContext.targetTeacherId, req.user);
+        if (existing && existing.status === 'submitted') {
+            throw new Error('Cannot apply prior-period adjustments to a submitted timesheet.');
+        }
+
+        const prior = await priorPeriodAdjustmentService.findPriorSubmittedTimesheet({
+            teacherId: teacherContext.targetTeacherId,
+            currentPeriod: period,
+            activeOrgId,
+            reqUser: req.user
+        });
+        if (!prior) throw new Error('No prior submitted timesheet found for adjustment.');
+
+        if (
+            existing?.priorPeriodAdjustmentsAppliedFrom &&
+            idsEqual(existing.priorPeriodAdjustmentsAppliedFrom, prior.priorPeriod.id)
+        ) {
+            const payloadOut = {
+                status: 'success',
+                message: 'Prior-period adjustments were already applied.',
+                entries: existing.entries || []
+            };
+            idempotencyGuardService.completeGuard(guardKey, payloadOut);
+            return res.json(payloadOut);
+        }
+
+        const adjustments = await priorPeriodAdjustmentService.detectAdjustments({
+            priorTimesheet: prior.priorTimesheet,
+            priorPeriod: prior.priorPeriod,
+            currentPeriod: period,
+            teacherId: teacherContext.targetTeacherId,
+            activeOrgId,
+            reqUser: req.user
+        });
+
+        const existingAdjIds = new Set(
+            (Array.isArray(existing?.entries) ? existing.entries : [])
+                .filter((entry) => entry?.isPriorPeriodAdjustment === true)
+                .map((entry) => String(entry?.sessionId || '').trim())
+                .filter(Boolean)
+        );
+        const pendingAdjustments = adjustments.filter(
+            (adj) => !existingAdjIds.has(String(adj.adjustmentSessionId || '').trim())
+        );
+
+        let mergedEntries = Array.isArray(existing?.entries) ? [...existing.entries] : [];
+        if (pendingAdjustments.length > 0) {
+            const adjustmentEntries = priorPeriodAdjustmentService.buildAdjustmentEntries({
+                adjustments: pendingAdjustments,
+                applyDate: period.startDate
+            });
+            mergedEntries = priorPeriodAdjustmentService.mergeAdjustmentEntries(mergedEntries, adjustmentEntries);
+        }
+
+        const totalHours = mergedEntries.reduce((sum, entry) => {
+            if (!entry || entry.isDeleted) return sum;
+            return sum + (Number(entry.hours) || 0);
+        }, 0);
+
+        const payload = {
+            orgId: existing?.orgId || period.orgId || activeOrgId,
+            periodId: String(periodId),
+            teacherId: String(teacherContext.targetTeacherId),
+            status: 'draft',
+            entries: mergedEntries,
+            totalHours: Number(totalHours.toFixed(2)),
+            priorPeriodAdjustmentsAppliedFrom: String(prior.priorPeriod.id)
+        };
+
+        let saved;
+        if (existing?.id) {
+            saved = await dataService.updateData('timesheets', existing.id, payload, req.user);
+        } else {
+            saved = await dataService.addData('timesheets', payload, req.user);
+        }
+
+        const appliedCount = pendingAdjustments.length;
+        const payloadOut = {
+            status: 'success',
+            message: appliedCount > 0
+                ? `Applied ${appliedCount} prior-period adjustment(s).`
+                : 'Prior-period review completed. No adjustments were required.',
+            entries: saved?.entries || mergedEntries,
+            actionStateId: req.actionStateId || null
+        };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(400).json({ status: 'error', message: error.message });
     }
 };
 

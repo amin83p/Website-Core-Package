@@ -49,6 +49,17 @@
         --bs-table-accent-bg: rgba(0,0,0,0.03) !important;
         background-color: rgba(0,0,0,0.03) !important;
     }
+
+    .row-prior-adjustment > * {
+        --bs-table-bg: #fff3cd !important;
+        --bs-table-accent-bg: #fff3cd !important;
+        background-color: #fff3cd !important;
+    }
+    .row-prior-adjustment:hover > * {
+        --bs-table-bg: #ffe8a1 !important;
+        --bs-table-accent-bg: #ffe8a1 !important;
+        background-color: #ffe8a1 !important;
+    }
 </style>
 
 <div class="sections-page">
@@ -182,6 +193,42 @@
 
 <%- include('partials/modal_GenericPicker') %>
 
+<div class="modal fade" id="priorAdjustmentModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-warning-subtle border-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Review Prior Period Adjustments</h5>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2" id="priorAdjustmentIntro">
+          Please review your last submitted timesheet before continuing with this period.
+        </p>
+        <div class="alert alert-light border mb-3 d-none" id="priorAdjustmentSummary"></div>
+        <div class="table-responsive" id="priorAdjustmentTableWrap">
+          <table class="table table-bordered table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Session Date</th>
+                <th>Class / Description</th>
+                <th>Change</th>
+                <th class="text-end">Paid Hrs</th>
+                <th class="text-end">Current Hrs</th>
+                <th class="text-end">Adjustment</th>
+              </tr>
+            </thead>
+            <tbody id="priorAdjustmentTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer bg-light border-0">
+        <button type="button" class="btn btn-outline-secondary" id="btnPriorAdjustmentLater">Review Later</button>
+        <button type="button" class="btn btn-warning fw-bold d-none" id="btnPriorAdjustmentApply">Apply Adjustments</button>
+        <button type="button" class="btn btn-primary fw-bold d-none" id="btnPriorAdjustmentContinue">Continue to Timesheet</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
     const P_START = "<%= period.startDate %>";
     const P_END = "<%= period.endDate %>";
@@ -190,9 +237,21 @@
     const TIMESHEET_ENTRIES = <%- JSON.stringify(timesheet.entries || []) %>;
     const SESSION_STATUS_META = <%- JSON.stringify(sessionStatusMeta || []) %>;
     const IS_READONLY = <%= isReadOnly %>;
+    const IS_ADMIN = <%= isAdmin %>;
+    const SHOW_PRIOR_ADJUSTMENT_REVIEW = <%= showPriorAdjustmentReview ? 'true' : 'false' %>;
+    const PERIOD_ID = "<%= period.id %>";
+    const TARGET_TEACHER_ID = "<%= targetTeacherId %>";
     const MAX_DAILY_HOURS = <%= maxDailyHours || 24 %>;
     const MAX_SESSION_HOURS = <%= maxSessionHours || 12 %>;
-    const ACTION_STATE_ID = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+    let actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+
+    function buildMutationQuery() {
+        const params = new URLSearchParams();
+        if (TARGET_TEACHER_ID) params.set('teacherId', TARGET_TEACHER_ID);
+        if (actionStateId) params.set('actionStateId', actionStateId);
+        const query = params.toString();
+        return query ? `?${query}` : '';
+    }
 </script>
 
 <script>
@@ -287,12 +346,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const isFinalAutoStatus = (entry) => {
         if (!entry || entry.isManual) return true;
+        if (entry.isPriorPeriodAdjustment === true) return true;
         if (entry.isReportReflection === true) return true;
         if (entry.isFinalStatus === true) return true;
         if (entry.isFinalStatus === false) return false;
         return normalizeStatusCode(entry.status) === 'completed';
     };
     const buildStatusBadgeHtml = (entry) => {
+        if (entry?.isPriorPeriodAdjustment === true) {
+            return `<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-arrow-left-right me-1"></i> Prior Period Adjustment</span>`;
+        }
         if (entry?.isManual) {
             return `<span class="badge bg-info text-dark border border-info"><i class="bi bi-person-fill me-1"></i> Manual</span>`;
         }
@@ -339,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
     TIMESHEET_ENTRIES.forEach(e => {
         if (e.isDeleted) {
             deletedAutoSessionIds.push(e.sessionId);
-        } else if (e.isManual) {
+        } else if (e.isManual || e.isPriorPeriodAdjustment) {
             activeEntries.push(e);
         } else {
             savedComments[e.sessionId] = e.comment;
@@ -417,17 +480,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     grandTotalHours += hrs;
 
                     const statusBadge = buildStatusBadgeHtml(ses);
-                    if (!ses.isManual && !isFinalAutoStatus(ses)) {
+                    if (!ses.isManual && !ses.isPriorPeriodAdjustment && !isFinalAutoStatus(ses)) {
                         hasUncompletedSessions = true;
                     }
 
-                    const commentInput = IS_READONLY 
+                    const isPriorAdj = ses.isPriorPeriodAdjustment === true;
+                    const rowClass = isPriorAdj ? `${bgClass} row-hover row-prior-adjustment` : `${bgClass} row-hover`;
+
+                    const commentInput = (IS_READONLY || isPriorAdj)
                         ? `<span class="text-muted fst-italic">${ses.comment || '-'}</span>`
                         : `<input type="text" class="form-control form-control-sm ts-comment border-0 shadow-sm" data-sesid="${ses.sessionId}" placeholder="Notes..." value="${ses.comment || ''}" onchange="updateComment('${ses.sessionId}', this.value)">`;
 
                     let actBtns = '';
                     if (!IS_READONLY) {
-                        if (ses.isManual) {
+                        if (isPriorAdj && !IS_ADMIN) {
+                            actBtns = `<span class="text-muted small"><i class="bi bi-lock-fill"></i></span>`;
+                        } else if (ses.isManual) {
                             actBtns = `<button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit" onclick="openManualModal('${dateStr}', '${ses.sessionId}')"><i class="bi bi-pencil"></i></button>
                                        <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" title="Remove" onclick="removeEntry('${ses.sessionId}')"><i class="bi bi-trash"></i></button>`;
                         } else {
@@ -443,14 +511,19 @@ document.addEventListener('DOMContentLoaded', () => {
                            </td>` 
                         : '';
 
+                    const hoursDisplay = isPriorAdj && hrs < 0 ? hrs.toFixed(2) : hrs.toFixed(2);
+                    const timeLabel = isPriorAdj
+                        ? `<div class="small text-muted">Prior period correction</div><div class="small text-muted">Ref: ${(ses.adjustmentMeta?.sourceSessionDate || ses.date || '').toString()}</div>`
+                        : `<div class="small">${ses.startTime ? `<i class="bi bi-clock"></i> ${ses.startTime} - ${ses.endTime}` : 'Manual Time'}</div><div class="small text-muted">ID: ${(ses.sessionId || '').substring(0,8)}...</div>`;
+
                     tbody.innerHTML += `
-                        <tr class="${bgClass} row-hover">
+                        <tr class="${rowClass}">
                             ${dateCell}
-                            <td><div class="fw-bold text-primary">${ses.className || ''}</div>${ses.isManual && !ses.classId ? '' : `<div class="small text-muted">${ses.classId || ''}</div>`}</td>
-                            <td><div class="small">${ses.startTime ? `<i class="bi bi-clock"></i> ${ses.startTime} - ${ses.endTime}` : 'Manual Time'}</div><div class="small text-muted">ID: ${(ses.sessionId || '').substring(0,8)}...</div></td>
+                            <td><div class="fw-bold text-primary">${ses.className || ''}</div>${ses.isManual && !ses.classId && !isPriorAdj ? '' : `<div class="small text-muted">${ses.classId || ''}</div>`}</td>
+                            <td>${timeLabel}</td>
                             <td>${statusBadge}</td>
                             <td>${commentInput}</td>
-                            <td class="text-end fw-bold align-middle">${hrs.toFixed(2)}</td>
+                            <td class="text-end fw-bold align-middle">${hoursDisplay}</td>
                             ${actHtml}
                         </tr>
                     `;
@@ -531,6 +604,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.openManualModal = function(dateStr, editId = null) {
+        if (editId) {
+            const existing = activeEntries.find(x => x.sessionId === editId);
+            if (existing?.isPriorPeriodAdjustment && !IS_ADMIN) {
+                messageBox({ title: 'Locked Entry', icon: 'warning', message: 'Prior-period adjustment rows cannot be edited.' });
+                return;
+            }
+        }
         document.getElementById('man_date').value = dateStr;
         document.getElementById('man_editSessionId').value = editId || '';
         document.getElementById('man_date_display').innerText = dateStr;
@@ -579,6 +659,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.removeEntry = async function(sesId) {
+        const entry = activeEntries.find(x => x.sessionId === sesId);
+        if (entry?.isPriorPeriodAdjustment && !IS_ADMIN) {
+            await messageBox({ title: 'Locked Entry', icon: 'warning', message: 'Prior-period adjustment rows cannot be removed.' });
+            return;
+        }
         const ok = await confirmAction({
             title: 'Remove Entry',
             message: 'Remove this entry from the timesheet?',
@@ -698,6 +783,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 isManual: e.isManual
             };
             if (e.isReportReflection === true) row.isReportReflection = true;
+            if (e.isPriorPeriodAdjustment === true) {
+                row.isPriorPeriodAdjustment = true;
+                row.adjustmentMeta = e.adjustmentMeta || {};
+            }
             return row;
         });
 
@@ -705,10 +794,10 @@ document.addEventListener('DOMContentLoaded', () => {
             payloadEntries.push({ sessionId: id, isDeleted: true });
         });
 
-        const payload = { status: statusStr, totalHours: grandTotalHours, entries: payloadEntries, actionStateId: ACTION_STATE_ID };
+        const payload = { status: statusStr, totalHours: grandTotalHours, entries: payloadEntries, actionStateId };
 
         try {
-            const res = await fetch(`/school/timesheets/editor/<%= period.id %>/save?teacherId=<%= targetTeacherId %>`, {
+            const res = await fetch(`/school/timesheets/editor/<%= period.id %>/save${buildMutationQuery()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
                 body: JSON.stringify(payload)
@@ -753,6 +842,149 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function formatSignedHours(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '0.00';
+        return (n > 0 ? '+' : '') + n.toFixed(2);
+    }
+
+    function mergeAppliedAdjustmentEntries(savedEntries) {
+        const nonAdjustment = activeEntries.filter((entry) => entry.isPriorPeriodAdjustment !== true);
+        const adjustmentRows = (Array.isArray(savedEntries) ? savedEntries : [])
+            .filter((entry) => entry?.isPriorPeriodAdjustment === true)
+            .map((entry) => ({
+                ...entry,
+                isManual: true,
+                durationHours: entry.hours
+            }));
+        activeEntries = [...nonAdjustment, ...adjustmentRows];
+        deletedAutoSessionIds = deletedAutoSessionIds.filter((id) => !adjustmentRows.some((row) => row.sessionId === id));
+        isEdited = true;
+        renderTable();
+    }
+
+    async function submitPriorReviewAcknowledgement() {
+        const applyRes = await fetch(`/school/timesheets/editor/${PERIOD_ID}/apply-prior-adjustments${buildMutationQuery()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+            body: JSON.stringify({ actionStateId })
+        });
+        const applyResult = await applyRes.json();
+        if (applyResult.status !== 'success') throw new Error(applyResult.message || 'Failed to complete prior-period review.');
+        if (applyResult.actionStateId) actionStateId = String(applyResult.actionStateId);
+        if (Array.isArray(applyResult.entries) && applyResult.entries.length > 0) {
+            mergeAppliedAdjustmentEntries(applyResult.entries);
+        }
+        return applyResult;
+    }
+
+    async function loadPriorAdjustmentsReview() {
+        if (!SHOW_PRIOR_ADJUSTMENT_REVIEW || IS_READONLY) return;
+
+        try {
+            const res = await fetch(`/school/timesheets/editor/${PERIOD_ID}/prior-adjustments${buildMutationQuery()}`, {
+                headers: { 'X-AJAX-Request': 'true' }
+            });
+            const result = await res.json();
+            if (result.status !== 'success' || !result.needsReview) {
+                return;
+            }
+
+            const priorName = result.priorPeriod?.name || 'the previous period';
+            const priorRange = result.priorPeriod
+                ? `${result.priorPeriod.startDate || ''} to ${result.priorPeriod.endDate || ''}`
+                : '';
+            const hasAdjustments = Array.isArray(result.adjustments) && result.adjustments.length > 0;
+            const summary = result.priorReviewSummary || {};
+
+            const intro = document.getElementById('priorAdjustmentIntro');
+            if (intro) {
+                intro.textContent = hasAdjustments
+                    ? `Schedule changes were detected after your submitted timesheet for "${priorName}". Review the adjustments below before continuing.`
+                    : `We reviewed your submitted timesheet for "${priorName}" (${priorRange}). No schedule changes require adjustment for this period.`;
+            }
+
+            const summaryEl = document.getElementById('priorAdjustmentSummary');
+            if (summaryEl) {
+                summaryEl.classList.remove('d-none');
+                summaryEl.innerHTML = `
+                    <div><strong>Prior period:</strong> ${priorName} (${priorRange})</div>
+                    <div class="small text-muted mt-1">Submitted entries reviewed: ${Number(summary.entryCount || 0)} | Paid hours in snapshot: ${Number(summary.totalSnapshotHours || 0).toFixed(2)}</div>
+                `;
+            }
+
+            const tableWrap = document.getElementById('priorAdjustmentTableWrap');
+            const tbodyPrior = document.getElementById('priorAdjustmentTableBody');
+            const applyBtn = document.getElementById('btnPriorAdjustmentApply');
+            const continueBtn = document.getElementById('btnPriorAdjustmentContinue');
+
+            if (hasAdjustments) {
+                if (tableWrap) tableWrap.classList.remove('d-none');
+                tbodyPrior.innerHTML = result.adjustments.map((adj) => `
+                    <tr>
+                        <td>${adj.sourceSessionDate || '-'}</td>
+                        <td>${adj.className || '-'}</td>
+                        <td>${adj.changeSummary || adj.comment || '-'}</td>
+                        <td class="text-end">${Number(adj.snapshotHours || 0).toFixed(2)}</td>
+                        <td class="text-end">${Number(adj.currentHours || 0).toFixed(2)}</td>
+                        <td class="text-end fw-bold ${Number(adj.deltaHours) < 0 ? 'text-danger' : 'text-success'}">${formatSignedHours(adj.deltaHours)}</td>
+                    </tr>
+                `).join('');
+                if (applyBtn) applyBtn.classList.remove('d-none');
+                if (continueBtn) continueBtn.classList.add('d-none');
+            } else {
+                if (tableWrap) tableWrap.classList.add('d-none');
+                if (tbodyPrior) tbodyPrior.innerHTML = '';
+                if (applyBtn) applyBtn.classList.add('d-none');
+                if (continueBtn) continueBtn.classList.remove('d-none');
+            }
+
+            if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+                console.error('Bootstrap modal is unavailable; cannot show prior-period review.');
+                return;
+            }
+
+            const modalEl = document.getElementById('priorAdjustmentModal');
+            const modal = new bootstrap.Modal(modalEl);
+
+            document.getElementById('btnPriorAdjustmentLater').onclick = () => modal.hide();
+
+            const runAcknowledgement = async (buttonEl, successTitle) => {
+                const orig = buttonEl.innerHTML;
+                buttonEl.disabled = true;
+                buttonEl.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+                try {
+                    const applyResult = await submitPriorReviewAcknowledgement();
+                    modal.hide();
+                    await messageBox({
+                        title: successTitle,
+                        icon: 'success',
+                        message: applyResult.message || 'Prior-period review completed.',
+                        okText: 'OK',
+                        okClass: 'btn-success'
+                    });
+                } catch (error) {
+                    await messageBox({ title: 'Error', icon: 'error', message: error.message });
+                } finally {
+                    buttonEl.disabled = false;
+                    buttonEl.innerHTML = orig;
+                }
+            };
+
+            if (applyBtn) {
+                applyBtn.onclick = () => runAcknowledgement(applyBtn, 'Adjustments Applied');
+            }
+            if (continueBtn) {
+                continueBtn.onclick = () => runAcknowledgement(continueBtn, 'Review Complete');
+            }
+
+            modal.show();
+        } catch (error) {
+            console.error('Failed to load prior-period adjustments', error);
+        }
+    }
+
     renderTable();
+    loadPriorAdjustmentsReview();
 });
 </script>
